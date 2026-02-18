@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Data Management - Literature Search Tool{% endblock %}
+{% block content %}
+<section class="page-header">
+    <h1>Data Management</h1>
+    <p class="subtitle">Fetch articles, create embeddings, and cluster your research data.</p>
+</section>
+
+<!-- Section 1: Fetch Articles -->
+<section class="card">
+    <h2>Fetch Articles</h2>
+    <div class="source-selector">
+        <label class="radio-label"><input type="radio" name="source" value="pubmed" checked> PubMed</label>
+        <label class="radio-label"><input type="radio" name="source" value="europepmc"> Europe PMC</label>
+        <label class="radio-label"><input type="radio" name="source" value="clinicaltrials"> ClinicalTrials.gov</label>
+        <label class="radio-label"><input type="radio" name="source" value="openalex"> OpenAlex</label>
+    </div>
+    <div class="form-row">
+        <div class="form-group flex-2">
+            <label>Search Query</label>
+            <input type="text" id="fetch-query" placeholder="e.g., machine learning healthcare">
+        </div>
+        <div class="form-group">
+            <label>Max Results</label>
+            <input type="number" id="fetch-max" value="500" min="10" max="5000" step="50">
+        </div>
+        <div class="form-group" id="email-group">
+            <label>Email</label>
+            <input type="email" id="fetch-email" placeholder="your.email@example.com">
+        </div>
+    </div>
+    <button id="fetch-btn" class="btn btn-primary">Fetch Articles</button>
+    <div id="fetch-status" class="status-indicator"></div>
+</section>
+
+<!-- Section 2: Create Embeddings -->
+<section class="card">
+    <h2>Create Embeddings</h2>
+    <p class="info-text" id="embedding-info">Loading article info...</p>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Embedding Model</label>
+            <select id="embedding-model">
+                <option value="general">general (fastest)</option>
+                <option value="pubmedbert">pubmedbert (biomedical)</option>
+                <option value="biosentbert">biosentbert (medical)</option>
+                <option value="specter">specter (scientific)</option>
+            </select>
+        </div>
+    </div>
+    <button id="embeddings-btn" class="btn btn-primary">Create Embeddings</button>
+    <div id="embeddings-status" class="status-indicator"></div>
+</section>
+
+<!-- Section 3: Cluster Articles -->
+<section class="card">
+    <h2>Cluster Articles</h2>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Number of Clusters</label>
+            <input type="number" id="n-clusters" value="10" min="2" max="50" step="1">
+        </div>
+        <div class="form-group">
+            <label>Method</label>
+            <select id="cluster-method">
+                <option value="kmeans">K-Means</option>
+                <option value="hierarchical">Hierarchical</option>
+            </select>
+        </div>
+    </div>
+    <button id="cluster-btn" class="btn btn-primary">Create Clusters</button>
+    <div id="cluster-status" class="status-indicator"></div>
+
+    <!-- Inline cluster display -->
+    <div id="cluster-list-section" style="display:none;">
+        <hr class="divider">
+        <h3>Current Clusters</h3>
+        <div id="cluster-list"></div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/data_management.js"></script>
+{% endblock %}
