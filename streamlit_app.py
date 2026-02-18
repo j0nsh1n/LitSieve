@@ -222,9 +222,11 @@ elif page == "📊 View Clusters":
                 html_content = f.read()
             st.components.v1.html(html_content, height=550, scrolling=True)
         
-        if os.path.exists(os.path.join(viz_dir, 'similarity_heatmap.png')):
+        if os.path.exists(os.path.join(viz_dir, 'similarity_heatmap.html')):
             st.subheader("Similarity Heatmap")
-            st.image(os.path.join(viz_dir, 'similarity_heatmap.png'))
+            with open(os.path.join(viz_dir, 'similarity_heatmap.html'), 'r', encoding='utf-8') as f:
+                html_content = f.read()
+            st.components.v1.html(html_content, height=750, scrolling=True)
 
 
 # Page: Data Management

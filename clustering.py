@@ -8,9 +8,6 @@ from sklearn.cluster import KMeans, AgglomerativeClustering
 from sklearn.decomposition import PCA
 from collections import Counter
 from typing import List, Dict, Tuple
-import umap
-import matplotlib.pyplot as plt
-import seaborn as sns
 import plotly.graph_objects as go
 import plotly.express as px
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -170,32 +167,20 @@ class ClusterVisualizer:
     """Creates visualizations of clustered articles"""
     
     @staticmethod
-    def reduce_dimensions(embeddings: np.ndarray, method: str = 'umap', n_components: int = 2) -> np.ndarray:
+    def reduce_dimensions(embeddings: np.ndarray, method: str = 'pca', n_components: int = 2) -> np.ndarray:
         """
-        Reduce high-dimensional embeddings to 2D or 3D
-        
+        Reduce high-dimensional embeddings to 2D or 3D using PCA
+
         Args:
             embeddings: High-dimensional embeddings
-            method: 'umap' or 'pca'
+            method: 'pca' (kept for API compatibility)
             n_components: Number of dimensions (2 or 3)
-            
+
         Returns:
             Reduced embeddings
         """
-        print(f"Reducing dimensions using {method}...")
-        
-        if method == 'umap':
-            reducer = umap.UMAP(
-                n_components=n_components,
-                random_state=42,
-                n_neighbors=15,
-                min_dist=0.1
-            )
-        elif method == 'pca':
-            reducer = PCA(n_components=n_components, random_state=42)
-        else:
-            raise ValueError(f"Unknown method: {method}")
-        
+        print(f"Reducing dimensions using PCA...")
+        reducer = PCA(n_components=n_components, random_state=42)
         reduced = reducer.fit_transform(embeddings)
         return reduced
     
@@ -268,43 +253,46 @@ class ClusterVisualizer:
         save_path: str = None
     ):
         """
-        Create heatmap of similarity matrix
-        
+        Create heatmap of similarity matrix using plotly
+
         Args:
             similarity_matrix: Pairwise similarity matrix
             labels: Cluster labels
             max_display: Maximum number of articles to display
-            save_path: Path to save plot
+            save_path: Path to save plot (saves as .html)
         """
         # Limit size for visualization
         n = min(max_display, len(similarity_matrix))
         sim_subset = similarity_matrix[:n, :n]
         labels_subset = labels[:n]
-        
+
         # Sort by cluster for better visualization
         sorted_indices = np.argsort(labels_subset)
         sim_sorted = sim_subset[sorted_indices][:, sorted_indices]
-        
-        # Create heatmap
-        plt.figure(figsize=(12, 10))
-        sns.heatmap(
-            sim_sorted,
-            cmap='RdYlBu_r',
-            vmin=0,
-            vmax=1,
-            square=True,
-            cbar_kws={'label': 'Cosine Similarity'}
+
+        fig = go.Figure(data=go.Heatmap(
+            z=sim_sorted,
+            colorscale='RdYlBu_r',
+            zmin=0,
+            zmax=1,
+            colorbar=dict(title='Cosine Similarity')
+        ))
+
+        fig.update_layout(
+            title=f'Article Similarity Heatmap (First {n} articles, sorted by cluster)',
+            xaxis_title='Article Index',
+            yaxis_title='Article Index',
+            width=800,
+            height=700
         )
-        plt.title(f'Article Similarity Heatmap (First {n} articles, sorted by cluster)')
-        plt.xlabel('Article Index')
-        plt.ylabel('Article Index')
-        plt.tight_layout()
-        
+
         if save_path:
-            plt.savefig(save_path, dpi=300, bbox_inches='tight')
-            print(f"Saved heatmap to {save_path}")
-        
-        return plt.gcf()
+            # Save as .html instead of .png (no kaleido dependency needed)
+            html_path = save_path.replace('.png', '.html')
+            fig.write_html(html_path)
+            print(f"Saved heatmap to {html_path}")
+
+        return fig
     
     @staticmethod
     def plot_cluster_summary(
@@ -359,7 +347,7 @@ if __name__ == "__main__":
     labels = clusterer.fit(sample_embeddings)
     
     # Reduce dimensions
-    embeddings_2d = ClusterVisualizer.reduce_dimensions(sample_embeddings, method='umap')
+    embeddings_2d = ClusterVisualizer.reduce_dimensions(sample_embeddings, method='pca')
     
     print(f"Clustering complete! Labels shape: {labels.shape}")
     print(f"2D embeddings shape: {embeddings_2d.shape}")

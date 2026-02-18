@@ -4,7 +4,6 @@ Creates semantic embeddings for articles using pre-trained models
 """
 
 import numpy as np
-from sentence_transformers import SentenceTransformer
 from typing import List, Dict, Tuple
 from sklearn.metrics.pairwise import cosine_similarity
 from tqdm import tqdm
@@ -34,6 +33,7 @@ class EmbeddingEngine:
     @property
     def model(self):
         if self._model is None:
+            from sentence_transformers import SentenceTransformer
             if self.model_name in self.BIOMEDICAL_MODELS:
                 model_path = self.BIOMEDICAL_MODELS[self.model_name]
             else:
