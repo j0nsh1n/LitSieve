@@ -141,6 +141,14 @@ class ArticleDatabase:
             self.conn.commit()
             print("Schema migration complete.")
 
+    def clear_all(self):
+        """Delete all articles, embeddings, and clusters from the database"""
+        cursor = self.conn.cursor()
+        cursor.execute("DELETE FROM clusters")
+        cursor.execute("DELETE FROM embeddings")
+        cursor.execute("DELETE FROM articles")
+        self.conn.commit()
+
     def insert_articles(self, articles: List[Dict]):
         """
         Insert articles into database

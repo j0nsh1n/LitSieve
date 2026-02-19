@@ -163,6 +163,15 @@ async def api_search_export(
         return JSONResponse(status_code=500, content={"detail": str(e)})
 
 
+@app.post("/api/clear-articles")
+async def api_clear_articles():
+    try:
+        get_pipeline().db.clear_all()
+        return {"status": "success"}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+
+
 @app.post("/api/fetch-articles")
 async def api_fetch(req: FetchRequest):
     try:

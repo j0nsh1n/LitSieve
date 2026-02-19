@@ -86,6 +86,13 @@ async function doSearch() {
     const topK = parseInt(document.getElementById('top-k').value);
     const sortBy = document.getElementById('sort-by').value;
 
+    // Get selected source filter
+    const selectedSources = Array.from(document.querySelectorAll('input[name="search-source"]:checked')).map(cb => cb.value);
+    if (selectedSources.length === 0) {
+        showNotification('Please select at least one source.', 'error');
+        return;
+    }
+
     // Get selected cluster filter
     const clusterSelect = document.getElementById('cluster-filter');
     const clusterFilter = Array.from(clusterSelect.selectedOptions).map(o => parseInt(o.value));
@@ -97,7 +104,8 @@ async function doSearch() {
         query_text: queryText,
         top_k: topK,
         sort_by: sortBy,
-        cluster_filter: clusterFilter.length > 0 ? clusterFilter : null
+        cluster_filter: clusterFilter.length > 0 ? clusterFilter : null,
+        source_filter: selectedSources
     };
 
     try {
@@ -106,8 +114,9 @@ async function doSearch() {
             body: lastSearchParams
         });
 
-        renderResults(data.results);
-        document.getElementById('result-count').textContent = data.total;
+        const filtered = data.results.filter(a => selectedSources.includes(a.source));
+        renderResults(filtered);
+        document.getElementById('result-count').textContent = filtered.length;
         document.getElementById('results-section').style.display = 'block';
     } catch (e) {
         showNotification(`Search failed: ${e.message}`, 'error');
