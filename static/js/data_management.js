@@ -3,10 +3,9 @@
 document.addEventListener('DOMContentLoaded', () => {
     loadPageData();
 
-    // Source radio change
-    document.querySelectorAll('input[name="source"]').forEach(radio => {
-        radio.addEventListener('change', () => {
-            // Email field is useful for PubMed and OpenAlex
+    // Source checkbox change (email field always visible since any source may need it)
+    document.querySelectorAll('input[name="source"]').forEach(checkbox => {
+        checkbox.addEventListener('change', () => {
             const emailGroup = document.getElementById('email-group');
             emailGroup.style.display = 'block';
         });
@@ -36,7 +35,7 @@ async function loadPageData() {
 }
 
 async function doFetch() {
-    const source = document.querySelector('input[name="source"]:checked').value;
+    const sources = Array.from(document.querySelectorAll('input[name="source"]:checked')).map(cb => cb.value);
     const query = document.getElementById('fetch-query').value.trim();
     const maxResults = parseInt(document.getElementById('fetch-max').value);
     const email = document.getElementById('fetch-email').value.trim();
@@ -46,25 +45,53 @@ async function doFetch() {
         return;
     }
 
+    if (sources.length === 0) {
+        showNotification('Please select at least one source.', 'error');
+        return;
+    }
+
     const btn = document.getElementById('fetch-btn');
     setLoading(btn, true);
-    setStatus('fetch-status', `Fetching articles from ${getSourceName(source)}...`, 'info');
 
+    // Clear existing articles before fetching new results
+    setStatus('fetch-status', 'Clearing existing articles...', 'info');
     try {
-        const data = await apiCall('/api/fetch-articles', {
-            method: 'POST',
-            body: { source, query, max_results: maxResults, email: email || null }
-        });
-
-        setStatus('fetch-status', `Fetched ${data.articles_fetched} articles from ${getSourceName(data.source)}.`, 'success');
-        showNotification(`Fetched ${data.articles_fetched} articles!`, 'success');
-        updateNavStats();
-        loadPageData();
+        await apiCall('/api/clear-articles', { method: 'POST' });
     } catch (e) {
-        setStatus('fetch-status', `Error: ${e.message}`, 'error');
-        showNotification(`Fetch failed: ${e.message}`, 'error');
-    } finally {
+        setStatus('fetch-status', `Failed to clear articles: ${e.message}`, 'error');
         setLoading(btn, false);
+        return;
+    }
+
+    let totalFetched = 0;
+    const errors = [];
+
+    for (const source of sources) {
+        setStatus('fetch-status', `Fetching from ${getSourceName(source)}...`, 'info');
+        try {
+            const data = await apiCall('/api/fetch-articles', {
+                method: 'POST',
+                body: { source, query, max_results: maxResults, email: email || null }
+            });
+            totalFetched += data.articles_fetched;
+        } catch (e) {
+            errors.push(`${getSourceName(source)}: ${e.message}`);
+        }
+    }
+
+    setLoading(btn, false);
+    updateNavStats();
+    loadPageData();
+
+    if (errors.length === 0) {
+        setStatus('fetch-status', `Fetched ${totalFetched} articles from ${sources.length} source(s).`, 'success');
+        showNotification(`Fetched ${totalFetched} articles!`, 'success');
+    } else if (errors.length < sources.length) {
+        setStatus('fetch-status', `Fetched ${totalFetched} articles. Errors: ${errors.join('; ')}`, 'warning');
+        showNotification(`Fetched ${totalFetched} articles with some errors.`, 'warning');
+    } else {
+        setStatus('fetch-status', `All fetches failed: ${errors.join('; ')}`, 'error');
+        showNotification('Fetch failed for all selected sources.', 'error');
     }
 }
 

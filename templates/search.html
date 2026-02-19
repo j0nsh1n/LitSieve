@@ -57,6 +57,15 @@
                 <option value="title">Title (A-Z)</option>
             </select>
         </div>
+        <div class="param-group">
+            <label>Sources</label>
+            <div class="source-selector">
+                <label class="radio-label"><input type="checkbox" name="search-source" value="pubmed" checked> PubMed</label>
+                <label class="radio-label"><input type="checkbox" name="search-source" value="europepmc" checked> Europe PMC</label>
+                <label class="radio-label"><input type="checkbox" name="search-source" value="clinicaltrials" checked> ClinicalTrials.gov</label>
+                <label class="radio-label"><input type="checkbox" name="search-source" value="openalex" checked> OpenAlex</label>
+            </div>
+        </div>
         <div class="param-group" id="cluster-filter-group" style="display:none;">
             <label>Filter by Cluster</label>
             <select id="cluster-filter" multiple size="3">
