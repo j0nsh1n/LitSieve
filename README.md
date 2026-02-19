@@ -1,3 +1,12 @@
+---
+title: Health Database Search
+emoji: 📚
+colorFrom: blue
+colorTo: green
+sdk: docker
+app_port: 7860
+---
+
 # Literature Search & Similarity Tool 📚
 
 A powerful tool for finding similar research papers using semantic search, clustering, and visualization. Built with NLP, embeddings, and machine learning.
