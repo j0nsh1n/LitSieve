@@ -4,7 +4,6 @@ Creates semantic embeddings for articles using pre-trained models
 """
 
 import numpy as np
-from sentence_transformers import SentenceTransformer
 from typing import List, Dict, Tuple
 from sklearn.metrics.pairwise import cosine_similarity
 from tqdm import tqdm
@@ -23,20 +22,26 @@ class EmbeddingEngine:
 
     def __init__(self, model_name: str = 'general'):
         """
-        Initialize embedding model
+        Initialize embedding model (lazy-loaded on first use)
 
         Args:
             model_name: Name of model to use (pubmedbert, biosentbert, specter, or general)
         """
-        if model_name in self.BIOMEDICAL_MODELS:
-            model_path = self.BIOMEDICAL_MODELS[model_name]
-        else:
-            model_path = model_name  # Allow custom model paths
-
-        print(f"Loading model: {model_path}")
-        self.model = SentenceTransformer(model_path)
         self.model_name = model_name
-        print("Model loaded successfully")
+        self._model = None
+
+    @property
+    def model(self):
+        if self._model is None:
+            from sentence_transformers import SentenceTransformer
+            if self.model_name in self.BIOMEDICAL_MODELS:
+                model_path = self.BIOMEDICAL_MODELS[self.model_name]
+            else:
+                model_path = self.model_name
+            print(f"Loading model: {model_path}")
+            self._model = SentenceTransformer(model_path)
+            print("Model loaded successfully")
+        return self._model
 
     def embed_articles(self, articles: List[Dict], batch_size: int = 32) -> Dict[Tuple[str, str], np.ndarray]:
         """

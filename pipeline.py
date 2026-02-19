@@ -192,7 +192,7 @@ class LiteratureSearchPipeline:
             articles_by_cluster[label].append(article)
 
         print("Creating 2D visualization...")
-        embeddings_2d = ClusterVisualizer.reduce_dimensions(matched_embeddings, method='umap', n_components=2)
+        embeddings_2d = ClusterVisualizer.reduce_dimensions(matched_embeddings, method='pca', n_components=2)
 
         fig_2d = ClusterVisualizer.plot_2d_clusters(
             embeddings_2d,
@@ -215,7 +215,7 @@ class LiteratureSearchPipeline:
             similarity_matrix,
             labels,
             max_display=100,
-            save_path=os.path.join(output_dir, 'similarity_heatmap.png')
+            save_path=os.path.join(output_dir, 'similarity_heatmap.html')
         )
 
         print(f"Visualizations saved to {output_dir}")

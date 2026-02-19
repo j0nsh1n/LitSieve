@@ -20,7 +20,14 @@ app = FastAPI(title="Literature Search Tool")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
-pipeline = LiteratureSearchPipeline(db_path="articles.db", embedding_model="general")
+pipeline = None
+
+
+def get_pipeline():
+    global pipeline
+    if pipeline is None:
+        pipeline = LiteratureSearchPipeline(db_path="articles.db", embedding_model="general")
+    return pipeline
 
 
 # --- Pydantic models ---
@@ -79,7 +86,7 @@ async def statistics_page(request: Request):
 @app.post("/api/search")
 async def api_search(req: SearchRequest):
     try:
-        results = pipeline.search_similar(req.query_text, top_k=req.top_k)
+        results = get_pipeline().search_similar(req.query_text, top_k=req.top_k)
 
         for article in results:
             article['pico'] = PICOExtractor.extract_pico(article.get('abstract', ''))
@@ -108,7 +115,7 @@ async def api_search_export(
     format: str = "csv"
 ):
     try:
-        results = pipeline.search_similar(query_text, top_k=top_k)
+        results = get_pipeline().search_similar(query_text, top_k=top_k)
 
         cluster_ids = [int(x) for x in cluster_filter.split(",") if x.strip()] if cluster_filter else None
         if cluster_ids:
@@ -159,7 +166,7 @@ async def api_search_export(
 @app.post("/api/fetch-articles")
 async def api_fetch(req: FetchRequest):
     try:
-        articles = pipeline.fetch_articles(
+        articles = get_pipeline().fetch_articles(
             query=req.query, max_results=req.max_results,
             email=req.email or "user@example.com", source=req.source
         )
@@ -171,12 +178,12 @@ async def api_fetch(req: FetchRequest):
 @app.post("/api/create-embeddings")
 async def api_create_embeddings(req: EmbeddingsRequest):
     try:
-        global pipeline
-        if req.model != pipeline.embedding_model_name:
-            pipeline.embedding_engine = EmbeddingEngine(req.model)
-            pipeline.embedding_model_name = req.model
-        pipeline.create_embeddings()
-        stats = pipeline.get_statistics()
+        p = get_pipeline()
+        if req.model != p.embedding_model_name:
+            p.embedding_engine = EmbeddingEngine(req.model)
+            p.embedding_model_name = req.model
+        p.create_embeddings()
+        stats = p.get_statistics()
         return {"status": "success", "articles_processed": stats['articles_with_embeddings']}
     except Exception as e:
         return JSONResponse(status_code=500, content={"detail": str(e)})
@@ -185,8 +192,8 @@ async def api_create_embeddings(req: EmbeddingsRequest):
 @app.post("/api/create-clusters")
 async def api_create_clusters(req: ClusterRequest):
     try:
-        pipeline.cluster_articles(n_clusters=req.n_clusters, method=req.method)
-        clusters = pipeline.db.get_all_clusters()
+        get_pipeline().cluster_articles(n_clusters=req.n_clusters, method=req.method)
+        clusters = get_pipeline().db.get_all_clusters()
         return {"status": "success", "clusters": clusters}
     except Exception as e:
         return JSONResponse(status_code=500, content={"detail": str(e)})
@@ -195,7 +202,7 @@ async def api_create_clusters(req: ClusterRequest):
 @app.get("/api/clusters")
 async def api_get_clusters():
     try:
-        clusters = pipeline.db.get_all_clusters()
+        clusters = get_pipeline().db.get_all_clusters()
         return {"clusters": clusters}
     except Exception as e:
         return JSONResponse(status_code=500, content={"detail": str(e)})
@@ -204,7 +211,7 @@ async def api_get_clusters():
 @app.get("/api/clusters/{cluster_id}/articles")
 async def api_get_cluster_articles(cluster_id: int):
     try:
-        articles = pipeline.db.get_articles_by_cluster(cluster_id)
+        articles = get_pipeline().db.get_articles_by_cluster(cluster_id)
         cluster_label = articles[0].get('cluster_label', f'Cluster {cluster_id}') if articles else f'Cluster {cluster_id}'
         # Remove abstract from response to keep it lightweight
         for a in articles:
@@ -217,7 +224,7 @@ async def api_get_cluster_articles(cluster_id: int):
 @app.get("/api/statistics")
 async def api_statistics():
     try:
-        return pipeline.get_statistics()
+        return get_pipeline().get_statistics()
     except Exception as e:
         return JSONResponse(status_code=500, content={"detail": str(e)})
 
@@ -225,11 +232,12 @@ async def api_statistics():
 @app.post("/api/detect-duplicates")
 async def api_detect_duplicates(req: DuplicateRequest):
     try:
-        duplicates = pipeline.detect_duplicates(threshold=req.threshold)
+        p = get_pipeline()
+        duplicates = p.detect_duplicates(threshold=req.threshold)
         result = []
         for id1, id2, sim in duplicates[:20]:
-            a1 = pipeline.db.get_article_by_id(*id1)
-            a2 = pipeline.db.get_article_by_id(*id2)
+            a1 = p.db.get_article_by_id(*id1)
+            a2 = p.db.get_article_by_id(*id2)
             if a1 and a2:
                 result.append({
                     "article1": {"article_id": a1['article_id'], "source": a1['source'], "title": a1['title']},
@@ -242,5 +250,7 @@ async def api_detect_duplicates(req: DuplicateRequest):
 
 
 if __name__ == "__main__":
+    import os
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.environ.get("PORT", 7860))
+    uvicorn.run(app, host="0.0.0.0", port=port)
