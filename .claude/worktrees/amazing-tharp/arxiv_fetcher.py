@@ -7,7 +7,7 @@ Free API, no authentication required
 import time
 import requests
 import xml.etree.ElementTree as ET
-from typing import List, Dict
+from typing import List, Dict, Optional
 from base_fetcher import BaseFetcher
 
 ATOM_NS = 'http://www.w3.org/2005/Atom'
@@ -78,7 +78,7 @@ class ArXivFetcher(BaseFetcher):
 
         return articles
 
-    def _parse_entry(self, entry, ns) -> Dict:
+    def _parse_entry(self, entry, ns) -> Optional[Dict]:
         try:
             id_el = entry.find('a:id', ns)
             if id_el is None:

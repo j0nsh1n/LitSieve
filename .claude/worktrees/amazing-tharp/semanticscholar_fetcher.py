@@ -21,10 +21,13 @@ class SemanticScholarFetcher(BaseFetcher):
             f'LiteratureSearchTool/1.0 ({email or "research@example.com"})'
         )
 
+    MAX_429_RETRIES = 5
+
     def search(self, query: str, max_results: int = 500) -> List[str]:
         ids = []
         limit = 100
         offset = 0
+        retries_429 = 0
 
         while len(ids) < max_results:
             n = min(limit, max_results - len(ids))
@@ -35,8 +38,13 @@ class SemanticScholarFetcher(BaseFetcher):
                     timeout=30
                 )
                 if r.status_code == 429:
-                    time.sleep(3)
+                    retries_429 += 1
+                    if retries_429 > self.MAX_429_RETRIES:
+                        print(f"Semantic Scholar: giving up after {self.MAX_429_RETRIES} consecutive 429s")
+                        break
+                    time.sleep(3 * retries_429)
                     continue
+                retries_429 = 0
                 r.raise_for_status()
                 papers = r.json().get('data', [])
                 if not papers:
@@ -54,8 +62,10 @@ class SemanticScholarFetcher(BaseFetcher):
 
     def fetch_details(self, ids: List[str], batch_size: int = 100) -> List[Dict]:
         articles = []
+        i = 0
+        retries_429 = 0
 
-        for i in range(0, len(ids), batch_size):
+        while i < len(ids):
             batch = ids[i:i + batch_size]
             try:
                 r = self.session.post(
@@ -65,8 +75,13 @@ class SemanticScholarFetcher(BaseFetcher):
                     timeout=30
                 )
                 if r.status_code == 429:
-                    time.sleep(3)
+                    retries_429 += 1
+                    if retries_429 > self.MAX_429_RETRIES:
+                        print(f"Semantic Scholar: giving up after {self.MAX_429_RETRIES} consecutive 429s")
+                        break
+                    time.sleep(3 * retries_429)
                     continue
+                retries_429 = 0
                 r.raise_for_status()
                 for paper in r.json():
                     if paper is None:
@@ -77,6 +92,7 @@ class SemanticScholarFetcher(BaseFetcher):
                 time.sleep(0.5)
             except Exception as e:
                 print(f"Semantic Scholar fetch error: {e}")
+            i += batch_size
 
         return articles
 

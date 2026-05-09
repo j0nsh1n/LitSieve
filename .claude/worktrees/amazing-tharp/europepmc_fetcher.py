@@ -49,9 +49,10 @@ class EuropePMCFetcher(BaseFetcher):
                     if article_id:
                         ids.append(article_id)
 
-                cursor_mark = data.get("nextCursorMark")
-                if not cursor_mark:
+                next_cursor = data.get("nextCursorMark")
+                if not next_cursor or next_cursor == cursor_mark:
                     break
+                cursor_mark = next_cursor
                 time.sleep(0.3)
 
             except Exception as e:
@@ -91,9 +92,10 @@ class EuropePMCFetcher(BaseFetcher):
                     if parsed:
                         articles.append(parsed)
 
-                cursor_mark = data.get("nextCursorMark")
-                if not cursor_mark:
+                next_cursor = data.get("nextCursorMark")
+                if not next_cursor or next_cursor == cursor_mark:
                     break
+                cursor_mark = next_cursor
                 time.sleep(0.3)
 
             except Exception as e:
