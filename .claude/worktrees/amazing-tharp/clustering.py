@@ -203,7 +203,13 @@ class ClusterVisualizer:
             save_path: Path to save plot
         """
         # Create hover text with article titles
-        hover_texts = [f"{a['title'][:100]}..." for a in articles]
+        hover_texts = []
+        for a in articles:
+            title = a.get('title') or ''
+            if len(title) > 100:
+                hover_texts.append(f"{title[:100]}...")
+            else:
+                hover_texts.append(title)
         
         # Create dataframe-like structure for plotly
         fig = go.Figure()

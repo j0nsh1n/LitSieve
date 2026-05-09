@@ -129,9 +129,10 @@ function renderResults(results) {
         else if (sim >= 0.4) simClass = 'sim-med';
 
         const url = getArticleUrl(article.article_id, article.source);
+        const idText = escapeHtml(article.article_id || '');
         const idLink = url
-            ? `<a href="${url}" target="_blank" rel="noopener" class="article-link">${article.article_id}</a>`
-            : article.article_id;
+            ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" class="article-link">${idText}</a>`
+            : idText;
 
         // Build PICO tags
         let picoHtml = '';

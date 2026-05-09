@@ -179,7 +179,7 @@ function buildCompareTable(articles) {
     articles.forEach(a => {
         const url = getArticleUrl(a.article_id, a.source);
         const idHtml = url
-            ? `<a href="${url}" target="_blank" rel="noopener">${escapeHtml(truncate(a.article_id, 24))}</a>`
+            ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(truncate(a.article_id, 24))}</a>`
             : escapeHtml(truncate(a.article_id, 24));
         const cell = document.createElement('div');
         cell.className = 'compare-cell compare-header-cell';

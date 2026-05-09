@@ -31,7 +31,6 @@ class EmbeddingEngine:
     def __init__(self, model_name: str = 'general'):
         self.model_name = model_name
         self._model = None
-        self._faiss_index = None
 
     @property
     def model(self):
@@ -66,25 +65,35 @@ class EmbeddingEngine:
         embeddings = np.concatenate(all_embeddings, axis=0) if all_embeddings else np.array([])
         print(f"Created embeddings of shape: {embeddings.shape}")
 
-        # Build FAISS index for future searches
-        if FAISS_AVAILABLE and len(embeddings) > 0:
-            dim = embeddings.shape[1]
-            self._faiss_index = faiss.IndexFlatIP(dim)  # Inner Product = cosine after normalization
-            faiss.normalize_L2(embeddings)
-            self._faiss_index.add(embeddings)
-
         return {key: emb for key, emb in zip(keys, embeddings)}
 
     def embed_query(self, query_text: str) -> np.ndarray:
         return self.model.encode(query_text, convert_to_numpy=True)
 
     def find_similar(self, query_embedding: np.ndarray, article_embeddings: np.ndarray, article_ids: list, top_k: int = 10) -> list:
-        if FAISS_AVAILABLE and self._faiss_index is not None:
-            # Use FAISS (much faster)
-            query_embedding = query_embedding.reshape(1, -1).astype(np.float32)
-            faiss.normalize_L2(query_embedding)
-            distances, indices = self._faiss_index.search(query_embedding, top_k)
-            return [(article_ids[idx], float(distances[0][i])) for i, idx in enumerate(indices[0])]
+        corpus_size = len(article_ids)
+        if corpus_size == 0:
+            return []
+        top_k = min(top_k, corpus_size)
+
+        if FAISS_AVAILABLE and len(article_embeddings) > 0:
+            # Build a transient FAISS index from the supplied embeddings.
+            # Defensive copy + cast to float32 so we don't mutate the caller's array
+            # (faiss.normalize_L2 normalises in place).
+            corpus = np.array(article_embeddings, dtype=np.float32, copy=True)
+            faiss.normalize_L2(corpus)
+            index = faiss.IndexFlatIP(corpus.shape[1])
+            index.add(corpus)
+
+            query = query_embedding.reshape(1, -1).astype(np.float32, copy=True)
+            faiss.normalize_L2(query)
+            distances, indices = index.search(query, top_k)
+            results = []
+            for i, idx in enumerate(indices[0]):
+                if idx < 0:
+                    continue
+                results.append((article_ids[idx], float(distances[0][i])))
+            return results
         else:
             # Fallback to scikit-learn
             query_embedding = query_embedding.reshape(1, -1)
@@ -146,7 +155,7 @@ class PICOExtractor:
         Returns:
             Dictionary with PICO components
         """
-        sentences = text.split('.')
+        sentences = (text or '').split('.')
 
         pico = {
             'population': [],

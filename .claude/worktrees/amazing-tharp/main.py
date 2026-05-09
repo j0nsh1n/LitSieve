@@ -278,7 +278,10 @@ async def api_search_export(
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
     try:
         results = await run_in_thread(get_pipeline(user["user_id"]).search_similar, query_text, top_k=top_k)
-        cluster_ids = [int(x) for x in cluster_filter.split(",") if x.strip()] if cluster_filter else None
+        try:
+            cluster_ids = [int(x) for x in cluster_filter.split(",") if x.strip()] if cluster_filter else None
+        except ValueError:
+            return JSONResponse(status_code=400, content={"error": "Invalid cluster_filter"})
         if cluster_ids:
             results = [a for a in results if a.get('cluster_id') in cluster_ids]
         if sort_by == "year":

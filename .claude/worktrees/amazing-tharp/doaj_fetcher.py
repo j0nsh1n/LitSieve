@@ -66,7 +66,7 @@ class DOAJFetcher(BaseFetcher):
                 if name:
                     authors.append(name)
 
-            year = (bib.get('year') or '').strip()
+            year = str(bib.get('year') or '').strip()
 
             journal = ''
             journal_info = bib.get('journal', {})

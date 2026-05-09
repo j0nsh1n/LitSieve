@@ -16,14 +16,19 @@ class NASAADSFetcher(BaseFetcher):
     BASE_URL = 'https://api.adsabs.harvard.edu/v1/search/query'
 
     def __init__(self, email: str = None):
-        token = os.getenv('NASA_ADS_TOKEN', '')
+        self.token = os.getenv('NASA_ADS_TOKEN', '').strip()
         self.session = requests.Session()
-        self.session.headers.update({
-            'Authorization': f'Bearer {token}',
+        headers = {
             'User-Agent': f'LiteratureSearchTool/1.0 ({email or "research@example.com"})',
-        })
+        }
+        if self.token:
+            headers['Authorization'] = f'Bearer {self.token}'
+        self.session.headers.update(headers)
 
     def search_and_fetch(self, query: str, max_results: int = 500) -> List[Dict]:
+        if not self.token:
+            print("NASA ADS: NASA_ADS_TOKEN env var not set; skipping source")
+            return []
         articles = []
         start = 0
         rows = min(200, max_results)
