@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register — Literature Research Aide</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script>
+        (function() {
+            const saved = localStorage.getItem('theme');
+            if (saved) document.documentElement.setAttribute('data-theme', saved);
+        })();
+    </script>
+</head>
+<body class="auth-body">
+    <div class="auth-card">
+        <div class="auth-logo">Literature Research Aide</div>
+        <div class="auth-subtitle">Create an account</div>
+
+        {% if error %}
+        <div class="auth-error">{{ error }}</div>
+        {% endif %}
+
+        <form method="post" action="/register" class="auth-form">
+            <div class="form-group">
+                <label>Username</label>
+                <input type="text" name="username" value="{{ username or '' }}"
+                    autocomplete="username" autofocus required
+                    pattern="[a-zA-Z0-9_\-]{3,20}"
+                    title="3–20 characters: letters, numbers, underscores, or hyphens">
+                <span class="auth-hint">3–20 characters — letters, numbers, _ or -</span>
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" name="password" autocomplete="new-password" required minlength="8">
+                <span class="auth-hint">Minimum 8 characters</span>
+            </div>
+            <div class="form-group">
+                <label>Confirm Password</label>
+                <input type="password" name="password_confirm" autocomplete="new-password" required minlength="8">
+            </div>
+            <button type="submit" class="btn btn-primary auth-btn">Create Account</button>
+        </form>
+
+        <p class="auth-switch">Already have an account? <a href="/login">Log in</a></p>
+    </div>
+</body>
+</html>
