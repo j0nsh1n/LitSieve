@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Literature Research Aide{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script>
+        (function() {
+            const saved = localStorage.getItem('theme');
+            if (saved) document.documentElement.setAttribute('data-theme', saved);
+        })();
+    </script>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">Literature Research Aide</div>
+        <div class="nav-links">
+            <a href="/data-management" class="nav-link {% if active_page == 'data_management' %}active{% endif %}">Data Management</a>
+            <a href="/statistics" class="nav-link {% if active_page == 'statistics' %}active{% endif %}">Duplicates</a>
+            <a href="/search" class="nav-link {% if active_page == 'search' %}active{% endif %}">Search</a>
+        </div>
+        <div class="nav-stats">
+            <button class="theme-toggle" id="theme-toggle" title="Toggle theme">🌙</button>
+            {% if user %}
+            <span class="nav-username">{{ user.username }}</span>
+            <a href="/logout" class="nav-logout">Logout</a>
+            {% endif %}
+            <span class="stat-badge" id="nav-article-count">-- articles</span>
+        </div>
+    </nav>
+
+    <main class="container">
+        <div id="notification-area"></div>
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+        <p>Literature Research Aide &mdash; v2.2.1</p>
+    </footer>
+
+    <script src="/static/js/common.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
