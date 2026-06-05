@@ -31,7 +31,7 @@ async function loadStatistics() {
                 const div = document.createElement('div');
                 div.className = 'source-bar';
                 div.innerHTML = `
-                    <span class="source-name">${getSourceName(source)}</span>
+                    <span class="source-name">${escapeHtml(getSourceName(source))}</span>
                     <div class="source-bar-fill">
                         <div class="source-bar-inner" style="width: ${pct}%"></div>
                     </div>
@@ -213,10 +213,4 @@ function buildCompareTable(articles) {
 function truncate(text, len) {
     if (!text) return '';
     return text.length > len ? text.substring(0, len) + '…' : text;
-}
-
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
 }

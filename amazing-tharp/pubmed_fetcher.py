@@ -4,12 +4,17 @@ Fetches research articles from PubMed using the Entrez API
 """
 
 from Bio import Entrez
+import socket
 import time
 import json
 from typing import List, Dict, Optional
 from tqdm import tqdm
 
 from base_fetcher import BaseFetcher
+
+# Entrez uses urllib under the hood, which has no default timeout. Without this,
+# a stalled NCBI connection hangs the worker thread indefinitely.
+socket.setdefaulttimeout(30)
 
 
 class PubMedFetcher(BaseFetcher):

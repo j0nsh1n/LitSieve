@@ -37,19 +37,21 @@ class UserDatabase:
         return {"id": user_id, "username": username}
 
     def get_by_username(self, username: str) -> Optional[Dict]:
-        row = self.conn.execute(
-            "SELECT id, username, hashed_password FROM users WHERE username = ? COLLATE NOCASE",
-            (username,)
-        ).fetchone()
+        with self._lock:
+            row = self.conn.execute(
+                "SELECT id, username, hashed_password FROM users WHERE username = ? COLLATE NOCASE",
+                (username,)
+            ).fetchone()
         if row:
             return {"id": row[0], "username": row[1], "hashed_password": row[2]}
         return None
 
     def get_by_id(self, user_id: str) -> Optional[Dict]:
-        row = self.conn.execute(
-            "SELECT id, username FROM users WHERE id = ?",
-            (user_id,)
-        ).fetchone()
+        with self._lock:
+            row = self.conn.execute(
+                "SELECT id, username FROM users WHERE id = ?",
+                (user_id,)
+            ).fetchone()
         if row:
             return {"id": row[0], "username": row[1]}
         return None

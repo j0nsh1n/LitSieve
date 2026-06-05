@@ -23,8 +23,16 @@ python-multipart>=0.0.18
 # Authentication
 PyJWT>=2.9.0
 passlib[bcrypt]>=1.7.4
-bcrypt>=5.0.0
+# passlib 1.7.4 introspects bcrypt.__about__.__version__, removed in bcrypt 4.1+.
+# Pin below 4.1 to keep the passlib bcrypt backend working.
+bcrypt>=4.0.1,<4.1
+
+# Rate limiting
+slowapi>=0.1.9
 
 # Utilities
 python-dotenv>=1.0.1
 tqdm>=4.66.0
+
+# Testing
+pytest>=8.0.0

@@ -4,11 +4,14 @@ Orchestrates the complete workflow from data fetching to visualization
 """
 
 import json
+import logging
 import os
 from typing import List, Dict, Optional, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 from pubmed_fetcher import PubMedFetcher
 from europepmc_fetcher import EuropePMCFetcher
@@ -76,7 +79,7 @@ class LiteratureSearchPipeline:
             email: Your email (required by some APIs)
             source: Data source ('pubmed', 'europepmc', 'clinicaltrials', 'openalex')
         """
-        print(f"\n=== Step 1: Fetching Articles from {source} ===")
+        logger.info(f"\n=== Step 1: Fetching Articles from {source} ===")
 
         fetcher_cls = FETCHERS.get(source)
         if not fetcher_cls:
@@ -86,13 +89,13 @@ class LiteratureSearchPipeline:
         articles = fetcher.search_and_fetch(query, max_results)
 
         if not articles:
-            print("No articles found")
+            logger.info("No articles found")
             return []
 
         # Save to database
         self.db.insert_articles(articles)
 
-        print(f"Fetched and stored {len(articles)} articles from {source}")
+        logger.info(f"Fetched and stored {len(articles)} articles from {source}")
         return articles
 
     def fetch_articles_parallel(
@@ -107,7 +110,7 @@ class LiteratureSearchPipeline:
         Fetch from multiple sources concurrently, insert results sequentially.
         progress_callback: callable(done, total) called each time a source completes.
         """
-        print(f"\n=== Fetching from {len(sources)} sources in parallel ===")
+        logger.info(f"\n=== Fetching from {len(sources)} sources in parallel ===")
         lock = threading.Lock()
         completed = [0]
         total = len(sources)
@@ -122,7 +125,7 @@ class LiteratureSearchPipeline:
                     articles = fetcher.search_and_fetch(query, max_results)
                     result = (source, articles or [], None)
                 except Exception as e:
-                    print(f"Error fetching {source}: {e}")
+                    logger.error(f"Error fetching {source}: {e}")
                     result = (source, [], str(e))
 
             with lock:
@@ -138,7 +141,7 @@ class LiteratureSearchPipeline:
             for future in as_completed(futures):
                 source, articles, error = future.result()
                 results[source] = {'articles': articles, 'error': error}
-                print(f"  {source}: {len(articles)} articles")
+                logger.info(f"  {source}: {len(articles)} articles")
 
         for source, data in results.items():
             if data['articles']:
@@ -151,29 +154,29 @@ class LiteratureSearchPipeline:
 
     def create_embeddings(self, progress_callback=None):
         """Step 2: Create embeddings for all articles"""
-        print("\n=== Step 2: Creating Embeddings ===")
+        logger.info("\n=== Step 2: Creating Embeddings ===")
 
         articles = self.db.get_all_articles()
         if not articles:
-            print("No articles in database. Fetch articles first.")
+            logger.info("No articles in database. Fetch articles first.")
             return
 
-        print(f"Creating embeddings for {len(articles)} articles...")
+        logger.info(f"Creating embeddings for {len(articles)} articles...")
 
         embeddings = self.embedding_engine.embed_articles(articles, progress_callback=progress_callback)
 
         self.db.insert_embeddings(embeddings, self.embedding_model_name)
 
-        print(f"Created and stored embeddings")
+        logger.info(f"Created and stored embeddings")
         return embeddings
 
     def cluster_articles(self, n_clusters: int = 10, method: str = 'kmeans'):
         """Step 3: Cluster articles"""
-        print("\n=== Step 3: Clustering Articles ===")
+        logger.info("\n=== Step 3: Clustering Articles ===")
 
         article_ids, embeddings = self.db.get_all_embeddings()
         if len(article_ids) == 0:
-            print("No embeddings found. Create embeddings first.")
+            logger.info("No embeddings found. Create embeddings first.")
             return
 
         # Perform clustering
@@ -196,7 +199,7 @@ class LiteratureSearchPipeline:
             articles_by_cluster[cluster_id].append(article)
 
         # Generate cluster labels
-        print("Generating cluster labels...")
+        logger.info("Generating cluster labels...")
         cluster_labels = ClusterLabeler.generate_tfidf_labels(articles_by_cluster)
 
         # Save cluster assignments to database
@@ -208,23 +211,23 @@ class LiteratureSearchPipeline:
 
         self.db.insert_clusters(cluster_assignments)
 
-        print(f"Clustered articles into {n_clusters} clusters")
-        print("\nCluster labels:")
+        logger.info(f"Clustered articles into {n_clusters} clusters")
+        logger.info("\nCluster labels:")
         for cluster_id, label in sorted(cluster_labels.items()):
             size = len(articles_by_cluster.get(cluster_id, []))
-            print(f"  Cluster {cluster_id} ({size} articles): {label}")
+            logger.info(f"  Cluster {cluster_id} ({size} articles): {label}")
 
         return labels, cluster_labels, articles_by_cluster
 
     def create_visualizations(self, output_dir: str = "visualizations"):
         """Step 4: Create visualizations"""
-        print("\n=== Step 4: Creating Visualizations ===")
+        logger.info("\n=== Step 4: Creating Visualizations ===")
 
         os.makedirs(output_dir, exist_ok=True)
         article_ids, embeddings = self.db.get_all_embeddings()
 
         if len(article_ids) == 0:
-            print("No embeddings found. Create embeddings first.")
+            logger.info("No embeddings found. Create embeddings first.")
             return
 
         id_to_emb_idx = {aid: i for i, aid in enumerate(article_ids)}
@@ -240,7 +243,7 @@ class LiteratureSearchPipeline:
         for key, article in articles_all_with_clusters.items():
             if key not in id_to_emb_idx:
                 continue
-            if article['cluster_id']:
+            if article['cluster_id'] is not None:
                 cluster_id = article['cluster_id']
                 labels.append(cluster_id)
                 cluster_labels[cluster_id] = article['cluster_label']
@@ -248,7 +251,7 @@ class LiteratureSearchPipeline:
                 emb_indices.append(id_to_emb_idx[key])
 
         if not labels:
-            print("No clusters found. Cluster articles first.")
+            logger.info("No clusters found. Cluster articles first.")
             return
 
         labels = np.array(labels)
@@ -260,7 +263,7 @@ class LiteratureSearchPipeline:
                 articles_by_cluster[label] = []
             articles_by_cluster[label].append(article)
 
-        print("Creating 2D visualization...")
+        logger.info("Creating 2D visualization...")
         embeddings_2d = ClusterVisualizer.reduce_dimensions(matched_embeddings, method='pca', n_components=2)
 
         fig_2d = ClusterVisualizer.plot_2d_clusters(
@@ -271,14 +274,14 @@ class LiteratureSearchPipeline:
             save_path=os.path.join(output_dir, 'clusters_2d.html')
         )
 
-        print("Creating cluster summary...")
+        logger.info("Creating cluster summary...")
         fig_summary = ClusterVisualizer.plot_cluster_summary(
             articles_by_cluster,
             cluster_labels,
             save_path=os.path.join(output_dir, 'cluster_summary.html')
         )
 
-        print("Creating similarity heatmap...")
+        logger.info("Creating similarity heatmap...")
         similarity_matrix = self.embedding_engine.calculate_similarity_matrix(matched_embeddings)
         fig_heatmap = ClusterVisualizer.plot_similarity_heatmap(
             similarity_matrix,
@@ -287,7 +290,7 @@ class LiteratureSearchPipeline:
             save_path=os.path.join(output_dir, 'similarity_heatmap.html')
         )
 
-        print(f"Visualizations saved to {output_dir}")
+        logger.info(f"Visualizations saved to {output_dir}")
 
         return {
             'clusters_2d': fig_2d,
@@ -306,13 +309,13 @@ class LiteratureSearchPipeline:
         Returns:
             List of similar articles with similarity scores
         """
-        print(f"\n=== Searching for similar articles ===")
-        print(f"Query: {query_text}\n")
+        logger.info(f"\n=== Searching for similar articles ===")
+        logger.info(f"Query: {query_text}\n")
 
         article_ids, article_embeddings = self.db.get_all_embeddings()
 
         if len(article_ids) == 0:
-            print("No embeddings found. Create embeddings first.")
+            logger.info("No embeddings found. Create embeddings first.")
             return []
 
         # Create query embedding
@@ -339,11 +342,11 @@ class LiteratureSearchPipeline:
                 similar_articles.append(article)
 
         # Print results
-        print(f"Top {len(similar_articles)} most similar articles:\n")
+        logger.info(f"Top {len(similar_articles)} most similar articles:\n")
         for i, article in enumerate(similar_articles, 1):
-            print(f"{i}. [{article['similarity_score']:.3f}] {article['title']}")
-            print(f"   {article['year']} | {article['journal']}")
-            print(f"   ID: {article['article_id']} ({article['source']})\n")
+            logger.info(f"{i}. [{article['similarity_score']:.3f}] {article['title']}")
+            logger.info(f"   {article['year']} | {article['journal']}")
+            logger.info(f"   ID: {article['article_id']} ({article['source']})\n")
 
         return similar_articles
 
@@ -357,12 +360,12 @@ class LiteratureSearchPipeline:
         Returns:
             List of duplicate pairs: ((article_id1, source1), (article_id2, source2), similarity)
         """
-        print(f"\n=== Detecting Duplicates (threshold: {threshold}) ===")
+        logger.info(f"\n=== Detecting Duplicates (threshold: {threshold}) ===")
 
         article_ids, embeddings = self.db.get_all_embeddings()
 
         if len(article_ids) == 0:
-            print("No embeddings found.")
+            logger.info("No embeddings found.")
             return []
 
         duplicates = self.embedding_engine.detect_duplicates(
@@ -372,15 +375,15 @@ class LiteratureSearchPipeline:
         )
 
         if duplicates:
-            print(f"\nFound {len(duplicates)} potential duplicate pairs:\n")
+            logger.info(f"\nFound {len(duplicates)} potential duplicate pairs:\n")
             for id1, id2, sim in duplicates[:10]:
                 article1 = self.db.get_article_by_id(*id1)
                 article2 = self.db.get_article_by_id(*id2)
-                print(f"[{sim:.3f}]")
+                logger.info(f"[{sim:.3f}]")
                 if article1:
-                    print(f"  1: {article1['title']}")
+                    logger.info(f"  1: {article1['title']}")
                 if article2:
-                    print(f"  2: {article2['title']}\n")
+                    logger.info(f"  2: {article2['title']}\n")
 
         return duplicates
 

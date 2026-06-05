@@ -1,0 +1,8 @@
+*.db
+.env
+.git
+__pycache__/
+user_data/
+visualizations/
+*.pyc
+.pytest_cache/
