@@ -160,7 +160,7 @@ function renderResults(results) {
                 <div class="article-meta">
                     <span><strong>Year:</strong> ${escapeHtml(article.year || '')}</span>
                     <span><strong>Journal:</strong> ${escapeHtml(article.journal || '')}</span>
-                    <span><strong>Source:</strong> ${getSourceName(article.source)}</span>
+                    <span><strong>Source:</strong> ${escapeHtml(getSourceName(article.source))}</span>
                     <span><strong>ID:</strong> ${idLink}</span>
                 </div>
                 <div class="article-meta">
@@ -188,10 +188,4 @@ function doExport(format) {
         format: format
     });
     window.location.href = `/api/search/export?${params.toString()}`;
-}
-
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
 }

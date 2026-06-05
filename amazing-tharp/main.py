@@ -1,12 +1,15 @@
 """
-FastAPI Application — Literature Research Aide v2.2.1
+FastAPI Application — Literature Research Aide v2.3.0
 Multi-user web interface for literature search and analysis.
 """
 
 import io
 import csv
 import os
+import secrets
+import logging
 import threading
+from collections import OrderedDict
 from typing import List, Optional
 from functools import partial
 import asyncio
@@ -18,15 +21,32 @@ from fastapi import FastAPI, Request, Form
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse, StreamingResponse, JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from slowapi import _rate_limit_exceeded_handler
 
 from pipeline import LiteratureSearchPipeline
 from embeddings import EmbeddingEngine, PICOExtractor
 from user_db import UserDatabase
 from auth import hash_password, verify_password, create_token, get_current_user
 
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s %(name)s %(levelname)s %(message)s',
+)
+logger = logging.getLogger(__name__)
+
+COOKIE_SECURE = os.getenv("DEBUG", "").strip().lower() not in ("1", "true", "yes")
+MAX_CACHED_USERS = 50
+
+limiter = Limiter(key_func=get_remote_address)
+
 # At top of file
 app = FastAPI(title="Literature Research Aide", version="2.3.0")
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 @app.get("/health")
 async def health():
     return {"status": "healthy", "version": "2.3.0"}
@@ -37,16 +57,27 @@ templates = Jinja2Templates(directory="templates")
 # --- User account database ---
 user_db = UserDatabase()
 
-# --- Per-user pipeline cache (lazy-initialised) ---
-_pipelines: dict = {}
+# --- Per-user pipeline cache (lazy-initialised, LRU-bounded) ---
+_pipelines: "OrderedDict[str, LiteratureSearchPipeline]" = OrderedDict()
+# Number of in-flight requests holding each pipeline. A pipeline is only safe
+# to close when its refcount hits 0; otherwise eviction defers the close.
+_pipeline_refcounts: "OrderedDict[str, int]" = OrderedDict()
+# Pipelines evicted while still in use, keyed by uid — closed on last release.
+_pending_close: "dict[str, LiteratureSearchPipeline]" = {}
+# Guards _pipelines, _pipeline_refcounts and _pending_close together.
 _pipelines_lock = threading.Lock()
 
-# --- Per-user progress tracking ---
-_all_progress: dict = {}
+# --- Per-user progress tracking (LRU-bounded) ---
+_all_progress: "OrderedDict[str, dict]" = OrderedDict()
 _progress_lock = threading.Lock()
 
 
 def get_pipeline(user_id: str) -> LiteratureSearchPipeline:
+    """Return the user's pipeline and register an in-flight reference.
+
+    The caller MUST pair every get_pipeline() with a release_pipeline() in a
+    finally block so deferred closes can run once the request completes.
+    """
     with _pipelines_lock:
         if user_id not in _pipelines:
             user_dir = f"user_data/{user_id}"
@@ -55,7 +86,39 @@ def get_pipeline(user_id: str) -> LiteratureSearchPipeline:
                 db_path=f"{user_dir}/articles.db",
                 embedding_model="general"
             )
-    return _pipelines[user_id]
+            # Evict least-recently-used pipelines to bound memory. Never close a
+            # pipeline that has in-flight references — defer until last release.
+            while len(_pipelines) > MAX_CACHED_USERS:
+                old_uid, old_pipeline = _pipelines.popitem(last=False)
+                if _pipeline_refcounts.get(old_uid, 0) > 0:
+                    _pending_close[old_uid] = old_pipeline
+                    continue
+                try:
+                    old_pipeline.db.close()
+                except Exception:
+                    logger.exception("Failed to close evicted pipeline for %s", old_uid)
+        _pipelines.move_to_end(user_id)
+        _pipeline_refcounts[user_id] = _pipeline_refcounts.get(user_id, 0) + 1
+        return _pipelines[user_id]
+
+
+def release_pipeline(user_id: str) -> None:
+    """Drop an in-flight reference, closing a deferred-evicted pipeline at 0."""
+    with _pipelines_lock:
+        count = _pipeline_refcounts.get(user_id, 0) - 1
+        if count > 0:
+            _pipeline_refcounts[user_id] = count
+            return
+        _pipeline_refcounts.pop(user_id, None)
+        # A pipeline evicted while in use is held in _pending_close (separate
+        # from any newer live pipeline under the same uid in _pipelines). Close
+        # the deferred object only — never the current live one.
+        pipeline = _pending_close.pop(user_id, None)
+        if pipeline is not None:
+            try:
+                pipeline.db.close()
+            except Exception:
+                logger.exception("Failed to close deferred pipeline for %s", user_id)
 
 
 def _ensure_progress(user_id: str) -> dict:
@@ -65,6 +128,9 @@ def _ensure_progress(user_id: str) -> dict:
             'fetch': {'active': False, 'done': 0, 'total': 0},
             'embed': {'active': False, 'done': 0, 'total': 0},
         }
+        while len(_all_progress) > MAX_CACHED_USERS:
+            _all_progress.popitem(last=False)
+    _all_progress.move_to_end(user_id)
     return _all_progress[user_id]
 
 
@@ -75,6 +141,32 @@ def update_progress(user_id: str, task: str, **kwargs):
 
 def current_user(request: Request) -> Optional[dict]:
     return get_current_user(request)
+
+
+def _set_auth_cookies(response, token: str):
+    """Set the JWT (httponly) and a CSRF token (readable) as cookies."""
+    csrf_token = secrets.token_urlsafe(32)
+    response.set_cookie(
+        "access_token", token, httponly=True, secure=COOKIE_SECURE,
+        samesite="lax", max_age=30 * 24 * 3600,
+    )
+    response.set_cookie(
+        "csrf_token", csrf_token, httponly=False, secure=COOKIE_SECURE,
+        samesite="lax", max_age=30 * 24 * 3600,
+    )
+
+
+def csrf_failed(request: Request) -> bool:
+    """Double-submit cookie check for state-changing /api requests."""
+    cookie_token = request.cookies.get("csrf_token")
+    header_token = request.headers.get("X-CSRF-Token")
+    return not cookie_token or not header_token or not secrets.compare_digest(cookie_token, header_token)
+
+
+def server_error(e: Exception) -> JSONResponse:
+    """Log the real exception server-side, return a generic message to the client."""
+    logger.exception("Unhandled error in API handler: %s", e)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
 # --- Pydantic models ---
@@ -88,13 +180,13 @@ class SearchRequest(BaseModel):
 class FetchRequest(BaseModel):
     source: str = "pubmed"
     query: str
-    max_results: int = 500
+    max_results: int = Field(default=500, ge=1, le=1000)
     email: Optional[str] = None
 
 class MultiFetchRequest(BaseModel):
     sources: List[str]
     query: str
-    max_results: int = 200
+    max_results: int = Field(default=200, ge=1, le=1000)
     email: Optional[str] = None
 
 class EmbeddingsRequest(BaseModel):
@@ -120,6 +212,7 @@ async def login_page(request: Request):
 
 
 @app.post("/login")
+@limiter.limit("10/minute")
 async def login_submit(
     request: Request,
     username: str = Form(...),
@@ -135,7 +228,7 @@ async def login_submit(
         )
     token = create_token(user["id"], user["username"])
     response = RedirectResponse(url="/data-management", status_code=302)
-    response.set_cookie("access_token", token, httponly=True, samesite="lax", max_age=30 * 24 * 3600)
+    _set_auth_cookies(response, token)
     return response
 
 
@@ -147,6 +240,7 @@ async def register_page(request: Request):
 
 
 @app.post("/register")
+@limiter.limit("10/minute")
 async def register_submit(
     request: Request,
     username: str = Form(...),
@@ -177,7 +271,7 @@ async def register_submit(
     user = user_db.create_user(username, hash_password(password))
     token = create_token(user["id"], user["username"])
     response = RedirectResponse(url="/data-management", status_code=302)
-    response.set_cookie("access_token", token, httponly=True, samesite="lax", max_age=30 * 24 * 3600)
+    _set_auth_cookies(response, token)
     return response
 
 
@@ -185,6 +279,7 @@ async def register_submit(
 async def logout():
     response = RedirectResponse(url="/login", status_code=302)
     response.delete_cookie("access_token")
+    response.delete_cookie("csrf_token")
     return response
 
 
@@ -247,8 +342,10 @@ async def api_search(req: SearchRequest, request: Request):
     user = current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    uid = user["user_id"]
+    p = get_pipeline(uid)
     try:
-        results = await run_in_thread(get_pipeline(user["user_id"]).search_similar, req.query_text, top_k=req.top_k)
+        results = await run_in_thread(p.search_similar, req.query_text, top_k=req.top_k)
         for article in results:
             article['pico'] = PICOExtractor.extract_pico(article.get('abstract', ''))
         if req.cluster_filter:
@@ -261,7 +358,9 @@ async def api_search(req: SearchRequest, request: Request):
             results.sort(key=lambda a: (a.get('title') or '').lower())
         return {"results": results, "total": len(results)}
     except Exception as e:
-        return JSONResponse(status_code=500, content={"detail": str(e)})
+        return server_error(e)
+    finally:
+        release_pipeline(uid)
 
 
 @app.get("/api/search/export")
@@ -276,8 +375,10 @@ async def api_search_export(
     user = current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    uid = user["user_id"]
+    p = get_pipeline(uid)
     try:
-        results = await run_in_thread(get_pipeline(user["user_id"]).search_similar, query_text, top_k=top_k)
+        results = await run_in_thread(p.search_similar, query_text, top_k=top_k)
         try:
             cluster_ids = [int(x) for x in cluster_filter.split(",") if x.strip()] if cluster_filter else None
         except ValueError:
@@ -321,7 +422,9 @@ async def api_search_export(
             headers={"Content-Disposition": f"attachment; filename={filename}"}
         )
     except Exception as e:
-        return JSONResponse(status_code=500, content={"detail": str(e)})
+        return server_error(e)
+    finally:
+        release_pipeline(uid)
 
 
 @app.post("/api/clear-articles")
@@ -329,11 +432,17 @@ async def api_clear_articles(request: Request):
     user = current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    uid = user["user_id"]
+    p = get_pipeline(uid)
     try:
-        await run_in_thread(get_pipeline(user["user_id"]).db.clear_all)
+        await run_in_thread(p.db.clear_all)
         return {"status": "success"}
     except Exception as e:
-        return JSONResponse(status_code=500, content={"detail": str(e)})
+        return server_error(e)
+    finally:
+        release_pipeline(uid)
 
 
 @app.post("/api/fetch-articles-multi")
@@ -341,14 +450,17 @@ async def api_fetch_multi(req: MultiFetchRequest, request: Request):
     user = current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
     uid = user["user_id"]
+    p = get_pipeline(uid)
     update_progress(uid, 'fetch', active=True, done=0, total=len(req.sources))
     try:
         def on_source_done(done, total):
             update_progress(uid, 'fetch', done=done, total=total)
 
         results = await run_in_thread(
-            get_pipeline(uid).fetch_articles_parallel,
+            p.fetch_articles_parallel,
             query=req.query,
             sources=req.sources,
             max_results=req.max_results,
@@ -364,9 +476,10 @@ async def api_fetch_multi(req: MultiFetchRequest, request: Request):
             "errors": errors,
         }
     except Exception as e:
-        return JSONResponse(status_code=500, content={"detail": str(e)})
+        return server_error(e)
     finally:
         update_progress(uid, 'fetch', active=False, done=0, total=0)
+        release_pipeline(uid)
 
 
 @app.post("/api/fetch-articles")
@@ -374,15 +487,21 @@ async def api_fetch(req: FetchRequest, request: Request):
     user = current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    uid = user["user_id"]
+    p = get_pipeline(uid)
     try:
         articles = await run_in_thread(
-            get_pipeline(user["user_id"]).fetch_articles,
+            p.fetch_articles,
             query=req.query, max_results=req.max_results,
             email=req.email or "user@example.com", source=req.source,
         )
         return {"status": "success", "articles_fetched": len(articles) if articles else 0, "source": req.source}
     except Exception as e:
-        return JSONResponse(status_code=500, content={"detail": str(e)})
+        return server_error(e)
+    finally:
+        release_pipeline(uid)
 
 
 @app.post("/api/create-embeddings")
@@ -390,10 +509,12 @@ async def api_create_embeddings(req: EmbeddingsRequest, request: Request):
     user = current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
     uid = user["user_id"]
+    p = get_pipeline(uid)
     update_progress(uid, 'embed', active=True, done=0, total=0)
     try:
-        p = get_pipeline(uid)
         if req.model != p.embedding_model_name:
             p.embedding_engine = EmbeddingEngine(req.model)
             p.embedding_model_name = req.model
@@ -405,9 +526,10 @@ async def api_create_embeddings(req: EmbeddingsRequest, request: Request):
         stats = p.get_statistics()
         return {"status": "success", "articles_processed": stats['articles_with_embeddings']}
     except Exception as e:
-        return JSONResponse(status_code=500, content={"detail": str(e)})
+        return server_error(e)
     finally:
         update_progress(uid, 'embed', active=False, done=0, total=0)
+        release_pipeline(uid)
 
 
 @app.post("/api/create-clusters")
@@ -415,12 +537,17 @@ async def api_create_clusters(req: ClusterRequest, request: Request):
     user = current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    uid = user["user_id"]
+    p = get_pipeline(uid)
     try:
-        p = get_pipeline(user["user_id"])
         await run_in_thread(p.cluster_articles, n_clusters=req.n_clusters, method=req.method)
         return {"status": "success", "clusters": p.db.get_all_clusters()}
     except Exception as e:
-        return JSONResponse(status_code=500, content={"detail": str(e)})
+        return server_error(e)
+    finally:
+        release_pipeline(uid)
 
 
 @app.get("/api/clusters")
@@ -428,10 +555,14 @@ async def api_get_clusters(request: Request):
     user = current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    uid = user["user_id"]
+    p = get_pipeline(uid)
     try:
-        return {"clusters": get_pipeline(user["user_id"]).db.get_all_clusters()}
+        return {"clusters": p.db.get_all_clusters()}
     except Exception as e:
-        return JSONResponse(status_code=500, content={"detail": str(e)})
+        return server_error(e)
+    finally:
+        release_pipeline(uid)
 
 
 @app.get("/api/clusters/{cluster_id}/articles")
@@ -439,14 +570,18 @@ async def api_get_cluster_articles(cluster_id: int, request: Request):
     user = current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    uid = user["user_id"]
+    p = get_pipeline(uid)
     try:
-        articles = get_pipeline(user["user_id"]).db.get_articles_by_cluster(cluster_id)
+        articles = p.db.get_articles_by_cluster(cluster_id)
         label = articles[0].get('cluster_label', f'Cluster {cluster_id}') if articles else f'Cluster {cluster_id}'
         for a in articles:
             a.pop('abstract', None)
         return {"cluster_id": cluster_id, "cluster_label": label, "articles": articles}
     except Exception as e:
-        return JSONResponse(status_code=500, content={"detail": str(e)})
+        return server_error(e)
+    finally:
+        release_pipeline(uid)
 
 
 @app.get("/api/statistics")
@@ -454,10 +589,14 @@ async def api_statistics(request: Request):
     user = current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    uid = user["user_id"]
+    p = get_pipeline(uid)
     try:
-        return get_pipeline(user["user_id"]).get_statistics()
+        return p.get_statistics()
     except Exception as e:
-        return JSONResponse(status_code=500, content={"detail": str(e)})
+        return server_error(e)
+    finally:
+        release_pipeline(uid)
 
 
 @app.post("/api/detect-duplicates")
@@ -465,8 +604,9 @@ async def api_detect_duplicates(req: DuplicateRequest, request: Request):
     user = current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    uid = user["user_id"]
+    p = get_pipeline(uid)
     try:
-        p = get_pipeline(user["user_id"])
         duplicates = p.detect_duplicates(threshold=req.threshold)
         result = []
         for id1, id2, sim in duplicates[:50]:
@@ -490,7 +630,9 @@ async def api_detect_duplicates(req: DuplicateRequest, request: Request):
                 })
         return {"duplicates": result, "total": len(duplicates)}
     except Exception as e:
-        return JSONResponse(status_code=500, content={"detail": str(e)})
+        return server_error(e)
+    finally:
+        release_pipeline(uid)
 
 
 if __name__ == "__main__":

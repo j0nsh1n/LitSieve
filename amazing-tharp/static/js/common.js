@@ -1,15 +1,34 @@
+// === HTML escaping (shared) ===
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text == null ? '' : text;
+    return div.innerHTML;
+}
+
+// === CSRF token (double-submit cookie) ===
+function getCsrfToken() {
+    const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+    return match ? decodeURIComponent(match[1]) : '';
+}
+
 // === API wrapper ===
 async function apiCall(url, options = {}) {
-    const defaults = {
-        headers: { 'Content-Type': 'application/json' }
-    };
-    const config = { ...defaults, ...options };
+    const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+    const method = (options.method || 'GET').toUpperCase();
+    if (method !== 'GET' && method !== 'HEAD') {
+        headers['X-CSRF-Token'] = getCsrfToken();
+    }
+    const config = { ...options, headers };
     if (config.body && typeof config.body === 'object') {
         config.body = JSON.stringify(config.body);
     }
 
     const response = await fetch(url, config);
     if (!response.ok) {
+        if (response.status === 401) {
+            window.location.href = '/login';
+            throw new Error('Session expired. Redirecting to login.');
+        }
         const error = await response.json().catch(() => ({ detail: response.statusText }));
         throw new Error(error.detail || 'Request failed');
     }

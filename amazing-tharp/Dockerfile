@@ -13,6 +13,9 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
+# NOTE: SECRET_KEY must be provided at runtime (e.g. `docker run -e SECRET_KEY=...`
+# or via the platform's secret store). The app refuses to start without it unless
+# DEBUG=true is set. See .env.example.
 COPY . .
 
 # HF Spaces expects port 7860

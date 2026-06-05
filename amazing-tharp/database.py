@@ -5,10 +5,13 @@ Handles storage and retrieval of articles and embeddings
 
 import sqlite3
 import json
+import logging
+import pickle
 import threading
 import numpy as np
 from typing import List, Dict, Optional, Tuple
-import pickle
+
+logger = logging.getLogger(__name__)
 
 
 class ArticleDatabase:
@@ -41,12 +44,15 @@ class ArticleDatabase:
             )
         """)
 
-        # Embeddings table
+        # Embeddings table. Embeddings are stored as raw numpy bytes plus the
+        # dtype and shape needed to reconstruct them (no pickle — see S3).
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS embeddings (
                 article_id TEXT NOT NULL,
                 source TEXT NOT NULL DEFAULT 'pubmed',
                 embedding BLOB NOT NULL,
+                dtype TEXT,
+                shape TEXT,
                 model_name TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (article_id, source),
@@ -75,8 +81,53 @@ class ArticleDatabase:
         cursor.execute("PRAGMA table_info(articles)")
         columns = [col[1] for col in cursor.fetchall()]
 
+        # Add dtype/shape columns to embeddings if missing (S3: numpy instead of pickle).
+        cursor.execute("PRAGMA table_info(embeddings)")
+        emb_columns = [col[1] for col in cursor.fetchall()]
+        if emb_columns and 'dtype' not in emb_columns:
+            cursor.execute("ALTER TABLE embeddings ADD COLUMN dtype TEXT")
+        if emb_columns and 'shape' not in emb_columns:
+            cursor.execute("ALTER TABLE embeddings ADD COLUMN shape TEXT")
+        self.conn.commit()
+
+        # Convert any legacy rows that still hold pickle.dumps(...) blobs (no
+        # dtype/shape) into the raw-numpy-bytes format. Rows whose blob is not a
+        # valid pickle are deleted so users regenerate them rather than reading
+        # back silently-corrupted vectors (Codex review).
+        if emb_columns:
+            cursor.execute(
+                "SELECT article_id, source, embedding FROM embeddings "
+                "WHERE dtype IS NULL OR shape IS NULL"
+            )
+            legacy_rows = cursor.fetchall()
+            converted = 0
+            deleted = 0
+            for article_id, source, blob in legacy_rows:
+                try:
+                    arr = np.asarray(pickle.loads(blob))
+                except Exception:
+                    cursor.execute(
+                        "DELETE FROM embeddings WHERE article_id = ? AND source = ?",
+                        (article_id, source),
+                    )
+                    deleted += 1
+                    continue
+                cursor.execute(
+                    "UPDATE embeddings SET embedding = ?, dtype = ?, shape = ? "
+                    "WHERE article_id = ? AND source = ?",
+                    (arr.tobytes(), str(arr.dtype), json.dumps(list(arr.shape)),
+                     article_id, source),
+                )
+                converted += 1
+            if converted or deleted:
+                self.conn.commit()
+                logger.info(
+                    "Embedding migration: converted %d legacy pickle rows, "
+                    "deleted %d unrecoverable rows", converted, deleted
+                )
+
         if 'pmid' in columns and 'source' not in columns:
-            print("Migrating database schema from pmid to article_id+source...")
+            logger.info("Migrating database schema from pmid to article_id+source...")
             cursor.execute("ALTER TABLE articles RENAME TO articles_old")
             cursor.execute("ALTER TABLE embeddings RENAME TO embeddings_old")
             cursor.execute("ALTER TABLE clusters RENAME TO clusters_old")
@@ -141,7 +192,7 @@ class ArticleDatabase:
             cursor.execute("DROP TABLE articles_old")
 
             self.conn.commit()
-            print("Schema migration complete.")
+            logger.info("Schema migration complete.")
 
     def clear_all(self):
         """Delete all articles, embeddings, and clusters from the database"""
@@ -152,13 +203,17 @@ class ArticleDatabase:
             cursor.execute("DELETE FROM articles")
             self.conn.commit()
 
-    def insert_articles(self, articles: List[Dict]):
+    def insert_articles(self, articles: List[Dict]) -> int:
         """
-        Insert articles into database
+        Insert articles into database.
 
         Args:
             articles: List of article dictionaries with 'article_id' and 'source' keys
+
+        Returns:
+            Number of articles that were dropped due to insertion errors.
         """
+        dropped = 0
         with self._lock:
             cursor = self.conn.cursor()
             for article in articles:
@@ -170,24 +225,28 @@ class ArticleDatabase:
                     """, (
                         article['article_id'],
                         article.get('source', 'pubmed'),
-                        article['title'],
-                        article['abstract'],
-                        article['year'],
-                        json.dumps(article['authors']),
-                        article['journal']
+                        article.get('title', ''),
+                        article.get('abstract', ''),
+                        article.get('year', ''),
+                        json.dumps(article.get('authors', [])),
+                        article.get('journal', '')
                     ))
                 except Exception as e:
-                    print(f"Error inserting article {article.get('article_id')}: {e}")
+                    dropped += 1
+                    logger.warning("Error inserting article %s: %s", article.get('article_id'), e)
             self.conn.commit()
-        print(f"Inserted {len(articles)} articles")
+        logger.info("Inserted %d articles (%d dropped)", len(articles) - dropped, dropped)
+        return dropped
 
     def get_all_articles(self) -> List[Dict]:
         """Retrieve all articles from database"""
-        cursor = self.conn.cursor()
-        cursor.execute("SELECT article_id, source, title, abstract, year, authors, journal FROM articles")
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT article_id, source, title, abstract, year, authors, journal FROM articles")
+            rows = cursor.fetchall()
 
         articles = []
-        for row in cursor.fetchall():
+        for row in rows:
             articles.append({
                 'article_id': row[0],
                 'source': row[1],
@@ -202,13 +261,13 @@ class ArticleDatabase:
 
     def get_article_by_id(self, article_id: str, source: str) -> Optional[Dict]:
         """Retrieve a specific article by article_id and source"""
-        cursor = self.conn.cursor()
-        cursor.execute(
-            "SELECT article_id, source, title, abstract, year, authors, journal FROM articles WHERE article_id = ? AND source = ?",
-            (article_id, source)
-        )
-
-        row = cursor.fetchone()
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                "SELECT article_id, source, title, abstract, year, authors, journal FROM articles WHERE article_id = ? AND source = ?",
+                (article_id, source)
+            )
+            row = cursor.fetchone()
         if row:
             return {
                 'article_id': row[0],
@@ -233,14 +292,16 @@ class ArticleDatabase:
             cursor = self.conn.cursor()
             for key, embedding in embeddings.items():
                 article_id, source = key
-                embedding_bytes = pickle.dumps(embedding)
+                arr = np.asarray(embedding)
+                embedding_bytes = arr.tobytes()
                 cursor.execute("""
                     INSERT OR REPLACE INTO embeddings
-                    (article_id, source, embedding, model_name)
-                    VALUES (?, ?, ?, ?)
-                """, (article_id, source, embedding_bytes, model_name))
+                    (article_id, source, embedding, dtype, shape, model_name)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (article_id, source, embedding_bytes, str(arr.dtype),
+                      json.dumps(list(arr.shape)), model_name))
             self.conn.commit()
-        print(f"Inserted embeddings for {len(embeddings)} articles")
+        logger.info("Inserted embeddings for %d articles", len(embeddings))
 
     def get_all_embeddings(self) -> Tuple[List[Tuple[str, str]], np.ndarray]:
         """
@@ -249,16 +310,39 @@ class ArticleDatabase:
         Returns:
             Tuple of (list of (article_id, source) tuples, numpy array of embeddings)
         """
-        cursor = self.conn.cursor()
-        cursor.execute("SELECT article_id, source, embedding FROM embeddings")
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT article_id, source, embedding, dtype, shape FROM embeddings")
+            rows = cursor.fetchall()
 
-        ids = []
-        embeddings = []
+            ids = []
+            embeddings = []
+            stale = []
 
-        for row in cursor.fetchall():
-            ids.append((row[0], row[1]))
-            embedding = pickle.loads(row[2])
-            embeddings.append(embedding)
+            for row in rows:
+                # A row missing dtype/shape escaped migration (e.g. written by
+                # an older path). We cannot reconstruct it reliably, so drop it
+                # rather than feed raw bytes to np.frombuffer (Codex review).
+                if row[3] is None or row[4] is None:
+                    stale.append((row[0], row[1]))
+                    continue
+                try:
+                    dtype = np.dtype(row[3])
+                    shape = tuple(json.loads(row[4]))
+                    embedding = np.frombuffer(row[2], dtype=dtype).reshape(shape)
+                except Exception:
+                    stale.append((row[0], row[1]))
+                    continue
+                ids.append((row[0], row[1]))
+                embeddings.append(embedding)
+
+            if stale:
+                cursor.executemany(
+                    "DELETE FROM embeddings WHERE article_id = ? AND source = ?",
+                    stale,
+                )
+                self.conn.commit()
+                logger.warning("Dropped %d embedding rows with missing/invalid dtype or shape", len(stale))
 
         if embeddings:
             return ids, np.array(embeddings)
@@ -281,20 +365,22 @@ class ArticleDatabase:
                     VALUES (?, ?, ?, ?)
                 """, (article_id, source, cluster_id, label))
             self.conn.commit()
-        print(f"Inserted cluster assignments for {len(cluster_assignments)} articles")
+        logger.info("Inserted cluster assignments for %d articles", len(cluster_assignments))
 
     def get_articles_by_cluster(self, cluster_id: int) -> List[Dict]:
         """Get all articles in a specific cluster"""
-        cursor = self.conn.cursor()
-        cursor.execute("""
-            SELECT a.article_id, a.source, a.title, a.abstract, a.year, a.authors, a.journal, c.cluster_label
-            FROM articles a
-            JOIN clusters c ON a.article_id = c.article_id AND a.source = c.source
-            WHERE c.cluster_id = ?
-        """, (cluster_id,))
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT a.article_id, a.source, a.title, a.abstract, a.year, a.authors, a.journal, c.cluster_label
+                FROM articles a
+                JOIN clusters c ON a.article_id = c.article_id AND a.source = c.source
+                WHERE c.cluster_id = ?
+            """, (cluster_id,))
+            rows = cursor.fetchall()
 
         articles = []
-        for row in cursor.fetchall():
+        for row in rows:
             articles.append({
                 'article_id': row[0],
                 'source': row[1],
@@ -310,30 +396,34 @@ class ArticleDatabase:
 
     def get_all_clusters(self) -> List[Dict]:
         """Get summary of all clusters with article counts"""
-        cursor = self.conn.cursor()
-        cursor.execute("""
-            SELECT cluster_id, cluster_label, COUNT(*) as article_count
-            FROM clusters
-            GROUP BY cluster_id, cluster_label
-            ORDER BY cluster_id
-        """)
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT cluster_id, cluster_label, COUNT(*) as article_count
+                FROM clusters
+                GROUP BY cluster_id, cluster_label
+                ORDER BY cluster_id
+            """)
+            rows = cursor.fetchall()
         return [
             {'cluster_id': row[0], 'cluster_label': row[1], 'article_count': row[2]}
-            for row in cursor.fetchall()
+            for row in rows
         ]
 
     def get_all_articles_with_clusters(self) -> Dict[Tuple[str, str], Dict]:
         """Retrieve all articles with their cluster info in one query (avoids O(N) calls)"""
-        cursor = self.conn.cursor()
-        cursor.execute("""
-            SELECT a.article_id, a.source, a.title, a.abstract, a.year, a.authors, a.journal,
-                   c.cluster_id, c.cluster_label
-            FROM articles a
-            LEFT JOIN clusters c ON a.article_id = c.article_id AND a.source = c.source
-        """)
-        
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT a.article_id, a.source, a.title, a.abstract, a.year, a.authors, a.journal,
+                       c.cluster_id, c.cluster_label
+                FROM articles a
+                LEFT JOIN clusters c ON a.article_id = c.article_id AND a.source = c.source
+            """)
+            rows = cursor.fetchall()
+
         result = {}
-        for row in cursor.fetchall():
+        for row in rows:
             key = (row[0], row[1])
             result[key] = {
                 'article_id': row[0],
@@ -350,20 +440,21 @@ class ArticleDatabase:
 
     def get_statistics(self) -> Dict:
         """Get database statistics"""
-        cursor = self.conn.cursor()
+        with self._lock:
+            cursor = self.conn.cursor()
 
-        cursor.execute("SELECT COUNT(*) FROM articles")
-        article_count = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) FROM articles")
+            article_count = cursor.fetchone()[0]
 
-        cursor.execute("SELECT COUNT(*) FROM embeddings")
-        embedding_count = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) FROM embeddings")
+            embedding_count = cursor.fetchone()[0]
 
-        cursor.execute("SELECT COUNT(DISTINCT cluster_id) FROM clusters")
-        cluster_count = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(DISTINCT cluster_id) FROM clusters")
+            cluster_count = cursor.fetchone()[0]
 
-        # Source breakdown
-        cursor.execute("SELECT source, COUNT(*) FROM articles GROUP BY source")
-        sources = {row[0]: row[1] for row in cursor.fetchall()}
+            # Source breakdown
+            cursor.execute("SELECT source, COUNT(*) FROM articles GROUP BY source")
+            sources = {row[0]: row[1] for row in cursor.fetchall()}
 
         return {
             'total_articles': article_count,

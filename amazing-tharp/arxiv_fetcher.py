@@ -16,7 +16,7 @@ ARXIV_NS = 'http://arxiv.org/schemas/atom'
 
 class ArXivFetcher(BaseFetcher):
     SOURCE_NAME = 'arxiv'
-    BASE_URL = 'http://export.arxiv.org/api/query'
+    BASE_URL = 'https://export.arxiv.org/api/query'
 
     def __init__(self, email: str = None):
         self.email = email

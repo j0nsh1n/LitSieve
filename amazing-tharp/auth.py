@@ -16,9 +16,17 @@ from fastapi import Request
 load_dotenv()
 
 _SECRET_KEY = os.getenv("SECRET_KEY", "").strip()
+_DEBUG = os.getenv("DEBUG", "").strip().lower() in ("1", "true", "yes")
+
 if not _SECRET_KEY:
-    # Warn instead of raising during import so tests and utilities can import this module.
-    print("⚠️ SECRET_KEY is not set. create_token will raise if called. Set SECRET_KEY in environment or .env.")
+    if _DEBUG:
+        # Allow imports/tests in debug mode; tokens cannot be created without a key.
+        print("⚠️ SECRET_KEY is not set (DEBUG mode). Tokens cannot be created.")
+    else:
+        raise RuntimeError(
+            "SECRET_KEY is not configured. Set SECRET_KEY in the environment "
+            "(or .env), or set DEBUG=true for local development."
+        )
 
 ALGORITHM = "HS256"
 TOKEN_EXPIRE_DAYS = 30
