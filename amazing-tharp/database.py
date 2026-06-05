@@ -6,6 +6,7 @@ Handles storage and retrieval of articles and embeddings
 import sqlite3
 import json
 import logging
+import pickle
 import threading
 import numpy as np
 from typing import List, Dict, Optional, Tuple
@@ -88,6 +89,42 @@ class ArticleDatabase:
         if emb_columns and 'shape' not in emb_columns:
             cursor.execute("ALTER TABLE embeddings ADD COLUMN shape TEXT")
         self.conn.commit()
+
+        # Convert any legacy rows that still hold pickle.dumps(...) blobs (no
+        # dtype/shape) into the raw-numpy-bytes format. Rows whose blob is not a
+        # valid pickle are deleted so users regenerate them rather than reading
+        # back silently-corrupted vectors (Codex review).
+        if emb_columns:
+            cursor.execute(
+                "SELECT article_id, source, embedding FROM embeddings "
+                "WHERE dtype IS NULL OR shape IS NULL"
+            )
+            legacy_rows = cursor.fetchall()
+            converted = 0
+            deleted = 0
+            for article_id, source, blob in legacy_rows:
+                try:
+                    arr = np.asarray(pickle.loads(blob))
+                except Exception:
+                    cursor.execute(
+                        "DELETE FROM embeddings WHERE article_id = ? AND source = ?",
+                        (article_id, source),
+                    )
+                    deleted += 1
+                    continue
+                cursor.execute(
+                    "UPDATE embeddings SET embedding = ?, dtype = ?, shape = ? "
+                    "WHERE article_id = ? AND source = ?",
+                    (arr.tobytes(), str(arr.dtype), json.dumps(list(arr.shape)),
+                     article_id, source),
+                )
+                converted += 1
+            if converted or deleted:
+                self.conn.commit()
+                logger.info(
+                    "Embedding migration: converted %d legacy pickle rows, "
+                    "deleted %d unrecoverable rows", converted, deleted
+                )
 
         if 'pmid' in columns and 'source' not in columns:
             logger.info("Migrating database schema from pmid to article_id+source...")
@@ -278,15 +315,34 @@ class ArticleDatabase:
             cursor.execute("SELECT article_id, source, embedding, dtype, shape FROM embeddings")
             rows = cursor.fetchall()
 
-        ids = []
-        embeddings = []
+            ids = []
+            embeddings = []
+            stale = []
 
-        for row in rows:
-            ids.append((row[0], row[1]))
-            dtype = row[3] or 'float32'
-            shape = tuple(json.loads(row[4])) if row[4] else (-1,)
-            embedding = np.frombuffer(row[2], dtype=np.dtype(dtype)).reshape(shape)
-            embeddings.append(embedding)
+            for row in rows:
+                # A row missing dtype/shape escaped migration (e.g. written by
+                # an older path). We cannot reconstruct it reliably, so drop it
+                # rather than feed raw bytes to np.frombuffer (Codex review).
+                if row[3] is None or row[4] is None:
+                    stale.append((row[0], row[1]))
+                    continue
+                try:
+                    dtype = np.dtype(row[3])
+                    shape = tuple(json.loads(row[4]))
+                    embedding = np.frombuffer(row[2], dtype=dtype).reshape(shape)
+                except Exception:
+                    stale.append((row[0], row[1]))
+                    continue
+                ids.append((row[0], row[1]))
+                embeddings.append(embedding)
+
+            if stale:
+                cursor.executemany(
+                    "DELETE FROM embeddings WHERE article_id = ? AND source = ?",
+                    stale,
+                )
+                self.conn.commit()
+                logger.warning("Dropped %d embedding rows with missing/invalid dtype or shape", len(stale))
 
         if embeddings:
             return ids, np.array(embeddings)
