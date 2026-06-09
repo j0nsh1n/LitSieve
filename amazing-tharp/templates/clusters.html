@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Clusters - Literature Research Aide{% endblock %}
+{% block content %}
+<section class="page-header">
+    <h1>Article Clusters</h1>
+    <p class="subtitle">Group your articles into themed clusters using their embeddings, then browse each cluster.</p>
+</section>
+
+<section class="card">
+    <h2>Generate Clusters</h2>
+    <p class="info-text">Clustering runs on articles that already have embeddings. Create embeddings on the Data Management page first if you haven't.</p>
+    <div class="form-row">
+        <div class="param-group">
+            <label>Number of clusters: <strong id="nclusters-display">10</strong></label>
+            <input type="range" id="n-clusters" min="2" max="30" value="10">
+        </div>
+        <div class="form-group">
+            <label>Method</label>
+            <select id="cluster-method">
+                <option value="kmeans">K-Means (fast)</option>
+                <option value="hierarchical">Hierarchical (Ward)</option>
+            </select>
+        </div>
+    </div>
+    <button id="cluster-btn" class="btn btn-primary">Generate Clusters</button>
+    <div id="cluster-status" class="status-indicator"></div>
+</section>
+
+<section class="card">
+    <div class="results-header">
+        <h2>Clusters: <span id="cluster-count">0</span></h2>
+    </div>
+    <div id="clusters-list">
+        <p class="info-text">No clusters yet. Generate them above to see them here.</p>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/clusters.js"></script>
+{% endblock %}

@@ -185,6 +185,7 @@ function doExport(format) {
         query_text: lastSearchParams.query_text,
         top_k: lastSearchParams.top_k,
         sort_by: lastSearchParams.sort_by,
+        source_filter: (lastSearchParams.source_filter || []).join(','),
         format: format
     });
     window.location.href = `/api/search/export?${params.toString()}`;

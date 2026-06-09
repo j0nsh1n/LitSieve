@@ -7,339 +7,206 @@ sdk: docker
 app_port: 7860
 ---
 
-# Literature Search & Similarity Tool 📚
+# Literature Research Aide 📚
 
-A powerful tool for finding similar research papers using semantic search, clustering, and visualization. Built with NLP, embeddings, and machine learning.
+A multi-user web app for finding similar research papers across many academic
+databases using semantic embeddings, clustering, and duplicate detection.
+
+Built with **FastAPI**, sentence-transformers, FAISS, and scikit-learn.
 
 ## Features
 
-✨ **Core Functionality:**
-- 🔍 Fetch research articles from PubMed
-- 🧠 Create semantic embeddings using pre-trained models
-- 📊 Cluster similar articles automatically
-- 🎯 Search for papers similar to your research
-- 📈 Interactive visualizations (UMAP, heatmaps, cluster plots)
-- 🔄 Duplicate detection
-- 💾 SQLite database for efficient storage
-
-🌐 **Web Interface:**
-- User-friendly Streamlit interface
-- PICO format support for medical research
-- Export results to CSV/PDF
-- Real-time search and filtering
+- 🔍 Fetch articles from **11 sources** in parallel (PubMed, Europe PMC,
+  ClinicalTrials.gov, OpenAlex, arXiv, Semantic Scholar, ERIC, Zenodo,
+  CrossRef, DOAJ, NASA ADS)
+- 🧠 Create semantic embeddings with pre-trained models
+- 🎯 Similarity search against your study description or PICO terms
+- 🧩 Automatic clustering with TF-IDF cluster labels
+- 🔄 Duplicate / near-duplicate detection (cross-source)
+- 📈 Statistics dashboard with per-source breakdown
+- 💾 Per-user SQLite storage, JWT auth, CSRF protection, rate limiting
+- 📤 Export search results to CSV or TXT
 
 ## Project Structure
 
 ```
-literature_search_tool/
-├── src/
-│   ├── pubmed_fetcher.py      # Fetch articles from PubMed
-│   ├── database.py             # SQLite database management
-│   ├── embeddings.py           # Create and compare embeddings
-│   ├── clustering.py           # Clustering and visualization
-│   └── pipeline.py             # Main orchestration pipeline
-├── app/
-│   └── streamlit_app.py        # Web interface
-├── data/                       # Data storage (created automatically)
-├── notebooks/                  # Jupyter notebooks (optional)
-├── requirements.txt            # Python dependencies
-└── README.md                   # This file
+amazing-tharp/
+├── main.py                 # FastAPI application (entry point)
+├── pipeline.py             # Orchestrates fetch → embed → cluster → search
+├── base_fetcher.py         # Abstract fetcher interface
+├── <source>_fetcher.py     # One fetcher per source (pubmed_fetcher.py, …)
+├── database.py             # Per-user article/embedding/cluster SQLite store
+├── user_db.py              # User-account database (users.db)
+├── auth.py                 # JWT + bcrypt password hashing
+├── embeddings.py           # EmbeddingEngine + PICOExtractor
+├── clustering.py           # Clustering, TF-IDF labels, Plotly visualizations
+├── templates/              # Jinja2 HTML pages
+├── static/                 # CSS + page JavaScript
+├── tests/                  # pytest suite
+├── requirements.txt
+├── Dockerfile              # Container build (HF Spaces / any Docker host)
+└── render.yaml             # Render.com deployment config
 ```
 
 ## Installation
 
 ### Prerequisites
-- Python 3.8 or higher
-- pip package manager
+- Python 3.11 recommended
+- pip
 
 ### Setup
 
-1. **Clone or download this project**
-
-2. **Install dependencies:**
 ```bash
+# 1. Install CPU-only PyTorch first (smaller than the default build)
+pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+# 2. Install the rest of the dependencies
 pip install -r requirements.txt
+
+# 3. Configure environment
+cp .env.example .env
+#   - Set SECRET_KEY (required), e.g.:
+#       python -c "import secrets; print(secrets.token_urlsafe(48))"
+#   - Or set DEBUG=true to run locally without a SECRET_KEY.
+#   - Optionally set NASA_ADS_TOKEN to enable the NASA ADS source.
 ```
 
-3. **Set up directories:**
+> The app refuses to start without `SECRET_KEY` unless `DEBUG=true`.
+
+## Running
+
 ```bash
-mkdir -p data data/visualizations
+uvicorn main:app --host 0.0.0.0 --port 7860
 ```
 
-## Usage
+Then open <http://localhost:7860>. You'll be redirected to `/login` — register
+an account, then use the workflow:
 
-### Option 1: Web Interface (Recommended)
+1. **Data Management** → pick topics/sources, enter a query, **Fetch** articles
+   (all selected sources run in parallel), then **Create embeddings**.
+2. **Clusters** → group the embedded articles into themed clusters (K-Means or
+   hierarchical) and browse the papers in each one.
+3. **Search** → describe your study (free text or PICO fields) to rank the most
+   similar papers; filter by source and export results to CSV/TXT.
+4. **Duplicates** → review database statistics and detect near-duplicate papers
+   across sources.
 
-Launch the Streamlit app:
+### Docker
 
 ```bash
-cd app
-streamlit run streamlit_app.py
+docker build -t literature-aide .
+docker run -p 7860:7860 -e SECRET_KEY="$(python -c 'import secrets;print(secrets.token_urlsafe(48))')" literature-aide
 ```
 
-Then navigate to:
-1. **Data Management** → Fetch articles from PubMed
-2. **Data Management** → Create embeddings
-3. **Data Management** → Cluster articles
-4. **Search Similar** → Find papers similar to your research
-5. **View Clusters** → Explore visualizations
+## Programmatic use (pipeline)
 
-### Option 2: Python API
+The web app is the primary interface, but the pipeline can be driven directly:
 
 ```python
-from src.pipeline import LiteratureSearchPipeline
+from pipeline import LiteratureSearchPipeline
 
-# Initialize pipeline
-pipeline = LiteratureSearchPipeline(
-    db_path="data/articles.db",
-    embedding_model='general'  # or 'pubmedbert' for better accuracy
-)
+pipeline = LiteratureSearchPipeline(db_path="articles.db", embedding_model="general")
 
-# Step 1: Fetch articles
-pipeline.fetch_articles(
-    query="machine learning healthcare",
-    max_results=1000,
-    email="your.email@example.com"  # Required by NCBI
-)
+# Fetch from a single source...
+pipeline.fetch_articles(query="machine learning healthcare", max_results=500,
+                        email="you@example.com", source="pubmed")
+# ...or several sources in parallel
+pipeline.fetch_articles_parallel(query="machine learning healthcare",
+                                 sources=["pubmed", "europepmc", "openalex"],
+                                 max_results=200, email="you@example.com")
 
-# Step 2: Create embeddings
 pipeline.create_embeddings()
+pipeline.cluster_articles(n_clusters=8, method="kmeans")
+pipeline.create_visualizations()           # writes Plotly HTML to visualizations/
 
-# Step 3: Cluster articles
-pipeline.cluster_articles(n_clusters=10, method='kmeans')
-
-# Step 4: Create visualizations
-pipeline.create_visualizations()
-
-# Search for similar articles
-results = pipeline.search_similar(
-    query_text="""
-    We are studying the use of deep learning to predict
-    patient outcomes from electronic health records.
-    """,
-    top_k=10
-)
-
-# Detect duplicates
+results = pipeline.search_similar("deep learning to predict patient outcomes", top_k=10)
 duplicates = pipeline.detect_duplicates(threshold=0.95)
-
-# Clean up
 pipeline.close()
 ```
 
-### Option 3: Command-Line Script
+## Performance & hardware acceleration
 
-Create a simple script `run_pipeline.py`:
+The pipeline has two distinct cost centres, accelerated differently:
 
-```python
-from src.pipeline import LiteratureSearchPipeline
-
-pipeline = LiteratureSearchPipeline()
-
-# Customize your workflow
-pipeline.fetch_articles(
-    query="YOUR_SEARCH_QUERY",
-    max_results=500,
-    email="your.email@example.com"
-)
-
-pipeline.create_embeddings()
-pipeline.cluster_articles(n_clusters=8)
-pipeline.create_visualizations()
-
-pipeline.close()
-```
-
-Run it:
-```bash
-python run_pipeline.py
-```
+- **Pulling articles** from the source databases is **network I/O**, not compute.
+  It is already concurrent across sources (a thread pool fans out to all
+  selected databases at once); within a single source, pages are fetched
+  sequentially on purpose to respect each API's rate limits. This stage does not
+  benefit from a GPU.
+- **Embeddings** run on a GPU when one is available. The device is auto-detected
+  as **cuda → mps (Apple Silicon) → cpu**, overridable with `EMBEDDING_DEVICE`.
+  If an accelerator fails to initialise, it falls back to CPU instead of
+  crashing the embedding step. Vectors are L2-normalised at creation so
+  similarity is a plain dot product downstream.
+  > The bundled Dockerfile installs CPU-only torch; for GPU, install a
+  > CUDA-enabled torch build in your image/host.
+- **Similarity search & duplicate detection** use **FAISS**. Search builds a
+  transient inner-product index; duplicate detection uses a FAISS *range search*
+  that only materialises the pairs above your threshold, instead of a dense
+  N×N matrix — so it scales to large corpora. (Without FAISS installed, both
+  fall back to scikit-learn.)
 
 ## Embedding Models
 
-The tool supports multiple embedding models:
+Selectable via the `model` field on the embeddings request:
 
-| Model | Speed | Accuracy | Best For |
-|-------|-------|----------|----------|
-| `general` | ⚡⚡⚡ Fast | Good | General text, quick testing |
-| `pubmedbert` | ⚡⚡ Medium | ⭐⭐⭐ Excellent | Biomedical research |
-| `biosentbert` | ⚡⚡ Medium | ⭐⭐⭐ Excellent | Medical text |
-| `specter` | ⚡ Slow | ⭐⭐⭐ Excellent | Scientific papers |
+| Key | Model | Best for |
+|-----|-------|----------|
+| `general` | `all-MiniLM-L6-v2` | Fast general-purpose (default) |
+| `pubmedbert` | `S-PubMedBert-MS-MARCO` | Biomedical research |
+| `biosentbert` | `BioBERT-...-stsb` | Medical text |
+| `specter` | `allenai/specter` | Scientific papers |
 
-**Recommendation:** Start with `general` for testing, then use `pubmedbert` for production.
-
-## Example Queries
-
-### PubMed Search Queries
-```
-"machine learning healthcare"
-"deep learning medical imaging"
-"natural language processing clinical notes"
-"AI diagnosis cancer"
-```
-
-### Similarity Search Queries
-```
-Study Description:
-"We are investigating whether machine learning models can predict
-hospital readmission rates using electronic health record data from
-diabetic patients."
-
-PICO Format:
-Population: Adults with type 2 diabetes
-Intervention: Machine learning prediction model
-Comparison: Standard risk assessment
-Outcome: 30-day hospital readmission
-```
-
-## Visualizations
-
-The tool creates three types of visualizations:
-
-1. **2D Cluster Plot** (`clusters_2d.html`)
-   - Interactive scatter plot using UMAP dimensionality reduction
-   - Hover to see article titles
-   - Color-coded by cluster
-
-2. **Cluster Summary** (`cluster_summary.html`)
-   - Bar chart showing articles per cluster
-   - Cluster labels based on key terms
-
-3. **Similarity Heatmap** (`similarity_heatmap.png`)
-   - Pairwise similarity matrix
-   - Identifies duplicate or highly similar papers
+Start with `general`; switch to a biomedical model for medical corpora.
 
 ## Database Schema
 
-The SQLite database contains three tables:
+Each user gets their own `user_data/<user_id>/articles.db` with three tables,
+all keyed by the composite `(article_id, source)`:
 
-**articles**
-- pmid (PRIMARY KEY)
-- title, abstract, year, authors, journal
+- **articles** — `article_id`, `source`, `title`, `abstract`, `year`, `authors`, `journal`
+- **embeddings** — raw numpy bytes + `dtype` + `shape` + `model_name` (no pickle)
+- **clusters** — `cluster_id`, `cluster_label`
 
-**embeddings**
-- pmid (PRIMARY KEY)
-- embedding (BLOB - pickled numpy array)
-- model_name
+User accounts live in a separate `users.db`.
 
-**clusters**
-- pmid (PRIMARY KEY)
-- cluster_id
-- cluster_label
+## Testing
 
-## Performance Tips
+```bash
+pytest
+```
 
-1. **Start Small:** Test with 100-500 articles first
-2. **Batch Processing:** Fetch articles in batches of 200-500
-3. **Model Selection:** Use `general` model for quick tests
-4. **Clustering:** 5-15 clusters works well for most datasets
-5. **Memory:** Large datasets (10,000+ articles) may need 8GB+ RAM
+`tests/conftest.py` sets a throwaway `SECRET_KEY` so the auth module imports
+cleanly during tests. Coverage includes:
+
+- **Unit** — password hashing/verification, JWT round-trip + expiry, user-DB
+  CRUD, duplicate-username rejection, embedding storage.
+- **Integration** (`test_integration_accounts.py`) — drives the real ASGI app
+  with FastAPI's `TestClient` through register → authenticated fetch →
+  statistics for two users, asserting per-account data isolation, CSRF
+  enforcement, login, and rejection of bad credentials. Network/model work is
+  stubbed (a fake fetcher), so it runs offline; it self-skips if app runtime
+  deps aren't installed.
 
 ## Troubleshooting
 
-### Common Issues
+**"SECRET_KEY is not configured"** — set `SECRET_KEY` in `.env`, or `DEBUG=true`
+for local development.
 
-**"No module named 'Bio'"**
-```bash
-pip install biopython
-```
+**Login succeeds but bounces straight back to the login page (locally)** — over
+plain `http://localhost` the browser drops the `Secure` auth cookie. Set
+`DEBUG=true` in `.env` for local development; keep it `false` on HTTPS deploys.
 
-**"NCBI API Error"**
-- Provide a valid email address
-- Don't exceed 3 requests per second
-- Consider getting an NCBI API key for higher limits
+**FAISS not installed** — the app falls back to scikit-learn for similarity
+search (slower on large corpora). Install `faiss-cpu` to re-enable it.
 
-**"Out of Memory"**
-- Reduce batch size in fetcher
-- Use `general` model instead of biomedical models
-- Process in smaller chunks
+**NASA ADS returns nothing** — set `NASA_ADS_TOKEN`; that source is skipped when
+the token is unset.
 
-**"No embeddings found"**
-- Make sure you run `create_embeddings()` after fetching articles
-- Check database: `pipeline.get_statistics()`
-
-## Advanced Features
-
-### PICO Extraction
-```python
-from src.embeddings import PICOExtractor
-
-pico = PICOExtractor.extract_pico(abstract_text)
-print(pico)  # Dictionary with P, I, C, O elements
-```
-
-### Custom Clustering
-```python
-from src.clustering import ArticleClusterer, ClusterLabeler
-
-clusterer = ArticleClusterer(n_clusters=15, method='hierarchical')
-labels = clusterer.fit(embeddings)
-
-# Generate better labels with LLM (requires API)
-cluster_labels = ClusterLabeler.generate_llm_labels(articles_by_cluster)
-```
-
-### Export Results
-```python
-import pandas as pd
-
-# Export to CSV
-df = pd.DataFrame(results)
-df.to_csv('search_results.csv', index=False)
-
-# Export to JSON
-import json
-with open('results.json', 'w') as f:
-    json.dump(results, f, indent=2)
-```
-
-## Development Timeline
-
-Based on your project plan:
-
-- ✅ **December**: Project setup, PubMed fetcher, data storage
-- ✅ **January**: Embeddings, similarity search, PICO extraction
-- ✅ **February**: Clustering, visualizations (current phase!)
-- ⏳ **March**: UI polish, testing, documentation
-
-## Next Steps
-
-1. **Test the system:**
-   ```bash
-   cd app
-   streamlit run streamlit_app.py
-   ```
-
-2. **Fetch your first dataset:**
-   - Use the web interface
-   - Start with 100-200 articles
-   - Try different search queries
-
-3. **Experiment with models:**
-   - Compare `general` vs `pubmedbert`
-   - Adjust number of clusters
-   - Try different visualization settings
-
-4. **Customize:**
-   - Modify cluster labels
-   - Add new visualizations
-   - Integrate with your workflow
-
-## Resources
-
-- [PubMed API Documentation](https://www.ncbi.nlm.nih.gov/books/NBK25501/)
-- [Sentence Transformers](https://www.sbert.net/)
-- [UMAP Documentation](https://umap-learn.readthedocs.io/)
-- [Streamlit Documentation](https://docs.streamlit.io/)
+**No search results** — make sure you fetched articles *and* created embeddings
+first; check counts on the Duplicates (statistics) page.
 
 ## License
 
-This project is for educational purposes. Please cite original papers when using in publications.
-
-## Contact
-
-For questions or issues, please open an issue in the repository.
-
----
-
-**Happy researching! 📚🔬**
+For educational purposes. Please cite original papers when using results in
+publications.

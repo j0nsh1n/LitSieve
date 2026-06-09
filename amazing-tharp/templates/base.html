@@ -17,13 +17,14 @@
         <div class="nav-brand">Literature Research Aide</div>
         <div class="nav-links">
             <a href="/data-management" class="nav-link {% if active_page == 'data_management' %}active{% endif %}">Data Management</a>
-            <a href="/statistics" class="nav-link {% if active_page == 'statistics' %}active{% endif %}">Duplicates</a>
+            <a href="/clusters" class="nav-link {% if active_page == 'clusters' %}active{% endif %}">Clusters</a>
             <a href="/search" class="nav-link {% if active_page == 'search' %}active{% endif %}">Search</a>
+            <a href="/statistics" class="nav-link {% if active_page == 'statistics' %}active{% endif %}">Duplicates</a>
         </div>
         <div class="nav-stats">
             <button class="theme-toggle" id="theme-toggle" title="Toggle theme">🌙</button>
             {% if user %}
-            <span class="nav-username">{{ user.username }}</span>
+            <a href="/account" class="nav-username {% if active_page == 'account' %}active{% endif %}" title="Account settings">{{ user.username }}</a>
             <a href="/logout" class="nav-logout">Logout</a>
             {% endif %}
             <span class="stat-badge" id="nav-article-count">-- articles</span>
@@ -36,7 +37,7 @@
     </main>
 
     <footer class="footer">
-        <p>Literature Research Aide &mdash; v2.3.0</p>
+        <p>Literature Research Aide &mdash; v2.4.1</p>
     </footer>
 
     <script src="/static/js/common.js"></script>
