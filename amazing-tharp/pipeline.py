@@ -353,8 +353,30 @@ class LiteratureSearchPipeline:
             article_ids = [article_ids[i] for i in keep]
             article_embeddings = article_embeddings[keep]
 
+        # The query must be embedded with the SAME model that built the stored
+        # vectors — different models have different dimensions, and the pipeline
+        # may have been recreated with the default model since embedding (e.g.
+        # after re-login). Re-sync to the stored model before embedding.
+        stored_model = self.db.get_embedding_model()
+        if stored_model and stored_model != self.embedding_model_name:
+            logger.info(
+                "Query embedder '%s' differs from stored embeddings' model '%s'; switching.",
+                self.embedding_model_name, stored_model,
+            )
+            self.embedding_engine = EmbeddingEngine(model_name=stored_model)
+            self.embedding_model_name = stored_model
+
         # Create query embedding
         query_embedding = self.embedding_engine.embed_query(query_text)
+
+        # Defensive: if the dimensions still disagree (e.g. corrupt/mixed-model
+        # embeddings), fail with a clear, actionable message instead of a cryptic
+        # FAISS assertion deep in the search call.
+        if query_embedding.shape[-1] != article_embeddings.shape[1]:
+            raise ValueError(
+                "Embedding dimension mismatch between the query and stored "
+                "articles. Re-create embeddings on the Data Management page."
+            )
 
         # Find similar articles
         results = self.embedding_engine.find_similar(

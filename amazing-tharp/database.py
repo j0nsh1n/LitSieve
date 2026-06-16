@@ -348,6 +348,23 @@ class ArticleDatabase:
             return ids, np.array(embeddings)
         return [], np.array([])
 
+    def get_embedding_model(self) -> Optional[str]:
+        """Return the model name the stored embeddings were built with.
+
+        Used so a search query is embedded with the same model as the corpus
+        (different models produce different vector dimensions). Returns the most
+        common model_name across stored embeddings, or None if there are none.
+        """
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                "SELECT model_name, COUNT(*) AS c FROM embeddings "
+                "WHERE model_name IS NOT NULL "
+                "GROUP BY model_name ORDER BY c DESC LIMIT 1"
+            )
+            row = cursor.fetchone()
+        return row[0] if row else None
+
     def insert_clusters(self, cluster_assignments: Dict):
         """
         Store cluster assignments

@@ -88,6 +88,20 @@ def test_insert_and_get_all_articles(article_db):
     assert ids == {"1", "2"}
 
 
+def test_get_embedding_model(article_db):
+    article_db.insert_articles([
+        {"article_id": "1", "source": "pubmed", "title": "t", "abstract": "a"},
+    ])
+    # No embeddings yet.
+    assert article_db.get_embedding_model() is None
+
+    article_db.insert_embeddings(
+        {("1", "pubmed"): np.arange(8, dtype=np.float32)}, model_name="pubmedbert"
+    )
+    # Search must know which model built the vectors, to match query dimensions.
+    assert article_db.get_embedding_model() == "pubmedbert"
+
+
 def test_embeddings_roundtrip_without_pickle(article_db):
     article_db.insert_articles([
         {"article_id": "1", "source": "pubmed", "title": "t",

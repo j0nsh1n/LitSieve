@@ -1,5 +1,5 @@
 """
-FastAPI Application — Literature Research Aide v2.4.1
+FastAPI Application — Literature Research Aide v2.5.0
 Multi-user web interface for literature search and analysis.
 """
 
@@ -45,12 +45,12 @@ MAX_CACHED_USERS = 50
 limiter = Limiter(key_func=get_remote_address)
 
 # At top of file
-app = FastAPI(title="Literature Research Aide", version="2.4.1")
+app = FastAPI(title="Literature Research Aide", version="2.5.0")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 @app.get("/health")
 async def health():
-    return {"status": "healthy", "version": "2.4.1"}
+    return {"status": "healthy", "version": "2.5.0"}
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
@@ -411,6 +411,8 @@ async def api_search(req: SearchRequest, request: Request):
         elif req.sort_by == "title":
             results.sort(key=lambda a: (a.get('title') or '').lower())
         return {"results": results, "total": len(results)}
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"detail": str(e)})
     except Exception as e:
         return server_error(e)
     finally:
@@ -479,6 +481,8 @@ async def api_search_export(
             media_type=media_type,
             headers={"Content-Disposition": f"attachment; filename={filename}"}
         )
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"detail": str(e)})
     except Exception as e:
         return server_error(e)
     finally:

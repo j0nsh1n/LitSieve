@@ -3,16 +3,9 @@
 let lastSearchParams = null;
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Restore last fetched sources
-    const savedSources = localStorage.getItem('last_fetched_sources');
-    if (savedSources) {
-        try {
-            const sources = JSON.parse(savedSources);
-            document.querySelectorAll('input[name="search-source"]').forEach(cb => {
-                cb.checked = sources.includes(cb.value);
-            });
-        } catch (e) { /* ignore corrupt data */ }
-    }
+    // Check/enable only the sources the account actually has articles for, so a
+    // fresh login doesn't search across empty sources (which looks broken).
+    applyAvailableSources();
 
     // Input method toggle
     document.querySelectorAll('input[name="input_method"]').forEach(radio => {
@@ -46,6 +39,49 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 });
+
+// Reflect the account's real data: check + enable sources that have articles,
+// disable + dim sources that have none, and show each source's article count.
+async function applyAvailableSources() {
+    let sources = {};
+    try {
+        const stats = await apiCall('/api/statistics');
+        sources = stats.sources || {};
+    } catch (e) {
+        return; // stats unavailable — leave the static defaults in place
+    }
+
+    let anyAvailable = false;
+    document.querySelectorAll('input[name="search-source"]').forEach(cb => {
+        const count = sources[cb.value] || 0;
+        const label = cb.closest('.radio-label');
+        cb.disabled = count === 0;
+        cb.checked = count > 0;
+        if (count > 0) anyAvailable = true;
+
+        if (label) {
+            label.classList.toggle('source-empty', count === 0);
+            let badge = label.querySelector('.src-count');
+            if (count > 0) {
+                if (!badge) {
+                    badge = document.createElement('span');
+                    badge.className = 'src-count';
+                    label.appendChild(badge);
+                }
+                badge.textContent = `(${count})`;
+            } else if (badge) {
+                badge.remove();
+            }
+        }
+    });
+
+    const hint = document.getElementById('source-availability-hint');
+    if (hint) {
+        hint.textContent = anyAvailable
+            ? ''
+            : 'No articles yet — fetch some on the Data Management page first.';
+    }
+}
 
 function buildQueryText() {
     const method = document.querySelector('input[name="input_method"]:checked').value;
@@ -163,7 +199,7 @@ function renderResults(results) {
                     <span><strong>Source:</strong> ${escapeHtml(getSourceName(article.source))}</span>
                     <span><strong>ID:</strong> ${idLink}</span>
                 </div>
-                <div class="article-meta">
+                <div class="article-meta meta-authors">
                     <span><strong>Authors:</strong> ${escapeHtml(authors)}</span>
                 </div>
                 <div class="article-abstract">${escapeHtml(article.abstract || '')}</div>
