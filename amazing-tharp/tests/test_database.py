@@ -33,6 +33,35 @@ def test_user_create_and_get(user_db):
     assert by_id["username"] == "alice"
 
 
+def test_duplicate_username_rejected(user_db):
+    user_db.create_user("bob", "pw1")
+    # The UNIQUE constraint (case-insensitive) must reject a second "bob",
+    # including a different-case variant, as a clean ValueError rather than a
+    # raw IntegrityError / 500.
+    with pytest.raises(ValueError):
+        user_db.create_user("bob", "pw2")
+    with pytest.raises(ValueError):
+        user_db.create_user("BOB", "pw3")
+
+
+def test_users_get_distinct_ids(user_db):
+    a = user_db.create_user("carol", "pw")
+    b = user_db.create_user("dave", "pw")
+    # Per-user data isolation depends on these ids being unique — they key the
+    # per-user article database directory (user_data/<id>/articles.db).
+    assert a["id"] != b["id"]
+
+
+def test_delete_user(user_db):
+    u = user_db.create_user("frank", "pw")
+    assert user_db.get_by_username("frank") is not None
+
+    assert user_db.delete_user(u["id"]) is True
+    assert user_db.get_by_username("frank") is None
+    # Deleting a non-existent id is a no-op that reports False.
+    assert user_db.delete_user(u["id"]) is False
+
+
 def test_insert_and_get_all_articles(article_db):
     articles = [
         {

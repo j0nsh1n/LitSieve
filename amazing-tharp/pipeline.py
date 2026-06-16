@@ -179,6 +179,16 @@ class LiteratureSearchPipeline:
             logger.info("No embeddings found. Create embeddings first.")
             return
 
+        # Clustering needs at least as many samples as clusters. Clamp rather
+        # than let scikit-learn raise, so the UI gets a usable result.
+        n_samples = len(article_ids)
+        if n_clusters > n_samples:
+            logger.warning(
+                "Requested %d clusters but only %d embedded articles; clamping.",
+                n_clusters, n_samples,
+            )
+            n_clusters = max(1, n_samples)
+
         # Perform clustering
         clusterer = ArticleClusterer(n_clusters=n_clusters, method=method)
         labels = clusterer.fit(embeddings)
@@ -282,11 +292,17 @@ class LiteratureSearchPipeline:
         )
 
         logger.info("Creating similarity heatmap...")
-        similarity_matrix = self.embedding_engine.calculate_similarity_matrix(matched_embeddings)
+        # The heatmap only ever displays up to `heatmap_n` articles, so compute
+        # the similarity matrix on that bounded subset instead of materialising
+        # the full O(N^2) matrix for the whole corpus.
+        heatmap_n = min(100, len(matched_embeddings))
+        similarity_matrix = self.embedding_engine.calculate_similarity_matrix(
+            matched_embeddings[:heatmap_n]
+        )
         fig_heatmap = ClusterVisualizer.plot_similarity_heatmap(
             similarity_matrix,
-            labels,
-            max_display=100,
+            labels[:heatmap_n],
+            max_display=heatmap_n,
             save_path=os.path.join(output_dir, 'similarity_heatmap.html')
         )
 
@@ -298,13 +314,22 @@ class LiteratureSearchPipeline:
             'heatmap': fig_heatmap
         }
 
-    def search_similar(self, query_text: str, top_k: int = 10) -> List[Dict]:
+    def search_similar(
+        self,
+        query_text: str,
+        top_k: int = 10,
+        source_filter: Optional[List[str]] = None,
+    ) -> List[Dict]:
         """
         Search for articles similar to a query
 
         Args:
             query_text: User's study description or search query
             top_k: Number of results to return
+            source_filter: If given, only rank articles whose source is in this
+                list. Filtering happens BEFORE the top-k cut so a narrow source
+                selection still returns up to top_k results rather than however
+                many survive a post-hoc filter.
 
         Returns:
             List of similar articles with similarity scores
@@ -317,6 +342,16 @@ class LiteratureSearchPipeline:
         if len(article_ids) == 0:
             logger.info("No embeddings found. Create embeddings first.")
             return []
+
+        # Restrict the candidate pool to the requested sources before ranking.
+        if source_filter:
+            allowed = set(source_filter)
+            keep = [i for i, (_, src) in enumerate(article_ids) if src in allowed]
+            if not keep:
+                logger.info("No embeddings match the requested sources.")
+                return []
+            article_ids = [article_ids[i] for i in keep]
+            article_embeddings = article_embeddings[keep]
 
         # Create query embedding
         query_embedding = self.embedding_engine.embed_query(query_text)

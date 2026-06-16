@@ -1,11 +1,12 @@
 """
-FastAPI Application — Literature Research Aide v2.3.0
+FastAPI Application — Literature Research Aide v2.4.1
 Multi-user web interface for literature search and analysis.
 """
 
 import io
 import csv
 import os
+import shutil
 import secrets
 import logging
 import threading
@@ -44,12 +45,12 @@ MAX_CACHED_USERS = 50
 limiter = Limiter(key_func=get_remote_address)
 
 # At top of file
-app = FastAPI(title="Literature Research Aide", version="2.3.0")
+app = FastAPI(title="Literature Research Aide", version="2.4.1")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 @app.get("/health")
 async def health():
-    return {"status": "healthy", "version": "2.3.0"}
+    return {"status": "healthy", "version": "2.4.1"}
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
@@ -121,6 +122,27 @@ def release_pipeline(user_id: str) -> None:
                 logger.exception("Failed to close deferred pipeline for %s", user_id)
 
 
+def _evict_pipeline(user_id: str) -> None:
+    """Forcibly drop and close a user's cached pipeline and progress state.
+
+    Used when an account is deleted: the SQLite connection must be closed before
+    the user's data directory can be removed on Windows (open file handle would
+    block rmtree).
+    """
+    with _pipelines_lock:
+        live = _pipelines.pop(user_id, None)
+        pending = _pending_close.pop(user_id, None)
+        _pipeline_refcounts.pop(user_id, None)
+        for pipe in (live, pending):
+            if pipe is not None:
+                try:
+                    pipe.db.close()
+                except Exception:
+                    logger.exception("Failed to close pipeline for %s during deletion", user_id)
+    with _progress_lock:
+        _all_progress.pop(user_id, None)
+
+
 def _ensure_progress(user_id: str) -> dict:
     """Return progress dict for user, creating it if needed. Must be called under _progress_lock."""
     if user_id not in _all_progress:
@@ -176,6 +198,7 @@ class SearchRequest(BaseModel):
     top_k: int = 10
     sort_by: str = "similarity"
     cluster_filter: Optional[List[int]] = None
+    source_filter: Optional[List[str]] = None
 
 class FetchRequest(BaseModel):
     source: str = "pubmed"
@@ -198,6 +221,9 @@ class ClusterRequest(BaseModel):
 
 class DuplicateRequest(BaseModel):
     threshold: float = 0.95
+
+class DeleteAccountRequest(BaseModel):
+    password: str
 
 
 # ============================================================
@@ -268,7 +294,15 @@ async def register_submit(
             status_code=400,
         )
 
-    user = user_db.create_user(username, hash_password(password))
+    try:
+        user = user_db.create_user(username, hash_password(password))
+    except ValueError:
+        # Lost the race against a concurrent registration of the same username.
+        return templates.TemplateResponse(
+            request, "register.html",
+            context={"error": "That username is already taken.", "username": username},
+            status_code=400,
+        )
     token = create_token(user["id"], user["username"])
     response = RedirectResponse(url="/data-management", status_code=302)
     _set_auth_cookies(response, token)
@@ -289,9 +323,10 @@ async def logout():
 
 @app.get("/")
 async def root(request: Request):
-    if not current_user(request):
-        return RedirectResponse(url="/login", status_code=302)
-    return RedirectResponse(url="/data-management", status_code=302)
+    # The landing page is the default page for everyone. The CTA adapts: signed-in
+    # users get an "Open App" button, logged-out visitors get login/register.
+    user = current_user(request)
+    return templates.TemplateResponse(request, "landing.html", context={"user": user})
 
 
 @app.get("/search")
@@ -316,6 +351,22 @@ async def statistics_page(request: Request):
     if not user:
         return RedirectResponse(url="/login", status_code=302)
     return templates.TemplateResponse(request, "statistics.html", context={"active_page": "statistics", "user": user})
+
+
+@app.get("/clusters")
+async def clusters_page(request: Request):
+    user = current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=302)
+    return templates.TemplateResponse(request, "clusters.html", context={"active_page": "clusters", "user": user})
+
+
+@app.get("/account")
+async def account_page(request: Request):
+    user = current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=302)
+    return templates.TemplateResponse(request, "account.html", context={"active_page": "account", "user": user})
 
 
 # ============================================================
@@ -345,7 +396,10 @@ async def api_search(req: SearchRequest, request: Request):
     uid = user["user_id"]
     p = get_pipeline(uid)
     try:
-        results = await run_in_thread(p.search_similar, req.query_text, top_k=req.top_k)
+        results = await run_in_thread(
+            p.search_similar, req.query_text,
+            top_k=req.top_k, source_filter=req.source_filter,
+        )
         for article in results:
             article['pico'] = PICOExtractor.extract_pico(article.get('abstract', ''))
         if req.cluster_filter:
@@ -370,6 +424,7 @@ async def api_search_export(
     top_k: int = 10,
     sort_by: str = "similarity",
     cluster_filter: str = "",
+    source_filter: str = "",
     format: str = "csv",
 ):
     user = current_user(request)
@@ -378,7 +433,10 @@ async def api_search_export(
     uid = user["user_id"]
     p = get_pipeline(uid)
     try:
-        results = await run_in_thread(p.search_similar, query_text, top_k=top_k)
+        sources = [s for s in source_filter.split(",") if s.strip()] or None
+        results = await run_in_thread(
+            p.search_similar, query_text, top_k=top_k, source_filter=sources,
+        )
         try:
             cluster_ids = [int(x) for x in cluster_filter.split(",") if x.strip()] if cluster_filter else None
         except ValueError:
@@ -633,6 +691,39 @@ async def api_detect_duplicates(req: DuplicateRequest, request: Request):
         return server_error(e)
     finally:
         release_pipeline(uid)
+
+
+@app.post("/api/delete-account")
+async def api_delete_account(req: DeleteAccountRequest, request: Request):
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+
+    uid = user["user_id"]
+    # Re-verify the password before destroying anything.
+    record = user_db.get_by_username(user["username"])
+    if not record or not verify_password(req.password, record["hashed_password"]):
+        return JSONResponse(status_code=400, content={"detail": "Incorrect password"})
+
+    try:
+        # 1. Close + drop the cached pipeline so the SQLite file is released.
+        _evict_pipeline(uid)
+        # 2. Remove the user's data directory (articles/embeddings/clusters).
+        user_dir = os.path.join("user_data", uid)
+        if os.path.isdir(user_dir):
+            shutil.rmtree(user_dir, ignore_errors=True)
+        # 3. Delete the account record.
+        user_db.delete_user(uid)
+    except Exception as e:
+        return server_error(e)
+
+    # Clear auth cookies so the now-deleted session can't keep being used.
+    response = JSONResponse(content={"status": "success"})
+    response.delete_cookie("access_token")
+    response.delete_cookie("csrf_token")
+    return response
 
 
 if __name__ == "__main__":

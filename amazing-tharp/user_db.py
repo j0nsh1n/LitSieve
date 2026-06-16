@@ -27,13 +27,22 @@ class UserDatabase:
         self.conn.commit()
 
     def create_user(self, username: str, hashed_password: str) -> Dict:
+        """Create a user. Raises ValueError if the username is already taken.
+
+        The UNIQUE constraint is the source of truth: relying on a prior
+        get_by_username() check alone would leave a race window where two
+        concurrent registrations both pass the check and one hits IntegrityError.
+        """
         user_id = str(uuid.uuid4())
         with self._lock:
-            self.conn.execute(
-                "INSERT INTO users (id, username, hashed_password) VALUES (?, ?, ?)",
-                (user_id, username, hashed_password)
-            )
-            self.conn.commit()
+            try:
+                self.conn.execute(
+                    "INSERT INTO users (id, username, hashed_password) VALUES (?, ?, ?)",
+                    (user_id, username, hashed_password)
+                )
+                self.conn.commit()
+            except sqlite3.IntegrityError as e:
+                raise ValueError(f"Username already taken: {username}") from e
         return {"id": user_id, "username": username}
 
     def get_by_username(self, username: str) -> Optional[Dict]:
@@ -55,3 +64,10 @@ class UserDatabase:
         if row:
             return {"id": row[0], "username": row[1]}
         return None
+
+    def delete_user(self, user_id: str) -> bool:
+        """Delete a user account. Returns True if a row was removed."""
+        with self._lock:
+            cur = self.conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+            self.conn.commit()
+            return cur.rowcount > 0

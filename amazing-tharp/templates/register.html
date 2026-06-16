@@ -32,15 +32,53 @@
             </div>
             <div class="form-group">
                 <label>Password</label>
-                <input type="password" name="password" autocomplete="new-password" required minlength="8">
+                <input type="password" name="password" class="pw-field" autocomplete="new-password" required minlength="8">
                 <span class="auth-hint">Minimum 8 characters</span>
             </div>
             <div class="form-group">
                 <label>Confirm Password</label>
-                <input type="password" name="password_confirm" autocomplete="new-password" required minlength="8">
+                <input type="password" name="password_confirm" class="pw-field" autocomplete="new-password" required minlength="8">
+                <span class="pw-match" id="pw-match"></span>
             </div>
+            <label class="show-pass">
+                <input type="checkbox" id="show-pw"> Show passwords
+            </label>
             <button type="submit" class="btn btn-primary auth-btn">Create Account</button>
         </form>
+
+        <script>
+            document.getElementById('show-pw').addEventListener('change', function () {
+                const type = this.checked ? 'text' : 'password';
+                document.querySelectorAll('.pw-field').forEach(function (el) { el.type = type; });
+            });
+
+            // Live password-match feedback as the user types.
+            const pw = document.querySelector('input[name="password"]');
+            const pwc = document.querySelector('input[name="password_confirm"]');
+            const matchEl = document.getElementById('pw-match');
+
+            function checkMatch() {
+                if (!pwc.value) {
+                    matchEl.textContent = '';
+                    matchEl.className = 'pw-match';
+                    pwc.setCustomValidity('');
+                    return;
+                }
+                if (pw.value === pwc.value) {
+                    matchEl.textContent = '✓ Passwords match';
+                    matchEl.className = 'pw-match match';
+                    pwc.setCustomValidity('');
+                } else {
+                    matchEl.textContent = '✗ Passwords do not match';
+                    matchEl.className = 'pw-match mismatch';
+                    // Blocks form submission with a native validation bubble.
+                    pwc.setCustomValidity('Passwords do not match');
+                }
+            }
+
+            pw.addEventListener('input', checkMatch);
+            pwc.addEventListener('input', checkMatch);
+        </script>
 
         <p class="auth-switch">Already have an account? <a href="/login">Log in</a></p>
     </div>
