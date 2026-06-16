@@ -120,7 +120,7 @@ function renderClusterArticles(articles, bodyEl) {
                 <span><strong>Source:</strong> ${escapeHtml(getSourceName(article.source))}</span>
                 <span><strong>ID:</strong> ${idLink}</span>
             </div>
-            <div class="article-meta">
+            <div class="article-meta meta-authors">
                 <span><strong>Authors:</strong> ${escapeHtml(authors)}</span>
             </div>
         `;
