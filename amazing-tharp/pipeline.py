@@ -3,7 +3,6 @@ Main Pipeline
 Orchestrates the complete workflow from data fetching to visualization
 """
 
-import json
 import logging
 import os
 from typing import List, Dict, Optional, Tuple
@@ -25,7 +24,7 @@ from crossref_fetcher import CrossRefFetcher
 from doaj_fetcher import DOAJFetcher
 from nasa_ads_fetcher import NASAADSFetcher
 from database import ArticleDatabase
-from embeddings import EmbeddingEngine, PICOExtractor
+from embeddings import EmbeddingEngine
 from clustering import ArticleClusterer, ClusterLabeler, ClusterVisualizer
 
 FETCHERS = {

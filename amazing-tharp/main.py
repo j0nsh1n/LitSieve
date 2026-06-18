@@ -1,5 +1,5 @@
 """
-FastAPI Application — Literature Research Aide v2.5.0
+FastAPI Application — Literature Research Aide v2.5.1
 Multi-user web interface for literature search and analysis.
 """
 
@@ -45,12 +45,12 @@ MAX_CACHED_USERS = 50
 limiter = Limiter(key_func=get_remote_address)
 
 # At top of file
-app = FastAPI(title="Literature Research Aide", version="2.5.0")
+app = FastAPI(title="Literature Research Aide", version="2.5.1")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 @app.get("/health")
 async def health():
-    return {"status": "healthy", "version": "2.5.0"}
+    return {"status": "healthy", "version": "2.5.1"}
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")

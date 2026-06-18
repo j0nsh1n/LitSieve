@@ -6,7 +6,6 @@ Fetches research articles from PubMed using the Entrez API
 from Bio import Entrez
 import socket
 import time
-import json
 from typing import List, Dict, Optional
 from tqdm import tqdm
 
@@ -56,10 +55,6 @@ class PubMedFetcher(BaseFetcher):
             print(f"Error searching PubMed: {e}")
             return []
 
-    # Backward-compatible alias
-    def search_pubmed(self, query: str, max_results: int = 1000) -> List[str]:
-        return self.search(query, max_results)
-
     def fetch_details(self, ids: List[str], batch_size: int = 200) -> List[Dict]:
         """Fetch article details for given PMIDs"""
         articles = []
@@ -90,10 +85,6 @@ class PubMedFetcher(BaseFetcher):
 
         print(f"Successfully fetched {len(articles)} articles")
         return articles
-
-    # Backward-compatible alias
-    def fetch_abstracts(self, pmids: List[str], batch_size: int = 200) -> List[Dict]:
-        return self.fetch_details(pmids, batch_size)
 
     def _parse_article(self, record: Dict) -> Optional[Dict]:
         """Parse a PubMed article record"""
@@ -138,18 +129,3 @@ class PubMedFetcher(BaseFetcher):
         except Exception as e:
             print(f"Error parsing article: {e}")
             return None
-
-    def fetch_and_save(self, query: str, max_results: int, output_file: str):
-        """Complete workflow: search, fetch, and save to JSON"""
-        pmids = self.search(query, max_results)
-
-        if not pmids:
-            print("No articles found")
-            return
-
-        articles = self.fetch_details(pmids)
-
-        with open(output_file, 'w', encoding='utf-8') as f:
-            json.dump(articles, f, indent=2, ensure_ascii=False)
-
-        print(f"Saved {len(articles)} articles to {output_file}")

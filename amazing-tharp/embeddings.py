@@ -85,7 +85,6 @@ class EmbeddingEngine:
         return self._model
 
     def embed_articles(self, articles: List[Dict], batch_size: int = 32, progress_callback=None) -> Dict[Tuple[str, str], np.ndarray]:
-        # ... (same as before — unchanged)
         print(f"Creating embeddings for {len(articles)} articles...")
 
         texts = []
@@ -266,14 +265,3 @@ class PICOExtractor:
                 pico['outcome'].append(sentence.strip())
 
         return pico
-
-    @staticmethod
-    def pico_to_text(pico: Dict[str, List[str]]) -> str:
-        """Convert PICO dictionary to formatted text"""
-        parts = []
-
-        for component, sentences in pico.items():
-            if sentences:
-                parts.append(f"{component.upper()}: {' '.join(sentences[:2])}")
-
-        return '\n'.join(parts)

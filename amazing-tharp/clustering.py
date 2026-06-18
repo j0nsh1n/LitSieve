@@ -7,7 +7,7 @@ import numpy as np
 from sklearn.cluster import KMeans, AgglomerativeClustering
 from sklearn.decomposition import PCA
 from collections import Counter
-from typing import List, Dict, Tuple
+from typing import List, Dict
 import plotly.graph_objects as go
 import plotly.express as px
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -117,47 +117,6 @@ class ClusterLabeler:
                 
             except Exception as e:
                 print(f"Error generating label for cluster {cluster_id}: {e}")
-                cluster_labels[cluster_id] = f"Cluster {cluster_id}"
-        
-        return cluster_labels
-    
-    @staticmethod
-    def generate_llm_labels(
-        articles_by_cluster: Dict[int, List[Dict]],
-        sample_size: int = 5
-    ) -> Dict[int, str]:
-        """
-        Generate cluster labels by analyzing sample titles
-        (Simplified version - in practice you'd use an LLM API)
-        
-        Args:
-            articles_by_cluster: Dictionary mapping cluster IDs to lists of articles
-            sample_size: Number of articles to sample per cluster
-            
-        Returns:
-            Dictionary mapping cluster IDs to label strings
-        """
-        cluster_labels = {}
-        
-        for cluster_id, articles in articles_by_cluster.items():
-            # Sample titles
-            sample_articles = articles[:sample_size]
-            sample_titles = [a['title'] for a in sample_articles]
-            
-            # For now, just use the most common words
-            # In a real implementation, you'd send this to an LLM
-            all_words = ' '.join(sample_titles).lower().split()
-            word_counts = Counter(all_words)
-            
-            # Remove common words
-            stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with'}
-            filtered_words = [(w, c) for w, c in word_counts.most_common(10) if w not in stop_words]
-            
-            if filtered_words:
-                top_words = [w for w, _ in filtered_words[:3]]
-                label = ' + '.join(top_words).title()
-                cluster_labels[cluster_id] = label
-            else:
                 cluster_labels[cluster_id] = f"Cluster {cluster_id}"
         
         return cluster_labels
@@ -340,20 +299,3 @@ class ClusterVisualizer:
             print(f"Saved cluster summary to {save_path}")
         
         return fig
-
-
-# Example usage
-if __name__ == "__main__":
-    # Create sample embeddings
-    np.random.seed(42)
-    sample_embeddings = np.random.randn(100, 384)  # 100 articles, 384-dim embeddings
-    
-    # Cluster
-    clusterer = ArticleClusterer(n_clusters=5)
-    labels = clusterer.fit(sample_embeddings)
-    
-    # Reduce dimensions
-    embeddings_2d = ClusterVisualizer.reduce_dimensions(sample_embeddings, method='pca')
-    
-    print(f"Clustering complete! Labels shape: {labels.shape}")
-    print(f"2D embeddings shape: {embeddings_2d.shape}")
