@@ -181,7 +181,6 @@ async function doFetch() {
     setLoading(btn, false);
     updateNavStats();
     loadPageData();
-    localStorage.setItem('last_fetched_sources', JSON.stringify(sources));
 
     const breakdown = Object.entries(data.by_source)
         .map(([src, count]) => `${getSourceName(src)}: ${count}`)

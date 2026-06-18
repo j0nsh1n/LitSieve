@@ -13,6 +13,7 @@ per-user ``user_data/<uid>/`` trees are created under tmp_path, never the repo.
 """
 
 import os
+import pathlib
 
 # Must be set BEFORE the app is imported:
 #   SECRET_KEY  -> lets auth.py mint/verify tokens
@@ -56,10 +57,14 @@ class _FakeFetcher:
 
 @pytest.fixture
 def app_module(tmp_path, monkeypatch):
-    # StaticFiles(directory="static") is mounted at import and requires the dir
-    # to exist relative to the CWD; create the dirs the app expects under tmp.
-    (tmp_path / "static").mkdir()
-    (tmp_path / "templates").mkdir()
+    # The app mounts static/ and renders templates/ by path relative to the CWD.
+    # Copy both into the tmp working dir so StaticFiles mounts and template
+    # rendering (e.g. the login error page) work, while users.db / user_data stay
+    # isolated under tmp.
+    import shutil
+    repo = pathlib.Path(__file__).resolve().parent.parent
+    shutil.copytree(repo / "templates", tmp_path / "templates")
+    shutil.copytree(repo / "static", tmp_path / "static")
     monkeypatch.chdir(tmp_path)
 
     import importlib
