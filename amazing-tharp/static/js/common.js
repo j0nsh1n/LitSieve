@@ -92,6 +92,8 @@ function getArticleUrl(articleId, source) {
             return `https://doaj.org/article/${articleId}`;
         case 'nasa_ads':
             return `https://ui.adsabs.harvard.edu/abs/${articleId}`;
+        case 'core':
+            return `https://core.ac.uk/works/${articleId}`;
         default:
             return null;
     }
@@ -111,6 +113,7 @@ function getSourceName(source) {
         crossref: 'CrossRef',
         doaj: 'DOAJ',
         nasa_ads: 'NASA ADS',
+        core: 'CORE',
     };
     return names[source] || source;
 }

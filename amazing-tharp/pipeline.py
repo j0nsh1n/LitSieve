@@ -23,6 +23,7 @@ from zenodo_fetcher import ZenodoFetcher
 from crossref_fetcher import CrossRefFetcher
 from doaj_fetcher import DOAJFetcher
 from nasa_ads_fetcher import NASAADSFetcher
+from core_fetcher import COREFetcher
 from database import ArticleDatabase
 from embeddings import EmbeddingEngine
 from clustering import ArticleClusterer, ClusterLabeler, ClusterVisualizer
@@ -39,6 +40,7 @@ FETCHERS = {
     'crossref': CrossRefFetcher,
     'doaj': DOAJFetcher,
     'nasa_ads': NASAADSFetcher,
+    'core': COREFetcher,
 }
 
 

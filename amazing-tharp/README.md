@@ -16,9 +16,9 @@ Built with **FastAPI**, sentence-transformers, FAISS, and scikit-learn.
 
 ## Features
 
-- 🔍 Fetch articles from **11 sources** in parallel (PubMed, Europe PMC,
+- 🔍 Fetch articles from **12 sources** in parallel (PubMed, Europe PMC,
   ClinicalTrials.gov, OpenAlex, arXiv, Semantic Scholar, ERIC, Zenodo,
-  CrossRef, DOAJ, NASA ADS)
+  CrossRef, DOAJ, NASA ADS, CORE)
 - 🧠 Create semantic embeddings with pre-trained models
 - 🎯 Similarity search against your study description or PICO terms
 - 🧩 Automatic clustering with TF-IDF cluster labels
@@ -68,7 +68,7 @@ cp .env.example .env
 #   - Set SECRET_KEY (required), e.g.:
 #       python -c "import secrets; print(secrets.token_urlsafe(48))"
 #   - Or set DEBUG=true to run locally without a SECRET_KEY.
-#   - Optionally set NASA_ADS_TOKEN to enable the NASA ADS source.
+#   - Optionally set NASA_ADS_TOKEN / CORE_API_KEY to enable those sources.
 ```
 
 > The app refuses to start without `SECRET_KEY` unless `DEBUG=true`.
@@ -200,8 +200,8 @@ plain `http://localhost` the browser drops the `Secure` auth cookie. Set
 **FAISS not installed** — the app falls back to scikit-learn for similarity
 search (slower on large corpora). Install `faiss-cpu` to re-enable it.
 
-**NASA ADS returns nothing** — set `NASA_ADS_TOKEN`; that source is skipped when
-the token is unset.
+**NASA ADS / CORE return nothing** — set `NASA_ADS_TOKEN` / `CORE_API_KEY`; those
+sources are skipped when their token/key is unset.
 
 **No search results** — make sure you fetched articles *and* created embeddings
 first; check counts on the Duplicates (statistics) page.
