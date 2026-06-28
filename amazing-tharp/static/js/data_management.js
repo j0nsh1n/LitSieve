@@ -1,18 +1,18 @@
 // === Topic and source definitions ===
 const TOPICS = [
-    { id: 'health',      name: 'Health & Medicine',    icon: '🏥', sources: ['pubmed', 'europepmc', 'clinicaltrials', 'openalex', 'semanticscholar', 'doaj', 'zenodo'] },
-    { id: 'biology',     name: 'Biology',              icon: '🧬', sources: ['pubmed', 'europepmc', 'openalex', 'arxiv', 'semanticscholar', 'crossref', 'zenodo', 'doaj'] },
-    { id: 'chemistry',   name: 'Chemistry',            icon: '⚗️', sources: ['openalex', 'arxiv', 'semanticscholar', 'crossref', 'zenodo', 'doaj'] },
-    { id: 'physics',     name: 'Physics',              icon: '⚛️', sources: ['arxiv', 'openalex', 'semanticscholar', 'crossref', 'zenodo', 'nasa_ads'] },
-    { id: 'math',        name: 'Mathematics',          icon: '📐', sources: ['arxiv', 'openalex', 'semanticscholar', 'crossref', 'zenodo'] },
-    { id: 'cs',          name: 'Computer Science',     icon: '💻', sources: ['arxiv', 'openalex', 'semanticscholar', 'crossref', 'zenodo', 'doaj'] },
-    { id: 'earth',       name: 'Earth & Environment',  icon: '🌍', sources: ['openalex', 'semanticscholar', 'zenodo', 'crossref', 'doaj', 'nasa_ads'] },
-    { id: 'history',     name: 'History',              icon: '📜', sources: ['openalex', 'semanticscholar', 'eric', 'crossref', 'doaj'] },
-    { id: 'economics',   name: 'Economics',            icon: '📊', sources: ['arxiv', 'openalex', 'semanticscholar', 'eric', 'crossref', 'doaj'] },
-    { id: 'psychology',  name: 'Psychology',           icon: '🧠', sources: ['pubmed', 'openalex', 'semanticscholar', 'eric', 'crossref', 'doaj'] },
-    { id: 'polisci',     name: 'Political Science',    icon: '🏛️', sources: ['openalex', 'semanticscholar', 'eric', 'crossref', 'doaj'] },
-    { id: 'literature',  name: 'Literature & Language',icon: '📖', sources: ['openalex', 'semanticscholar', 'eric', 'crossref', 'doaj'] },
-    { id: 'education',   name: 'Education',            icon: '🎓', sources: ['eric', 'openalex', 'semanticscholar', 'crossref', 'doaj'] },
+    { id: 'health',      name: 'Health & Medicine',    icon: '🏥', sources: ['pubmed', 'europepmc', 'clinicaltrials', 'openalex', 'semanticscholar', 'doaj', 'zenodo', 'core'] },
+    { id: 'biology',     name: 'Biology',              icon: '🧬', sources: ['pubmed', 'europepmc', 'openalex', 'arxiv', 'semanticscholar', 'crossref', 'zenodo', 'doaj', 'core'] },
+    { id: 'chemistry',   name: 'Chemistry',            icon: '⚗️', sources: ['openalex', 'arxiv', 'semanticscholar', 'crossref', 'zenodo', 'doaj', 'core'] },
+    { id: 'physics',     name: 'Physics',              icon: '⚛️', sources: ['arxiv', 'openalex', 'semanticscholar', 'crossref', 'zenodo', 'nasa_ads', 'core'] },
+    { id: 'math',        name: 'Mathematics',          icon: '📐', sources: ['arxiv', 'openalex', 'semanticscholar', 'crossref', 'zenodo', 'core'] },
+    { id: 'cs',          name: 'Computer Science',     icon: '💻', sources: ['arxiv', 'openalex', 'semanticscholar', 'crossref', 'zenodo', 'doaj', 'core'] },
+    { id: 'earth',       name: 'Earth & Environment',  icon: '🌍', sources: ['openalex', 'semanticscholar', 'zenodo', 'crossref', 'doaj', 'nasa_ads', 'core'] },
+    { id: 'history',     name: 'History',              icon: '📜', sources: ['openalex', 'semanticscholar', 'eric', 'crossref', 'doaj', 'core'] },
+    { id: 'economics',   name: 'Economics',            icon: '📊', sources: ['arxiv', 'openalex', 'semanticscholar', 'eric', 'crossref', 'doaj', 'core'] },
+    { id: 'psychology',  name: 'Psychology',           icon: '🧠', sources: ['pubmed', 'openalex', 'semanticscholar', 'eric', 'crossref', 'doaj', 'core'] },
+    { id: 'polisci',     name: 'Political Science',    icon: '🏛️', sources: ['openalex', 'semanticscholar', 'eric', 'crossref', 'doaj', 'core'] },
+    { id: 'literature',  name: 'Literature & Language',icon: '📖', sources: ['openalex', 'semanticscholar', 'eric', 'crossref', 'doaj', 'core'] },
+    { id: 'education',   name: 'Education',            icon: '🎓', sources: ['eric', 'openalex', 'semanticscholar', 'crossref', 'doaj', 'core'] },
 ];
 
 const ALL_SOURCES = {
@@ -27,6 +27,7 @@ const ALL_SOURCES = {
     crossref:        { name: 'CrossRef',           desc: 'Broad academic metadata registry' },
     doaj:            { name: 'DOAJ',               desc: 'Peer-reviewed open access journals' },
     nasa_ads:        { name: 'NASA ADS',           desc: 'Astronomy, astrophysics & geosciences' },
+    core:            { name: 'CORE',               desc: 'Open-access full text, all disciplines' },
 };
 
 let selectedTopics = new Set();
