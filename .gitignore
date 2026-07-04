@@ -6,4 +6,8 @@ dist/
 build/
 *.db
 .pytest_cache/
+.ruff_cache/
 user_data/
+.venv/
+venv/
+.claude/
