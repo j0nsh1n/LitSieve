@@ -26,7 +26,10 @@ from nasa_ads_fetcher import NASAADSFetcher
 from core_fetcher import COREFetcher
 from database import ArticleDatabase
 from embeddings import EmbeddingEngine
-from clustering import ArticleClusterer, ClusterLabeler, ClusterVisualizer
+from clustering import (
+    ArticleClusterer, ClusterLabeler, ClusterVisualizer,
+    NOISE_CLUSTER_ID, NOISE_CLUSTER_LABEL,
+)
 
 FETCHERS = {
     'pubmed': PubMedFetcher,
@@ -234,6 +237,11 @@ class LiteratureSearchPipeline:
         cluster_titles = ClusterLabeler.pick_representative_titles(
             article_ids, embeddings, labels, title_by_key
         )
+        # The HDBSCAN noise bucket isn't a coherent topic — give it an honest
+        # fixed label and no representative headline.
+        if NOISE_CLUSTER_ID in articles_by_cluster:
+            cluster_labels[NOISE_CLUSTER_ID] = NOISE_CLUSTER_LABEL
+            cluster_titles.pop(NOISE_CLUSTER_ID, None)
 
         # Save cluster assignments to database
         cluster_assignments = {}

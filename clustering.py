@@ -5,7 +5,7 @@ Groups similar articles and creates visualizations
 
 import logging
 import numpy as np
-from sklearn.cluster import KMeans, AgglomerativeClustering
+from sklearn.cluster import KMeans, AgglomerativeClustering, HDBSCAN
 from sklearn.decomposition import PCA
 from sklearn.metrics import silhouette_score
 from collections import Counter
@@ -22,6 +22,18 @@ AUTO_K_MIN = 2
 AUTO_K_MAX = 12
 # Silhouette is O(n^2); above this many points we score on a random subsample.
 SILHOUETTE_SAMPLE_CAP = 2000
+
+# Density clustering (HDBSCAN) label for points that don't belong to any dense
+# region. Surfaced to the user as a real, honest "these didn't fit" bucket.
+NOISE_CLUSTER_ID = -1
+NOISE_CLUSTER_LABEL = "Miscellaneous (outliers)"
+# Sentence-embedding spaces are high-dim (384+); density estimation degrades
+# badly there ("curse of dimensionality"), so we reduce before HDBSCAN.
+# PCA is aggressive (few dims) + re-normalised: on real corpora, raw PCA output
+# collapses HDBSCAN to ~2 clusters, but L2-normalising the low-dim projection
+# restores the angular (cosine) separation the embeddings were built with.
+DENSITY_PCA_DIMS = 5
+DENSITY_UMAP_DIMS = 10
 
 
 class ArticleClusterer:
@@ -50,6 +62,57 @@ class ArticleClusterer:
         elif self.method == 'hierarchical':
             return AgglomerativeClustering(n_clusters=k, linkage='ward')
         raise ValueError(f"Unknown method: {self.method}")
+
+    @staticmethod
+    def _reduce_for_density(embeddings: np.ndarray) -> np.ndarray:
+        """Reduce dimensionality before density clustering.
+
+        UMAP preserves local neighbourhood structure best (what HDBSCAN needs),
+        so use it when installed; otherwise fall back to PCA, which is linear
+        and dependency-free but still far better than clustering raw 384-dim
+        vectors by density.
+        """
+        n_samples, n_features = embeddings.shape
+        try:
+            import umap  # optional; big (numba) dep, so not required
+            target = min(DENSITY_UMAP_DIMS, n_features, max(2, n_samples - 1))
+            logger.info("Density reduce: UMAP -> %d dims", target)
+            reducer = umap.UMAP(
+                n_components=target, n_neighbors=min(15, n_samples - 1),
+                min_dist=0.0, metric='cosine', random_state=42,
+            )
+            return reducer.fit_transform(embeddings)
+        except Exception as e:
+            logger.info("Density reduce: PCA fallback (%s)", type(e).__name__)
+            target = min(DENSITY_PCA_DIMS, n_features, max(2, n_samples - 1))
+            if target >= n_features:
+                return embeddings
+            reduced = PCA(n_components=target, random_state=42).fit_transform(embeddings)
+            # Re-normalise: restores the cosine/angular separation HDBSCAN needs
+            # (raw PCA output collapses to ~2 clusters on real corpora).
+            from sklearn.preprocessing import normalize
+            return normalize(reduced)
+
+    def _fit_density(self, embeddings: np.ndarray) -> np.ndarray:
+        """HDBSCAN density clustering: finds the cluster count itself and marks
+        points in no dense region as noise (NOISE_CLUSTER_ID)."""
+        n = len(embeddings)
+        reduced = self._reduce_for_density(embeddings)
+        # min_cluster_size is the main knob: the smallest group we'll call a
+        # topic. Scale gently with corpus size, floor at 5.
+        min_cluster_size = max(5, n // 40)
+        model = HDBSCAN(
+            min_cluster_size=min_cluster_size,
+            min_samples=max(2, min_cluster_size // 2),  # lower -> less noise
+            metric='euclidean',
+        )
+        labels = model.fit_predict(reduced)
+        n_clusters = len(set(labels) - {NOISE_CLUSTER_ID})
+        n_noise = int(np.sum(labels == NOISE_CLUSTER_ID))
+        logger.info("HDBSCAN: %d clusters, %d/%d points as noise (min_cluster_size=%d)",
+                    n_clusters, n_noise, n, min_cluster_size)
+        self.cluster_model = model
+        return labels
 
     def _auto_select_k(self, embeddings: np.ndarray, k_max: int) -> int:
         """Pick the k in [AUTO_K_MIN, k_max] with the best silhouette score.
@@ -102,6 +165,14 @@ class ArticleClusterer:
             Array of cluster labels
         """
         n_samples = len(embeddings)
+
+        # Density clustering finds its own cluster count (and a noise bucket),
+        # so it ignores n_clusters / auto-k entirely.
+        if self.method == 'hdbscan':
+            self.labels = self._fit_density(embeddings)
+            self.resolved_n_clusters = len(set(self.labels) - {NOISE_CLUSTER_ID})
+            print(f"Cluster distribution: {dict(sorted(Counter(self.labels).items()))}")
+            return self.labels
 
         if self.n_clusters is None:
             # Never search for more clusters than we could meaningfully support.

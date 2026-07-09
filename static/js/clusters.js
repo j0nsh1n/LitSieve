@@ -4,15 +4,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const slider = document.getElementById('n-clusters');
     const display = document.getElementById('nclusters-display');
     const auto = document.getElementById('auto-clusters');
+    const method = document.getElementById('cluster-method');
     slider.addEventListener('input', () => { display.textContent = slider.value; });
 
-    // Auto mode disables the manual slider.
-    const syncAuto = () => {
-        slider.disabled = auto.checked;
-        display.textContent = auto.checked ? 'auto' : slider.value;
+    // Density (HDBSCAN) determines the count itself, so the Auto toggle and
+    // manual slider don't apply to it.
+    const syncControls = () => {
+        const isDensity = method.value === 'hdbscan';
+        auto.disabled = isDensity;
+        slider.disabled = isDensity || auto.checked;
+        display.textContent = isDensity ? 'auto (density)'
+            : (auto.checked ? 'auto' : slider.value);
     };
-    auto.addEventListener('change', syncAuto);
-    syncAuto();
+    auto.addEventListener('change', syncControls);
+    method.addEventListener('change', syncControls);
+    syncControls();
 
     document.getElementById('cluster-btn').addEventListener('click', doGenerateClusters);
 
@@ -46,9 +52,16 @@ async function doGenerateClusters() {
         });
         const clusters = data.clusters || [];
         renderClusters(clusters);
-        const msg = data.auto
-            ? `Auto-selected ${data.resolved_n_clusters} cluster(s) as the cleanest grouping.`
-            : `Created ${clusters.length} cluster(s).`;
+        const hasNoise = clusters.some(c => c.cluster_id === -1);
+        let msg;
+        if (method === 'hdbscan') {
+            msg = `Found ${data.resolved_n_clusters} topic(s)`
+                + (hasNoise ? ', plus an outliers group for papers that fit none.' : '.');
+        } else if (data.auto) {
+            msg = `Auto-selected ${data.resolved_n_clusters} cluster(s) as the cleanest grouping.`;
+        } else {
+            msg = `Created ${clusters.length} cluster(s).`;
+        }
         setStatus('cluster-status', msg, 'success');
         showNotification('Clusters generated successfully!', 'success');
     } catch (e) {
@@ -71,7 +84,12 @@ function renderClusters(clusters) {
 
     clusters
         .slice()
-        .sort((a, b) => a.cluster_id - b.cluster_id)
+        // Real topics first in id order; the outliers bucket (-1) always last.
+        .sort((a, b) => {
+            const ax = a.cluster_id < 0 ? Infinity : a.cluster_id;
+            const bx = b.cluster_id < 0 ? Infinity : b.cluster_id;
+            return ax - bx;
+        })
         .forEach(cluster => {
             const details = document.createElement('details');
             details.className = 'article-card cluster-card';

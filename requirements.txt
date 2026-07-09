@@ -11,6 +11,11 @@ scikit-learn>=1.5.0
 # Fast vector search (new in v2.3.0)
 faiss-cpu>=1.8.0
 
+# Density clustering (HDBSCAN "Density" method) reduces embeddings with UMAP
+# first. Optional but strongly recommended: without it, HDBSCAN falls back to a
+# PCA reduction that produces far more "outliers". Pulls in numba/llvmlite.
+umap-learn>=0.5.6
+
 # Visualization
 plotly>=6.0.0
 

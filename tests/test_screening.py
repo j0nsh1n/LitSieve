@@ -107,6 +107,51 @@ def test_auto_select_k_finds_natural_group_count():
     assert len(set(labels)) == 2
 
 
+def test_hdbscan_finds_dense_groups():
+    import numpy as np
+    from clustering import ArticleClusterer
+
+    rng = np.random.default_rng(1)
+    # Three tight, well-separated dense blobs -> HDBSCAN should recover them
+    # regardless of whether UMAP or the PCA fallback does the reduction.
+    blobs = [rng.normal(0, 0.01, (40, 16)) + np.eye(16)[i] for i in range(3)]
+    X = np.vstack(blobs).astype(np.float32)
+
+    clusterer = ArticleClusterer(method="hdbscan")
+    labels = clusterer.fit(X)
+    # Density clustering set its own count (>= 2 real topics) and labelled every
+    # point (some possibly as the noise bucket, depending on the reducer).
+    assert clusterer.resolved_n_clusters >= 2
+    assert len(labels) == len(X)
+
+
+def test_noise_bucket_is_relabelled_in_pipeline(monkeypatch):
+    """The HDBSCAN noise bucket gets a fixed, honest label and no headline."""
+    for _dep in ("requests", "Bio", "plotly", "tqdm", "dotenv"):
+        pytest.importorskip(_dep)
+    import numpy as np
+    import clustering
+    from pipeline import LiteratureSearchPipeline
+    from clustering import NOISE_CLUSTER_ID, NOISE_CLUSTER_LABEL
+    import tempfile, os
+
+    p = LiteratureSearchPipeline(db_path=os.path.join(tempfile.mkdtemp(), "a.db"))
+    p.db.insert_articles([_article(str(i)) for i in range(6)])
+    p.db.insert_embeddings(
+        {(str(i), "pubmed"): np.eye(4, dtype=np.float32)[i % 4] for i in range(6)},
+        model_name="general",
+    )
+    # Force a deterministic labelling with a noise point, bypassing HDBSCAN.
+    forced = np.array([0, 0, 0, 1, 1, NOISE_CLUSTER_ID])
+    monkeypatch.setattr(clustering.ArticleClusterer, "fit", lambda self, emb: forced)
+
+    p.cluster_articles(method="hdbscan")
+    clusters = {c["cluster_id"]: c for c in p.db.get_all_clusters()}
+    assert clusters[NOISE_CLUSTER_ID]["cluster_label"] == NOISE_CLUSTER_LABEL
+    assert clusters[NOISE_CLUSTER_ID]["representative_title"] is None
+    p.close()
+
+
 def test_cluster_labels_empty_and_fallback():
     from clustering import ClusterLabeler
     assert ClusterLabeler.generate_tfidf_labels({}) == {}
