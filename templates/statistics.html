@@ -3,7 +3,8 @@
 {% block content %}
 <section class="page-header">
     <h1>Detect Duplicates</h1>
-    <p class="subtitle">Find and review near-duplicate articles across your database before searching.</p>
+    <p class="subtitle">The same paper often arrives from several databases under different IDs. Find those
+        near-duplicates, compare them side by side, and keep only the best copy of each.</p>
 </section>
 
 <section class="stats-cards">
@@ -15,7 +16,7 @@
         <div class="stat-value" id="stat-embeddings">--</div>
         <div class="stat-label">With Embeddings</div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card" title="Articles you've excluded — via cluster triage, duplicate resolution, or manually. Hidden from search results but never deleted.">
         <div class="stat-value" id="stat-excluded">--</div>
         <div class="stat-label">Screened Out</div>
     </div>

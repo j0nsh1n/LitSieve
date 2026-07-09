@@ -7,6 +7,12 @@
 </section>
 
 <section class="card">
+    <p class="info-text">Searches the articles you've fetched and embedded — not the internet. Your
+        description is compared against every article by meaning, not keywords, so plain language works
+        well. <strong>Text Input</strong> takes a free-form research question;
+        <strong>PICO Format</strong> builds the query from structured Population / Intervention /
+        Comparison / Outcome fields (common for clinical questions). Articles you've screened out on the
+        Clusters or Duplicates pages won't appear in results.</p>
     <div class="input-method-toggle">
         <label class="radio-label">
             <input type="radio" name="input_method" value="text" checked> Text Input
@@ -83,10 +89,13 @@
     <div class="results-header">
         <h2>Results: <span id="result-count">0</span> articles found</h2>
         <div class="export-row">
-            <button id="export-csv" class="btn btn-secondary btn-sm">Download CSV</button>
-            <button id="export-txt" class="btn btn-secondary btn-sm">Download Text</button>
+            <button id="export-csv" class="btn btn-secondary btn-sm" title="Download these results as a spreadsheet-ready CSV file">Download CSV</button>
+            <button id="export-txt" class="btn btn-secondary btn-sm" title="Download these results as a plain-text reading list">Download Text</button>
         </div>
     </div>
+    <p class="info-text">The badge on each result is its similarity score (0–1): how closely the article's
+        content matches your description. Colored tags mark which PICO elements were detected in the
+        abstract. Click a result to expand its full abstract.</p>
     <div id="results-list"></div>
 </section>
 {% endblock %}

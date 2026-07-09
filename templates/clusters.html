@@ -8,7 +8,11 @@
 
 <section class="card">
     <h2>Generate Clusters</h2>
-    <p class="info-text">Clustering runs on articles that already have embeddings. Create embeddings on the Data Management page first if you haven't.</p>
+    <p class="info-text">Clustering groups your articles by topic similarity using their embeddings —
+        create embeddings on the Data Management page first. As a rule of thumb, start with roughly one
+        cluster per 20–50 articles and adjust: too few clusters mixes topics together, too many splits
+        them apart. K-Means is fast and works well in most cases; Hierarchical (Ward) can give cleaner
+        groups on smaller collections. Re-clustering replaces the groups but keeps your exclusions.</p>
     <div class="form-row">
         <div class="param-group">
             <label>Number of clusters: <strong id="nclusters-display">10</strong></label>
@@ -30,6 +34,12 @@
     <div class="results-header">
         <h2>Clusters: <span id="cluster-count">0</span></h2>
     </div>
+    <p class="info-text">Each cluster's label is built from the terms that most distinguish it from the
+        other clusters, so no keyword appears in two labels. Use the clusters to triage your collection:
+        <strong>Exclude cluster</strong> screens out an entire off-topic group at once, and each article
+        inside has its own Exclude/Restore toggle. Screened-out articles are hidden from Search results
+        and exports (and shown crossed out here) — nothing is deleted, and Restore brings them back
+        anytime.</p>
     <div id="clusters-list">
         <p class="info-text">No clusters yet. Generate them above to see them here.</p>
     </div>

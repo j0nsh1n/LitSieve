@@ -23,6 +23,10 @@
 <!-- Step 3: Fetch -->
 <section class="card">
     <h2>3 — Fetch Articles</h2>
+    <p class="info-text">Runs your query against every selected source in parallel and saves the results
+        (title, abstract, authors, year, journal) into your private database. Articles without an abstract
+        are skipped — the analysis steps need text to work with. Re-fetching is safe: existing articles are
+        updated, not duplicated.</p>
     <div class="form-row">
         <div class="form-group flex-2">
             <label>Search Query</label>
@@ -48,6 +52,11 @@
 <!-- Step 4: Embeddings -->
 <section class="card">
     <h2>4 — Create Embeddings</h2>
+    <p class="info-text">Embeddings turn each article into a numerical "meaning fingerprint" — they power
+        Search, Clusters, and Duplicate detection, so run this after every fetch. Pick <em>general</em> for
+        speed or mixed topics, <em>pubmedbert</em>/<em>biosentbert</em> for medical corpora, or
+        <em>specter</em> for scientific papers. Switching models re-embeds everything; searches always use
+        the same model your articles were embedded with. Runs on your GPU when one is available.</p>
     <p class="info-text" id="embedding-info">Loading article info...</p>
     <div class="form-row">
         <div class="form-group">
