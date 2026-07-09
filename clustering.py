@@ -72,54 +72,111 @@ class ArticleClusterer:
 
 class ClusterLabeler:
     """Generates human-readable labels for clusters"""
-    
+
+    @staticmethod
+    def _overlaps(term: str, chosen: List[str]) -> bool:
+        """True if term shares a word stem with any already-chosen term.
+
+        Blocks near-duplicate picks inside one label like "cancer" alongside
+        "cancer patients", or "therapy" alongside "gene therapy".
+        """
+        term_words = set(term.split())
+        for other in chosen:
+            if term_words & set(other.split()):
+                return True
+        return False
+
     @staticmethod
     def generate_tfidf_labels(
         articles_by_cluster: Dict[int, List[Dict]],
         top_n_terms: int = 3
     ) -> Dict[int, str]:
         """
-        Generate cluster labels using TF-IDF
-        
+        Generate cluster labels that are DISTINCT across clusters.
+
+        Old behaviour ran TF-IDF within each cluster independently, so generic
+        corpus-wide terms ("patients", "treatment") dominated every label and
+        clusters looked interchangeable. This version:
+
+        1. Builds ONE document per cluster and fits TF-IDF across those docs,
+           so the idf term punishes words that appear in many clusters — the
+           score now measures "how characteristic of THIS cluster vs the
+           others", not just "how frequent inside it".
+        2. Assigns terms round-robin with a global claimed-set, so a given
+           term can appear in at most ONE cluster's label.
+        3. Skips terms that share a word with a term already in the same
+           label (no "cancer | cancer patients").
+
         Args:
             articles_by_cluster: Dictionary mapping cluster IDs to lists of articles
             top_n_terms: Number of top terms to use in label
-            
+
         Returns:
             Dictionary mapping cluster IDs to label strings
         """
-        cluster_labels = {}
-        
-        for cluster_id, articles in articles_by_cluster.items():
-            # Combine all abstracts in cluster
-            texts = [f"{a['title']} {a['abstract']}" for a in articles]
-            
-            # Use TF-IDF to find most important terms
-            vectorizer = TfidfVectorizer(
-                max_features=100,
-                stop_words='english',
-                ngram_range=(1, 2)
-            )
-            
-            try:
-                tfidf_matrix = vectorizer.fit_transform(texts)
-                feature_names = vectorizer.get_feature_names_out()
-                
-                # Get average TF-IDF scores across cluster
-                avg_scores = tfidf_matrix.mean(axis=0).A1
-                top_indices = avg_scores.argsort()[::-1][:top_n_terms]
-                
-                # Create label from top terms
-                top_terms = [feature_names[i] for i in top_indices]
-                label = ' | '.join(top_terms)
-                
-                cluster_labels[cluster_id] = label
-                
-            except Exception as e:
-                print(f"Error generating label for cluster {cluster_id}: {e}")
-                cluster_labels[cluster_id] = f"Cluster {cluster_id}"
-        
-        return cluster_labels
+        cluster_ids = sorted(articles_by_cluster.keys())
+        if not cluster_ids:
+            return {}
+
+        fallback = {cid: f"Cluster {cid}" for cid in cluster_ids}
+
+        # One combined document per cluster.
+        docs = [
+            ' '.join(f"{a.get('title', '')} {a.get('abstract', '')}"
+                     for a in articles_by_cluster[cid])
+            for cid in cluster_ids
+        ]
+
+        vectorizer = TfidfVectorizer(
+            max_features=2000,
+            stop_words='english',
+            ngram_range=(1, 2),
+            sublinear_tf=True,  # tame huge clusters dominating on raw counts
+        )
+        try:
+            tfidf = vectorizer.fit_transform(docs)  # rows = clusters
+            feature_names = vectorizer.get_feature_names_out()
+        except Exception as e:
+            print(f"Error generating cluster labels: {e}")
+            return fallback
+
+        # Per-cluster term ranking (indices sorted by descending score).
+        scores = tfidf.toarray()
+        rankings = {
+            cid: scores[row].argsort()[::-1]
+            for row, cid in enumerate(cluster_ids)
+        }
+
+        # Round-robin claiming: each round, every cluster (largest first, so
+        # big clusters don't lose all their best terms to tiny ones) claims its
+        # best still-unclaimed, non-overlapping term. Global uniqueness is
+        # enforced by the shared `claimed` set.
+        order = sorted(cluster_ids, key=lambda c: -len(articles_by_cluster[c]))
+        claimed = set()
+        chosen: Dict[int, List[str]] = {cid: [] for cid in cluster_ids}
+        cursor = {cid: 0 for cid in cluster_ids}
+
+        for _round in range(top_n_terms):
+            for cid in order:
+                row = cluster_ids.index(cid)
+                ranking = rankings[cid]
+                while cursor[cid] < len(ranking):
+                    idx = ranking[cursor[cid]]
+                    cursor[cid] += 1
+                    term = feature_names[idx]
+                    if scores[row][idx] <= 0:
+                        cursor[cid] = len(ranking)  # nothing meaningful left
+                        break
+                    if term in claimed or ClusterLabeler._overlaps(term, chosen[cid]):
+                        continue
+                    claimed.add(term)
+                    chosen[cid].append(term)
+                    break
+
+        return {
+            cid: (' | '.join(terms) if terms else fallback[cid])
+            for cid, terms in chosen.items()
+        }
 
 
 class ClusterVisualizer:

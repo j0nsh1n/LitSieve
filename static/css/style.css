@@ -1265,3 +1265,15 @@ input[type="range"]::-moz-range-thumb:hover { background: var(--accent); }
     .landing-cta { flex-direction: column; }
     .landing-cta .btn { width: 100%; }
 }
+
+/* === Screening / triage (clusters + duplicates) === */
+.cluster-article.excluded,
+.dup-resolved { opacity: 0.45; }
+.cluster-article.excluded .article-title { text-decoration: line-through; }
+.cluster-actions { display: inline-flex; gap: 0.4rem; margin-left: auto; }
+.excluded-badge {
+    font-size: 0.75rem; padding: 0.1rem 0.5rem; border-radius: 999px;
+    background: color-mix(in srgb, var(--danger, #dc2626) 15%, transparent);
+    color: var(--danger, #dc2626);
+}
+.screen-toggle { margin-left: auto; white-space: nowrap; }

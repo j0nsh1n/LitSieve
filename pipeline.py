@@ -371,6 +371,17 @@ class LiteratureSearchPipeline:
             logger.info("No embeddings found. Create embeddings first.")
             return []
 
+        # Screened-out articles (excluded clusters, resolved duplicates, manual
+        # exclusions) never participate in ranking.
+        excluded = self.db.get_excluded_keys()
+        if excluded:
+            keep = [i for i, key in enumerate(article_ids) if key not in excluded]
+            if not keep:
+                logger.info("All embedded articles are currently excluded.")
+                return []
+            article_ids = [article_ids[i] for i in keep]
+            article_embeddings = article_embeddings[keep]
+
         # Restrict the candidate pool to the requested sources before ranking.
         if source_filter:
             allowed = set(source_filter)
@@ -469,6 +480,15 @@ class LiteratureSearchPipeline:
 
         article_ids, embeddings = self.db.get_all_embeddings()
 
+        # Excluded articles don't participate: once a duplicate group is
+        # resolved (losers excluded), re-running detection only reports the
+        # groups that still need attention.
+        excluded = self.db.get_excluded_keys()
+        if excluded and len(article_ids) > 0:
+            keep = [i for i, key in enumerate(article_ids) if key not in excluded]
+            article_ids = [article_ids[i] for i in keep]
+            embeddings = embeddings[keep] if keep else embeddings[:0]
+
         if len(article_ids) == 0:
             logger.info("No embeddings found.")
             return []
@@ -491,6 +511,64 @@ class LiteratureSearchPipeline:
                     logger.info(f"  2: {article2['title']}\n")
 
         return duplicates
+
+    def resolve_duplicates(self, threshold: float = 0.95) -> Dict:
+        """
+        Auto-resolve duplicate groups: keep the best copy, exclude the rest.
+
+        Duplicate pairs are grouped transitively (union-find), then within each
+        group the article with the LONGEST ABSTRACT wins (more text = better
+        embedding + more useful record), with (source, article_id) as a
+        deterministic tie-break. The losers are marked excluded with reason
+        'duplicate', which removes them from search results and from future
+        duplicate detection runs. Everything is reversible via include_articles.
+
+        Returns:
+            {'groups': n_groups_resolved, 'excluded': n_articles_excluded}
+        """
+        duplicates = self.detect_duplicates(threshold=threshold)
+        if not duplicates:
+            return {'groups': 0, 'excluded': 0}
+
+        # Union-find over (article_id, source) keys.
+        parent = {}
+
+        def find(k):
+            parent.setdefault(k, k)
+            while parent[k] != k:
+                parent[k] = parent[parent[k]]
+                k = parent[k]
+            return k
+
+        def union(a, b):
+            parent[find(a)] = find(b)
+
+        for id1, id2, _sim in duplicates:
+            union(id1, id2)
+
+        groups: Dict = {}
+        for key in list(parent):
+            groups.setdefault(find(key), []).append(key)
+
+        articles = self.db.get_all_articles_with_clusters()
+        losers = []
+        n_groups = 0
+        for members in groups.values():
+            if len(members) < 2:
+                continue
+            n_groups += 1
+            def quality(key):
+                abstract = (articles.get(key) or {}).get('abstract') or ''
+                # Longest abstract wins; negative-string tie-break keeps the
+                # ordering deterministic across runs.
+                return (len(abstract), key[1], key[0])
+            keeper = max(members, key=quality)
+            losers.extend(k for k in members if k != keeper)
+
+        self.db.exclude_articles(losers, reason='duplicate')
+        logger.info("Resolved %d duplicate groups: excluded %d redundant copies",
+                    n_groups, len(losers))
+        return {'groups': n_groups, 'excluded': len(losers)}
 
     def get_statistics(self) -> Dict:
         """Get database statistics"""

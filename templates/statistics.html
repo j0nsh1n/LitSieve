@@ -15,6 +15,10 @@
         <div class="stat-value" id="stat-embeddings">--</div>
         <div class="stat-label">With Embeddings</div>
     </div>
+    <div class="stat-card">
+        <div class="stat-value" id="stat-excluded">--</div>
+        <div class="stat-label">Screened Out</div>
+    </div>
 </section>
 
 <section class="card" id="source-breakdown-section" style="display:none;">
@@ -32,7 +36,9 @@
         </div>
     </div>
     <button id="detect-btn" class="btn btn-primary">Detect Duplicates</button>
+    <button id="resolve-btn" class="btn btn-secondary" title="Keep the best copy of every duplicate group and screen out the rest">Auto-Resolve All</button>
     <div id="duplicates-status" class="status-indicator"></div>
+    <p class="info-text">Resolving keeps the copy with the most complete abstract and screens out the redundant ones — they stop appearing in search results and future detection runs. You can restore anything from its cluster on the Clusters page.</p>
     <div id="duplicates-list"></div>
 </section>
 {% endblock %}

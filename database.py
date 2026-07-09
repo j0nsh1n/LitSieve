@@ -73,6 +73,21 @@ class ArticleDatabase:
             )
         """)
 
+        # Screening table: presence of a row means the article is EXCLUDED from
+        # search/dedup (screened out). reason records why: 'manual', 'cluster'
+        # (bulk cluster exclusion) or 'duplicate' (auto-resolve kept a better
+        # copy). Including an article back just deletes its row.
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS screening (
+                article_id TEXT NOT NULL,
+                source TEXT NOT NULL DEFAULT 'pubmed',
+                reason TEXT NOT NULL DEFAULT 'manual',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (article_id, source),
+                FOREIGN KEY (article_id, source) REFERENCES articles (article_id, source)
+            )
+        """)
+
         self.conn.commit()
 
     def migrate_schema(self):
@@ -195,9 +210,10 @@ class ArticleDatabase:
             logger.info("Schema migration complete.")
 
     def clear_all(self):
-        """Delete all articles, embeddings, and clusters from the database"""
+        """Delete all articles, embeddings, clusters, and screening state"""
         with self._lock:
             cursor = self.conn.cursor()
+            cursor.execute("DELETE FROM screening")
             cursor.execute("DELETE FROM clusters")
             cursor.execute("DELETE FROM embeddings")
             cursor.execute("DELETE FROM articles")
@@ -365,6 +381,58 @@ class ArticleDatabase:
             row = cursor.fetchone()
         return row[0] if row else None
 
+    def exclude_articles(self, keys: List[Tuple[str, str]], reason: str = 'manual') -> int:
+        """Mark articles as screened out (excluded from search/dedup).
+
+        Args:
+            keys: list of (article_id, source) tuples
+            reason: 'manual' | 'cluster' | 'duplicate'
+
+        Returns:
+            Number of rows written.
+        """
+        if not keys:
+            return 0
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.executemany(
+                "INSERT OR REPLACE INTO screening (article_id, source, reason) VALUES (?, ?, ?)",
+                [(aid, src, reason) for aid, src in keys],
+            )
+            self.conn.commit()
+        logger.info("Excluded %d articles (reason=%s)", len(keys), reason)
+        return len(keys)
+
+    def include_articles(self, keys: List[Tuple[str, str]]) -> int:
+        """Undo exclusion for the given (article_id, source) keys."""
+        if not keys:
+            return 0
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.executemany(
+                "DELETE FROM screening WHERE article_id = ? AND source = ?",
+                keys,
+            )
+            self.conn.commit()
+        return len(keys)
+
+    def get_excluded_keys(self) -> set:
+        """Return the set of (article_id, source) keys currently screened out."""
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT article_id, source FROM screening")
+            return {(row[0], row[1]) for row in cursor.fetchall()}
+
+    def get_cluster_article_keys(self, cluster_id: int) -> List[Tuple[str, str]]:
+        """Return (article_id, source) keys for every article in a cluster."""
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                "SELECT article_id, source FROM clusters WHERE cluster_id = ?",
+                (cluster_id,),
+            )
+            return [(row[0], row[1]) for row in cursor.fetchall()]
+
     def insert_clusters(self, cluster_assignments: Dict):
         """
         Store cluster assignments
@@ -389,9 +457,11 @@ class ArticleDatabase:
         with self._lock:
             cursor = self.conn.cursor()
             cursor.execute("""
-                SELECT a.article_id, a.source, a.title, a.abstract, a.year, a.authors, a.journal, c.cluster_label
+                SELECT a.article_id, a.source, a.title, a.abstract, a.year, a.authors, a.journal, c.cluster_label,
+                       s.article_id IS NOT NULL AS excluded
                 FROM articles a
                 JOIN clusters c ON a.article_id = c.article_id AND a.source = c.source
+                LEFT JOIN screening s ON a.article_id = s.article_id AND a.source = s.source
                 WHERE c.cluster_id = ?
             """, (cluster_id,))
             rows = cursor.fetchall()
@@ -406,7 +476,8 @@ class ArticleDatabase:
                 'year': row[4],
                 'authors': json.loads(row[5]) if row[5] else [],
                 'journal': row[6],
-                'cluster_label': row[7]
+                'cluster_label': row[7],
+                'excluded': bool(row[8])
             })
 
         return articles
@@ -416,14 +487,17 @@ class ArticleDatabase:
         with self._lock:
             cursor = self.conn.cursor()
             cursor.execute("""
-                SELECT cluster_id, cluster_label, COUNT(*) as article_count
-                FROM clusters
-                GROUP BY cluster_id, cluster_label
-                ORDER BY cluster_id
+                SELECT c.cluster_id, c.cluster_label, COUNT(*) as article_count,
+                       SUM(CASE WHEN s.article_id IS NOT NULL THEN 1 ELSE 0 END) as excluded_count
+                FROM clusters c
+                LEFT JOIN screening s ON c.article_id = s.article_id AND c.source = s.source
+                GROUP BY c.cluster_id, c.cluster_label
+                ORDER BY c.cluster_id
             """)
             rows = cursor.fetchall()
         return [
-            {'cluster_id': row[0], 'cluster_label': row[1], 'article_count': row[2]}
+            {'cluster_id': row[0], 'cluster_label': row[1], 'article_count': row[2],
+             'excluded_count': row[3] or 0}
             for row in rows
         ]
 
@@ -469,6 +543,9 @@ class ArticleDatabase:
             cursor.execute("SELECT COUNT(DISTINCT cluster_id) FROM clusters")
             cluster_count = cursor.fetchone()[0]
 
+            cursor.execute("SELECT COUNT(*) FROM screening")
+            excluded_count = cursor.fetchone()[0]
+
             # Source breakdown
             cursor.execute("SELECT source, COUNT(*) FROM articles GROUP BY source")
             sources = {row[0]: row[1] for row in cursor.fetchall()}
@@ -477,6 +554,7 @@ class ArticleDatabase:
             'total_articles': article_count,
             'articles_with_embeddings': embedding_count,
             'num_clusters': cluster_count,
+            'excluded_articles': excluded_count,
             'sources': sources
         }
 

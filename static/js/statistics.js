@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.getElementById('detect-btn').addEventListener('click', doDetectDuplicates);
+    document.getElementById('resolve-btn').addEventListener('click', doResolveAll);
 });
 
 async function loadStatistics() {
@@ -18,6 +19,7 @@ async function loadStatistics() {
 
         document.getElementById('stat-total').textContent = stats.total_articles;
         document.getElementById('stat-embeddings').textContent = stats.articles_with_embeddings;
+        document.getElementById('stat-excluded').textContent = stats.excluded_articles ?? 0;
 
         const sources = stats.sources || {};
         const sourceKeys = Object.keys(sources);
@@ -72,6 +74,57 @@ async function doDetectDuplicates() {
         showNotification(`Detection failed: ${e.message}`, 'error');
     } finally {
         setLoading(btn, false);
+    }
+}
+
+// === Auto-resolve all duplicate groups server-side ===
+async function doResolveAll() {
+    const threshold = parseFloat(document.getElementById('threshold').value);
+    const btn = document.getElementById('resolve-btn');
+    setLoading(btn, true);
+    setStatus('duplicates-status', 'Resolving duplicate groups…', 'info');
+
+    try {
+        const data = await apiCall('/api/resolve-duplicates', {
+            method: 'POST',
+            body: { threshold }
+        });
+        if (data.groups === 0) {
+            setStatus('duplicates-status', 'No duplicate groups to resolve at this threshold.', 'success');
+        } else {
+            setStatus('duplicates-status',
+                `Resolved ${data.groups} group(s): kept the best copy of each, screened out ${data.excluded} redundant article(s).`,
+                'success');
+            showNotification(`Screened out ${data.excluded} duplicate article(s).`, 'success');
+        }
+        document.getElementById('duplicates-list').innerHTML = '';
+        loadStatistics(); // refresh the Screened Out counter
+    } catch (e) {
+        setStatus('duplicates-status', `Error: ${e.message}`, 'error');
+        showNotification(`Resolve failed: ${e.message}`, 'error');
+    } finally {
+        setLoading(btn, false);
+    }
+}
+
+// === Resolve ONE group: keep the clicked article, screen out its siblings ===
+async function keepArticle(group, keeper, cardEl) {
+    const losers = group.articles
+        .filter(a => !(a.article_id === keeper.article_id && a.source === keeper.source))
+        .map(a => ({ article_id: a.article_id, source: a.source }));
+    if (losers.length === 0) return;
+
+    try {
+        await apiCall('/api/screening', {
+            method: 'POST',
+            body: { items: losers, action: 'exclude' }
+        });
+        cardEl.classList.add('dup-resolved');
+        cardEl.querySelectorAll('.keep-btn').forEach(b => b.remove());
+        showNotification(`Kept ${getSourceName(keeper.source)} copy; screened out ${losers.length} other(s).`, 'success');
+        loadStatistics();
+    } catch (e) {
+        showNotification(`Failed to resolve group: ${e.message}`, 'error');
     }
 }
 
@@ -149,7 +202,7 @@ function renderDuplicates(groups) {
 
         const body = document.createElement('div');
         body.className = 'dup-body';
-        body.appendChild(buildCompareTable(articles));
+        body.appendChild(buildCompareTable(articles, group, details));
         details.appendChild(body);
 
         container.appendChild(details);
@@ -157,7 +210,7 @@ function renderDuplicates(groups) {
 }
 
 // === Side-by-side compare table ===
-function buildCompareTable(articles) {
+function buildCompareTable(articles, group, cardEl) {
     const n = articles.length;
     const fields = [
         { key: 'title',    label: 'Title' },
@@ -184,6 +237,14 @@ function buildCompareTable(articles) {
         const cell = document.createElement('div');
         cell.className = 'compare-cell compare-header-cell';
         cell.innerHTML = `<strong>${escapeHtml(getSourceName(a.source))}</strong><span class="compare-id">${idHtml}</span>`;
+
+        const keepBtn = document.createElement('button');
+        keepBtn.className = 'btn btn-sm btn-secondary keep-btn';
+        keepBtn.textContent = 'Keep this';
+        keepBtn.title = 'Keep this copy and screen out the others in this group';
+        keepBtn.addEventListener('click', () => keepArticle(group, a, cardEl));
+        cell.appendChild(keepBtn);
+
         table.appendChild(cell);
     });
 

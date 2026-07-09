@@ -222,6 +222,20 @@ class ClusterRequest(BaseModel):
 class DuplicateRequest(BaseModel):
     threshold: float = 0.95
 
+class ScreeningItem(BaseModel):
+    article_id: str
+    source: str
+
+class ScreeningRequest(BaseModel):
+    items: List[ScreeningItem]
+    action: str = Field(default="exclude", pattern="^(exclude|include)$")
+
+class ClusterScreeningRequest(BaseModel):
+    action: str = Field(default="exclude", pattern="^(exclude|include)$")
+
+class ResolveDuplicatesRequest(BaseModel):
+    threshold: float = Field(default=0.95, ge=0.5, le=1.0)
+
 class DeleteAccountRequest(BaseModel):
     password: str
 
@@ -692,6 +706,73 @@ async def api_detect_duplicates(req: DuplicateRequest, request: Request):
                     "similarity": round(sim, 3),
                 })
         return {"duplicates": result, "total": len(duplicates)}
+    except Exception as e:
+        return server_error(e)
+    finally:
+        release_pipeline(uid)
+
+
+@app.post("/api/screening")
+async def api_screening(req: ScreeningRequest, request: Request):
+    """Exclude (screen out) or re-include specific articles."""
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    uid = user["user_id"]
+    p = get_pipeline(uid)
+    try:
+        keys = [(item.article_id, item.source) for item in req.items]
+        if req.action == "exclude":
+            count = p.db.exclude_articles(keys, reason='manual')
+        else:
+            count = p.db.include_articles(keys)
+        return {"status": "success", "action": req.action, "count": count}
+    except Exception as e:
+        return server_error(e)
+    finally:
+        release_pipeline(uid)
+
+
+@app.post("/api/clusters/{cluster_id}/screening")
+async def api_cluster_screening(cluster_id: int, req: ClusterScreeningRequest, request: Request):
+    """Bulk exclude/include every article in a cluster (screening triage)."""
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    uid = user["user_id"]
+    p = get_pipeline(uid)
+    try:
+        keys = p.db.get_cluster_article_keys(cluster_id)
+        if not keys:
+            return JSONResponse(status_code=404, content={"detail": f"Cluster {cluster_id} has no articles"})
+        if req.action == "exclude":
+            count = p.db.exclude_articles(keys, reason='cluster')
+        else:
+            count = p.db.include_articles(keys)
+        return {"status": "success", "action": req.action, "cluster_id": cluster_id, "count": count}
+    except Exception as e:
+        return server_error(e)
+    finally:
+        release_pipeline(uid)
+
+
+@app.post("/api/resolve-duplicates")
+async def api_resolve_duplicates(req: ResolveDuplicatesRequest, request: Request):
+    """Auto-resolve duplicate groups: keep the best copy of each, exclude the rest."""
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    uid = user["user_id"]
+    p = get_pipeline(uid)
+    try:
+        result = await run_in_thread(p.resolve_duplicates, threshold=req.threshold)
+        return {"status": "success", **result}
     except Exception as e:
         return server_error(e)
     finally:
