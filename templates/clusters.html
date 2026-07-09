@@ -9,14 +9,23 @@
 <section class="card">
     <h2>Generate Clusters</h2>
     <p class="info-text">Clustering groups your articles by topic similarity using their embeddings —
-        create embeddings on the Data Management page first. As a rule of thumb, start with roughly one
-        cluster per 20–50 articles and adjust: too few clusters mixes topics together, too many splits
-        them apart. K-Means is fast and works well in most cases; Hierarchical (Ward) can give cleaner
-        groups on smaller collections. Re-clustering replaces the groups but keeps your exclusions.</p>
+        create embeddings on the Data Management page first. Leave <strong>Auto</strong> on and the app
+        tries a range of cluster counts and keeps the one that separates topics most cleanly. Turn Auto
+        off to set the number yourself: too few mixes topics together, too many splits them apart.
+        K-Means is fast and works well in most cases; Hierarchical (Ward) can give cleaner groups on
+        smaller collections. Re-clustering replaces the groups but keeps your exclusions.</p>
+    <div class="form-row">
+        <div class="form-group">
+            <label class="radio-label">
+                <input type="checkbox" id="auto-clusters" checked>
+                Auto — let the app pick the best number of clusters
+            </label>
+        </div>
+    </div>
     <div class="form-row">
         <div class="param-group">
             <label>Number of clusters: <strong id="nclusters-display">10</strong></label>
-            <input type="range" id="n-clusters" min="2" max="30" value="10">
+            <input type="range" id="n-clusters" min="2" max="30" value="10" disabled>
         </div>
         <div class="form-group">
             <label>Method</label>

@@ -67,6 +67,7 @@ class ArticleDatabase:
                 source TEXT NOT NULL DEFAULT 'pubmed',
                 cluster_id INTEGER,
                 cluster_label TEXT,
+                representative_title TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (article_id, source),
                 FOREIGN KEY (article_id, source) REFERENCES articles (article_id, source)
@@ -103,6 +104,13 @@ class ArticleDatabase:
             cursor.execute("ALTER TABLE embeddings ADD COLUMN dtype TEXT")
         if emb_columns and 'shape' not in emb_columns:
             cursor.execute("ALTER TABLE embeddings ADD COLUMN shape TEXT")
+
+        # Add representative_title to clusters if an older DB predates it.
+        cursor.execute("PRAGMA table_info(clusters)")
+        cluster_columns = [col[1] for col in cursor.fetchall()]
+        if cluster_columns and 'representative_title' not in cluster_columns:
+            cursor.execute("ALTER TABLE clusters ADD COLUMN representative_title TEXT")
+
         self.conn.commit()
 
         # Convert any legacy rows that still hold pickle.dumps(...) blobs (no
@@ -433,22 +441,29 @@ class ArticleDatabase:
             )
             return [(row[0], row[1]) for row in cursor.fetchall()]
 
-    def insert_clusters(self, cluster_assignments: Dict):
+    def insert_clusters(self, cluster_assignments: Dict, cluster_titles: Optional[Dict] = None):
         """
         Store cluster assignments
 
         Args:
             cluster_assignments: Dict mapping (article_id, source) tuples to (cluster_id, cluster_label)
+            cluster_titles: Optional {cluster_id: representative_title} — a real
+                article title used as the cluster's human-readable headline.
+
+        Re-clustering replaces assignments; wipe the old ones first so stale
+        clusters (e.g. from a larger previous k) don't linger.
         """
+        cluster_titles = cluster_titles or {}
         with self._lock:
             cursor = self.conn.cursor()
+            cursor.execute("DELETE FROM clusters")
             for key, (cluster_id, label) in cluster_assignments.items():
                 article_id, source = key
                 cursor.execute("""
                     INSERT OR REPLACE INTO clusters
-                    (article_id, source, cluster_id, cluster_label)
-                    VALUES (?, ?, ?, ?)
-                """, (article_id, source, cluster_id, label))
+                    (article_id, source, cluster_id, cluster_label, representative_title)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (article_id, source, cluster_id, label, cluster_titles.get(cluster_id)))
             self.conn.commit()
         logger.info("Inserted cluster assignments for %d articles", len(cluster_assignments))
 
@@ -488,7 +503,8 @@ class ArticleDatabase:
             cursor = self.conn.cursor()
             cursor.execute("""
                 SELECT c.cluster_id, c.cluster_label, COUNT(*) as article_count,
-                       SUM(CASE WHEN s.article_id IS NOT NULL THEN 1 ELSE 0 END) as excluded_count
+                       SUM(CASE WHEN s.article_id IS NOT NULL THEN 1 ELSE 0 END) as excluded_count,
+                       MAX(c.representative_title) as representative_title
                 FROM clusters c
                 LEFT JOIN screening s ON c.article_id = s.article_id AND c.source = s.source
                 GROUP BY c.cluster_id, c.cluster_label
@@ -497,7 +513,7 @@ class ArticleDatabase:
             rows = cursor.fetchall()
         return [
             {'cluster_id': row[0], 'cluster_label': row[1], 'article_count': row[2],
-             'excluded_count': row[3] or 0}
+             'excluded_count': row[3] or 0, 'representative_title': row[4]}
             for row in rows
         ]
 

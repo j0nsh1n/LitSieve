@@ -3,7 +3,16 @@
 document.addEventListener('DOMContentLoaded', () => {
     const slider = document.getElementById('n-clusters');
     const display = document.getElementById('nclusters-display');
+    const auto = document.getElementById('auto-clusters');
     slider.addEventListener('input', () => { display.textContent = slider.value; });
+
+    // Auto mode disables the manual slider.
+    const syncAuto = () => {
+        slider.disabled = auto.checked;
+        display.textContent = auto.checked ? 'auto' : slider.value;
+    };
+    auto.addEventListener('change', syncAuto);
+    syncAuto();
 
     document.getElementById('cluster-btn').addEventListener('click', doGenerateClusters);
 
@@ -20,12 +29,15 @@ async function loadClusters() {
 }
 
 async function doGenerateClusters() {
-    const nClusters = parseInt(document.getElementById('n-clusters').value);
+    const auto = document.getElementById('auto-clusters').checked;
+    const nClusters = auto ? null : parseInt(document.getElementById('n-clusters').value);
     const method = document.getElementById('cluster-method').value;
     const btn = document.getElementById('cluster-btn');
 
     setLoading(btn, true);
-    setStatus('cluster-status', 'Clustering articles… this can take a moment.', 'info');
+    setStatus('cluster-status',
+        auto ? 'Finding the best number of clusters… this can take a moment.'
+             : 'Clustering articles… this can take a moment.', 'info');
 
     try {
         const data = await apiCall('/api/create-clusters', {
@@ -34,7 +46,10 @@ async function doGenerateClusters() {
         });
         const clusters = data.clusters || [];
         renderClusters(clusters);
-        setStatus('cluster-status', `Created ${clusters.length} cluster(s).`, 'success');
+        const msg = data.auto
+            ? `Auto-selected ${data.resolved_n_clusters} cluster(s) as the cleanest grouping.`
+            : `Created ${clusters.length} cluster(s).`;
+        setStatus('cluster-status', msg, 'success');
         showNotification('Clusters generated successfully!', 'success');
     } catch (e) {
         setStatus('cluster-status', `Error: ${e.message}`, 'error');
@@ -69,10 +84,19 @@ function renderClusters(clusters) {
             const excludedBadge = excluded > 0
                 ? `<span class="excluded-badge">${excluded === total ? 'excluded' : excluded + ' excluded'}</span>`
                 : '';
+            // A real, central article title reads far better than keywords, so
+            // lead with it when present and show the keyword label underneath.
+            const repTitle = (cluster.representative_title || '').trim();
+            const headline = repTitle || label;
+            const subline = repTitle && label && label !== repTitle
+                ? `<span class="cluster-keywords">${escapeHtml(label)}</span>` : '';
             details.innerHTML = `
                 <summary>
                     <span class="cluster-badge">#${cluster.cluster_id}</span>
-                    <span class="article-title">${escapeHtml(label)}</span>
+                    <span class="cluster-heading">
+                        <span class="article-title">${escapeHtml(headline)}</span>
+                        ${subline}
+                    </span>
                     <span class="cluster-count">${total} article(s)</span>
                     ${excludedBadge}
                     <span class="cluster-actions">

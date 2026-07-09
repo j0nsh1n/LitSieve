@@ -52,13 +52,59 @@ def test_cluster_labels_are_distinct_across_clusters():
     })
 
     assert set(labels) == {0, 1}
-    terms0 = set(labels[0].split(" | "))
-    terms1 = set(labels[1].split(" | "))
+    terms0 = set(t.lower() for t in labels[0].split(", "))
+    terms1 = set(t.lower() for t in labels[1].split(", "))
     # No term may appear in both labels.
     assert not (terms0 & terms1), f"labels share terms: {labels}"
     # Each cluster's distinctive theme word should surface somewhere in its label.
     assert any("cardiology" in t for t in terms0)
     assert any("oncology" in t for t in terms1)
+
+
+def test_cluster_labels_drop_foreign_and_short_tokens():
+    from clustering import ClusterLabeler
+
+    labels = ClusterLabeler.generate_tfidf_labels({
+        0: [{"title": "κα με να gi pl abr", "abstract": "immune response signaling cascade"}],
+        1: [{"title": "climate warming", "abstract": "ocean temperature rising decadal trends"}],
+    })
+    # Greek stop-words, 2-letter fragments and digits never reach a label:
+    # every emitted token is ASCII and >= 3 characters.
+    for lab in labels.values():
+        for word in lab.replace(",", " ").split():
+            assert word.isascii(), lab
+            assert len(word) >= 3, lab
+
+
+def test_representative_title_is_most_central():
+    import numpy as np
+    from clustering import ClusterLabeler
+
+    ids = [("1", "s"), ("2", "s"), ("3", "s")]
+    emb = np.array([[1.0, 0.0], [0.9, 0.1], [0.0, 1.0]], dtype=np.float32)
+    labels = np.array([0, 0, 1])
+    title_by_key = {("1", "s"): "Central A", ("2", "s"): "Edge A", ("3", "s"): "Solo B"}
+
+    reps = ClusterLabeler.pick_representative_titles(ids, emb, labels, title_by_key)
+    # Cluster 0 centroid = [0.95, 0.05]; article 1 is nearest.
+    assert reps[0] == "Central A"
+    assert reps[1] == "Solo B"
+
+
+def test_auto_select_k_finds_natural_group_count():
+    import numpy as np
+    from clustering import ArticleClusterer
+
+    rng = np.random.default_rng(0)
+    # Two well-separated blobs -> silhouette should pick k=2.
+    a = rng.normal(0, 0.02, (30, 8)) + np.array([1, 0, 0, 0, 0, 0, 0, 0])
+    b = rng.normal(0, 0.02, (30, 8)) + np.array([0, 1, 0, 0, 0, 0, 0, 0])
+    X = np.vstack([a, b]).astype(np.float32)
+
+    clusterer = ArticleClusterer(n_clusters=None, method="kmeans")
+    labels = clusterer.fit(X)
+    assert clusterer.resolved_n_clusters == 2
+    assert len(set(labels)) == 2
 
 
 def test_cluster_labels_empty_and_fallback():

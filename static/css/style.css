@@ -1277,3 +1277,7 @@ input[type="range"]::-moz-range-thumb:hover { background: var(--accent); }
     color: var(--danger, #dc2626);
 }
 .screen-toggle { margin-left: auto; white-space: nowrap; }
+
+/* === Cluster headline (representative title + keyword subline) === */
+.cluster-heading { display: inline-flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.cluster-keywords { font-size: 0.8rem; opacity: 0.7; font-weight: 400; }

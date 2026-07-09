@@ -193,8 +193,12 @@ class LiteratureSearchPipeline:
         logger.info(f"Created and stored embeddings")
         return embeddings
 
-    def cluster_articles(self, n_clusters: int = 10, method: str = 'kmeans'):
-        """Step 3: Cluster articles"""
+    def cluster_articles(self, n_clusters: Optional[int] = None, method: str = 'kmeans'):
+        """Step 3: Cluster articles.
+
+        n_clusters=None (or <= 0) auto-selects the count by silhouette score.
+        Returns (labels, cluster_labels, articles_by_cluster, resolved_n_clusters).
+        """
         logger.info("\n=== Step 3: Clustering Articles ===")
 
         article_ids, embeddings = self.db.get_all_embeddings()
@@ -202,25 +206,18 @@ class LiteratureSearchPipeline:
             logger.info("No embeddings found. Create embeddings first.")
             return
 
-        # Clustering needs at least as many samples as clusters. Clamp rather
-        # than let scikit-learn raise, so the UI gets a usable result.
-        n_samples = len(article_ids)
-        if n_clusters > n_samples:
-            logger.warning(
-                "Requested %d clusters but only %d embedded articles; clamping.",
-                n_clusters, n_samples,
-            )
-            n_clusters = max(1, n_samples)
-
-        # Perform clustering
+        # ArticleClusterer handles auto-selection (None) and clamping to the
+        # number of samples internally.
         clusterer = ArticleClusterer(n_clusters=n_clusters, method=method)
         labels = clusterer.fit(embeddings)
+        resolved_n = clusterer.resolved_n_clusters
 
         # Build lookup from (article_id, source) to cluster label
         id_to_cluster = {aid: int(labels[i]) for i, aid in enumerate(article_ids)}
 
         # Get articles that have embeddings and group by cluster
         articles = self.db.get_all_articles()
+        title_by_key = {(a['article_id'], a['source']): a.get('title', '') for a in articles}
         articles_by_cluster = {}
         for article in articles:
             key = (article['article_id'], article['source'])
@@ -231,9 +228,12 @@ class LiteratureSearchPipeline:
                 articles_by_cluster[cluster_id] = []
             articles_by_cluster[cluster_id].append(article)
 
-        # Generate cluster labels
+        # Generate cluster labels + a representative (most central) title each.
         logger.info("Generating cluster labels...")
         cluster_labels = ClusterLabeler.generate_tfidf_labels(articles_by_cluster)
+        cluster_titles = ClusterLabeler.pick_representative_titles(
+            article_ids, embeddings, labels, title_by_key
+        )
 
         # Save cluster assignments to database
         cluster_assignments = {}
@@ -242,15 +242,15 @@ class LiteratureSearchPipeline:
             cluster_label = cluster_labels.get(cluster_id, f"Cluster {cluster_id}")
             cluster_assignments[aid] = (cluster_id, cluster_label)
 
-        self.db.insert_clusters(cluster_assignments)
+        self.db.insert_clusters(cluster_assignments, cluster_titles)
 
-        logger.info(f"Clustered articles into {n_clusters} clusters")
+        logger.info(f"Clustered articles into {resolved_n} clusters")
         logger.info("\nCluster labels:")
         for cluster_id, label in sorted(cluster_labels.items()):
             size = len(articles_by_cluster.get(cluster_id, []))
             logger.info(f"  Cluster {cluster_id} ({size} articles): {label}")
 
-        return labels, cluster_labels, articles_by_cluster
+        return labels, cluster_labels, articles_by_cluster, resolved_n
 
     def create_visualizations(self, output_dir: str = "visualizations"):
         """Step 4: Create visualizations"""

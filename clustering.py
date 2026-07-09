@@ -3,66 +3,126 @@ Clustering and Visualization Module
 Groups similar articles and creates visualizations
 """
 
+import logging
 import numpy as np
 from sklearn.cluster import KMeans, AgglomerativeClustering
 from sklearn.decomposition import PCA
+from sklearn.metrics import silhouette_score
 from collections import Counter
-from typing import List, Dict
+from typing import List, Dict, Optional
 import plotly.graph_objects as go
 import plotly.express as px
 from sklearn.feature_extraction.text import TfidfVectorizer
 
+logger = logging.getLogger(__name__)
+
+# When n_clusters is left unset we search this many groupings and keep the one
+# that separates best. Capped again by the corpus size at fit time.
+AUTO_K_MIN = 2
+AUTO_K_MAX = 12
+# Silhouette is O(n^2); above this many points we score on a random subsample.
+SILHOUETTE_SAMPLE_CAP = 2000
+
 
 class ArticleClusterer:
     """Clusters articles based on their embeddings"""
-    
-    def __init__(self, n_clusters: int = 10, method: str = 'kmeans'):
+
+    def __init__(self, n_clusters: Optional[int] = None, method: str = 'kmeans'):
         """
         Initialize clusterer
-        
+
         Args:
-            n_clusters: Number of clusters to create
+            n_clusters: Number of clusters to create. Pass None (or a
+                non-positive value) to auto-select the count by silhouette score.
             method: Clustering method ('kmeans' or 'hierarchical')
         """
-        self.n_clusters = n_clusters
+        # Normalise "auto" sentinels (None / 0 / negative) to None.
+        self.n_clusters = n_clusters if (n_clusters and n_clusters > 0) else None
         self.method = method
         self.cluster_model = None
         self.labels = None
-    
+        # Populated at fit time; lets the caller report what "Auto" resolved to.
+        self.resolved_n_clusters = None
+
+    def _build_model(self, k: int):
+        if self.method == 'kmeans':
+            return KMeans(n_clusters=k, random_state=42, n_init=10)
+        elif self.method == 'hierarchical':
+            return AgglomerativeClustering(n_clusters=k, linkage='ward')
+        raise ValueError(f"Unknown method: {self.method}")
+
+    def _auto_select_k(self, embeddings: np.ndarray, k_max: int) -> int:
+        """Pick the k in [AUTO_K_MIN, k_max] with the best silhouette score.
+
+        Silhouette measures how well each point sits inside its own cluster vs
+        the nearest other cluster (higher = cleaner separation), so it rewards
+        the grouping that actually reflects structure in the data instead of a
+        number the user guessed. Scored on a subsample when the corpus is large.
+        """
+        n = len(embeddings)
+        if n <= AUTO_K_MIN:
+            return max(1, n)
+
+        # Subsample for the (expensive) silhouette evaluation only; the final
+        # fit still runs on all points.
+        if n > SILHOUETTE_SAMPLE_CAP:
+            rng = np.random.default_rng(42)
+            idx = rng.choice(n, SILHOUETTE_SAMPLE_CAP, replace=False)
+            sample = embeddings[idx]
+        else:
+            sample = embeddings
+
+        best_k, best_score = AUTO_K_MIN, -1.0
+        for k in range(AUTO_K_MIN, k_max + 1):
+            try:
+                labels = self._build_model(k).fit_predict(sample)
+            except Exception as e:
+                logger.warning("Auto-k: fit failed at k=%d (%s)", k, e)
+                continue
+            if len(set(labels)) < 2:
+                continue
+            try:
+                score = silhouette_score(sample, labels)
+            except Exception:
+                continue
+            logger.info("Auto-k: k=%d silhouette=%.4f", k, score)
+            if score > best_score:
+                best_k, best_score = k, score
+        logger.info("Auto-k selected %d clusters (silhouette=%.4f)", best_k, best_score)
+        return best_k
+
     def fit(self, embeddings: np.ndarray) -> np.ndarray:
         """
         Perform clustering on embeddings
-        
+
         Args:
             embeddings: Matrix of article embeddings
-            
+
         Returns:
             Array of cluster labels
         """
-        print(f"Clustering {len(embeddings)} articles into {self.n_clusters} clusters...")
-        
-        if self.method == 'kmeans':
-            self.cluster_model = KMeans(
-                n_clusters=self.n_clusters,
-                random_state=42,
-                n_init=10
-            )
-        elif self.method == 'hierarchical':
-            self.cluster_model = AgglomerativeClustering(
-                n_clusters=self.n_clusters,
-                linkage='ward'
-            )
+        n_samples = len(embeddings)
+
+        if self.n_clusters is None:
+            # Never search for more clusters than we could meaningfully support.
+            k_max = min(AUTO_K_MAX, max(AUTO_K_MIN, n_samples - 1))
+            k = self._auto_select_k(embeddings, k_max)
         else:
-            raise ValueError(f"Unknown method: {self.method}")
-        
+            k = min(self.n_clusters, n_samples)
+
+        k = max(1, k)
+        self.resolved_n_clusters = k
+        print(f"Clustering {n_samples} articles into {k} clusters...")
+
+        self.cluster_model = self._build_model(k)
         self.labels = self.cluster_model.fit_predict(embeddings)
-        
+
         # Print cluster distribution
         cluster_counts = Counter(self.labels)
         print(f"Cluster distribution: {dict(sorted(cluster_counts.items()))}")
-        
+
         return self.labels
-    
+
     def get_cluster_assignments(self) -> np.ndarray:
         """Get cluster labels"""
         if self.labels is None:
@@ -102,10 +162,16 @@ class ClusterLabeler:
            so the idf term punishes words that appear in many clusters — the
            score now measures "how characteristic of THIS cluster vs the
            others", not just "how frequent inside it".
-        2. Assigns terms round-robin with a global claimed-set, so a given
-           term can appear in at most ONE cluster's label.
-        3. Skips terms that share a word with a term already in the same
-           label (no "cancer | cancer patients").
+        2. Only keeps human-readable tokens: ASCII letters, length >= 3. This
+           drops foreign-script stop-words (κα, με, να), digits, and 2-letter
+           abbreviations (gi, pl, abr) that made labels look like noise.
+        3. Prefers multi-word phrases ("gut microbiota") over lone jargon words,
+           which read as recognisable topics to a non-specialist.
+        4. Assigns terms round-robin with a global claimed-set, so a given term
+           can appear in at most ONE cluster's label, and skips terms sharing a
+           word with one already in the same label.
+        5. Formats the result as a Title Case phrase ("Gut Microbiota, Immune
+           Response") instead of a "a | b | c" keyword dump.
 
         Args:
             articles_by_cluster: Dictionary mapping cluster IDs to lists of articles
@@ -132,6 +198,9 @@ class ClusterLabeler:
             stop_words='english',
             ngram_range=(1, 2),
             sublinear_tf=True,  # tame huge clusters dominating on raw counts
+            # Only whole words of >= 3 ASCII letters. Excludes numbers,
+            # non-latin scripts, and tiny abbreviations.
+            token_pattern=r"(?u)\b[A-Za-z][A-Za-z][A-Za-z]+\b",
         )
         try:
             tfidf = vectorizer.fit_transform(docs)  # rows = clusters
@@ -140,10 +209,14 @@ class ClusterLabeler:
             print(f"Error generating cluster labels: {e}")
             return fallback
 
-        # Per-cluster term ranking (indices sorted by descending score).
         scores = tfidf.toarray()
+        # Rank by a phrase-boosted score so descriptive bigrams win ties against
+        # single jargon words, but judge "is this term meaningful at all" on the
+        # raw score.
+        is_bigram = np.array([' ' in f for f in feature_names])
+        rank_scores = scores * np.where(is_bigram, 1.35, 1.0)
         rankings = {
-            cid: scores[row].argsort()[::-1]
+            cid: rank_scores[row].argsort()[::-1]
             for row, cid in enumerate(cluster_ids)
         }
 
@@ -174,9 +247,49 @@ class ClusterLabeler:
                     break
 
         return {
-            cid: (' | '.join(terms) if terms else fallback[cid])
+            cid: (', '.join(t.title() for t in terms) if terms else fallback[cid])
             for cid, terms in chosen.items()
         }
+
+    @staticmethod
+    def pick_representative_titles(
+        article_ids: List,
+        embeddings: np.ndarray,
+        labels,
+        title_by_key: Dict,
+    ) -> Dict[int, str]:
+        """Pick the most central article's title as each cluster's headline.
+
+        The article whose embedding is closest to its cluster's centroid is the
+        most typical member, so its (real, grammatical) title is the clearest
+        one-line description of what the cluster is about — far more legible to a
+        non-specialist than a keyword list.
+
+        Args:
+            article_ids: list of (article_id, source) keys, aligned with rows of
+                `embeddings` and entries of `labels`.
+            embeddings: 2D array of article embeddings.
+            labels: cluster id per article (aligned with article_ids).
+            title_by_key: {(article_id, source): title}
+
+        Returns:
+            {cluster_id: representative_title}
+        """
+        labels = np.asarray(labels)
+        titles: Dict[int, str] = {}
+        for cid in set(int(x) for x in labels):
+            member_idx = np.where(labels == cid)[0]
+            if len(member_idx) == 0:
+                continue
+            centroid = embeddings[member_idx].mean(axis=0)
+            # Nearest member to the centroid (Euclidean; vectors are unit-norm).
+            dists = np.linalg.norm(embeddings[member_idx] - centroid, axis=1)
+            best = member_idx[int(np.argmin(dists))]
+            key = article_ids[best]
+            title = (title_by_key.get(key) or '').strip()
+            if title:
+                titles[cid] = title
+        return titles
 
 
 class ClusterVisualizer:

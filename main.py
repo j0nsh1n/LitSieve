@@ -216,7 +216,8 @@ class EmbeddingsRequest(BaseModel):
     model: str = "general"
 
 class ClusterRequest(BaseModel):
-    n_clusters: int = 10
+    # None (or <= 0) means auto-select the count by silhouette score.
+    n_clusters: Optional[int] = None
     method: str = "kmeans"
 
 class DuplicateRequest(BaseModel):
@@ -617,8 +618,16 @@ async def api_create_clusters(req: ClusterRequest, request: Request):
     uid = user["user_id"]
     p = get_pipeline(uid)
     try:
-        await run_in_thread(p.cluster_articles, n_clusters=req.n_clusters, method=req.method)
-        return {"status": "success", "clusters": p.db.get_all_clusters()}
+        result = await run_in_thread(p.cluster_articles, n_clusters=req.n_clusters, method=req.method)
+        # cluster_articles returns (labels, cluster_labels, by_cluster, resolved_n)
+        # or None when there are no embeddings yet.
+        resolved_n = result[3] if result else 0
+        return {
+            "status": "success",
+            "clusters": p.db.get_all_clusters(),
+            "resolved_n_clusters": resolved_n,
+            "auto": req.n_clusters is None or req.n_clusters <= 0,
+        }
     except Exception as e:
         return server_error(e)
     finally:
