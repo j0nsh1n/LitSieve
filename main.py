@@ -218,7 +218,9 @@ class EmbeddingsRequest(BaseModel):
 class ClusterRequest(BaseModel):
     # None (or <= 0) means auto-select the count by silhouette score.
     n_clusters: Optional[int] = None
-    method: str = "kmeans"
+    # Density (HDBSCAN) is the default: it finds the topic count itself and sets
+    # outliers aside, which beats a guessed/auto k on real corpora.
+    method: str = "hdbscan"
 
 class DuplicateRequest(BaseModel):
     threshold: float = 0.95
