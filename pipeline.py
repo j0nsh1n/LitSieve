@@ -63,6 +63,12 @@ class LiteratureSearchPipeline:
         self.db = ArticleDatabase(db_path)
         self.embedding_engine = EmbeddingEngine(model_name=embedding_model)
         self.embedding_model_name = embedding_model
+        # One pipeline instance is shared across concurrent requests for the same
+        # user (see the pipeline cache in main.py). This lock guards the mutable
+        # embedding engine so a search can't swap the model out from under an
+        # in-flight embedding job (or vice versa), which would otherwise mix
+        # vectors from two different models.
+        self._engine_lock = threading.Lock()
 
     def fetch_articles(
         self,
@@ -153,8 +159,15 @@ class LiteratureSearchPipeline:
             for source, data in results.items()
         }
 
-    def create_embeddings(self, progress_callback=None):
-        """Step 2: Create embeddings for all articles"""
+    def create_embeddings(self, model: Optional[str] = None, progress_callback=None):
+        """Step 2: Create embeddings for all articles
+
+        Args:
+            model: If given, switch the embedding engine to this model before
+                embedding. Doing the swap here (under the engine lock) keeps it
+                atomic with the embedding pass, instead of mutating the shared
+                pipeline from the request handler.
+        """
         logger.info("\n=== Step 2: Creating Embeddings ===")
 
         articles = self.db.get_all_articles()
@@ -164,9 +177,18 @@ class LiteratureSearchPipeline:
 
         logger.info(f"Creating embeddings for {len(articles)} articles...")
 
-        embeddings = self.embedding_engine.embed_articles(articles, progress_callback=progress_callback)
+        # Hold the engine lock across the swap AND the embedding pass so a
+        # concurrent search can't replace the engine while embed_articles runs.
+        with self._engine_lock:
+            if model and model != self.embedding_model_name:
+                self.embedding_engine = EmbeddingEngine(model_name=model)
+                self.embedding_model_name = model
+            model_name = self.embedding_model_name
+            embeddings = self.embedding_engine.embed_articles(
+                articles, progress_callback=progress_callback
+            )
 
-        self.db.insert_embeddings(embeddings, self.embedding_model_name)
+        self.db.insert_embeddings(embeddings, model_name)
 
         logger.info(f"Created and stored embeddings")
         return embeddings
@@ -320,6 +342,7 @@ class LiteratureSearchPipeline:
         query_text: str,
         top_k: int = 10,
         source_filter: Optional[List[str]] = None,
+        cluster_filter: Optional[List[int]] = None,
     ) -> List[Dict]:
         """
         Search for articles similar to a query
@@ -331,6 +354,10 @@ class LiteratureSearchPipeline:
                 list. Filtering happens BEFORE the top-k cut so a narrow source
                 selection still returns up to top_k results rather than however
                 many survive a post-hoc filter.
+            cluster_filter: If given, only rank articles whose cluster_id is in
+                this list. Like source_filter, this is applied BEFORE the top-k
+                cut so the caller still gets up to top_k results from the chosen
+                clusters.
 
         Returns:
             List of similar articles with similarity scores
@@ -354,21 +381,41 @@ class LiteratureSearchPipeline:
             article_ids = [article_ids[i] for i in keep]
             article_embeddings = article_embeddings[keep]
 
+        # Restrict the candidate pool to the requested clusters before ranking,
+        # for the same reason as source_filter above.
+        if cluster_filter:
+            wanted = set(cluster_filter)
+            cluster_map = self.db.get_all_articles_with_clusters()
+            keep = [
+                i for i, key in enumerate(article_ids)
+                if (cluster_map.get(key) or {}).get('cluster_id') in wanted
+            ]
+            if not keep:
+                logger.info("No embeddings match the requested clusters.")
+                return []
+            article_ids = [article_ids[i] for i in keep]
+            article_embeddings = article_embeddings[keep]
+
         # The query must be embedded with the SAME model that built the stored
         # vectors — different models have different dimensions, and the pipeline
         # may have been recreated with the default model since embedding (e.g.
         # after re-login). Re-sync to the stored model before embedding.
+        #
+        # Hold the engine lock across the re-sync AND the query embedding so a
+        # concurrent create_embeddings can't swap the engine between the two and
+        # leave us embedding the query with the wrong model.
         stored_model = self.db.get_embedding_model()
-        if stored_model and stored_model != self.embedding_model_name:
-            logger.info(
-                "Query embedder '%s' differs from stored embeddings' model '%s'; switching.",
-                self.embedding_model_name, stored_model,
-            )
-            self.embedding_engine = EmbeddingEngine(model_name=stored_model)
-            self.embedding_model_name = stored_model
+        with self._engine_lock:
+            if stored_model and stored_model != self.embedding_model_name:
+                logger.info(
+                    "Query embedder '%s' differs from stored embeddings' model '%s'; switching.",
+                    self.embedding_model_name, stored_model,
+                )
+                self.embedding_engine = EmbeddingEngine(model_name=stored_model)
+                self.embedding_model_name = stored_model
 
-        # Create query embedding
-        query_embedding = self.embedding_engine.embed_query(query_text)
+            # Create query embedding
+            query_embedding = self.embedding_engine.embed_query(query_text)
 
         # Defensive: if the dimensions still disagree (e.g. corrupt/mixed-model
         # embeddings), fail with a clear, actionable message instead of a cryptic

@@ -29,7 +29,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi import _rate_limit_exceeded_handler
 
 from pipeline import LiteratureSearchPipeline
-from embeddings import EmbeddingEngine, PICOExtractor
+from embeddings import PICOExtractor
 from user_db import UserDatabase
 from auth import hash_password, verify_password, create_token, get_current_user
 
@@ -399,11 +399,10 @@ async def api_search(req: SearchRequest, request: Request):
         results = await run_in_thread(
             p.search_similar, req.query_text,
             top_k=req.top_k, source_filter=req.source_filter,
+            cluster_filter=req.cluster_filter,
         )
         for article in results:
             article['pico'] = PICOExtractor.extract_pico(article.get('abstract', ''))
-        if req.cluster_filter:
-            results = [a for a in results if a.get('cluster_id') in req.cluster_filter]
         if req.sort_by == "year":
             results.sort(key=lambda a: a.get('year', '0'), reverse=True)
         elif req.sort_by == "journal":
@@ -436,15 +435,14 @@ async def api_search_export(
     p = get_pipeline(uid)
     try:
         sources = [s for s in source_filter.split(",") if s.strip()] or None
-        results = await run_in_thread(
-            p.search_similar, query_text, top_k=top_k, source_filter=sources,
-        )
         try:
             cluster_ids = [int(x) for x in cluster_filter.split(",") if x.strip()] if cluster_filter else None
         except ValueError:
             return JSONResponse(status_code=400, content={"error": "Invalid cluster_filter"})
-        if cluster_ids:
-            results = [a for a in results if a.get('cluster_id') in cluster_ids]
+        results = await run_in_thread(
+            p.search_similar, query_text, top_k=top_k, source_filter=sources,
+            cluster_filter=cluster_ids,
+        )
         if sort_by == "year":
             results.sort(key=lambda a: a.get('year', '0'), reverse=True)
         elif sort_by == "journal":
@@ -508,6 +506,7 @@ async def api_clear_articles(request: Request):
 
 
 @app.post("/api/fetch-articles-multi")
+@limiter.limit("20/minute")
 async def api_fetch_multi(req: MultiFetchRequest, request: Request):
     user = current_user(request)
     if not user:
@@ -545,6 +544,7 @@ async def api_fetch_multi(req: MultiFetchRequest, request: Request):
 
 
 @app.post("/api/fetch-articles")
+@limiter.limit("20/minute")
 async def api_fetch(req: FetchRequest, request: Request):
     user = current_user(request)
     if not user:
@@ -567,6 +567,7 @@ async def api_fetch(req: FetchRequest, request: Request):
 
 
 @app.post("/api/create-embeddings")
+@limiter.limit("12/minute")
 async def api_create_embeddings(req: EmbeddingsRequest, request: Request):
     user = current_user(request)
     if not user:
@@ -577,14 +578,12 @@ async def api_create_embeddings(req: EmbeddingsRequest, request: Request):
     p = get_pipeline(uid)
     update_progress(uid, 'embed', active=True, done=0, total=0)
     try:
-        if req.model != p.embedding_model_name:
-            p.embedding_engine = EmbeddingEngine(req.model)
-            p.embedding_model_name = req.model
-
         def on_batch_done(done, total):
             update_progress(uid, 'embed', done=done, total=total)
 
-        await run_in_thread(p.create_embeddings, progress_callback=on_batch_done)
+        # The engine swap happens inside create_embeddings under the pipeline's
+        # engine lock, so it stays atomic with the embedding pass.
+        await run_in_thread(p.create_embeddings, model=req.model, progress_callback=on_batch_done)
         stats = p.get_statistics()
         return {"status": "success", "articles_processed": stats['articles_with_embeddings']}
     except Exception as e:
@@ -666,6 +665,8 @@ async def api_detect_duplicates(req: DuplicateRequest, request: Request):
     user = current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
     uid = user["user_id"]
     p = get_pipeline(uid)
     try:
