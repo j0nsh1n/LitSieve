@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Account - Literature Research Aide{% endblock %}
+{% block content %}
+<section class="page-header">
+    <h1>Account</h1>
+    <p class="subtitle">Manage your account.</p>
+</section>
+
+<section class="card">
+    <h2>Profile</h2>
+    <p class="info-text">Signed in as <strong>{{ user.username }}</strong>.</p>
+    <a href="/logout" class="btn btn-secondary">Log Out</a>
+</section>
+
+<section class="card danger-zone">
+    <h2>Delete Account</h2>
+    <p class="info-text">
+        This permanently deletes your account and everything in your workspace —
+        all fetched articles, embeddings, and clusters. This cannot be undone.
+    </p>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Confirm your password</label>
+            <input type="password" id="delete-password" class="pw-field" autocomplete="current-password">
+        </div>
+    </div>
+    <label class="show-pass">
+        <input type="checkbox" id="show-delete-pw"> Show password
+    </label>
+    <label class="show-pass" style="margin-top: 0.6rem;">
+        <input type="checkbox" id="delete-confirm"> I understand this permanently deletes my account and all my data.
+    </label>
+    <button id="delete-account-btn" class="btn btn-danger" disabled>Delete My Account</button>
+    <div id="delete-status" class="status-indicator"></div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/account.js"></script>
+{% endblock %}

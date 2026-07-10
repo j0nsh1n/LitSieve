@@ -1,0 +1,29 @@
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+
+# --- Secrets / credentials (NEVER commit) ---
+.env
+.env.*
+!.env.example
+.secret_key
+*.secret_key
+*.pem
+*.key
+*.pfx
+secrets.*
+
+# --- Databases / user data (accounts, password hashes, fetched corpora) ---
+*.db
+*.sqlite
+*.sqlite3
+.pytest_cache/
+.ruff_cache/
+user_data/
+.venv/
+venv/
+.claude/
+# Generated Plotly/heatmap artifacts (written by pipeline.create_visualizations)
+visualizations/
