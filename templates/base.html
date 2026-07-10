@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Literature Research Aide{% endblock %}</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260709m">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260709u">
     <script>
         (function() {
             const root = document.documentElement;
@@ -13,30 +13,70 @@
             if (localStorage.getItem('readingMode') === 'on') {
                 root.setAttribute('data-reading', 'on');
             }
-            // Avoid a flash of unstyled enter-animation on bfcache restore.
             root.classList.add('js-ready');
         })();
     </script>
 </head>
 <body>
-    <nav class="navbar" role="navigation" aria-label="Main">
-        <div class="nav-brand">Literature Research Aide</div>
-        <div class="nav-links">
-            <a href="/data-management" class="nav-link {% if active_page == 'data_management' %}active{% endif %}">Data Management</a>
-            <a href="/clusters" class="nav-link {% if active_page == 'clusters' %}active{% endif %}">Clusters</a>
-            <a href="/search" class="nav-link {% if active_page == 'search' %}active{% endif %}">Search</a>
-            <a href="/statistics" class="nav-link {% if active_page == 'statistics' %}active{% endif %}">Duplicates</a>
+    {# Recommended order: Fetch/Embed → Cluster/Triage → Dedup → Search #}
+    {% set workflow = [
+        ("data_management", "Data Management", "/data-management", "Step 1: fetch papers and create embeddings"),
+        ("clusters", "Clusters", "/clusters", "Step 2: group topics and screen out noise"),
+        ("statistics", "Duplicates", "/statistics", "Step 3: remove near-duplicate copies"),
+        ("search", "Search", "/search", "Step 4: rank the papers you kept"),
+    ] %}
+    {% set ns = namespace(current_label="Steps", current_num="") %}
+    {% for key, label, href, tip in workflow %}
+        {% if key == active_page %}
+            {% set ns.current_label = label %}
+            {% set ns.current_num = loop.index|string %}
+        {% endif %}
+    {% endfor %}
+
+    <nav class="navbar" id="site-navbar" role="navigation" aria-label="Main">
+        <div class="navbar-top">
+            <div class="nav-brand">Literature Research Aide</div>
+            <div class="nav-stats">
+                <button type="button"
+                        class="nav-menu-toggle"
+                        id="nav-menu-toggle"
+                        aria-expanded="false"
+                        aria-controls="nav-links-panel"
+                        title="Open steps menu">
+                    <span class="nav-menu-toggle-icon" aria-hidden="true">☰</span>
+                    <span class="nav-menu-toggle-text">
+                        {% if ns.current_num %}
+                        <span class="nav-step-num nav-menu-step">{{ ns.current_num }}</span>
+                        {% endif %}
+                        <span class="nav-menu-current">{{ ns.current_label }}</span>
+                    </span>
+                    <span class="nav-menu-caret" aria-hidden="true">▾</span>
+                </button>
+                <button type="button" class="reading-toggle" id="reading-toggle"
+                    title="Reading mode - denser layout, better abstracts"
+                    aria-label="Toggle reading mode" aria-pressed="false">Aa</button>
+                <button type="button" class="theme-toggle" id="theme-toggle" title="Toggle theme" aria-label="Toggle theme">🌙</button>
+                {% if user %}
+                <a href="/account" class="nav-username {% if active_page == 'account' %}active{% endif %}" title="Account settings">{{ user.username }}</a>
+                <a href="/logout" class="nav-logout">Logout</a>
+                {% endif %}
+                <span class="stat-badge" id="nav-article-count" aria-live="polite">-- articles</span>
+            </div>
         </div>
-        <div class="nav-stats">
-            <button type="button" class="reading-toggle" id="reading-toggle"
-                title="Reading mode — denser layout, better abstracts"
-                aria-label="Toggle reading mode" aria-pressed="false">Aa</button>
-            <button type="button" class="theme-toggle" id="theme-toggle" title="Toggle theme" aria-label="Toggle theme">🌙</button>
-            {% if user %}
-            <a href="/account" class="nav-username {% if active_page == 'account' %}active{% endif %}" title="Account settings">{{ user.username }}</a>
-            <a href="/logout" class="nav-logout">Logout</a>
+
+        <div class="nav-links" id="nav-links-panel" aria-label="Workflow steps in order">
+            {% for key, label, href, tip in workflow %}
+            {% if not loop.first %}
+            <span class="nav-flow-arrow" aria-hidden="true">→</span>
             {% endif %}
-            <span class="stat-badge" id="nav-article-count" aria-live="polite">-- articles</span>
+            <a href="{{ href }}"
+               class="nav-link {% if active_page == key %}active{% endif %}"
+               title="{{ tip }}"
+               {% if active_page == key %}aria-current="page"{% endif %}>
+                <span class="nav-step-num">{{ loop.index }}</span>
+                <span class="nav-step-label">{{ label }}</span>
+            </a>
+            {% endfor %}
         </div>
     </nav>
 
@@ -46,10 +86,10 @@
     </main>
 
     <footer class="footer">
-        <p>Literature Research Aide &mdash; v3.0.0</p>
+        <p>Literature Research Aide - v3.1.0</p>
     </footer>
 
-    <script src="/static/js/common.js?v=20260709d"></script>
+    <script src="/static/js/common.js?v=20260709v"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

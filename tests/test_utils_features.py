@@ -65,7 +65,7 @@ def test_cluster_briefing_year_span():
         2,
         representative_title="Paper A",
     )
-    assert b["year_span"] == "2010–2020"
+    assert b["year_span"] == "2010-2020"
     assert b["bullets"][0] == "Paper A"
 
 

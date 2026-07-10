@@ -3,48 +3,49 @@
 {% block container_mod %}container-wide{% endblock %}
 {% block content %}
 <section class="page-header">
-    <h1>Detect Duplicates</h1>
-    <p class="subtitle">The same paper often arrives from several databases under different IDs. Find those
-        near-duplicates, compare them side by side, and keep only the best copy of each.</p>
+ <h1>Detect Duplicates</h1>
+ <p class="subtitle"><strong>Step 3 of 4.</strong> The same paper often arrives from several databases under
+ different IDs - find near-duplicates and keep the best copy of each.
+ Next → <a href="/search">Search</a> to rank what you kept.</p>
 </section>
 
 <section class="stats-cards">
-    <div class="stat-card">
-        <div class="stat-value" id="stat-total">--</div>
-        <div class="stat-label">Total Articles</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-value" id="stat-embeddings">--</div>
-        <div class="stat-label">With Embeddings</div>
-    </div>
-    <div class="stat-card" title="Articles you've excluded — via cluster triage, duplicate resolution, or manually. Hidden from search results but never deleted.">
-        <div class="stat-value" id="stat-excluded">--</div>
-        <div class="stat-label">Screened Out</div>
-    </div>
+ <div class="stat-card">
+ <div class="stat-value" id="stat-total">--</div>
+ <div class="stat-label">Total Articles</div>
+ </div>
+ <div class="stat-card">
+ <div class="stat-value" id="stat-embeddings">--</div>
+ <div class="stat-label">With Embeddings</div>
+ </div>
+ <div class="stat-card" title="Articles you've excluded - via cluster triage, duplicate resolution, or manually. Hidden from search results but never deleted.">
+ <div class="stat-value" id="stat-excluded">--</div>
+ <div class="stat-label">Screened Out</div>
+ </div>
 </section>
 
 <section class="card" id="source-breakdown-section" style="display:none;">
-    <h2>Articles by Source</h2>
-    <div id="source-breakdown"></div>
+ <h2>Articles by Source</h2>
+ <div id="source-breakdown"></div>
 </section>
 
 <section class="card">
-    <h2>Duplicate Detection</h2>
-    <p class="info-text">Adjust the similarity threshold — higher values find only near-identical articles, lower values find more loosely related ones.</p>
-    <div class="form-row">
-        <div class="param-group">
-            <label>Similarity Threshold: <strong id="threshold-display">0.95</strong></label>
-            <input type="range" id="threshold" min="0.80" max="0.99" step="0.01" value="0.95">
-        </div>
-    </div>
-    <button id="detect-btn" class="btn btn-primary">Detect Duplicates</button>
-    <button id="resolve-btn" class="btn btn-secondary" title="Keep the best copy of every duplicate group and screen out the rest">Auto-Resolve All</button>
-    <div id="duplicates-status" class="status-indicator"></div>
-    <p class="info-text">Resolving keeps the most complete abstract first; if lengths are similar it prefers
-        higher-quality sources (PubMed &gt; Europe PMC &gt; CrossRef &gt; OpenAlex &gt; …). Redundant copies
-        are screened out (hidden from Search, not deleted). You can restore anything from its cluster on
-        the Clusters page. Use per-group <strong>Keep this</strong> when you want to choose the winner by hand.</p>
-    <div id="duplicates-list"></div>
+ <h2>Duplicate Detection</h2>
+ <p class="info-text">Adjust the similarity threshold - higher values find only near-identical articles, lower values find more loosely related ones.</p>
+ <div class="form-row">
+ <div class="param-group">
+ <label>Similarity Threshold: <strong id="threshold-display">0.95</strong></label>
+ <input type="range" id="threshold" min="0.80" max="0.99" step="0.01" value="0.95">
+ </div>
+ </div>
+ <button id="detect-btn" class="btn btn-primary">Detect Duplicates</button>
+ <button id="resolve-btn" class="btn btn-secondary" title="Keep the best copy of every duplicate group and screen out the rest">Auto-Resolve All</button>
+ <div id="duplicates-status" class="status-indicator"></div>
+ <p class="info-text">Resolving keeps the most complete abstract first; if lengths are similar it prefers
+ higher-quality sources (PubMed &gt; Europe PMC &gt; CrossRef &gt; OpenAlex &gt; …). Redundant copies
+ are screened out (hidden from Search, not deleted). You can restore anything from its cluster on
+ the Clusters page. Use per-group <strong>Keep this</strong> when you want to choose the winner by hand.</p>
+ <div id="duplicates-list"></div>
 </section>
 {% endblock %}
 

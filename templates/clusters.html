@@ -3,66 +3,67 @@
 {% block container_mod %}container-wide{% endblock %}
 {% block content %}
 <section class="page-header">
-    <h1>Article Clusters</h1>
-    <p class="subtitle">Group your articles into themed clusters using their embeddings, then browse each cluster.</p>
+ <h1>Article Clusters</h1>
+ <p class="subtitle"><strong>Step 2 of 4.</strong> Group papers by topic and exclude off-topic clusters or papers.
+ Next → <a href="/statistics">Duplicates</a> to drop near-identical copies across sources.</p>
 </section>
 
 <section class="card">
-    <h2>Generate Clusters</h2>
-    <p class="info-text">Clustering groups your articles by topic using their embeddings — create
-        embeddings on the Data Management page first. <strong>Density</strong> (default) finds natural
-        topics itself and parks odd papers in an “outliers” group — you do not choose a count.
-        Prefer a fixed number of groups? Switch method to <strong>K-Means</strong> or
-        <strong>Hierarchical</strong>, then use <strong>Auto</strong> (app picks the cleanest count)
-        or uncheck Auto and set the slider yourself. Re-clustering replaces groups but keeps exclusions.</p>
-    <div class="form-row">
-        <div class="form-group">
-            <label>Method</label>
-            <select id="cluster-method">
-                <option value="hdbscan" selected>Density — finds topics &amp; sets aside outliers (recommended)</option>
-                <option value="kmeans">K-Means (fast, fixed or auto count)</option>
-                <option value="hierarchical">Hierarchical (Ward — fixed or auto count)</option>
-            </select>
-        </div>
-    </div>
-    <p class="info-text" id="density-count-note">
-        Density mode chooses how many clusters automatically. To turn Auto off and set a number by hand,
-        switch Method to K-Means or Hierarchical above.
-    </p>
-    <div id="k-controls">
-        <div class="form-row">
-            <div class="form-group">
-                <label class="radio-label">
-                    <input type="checkbox" id="auto-clusters" checked>
-                    Auto — let the app pick the best number of clusters
-                </label>
-            </div>
-        </div>
-        <div class="form-row">
-            <div class="param-group">
-                <label>Number of clusters: <strong id="nclusters-display">10</strong></label>
-                <input type="range" id="n-clusters" min="2" max="30" value="10" disabled>
-                <span class="help-text" id="slider-hint">Uncheck Auto to move this slider.</span>
-            </div>
-        </div>
-    </div>
-    <button id="cluster-btn" class="btn btn-primary">Generate Clusters</button>
-    <div id="cluster-status" class="status-indicator"></div>
+ <h2>Generate Clusters</h2>
+ <p class="info-text">Clustering groups your articles by topic using their embeddings - create
+ embeddings on the Data Management page first. <strong>Density</strong> (default) finds natural
+ topics itself and parks odd papers in an “outliers” group - you do not choose a count.
+ Prefer a fixed number of groups? Switch method to <strong>K-Means</strong> or
+ <strong>Hierarchical</strong>, then use <strong>Auto</strong> (app picks the cleanest count)
+ or uncheck Auto and set the slider yourself. Re-clustering replaces groups but keeps exclusions.</p>
+ <div class="form-row">
+ <div class="form-group">
+ <label>Method</label>
+ <select id="cluster-method">
+ <option value="hdbscan" selected>Density - finds topics &amp; sets aside outliers (recommended)</option>
+ <option value="kmeans">K-Means (fast, fixed or auto count)</option>
+ <option value="hierarchical">Hierarchical (Ward - fixed or auto count)</option>
+ </select>
+ </div>
+ </div>
+ <p class="info-text" id="density-count-note">
+ Density mode chooses how many clusters automatically. To turn Auto off and set a number by hand,
+ switch Method to K-Means or Hierarchical above.
+ </p>
+ <div id="k-controls">
+ <div class="form-row">
+ <div class="form-group">
+ <label class="radio-label">
+ <input type="checkbox" id="auto-clusters" checked>
+ Auto - let the app pick the best number of clusters
+ </label>
+ </div>
+ </div>
+ <div class="form-row">
+ <div class="param-group">
+ <label>Number of clusters: <strong id="nclusters-display">10</strong></label>
+ <input type="range" id="n-clusters" min="2" max="30" value="10" disabled>
+ <span class="help-text" id="slider-hint">Uncheck Auto to move this slider.</span>
+ </div>
+ </div>
+ </div>
+ <button id="cluster-btn" class="btn btn-primary">Generate Clusters</button>
+ <div id="cluster-status" class="status-indicator"></div>
 </section>
 
 <section class="card">
-    <div class="results-header">
-        <h2>Clusters: <span id="cluster-count">0</span></h2>
-    </div>
-    <p class="info-text">Each cluster's label uses terms that most distinguish it from other clusters
-        (no shared keyword spam). Opening a cluster shows a short <strong>topic overview</strong>
-        (year span + example titles) so you can decide if the group is on-topic.
-        <strong>This page is where you triage:</strong> Exclude cluster (or a single paper) screens
-        them out of Search entirely. Search has no second topic list — it only ranks what you kept.
-        Nothing is deleted; Restore brings papers back anytime.</p>
-    <div id="clusters-list">
-        <p class="info-text">No clusters yet. Generate them above to see them here.</p>
-    </div>
+ <div class="results-header">
+ <h2>Clusters: <span id="cluster-count">0</span></h2>
+ </div>
+ <p class="info-text">Each cluster's label uses terms that most distinguish it from other clusters
+ (no shared keyword spam). Opening a cluster shows a short <strong>topic overview</strong>
+ (year span + example titles) so you can decide if the group is on-topic.
+ <strong>This page is where you triage:</strong> Exclude cluster (or a single paper) screens
+ them out of Search entirely. Search has no second topic list - it only ranks what you kept.
+ Nothing is deleted; Restore brings papers back anytime.</p>
+ <div id="clusters-list">
+ <p class="info-text">No clusters yet. Generate them above to see them here.</p>
+ </div>
 </section>
 {% endblock %}
 

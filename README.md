@@ -7,7 +7,7 @@ sdk: docker
 app_port: 7860
 ---
 
-# Literature Research Aide 📚 — v3.0.0
+# Literature Research Aide 📚 — v3.1.0
 
 A multi-user web app for teachers and students to find, screen, and rank
 research papers across many academic databases using semantic embeddings,
@@ -47,7 +47,6 @@ Built with **FastAPI**, sentence-transformers, FAISS, and scikit-learn.
 ├── templates/              # Jinja2 HTML pages
 ├── static/                 # CSS + page JavaScript
 ├── tests/                  # pytest suite
-├── context.md              # Dev primer / product map
 ├── run_dev.sh              # Local dev with --reload
 ├── requirements.txt
 ├── Dockerfile              # Container build (HF Spaces / any Docker host)
