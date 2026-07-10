@@ -182,7 +182,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function updateButton(theme) {
-        btn.textContent = theme === 'dark' ? '☀' : '🌙';
+        // Icon = current mode (moon while dark, sun while light).
+        // Title describes the action of the next click.
+        btn.textContent = theme === 'dark' ? '🌙' : '☀';
         btn.title = theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
         btn.setAttribute('aria-label', btn.title);
     }
@@ -212,6 +214,68 @@ document.addEventListener('DOMContentLoaded', function() {
     };
     onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
+});
+
+// === Mobile nav dropdown (workflow steps) ===
+// Uses body.nav-menu-open + .navbar.nav-open so CSS can force the panel open
+// even when other display rules fight. Outside-close is deferred one tick so
+// the same tap that opens the menu does not immediately close it.
+document.addEventListener('DOMContentLoaded', function() {
+    const nav = document.getElementById('site-navbar') || document.querySelector('.navbar');
+    const toggle = document.getElementById('nav-menu-toggle');
+    const panel = document.getElementById('nav-links-panel');
+    if (!nav || !toggle || !panel) return;
+
+    let open = false;
+
+    function setOpen(next) {
+        open = !!next;
+        nav.classList.toggle('nav-open', open);
+        document.body.classList.toggle('nav-menu-open', open);
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        toggle.title = open ? 'Close steps menu' : 'Open steps menu';
+        // Keep panel in tab order only when open on mobile (desktop always shows it)
+        if (window.matchMedia('(max-width: 900px)').matches) {
+            panel.setAttribute('aria-hidden', open ? 'false' : 'true');
+        } else {
+            panel.removeAttribute('aria-hidden');
+        }
+    }
+
+    setOpen(false);
+
+    toggle.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        setOpen(!open);
+    });
+
+    panel.querySelectorAll('a.nav-link').forEach(function(link) {
+        link.addEventListener('click', function() {
+            setOpen(false);
+        });
+    });
+
+    // Outside click: listen on pointerdown so it feels instant; ignore the toggle.
+    document.addEventListener('pointerdown', function(e) {
+        if (!open) return;
+        if (nav.contains(e.target)) return;
+        setOpen(false);
+    }, true);
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && open) {
+            setOpen(false);
+            toggle.focus();
+        }
+    });
+
+    const mq = window.matchMedia('(min-width: 901px)');
+    function onMq() {
+        if (mq.matches) setOpen(false);
+    }
+    if (mq.addEventListener) mq.addEventListener('change', onMq);
+    else if (mq.addListener) mq.addListener(onMq);
 });
 
 // === Prefers-reduced-motion helper ===

@@ -3,152 +3,153 @@
 {% block container_mod %}container-wide{% endblock %}
 {% block content %}
 <section class="page-header">
-    <h1>Search for Similar Articles</h1>
-    <p class="subtitle">Find papers in your collection by meaning — or start from a seed paper you already have.</p>
+ <h1>Search for Similar Articles</h1>
+ <p class="subtitle"><strong>Step 4 of 4 (last).</strong> Rank papers you kept by meaning - or start from a seed
+ paper. Screen on <a href="/clusters">Clusters</a> and clean copies on <a href="/statistics">Duplicates</a> first.</p>
 </section>
 
 <section class="card">
-    <p class="info-text">This searches <strong>your fetched &amp; embedded articles only</strong> — not the whole internet.
-        Plain language works: the app compares meaning, not just keywords.
-        <strong>Text</strong> is a free research question;
-        <strong>PICO</strong> is for clinical-style questions (Population / Intervention / Comparison / Outcome).
-        Screen out off-topic groups or papers on the <a href="/clusters">Clusters</a> page (or resolve
-        duplicates first) — those never appear here. Search is only for ranking what you kept.</p>
-    <div class="input-method-toggle">
-        <label class="radio-label">
-            <input type="radio" name="input_method" value="text" checked> Text Input
-        </label>
-        <label class="radio-label">
-            <input type="radio" name="input_method" value="pico"> PICO Format
-        </label>
-        <label class="radio-label">
-            <input type="radio" name="input_method" value="seed"> Seed paper
-        </label>
-    </div>
+ <p class="info-text">This searches <strong>your fetched &amp; embedded articles only</strong> - not the whole internet.
+ Plain language works: the app compares meaning, not just keywords.
+ <strong>Text</strong> is a free research question;
+ <strong>PICO</strong> is for clinical-style questions (Population / Intervention / Comparison / Outcome).
+ Screen out off-topic groups or papers on the <a href="/clusters">Clusters</a> page (or resolve
+ duplicates first) - those never appear here. Search is only for ranking what you kept.</p>
+ <div class="input-method-toggle">
+ <label class="radio-label">
+ <input type="radio" name="input_method" value="text" checked> Text Input
+ </label>
+ <label class="radio-label">
+ <input type="radio" name="input_method" value="pico"> PICO Format
+ </label>
+ <label class="radio-label">
+ <input type="radio" name="input_method" value="seed"> Seed paper
+ </label>
+ </div>
 
-    <div id="text-input-panel">
-        <textarea id="query-text" placeholder="Enter your study description or research question..." rows="4"></textarea>
-    </div>
+ <div id="text-input-panel">
+ <textarea id="query-text" placeholder="Enter your study description or research question..." rows="4"></textarea>
+ </div>
 
-    <div id="pico-input-panel" style="display:none;">
-        <p class="info-text">Fill in the parts you know. Optional: turn on <em>Prefer PICO matches</em> below so abstracts that mention your terms rank a little higher.</p>
-        <div class="pico-grid">
-            <div class="form-group">
-                <label>Population</label>
-                <input type="text" id="pico-population" placeholder="e.g., Adults with type 2 diabetes">
-            </div>
-            <div class="form-group">
-                <label>Intervention</label>
-                <input type="text" id="pico-intervention" placeholder="e.g., Metformin treatment">
-            </div>
-            <div class="form-group">
-                <label>Comparison</label>
-                <input type="text" id="pico-comparison" placeholder="e.g., Placebo or standard care">
-            </div>
-            <div class="form-group">
-                <label>Outcome</label>
-                <input type="text" id="pico-outcome" placeholder="e.g., Glycemic control">
-            </div>
-        </div>
-    </div>
+ <div id="pico-input-panel" style="display:none;">
+ <p class="info-text">Fill in the parts you know. Optional: turn on <em>Prefer PICO matches</em> below so abstracts that mention your terms rank a little higher.</p>
+ <div class="pico-grid">
+ <div class="form-group">
+ <label>Population</label>
+ <input type="text" id="pico-population" placeholder="e.g., Adults with type 2 diabetes">
+ </div>
+ <div class="form-group">
+ <label>Intervention</label>
+ <input type="text" id="pico-intervention" placeholder="e.g., Metformin treatment">
+ </div>
+ <div class="form-group">
+ <label>Comparison</label>
+ <input type="text" id="pico-comparison" placeholder="e.g., Placebo or standard care">
+ </div>
+ <div class="form-group">
+ <label>Outcome</label>
+ <input type="text" id="pico-outcome" placeholder="e.g., Glycemic control">
+ </div>
+ </div>
+ </div>
 
-    <div id="seed-input-panel" style="display:none;">
-        <p class="info-text"><strong>Seed paper:</strong> paste an article id (e.g. PubMed ID or DOI) or part of a
-            title from a paper already in your collection. The app finds that paper, then ranks others that are
-            most like it — useful when a teacher gives you one starter citation.</p>
-        <div class="form-group">
-            <label>Seed id or title fragment</label>
-            <input type="text" id="seed-query" placeholder="e.g. 10.1038/... or climate warming oceans">
-        </div>
-    </div>
+ <div id="seed-input-panel" style="display:none;">
+ <p class="info-text"><strong>Seed paper:</strong> paste an article id (e.g. PubMed ID or DOI) or part of a
+ title from a paper already in your collection. The app finds that paper, then ranks others that are
+ most like it - useful when a teacher gives you one starter citation.</p>
+ <div class="form-group">
+ <label>Seed id or title fragment</label>
+ <input type="text" id="seed-query" placeholder="e.g. 10.1038/... or climate warming oceans">
+ </div>
+ </div>
 </section>
 
 <section class="card">
-    <div class="param-row">
-        <div class="param-group">
-            <label>Results: <strong id="topk-display">10</strong></label>
-            <input type="range" id="top-k" min="1" max="50" value="10">
-        </div>
-        <div class="param-group">
-            <label>Sort by</label>
-            <select id="sort-by">
-                <option value="similarity">Similarity Score</option>
-                <option value="year">Publication Year (newest first)</option>
-                <option value="journal">Journal Name (A-Z)</option>
-                <option value="title">Title (A-Z)</option>
-            </select>
-        </div>
-        <div class="param-group">
-            <label class="radio-label" style="margin-top:1.4rem;">
-                <input type="checkbox" id="pico-boost"> Prefer PICO matches
-            </label>
-            <span class="help-text">Slight boost when abstract text overlaps your query terms (does not replace similarity).</span>
-        </div>
-        <div class="param-group">
-            <label>Sources</label>
-            <div class="source-selector">
-                <label class="radio-label"><input type="checkbox" name="search-source" value="pubmed" checked> PubMed</label>
-                <label class="radio-label"><input type="checkbox" name="search-source" value="europepmc" checked> Europe PMC</label>
-                <label class="radio-label"><input type="checkbox" name="search-source" value="clinicaltrials" checked> ClinicalTrials.gov</label>
-                <label class="radio-label"><input type="checkbox" name="search-source" value="openalex" checked> OpenAlex</label>
-                <label class="radio-label"><input type="checkbox" name="search-source" value="arxiv" checked> arXiv</label>
-                <label class="radio-label"><input type="checkbox" name="search-source" value="semanticscholar" checked> Semantic Scholar</label>
-                <label class="radio-label"><input type="checkbox" name="search-source" value="eric" checked> ERIC</label>
-                <label class="radio-label"><input type="checkbox" name="search-source" value="zenodo" checked> Zenodo</label>
-                <label class="radio-label"><input type="checkbox" name="search-source" value="crossref" checked> CrossRef</label>
-                <label class="radio-label"><input type="checkbox" name="search-source" value="doaj" checked> DOAJ</label>
-                <label class="radio-label"><input type="checkbox" name="search-source" value="nasa_ads" checked> NASA ADS</label>
-                <label class="radio-label"><input type="checkbox" name="search-source" value="core" checked> CORE</label>
-            </div>
-            <div class="help-text" id="source-availability-hint" style="margin-top:0.4rem;"></div>
-        </div>
-    </div>
-    <button id="search-btn" class="btn btn-primary btn-block">Search</button>
+ <div class="param-row">
+ <div class="param-group">
+ <label>Results: <strong id="topk-display">10</strong></label>
+ <input type="range" id="top-k" min="1" max="50" value="10">
+ </div>
+ <div class="param-group">
+ <label>Sort by</label>
+ <select id="sort-by">
+ <option value="similarity">Similarity Score</option>
+ <option value="year">Publication Year (newest first)</option>
+ <option value="journal">Journal Name (A-Z)</option>
+ <option value="title">Title (A-Z)</option>
+ </select>
+ </div>
+ <div class="param-group">
+ <label class="radio-label" style="margin-top:1.4rem;">
+ <input type="checkbox" id="pico-boost"> Prefer PICO matches
+ </label>
+ <span class="help-text">Slight boost when abstract text overlaps your query terms (does not replace similarity).</span>
+ </div>
+ <div class="param-group">
+ <label>Sources</label>
+ <div class="source-selector">
+ <label class="radio-label"><input type="checkbox" name="search-source" value="pubmed" checked> PubMed</label>
+ <label class="radio-label"><input type="checkbox" name="search-source" value="europepmc" checked> Europe PMC</label>
+ <label class="radio-label"><input type="checkbox" name="search-source" value="clinicaltrials" checked> ClinicalTrials.gov</label>
+ <label class="radio-label"><input type="checkbox" name="search-source" value="openalex" checked> OpenAlex</label>
+ <label class="radio-label"><input type="checkbox" name="search-source" value="arxiv" checked> arXiv</label>
+ <label class="radio-label"><input type="checkbox" name="search-source" value="semanticscholar" checked> Semantic Scholar</label>
+ <label class="radio-label"><input type="checkbox" name="search-source" value="eric" checked> ERIC</label>
+ <label class="radio-label"><input type="checkbox" name="search-source" value="zenodo" checked> Zenodo</label>
+ <label class="radio-label"><input type="checkbox" name="search-source" value="crossref" checked> CrossRef</label>
+ <label class="radio-label"><input type="checkbox" name="search-source" value="doaj" checked> DOAJ</label>
+ <label class="radio-label"><input type="checkbox" name="search-source" value="nasa_ads" checked> NASA ADS</label>
+ <label class="radio-label"><input type="checkbox" name="search-source" value="core" checked> CORE</label>
+ </div>
+ <div class="help-text" id="source-availability-hint" style="margin-top:0.4rem;"></div>
+ </div>
+ </div>
+ <button id="search-btn" class="btn btn-primary btn-block">Search</button>
 </section>
 
 <section class="card">
-    <h2>Citations</h2>
-    <p class="info-text">This app does not auto-format bibliographies (so you stay in control of style rules).
-        When you are ready to cite, open a free citation helper, paste the title or DOI from a result, and
-        pick APA, MLA, Chicago, etc. yourself:</p>
-    <p>
-        <a class="btn btn-secondary" href="https://zbib.org/" target="_blank" rel="noopener">
-            Open ZoteroBib (zbib.org)
-        </a>
-        <span class="help-text" style="display:inline;margin-left:0.6rem;">No account required · good for students</span>
-    </p>
+ <h2>Citations</h2>
+ <p class="info-text">This app does not auto-format bibliographies (so you stay in control of style rules).
+ When you are ready to cite, open a free citation helper, paste the title or DOI from a result, and
+ pick APA, MLA, Chicago, etc. yourself:</p>
+ <p>
+ <a class="btn btn-secondary" href="https://zbib.org/" target="_blank" rel="noopener">
+ Open ZoteroBib (zbib.org)
+ </a>
+ <span class="help-text" style="display:inline;margin-left:0.6rem;">No account required · good for students</span>
+ </p>
 </section>
 
 <section class="card">
-    <h2>Export your library</h2>
-    <p class="info-text">Download your whole collection (not just the last search), including cluster labels,
-        exclusion status, stars, and private notes. Useful for hand-ins or spreadsheet screening logs.</p>
-    <div class="export-row">
-        <button type="button" class="btn btn-secondary btn-sm" data-lib-export="all">All articles (CSV)</button>
-        <button type="button" class="btn btn-secondary btn-sm" data-lib-export="included">Included only</button>
-        <button type="button" class="btn btn-secondary btn-sm" data-lib-export="excluded">Screened out only</button>
-        <button type="button" class="btn btn-secondary btn-sm" data-lib-export="starred">Starred only</button>
-    </div>
+ <h2>Export your library</h2>
+ <p class="info-text">Download your whole collection (not just the last search), including cluster labels,
+ exclusion status, stars, and private notes. Useful for hand-ins or spreadsheet screening logs.</p>
+ <div class="export-row">
+ <button type="button" class="btn btn-secondary btn-sm" data-lib-export="all">All articles (CSV)</button>
+ <button type="button" class="btn btn-secondary btn-sm" data-lib-export="included">Included only</button>
+ <button type="button" class="btn btn-secondary btn-sm" data-lib-export="excluded">Screened out only</button>
+ <button type="button" class="btn btn-secondary btn-sm" data-lib-export="starred">Starred only</button>
+ </div>
 </section>
 
 <section id="seed-banner" class="card" style="display:none;">
-    <h2>Seed paper</h2>
-    <p class="info-text" id="seed-banner-text"></p>
+ <h2>Seed paper</h2>
+ <p class="info-text" id="seed-banner-text"></p>
 </section>
 
 <section id="results-section" style="display:none;">
-    <div class="results-header">
-        <h2>Results: <span id="result-count">0</span> articles found</h2>
-        <div class="export-row">
-            <button id="export-csv" class="btn btn-secondary btn-sm" title="Download these results as a spreadsheet-ready CSV file">Download CSV</button>
-            <button id="export-txt" class="btn btn-secondary btn-sm" title="Download these results as a plain-text reading list">Download Text</button>
-        </div>
-    </div>
-    <p class="info-text">The badge is the similarity score (0–1). Matching words from your query are
-        <mark class="hl-demo">highlighted</mark> in abstracts. PICO chips show which clinical elements were
-        detected, with short quotes when available. Use ★ to bookmark and the note box for private study notes
-        (saved only in your account).</p>
-    <div id="results-list"></div>
+ <div class="results-header">
+ <h2>Results: <span id="result-count">0</span> articles found</h2>
+ <div class="export-row">
+ <button id="export-csv" class="btn btn-secondary btn-sm" title="Download these results as a spreadsheet-ready CSV file">Download CSV</button>
+ <button id="export-txt" class="btn btn-secondary btn-sm" title="Download these results as a plain-text reading list">Download Text</button>
+ </div>
+ </div>
+ <p class="info-text">The badge is the similarity score (0-1). Matching words from your query are
+ <mark class="hl-demo">highlighted</mark> in abstracts. PICO chips show which clinical elements were
+ detected, with short quotes when available. Use ★ to bookmark and the note box for private study notes
+ (saved only in your account).</p>
+ <div id="results-list"></div>
 </section>
 {% endblock %}
 

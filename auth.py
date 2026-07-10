@@ -4,6 +4,7 @@ JWT token creation/verification and bcrypt password hashing.
 """
 
 import os
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -14,6 +15,48 @@ from passlib.context import CryptContext
 from fastapi import Request
 
 load_dotenv()
+
+# Login id: short handle OR email-style. Stored lowercased; not used in file paths
+# (per-user data is keyed by UUID). Digits 0-9 allowed; null/control chars are not.
+_LOGIN_ALLOWED = re.compile(r"^[a-z0-9._+\-@]+$")
+_LOGIN_HAS_ALNUM = re.compile(r"[a-z0-9]")
+LOGIN_MIN_LEN = 3
+LOGIN_MAX_LEN = 64
+
+
+def validate_login_name(raw: str) -> Optional[str]:
+    """Validate a username or email-style login.
+
+    Returns an error message, or None if the value is acceptable.
+    Caller should still .strip().lower() before storage (this function does not
+    mutate the input).
+    """
+    if raw is None:
+        return "Login is required."
+    # Reject embedded control characters (including null bytes) before other checks.
+    if any(ord(c) < 32 for c in raw):
+        return "Login contains invalid characters."
+    u = raw.strip().lower()
+    if len(u) < LOGIN_MIN_LEN or len(u) > LOGIN_MAX_LEN:
+        return f"Login must be {LOGIN_MIN_LEN}-{LOGIN_MAX_LEN} characters."
+    if not _LOGIN_ALLOWED.fullmatch(u):
+        return "Use letters, numbers, and . _ + - @ only (email-style logins OK)."
+    if not _LOGIN_HAS_ALNUM.search(u):
+        return "Login must include at least one letter or number."
+    if u.count("@") > 1:
+        return "Login can contain at most one @."
+    if "@" in u:
+        local, _, domain = u.partition("@")
+        if not local or not domain:
+            return "That doesn’t look like a valid email address."
+        if domain.startswith(".") or domain.endswith(".") or ".." in domain:
+            return "That doesn’t look like a valid email address."
+        if "." not in domain:
+            return "Email domain should include a dot (e.g. school.edu)."
+        if local.startswith(".") or local.endswith(".") or ".." in local:
+            return "That doesn’t look like a valid email address."
+    return None
+
 
 _SECRET_KEY = os.getenv("SECRET_KEY", "").strip()
 _DEBUG = os.getenv("DEBUG", "").strip().lower() in ("1", "true", "yes")

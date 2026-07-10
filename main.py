@@ -1,5 +1,5 @@
 """
-FastAPI Application — Literature Research Aide v3.0.0
+FastAPI Application — Literature Research Aide v3.1.0
 Multi-user web interface for literature search and analysis.
 """
 
@@ -32,7 +32,13 @@ from slowapi import _rate_limit_exceeded_handler
 from pipeline import LiteratureSearchPipeline
 from embeddings import PICOExtractor
 from user_db import UserDatabase
-from auth import hash_password, verify_password, create_token, get_current_user
+from auth import (
+    hash_password,
+    verify_password,
+    create_token,
+    get_current_user,
+    validate_login_name,
+)
 from utils import sort_articles, coverage_suggestions
 from feature_guides import get_guide, list_guides, neighbors
 
@@ -48,12 +54,12 @@ MAX_CACHED_USERS = 50
 limiter = Limiter(key_func=get_remote_address)
 
 # At top of file
-app = FastAPI(title="Literature Research Aide", version="3.0.0")
+app = FastAPI(title="Literature Research Aide", version="3.1.0")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 @app.get("/health")
 async def health():
-    return {"status": "healthy", "version": "3.0.0"}
+    return {"status": "healthy", "version": "3.1.0"}
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
@@ -316,18 +322,14 @@ async def register_submit(
     password_confirm: str = Form(...),
 ):
     username = username.strip().lower()
-    error = None
+    error = validate_login_name(username)
 
-    if len(username) < 3 or len(username) > 20:
-        error = "Username must be 3–20 characters."
-    elif not all(c.isalnum() or c in "_-" for c in username):
-        error = "Username can only contain letters, numbers, _ and -."
-    elif len(password) < 8:
+    if error is None and len(password) < 8:
         error = "Password must be at least 8 characters."
-    elif password != password_confirm:
+    elif error is None and password != password_confirm:
         error = "Passwords do not match."
-    elif user_db.get_by_username(username):
-        error = "That username is already taken."
+    elif error is None and user_db.get_by_username(username):
+        error = "That login is already taken."
 
     if error:
         return templates.TemplateResponse(
@@ -339,10 +341,10 @@ async def register_submit(
     try:
         user = user_db.create_user(username, hash_password(password))
     except ValueError:
-        # Lost the race against a concurrent registration of the same username.
+        # Lost the race against a concurrent registration of the same login.
         return templates.TemplateResponse(
             request, "register.html",
-            context={"error": "That username is already taken.", "username": username},
+            context={"error": "That login is already taken.", "username": username},
             status_code=400,
         )
     token = create_token(user["id"], user["username"])

@@ -103,7 +103,7 @@ def build_cluster_briefing(
     year_span = ""
     if parsed:
         lo, hi = min(parsed), max(parsed)
-        year_span = str(lo) if lo == hi else f"{lo}–{hi}"
+        year_span = str(lo) if lo == hi else f"{lo}-{hi}"
 
     clean_titles = [t.strip() for t in titles if t and t.strip()]
     # Prefer representative headline first, then other distinct titles.

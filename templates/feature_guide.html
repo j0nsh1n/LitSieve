@@ -1,113 +1,113 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ guide.title }} — Literature Research Aide</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260709j">
-    <script>
-        (function() {
-            const saved = localStorage.getItem('theme');
-            if (saved) document.documentElement.setAttribute('data-theme', saved);
-            if (localStorage.getItem('readingMode') === 'on') {
-                document.documentElement.setAttribute('data-reading', 'on');
-            }
-            document.documentElement.classList.add('js-ready');
-        })();
-    </script>
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ <title>{{ guide.title }} - Literature Research Aide</title>
+ <link rel="stylesheet" href="/static/css/style.css?v=20260709r">
+ <script>
+ (function() {
+ const saved = localStorage.getItem('theme');
+ if (saved) document.documentElement.setAttribute('data-theme', saved);
+ if (localStorage.getItem('readingMode') === 'on') {
+ document.documentElement.setAttribute('data-reading', 'on');
+ }
+ document.documentElement.classList.add('js-ready');
+ })();
+ </script>
 </head>
 <body class="guide-body">
-    <main class="landing guide-page">
-        <nav class="guide-nav" aria-label="Guide navigation">
-            <a href="/" class="guide-back">← Back to home</a>
-            <div class="guide-nav-actions">
-                {% if user %}
-                <a href="{{ guide.app_path }}" class="btn btn-sm btn-primary">{{ guide.app_label }}</a>
-                {% else %}
-                <a href="/login" class="btn btn-sm btn-primary">Log in to try it</a>
-                {% endif %}
-            </div>
-        </nav>
+ <main class="landing guide-page">
+ <nav class="guide-nav" aria-label="Guide navigation">
+ <a href="/" class="guide-back">← Back to home</a>
+ <div class="guide-nav-actions">
+ {% if user %}
+ <a href="{{ guide.app_path }}" class="btn btn-sm btn-primary">{{ guide.app_label }}</a>
+ {% else %}
+ <a href="/login" class="btn btn-sm btn-primary">Log in to try it</a>
+ {% endif %}
+ </div>
+ </nav>
 
-        <header class="guide-header page-header">
-            <span class="guide-icon" aria-hidden="true">{{ guide.icon }}</span>
-            <h1>{{ guide.title }}</h1>
-            <p class="subtitle">{{ guide.tagline }}</p>
-        </header>
+ <header class="guide-header page-header">
+ <span class="guide-icon" aria-hidden="true">{{ guide.icon }}</span>
+ <h1>{{ guide.title }}</h1>
+ <p class="subtitle">{{ guide.tagline }}</p>
+ </header>
 
-        <section class="card guide-section">
-            <h2>What it is</h2>
-            <p class="guide-prose">{{ guide.summary }}</p>
-        </section>
+ <section class="card guide-section">
+ <h2>What it is</h2>
+ <p class="guide-prose">{{ guide.summary }}</p>
+ </section>
 
-        <section class="card guide-section">
-            <h2>How it works</h2>
-            <ol class="guide-steps">
-                {% for step in guide.how_it_works %}
-                <li>{{ step }}</li>
-                {% endfor %}
-            </ol>
-        </section>
+ <section class="card guide-section">
+ <h2>How it works</h2>
+ <ol class="guide-steps">
+ {% for step in guide.how_it_works %}
+ <li>{{ step }}</li>
+ {% endfor %}
+ </ol>
+ </section>
 
-        <section class="card guide-section">
-            <h2>Tips for teachers &amp; students</h2>
-            <ul class="guide-tips">
-                {% for tip in guide.tips %}
-                <li>{{ tip }}</li>
-                {% endfor %}
-            </ul>
-        </section>
+ <section class="card guide-section">
+ <h2>Tips for teachers &amp; students</h2>
+ <ul class="guide-tips">
+ {% for tip in guide.tips %}
+ <li>{{ tip }}</li>
+ {% endfor %}
+ </ul>
+ </section>
 
-        <section class="card guide-section">
-            <h2>Where to find it</h2>
-            <p class="guide-prose">{{ guide.where_in_app }}</p>
-            <div class="landing-cta" style="justify-content:flex-start;margin-top:1rem;">
-                {% if user %}
-                <a href="{{ guide.app_path }}" class="btn btn-primary">{{ guide.app_label }}</a>
-                <a href="/" class="btn btn-secondary">Home</a>
-                {% else %}
-                <a href="/register" class="btn btn-primary">Create account</a>
-                <a href="/login" class="btn btn-secondary">Log in</a>
-                {% endif %}
-            </div>
-        </section>
+ <section class="card guide-section">
+ <h2>Where to find it</h2>
+ <p class="guide-prose">{{ guide.where_in_app }}</p>
+ <div class="landing-cta" style="justify-content:flex-start;margin-top:1rem;">
+ {% if user %}
+ <a href="{{ guide.app_path }}" class="btn btn-primary">{{ guide.app_label }}</a>
+ <a href="/" class="btn btn-secondary">Home</a>
+ {% else %}
+ <a href="/register" class="btn btn-primary">Create account</a>
+ <a href="/login" class="btn btn-secondary">Log in</a>
+ {% endif %}
+ </div>
+ </section>
 
-        <nav class="guide-pager" aria-label="Other features">
-            <div class="guide-pager-side">
-                {% if prev %}
-                <a href="/learn/{{ prev.slug }}" class="guide-pager-link">
-                    <span class="help-text">Previous</span>
-                    <span>{{ prev.icon }} {{ prev.title }}</span>
-                </a>
-                {% endif %}
-            </div>
-            <div class="guide-pager-side guide-pager-next">
-                {% if next %}
-                <a href="/learn/{{ next.slug }}" class="guide-pager-link">
-                    <span class="help-text">Next</span>
-                    <span>{{ next.icon }} {{ next.title }}</span>
-                </a>
-                {% endif %}
-            </div>
-        </nav>
+ <nav class="guide-pager" aria-label="Other features">
+ <div class="guide-pager-side">
+ {% if prev %}
+ <a href="/learn/{{ prev.slug }}" class="guide-pager-link">
+ <span class="help-text">Previous</span>
+ <span>{{ prev.icon }} {{ prev.title }}</span>
+ </a>
+ {% endif %}
+ </div>
+ <div class="guide-pager-side guide-pager-next">
+ {% if next %}
+ <a href="/learn/{{ next.slug }}" class="guide-pager-link">
+ <span class="help-text">Next</span>
+ <span>{{ next.icon }} {{ next.title }}</span>
+ </a>
+ {% endif %}
+ </div>
+ </nav>
 
-        <section class="card guide-section">
-            <h2>All features</h2>
-            <ul class="guide-index">
-                {% for g in all_guides %}
-                <li>
-                    {% if g.slug == guide.slug %}
-                    <strong>{{ g.icon }} {{ g.title }}</strong>
-                    {% else %}
-                    <a href="/learn/{{ g.slug }}">{{ g.icon }} {{ g.title }}</a>
-                    {% endif %}
-                </li>
-                {% endfor %}
-            </ul>
-        </section>
+ <section class="card guide-section">
+ <h2>All features</h2>
+ <ul class="guide-index">
+ {% for g in all_guides %}
+ <li>
+ {% if g.slug == guide.slug %}
+ <strong>{{ g.icon }} {{ g.title }}</strong>
+ {% else %}
+ <a href="/learn/{{ g.slug }}">{{ g.icon }} {{ g.title }}</a>
+ {% endif %}
+ </li>
+ {% endfor %}
+ </ul>
+ </section>
 
-        <footer class="landing-footer">Literature Research Aide &mdash; v3.0.0</footer>
-    </main>
+ <footer class="landing-footer">Literature Research Aide - v3.1.0</footer>
+ </main>
     {# No common.js on public pages — it talks to authenticated APIs. #}
 </body>
 </html>

@@ -1,88 +1,89 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Register — Literature Research Aide</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260709j">
-    <script>
-        (function() {
-            const saved = localStorage.getItem('theme');
-            if (saved) document.documentElement.setAttribute('data-theme', saved);
-        })();
-    </script>
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ <title>Register - Literature Research Aide</title>
+ <link rel="stylesheet" href="/static/css/style.css?v=20260709r">
+ <script>
+ (function() {
+ const saved = localStorage.getItem('theme');
+ if (saved) document.documentElement.setAttribute('data-theme', saved);
+ })();
+ </script>
 </head>
 <body class="auth-body">
-    <div class="auth-card">
-        <a href="/" class="auth-home-link">← Back to home</a>
-        <div class="auth-logo">Literature Research Aide</div>
-        <div class="auth-subtitle">Create an account</div>
+ <div class="auth-card">
+ <a href="/" class="auth-home-link">← Back to home</a>
+ <div class="auth-logo">Literature Research Aide</div>
+ <div class="auth-subtitle">Create an account</div>
 
-        {% if error %}
-        <div class="auth-error">{{ error }}</div>
-        {% endif %}
+ {% if error %}
+ <div class="auth-error">{{ error }}</div>
+ {% endif %}
 
-        <form method="post" action="/register" class="auth-form">
-            <div class="form-group">
-                <label>Username</label>
-                <input type="text" name="username" value="{{ username or '' }}"
-                    autocomplete="username" autofocus required
-                    pattern="[a-zA-Z0-9_\-]{3,20}"
-                    title="3–20 characters: letters, numbers, underscores, or hyphens">
-                <span class="auth-hint">3–20 characters — letters, numbers, _ or -</span>
-            </div>
-            <div class="form-group">
-                <label>Password</label>
-                <input type="password" name="password" class="pw-field" autocomplete="new-password" required minlength="8">
-                <span class="auth-hint">Minimum 8 characters</span>
-            </div>
-            <div class="form-group">
-                <label>Confirm Password</label>
-                <input type="password" name="password_confirm" class="pw-field" autocomplete="new-password" required minlength="8">
-                <span class="pw-match" id="pw-match"></span>
-            </div>
-            <label class="show-pass">
-                <input type="checkbox" id="show-pw"> Show passwords
-            </label>
-            <button type="submit" class="btn btn-primary auth-btn">Create Account</button>
-        </form>
+ <form method="post" action="/register" class="auth-form">
+ <div class="form-group">
+ <label>Username or email</label>
+ <input type="text" name="username" value="{{ username or '' }}"
+ autocomplete="username" autofocus required
+ minlength="3" maxlength="64"
+ pattern="[A-Za-z0-9._+\-@]{3,64}"
+ title="3-64 characters: letters, numbers, and . _ + - @ (email OK)">
+ <span class="auth-hint">3-64 characters - letters, numbers, and . _ + - @ (e.g. alex or you@school.edu). Digits like 0 are fine; we store it lowercased.</span>
+ </div>
+ <div class="form-group">
+ <label>Password</label>
+ <input type="password" name="password" class="pw-field" autocomplete="new-password" required minlength="8">
+ <span class="auth-hint">Minimum 8 characters</span>
+ </div>
+ <div class="form-group">
+ <label>Confirm Password</label>
+ <input type="password" name="password_confirm" class="pw-field" autocomplete="new-password" required minlength="8">
+ <span class="pw-match" id="pw-match"></span>
+ </div>
+ <label class="show-pass">
+ <input type="checkbox" id="show-pw"> Show passwords
+ </label>
+ <button type="submit" class="btn btn-primary auth-btn">Create Account</button>
+ </form>
 
-        <script>
-            document.getElementById('show-pw').addEventListener('change', function () {
-                const type = this.checked ? 'text' : 'password';
-                document.querySelectorAll('.pw-field').forEach(function (el) { el.type = type; });
-            });
+ <script>
+ document.getElementById('show-pw').addEventListener('change', function () {
+ const type = this.checked ? 'text' : 'password';
+ document.querySelectorAll('.pw-field').forEach(function (el) { el.type = type; });
+ });
 
-            // Live password-match feedback as the user types.
-            const pw = document.querySelector('input[name="password"]');
-            const pwc = document.querySelector('input[name="password_confirm"]');
-            const matchEl = document.getElementById('pw-match');
+ // Live password-match feedback as the user types.
+ const pw = document.querySelector('input[name="password"]');
+ const pwc = document.querySelector('input[name="password_confirm"]');
+ const matchEl = document.getElementById('pw-match');
 
-            function checkMatch() {
-                if (!pwc.value) {
-                    matchEl.textContent = '';
-                    matchEl.className = 'pw-match';
-                    pwc.setCustomValidity('');
-                    return;
-                }
-                if (pw.value === pwc.value) {
-                    matchEl.textContent = '✓ Passwords match';
-                    matchEl.className = 'pw-match match';
-                    pwc.setCustomValidity('');
-                } else {
-                    matchEl.textContent = '✗ Passwords do not match';
-                    matchEl.className = 'pw-match mismatch';
-                    // Blocks form submission with a native validation bubble.
-                    pwc.setCustomValidity('Passwords do not match');
-                }
-            }
+ function checkMatch() {
+ if (!pwc.value) {
+ matchEl.textContent = '';
+ matchEl.className = 'pw-match';
+ pwc.setCustomValidity('');
+ return;
+ }
+ if (pw.value === pwc.value) {
+ matchEl.textContent = '✓ Passwords match';
+ matchEl.className = 'pw-match match';
+ pwc.setCustomValidity('');
+ } else {
+ matchEl.textContent = '✗ Passwords do not match';
+ matchEl.className = 'pw-match mismatch';
+ // Blocks form submission with a native validation bubble.
+ pwc.setCustomValidity('Passwords do not match');
+ }
+ }
 
-            pw.addEventListener('input', checkMatch);
-            pwc.addEventListener('input', checkMatch);
-        </script>
+ pw.addEventListener('input', checkMatch);
+ pwc.addEventListener('input', checkMatch);
+ </script>
 
-        <p class="auth-switch">Already have an account? <a href="/login">Log in</a></p>
-        <p class="auth-switch auth-home-foot"><a href="/">← Back to home</a></p>
-    </div>
+ <p class="auth-switch">Already have an account? <a href="/login">Log in</a></p>
+ <p class="auth-switch auth-home-foot"><a href="/">← Back to home</a></p>
+ </div>
 </body>
 </html>

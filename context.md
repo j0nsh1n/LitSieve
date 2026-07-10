@@ -3,7 +3,7 @@
 Read this first on a fresh conversation. Update when things change materially.
 
 ## What this is
-**Literature Research Aide** (**v3.0.0**) — multi-user FastAPI app for
+**Literature Research Aide** (**v3.1.0**) — multi-user FastAPI app for
 **teachers & students**: fetch from **12 academic sources** in parallel → embed →
 semantic search, clustering, screening triage, cross-source duplicate detection.
 Per-user SQLite; JWT + bcrypt; CSRF; rate limits. Docker / HF Spaces / Render
@@ -61,9 +61,18 @@ duplicate resolve) defines the pool; Search only ranks remaining papers.
 
 ---
 
-## Features in v3.0.0 (major — condensed)
+## Features in v3.1.0
+### Also in v3.1.0 (UX / mobile / auth polish)
+- Email-style logins allowed (letters, digits, `. _ + - @`, length 3–64); null/control chars blocked
+- Nav workflow order with step numbers; **mobile dropdown menu** (no drag strip)
+- Theme toggle icon matches **current** mode (moon = dark, sun = light)
+- Em-dashes removed from user-facing copy
+- Broad mobile CSS (forms, tables, bars, touch targets, safe areas)
+- Source breakdown box owns its bottom border; only-missing embed follows Add vs Replace fetch mode
 
-### Screening / triage (committed baseline + polish)
+### From v3.0.0 (major baseline)
+
+### Screening / triage
 - Table `screening`: excluded = (`manual` \| `cluster` \| `duplicate`)
 - Search + dedup skip excluded; reversible include/restore
 - Clusters page: Exclude/Restore cluster + per-article toggles; excluded badges
@@ -106,6 +115,9 @@ duplicate resolve) defines the pool; Search only ranks remaining papers.
 - Warm linen light / cool slate dark; **library teal** accent (`#2a5f6e` / `#7eb8c4`);
   error red separate from accent
 - Reading mode (`Aa` in nav), theme toggle, frosted sticky nav, restrained motion
+- **Nav workflow order**: `1 Data Management → 2 Clusters → 3 Duplicates → 4 Search`
+  (step numbers + arrows in the bar; no separate banner; no green “done” states).
+  Mobile: brand row + horizontally scrollable step strip with larger tap targets.
 - Page transitions (View Transitions API + fallback); **never hide main content**
   until enter (pre-hide bug fixed)
 - Wide layout (`container-wide`) on Clusters / Search / Duplicates

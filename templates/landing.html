@@ -1,96 +1,96 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Literature Research Aide</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260709j">
-    <script>
-        (function() {
-            const saved = localStorage.getItem('theme');
-            if (saved) document.documentElement.setAttribute('data-theme', saved);
-            if (localStorage.getItem('readingMode') === 'on') {
-                document.documentElement.setAttribute('data-reading', 'on');
-            }
-            document.documentElement.classList.add('js-ready');
-        })();
-    </script>
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ <title>Literature Research Aide</title>
+ <link rel="stylesheet" href="/static/css/style.css?v=20260709r">
+ <script>
+ (function() {
+ const saved = localStorage.getItem('theme');
+ if (saved) document.documentElement.setAttribute('data-theme', saved);
+ if (localStorage.getItem('readingMode') === 'on') {
+ document.documentElement.setAttribute('data-reading', 'on');
+ }
+ document.documentElement.classList.add('js-ready');
+ })();
+ </script>
 </head>
 <body>
-    <main class="landing">
-        <header class="landing-header">
-            <h1 class="landing-title">Literature <span class="accent">Research Aide</span></h1>
-            <p class="landing-tagline">
-                Search across 12 research databases at once, then use semantic AI to
-                cluster, de-duplicate, screen, and rank the papers that matter to your work.
-            </p>
-            <div class="landing-cta">
-                {% if user %}
-                <a href="/data-management" class="btn btn-primary">Open App</a>
-                <a href="/logout" class="btn btn-secondary">Log Out ({{ user.username }})</a>
-                {% else %}
-                <a href="/login" class="btn btn-primary">Log In</a>
-                <a href="/register" class="btn btn-secondary">Create Account</a>
-                {% endif %}
-            </div>
-        </header>
+ <main class="landing">
+ <header class="landing-header">
+ <h1 class="landing-title">Literature <span class="accent">Research Aide</span></h1>
+ <p class="landing-tagline">
+ Search across 12 research databases at once, then use semantic AI to
+ cluster, de-duplicate, screen, and rank the papers that matter to your work.
+ </p>
+ <div class="landing-cta">
+ {% if user %}
+ <a href="/data-management" class="btn btn-primary">Open App</a>
+ <a href="/logout" class="btn btn-secondary">Log Out ({{ user.username }})</a>
+ {% else %}
+ <a href="/login" class="btn btn-primary">Log In</a>
+ <a href="/register" class="btn btn-secondary">Create Account</a>
+ {% endif %}
+ </div>
+ </header>
 
-        <p class="landing-features-hint">Hover a card for a preview — click any card to open a full guide.</p>
+ <p class="landing-features-hint">Hover a card for a preview - click any card to open a full guide.</p>
 
-        <section class="feature-grid" aria-label="Features">
-            <a href="/learn/multi-source-search" class="feature-card">
-                <span class="feature-icon" aria-hidden="true">&#128269;</span>
-                <h3>Multi-source search</h3>
-                <p>Pull articles for any topic from 12 databases at once — PubMed, Europe
-                   PMC, arXiv, OpenAlex, Semantic Scholar, ClinicalTrials.gov, CORE and
-                   more — all fetched in parallel.</p>
-                <span class="feature-more">Learn more →</span>
-            </a>
-            <a href="/learn/semantic-embeddings" class="feature-card">
-                <span class="feature-icon" aria-hidden="true">&#129504;</span>
-                <h3>Semantic embeddings</h3>
-                <p>Every article is turned into a meaning-based vector (GPU-accelerated when
-                   available), so papers are matched by concept, not just keywords.</p>
-                <span class="feature-more">Learn more →</span>
-            </a>
-            <a href="/learn/clustering-triage" class="feature-card">
-                <span class="feature-icon" aria-hidden="true">&#129513;</span>
-                <h3>Clustering &amp; triage</h3>
-                <p>Group your papers into themed clusters with distinct auto-generated
-                   labels, then screen out whole off-topic clusters — or single papers —
-                   in one click.</p>
-                <span class="feature-more">Learn more →</span>
-            </a>
-            <a href="/learn/duplicate-resolution" class="feature-card">
-                <span class="feature-icon" aria-hidden="true">&#128260;</span>
-                <h3>Duplicate resolution</h3>
-                <p>Find near-identical papers across sources, compare them side by side,
-                   and auto-keep the best copy of each — the redundant ones drop out of
-                   your results.</p>
-                <span class="feature-more">Learn more →</span>
-            </a>
-            <a href="/learn/similarity-search" class="feature-card">
-                <span class="feature-icon" aria-hidden="true">&#127919;</span>
-                <h3>Similarity search</h3>
-                <p>Describe your study in plain text or PICO format and rank the most
-                   relevant papers in your collection. Export results to CSV or text.</p>
-                <span class="feature-more">Learn more →</span>
-            </a>
-            <a href="/learn/private-workspace" class="feature-card">
-                <span class="feature-icon" aria-hidden="true">&#128274;</span>
-                <h3>Private workspace</h3>
-                <p>Each account gets its own isolated database — your fetched articles,
-                   embeddings, and searches stay entirely your own.</p>
-                <span class="feature-more">Learn more →</span>
-            </a>
-        </section>
+ <section class="feature-grid" aria-label="Features">
+ <a href="/learn/multi-source-search" class="feature-card">
+ <span class="feature-icon" aria-hidden="true">&#128269;</span>
+ <h3>Multi-source search</h3>
+ <p>Pull articles for any topic from 12 databases at once - PubMed, Europe
+ PMC, arXiv, OpenAlex, Semantic Scholar, ClinicalTrials.gov, CORE and
+ more - all fetched in parallel.</p>
+ <span class="feature-more">Learn more →</span>
+ </a>
+ <a href="/learn/semantic-embeddings" class="feature-card">
+ <span class="feature-icon" aria-hidden="true">&#129504;</span>
+ <h3>Semantic embeddings</h3>
+ <p>Every article is turned into a meaning-based vector (GPU-accelerated when
+ available), so papers are matched by concept, not just keywords.</p>
+ <span class="feature-more">Learn more →</span>
+ </a>
+ <a href="/learn/clustering-triage" class="feature-card">
+ <span class="feature-icon" aria-hidden="true">&#129513;</span>
+ <h3>Clustering &amp; triage</h3>
+ <p>Group your papers into themed clusters with distinct auto-generated
+ labels, then screen out whole off-topic clusters - or single papers - 
+ in one click.</p>
+ <span class="feature-more">Learn more →</span>
+ </a>
+ <a href="/learn/duplicate-resolution" class="feature-card">
+ <span class="feature-icon" aria-hidden="true">&#128260;</span>
+ <h3>Duplicate resolution</h3>
+ <p>Find near-identical papers across sources, compare them side by side,
+ and auto-keep the best copy of each - the redundant ones drop out of
+ your results.</p>
+ <span class="feature-more">Learn more →</span>
+ </a>
+ <a href="/learn/similarity-search" class="feature-card">
+ <span class="feature-icon" aria-hidden="true">&#127919;</span>
+ <h3>Similarity search</h3>
+ <p>Describe your study in plain text or PICO format and rank the most
+ relevant papers in your collection. Export results to CSV or text.</p>
+ <span class="feature-more">Learn more →</span>
+ </a>
+ <a href="/learn/private-workspace" class="feature-card">
+ <span class="feature-icon" aria-hidden="true">&#128274;</span>
+ <h3>Private workspace</h3>
+ <p>Each account gets its own isolated database - your fetched articles,
+ embeddings, and searches stay entirely your own.</p>
+ <span class="feature-more">Learn more →</span>
+ </a>
+ </section>
 
-        <p class="landing-steps">
-            Fetch &rarr; Embed &rarr; Cluster &rarr; Screen &rarr; De-duplicate &rarr; Search — all in one place.
-        </p>
+ <p class="landing-steps">
+ Fetch &rarr; Embed &rarr; Cluster &rarr; Screen &rarr; De-duplicate &rarr; Search - all in one place.
+ </p>
 
-        <footer class="landing-footer">Literature Research Aide &mdash; v3.0.0</footer>
-    </main>
+ <footer class="landing-footer">Literature Research Aide - v3.1.0</footer>
+ </main>
     {# No common.js on public pages — it talks to authenticated APIs. #}
 </body>
 </html>
