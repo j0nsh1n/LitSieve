@@ -4,16 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Literature Research Aide{% endblock %}</title>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260709m">
     <script>
         (function() {
+            const root = document.documentElement;
             const saved = localStorage.getItem('theme');
-            if (saved) document.documentElement.setAttribute('data-theme', saved);
+            if (saved) root.setAttribute('data-theme', saved);
+            if (localStorage.getItem('readingMode') === 'on') {
+                root.setAttribute('data-reading', 'on');
+            }
+            // Avoid a flash of unstyled enter-animation on bfcache restore.
+            root.classList.add('js-ready');
         })();
     </script>
 </head>
 <body>
-    <nav class="navbar">
+    <nav class="navbar" role="navigation" aria-label="Main">
         <div class="nav-brand">Literature Research Aide</div>
         <div class="nav-links">
             <a href="/data-management" class="nav-link {% if active_page == 'data_management' %}active{% endif %}">Data Management</a>
@@ -22,25 +28,28 @@
             <a href="/statistics" class="nav-link {% if active_page == 'statistics' %}active{% endif %}">Duplicates</a>
         </div>
         <div class="nav-stats">
-            <button class="theme-toggle" id="theme-toggle" title="Toggle theme">🌙</button>
+            <button type="button" class="reading-toggle" id="reading-toggle"
+                title="Reading mode — denser layout, better abstracts"
+                aria-label="Toggle reading mode" aria-pressed="false">Aa</button>
+            <button type="button" class="theme-toggle" id="theme-toggle" title="Toggle theme" aria-label="Toggle theme">🌙</button>
             {% if user %}
             <a href="/account" class="nav-username {% if active_page == 'account' %}active{% endif %}" title="Account settings">{{ user.username }}</a>
             <a href="/logout" class="nav-logout">Logout</a>
             {% endif %}
-            <span class="stat-badge" id="nav-article-count">-- articles</span>
+            <span class="stat-badge" id="nav-article-count" aria-live="polite">-- articles</span>
         </div>
     </nav>
 
-    <main class="container">
+    <main class="container {% block container_mod %}{% endblock %}" id="page-main">
         <div id="notification-area"></div>
         {% block content %}{% endblock %}
     </main>
 
     <footer class="footer">
-        <p>Literature Research Aide &mdash; v2.6.0</p>
+        <p>Literature Research Aide &mdash; v3.0.0</p>
     </footer>
 
-    <script src="/static/js/common.js"></script>
+    <script src="/static/js/common.js?v=20260709d"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

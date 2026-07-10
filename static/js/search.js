@@ -1,37 +1,37 @@
 // === Search page logic ===
 
 let lastSearchParams = null;
+let lastQueryTokens = [];
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Check/enable only the sources the account actually has articles for, so a
-    // fresh login doesn't search across empty sources (which looks broken).
     applyAvailableSources();
 
-    // Input method toggle
     document.querySelectorAll('input[name="input_method"]').forEach(radio => {
         radio.addEventListener('change', () => {
-            document.getElementById('text-input-panel').style.display =
-                radio.value === 'text' ? 'block' : 'none';
-            document.getElementById('pico-input-panel').style.display =
-                radio.value === 'pico' ? 'block' : 'none';
+            const v = radio.value;
+            document.getElementById('text-input-panel').style.display = v === 'text' ? 'block' : 'none';
+            document.getElementById('pico-input-panel').style.display = v === 'pico' ? 'block' : 'none';
+            document.getElementById('seed-input-panel').style.display = v === 'seed' ? 'block' : 'none';
         });
     });
 
-    // Top-k slider
     const topkSlider = document.getElementById('top-k');
     const topkDisplay = document.getElementById('topk-display');
     topkSlider.addEventListener('input', () => {
         topkDisplay.textContent = topkSlider.value;
     });
 
-    // Search button
     document.getElementById('search-btn').addEventListener('click', doSearch);
-
-    // Export buttons
     document.getElementById('export-csv').addEventListener('click', () => doExport('csv'));
     document.getElementById('export-txt').addEventListener('click', () => doExport('txt'));
 
-    // Allow Enter key in textarea to search
+    document.querySelectorAll('[data-lib-export]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const scope = btn.getAttribute('data-lib-export');
+            window.location.href = `/api/export/library?scope=${encodeURIComponent(scope)}&format=csv`;
+        });
+    });
+
     document.getElementById('query-text').addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
@@ -40,15 +40,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-// Reflect the account's real data: check + enable sources that have articles,
-// disable + dim sources that have none, and show each source's article count.
 async function applyAvailableSources() {
     let sources = {};
     try {
         const stats = await apiCall('/api/statistics');
         sources = stats.sources || {};
     } catch (e) {
-        return; // stats unavailable — leave the static defaults in place
+        return;
     }
 
     let anyAvailable = false;
@@ -87,37 +85,66 @@ function buildQueryText() {
     const method = document.querySelector('input[name="input_method"]:checked').value;
     if (method === 'text') {
         return document.getElementById('query-text').value.trim();
-    } else {
-        const parts = [];
-        const pop = document.getElementById('pico-population').value.trim();
-        const int_ = document.getElementById('pico-intervention').value.trim();
-        const comp = document.getElementById('pico-comparison').value.trim();
-        const out = document.getElementById('pico-outcome').value.trim();
-        if (pop) parts.push(`Population: ${pop}`);
-        if (int_) parts.push(`Intervention: ${int_}`);
-        if (comp) parts.push(`Comparison: ${comp}`);
-        if (out) parts.push(`Outcome: ${out}`);
-        return parts.join('. ');
     }
+    if (method === 'seed') {
+        return document.getElementById('seed-query').value.trim();
+    }
+    const parts = [];
+    const pop = document.getElementById('pico-population').value.trim();
+    const int_ = document.getElementById('pico-intervention').value.trim();
+    const comp = document.getElementById('pico-comparison').value.trim();
+    const out = document.getElementById('pico-outcome').value.trim();
+    if (pop) parts.push(`Population: ${pop}`);
+    if (int_) parts.push(`Intervention: ${int_}`);
+    if (comp) parts.push(`Comparison: ${comp}`);
+    if (out) parts.push(`Outcome: ${out}`);
+    return parts.join('. ');
+}
+
+function tokensFromQuery(text) {
+    const stop = new Set([
+        'population', 'intervention', 'comparison', 'outcome', 'with', 'from',
+        'that', 'this', 'have', 'been', 'were', 'their', 'about', 'into', 'over',
+    ]);
+    return (text || '')
+        .toLowerCase()
+        .match(/[a-zA-Z]{4,}/g)
+        ?.filter(t => !stop.has(t)) || [];
+}
+
+function highlightText(text, tokens) {
+    const raw = text || '';
+    if (!tokens.length) return escapeHtml(raw);
+    // Longest first so multi-word-ish tokens win when overlapping.
+    const sorted = [...new Set(tokens)].sort((a, b) => b.length - a.length);
+    const pattern = new RegExp('(' + sorted.map(escapeRegExp).join('|') + ')', 'gi');
+    return escapeHtml(raw).replace(pattern, '<mark class="query-hl">$1</mark>');
+}
+
+function escapeRegExp(s) {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 async function doSearch() {
+    const method = document.querySelector('input[name="input_method"]:checked').value;
     const queryText = buildQueryText();
     if (!queryText) {
-        showNotification('Please enter a search query.', 'error');
+        showNotification(method === 'seed' ? 'Enter a seed id or title.' : 'Please enter a search query.', 'error');
         return;
     }
 
-    const topK = parseInt(document.getElementById('top-k').value);
+    const topK = parseInt(document.getElementById('top-k').value, 10);
     const sortBy = document.getElementById('sort-by').value;
-
-    // Get selected source filter
-    const selectedSources = Array.from(document.querySelectorAll('input[name="search-source"]:checked')).map(cb => cb.value);
+    const picoBoost = document.getElementById('pico-boost').checked;
+    const selectedSources = Array.from(
+        document.querySelectorAll('input[name="search-source"]:checked')
+    ).map(cb => cb.value);
     if (selectedSources.length === 0) {
         showNotification('Please select at least one source.', 'error');
         return;
     }
-
+    // Topic pool is managed via screening (checkboxes above) — no separate
+    // cluster_filter. Backend already skips screened-out papers.
     const btn = document.getElementById('search-btn');
     setLoading(btn, true);
 
@@ -125,24 +152,99 @@ async function doSearch() {
         query_text: queryText,
         top_k: topK,
         sort_by: sortBy,
-        source_filter: selectedSources
+        source_filter: selectedSources,
+        pico_boost: picoBoost,
+        mode: method,
     };
+    lastQueryTokens = tokensFromQuery(queryText);
 
     try {
-        const data = await apiCall('/api/search', {
-            method: 'POST',
-            body: lastSearchParams
-        });
+        let data;
+        if (method === 'seed') {
+            data = await apiCall('/api/search/seed', {
+                method: 'POST',
+                body: {
+                    seed: queryText,
+                    top_k: topK,
+                    source_filter: selectedSources,
+                },
+            });
+            const seed = data.seed;
+            const banner = document.getElementById('seed-banner');
+            const bannerText = document.getElementById('seed-banner-text');
+            if (seed && banner && bannerText) {
+                banner.style.display = 'block';
+                bannerText.textContent =
+                    `Starting from “${seed.title || seed.article_id}” (${getSourceName(seed.source)} · ${seed.year || 'n.d.'}). Showing papers most like this one.`;
+                lastQueryTokens = tokensFromQuery(`${seed.title || ''} ${seed.abstract || ''}`);
+            }
+            if (sortBy !== 'similarity') {
+                data.results = clientSort(data.results || [], sortBy);
+            }
+        } else {
+            document.getElementById('seed-banner').style.display = 'none';
+            data = await apiCall('/api/search', {
+                method: 'POST',
+                body: {
+                    query_text: queryText,
+                    top_k: topK,
+                    sort_by: sortBy,
+                    source_filter: selectedSources,
+                    pico_boost: picoBoost,
+                },
+            });
+        }
 
-        const filtered = data.results.filter(a => selectedSources.includes(a.source));
-        renderResults(filtered);
-        document.getElementById('result-count').textContent = filtered.length;
+        renderResults(data.results || []);
+        document.getElementById('result-count').textContent = (data.results || []).length;
         document.getElementById('results-section').style.display = 'block';
     } catch (e) {
         showNotification(`Search failed: ${e.message}`, 'error');
     } finally {
         setLoading(btn, false);
     }
+}
+
+function clientSort(results, sortBy) {
+    const arr = results.slice();
+    if (sortBy === 'year') {
+        arr.sort((a, b) => (parseYear(b.year) - parseYear(a.year)));
+    } else if (sortBy === 'journal') {
+        arr.sort((a, b) => (a.journal || '').localeCompare(b.journal || ''));
+    } else if (sortBy === 'title') {
+        arr.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+    }
+    return arr;
+}
+
+function parseYear(y) {
+    const m = String(y || '').match(/(?:19|20)\d{2}/);
+    return m ? parseInt(m[0], 10) : 0;
+}
+
+function renderPicoBlock(pico) {
+    if (!pico) return '';
+    const keys = [
+        ['population', 'pop', 'Population'],
+        ['intervention', 'int', 'Intervention'],
+        ['comparison', 'comp', 'Comparison'],
+        ['outcome', 'out', 'Outcome'],
+    ];
+    const parts = [];
+    keys.forEach(([k, cls, label]) => {
+        const list = pico[k] || [];
+        if (!list.length) return;
+        const quote = list[0];
+        const short = quote.length > 140 ? quote.slice(0, 138) + '…' : quote;
+        parts.push(
+            `<div class="pico-snippet">
+                <span class="pico-tag ${cls}">${label}</span>
+                <span class="pico-quote">“${highlightText(short, lastQueryTokens)}”</span>
+            </div>`
+        );
+    });
+    if (!parts.length) return '';
+    return `<div class="pico-detail">${parts.join('')}</div>`;
 }
 
 function renderResults(results) {
@@ -170,27 +272,20 @@ function renderResults(results) {
             ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" class="article-link">${idText}</a>`
             : idText;
 
-        // Build PICO tags
-        let picoHtml = '';
-        if (article.pico) {
-            const tags = [];
-            if (article.pico.population && article.pico.population.length)
-                tags.push('<span class="pico-tag pop">Population</span>');
-            if (article.pico.intervention && article.pico.intervention.length)
-                tags.push('<span class="pico-tag int">Intervention</span>');
-            if (article.pico.comparison && article.pico.comparison.length)
-                tags.push('<span class="pico-tag comp">Comparison</span>');
-            if (article.pico.outcome && article.pico.outcome.length)
-                tags.push('<span class="pico-tag out">Outcome</span>');
-            if (tags.length) picoHtml = `<div class="pico-tags">${tags.join('')}</div>`;
-        }
-
         const authors = (article.authors || []).join('; ');
+        const abstractHtml = highlightText(article.abstract || '', lastQueryTokens);
+        const picoHtml = renderPicoBlock(article.pico);
+        const starred = !!article.starred;
+        const noteVal = article.note || '';
+        const clusterBit = article.cluster_label
+            ? `<span><strong>Cluster:</strong> ${escapeHtml(String(article.cluster_label))}</span>`
+            : '';
 
         details.innerHTML = `
             <summary>
-                <span class="sim-badge ${simClass}">${sim.toFixed(3)}</span>
+                <span class="sim-badge ${simClass}">${Number(sim).toFixed(3)}</span>
                 <span class="article-title">${escapeHtml(article.title || '')}</span>
+                <button type="button" class="star-btn ${starred ? 'is-starred' : ''}" title="Bookmark" aria-label="Star article">${starred ? '★' : '☆'}</button>
             </summary>
             <div class="article-body">
                 <div class="article-meta">
@@ -198,21 +293,77 @@ function renderResults(results) {
                     <span><strong>Journal:</strong> ${escapeHtml(article.journal || '')}</span>
                     <span><strong>Source:</strong> ${escapeHtml(getSourceName(article.source))}</span>
                     <span><strong>ID:</strong> ${idLink}</span>
+                    ${clusterBit}
                 </div>
                 <div class="article-meta meta-authors">
                     <span><strong>Authors:</strong> ${escapeHtml(authors)}</span>
                 </div>
-                <div class="article-abstract">${escapeHtml(article.abstract || '')}</div>
+                <div class="article-abstract">${abstractHtml}</div>
                 ${picoHtml}
+                <div class="note-row">
+                    <label class="help-text">Private note</label>
+                    <textarea class="note-field" rows="2" placeholder="Optional study note (saved to your account)…"></textarea>
+                    <button type="button" class="btn btn-sm btn-secondary note-save">Save note</button>
+                </div>
             </div>
         `;
 
+        const noteField = details.querySelector('.note-field');
+        noteField.value = noteVal;
+
+        const starBtn = details.querySelector('.star-btn');
+        starBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const next = !starBtn.classList.contains('is-starred');
+            try {
+                await apiCall('/api/notes', {
+                    method: 'POST',
+                    body: {
+                        article_id: article.article_id,
+                        source: article.source,
+                        starred: next,
+                    },
+                });
+                starBtn.classList.toggle('is-starred', next);
+                starBtn.textContent = next ? '★' : '☆';
+            } catch (err) {
+                showNotification(`Could not save star: ${err.message}`, 'error');
+            }
+        });
+
+        const saveBtn = details.querySelector('.note-save');
+        saveBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            try {
+                await apiCall('/api/notes', {
+                    method: 'POST',
+                    body: {
+                        article_id: article.article_id,
+                        source: article.source,
+                        note: noteField.value,
+                    },
+                });
+                showNotification('Note saved.', 'success');
+            } catch (err) {
+                showNotification(`Could not save note: ${err.message}`, 'error');
+            }
+        });
+
         container.appendChild(details);
     });
+
+    if (typeof enhanceAbstracts === 'function') {
+        enhanceAbstracts(container);
+    }
 }
 
 function doExport(format) {
-    if (!lastSearchParams) {
+    if (!lastSearchParams || lastSearchParams.mode === 'seed') {
+        if (lastSearchParams && lastSearchParams.mode === 'seed') {
+            showNotification('For seed search, use the library export buttons above, or search with Text/PICO to export ranked results.', 'info');
+            return;
+        }
         showNotification('Please perform a search first.', 'error');
         return;
     }
@@ -222,7 +373,8 @@ function doExport(format) {
         top_k: lastSearchParams.top_k,
         sort_by: lastSearchParams.sort_by,
         source_filter: (lastSearchParams.source_filter || []).join(','),
-        format: format
+        format: format,
+        pico_boost: lastSearchParams.pico_boost ? 'true' : 'false',
     });
     window.location.href = `/api/search/export?${params.toString()}`;
 }

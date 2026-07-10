@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login — Literature Research Aide</title>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260709j">
     <script>
         (function() {
             const saved = localStorage.getItem('theme');
@@ -14,8 +14,9 @@
 </head>
 <body class="auth-body">
     <div class="auth-card">
+        <a href="/" class="auth-home-link">← Back to home</a>
         <div class="auth-logo">Literature Research Aide</div>
-        <div class="auth-subtitle">v2.6.0</div>
+        <div class="auth-subtitle">v3.0.0</div>
 
         {% if error %}
         <div class="auth-error">{{ error }}</div>
@@ -44,6 +45,7 @@
         </script>
 
         <p class="auth-switch">Don't have an account? <a href="/register">Create one</a></p>
+        <p class="auth-switch auth-home-foot"><a href="/">Learn about the app without logging in</a></p>
     </div>
 </body>
 </html>

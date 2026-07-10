@@ -1,11 +1,12 @@
 """
-FastAPI Application — Literature Research Aide v2.6.0
+FastAPI Application — Literature Research Aide v3.0.0
 Multi-user web interface for literature search and analysis.
 """
 
 import io
 import csv
 import os
+import re
 import shutil
 import secrets
 import logging
@@ -32,6 +33,8 @@ from pipeline import LiteratureSearchPipeline
 from embeddings import PICOExtractor
 from user_db import UserDatabase
 from auth import hash_password, verify_password, create_token, get_current_user
+from utils import sort_articles, coverage_suggestions
+from feature_guides import get_guide, list_guides, neighbors
 
 logging.basicConfig(
     level=logging.INFO,
@@ -45,12 +48,12 @@ MAX_CACHED_USERS = 50
 limiter = Limiter(key_func=get_remote_address)
 
 # At top of file
-app = FastAPI(title="Literature Research Aide", version="2.6.0")
+app = FastAPI(title="Literature Research Aide", version="3.0.0")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 @app.get("/health")
 async def health():
-    return {"status": "healthy", "version": "2.6.0"}
+    return {"status": "healthy", "version": "3.0.0"}
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
@@ -199,6 +202,14 @@ class SearchRequest(BaseModel):
     sort_by: str = "similarity"
     cluster_filter: Optional[List[int]] = None
     source_filter: Optional[List[str]] = None
+    # When true, slightly prefer abstracts that mention the user's PICO terms.
+    pico_boost: bool = False
+
+class SeedSearchRequest(BaseModel):
+    seed: str
+    top_k: int = 10
+    cluster_filter: Optional[List[int]] = None
+    source_filter: Optional[List[str]] = None
 
 class FetchRequest(BaseModel):
     source: str = "pubmed"
@@ -211,9 +222,23 @@ class MultiFetchRequest(BaseModel):
     query: str
     max_results: int = Field(default=200, ge=1, le=1000)
     email: Optional[str] = None
+    # True = wipe collection first (default classroom "start fresh").
+    # False = append / update without clearing.
+    clear_first: bool = True
 
 class EmbeddingsRequest(BaseModel):
     model: str = "general"
+    # Skip articles that already have vectors (unless the model changes).
+    only_missing: bool = True
+
+class NoteRequest(BaseModel):
+    article_id: str
+    source: str
+    note: Optional[str] = None
+    starred: Optional[bool] = None
+
+class CoverageRequest(BaseModel):
+    topics: Optional[List[str]] = None
 
 class ClusterRequest(BaseModel):
     # None (or <= 0) means auto-select the count by silhouette score.
@@ -346,6 +371,27 @@ async def root(request: Request):
     return templates.TemplateResponse(request, "landing.html", context={"user": user})
 
 
+@app.get("/learn/{slug}")
+async def feature_guide_page(slug: str, request: Request):
+    """Public detail pages for each landing feature card (no login required)."""
+    guide = get_guide(slug)
+    if not guide:
+        return RedirectResponse(url="/", status_code=302)
+    prev_g, next_g = neighbors(slug)
+    user = current_user(request)
+    return templates.TemplateResponse(
+        request,
+        "feature_guide.html",
+        context={
+            "guide": guide,
+            "prev": prev_g,
+            "next": next_g,
+            "all_guides": list_guides(),
+            "user": user,
+        },
+    )
+
+
 @app.get("/search")
 async def search_page(request: Request):
     user = current_user(request)
@@ -405,6 +451,42 @@ async def api_progress(request: Request):
         return {k: dict(v) for k, v in p.items()}
 
 
+def _attach_pico(results: List[dict]) -> None:
+    """Add structured PICO snippets (sentences) to each result."""
+    for article in results:
+        pico = PICOExtractor.extract_pico(article.get("abstract", ""))
+        # Cap snippets so the UI stays readable.
+        article["pico"] = {
+            k: (v[:3] if isinstance(v, list) else v) for k, v in pico.items()
+        }
+
+
+def _apply_pico_boost(results: List[dict], query_text: str) -> None:
+    """Small re-rank boost when abstract PICO snippets overlap query terms."""
+    q = (query_text or "").lower()
+    # Pull meaningful tokens from a PICO-style or free-text query.
+    tokens = [t for t in re.findall(r"[a-zA-Z]{4,}", q) if t not in {
+        "population", "intervention", "comparison", "outcome", "with", "from",
+        "that", "this", "have", "been", "were", "their", "about",
+    }]
+    if not tokens:
+        return
+    for a in results:
+        base = float(a.get("similarity_score") or 0)
+        blob = " ".join(
+            " ".join(a.get("pico", {}).get(k) or [])
+            for k in ("population", "intervention", "comparison", "outcome")
+        ).lower()
+        if not blob:
+            blob = (a.get("abstract") or "").lower()
+        hits = sum(1 for t in tokens if t in blob)
+        # At most +0.08 so similarity still dominates.
+        boost = min(0.08, 0.015 * hits)
+        a["similarity_score"] = round(base + boost, 4)
+        a["pico_boost"] = round(boost, 4)
+    results.sort(key=lambda x: x.get("similarity_score") or 0, reverse=True)
+
+
 @app.post("/api/search")
 async def api_search(req: SearchRequest, request: Request):
     user = current_user(request)
@@ -418,15 +500,50 @@ async def api_search(req: SearchRequest, request: Request):
             top_k=req.top_k, source_filter=req.source_filter,
             cluster_filter=req.cluster_filter,
         )
-        for article in results:
-            article['pico'] = PICOExtractor.extract_pico(article.get('abstract', ''))
-        if req.sort_by == "year":
-            results.sort(key=lambda a: a.get('year', '0'), reverse=True)
-        elif req.sort_by == "journal":
-            results.sort(key=lambda a: (a.get('journal') or '').lower())
-        elif req.sort_by == "title":
-            results.sort(key=lambda a: (a.get('title') or '').lower())
+        _attach_pico(results)
+        if req.pico_boost:
+            _apply_pico_boost(results, req.query_text)
+        sort_articles(results, req.sort_by)
+        # Attach personal notes/stars for the results list.
+        notes = p.db.get_notes_map()
+        for a in results:
+            n = notes.get((a.get("article_id"), a.get("source"))) or {}
+            a["note"] = n.get("note") or ""
+            a["starred"] = bool(n.get("starred"))
         return {"results": results, "total": len(results)}
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"detail": str(e)})
+    except Exception as e:
+        return server_error(e)
+    finally:
+        release_pipeline(uid)
+
+
+@app.post("/api/search/seed")
+async def api_search_seed(req: SeedSearchRequest, request: Request):
+    """Find more papers like one you already have (by id or title fragment)."""
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    uid = user["user_id"]
+    p = get_pipeline(uid)
+    try:
+        data = await run_in_thread(
+            p.search_by_seed, req.seed, req.top_k,
+            req.source_filter, req.cluster_filter,
+        )
+        results = data["results"]
+        _attach_pico(results)
+        notes = p.db.get_notes_map()
+        for a in results:
+            n = notes.get((a.get("article_id"), a.get("source"))) or {}
+            a["note"] = n.get("note") or ""
+            a["starred"] = bool(n.get("starred"))
+        return {
+            "seed": data["seed"],
+            "results": results,
+            "total": len(results),
+        }
     except ValueError as e:
         return JSONResponse(status_code=400, content={"detail": str(e)})
     except Exception as e:
@@ -444,6 +561,7 @@ async def api_search_export(
     cluster_filter: str = "",
     source_filter: str = "",
     format: str = "csv",
+    pico_boost: bool = False,
 ):
     user = current_user(request)
     if not user:
@@ -460,23 +578,25 @@ async def api_search_export(
             p.search_similar, query_text, top_k=top_k, source_filter=sources,
             cluster_filter=cluster_ids,
         )
-        if sort_by == "year":
-            results.sort(key=lambda a: a.get('year', '0'), reverse=True)
-        elif sort_by == "journal":
-            results.sort(key=lambda a: (a.get('journal') or '').lower())
-        elif sort_by == "title":
-            results.sort(key=lambda a: (a.get('title') or '').lower())
+        if pico_boost:
+            _attach_pico(results)
+            _apply_pico_boost(results, query_text)
+        sort_articles(results, sort_by)
 
         if format == "csv":
             output = io.StringIO()
             writer = csv.writer(output)
-            writer.writerow(["Rank", "Similarity", "Title", "Year", "Journal", "Authors", "Source", "ID"])
+            writer.writerow([
+                "Rank", "Similarity", "Title", "Year", "Journal", "Authors",
+                "Source", "ID", "Cluster ID", "Cluster Label",
+            ])
             for i, a in enumerate(results, 1):
                 writer.writerow([
                     i, f"{a.get('similarity_score', 0):.3f}",
                     a.get('title', ''), a.get('year', ''),
                     a.get('journal', ''), "; ".join(a.get('authors', [])),
-                    a.get('source', ''), a.get('article_id', '')
+                    a.get('source', ''), a.get('article_id', ''),
+                    a.get('cluster_id', ''), a.get('cluster_label', ''),
                 ])
             content = output.getvalue()
             media_type, filename = "text/csv", "search_results.csv"
@@ -487,6 +607,8 @@ async def api_search_export(
                 lines.append(f"   Year: {a.get('year', '')} | Journal: {a.get('journal', '')}")
                 lines.append(f"   Authors: {'; '.join(a.get('authors', []))}")
                 lines.append(f"   Source: {a.get('source', '')} | ID: {a.get('article_id', '')}")
+                if a.get("cluster_label"):
+                    lines.append(f"   Cluster: {a.get('cluster_label')}")
                 lines.append("")
             content = "\n".join(lines)
             media_type, filename = "text/plain", "search_results.txt"
@@ -498,6 +620,75 @@ async def api_search_export(
         )
     except ValueError as e:
         return JSONResponse(status_code=400, content={"detail": str(e)})
+    except Exception as e:
+        return server_error(e)
+    finally:
+        release_pipeline(uid)
+
+
+@app.get("/api/export/library")
+async def api_export_library(
+    request: Request,
+    scope: str = "all",
+    format: str = "csv",
+):
+    """Export the collection with cluster membership and exclusion reasons.
+
+    scope: all | included | excluded | starred
+    """
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if scope not in ("all", "included", "excluded", "starred"):
+        return JSONResponse(status_code=400, content={"detail": "Invalid scope"})
+    uid = user["user_id"]
+    p = get_pipeline(uid)
+    try:
+        rows = p.db.get_library_export_rows(scope=scope)
+        if format == "txt":
+            lines = []
+            for a in rows:
+                flag = "EXCLUDED" if a.get("excluded") else ("STARRED" if a.get("starred") else "INCLUDED")
+                lines.append(f"[{flag}] {a.get('title', '')}")
+                lines.append(
+                    f"  Year: {a.get('year', '')} | Source: {a.get('source', '')} | "
+                    f"ID: {a.get('article_id', '')}"
+                )
+                if a.get("cluster_label"):
+                    lines.append(f"  Cluster: {a.get('cluster_label')}")
+                if a.get("exclusion_reason"):
+                    lines.append(f"  Exclusion reason: {a.get('exclusion_reason')}")
+                if a.get("note"):
+                    lines.append(f"  Note: {a.get('note')}")
+                lines.append("")
+            content = "\n".join(lines)
+            media_type, filename = "text/plain", f"library_{scope}.txt"
+        else:
+            output = io.StringIO()
+            writer = csv.writer(output)
+            writer.writerow([
+                "Title", "Year", "Journal", "Authors", "Source", "ID",
+                "Cluster ID", "Cluster Label", "Excluded", "Exclusion Reason",
+                "Starred", "Note",
+            ])
+            for a in rows:
+                writer.writerow([
+                    a.get("title", ""), a.get("year", ""), a.get("journal", ""),
+                    "; ".join(a.get("authors") or []),
+                    a.get("source", ""), a.get("article_id", ""),
+                    a.get("cluster_id", ""), a.get("cluster_label", ""),
+                    "yes" if a.get("excluded") else "no",
+                    a.get("exclusion_reason", ""),
+                    "yes" if a.get("starred") else "no",
+                    a.get("note", ""),
+                ])
+            content = output.getvalue()
+            media_type, filename = "text/csv", f"library_{scope}.csv"
+        return StreamingResponse(
+            io.BytesIO(content.encode()),
+            media_type=media_type,
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
+        )
     except Exception as e:
         return server_error(e)
     finally:
@@ -534,6 +725,9 @@ async def api_fetch_multi(req: MultiFetchRequest, request: Request):
     p = get_pipeline(uid)
     update_progress(uid, 'fetch', active=True, done=0, total=len(req.sources))
     try:
+        if req.clear_first:
+            await run_in_thread(p.db.clear_all)
+
         def on_source_done(done, total):
             update_progress(uid, 'fetch', done=done, total=total)
 
@@ -547,11 +741,14 @@ async def api_fetch_multi(req: MultiFetchRequest, request: Request):
         )
         total = sum(v['count'] for v in results.values())
         errors = {src: v['error'] for src, v in results.items() if v['error']}
+        ok = {src: v['count'] for src, v in results.items() if not v['error']}
         return {
             "status": "success",
             "total_fetched": total,
             "by_source": {src: v['count'] for src, v in results.items()},
+            "ok_sources": ok,
             "errors": errors,
+            "cleared_first": req.clear_first,
         }
     except Exception as e:
         return server_error(e)
@@ -600,9 +797,23 @@ async def api_create_embeddings(req: EmbeddingsRequest, request: Request):
 
         # The engine swap happens inside create_embeddings under the pipeline's
         # engine lock, so it stays atomic with the embedding pass.
-        await run_in_thread(p.create_embeddings, model=req.model, progress_callback=on_batch_done)
+        result = await run_in_thread(
+            p.create_embeddings,
+            model=req.model,
+            progress_callback=on_batch_done,
+            only_missing=req.only_missing,
+        )
         stats = p.get_statistics()
-        return {"status": "success", "articles_processed": stats['articles_with_embeddings']}
+        result = result or {}
+        return {
+            "status": "success",
+            "articles_processed": stats["articles_with_embeddings"],
+            "embeddings_created": result.get("embeddings_created", 0),
+            "skipped_existing": result.get("skipped_existing", 0),
+            "seconds": result.get("seconds", 0),
+            "model": result.get("model") or req.model,
+            "device": result.get("device") or "cpu",
+        }
     except Exception as e:
         return server_error(e)
     finally:
@@ -644,7 +855,27 @@ async def api_get_clusters(request: Request):
     uid = user["user_id"]
     p = get_pipeline(uid)
     try:
-        return {"clusters": p.db.get_all_clusters()}
+        clusters = p.db.get_all_clusters()
+        briefings = await run_in_thread(p.get_cluster_briefings)
+        by_id = {b["cluster_id"]: b for b in briefings}
+        for c in clusters:
+            c["briefing"] = by_id.get(c["cluster_id"])
+        return {"clusters": clusters}
+    except Exception as e:
+        return server_error(e)
+    finally:
+        release_pipeline(uid)
+
+
+@app.get("/api/clusters/briefings")
+async def api_cluster_briefings(request: Request):
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    uid = user["user_id"]
+    p = get_pipeline(uid)
+    try:
+        return {"briefings": await run_in_thread(p.get_cluster_briefings)}
     except Exception as e:
         return server_error(e)
     finally:
@@ -784,6 +1015,67 @@ async def api_resolve_duplicates(req: ResolveDuplicatesRequest, request: Request
     try:
         result = await run_in_thread(p.resolve_duplicates, threshold=req.threshold)
         return {"status": "success", **result}
+    except Exception as e:
+        return server_error(e)
+    finally:
+        release_pipeline(uid)
+
+
+@app.post("/api/notes")
+async def api_upsert_note(req: NoteRequest, request: Request):
+    """Save a private note and/or star flag on an article."""
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    uid = user["user_id"]
+    p = get_pipeline(uid)
+    try:
+        note = p.db.upsert_note(req.article_id, req.source, note=req.note, starred=req.starred)
+        return {"status": "success", "note": note}
+    except Exception as e:
+        return server_error(e)
+    finally:
+        release_pipeline(uid)
+
+
+@app.get("/api/notes")
+async def api_get_note(request: Request, article_id: str = "", source: str = ""):
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if not article_id or not source:
+        return JSONResponse(status_code=400, content={"detail": "article_id and source required"})
+    uid = user["user_id"]
+    p = get_pipeline(uid)
+    try:
+        return p.db.get_note(article_id, source)
+    except Exception as e:
+        return server_error(e)
+    finally:
+        release_pipeline(uid)
+
+
+@app.post("/api/coverage")
+async def api_coverage(req: CoverageRequest, request: Request):
+    """Coverage map: what you have vs sources usually useful for your topics."""
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    uid = user["user_id"]
+    p = get_pipeline(uid)
+    try:
+        stats = p.get_statistics()
+        sources = stats.get("sources") or {}
+        suggestions = coverage_suggestions(sources, req.topics or [])
+        return {
+            "sources": sources,
+            "total_articles": stats.get("total_articles", 0),
+            "suggestions": suggestions,
+            "embedding_model": stats.get("embedding_model"),
+            "missing_embeddings": stats.get("missing_embeddings"),
+        }
     except Exception as e:
         return server_error(e)
     finally:

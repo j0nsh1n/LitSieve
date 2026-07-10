@@ -3,13 +3,14 @@
 {% block content %}
 <section class="page-header">
     <h1>Data Management</h1>
-    <p class="subtitle">Select your research topics, choose sources, and build your article database.</p>
+    <p class="subtitle">Select topics, choose sources, fetch papers, then create embeddings so Search and Clusters can work.</p>
 </section>
 
 <!-- Step 1: Topics -->
 <section class="card">
     <h2>1 — Select Topics</h2>
-    <p class="info-text">Choose the academic areas you want to research. Recommended sources will be suggested based on your selection.</p>
+    <p class="info-text">Choose the academic areas you care about. We use this to recommend databases and to
+        check your <strong>coverage map</strong> (are you missing sources teachers often expect for this topic?).</p>
     <div class="topic-grid" id="topic-grid"></div>
 </section>
 
@@ -20,13 +21,22 @@
     <div class="source-option-grid" id="source-option-grid"></div>
 </section>
 
+<!-- Coverage map -->
+<section class="card">
+    <h2>Coverage map</h2>
+    <p class="info-text">A quick health check: how many papers you already have per database, and which
+        recommended sources are still empty. Re-run after a fetch.</p>
+    <div id="coverage-bars"></div>
+    <div id="coverage-suggestions" class="info-text" style="margin-top:0.75rem;"></div>
+    <button type="button" id="coverage-refresh" class="btn btn-secondary btn-sm">Refresh coverage</button>
+</section>
+
 <!-- Step 3: Fetch -->
 <section class="card">
     <h2>3 — Fetch Articles</h2>
-    <p class="info-text">Runs your query against every selected source in parallel and saves the results
-        (title, abstract, authors, year, journal) into your private database. Articles without an abstract
-        are skipped — the analysis steps need text to work with. Re-fetching is safe: existing articles are
-        updated, not duplicated.</p>
+    <p class="info-text">Runs your query against every selected source <strong>in parallel</strong> and saves
+        title, abstract, authors, year, and journal into your private database. Records without an abstract are
+        skipped (later steps need text). Your last query, sources, and email are remembered in this browser.</p>
     <div class="form-row">
         <div class="form-group flex-2">
             <label>Search Query</label>
@@ -41,8 +51,21 @@
             <input type="email" id="fetch-email" placeholder="your.email@example.com">
         </div>
     </div>
+    <div class="form-row">
+        <div class="form-group">
+            <label class="radio-label">
+                <input type="radio" name="fetch-mode" value="replace" checked>
+                Replace collection (clear first — clean start)
+            </label>
+            <label class="radio-label">
+                <input type="radio" name="fetch-mode" value="append">
+                Add to collection (keep existing papers; same ids update)
+            </label>
+        </div>
+    </div>
     <button id="fetch-btn" class="btn btn-primary">Fetch Articles</button>
     <div id="fetch-status" class="status-indicator"></div>
+    <div id="fetch-source-report" class="info-text" style="display:none;margin-top:0.5rem;"></div>
     <div id="fetch-progress-wrap" style="display:none;">
         <div class="progress-bar-track"><div class="progress-bar-fill" id="fetch-progress-fill"></div></div>
         <div class="progress-bar-label" id="fetch-progress-label"></div>
@@ -52,11 +75,12 @@
 <!-- Step 4: Embeddings -->
 <section class="card">
     <h2>4 — Create Embeddings</h2>
-    <p class="info-text">Embeddings turn each article into a numerical "meaning fingerprint" — they power
-        Search, Clusters, and Duplicate detection, so run this after every fetch. Pick <em>general</em> for
-        speed or mixed topics, <em>pubmedbert</em>/<em>biosentbert</em> for medical corpora, or
-        <em>specter</em> for scientific papers. Switching models re-embeds everything; searches always use
-        the same model your articles were embedded with. Runs on your GPU when one is available.</p>
+    <p class="info-text">Embeddings turn each abstract into a numerical “meaning fingerprint.” They power
+        Search, Clusters, and Duplicate detection — run this after every fetch. Pick <em>general</em> for speed
+        or mixed topics; <em>pubmedbert</em> / <em>biosentbert</em> for medical corpora; <em>specter</em> for
+        scientific papers. <strong>Only embed new papers</strong> turns on automatically when you choose
+        <em>Add to collection</em> (so existing vectors are kept); for a full <em>Replace</em> fetch it stays
+        off so everything is embedded. Switching models re-embeds everything. Uses your GPU when available.</p>
     <p class="info-text" id="embedding-info">Loading article info...</p>
     <div class="form-row">
         <div class="form-group">
@@ -67,6 +91,13 @@
                 <option value="biosentbert">biosentbert (medical)</option>
                 <option value="specter">specter (scientific)</option>
             </select>
+        </div>
+        <div class="form-group">
+            <label class="radio-label" style="margin-top:1.4rem;">
+                <input type="checkbox" id="only-missing">
+                Only embed new papers (skip ones that already have vectors)
+            </label>
+            <span class="help-text" id="only-missing-hint">Checked automatically after “Add to collection”; off for “Replace”.</span>
         </div>
     </div>
     <button id="embeddings-btn" class="btn btn-primary">Create Embeddings</button>
@@ -79,5 +110,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/data_management.js"></script>
+<script src="/static/js/data_management.js?v=20260709n"></script>
 {% endblock %}

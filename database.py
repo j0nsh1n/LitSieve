@@ -89,6 +89,19 @@ class ArticleDatabase:
             )
         """)
 
+        # Private notes / bookmarks (per article, per user DB).
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS notes (
+                article_id TEXT NOT NULL,
+                source TEXT NOT NULL DEFAULT 'pubmed',
+                note TEXT NOT NULL DEFAULT '',
+                starred INTEGER NOT NULL DEFAULT 0,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (article_id, source),
+                FOREIGN KEY (article_id, source) REFERENCES articles (article_id, source)
+            )
+        """)
+
         self.conn.commit()
 
     def migrate_schema(self):
@@ -218,9 +231,10 @@ class ArticleDatabase:
             logger.info("Schema migration complete.")
 
     def clear_all(self):
-        """Delete all articles, embeddings, clusters, and screening state"""
+        """Delete all articles, embeddings, clusters, screening, and notes."""
         with self._lock:
             cursor = self.conn.cursor()
+            cursor.execute("DELETE FROM notes")
             cursor.execute("DELETE FROM screening")
             cursor.execute("DELETE FROM clusters")
             cursor.execute("DELETE FROM embeddings")
@@ -388,6 +402,166 @@ class ArticleDatabase:
             )
             row = cursor.fetchone()
         return row[0] if row else None
+
+    def get_embedding_keys(self) -> set:
+        """Set of (article_id, source) keys that already have embeddings."""
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT article_id, source FROM embeddings")
+            return {(row[0], row[1]) for row in cursor.fetchall()}
+
+    def get_embedding_status(self) -> Dict:
+        """Counts + model for the embeddings step UI."""
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM articles")
+            total = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) FROM embeddings")
+            with_emb = cursor.fetchone()[0]
+        return {
+            "total_articles": total,
+            "with_embeddings": with_emb,
+            "missing_embeddings": max(0, total - with_emb),
+            "model": self.get_embedding_model(),
+        }
+
+    def find_article_by_seed(self, seed: str) -> Optional[Dict]:
+        """Locate an article by DOI/id substring or title substring (case-insensitive)."""
+        seed = (seed or "").strip()
+        if not seed:
+            return None
+        like = f"%{seed}%"
+        with self._lock:
+            cursor = self.conn.cursor()
+            # Prefer exact id match, then id substring, then title substring.
+            cursor.execute(
+                "SELECT article_id, source, title, abstract, year, authors, journal "
+                "FROM articles WHERE article_id = ? COLLATE NOCASE LIMIT 1",
+                (seed,),
+            )
+            row = cursor.fetchone()
+            if not row:
+                cursor.execute(
+                    "SELECT article_id, source, title, abstract, year, authors, journal "
+                    "FROM articles WHERE article_id LIKE ? COLLATE NOCASE "
+                    "OR title LIKE ? COLLATE NOCASE LIMIT 1",
+                    (like, like),
+                )
+                row = cursor.fetchone()
+        if not row:
+            return None
+        return {
+            "article_id": row[0],
+            "source": row[1],
+            "title": row[2],
+            "abstract": row[3],
+            "year": row[4],
+            "authors": json.loads(row[5]) if row[5] else [],
+            "journal": row[6],
+        }
+
+    def get_library_export_rows(self, scope: str = "all") -> List[Dict]:
+        """Articles with cluster + screening + note metadata for CSV export.
+
+        scope: 'all' | 'included' | 'excluded' | 'starred'
+        """
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT a.article_id, a.source, a.title, a.abstract, a.year, a.authors, a.journal,
+                       c.cluster_id, c.cluster_label,
+                       s.reason,
+                       n.note, n.starred
+                FROM articles a
+                LEFT JOIN clusters c ON a.article_id = c.article_id AND a.source = c.source
+                LEFT JOIN screening s ON a.article_id = s.article_id AND a.source = s.source
+                LEFT JOIN notes n ON a.article_id = n.article_id AND a.source = n.source
+                ORDER BY a.year DESC, a.title ASC
+            """)
+            rows = cursor.fetchall()
+
+        out = []
+        for row in rows:
+            excluded = row[9] is not None
+            starred = bool(row[11])
+            if scope == "included" and excluded:
+                continue
+            if scope == "excluded" and not excluded:
+                continue
+            if scope == "starred" and not starred:
+                continue
+            out.append({
+                "article_id": row[0],
+                "source": row[1],
+                "title": row[2],
+                "abstract": row[3],
+                "year": row[4],
+                "authors": json.loads(row[5]) if row[5] else [],
+                "journal": row[6],
+                "cluster_id": row[7],
+                "cluster_label": row[8],
+                "excluded": excluded,
+                "exclusion_reason": row[9] or "",
+                "note": row[10] or "",
+                "starred": starred,
+            })
+        return out
+
+    def get_note(self, article_id: str, source: str) -> Dict:
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                "SELECT note, starred FROM notes WHERE article_id = ? AND source = ?",
+                (article_id, source),
+            )
+            row = cursor.fetchone()
+        if not row:
+            return {"article_id": article_id, "source": source, "note": "", "starred": False}
+        return {
+            "article_id": article_id,
+            "source": source,
+            "note": row[0] or "",
+            "starred": bool(row[1]),
+        }
+
+    def upsert_note(self, article_id: str, source: str, note: Optional[str] = None,
+                    starred: Optional[bool] = None) -> Dict:
+        """Create/update a note. Pass only the fields you want to change."""
+        current = self.get_note(article_id, source)
+        new_note = current["note"] if note is None else note
+        new_star = current["starred"] if starred is None else bool(starred)
+        # Drop empty unstarred rows to keep the table small.
+        if not new_note and not new_star:
+            with self._lock:
+                cursor = self.conn.cursor()
+                cursor.execute(
+                    "DELETE FROM notes WHERE article_id = ? AND source = ?",
+                    (article_id, source),
+                )
+                self.conn.commit()
+            return {"article_id": article_id, "source": source, "note": "", "starred": False}
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                INSERT INTO notes (article_id, source, note, starred, updated_at)
+                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(article_id, source) DO UPDATE SET
+                    note = excluded.note,
+                    starred = excluded.starred,
+                    updated_at = CURRENT_TIMESTAMP
+            """, (article_id, source, new_note, 1 if new_star else 0))
+            self.conn.commit()
+        return {"article_id": article_id, "source": source, "note": new_note, "starred": new_star}
+
+    def get_notes_map(self) -> Dict[Tuple[str, str], Dict]:
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT article_id, source, note, starred FROM notes")
+            rows = cursor.fetchall()
+        return {
+            (r[0], r[1]): {"note": r[2] or "", "starred": bool(r[3])}
+            for r in rows
+        }
 
     def exclude_articles(self, keys: List[Tuple[str, str]], reason: str = 'manual') -> int:
         """Mark articles as screened out (excluded from search/dedup).

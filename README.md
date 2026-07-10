@@ -7,10 +7,11 @@ sdk: docker
 app_port: 7860
 ---
 
-# Literature Research Aide 📚
+# Literature Research Aide 📚 — v3.0.0
 
-A multi-user web app for finding similar research papers across many academic
-databases using semantic embeddings, clustering, and duplicate detection.
+A multi-user web app for teachers and students to find, screen, and rank
+research papers across many academic databases using semantic embeddings,
+clustering, and duplicate detection.
 
 Built with **FastAPI**, sentence-transformers, FAISS, and scikit-learn.
 
@@ -18,31 +19,36 @@ Built with **FastAPI**, sentence-transformers, FAISS, and scikit-learn.
 
 - 🔍 Fetch articles from **12 sources** in parallel (PubMed, Europe PMC,
   ClinicalTrials.gov, OpenAlex, arXiv, Semantic Scholar, ERIC, Zenodo,
-  CrossRef, DOAJ, NASA ADS, CORE)
-- 🧠 Create semantic embeddings with pre-trained models
-- 🎯 Similarity search against your study description or PICO terms
-- 🧩 Automatic clustering with TF-IDF cluster labels
-- 🔄 Duplicate / near-duplicate detection (cross-source)
-- 📈 Statistics dashboard with per-source breakdown
+  CrossRef, DOAJ, NASA ADS, CORE) — replace or append to your collection
+- 🧠 Semantic embeddings (only-new or full re-embed; GPU when available)
+- 🎯 Similarity search (plain text, PICO, or seed paper) with highlights & notes
+- 🧩 Clustering: Density (HDBSCAN), K-Means, Hierarchical — triage by exclude
+- 🔄 Cross-source duplicate detection with preferred-source auto-resolve
+- 📈 Coverage map and per-source breakdown
 - 💾 Per-user SQLite storage, JWT auth, CSRF protection, rate limiting
-- 📤 Export search results to CSV or TXT
+- 📤 Export search hits or full library (included / screened / starred)
+- 📖 Public feature guides on the landing page (`/learn/…`)
 
 ## Project Structure
 
 ```
-amazing-tharp/
+.
 ├── main.py                 # FastAPI application (entry point)
 ├── pipeline.py             # Orchestrates fetch → embed → cluster → search
 ├── base_fetcher.py         # Abstract fetcher interface
 ├── <source>_fetcher.py     # One fetcher per source (pubmed_fetcher.py, …)
-├── database.py             # Per-user article/embedding/cluster SQLite store
+├── database.py             # Per-user article/embedding/cluster/notes SQLite
 ├── user_db.py              # User-account database (users.db)
 ├── auth.py                 # JWT + bcrypt password hashing
 ├── embeddings.py           # EmbeddingEngine + PICOExtractor
 ├── clustering.py           # Clustering, TF-IDF labels, Plotly visualizations
+├── utils.py                # Year sort, source priority, coverage, briefings
+├── feature_guides.py       # Landing “learn more” page content
 ├── templates/              # Jinja2 HTML pages
 ├── static/                 # CSS + page JavaScript
 ├── tests/                  # pytest suite
+├── context.md              # Dev primer / product map
+├── run_dev.sh              # Local dev with --reload
 ├── requirements.txt
 ├── Dockerfile              # Container build (HF Spaces / any Docker host)
 └── render.yaml             # Render.com deployment config
@@ -82,14 +88,13 @@ uvicorn main:app --host 0.0.0.0 --port 7860
 Then open <http://localhost:7860>. You'll be redirected to `/login` — register
 an account, then use the workflow:
 
-1. **Data Management** → pick topics/sources, enter a query, **Fetch** articles
-   (all selected sources run in parallel), then **Create embeddings**.
-2. **Clusters** → group the embedded articles into themed clusters (K-Means or
-   hierarchical) and browse the papers in each one.
-3. **Search** → describe your study (free text or PICO fields) to rank the most
-   similar papers; filter by source and export results to CSV/TXT.
-4. **Duplicates** → review database statistics and detect near-duplicate papers
-   across sources.
+1. **Data Management** → pick topics/sources, **Fetch** (replace or add), then
+   **Create embeddings**.
+2. **Clusters** → Density / K-Means / Hierarchical; **exclude** off-topic groups
+   or single papers (this is where triage lives).
+3. **Duplicates** → find cross-source near-duplicates and auto-resolve or keep one.
+4. **Search** → free text, PICO, or seed paper; ranks only papers you kept;
+   notes/stars; export results or the full library.
 
 ### Docker
 

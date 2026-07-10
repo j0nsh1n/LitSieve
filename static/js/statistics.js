@@ -35,7 +35,9 @@ async function loadStatistics() {
                 div.innerHTML = `
                     <span class="source-name">${escapeHtml(getSourceName(source))}</span>
                     <div class="source-bar-fill">
-                        <div class="source-bar-inner" style="width: ${pct}%"></div>
+                        <div class="source-track">
+                            <div class="source-bar-inner" style="width: ${pct}%"></div>
+                        </div>
                     </div>
                     <span class="source-count">${count}</span>
                 `;

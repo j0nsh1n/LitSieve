@@ -5,16 +5,35 @@ document.addEventListener('DOMContentLoaded', () => {
     const display = document.getElementById('nclusters-display');
     const auto = document.getElementById('auto-clusters');
     const method = document.getElementById('cluster-method');
+    const kControls = document.getElementById('k-controls');
+    const densityNote = document.getElementById('density-count-note');
+    const sliderHint = document.getElementById('slider-hint');
+
     slider.addEventListener('input', () => { display.textContent = slider.value; });
 
-    // Density (HDBSCAN) determines the count itself, so the Auto toggle and
-    // manual slider don't apply to it.
+    // Density (HDBSCAN) picks its own count — hide Auto/slider so they aren't
+    // stuck disabled. For K-Means / Hierarchical, Auto is fully toggleable.
     const syncControls = () => {
         const isDensity = method.value === 'hdbscan';
-        auto.disabled = isDensity;
-        slider.disabled = isDensity || auto.checked;
-        display.textContent = isDensity ? 'auto (density)'
-            : (auto.checked ? 'auto' : slider.value);
+        if (kControls) kControls.style.display = isDensity ? 'none' : '';
+        if (densityNote) densityNote.style.display = isDensity ? '' : 'none';
+
+        if (isDensity) {
+            // Not used while hidden; keep sane defaults for if they switch back.
+            auto.disabled = false;
+            slider.disabled = true;
+            return;
+        }
+
+        auto.disabled = false;
+        const useAuto = auto.checked;
+        slider.disabled = useAuto;
+        display.textContent = useAuto ? 'auto' : slider.value;
+        if (sliderHint) {
+            sliderHint.textContent = useAuto
+                ? 'Uncheck Auto to move this slider.'
+                : 'Drag to set how many topic groups to create.';
+        }
     };
     auto.addEventListener('change', syncControls);
     method.addEventListener('change', syncControls);
@@ -35,15 +54,23 @@ async function loadClusters() {
 }
 
 async function doGenerateClusters() {
-    const auto = document.getElementById('auto-clusters').checked;
-    const nClusters = auto ? null : parseInt(document.getElementById('n-clusters').value);
     const method = document.getElementById('cluster-method').value;
+    const isDensity = method === 'hdbscan';
+    const auto = document.getElementById('auto-clusters').checked;
+    // Density always auto-counts; otherwise honor Auto checkbox / slider.
+    const nClusters = isDensity || auto
+        ? null
+        : parseInt(document.getElementById('n-clusters').value, 10);
     const btn = document.getElementById('cluster-btn');
 
     setLoading(btn, true);
-    setStatus('cluster-status',
-        auto ? 'Finding the best number of clusters… this can take a moment.'
-             : 'Clustering articles… this can take a moment.', 'info');
+    let statusMsg = 'Clustering articles… this can take a moment.';
+    if (isDensity) {
+        statusMsg = 'Density clustering — finding natural topics and outliers…';
+    } else if (auto) {
+        statusMsg = 'Finding the best number of clusters… this can take a moment.';
+    }
+    setStatus('cluster-status', statusMsg, 'info');
 
     try {
         const data = await apiCall('/api/create-clusters', {
@@ -98,6 +125,7 @@ function renderClusters(clusters) {
             const total = cluster.article_count;
             const fullyExcluded = excluded >= total;
             const label = cluster.cluster_label || `Cluster ${cluster.cluster_id}`;
+            const briefing = cluster.briefing || null;
 
             const excludedBadge = excluded > 0
                 ? `<span class="excluded-badge">${excluded === total ? 'excluded' : excluded + ' excluded'}</span>`
@@ -108,6 +136,18 @@ function renderClusters(clusters) {
             const headline = repTitle || label;
             const subline = repTitle && label && label !== repTitle
                 ? `<span class="cluster-keywords">${escapeHtml(label)}</span>` : '';
+            let briefingHtml = '';
+            if (briefing && (briefing.summary || (briefing.bullets && briefing.bullets.length))) {
+                const bullets = (briefing.bullets || [])
+                    .map(t => `<li>${escapeHtml(t)}</li>`)
+                    .join('');
+                briefingHtml = `
+                    <div class="cluster-briefing">
+                        <p class="info-text"><strong>Topic overview:</strong> ${escapeHtml(briefing.summary || '')}</p>
+                        ${bullets ? `<ul class="briefing-bullets">${bullets}</ul>` : ''}
+                    </div>`;
+            }
+
             details.innerHTML = `
                 <summary>
                     <span class="cluster-badge">#${cluster.cluster_id}</span>
@@ -124,7 +164,10 @@ function renderClusters(clusters) {
                     </span>
                 </summary>
                 <div class="article-body">
-                    <p class="loading-text">Loading articles…</p>
+                    ${briefingHtml}
+                    <div class="cluster-articles-slot">
+                        <p class="loading-text">Loading articles…</p>
+                    </div>
                 </div>
             `;
 
@@ -157,7 +200,9 @@ function renderClusters(clusters) {
             details.addEventListener('toggle', () => {
                 if (details.open && !details.dataset.loaded) {
                     details.dataset.loaded = '1';
-                    loadClusterArticles(cluster.cluster_id, details.querySelector('.article-body'));
+                    const slot = details.querySelector('.cluster-articles-slot')
+                        || details.querySelector('.article-body');
+                    loadClusterArticles(cluster.cluster_id, slot);
                 }
             });
 

@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Duplicates - Literature Research Aide{% endblock %}
+{% block container_mod %}container-wide{% endblock %}
 {% block content %}
 <section class="page-header">
     <h1>Detect Duplicates</h1>
@@ -39,7 +40,10 @@
     <button id="detect-btn" class="btn btn-primary">Detect Duplicates</button>
     <button id="resolve-btn" class="btn btn-secondary" title="Keep the best copy of every duplicate group and screen out the rest">Auto-Resolve All</button>
     <div id="duplicates-status" class="status-indicator"></div>
-    <p class="info-text">Resolving keeps the copy with the most complete abstract and screens out the redundant ones — they stop appearing in search results and future detection runs. You can restore anything from its cluster on the Clusters page.</p>
+    <p class="info-text">Resolving keeps the most complete abstract first; if lengths are similar it prefers
+        higher-quality sources (PubMed &gt; Europe PMC &gt; CrossRef &gt; OpenAlex &gt; …). Redundant copies
+        are screened out (hidden from Search, not deleted). You can restore anything from its cluster on
+        the Clusters page. Use per-group <strong>Keep this</strong> when you want to choose the winner by hand.</p>
     <div id="duplicates-list"></div>
 </section>
 {% endblock %}

@@ -30,15 +30,57 @@ const ALL_SOURCES = {
     core:            { name: 'CORE',               desc: 'Open-access full text, all disciplines' },
 };
 
+const FETCH_PREFS_KEY = 'lra_fetch_prefs_v1';
+
 let selectedTopics = new Set();
 
 document.addEventListener('DOMContentLoaded', () => {
     renderTopicGrid();
     renderSourceGrid();
+    restoreFetchPrefs();
     loadPageData();
+    refreshCoverage();
     document.getElementById('fetch-btn').addEventListener('click', doFetch);
     document.getElementById('embeddings-btn').addEventListener('click', doCreateEmbeddings);
+    document.getElementById('coverage-refresh').addEventListener('click', refreshCoverage);
+
+    // Persist prefs as the user edits.
+    ['fetch-query', 'fetch-max', 'fetch-email', 'embedding-model'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('change', saveFetchPrefs);
+    });
+    document.querySelectorAll('input[name="fetch-mode"]').forEach(el => {
+        el.addEventListener('change', () => {
+            // Append → prefer only-new; Replace → re-embed all by default.
+            syncOnlyMissingFromFetchMode();
+            saveFetchPrefs();
+        });
+    });
+    const onlyMissingEl = document.getElementById('only-missing');
+    if (onlyMissingEl) {
+        onlyMissingEl.addEventListener('change', saveFetchPrefs);
+    }
+    // Initial state from default (or restored) fetch mode.
+    syncOnlyMissingFromFetchMode();
 });
+
+/**
+ * Auto-check "Only embed new papers" only when fetch mode is append
+ * ("Add to collection"). Replace mode unchecks it so a clean corpus
+ * gets fully embedded. User can still toggle manually afterward.
+ */
+function syncOnlyMissingFromFetchMode() {
+    const mode = (document.querySelector('input[name="fetch-mode"]:checked') || {}).value || 'replace';
+    const box = document.getElementById('only-missing');
+    if (!box) return;
+    box.checked = mode === 'append';
+    const hint = document.getElementById('only-missing-hint');
+    if (hint) {
+        hint.textContent = mode === 'append'
+            ? 'On because you chose “Add to collection” — existing vectors are kept.'
+            : 'Off for “Replace collection” — all papers will be embedded. Switch to Add to auto-check this.';
+    }
+}
 
 function renderTopicGrid() {
     const grid = document.getElementById('topic-grid');
@@ -61,6 +103,8 @@ function toggleTopic(topicId, card) {
         card.classList.add('selected');
     }
     updateRecommendedSources();
+    saveFetchPrefs();
+    refreshCoverage();
 }
 
 function updateRecommendedSources() {
@@ -78,7 +122,9 @@ function updateRecommendedSources() {
     Object.keys(ALL_SOURCES).forEach(sourceId => {
         const checkbox = document.getElementById(`source-${sourceId}`);
         if (!checkbox) return;
-        checkbox.checked = selectedTopics.size > 0 && recommended.has(sourceId);
+        if (selectedTopics.size > 0) {
+            checkbox.checked = recommended.has(sourceId);
+        }
         const card = checkbox.closest('.source-option');
         if (card) card.classList.toggle('recommended', selectedTopics.size > 0 && recommended.has(sourceId));
     });
@@ -96,17 +142,127 @@ function renderSourceGrid() {
                 <span class="source-desc">${info.desc}</span>
             </div>
         `;
+        label.querySelector('input').addEventListener('change', saveFetchPrefs);
         grid.appendChild(label);
     });
+}
+
+function saveFetchPrefs() {
+    const sources = Array.from(
+        document.querySelectorAll('#source-option-grid input[type="checkbox"]:checked')
+    ).map(cb => cb.value);
+    const mode = (document.querySelector('input[name="fetch-mode"]:checked') || {}).value || 'replace';
+    const prefs = {
+        query: document.getElementById('fetch-query').value,
+        max: document.getElementById('fetch-max').value,
+        email: document.getElementById('fetch-email').value,
+        sources,
+        mode,
+        topics: [...selectedTopics],
+        model: document.getElementById('embedding-model').value,
+        onlyMissing: document.getElementById('only-missing').checked,
+    };
+    try { localStorage.setItem(FETCH_PREFS_KEY, JSON.stringify(prefs)); } catch (e) { /* ignore */ }
+}
+
+function restoreFetchPrefs() {
+    let prefs;
+    try { prefs = JSON.parse(localStorage.getItem(FETCH_PREFS_KEY) || 'null'); } catch (e) { prefs = null; }
+    if (!prefs) return;
+    if (prefs.query) document.getElementById('fetch-query').value = prefs.query;
+    if (prefs.max) document.getElementById('fetch-max').value = prefs.max;
+    if (prefs.email) document.getElementById('fetch-email').value = prefs.email;
+    if (prefs.model) document.getElementById('embedding-model').value = prefs.model;
+    if (prefs.mode) {
+        const radio = document.querySelector(`input[name="fetch-mode"][value="${prefs.mode}"]`);
+        if (radio) radio.checked = true;
+    }
+    // Derive only-missing from fetch mode (append → on, replace → off).
+    // Do this after mode restore so it stays consistent.
+    syncOnlyMissingFromFetchMode();
+    if (Array.isArray(prefs.topics)) {
+        prefs.topics.forEach(tid => {
+            selectedTopics.add(tid);
+            const card = document.querySelector(`.topic-card[data-topic-id="${tid}"]`);
+            if (card) card.classList.add('selected');
+        });
+        updateRecommendedSources();
+    }
+    if (Array.isArray(prefs.sources) && prefs.sources.length) {
+        Object.keys(ALL_SOURCES).forEach(id => {
+            const cb = document.getElementById(`source-${id}`);
+            if (cb) cb.checked = prefs.sources.includes(id);
+        });
+    }
 }
 
 async function loadPageData() {
     try {
         const stats = await apiCall('/api/statistics');
+        const model = stats.embedding_model || '—';
+        const missing = stats.missing_embeddings ?? Math.max(0, (stats.total_articles || 0) - (stats.articles_with_embeddings || 0));
         document.getElementById('embedding-info').textContent =
-            `${stats.articles_with_embeddings} of ${stats.total_articles} articles have embeddings.`;
+            `${stats.articles_with_embeddings} of ${stats.total_articles} articles have embeddings` +
+            (stats.articles_with_embeddings ? ` (model: ${model})` : '') +
+            (missing ? ` · ${missing} still need embedding` : '') + '.';
+        if (stats.embedding_model) {
+            const sel = document.getElementById('embedding-model');
+            if ([...sel.options].some(o => o.value === stats.embedding_model)) {
+                sel.value = stats.embedding_model;
+            }
+        }
     } catch (e) {
         document.getElementById('embedding-info').textContent = 'Unable to load article info.';
+    }
+}
+
+async function refreshCoverage() {
+    const bars = document.getElementById('coverage-bars');
+    const sug = document.getElementById('coverage-suggestions');
+    try {
+        const data = await apiCall('/api/coverage', {
+            method: 'POST',
+            body: { topics: [...selectedTopics] },
+        });
+        const sources = data.sources || {};
+        const keys = Object.keys(sources);
+        bars.innerHTML = '';
+        if (!keys.length) {
+            bars.innerHTML = '<p class="info-text">No articles yet — run a fetch to fill the map.</p>';
+        } else {
+            const maxCount = Math.max(...Object.values(sources), 1);
+            keys.sort((a, b) => sources[b] - sources[a]).forEach(src => {
+                const count = sources[src];
+                const pct = (count / maxCount) * 100;
+                const div = document.createElement('div');
+                div.className = 'source-bar';
+                div.innerHTML = `
+                    <span class="source-name">${escapeHtml(getSourceName(src))}</span>
+                    <div class="source-bar-fill">
+                        <div class="source-track">
+                            <div class="source-bar-inner" style="width: ${pct}%"></div>
+                        </div>
+                    </div>
+                    <span class="source-count">${count}</span>
+                `;
+                bars.appendChild(div);
+            });
+        }
+        const suggestions = data.suggestions || [];
+        if (suggestions.length) {
+            sug.innerHTML = '<strong>Suggested sources you are missing:</strong> ' +
+                suggestions.map(s => escapeHtml(getSourceName(s.source))).join(' · ') +
+                '. Consider adding them on the next fetch.';
+        } else if (keys.length) {
+            sug.textContent = selectedTopics.size
+                ? 'Coverage looks good for your selected topics — recommended sources each have at least one paper.'
+                : 'Select topics above for more specific coverage suggestions.';
+        } else {
+            sug.textContent = '';
+        }
+    } catch (e) {
+        bars.innerHTML = '<p class="info-text">Could not load coverage.</p>';
+        sug.textContent = '';
     }
 }
 
@@ -144,25 +300,27 @@ async function doFetch() {
         document.querySelectorAll('#source-option-grid input[type="checkbox"]:checked')
     ).map(cb => cb.value);
     const query = document.getElementById('fetch-query').value.trim();
-    const maxResults = parseInt(document.getElementById('fetch-max').value);
+    const maxResults = parseInt(document.getElementById('fetch-max').value, 10);
     const email = document.getElementById('fetch-email').value.trim();
+    const mode = (document.querySelector('input[name="fetch-mode"]:checked') || {}).value || 'replace';
+    const clearFirst = mode === 'replace';
 
     if (!query) { showNotification('Please enter a search query.', 'error'); return; }
     if (sources.length === 0) { showNotification('Please select at least one source.', 'error'); return; }
 
+    saveFetchPrefs();
+
     const btn = document.getElementById('fetch-btn');
     setLoading(btn, true);
-    setStatus('fetch-status', 'Clearing existing articles...', 'info');
+    document.getElementById('fetch-source-report').style.display = 'none';
+    setStatus(
+        'fetch-status',
+        clearFirst
+            ? `Starting fresh: clearing collection, then fetching from ${sources.length} source(s)…`
+            : `Adding to collection from ${sources.length} source(s)…`,
+        'info'
+    );
 
-    try {
-        await apiCall('/api/clear-articles', { method: 'POST' });
-    } catch (e) {
-        setStatus('fetch-status', `Failed to clear articles: ${e.message}`, 'error');
-        setLoading(btn, false);
-        return;
-    }
-
-    setStatus('fetch-status', `Fetching from ${sources.length} source(s) simultaneously...`, 'info');
     startProgressPolling('fetch', 'fetch-progress-fill', 'fetch-progress-label', 'fetch-progress-wrap',
         (done, total) => `${done} of ${total} source(s) done`);
 
@@ -170,7 +328,13 @@ async function doFetch() {
     try {
         data = await apiCall('/api/fetch-articles-multi', {
             method: 'POST',
-            body: { sources, query, max_results: maxResults, email: email || null }
+            body: {
+                sources,
+                query,
+                max_results: maxResults,
+                email: email || null,
+                clear_first: clearFirst,
+            },
         });
     } catch (e) {
         setStatus('fetch-status', `Fetch failed: ${e.message}`, 'error');
@@ -180,38 +344,65 @@ async function doFetch() {
     }
 
     setLoading(btn, false);
+    // After a fetch, align embed checkbox with the mode that was just used.
+    syncOnlyMissingFromFetchMode();
+    saveFetchPrefs();
     updateNavStats();
     loadPageData();
+    refreshCoverage();
 
-    const breakdown = Object.entries(data.by_source)
+    const okLines = Object.entries(data.by_source || {})
+        .filter(([src]) => !(data.errors || {})[src])
+        .map(([src, count]) => `✓ ${getSourceName(src)}: ${count}`);
+    const errLines = Object.entries(data.errors || {})
+        .map(([src, msg]) => `✗ ${getSourceName(src)}: ${msg}`);
+    const report = document.getElementById('fetch-source-report');
+    report.style.display = 'block';
+    report.innerHTML = [...okLines, ...errLines].map(escapeHtml).join('<br>');
+
+    const errorCount = Object.keys(data.errors || {}).length;
+    const breakdown = Object.entries(data.by_source || {})
         .map(([src, count]) => `${getSourceName(src)}: ${count}`)
         .join(' · ');
-    const errorCount = Object.keys(data.errors || {}).length;
 
     if (errorCount === 0) {
         setStatus('fetch-status', `Fetched ${data.total_fetched} articles — ${breakdown}`, 'success');
         showNotification(`Fetched ${data.total_fetched} articles!`, 'success');
     } else if (errorCount < sources.length) {
-        const errDetail = Object.entries(data.errors).map(([src, msg]) => `${getSourceName(src)}: ${msg}`).join('; ');
-        setStatus('fetch-status', `Fetched ${data.total_fetched} articles — ${breakdown}. Errors: ${errDetail}`, 'warning');
+        setStatus('fetch-status', `Fetched ${data.total_fetched} articles with some source errors (see list).`, 'warning');
         showNotification(`Fetched ${data.total_fetched} articles with some errors.`, 'warning');
     } else {
-        setStatus('fetch-status', `All fetches failed.`, 'error');
+        setStatus('fetch-status', 'All fetches failed.', 'error');
         showNotification('Fetch failed for all selected sources.', 'error');
     }
 }
 
 async function doCreateEmbeddings() {
     const model = document.getElementById('embedding-model').value;
+    const onlyMissing = document.getElementById('only-missing').checked;
     const btn = document.getElementById('embeddings-btn');
+    saveFetchPrefs();
     setLoading(btn, true);
-    setStatus('embeddings-status', 'Creating embeddings... This may take a few minutes.', 'info');
+    setStatus('embeddings-status', 'Creating embeddings… this may take a few minutes on large collections.', 'info');
     startProgressPolling('embed', 'embed-progress-fill', 'embed-progress-label', 'embed-progress-wrap',
-        (done, total, pct) => total > 0 ? `${done} / ${total} articles embedded (${pct}%)` : 'Loading model...');
+        (done, total, pct) => total > 0 ? `${done} / ${total} articles (${pct}%)` : 'Loading model…');
 
     try {
-        const data = await apiCall('/api/create-embeddings', { method: 'POST', body: { model } });
-        setStatus('embeddings-status', `Embeddings created for ${data.articles_processed} articles.`, 'success');
+        const data = await apiCall('/api/create-embeddings', {
+            method: 'POST',
+            body: { model, only_missing: onlyMissing },
+        });
+        const secs = data.seconds != null ? `${data.seconds}s` : '?';
+        const device = data.device || 'cpu';
+        const created = data.embeddings_created ?? data.articles_processed;
+        const skipped = data.skipped_existing || 0;
+        setStatus(
+            'embeddings-status',
+            `Done: ${created} embedded, ${skipped} skipped (already had vectors). ` +
+            `Model ${data.model || model} on ${device} in ${secs}. ` +
+            `Corpus total with embeddings: ${data.articles_processed}.`,
+            'success'
+        );
         showNotification('Embeddings created successfully!', 'success');
         loadPageData();
     } catch (e) {

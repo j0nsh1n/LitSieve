@@ -162,23 +162,77 @@ class LiteratureSearchPipeline:
             for source, data in results.items()
         }
 
-    def create_embeddings(self, model: Optional[str] = None, progress_callback=None):
-        """Step 2: Create embeddings for all articles
+    def create_embeddings(
+        self,
+        model: Optional[str] = None,
+        progress_callback=None,
+        only_missing: bool = True,
+    ):
+        """Step 2: Create embeddings for articles.
 
         Args:
             model: If given, switch the embedding engine to this model before
                 embedding. Doing the swap here (under the engine lock) keeps it
                 atomic with the embedding pass, instead of mutating the shared
                 pipeline from the request handler.
+            only_missing: When True (default), skip articles that already have
+                embeddings — much faster after an incremental fetch. If the
+                requested model differs from the stored model, everything is
+                re-embedded so dimensions stay consistent.
         """
+        import time
+        from embeddings import select_device
+
         logger.info("\n=== Step 2: Creating Embeddings ===")
+        t0 = time.perf_counter()
 
         articles = self.db.get_all_articles()
         if not articles:
             logger.info("No articles in database. Fetch articles first.")
-            return
+            return {
+                "embeddings_created": 0,
+                "skipped_existing": 0,
+                "seconds": 0.0,
+                "model": model or self.embedding_model_name,
+                "device": select_device(),
+            }
 
-        logger.info(f"Creating embeddings for {len(articles)} articles...")
+        stored_model = self.db.get_embedding_model()
+        target_model = model or self.embedding_model_name
+        # Switching models invalidates prior vectors (different dims/spaces).
+        force_all = bool(stored_model and target_model and stored_model != target_model)
+        if force_all:
+            only_missing = False
+            logger.info(
+                "Model change %s → %s: re-embedding all articles",
+                stored_model, target_model,
+            )
+
+        existing = self.db.get_embedding_keys() if only_missing else set()
+        if only_missing and existing:
+            to_embed = [
+                a for a in articles
+                if (a["article_id"], a["source"]) not in existing
+            ]
+            skipped = len(articles) - len(to_embed)
+        else:
+            to_embed = articles
+            skipped = 0
+
+        if not to_embed:
+            logger.info("All articles already have embeddings; nothing to do.")
+            return {
+                "embeddings_created": 0,
+                "skipped_existing": skipped,
+                "seconds": round(time.perf_counter() - t0, 2),
+                "model": stored_model or target_model,
+                "device": select_device(),
+            }
+
+        logger.info(
+            "Creating embeddings for %d articles (%d already embedded, skipped=%s)...",
+            len(to_embed), skipped, only_missing,
+        )
 
         # Hold the engine lock across the swap AND the embedding pass so a
         # concurrent search can't replace the engine while embed_articles runs.
@@ -188,13 +242,21 @@ class LiteratureSearchPipeline:
                 self.embedding_model_name = model
             model_name = self.embedding_model_name
             embeddings = self.embedding_engine.embed_articles(
-                articles, progress_callback=progress_callback
+                to_embed, progress_callback=progress_callback
             )
+            device = getattr(self.embedding_engine, "device", None) or select_device()
 
         self.db.insert_embeddings(embeddings, model_name)
+        seconds = round(time.perf_counter() - t0, 2)
 
-        logger.info(f"Created and stored embeddings")
-        return embeddings
+        logger.info("Created and stored embeddings in %.2fs on %s", seconds, device)
+        return {
+            "embeddings_created": len(embeddings),
+            "skipped_existing": skipped,
+            "seconds": seconds,
+            "model": model_name,
+            "device": device,
+        }
 
     def cluster_articles(self, n_clusters: Optional[int] = None, method: str = 'kmeans'):
         """Step 3: Cluster articles.
@@ -524,12 +586,10 @@ class LiteratureSearchPipeline:
         """
         Auto-resolve duplicate groups: keep the best copy, exclude the rest.
 
-        Duplicate pairs are grouped transitively (union-find), then within each
-        group the article with the LONGEST ABSTRACT wins (more text = better
-        embedding + more useful record), with (source, article_id) as a
-        deterministic tie-break. The losers are marked excluded with reason
-        'duplicate', which removes them from search results and from future
-        duplicate detection runs. Everything is reversible via include_articles.
+        Duplicate pairs are grouped transitively (union-find). Within each group
+        the winner is the LONGEST ABSTRACT, then preferred SOURCE_PRIORITY
+        (PubMed before secondary databases), then stable ids. Losers are marked
+        excluded reason='duplicate' (hidden from search/detection; reversible).
 
         Returns:
             {'groups': n_groups_resolved, 'excluded': n_articles_excluded}
@@ -559,18 +619,18 @@ class LiteratureSearchPipeline:
             groups.setdefault(find(key), []).append(key)
 
         articles = self.db.get_all_articles_with_clusters()
+        from utils import duplicate_quality_key
         losers = []
         n_groups = 0
         for members in groups.values():
             if len(members) < 2:
                 continue
             n_groups += 1
-            def quality(key):
-                abstract = (articles.get(key) or {}).get('abstract') or ''
-                # Longest abstract wins; negative-string tie-break keeps the
-                # ordering deterministic across runs.
-                return (len(abstract), key[1], key[0])
-            keeper = max(members, key=quality)
+            # Longest abstract wins; preferred source (PubMed > …) breaks ties.
+            keeper = max(
+                members,
+                key=lambda k: duplicate_quality_key(articles.get(k), k),
+            )
             losers.extend(k for k in members if k != keeper)
 
         self.db.exclude_articles(losers, reason='duplicate')
@@ -578,9 +638,63 @@ class LiteratureSearchPipeline:
                     n_groups, len(losers))
         return {'groups': n_groups, 'excluded': len(losers)}
 
+    def search_by_seed(
+        self,
+        seed: str,
+        top_k: int = 10,
+        source_filter: Optional[List[str]] = None,
+        cluster_filter: Optional[List[int]] = None,
+    ) -> Dict:
+        """Find a local seed article (by id/title), then rank similar papers."""
+        article = self.db.find_article_by_seed(seed)
+        if not article:
+            raise ValueError(
+                "No matching article in your collection. Fetch papers first, "
+                "or try a different id / title fragment."
+            )
+        query = f"{article.get('title') or ''}. {article.get('abstract') or ''}".strip()
+        results = self.search_similar(
+            query, top_k=top_k + 1,
+            source_filter=source_filter,
+            cluster_filter=cluster_filter,
+        )
+        seed_key = (article["article_id"], article["source"])
+        results = [
+            r for r in results
+            if (r.get("article_id"), r.get("source")) != seed_key
+        ][:top_k]
+        return {"seed": article, "results": results}
+
+    def get_cluster_briefings(self) -> List[Dict]:
+        """Rule-based topic overview cards for each cluster."""
+        from utils import build_cluster_briefing
+        clusters = self.db.get_all_clusters()
+        briefings = []
+        for c in clusters:
+            cid = c["cluster_id"]
+            arts = self.db.get_articles_by_cluster(cid)
+            titles = [a.get("title") or "" for a in arts]
+            years = [a.get("year") for a in arts]
+            briefing = build_cluster_briefing(
+                cid,
+                c.get("cluster_label") or "",
+                titles,
+                years,
+                c.get("article_count") or len(arts),
+                representative_title=c.get("representative_title"),
+            )
+            briefing["cluster_id"] = cid
+            briefing["excluded_count"] = c.get("excluded_count") or 0
+            briefings.append(briefing)
+        return briefings
+
     def get_statistics(self) -> Dict:
-        """Get database statistics"""
-        return self.db.get_statistics()
+        """Get database statistics plus embedding status fields."""
+        stats = self.db.get_statistics()
+        emb = self.db.get_embedding_status()
+        stats["embedding_model"] = emb.get("model")
+        stats["missing_embeddings"] = emb.get("missing_embeddings")
+        return stats
 
     def close(self):
         """Close database connection"""
