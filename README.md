@@ -47,7 +47,6 @@ Built with **FastAPI**, sentence-transformers, FAISS, and scikit-learn.
 ├── templates/              # Jinja2 HTML pages
 ├── static/                 # CSS + page JavaScript
 ├── tests/                  # pytest suite
-├── context.md              # Dev primer / product map
 ├── run_dev.sh              # Local dev with --reload
 ├── requirements.txt
 ├── Dockerfile              # Container build (HF Spaces / any Docker host)
