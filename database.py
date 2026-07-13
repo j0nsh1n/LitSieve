@@ -21,6 +21,10 @@ class ArticleDatabase:
         """Initialize database connection"""
         self.db_path = db_path
         self.conn = sqlite3.connect(db_path, check_same_thread=False)
+        # WAL reduces "database is locked" under concurrent readers/writers;
+        # busy_timeout waits up to 5s before raising instead of failing immediately.
+        self.conn.execute("PRAGMA journal_mode=WAL")
+        self.conn.execute("PRAGMA busy_timeout=5000")
         self._lock = threading.Lock()
         self.create_tables()
         self.migrate_schema()
