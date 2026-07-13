@@ -62,6 +62,16 @@ def test_delete_user(user_db):
     assert user_db.delete_user(u["id"]) is False
 
 
+def test_article_db_uses_wal_journal(tmp_path):
+    """Fresh ArticleDatabase connections enable WAL to reduce lock errors."""
+    db = ArticleDatabase(db_path=str(tmp_path / "wal.db"))
+    try:
+        mode = db.conn.execute("PRAGMA journal_mode").fetchone()[0]
+        assert str(mode).lower() == "wal"
+    finally:
+        db.close()
+
+
 def test_insert_and_get_all_articles(article_db):
     articles = [
         {

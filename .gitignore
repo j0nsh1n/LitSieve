@@ -17,6 +17,8 @@ secrets.*
 
 # --- Databases / user data (accounts, password hashes, fetched corpora) ---
 *.db
+*.db-wal
+*.db-shm
 *.sqlite
 *.sqlite3
 .pytest_cache/

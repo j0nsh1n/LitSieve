@@ -12,6 +12,9 @@ from typing import Optional, Dict
 class UserDatabase:
     def __init__(self, db_path: str = "users.db"):
         self.conn = sqlite3.connect(db_path, check_same_thread=False)
+        # WAL + busy_timeout: same rationale as ArticleDatabase (concurrent access).
+        self.conn.execute("PRAGMA journal_mode=WAL")
+        self.conn.execute("PRAGMA busy_timeout=5000")
         self._lock = threading.Lock()
         self._create_tables()
 
