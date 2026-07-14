@@ -567,6 +567,16 @@ class ArticleDatabase:
             for r in rows
         }
 
+    def get_starred_keys(self) -> List[Tuple[str, str]]:
+        """Keys of notes marked starred=1 (order stable by article_id, source)."""
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                "SELECT article_id, source FROM notes WHERE starred = 1 "
+                "ORDER BY article_id, source"
+            )
+            return [(r[0], r[1]) for r in cursor.fetchall()]
+
     def exclude_articles(self, keys: List[Tuple[str, str]], reason: str = 'manual') -> int:
         """Mark articles as screened out (excluded from search/dedup).
 

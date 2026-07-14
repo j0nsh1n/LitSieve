@@ -3,13 +3,39 @@
 {% block content %}
 <section class="page-header">
  <h1>Account</h1>
- <p class="subtitle">Manage your account.</p>
+ <p class="subtitle">Change your password (signs out other devices), or delete your account and data.</p>
 </section>
 
 <section class="card">
  <h2>Profile</h2>
  <p class="info-text">Signed in as <strong>{{ user.username }}</strong>.</p>
  <a href="/logout" class="btn btn-secondary">Log Out</a>
+</section>
+
+<section class="card">
+ <h2>Change password</h2>
+ <p class="info-text">Updates your password and signs out other sessions (this device stays signed in).</p>
+ <div class="form-row">
+ <div class="form-group">
+ <label for="pw-current">Current password</label>
+ <input type="password" id="pw-current" class="pw-field" autocomplete="current-password">
+ </div>
+ </div>
+ <div class="form-row">
+ <div class="form-group">
+ <label for="pw-new">New password</label>
+ <input type="password" id="pw-new" class="pw-field" autocomplete="new-password">
+ </div>
+ <div class="form-group">
+ <label for="pw-confirm">Confirm new password</label>
+ <input type="password" id="pw-confirm" class="pw-field" autocomplete="new-password">
+ </div>
+ </div>
+ <label class="show-pass">
+ <input type="checkbox" id="show-change-pw"> Show passwords
+ </label>
+ <button type="button" id="change-password-btn" class="btn btn-primary">Change password</button>
+ <div id="change-password-status" class="status-indicator"></div>
 </section>
 
 <section class="card danger-zone">
@@ -36,5 +62,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/account.js"></script>
+<script src="/static/js/account.js?v=20260713d"></script>
 {% endblock %}

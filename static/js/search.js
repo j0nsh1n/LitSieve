@@ -5,6 +5,7 @@ let lastQueryTokens = [];
 
 document.addEventListener('DOMContentLoaded', () => {
  applyAvailableSources();
+ refreshStarredCount();
 
  document.querySelectorAll('input[name="input_method"]').forEach(radio => {
  radio.addEventListener('change', () => {
@@ -22,6 +23,8 @@ document.addEventListener('DOMContentLoaded', () => {
  });
 
  document.getElementById('search-btn').addEventListener('click', doSearch);
+ const starredBtn = document.getElementById('starred-search-btn');
+ if (starredBtn) starredBtn.addEventListener('click', doStarredSearch);
  document.getElementById('export-csv').addEventListener('click', () => doExport('csv'));
  document.getElementById('export-txt').addEventListener('click', () => doExport('txt'));
 
@@ -42,6 +45,46 @@ document.addEventListener('DOMContentLoaded', () => {
  }
  });
 });
+
+function parseOptionalYear(id) {
+ const el = document.getElementById(id);
+ if (!el || el.value === '' || el.value == null) return null;
+ const n = parseInt(el.value, 10);
+ return Number.isFinite(n) ? n : null;
+}
+
+function collectSearchFilters() {
+ const topK = parseInt(document.getElementById('top-k').value, 10);
+ const sortBy = document.getElementById('sort-by').value;
+ const picoBoost = document.getElementById('pico-boost').checked;
+ const lexicalEl = document.getElementById('lexical-boost');
+ const lexicalBoost = lexicalEl ? lexicalEl.checked : true;
+ const selectedSources = Array.from(
+ document.querySelectorAll('input[name="search-source"]:checked')
+ ).map(cb => cb.value);
+ return {
+ top_k: topK,
+ sort_by: sortBy,
+ pico_boost: picoBoost,
+ lexical_boost: lexicalBoost,
+ source_filter: selectedSources,
+ year_min: parseOptionalYear('year-min'),
+ year_max: parseOptionalYear('year-max'),
+ };
+}
+
+async function refreshStarredCount() {
+ const el = document.getElementById('starred-count');
+ if (!el) return;
+ try {
+ // Library export rows for starred scope is heavy; use screening report + notes via statistics if needed.
+ // Cheap path: open a tiny search is wrong; count from export library is ok for small corpora.
+ const r = await apiCall('/api/screening-report?format=json');
+ el.textContent = String(r.starred || 0);
+ } catch (e) {
+ el.textContent = '?';
+ }
+}
 
 async function applyAvailableSources() {
  let sources = {};
@@ -136,27 +179,23 @@ async function doSearch() {
  return;
  }
 
- const topK = parseInt(document.getElementById('top-k').value, 10);
- const sortBy = document.getElementById('sort-by').value;
- const picoBoost = document.getElementById('pico-boost').checked;
- const selectedSources = Array.from(
- document.querySelectorAll('input[name="search-source"]:checked')
- ).map(cb => cb.value);
- if (selectedSources.length === 0) {
+ const filters = collectSearchFilters();
+ if (filters.source_filter.length === 0) {
  showNotification('Please select at least one source.', 'error');
  return;
  }
-    // Topic pool is managed via screening (checkboxes above) — no separate
-    // cluster_filter. Backend already skips screened-out papers.
  const btn = document.getElementById('search-btn');
  setLoading(btn, true);
 
  lastSearchParams = {
  query_text: queryText,
- top_k: topK,
- sort_by: sortBy,
- source_filter: selectedSources,
- pico_boost: picoBoost,
+ top_k: filters.top_k,
+ sort_by: filters.sort_by,
+ source_filter: filters.source_filter,
+ pico_boost: filters.pico_boost,
+ lexical_boost: filters.lexical_boost,
+ year_min: filters.year_min,
+ year_max: filters.year_max,
  mode: method,
  };
  lastQueryTokens = tokensFromQuery(queryText);
@@ -168,8 +207,11 @@ async function doSearch() {
  method: 'POST',
  body: {
  seed: queryText,
- top_k: topK,
- source_filter: selectedSources,
+ top_k: filters.top_k,
+ source_filter: filters.source_filter,
+ year_min: filters.year_min,
+ year_max: filters.year_max,
+ lexical_boost: filters.lexical_boost,
  },
  });
  const seed = data.seed;
@@ -181,8 +223,8 @@ async function doSearch() {
  `Starting from “${seed.title || seed.article_id}” (${getSourceName(seed.source)} · ${seed.year || 'n.d.'}). Showing papers most like this one.`;
  lastQueryTokens = tokensFromQuery(`${seed.title || ''} ${seed.abstract || ''}`);
  }
- if (sortBy !== 'similarity') {
- data.results = clientSort(data.results || [], sortBy);
+ if (filters.sort_by !== 'similarity') {
+ data.results = clientSort(data.results || [], filters.sort_by);
  }
  } else {
  document.getElementById('seed-banner').style.display = 'none';
@@ -190,10 +232,13 @@ async function doSearch() {
  method: 'POST',
  body: {
  query_text: queryText,
- top_k: topK,
- sort_by: sortBy,
- source_filter: selectedSources,
- pico_boost: picoBoost,
+ top_k: filters.top_k,
+ sort_by: filters.sort_by,
+ source_filter: filters.source_filter,
+ pico_boost: filters.pico_boost,
+ lexical_boost: filters.lexical_boost,
+ year_min: filters.year_min,
+ year_max: filters.year_max,
  },
  });
  }
@@ -203,6 +248,59 @@ async function doSearch() {
  document.getElementById('results-section').style.display = 'block';
  } catch (e) {
  showNotification(`Search failed: ${e.message}`, 'error');
+ } finally {
+ setLoading(btn, false);
+ }
+}
+
+async function doStarredSearch() {
+ const filters = collectSearchFilters();
+ if (filters.source_filter.length === 0) {
+ showNotification('Please select at least one source.', 'error');
+ return;
+ }
+ const btn = document.getElementById('starred-search-btn');
+ setLoading(btn, true);
+ lastSearchParams = {
+ query_text: '',
+ top_k: filters.top_k,
+ sort_by: filters.sort_by,
+ source_filter: filters.source_filter,
+ pico_boost: false,
+ lexical_boost: false,
+ year_min: filters.year_min,
+ year_max: filters.year_max,
+ mode: 'starred',
+ };
+ lastQueryTokens = [];
+ try {
+ document.getElementById('seed-banner').style.display = 'none';
+ const data = await apiCall('/api/search/starred', {
+ method: 'POST',
+ body: {
+ top_k: filters.top_k,
+ source_filter: filters.source_filter,
+ year_min: filters.year_min,
+ year_max: filters.year_max,
+ },
+ });
+ const banner = document.getElementById('seed-banner');
+ const bannerText = document.getElementById('seed-banner-text');
+ if (banner && bannerText) {
+ banner.style.display = 'block';
+ bannerText.textContent =
+ `More like your starred papers (${data.seed_count || 0} star${(data.seed_count || 0) === 1 ? '' : 's'}). Starred items are excluded from this list.`;
+ }
+ let results = data.results || [];
+ if (filters.sort_by !== 'similarity') {
+ results = clientSort(results, filters.sort_by);
+ }
+ renderResults(results);
+ document.getElementById('result-count').textContent = results.length;
+ document.getElementById('results-section').style.display = 'block';
+ await refreshStarredCount();
+ } catch (e) {
+ showNotification(`Starred search failed: ${e.message}`, 'error');
  } finally {
  setLoading(btn, false);
  }
@@ -330,6 +428,7 @@ function renderResults(results) {
  });
  starBtn.classList.toggle('is-starred', next);
  starBtn.textContent = next ? '★' : '☆';
+ refreshStarredCount();
  } catch (err) {
  showNotification(`Could not save star: ${err.message}`, 'error');
  }
@@ -362,9 +461,9 @@ function renderResults(results) {
 }
 
 function doExport(format) {
- if (!lastSearchParams || lastSearchParams.mode === 'seed') {
- if (lastSearchParams && lastSearchParams.mode === 'seed') {
- showNotification('For seed search, use the library export buttons above, or search with Text/PICO to export ranked results.', 'info');
+ if (!lastSearchParams || lastSearchParams.mode === 'seed' || lastSearchParams.mode === 'starred') {
+ if (lastSearchParams && (lastSearchParams.mode === 'seed' || lastSearchParams.mode === 'starred')) {
+ showNotification('For seed/starred search, use the library export buttons above, or search with Text/PICO to export ranked results.', 'info');
  return;
  }
  showNotification('Please perform a search first.', 'error');
@@ -378,6 +477,9 @@ function doExport(format) {
  source_filter: (lastSearchParams.source_filter || []).join(','),
  format: format,
  pico_boost: lastSearchParams.pico_boost ? 'true' : 'false',
+ lexical_boost: lastSearchParams.lexical_boost !== false ? 'true' : 'false',
  });
+ if (lastSearchParams.year_min != null) params.set('year_min', String(lastSearchParams.year_min));
+ if (lastSearchParams.year_max != null) params.set('year_max', String(lastSearchParams.year_max));
  window.location.href = `/api/search/export?${params.toString()}`;
 }

@@ -1020,6 +1020,15 @@ input[type="range"]::-moz-range-thumb:hover {
     font-weight: 700;
 }
 
+.year-input {
+    width: 7rem;
+    max-width: 100%;
+}
+
+.year-range-hint {
+    margin-top: 0.5rem;
+}
+
 .export-row {
     display: flex;
     gap: 0.5rem;

@@ -4,17 +4,19 @@
 {% block content %}
 <section class="page-header">
  <h1>Search for Similar Articles</h1>
- <p class="subtitle"><strong>Step 4 of 4 (last).</strong> Rank papers you kept by meaning - or start from a seed
- paper. Screen on <a href="/clusters">Clusters</a> and clean copies on <a href="/statistics">Duplicates</a> first.</p>
+ <p class="subtitle"><strong>Step 4 of 4 (last).</strong> Rank papers you kept by meaning (plus exact-word boost),
+ year range, a seed paper, or papers like your stars. Screen on
+ <a href="/clusters">Clusters</a> and clean copies on <a href="/statistics">Duplicates</a> first.</p>
 </section>
 
 <section class="card">
  <p class="info-text">This searches <strong>your fetched &amp; embedded articles only</strong> - not the whole internet.
- Plain language works: the app compares meaning, not just keywords.
+ Plain language works: the app compares meaning, then slightly boosts papers that also share your exact words.
  <strong>Text</strong> is a free research question;
- <strong>PICO</strong> is for clinical-style questions (Population / Intervention / Comparison / Outcome).
- Screen out off-topic groups or papers on the <a href="/clusters">Clusters</a> page (or resolve
- duplicates first) - those never appear here. Search is only for ranking what you kept.</p>
+ <strong>PICO</strong> is for clinical-style questions (Population / Intervention / Comparison / Outcome);
+ <strong>Seed</strong> starts from one paper already in your collection.
+ You can also run <strong>More like my starred</strong> after bookmarking papers with ★.
+ Screen out off-topic groups on <a href="/clusters">Clusters</a> (or resolve duplicates first) - those never appear here.</p>
  <div class="input-method-toggle">
  <label class="radio-label">
  <input type="radio" name="input_method" value="text" checked> Text Input
@@ -86,6 +88,20 @@
  <span class="help-text">Slight boost when abstract text overlaps your query terms (does not replace similarity).</span>
  </div>
  <div class="param-group">
+ <label class="radio-label" style="margin-top:1.4rem;">
+ <input type="checkbox" id="lexical-boost" checked> Prefer exact words (hybrid)
+ </label>
+ <span class="help-text">Blend meaning similarity with TF-IDF word overlap (on by default).</span>
+ </div>
+ <div class="param-group year-range-group">
+ <label>From year</label>
+ <input type="number" id="year-min" class="year-input" min="1900" max="2100" step="1" placeholder="e.g. 2015">
+ </div>
+ <div class="param-group year-range-group">
+ <label>To year</label>
+ <input type="number" id="year-max" class="year-input" min="1900" max="2100" step="1" placeholder="e.g. 2024">
+ </div>
+ <div class="param-group">
  <label>Sources</label>
  <div class="source-selector">
  <label class="radio-label"><input type="checkbox" name="search-source" value="pubmed" checked> PubMed</label>
@@ -102,16 +118,20 @@
  <label class="radio-label"><input type="checkbox" name="search-source" value="core" checked> CORE</label>
  </div>
  <div class="help-text" id="source-availability-hint" style="margin-top:0.4rem;"></div>
+ <p class="help-text year-range-hint">Papers with unknown year are hidden when a range is set.</p>
  </div>
  </div>
  <button id="search-btn" class="btn btn-primary btn-block">Search</button>
+ <button type="button" id="starred-search-btn" class="btn btn-secondary btn-block" style="margin-top:0.6rem;">
+ More like my starred (<span id="starred-count">0</span>)
+ </button>
+ <p class="help-text">Uses the average of your starred papers' embeddings (excludes the starred papers themselves from results).</p>
 </section>
 
 <section class="card">
  <h2>Citations</h2>
- <p class="info-text">This app does not auto-format bibliographies (so you stay in control of style rules).
- When you are ready to cite, open a free citation helper, paste the title or DOI from a result, and
- pick APA, MLA, Chicago, etc. yourself:</p>
+ <p class="info-text">Download RIS or BibTeX from <strong>Export your library</strong> below for Zotero, EndNote, or Mendeley.
+ For APA/MLA/Chicago hand-formatting, open ZoteroBib, paste a title or DOI from a result, and pick the style yourself:</p>
  <p>
  <a class="btn btn-secondary" href="https://zbib.org/" target="_blank" rel="noopener">
  Open ZoteroBib (zbib.org)
@@ -124,7 +144,7 @@
  <h2>Export your library</h2>
  <p class="info-text">Download your whole collection (not just the last search), including cluster labels,
  exclusion status, stars, and private notes. Useful for hand-ins or spreadsheet screening logs.
- Choose a scope, then a format. RIS and BibTeX import into Zotero, EndNote, or Mendeley.</p>
+ Choose a scope, then a format (CSV spreadsheet, RIS, or BibTeX). Screening counts for hand-ins are on the Duplicates page.</p>
  <div class="export-scope-row">
  <label for="lib-export-scope" class="help-text export-scope-label">Scope</label>
  <select id="lib-export-scope" class="export-scope-select">
@@ -163,5 +183,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/search.js?v=20260713b"></script>
+<script src="/static/js/search.js?v=20260713d"></script>
 {% endblock %}

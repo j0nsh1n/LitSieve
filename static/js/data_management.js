@@ -266,85 +266,49 @@ async function refreshCoverage() {
  }
 }
 
-// === Progress polling ===
-function startProgressPolling(task, fillId, labelId, wrapId, formatLabel) {
+// === Progress polling (jobs return 202; UI waits on /api/progress) ===
+function waitForJob(task, fillId, labelId, wrapId, formatLabel, timeoutMs = 600000) {
+ return new Promise((resolve, reject) => {
  const fill = document.getElementById(fillId);
  const label = document.getElementById(labelId);
  const wrap = document.getElementById(wrapId);
  wrap.style.display = 'block';
  fill.style.width = '0%';
+ const started = Date.now();
 
  const interval = setInterval(async () => {
  try {
- const data = await apiCall('/api/progress');
- const p = data[task];
- if (!p || !p.active) {
+ if (Date.now() - started > timeoutMs) {
  clearInterval(interval);
- fill.style.width = '100%';
- setTimeout(() => { wrap.style.display = 'none'; fill.style.width = '0%'; }, 800);
+ reject(new Error('Timed out waiting for the job to finish'));
  return;
  }
+ const data = await apiCall('/api/progress');
+ const p = data[task];
+ if (!p) return;
+ if (p.active) {
  const pct = p.total > 0 ? Math.round((p.done / p.total) * 100) : 0;
  fill.style.width = pct + '%';
  label.textContent = formatLabel(p.done, p.total, pct);
- } catch (e) {
- clearInterval(interval);
- }
- }, 500);
-
- return interval;
-}
-
-async function doFetch() {
- const sources = Array.from(
- document.querySelectorAll('#source-option-grid input[type="checkbox"]:checked')
- ).map(cb => cb.value);
- const query = document.getElementById('fetch-query').value.trim();
- const maxResults = parseInt(document.getElementById('fetch-max').value, 10);
- const email = document.getElementById('fetch-email').value.trim();
- const mode = (document.querySelector('input[name="fetch-mode"]:checked') || {}).value || 'replace';
- const clearFirst = mode === 'replace';
-
- if (!query) { showNotification('Please enter a search query.', 'error'); return; }
- if (sources.length === 0) { showNotification('Please select at least one source.', 'error'); return; }
-
- saveFetchPrefs();
-
- const btn = document.getElementById('fetch-btn');
- setLoading(btn, true);
- document.getElementById('fetch-source-report').style.display = 'none';
- setStatus(
- 'fetch-status',
- clearFirst
- ? `Starting fresh: clearing collection, then fetching from ${sources.length} source(s)…`
- : `Adding to collection from ${sources.length} source(s)…`,
- 'info'
- );
-
- startProgressPolling('fetch', 'fetch-progress-fill', 'fetch-progress-label', 'fetch-progress-wrap',
- (done, total) => `${done} of ${total} source(s) done`);
-
- let data;
- try {
- data = await apiCall('/api/fetch-articles-multi', {
- method: 'POST',
- body: {
- sources,
- query,
- max_results: maxResults,
- email: email || null,
- clear_first: clearFirst,
- },
- });
- } catch (e) {
- setStatus('fetch-status', `Fetch failed: ${e.message}`, 'error');
- showNotification(`Fetch failed: ${e.message}`, 'error');
- setLoading(btn, false);
  return;
  }
+ clearInterval(interval);
+ fill.style.width = '100%';
+ setTimeout(() => { wrap.style.display = 'none'; fill.style.width = '0%'; }, 800);
+ if (p.error) {
+ reject(new Error(p.error));
+ } else {
+ resolve(p.result || {});
+ }
+ } catch (e) {
+ clearInterval(interval);
+ reject(e);
+ }
+ }, 500);
+ });
+}
 
- setLoading(btn, false);
-    // After a fetch, align embed checkbox with the mode that was just used.
+function applyFetchResult(data, sources) {
  syncOnlyMissingFromFetchMode();
  saveFetchPrefs();
  updateNavStats();
@@ -377,6 +341,66 @@ async function doFetch() {
  }
 }
 
+async function doFetch() {
+ const sources = Array.from(
+ document.querySelectorAll('#source-option-grid input[type="checkbox"]:checked')
+ ).map(cb => cb.value);
+ const query = document.getElementById('fetch-query').value.trim();
+ const maxResults = parseInt(document.getElementById('fetch-max').value, 10);
+ const email = document.getElementById('fetch-email').value.trim();
+ const mode = (document.querySelector('input[name="fetch-mode"]:checked') || {}).value || 'replace';
+ const clearFirst = mode === 'replace';
+
+ if (!query) { showNotification('Please enter a search query.', 'error'); return; }
+ if (sources.length === 0) { showNotification('Please select at least one source.', 'error'); return; }
+
+ saveFetchPrefs();
+
+ const btn = document.getElementById('fetch-btn');
+ setLoading(btn, true);
+ document.getElementById('fetch-source-report').style.display = 'none';
+ setStatus(
+ 'fetch-status',
+ clearFirst
+ ? `Starting fresh: clearing collection, then fetching from ${sources.length} source(s)…`
+ : `Adding to collection from ${sources.length} source(s)…`,
+ 'info'
+ );
+
+ try {
+ const started = await apiCall('/api/fetch-articles-multi', {
+ method: 'POST',
+ body: {
+ sources,
+ query,
+ max_results: maxResults,
+ email: email || null,
+ clear_first: clearFirst,
+ },
+ });
+ // 202 → {status: started}; poll for result. (wait=true legacy returns full body.)
+ let data = started;
+ if (started && started.status === 'started') {
+ data = await waitForJob(
+ 'fetch', 'fetch-progress-fill', 'fetch-progress-label', 'fetch-progress-wrap',
+ (done, total) => `${done} of ${total} source(s) done`
+ );
+ }
+ applyFetchResult(data, sources);
+ } catch (e) {
+ const msg = e.message || '';
+ if (msg.toLowerCase().includes('already running')) {
+ setStatus('fetch-status', 'A fetch is already running.', 'warning');
+ showNotification('A fetch is already running.', 'warning');
+ } else {
+ setStatus('fetch-status', `Fetch failed: ${msg}`, 'error');
+ showNotification(`Fetch failed: ${msg}`, 'error');
+ }
+ } finally {
+ setLoading(btn, false);
+ }
+}
+
 async function doCreateEmbeddings() {
  const model = document.getElementById('embedding-model').value;
  const onlyMissing = document.getElementById('only-missing').checked;
@@ -384,14 +408,19 @@ async function doCreateEmbeddings() {
  saveFetchPrefs();
  setLoading(btn, true);
  setStatus('embeddings-status', 'Creating embeddings… this may take a few minutes on large collections.', 'info');
- startProgressPolling('embed', 'embed-progress-fill', 'embed-progress-label', 'embed-progress-wrap',
- (done, total, pct) => total > 0 ? `${done} / ${total} articles (${pct}%)` : 'Loading model…');
 
  try {
- const data = await apiCall('/api/create-embeddings', {
+ const started = await apiCall('/api/create-embeddings', {
  method: 'POST',
  body: { model, only_missing: onlyMissing },
  });
+ let data = started;
+ if (started && started.status === 'started') {
+ data = await waitForJob(
+ 'embed', 'embed-progress-fill', 'embed-progress-label', 'embed-progress-wrap',
+ (done, total, pct) => total > 0 ? `${done} / ${total} articles (${pct}%)` : 'Loading model…'
+ );
+ }
  const secs = data.seconds != null ? `${data.seconds}s` : '?';
  const device = data.device || 'cpu';
  const created = data.embeddings_created ?? data.articles_processed;
@@ -406,8 +435,14 @@ async function doCreateEmbeddings() {
  showNotification('Embeddings created successfully!', 'success');
  loadPageData();
  } catch (e) {
- setStatus('embeddings-status', `Error: ${e.message}`, 'error');
- showNotification(`Embeddings failed: ${e.message}`, 'error');
+ const msg = e.message || '';
+ if (msg.toLowerCase().includes('already running')) {
+ setStatus('embeddings-status', 'Embedding is already running.', 'warning');
+ showNotification('An embedding job is already running.', 'warning');
+ } else {
+ setStatus('embeddings-status', `Error: ${msg}`, 'error');
+ showNotification(`Embeddings failed: ${msg}`, 'error');
+ }
  } finally {
  setLoading(btn, false);
  }

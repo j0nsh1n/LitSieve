@@ -7,7 +7,7 @@ sdk: docker
 app_port: 7860
 ---
 
-# Literature Research Aide 📚 — v3.3.0
+# Literature Research Aide 📚 — v3.5.0
 
 A multi-user web app for teachers and students to find, screen, and rank
 research papers across many academic databases using semantic embeddings,
