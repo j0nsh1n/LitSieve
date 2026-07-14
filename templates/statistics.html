@@ -24,6 +24,22 @@
  </div>
 </section>
 
+<section class="card">
+ <div class="screening-report-header">
+ <div>
+ <h2 class="screening-report-title">Screening report</h2>
+ <p class="info-text screening-report-lead">Show-your-work counts for hand-ins (collected, excluded by reason, included set).</p>
+ </div>
+ <button type="button" id="screening-report-btn" class="btn btn-secondary btn-sm">Screening report</button>
+ </div>
+ <div id="screening-report-panel" class="screening-report-panel" hidden>
+ <pre id="screening-report-body" class="screening-report-body"></pre>
+ <p class="screening-report-actions">
+ <a id="screening-report-download" class="btn btn-secondary btn-sm" href="/api/screening-report?format=txt">Download (.txt)</a>
+ </p>
+ </div>
+</section>
+
 <section class="card" id="source-breakdown-section" style="display:none;">
  <h2>Articles by Source</h2>
  <div id="source-breakdown"></div>
@@ -50,5 +66,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/statistics.js"></script>
+<script src="/static/js/statistics.js?v=20260713b"></script>
 {% endblock %}

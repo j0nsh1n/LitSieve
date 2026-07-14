@@ -83,6 +83,7 @@ function setStatus(elementId, message, type = 'info') {
 }
 
 // === Build article link based on source ===
+// Keep in sync with SOURCE_URL in citations.py
 function getArticleUrl(articleId, source) {
     switch (source) {
         case 'pubmed':

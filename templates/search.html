@@ -123,12 +123,21 @@
 <section class="card">
  <h2>Export your library</h2>
  <p class="info-text">Download your whole collection (not just the last search), including cluster labels,
- exclusion status, stars, and private notes. Useful for hand-ins or spreadsheet screening logs.</p>
- <div class="export-row">
- <button type="button" class="btn btn-secondary btn-sm" data-lib-export="all">All articles (CSV)</button>
- <button type="button" class="btn btn-secondary btn-sm" data-lib-export="included">Included only</button>
- <button type="button" class="btn btn-secondary btn-sm" data-lib-export="excluded">Screened out only</button>
- <button type="button" class="btn btn-secondary btn-sm" data-lib-export="starred">Starred only</button>
+ exclusion status, stars, and private notes. Useful for hand-ins or spreadsheet screening logs.
+ Choose a scope, then a format. RIS and BibTeX import into Zotero, EndNote, or Mendeley.</p>
+ <div class="export-scope-row">
+ <label for="lib-export-scope" class="help-text export-scope-label">Scope</label>
+ <select id="lib-export-scope" class="export-scope-select">
+ <option value="all">All articles</option>
+ <option value="included">Included only</option>
+ <option value="excluded">Screened out only</option>
+ <option value="starred">Starred only</option>
+ </select>
+ </div>
+ <div class="export-row export-row-formats">
+ <button type="button" class="btn btn-secondary btn-sm" data-lib-export-format="csv">CSV</button>
+ <button type="button" class="btn btn-secondary btn-sm" data-lib-export-format="ris">RIS (Zotero/EndNote)</button>
+ <button type="button" class="btn btn-secondary btn-sm" data-lib-export-format="bibtex">BibTeX</button>
  </div>
 </section>
 
@@ -154,5 +163,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/search.js?v=20260709e"></script>
+<script src="/static/js/search.js?v=20260713b"></script>
 {% endblock %}

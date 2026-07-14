@@ -1023,6 +1023,68 @@ input[type="range"]::-moz-range-thumb:hover {
 .export-row {
     display: flex;
     gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.export-row-formats {
+    margin-top: 0.75rem;
+}
+
+.export-scope-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.export-scope-label {
+    margin: 0;
+}
+
+.export-scope-select {
+    width: auto;
+    min-width: 10rem;
+}
+
+/* Screening report (Duplicates page) */
+.screening-report-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.screening-report-title {
+    margin-bottom: 0.25rem;
+}
+
+.screening-report-lead {
+    margin: 0;
+}
+
+.screening-report-panel {
+    margin-top: 1rem;
+    padding: 1rem;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    background: var(--surface);
+}
+
+.screening-report-panel[hidden] {
+    display: none;
+}
+
+.screening-report-body {
+    margin: 0;
+    white-space: pre-wrap;
+    font-family: inherit;
+    font-size: 0.92rem;
+    line-height: 1.45;
+}
+
+.screening-report-actions {
+    margin: 0.75rem 0 0;
 }
 
 /* === Article entries (details/summary) === */

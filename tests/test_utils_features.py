@@ -10,6 +10,8 @@ from utils import (
     duplicate_quality_key,
     coverage_suggestions,
     build_cluster_briefing,
+    build_screening_report,
+    format_screening_report_txt,
 )
 
 
@@ -111,4 +113,79 @@ def test_embedding_status_missing_count(tmp_path):
     assert st["with_embeddings"] == 1
     assert st["missing_embeddings"] == 1
     assert st["model"] == "general"
+    db.close()
+
+
+def test_screening_report_empty_and_seeded(tmp_path):
+    empty = ArticleDatabase(db_path=str(tmp_path / "empty.db"))
+    er = build_screening_report(empty)
+    assert er["total_articles"] == 0
+    assert er["by_source"] == {}
+    assert er["with_embeddings"] == 0
+    assert er["excluded"] == {"duplicate": 0, "cluster": 0, "manual": 0, "total": 0}
+    assert er["included"] == 0
+    assert er["starred"] == 0
+    assert er["clusters"] == 0
+    empty.close()
+
+    db = ArticleDatabase(db_path=str(tmp_path / "report.db"))
+    articles = []
+    for i in range(4):
+        articles.append({
+            "article_id": str(i + 1),
+            "source": "pubmed",
+            "title": f"P{i}",
+            "abstract": "A",
+            "year": "2020",
+            "authors": [],
+            "journal": "J",
+        })
+    for i in range(2):
+        articles.append({
+            "article_id": str(i + 10),
+            "source": "arxiv",
+            "title": f"A{i}",
+            "abstract": "B",
+            "year": "2021",
+            "authors": [],
+            "journal": "J",
+        })
+    db.insert_articles(articles)
+    db.insert_embeddings({
+        ("1", "pubmed"): np.array([1.0, 0.0], dtype=np.float32),
+        ("2", "pubmed"): np.array([0.0, 1.0], dtype=np.float32),
+    }, model_name="general")
+    db.exclude_articles([("1", "pubmed")], reason="duplicate")
+    db.exclude_articles([("2", "pubmed")], reason="cluster")
+    db.exclude_articles([("3", "pubmed")], reason="manual")
+    db.upsert_note("4", "pubmed", note="keep", starred=True)
+    # Two real clusters + noise (-1)
+    db.insert_clusters(
+        {
+            ("1", "pubmed"): (0, "Theme A"),
+            ("2", "pubmed"): (0, "Theme A"),
+            ("3", "pubmed"): (1, "Theme B"),
+            ("10", "arxiv"): (-1, "Noise"),
+        },
+        cluster_titles={0: "P0", 1: "P2", -1: "A0"},
+    )
+
+    r = build_screening_report(db)
+    assert r["total_articles"] == 6
+    assert r["by_source"] == {"pubmed": 4, "arxiv": 2}
+    assert r["with_embeddings"] == 2
+    assert r["excluded"] == {"duplicate": 1, "cluster": 1, "manual": 1, "total": 3}
+    assert r["included"] == 3
+    assert r["starred"] == 1
+    assert r["clusters"] == 2
+
+    txt = format_screening_report_txt(r)
+    assert "SCREENING REPORT - 6 papers collected" in txt
+    assert "Duplicates removed (kept best copy): 1" in txt
+    assert "Excluded as off-topic (cluster triage): 1" in txt
+    assert "Excluded manually: 1" in txt
+    assert "INCLUDED in final set: 3" in txt
+    assert "Starred: 1" in txt
+    assert "With embeddings: 2" in txt
+    assert "Clusters (excl. noise): 2" in txt
     db.close()

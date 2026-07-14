@@ -1,5 +1,5 @@
 """
-FastAPI Application — Literature Research Aide v3.2.0
+FastAPI Application — Literature Research Aide v3.3.0
 Multi-user web interface for literature search and analysis.
 """
 
@@ -39,7 +39,13 @@ from auth import (
     get_current_user,
     validate_login_name,
 )
-from utils import sort_articles, coverage_suggestions
+from utils import (
+    sort_articles,
+    coverage_suggestions,
+    build_screening_report,
+    format_screening_report_txt,
+)
+from citations import collection_to_ris, collection_to_bibtex
 from feature_guides import get_guide, list_guides, neighbors
 
 logging.basicConfig(
@@ -68,12 +74,12 @@ def rate_limit_key(request: Request) -> str:
 limiter = Limiter(key_func=rate_limit_key)
 
 # At top of file
-app = FastAPI(title="Literature Research Aide", version="3.2.0")
+app = FastAPI(title="Literature Research Aide", version="3.3.0")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 @app.get("/health")
 async def health():
-    return {"status": "healthy", "version": "3.2.0"}
+    return {"status": "healthy", "version": "3.3.0"}
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
@@ -651,17 +657,29 @@ async def api_export_library(
     """Export the collection with cluster membership and exclusion reasons.
 
     scope: all | included | excluded | starred
+    format: csv | txt | ris | bibtex
     """
     user = current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
     if scope not in ("all", "included", "excluded", "starred"):
         return JSONResponse(status_code=400, content={"detail": "Invalid scope"})
+    fmt = (format or "csv").lower().strip()
+    if fmt not in ("csv", "txt", "ris", "bibtex"):
+        return JSONResponse(status_code=400, content={"detail": "Invalid format"})
     uid = user["user_id"]
     p = get_pipeline(uid)
     try:
         rows = p.db.get_library_export_rows(scope=scope)
-        if format == "txt":
+        if fmt == "ris":
+            content = collection_to_ris(rows)
+            media_type = "application/x-research-info-systems"
+            filename = "library.ris"
+        elif fmt == "bibtex":
+            content = collection_to_bibtex(rows)
+            media_type = "application/x-bibtex"
+            filename = "library.bib"
+        elif fmt == "txt":
             lines = []
             for a in rows:
                 flag = "EXCLUDED" if a.get("excluded") else ("STARRED" if a.get("starred") else "INCLUDED")
@@ -705,6 +723,35 @@ async def api_export_library(
             media_type=media_type,
             headers={"Content-Disposition": f"attachment; filename={filename}"},
         )
+    except Exception as e:
+        return server_error(e)
+    finally:
+        release_pipeline(uid)
+
+
+@app.get("/api/screening-report")
+async def api_screening_report(request: Request, format: str = "json"):
+    """PRISMA-style screening accounting (read-only). format: json | txt"""
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    fmt = (format or "json").lower().strip()
+    if fmt not in ("json", "txt"):
+        return JSONResponse(status_code=400, content={"detail": "Invalid format"})
+    uid = user["user_id"]
+    p = get_pipeline(uid)
+    try:
+        report = build_screening_report(p.db)
+        if fmt == "txt":
+            content = format_screening_report_txt(report)
+            return StreamingResponse(
+                io.BytesIO(content.encode()),
+                media_type="text/plain",
+                headers={
+                    "Content-Disposition": "attachment; filename=screening_report.txt"
+                },
+            )
+        return report
     except Exception as e:
         return server_error(e)
     finally:

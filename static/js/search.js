@@ -25,10 +25,13 @@ document.addEventListener('DOMContentLoaded', () => {
  document.getElementById('export-csv').addEventListener('click', () => doExport('csv'));
  document.getElementById('export-txt').addEventListener('click', () => doExport('txt'));
 
- document.querySelectorAll('[data-lib-export]').forEach(btn => {
+ document.querySelectorAll('[data-lib-export-format]').forEach(btn => {
  btn.addEventListener('click', () => {
- const scope = btn.getAttribute('data-lib-export');
- window.location.href = `/api/export/library?scope=${encodeURIComponent(scope)}&format=csv`;
+ const format = btn.getAttribute('data-lib-export-format') || 'csv';
+ const scopeEl = document.getElementById('lib-export-scope');
+ const scope = scopeEl ? scopeEl.value : 'all';
+ window.location.href =
+ `/api/export/library?scope=${encodeURIComponent(scope)}&format=${encodeURIComponent(format)}`;
  });
  });
 
