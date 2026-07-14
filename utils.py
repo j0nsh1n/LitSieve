@@ -157,3 +157,37 @@ def coverage_suggestions(
                 "reason": "Usually useful for your selected topic(s), but you have no articles from it yet.",
             })
     return suggestions[:6]
+
+
+def build_screening_report(db) -> Dict[str, Any]:
+    """PRISMA-style accounting of the current collection.
+
+    Empty tables yield zeros naturally. Failures propagate so the endpoint
+    can log and return 500 via server_error() — never mask them as empty data.
+    """
+    return db.build_screening_report_counts()
+
+
+def format_screening_report_txt(report: Dict[str, Any]) -> str:
+    """Plain-text screening report for download / on-screen panel (one source)."""
+    total = int(report.get("total_articles") or 0)
+    by_source = report.get("by_source") or {}
+    if by_source:
+        sources_str = "; ".join(f"{src}: {n}" for src, n in sorted(by_source.items()))
+    else:
+        sources_str = "(none)"
+    excluded = report.get("excluded") or {}
+    lines = [
+        f"SCREENING REPORT - {total} papers collected",
+        f"Sources: {sources_str}",
+        f"Duplicates removed (kept best copy): {int(excluded.get('duplicate') or 0)}",
+        f"Excluded as off-topic (cluster triage): {int(excluded.get('cluster') or 0)}",
+        f"Excluded manually: {int(excluded.get('manual') or 0)}",
+        f"INCLUDED in final set: {int(report.get('included') or 0)}",
+        f"Starred: {int(report.get('starred') or 0)}",
+        f"With embeddings: {int(report.get('with_embeddings') or 0)}",
+        f"Clusters (excl. noise): {int(report.get('clusters') or 0)}",
+        "Note: counts reflect the current collection state.",
+        "",
+    ]
+    return "\n".join(lines)

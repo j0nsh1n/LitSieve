@@ -6,7 +6,8 @@
  <h1>Detect Duplicates</h1>
  <p class="subtitle"><strong>Step 3 of 4.</strong> The same paper often arrives from several databases under
  different IDs - find near-duplicates and keep the best copy of each.
- Next → <a href="/search">Search</a> to rank what you kept.</p>
+ Use the screening report for hand-in counts. Next →
+ <a href="/search">Search</a> to rank what you kept.</p>
 </section>
 
 <section class="stats-cards">
@@ -21,6 +22,22 @@
  <div class="stat-card" title="Articles you've excluded - via cluster triage, duplicate resolution, or manually. Hidden from search results but never deleted.">
  <div class="stat-value" id="stat-excluded">--</div>
  <div class="stat-label">Screened Out</div>
+ </div>
+</section>
+
+<section class="card">
+ <div class="screening-report-header">
+ <div>
+ <h2 class="screening-report-title">Screening report</h2>
+ <p class="info-text screening-report-lead">Show-your-work counts for hand-ins (collected, excluded by reason, included set).</p>
+ </div>
+ <button type="button" id="screening-report-btn" class="btn btn-secondary btn-sm">Screening report</button>
+ </div>
+ <div id="screening-report-panel" class="screening-report-panel" hidden>
+ <pre id="screening-report-body" class="screening-report-body"></pre>
+ <p class="screening-report-actions">
+ <a id="screening-report-download" class="btn btn-secondary btn-sm" href="/api/screening-report?format=txt">Download (.txt)</a>
+ </p>
  </div>
 </section>
 
@@ -50,5 +67,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/statistics.js"></script>
+<script src="/static/js/statistics.js?v=20260713d"></script>
 {% endblock %}

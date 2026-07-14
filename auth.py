@@ -85,11 +85,16 @@ def verify_password(plain: str, hashed: str) -> bool:
     return pwd_context.verify(plain, hashed)
 
 
-def create_token(user_id: str, username: str) -> str:
+def create_token(user_id: str, username: str, token_version: int = 0) -> str:
     if not _SECRET_KEY:
         raise RuntimeError("SECRET_KEY is not configured. Cannot create JWT tokens.")
     expire = datetime.now(timezone.utc) + timedelta(days=TOKEN_EXPIRE_DAYS)
-    payload = {"user_id": user_id, "username": username, "exp": expire}
+    payload = {
+        "user_id": user_id,
+        "username": username,
+        "tv": int(token_version or 0),
+        "exp": expire,
+    }
     return jwt.encode(payload, _SECRET_KEY, algorithm=ALGORITHM)
 
 

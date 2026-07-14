@@ -1,5 +1,5 @@
 """
-FastAPI Application — Literature Research Aide v3.2.0
+FastAPI Application — Literature Research Aide v3.5.0
 Multi-user web interface for literature search and analysis.
 """
 
@@ -39,7 +39,13 @@ from auth import (
     get_current_user,
     validate_login_name,
 )
-from utils import sort_articles, coverage_suggestions
+from utils import (
+    sort_articles,
+    coverage_suggestions,
+    build_screening_report,
+    format_screening_report_txt,
+)
+from citations import collection_to_ris, collection_to_bibtex
 from feature_guides import get_guide, list_guides, neighbors
 
 logging.basicConfig(
@@ -68,12 +74,12 @@ def rate_limit_key(request: Request) -> str:
 limiter = Limiter(key_func=rate_limit_key)
 
 # At top of file
-app = FastAPI(title="Literature Research Aide", version="3.2.0")
+app = FastAPI(title="Literature Research Aide", version="3.5.0")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 @app.get("/health")
 async def health():
-    return {"status": "healthy", "version": "3.2.0"}
+    return {"status": "healthy", "version": "3.5.0"}
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
@@ -170,12 +176,19 @@ def _ensure_progress(user_id: str) -> dict:
     """Return progress dict for user, creating it if needed. Must be called under _progress_lock."""
     if user_id not in _all_progress:
         _all_progress[user_id] = {
-            'fetch': {'active': False, 'done': 0, 'total': 0},
-            'embed': {'active': False, 'done': 0, 'total': 0},
+            'fetch': {'active': False, 'done': 0, 'total': 0, 'result': None, 'error': None},
+            'embed': {'active': False, 'done': 0, 'total': 0, 'result': None, 'error': None},
         }
         while len(_all_progress) > MAX_CACHED_USERS:
             _all_progress.popitem(last=False)
     _all_progress.move_to_end(user_id)
+    # Backfill keys if an older in-memory entry lacks them.
+    for task in ('fetch', 'embed'):
+        slot = _all_progress[user_id].setdefault(
+            task, {'active': False, 'done': 0, 'total': 0, 'result': None, 'error': None}
+        )
+        slot.setdefault('result', None)
+        slot.setdefault('error', None)
     return _all_progress[user_id]
 
 
@@ -184,8 +197,57 @@ def update_progress(user_id: str, task: str, **kwargs):
         _ensure_progress(user_id)[task].update(kwargs)
 
 
+def start_user_job(uid: str, task: str, fn, /, **kwargs) -> bool:
+    """Run fn(pipeline, **kwargs) in a thread; progress + result in _all_progress.
+
+    Returns False if a job of this task type is already active for uid.
+    The worker holds the pipeline ref until completion (release in done callback).
+    """
+    with _progress_lock:
+        p = _ensure_progress(uid)
+        if p[task].get('active'):
+            return False
+        p[task].update({
+            'active': True, 'done': 0, 'total': 0, 'result': None, 'error': None,
+        })
+
+    pipe = get_pipeline(uid)
+    loop = asyncio.get_running_loop()
+
+    def worker():
+        return fn(pipe, **kwargs)
+
+    future = loop.run_in_executor(None, worker)
+
+    def _on_done(fut):
+        try:
+            result = fut.result()
+            update_progress(uid, task, active=False, result=result, error=None)
+        except Exception as exc:
+            logger.exception("Background %s job failed for %s", task, uid)
+            update_progress(uid, task, active=False, result=None, error=str(exc))
+        finally:
+            release_pipeline(uid)
+
+    future.add_done_callback(_on_done)
+    return True
+
+
 def current_user(request: Request) -> Optional[dict]:
-    return get_current_user(request)
+    """JWT + live account check (token_version) so password change revokes old sessions."""
+    payload = get_current_user(request)
+    if not payload or not payload.get("user_id"):
+        return None
+    record = user_db.get_by_id(payload["user_id"])
+    if not record:
+        return None
+    if int(payload.get("tv", 0) or 0) != int(record.get("token_version") or 0):
+        return None
+    return {
+        "user_id": record["id"],
+        "username": record["username"],
+        "token_version": int(record.get("token_version") or 0),
+    }
 
 
 def _set_auth_cookies(response, token: str):
@@ -224,12 +286,26 @@ class SearchRequest(BaseModel):
     source_filter: Optional[List[str]] = None
     # When true, slightly prefer abstracts that mention the user's PICO terms.
     pico_boost: bool = False
+    year_min: Optional[int] = None
+    year_max: Optional[int] = None
+    # Blend TF-IDF word overlap with embedding similarity (default on).
+    lexical_boost: bool = True
 
 class SeedSearchRequest(BaseModel):
     seed: str
     top_k: int = 10
     cluster_filter: Optional[List[int]] = None
     source_filter: Optional[List[str]] = None
+    year_min: Optional[int] = None
+    year_max: Optional[int] = None
+    lexical_boost: bool = True
+
+class StarredSearchRequest(BaseModel):
+    top_k: int = 10
+    source_filter: Optional[List[str]] = None
+    cluster_filter: Optional[List[int]] = None
+    year_min: Optional[int] = None
+    year_max: Optional[int] = None
 
 class FetchRequest(BaseModel):
     source: str = "pubmed"
@@ -245,11 +321,19 @@ class MultiFetchRequest(BaseModel):
     # True = wipe collection first (default classroom "start fresh").
     # False = append / update without clearing.
     clear_first: bool = True
+    # wait=true: block until done (tests / legacy). Default: 202 + poll progress.
+    wait: bool = False
 
 class EmbeddingsRequest(BaseModel):
     model: str = "general"
     # Skip articles that already have vectors (unless the model changes).
     only_missing: bool = True
+    wait: bool = False
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+    new_password_confirm: str
 
 class NoteRequest(BaseModel):
     article_id: str
@@ -314,7 +398,9 @@ async def login_submit(
             context={"error": "Invalid username or password"},
             status_code=400,
         )
-    token = create_token(user["id"], user["username"])
+    token = create_token(
+        user["id"], user["username"], user.get("token_version", 0),
+    )
     response = RedirectResponse(url="/data-management", status_code=302)
     _set_auth_cookies(response, token)
     return response
@@ -361,7 +447,9 @@ async def register_submit(
             context={"error": "That login is already taken.", "username": username},
             status_code=400,
         )
-    token = create_token(user["id"], user["username"])
+    token = create_token(
+        user["id"], user["username"], user.get("token_version", 0),
+    )
     response = RedirectResponse(url="/data-management", status_code=302)
     _set_auth_cookies(response, token)
     return response
@@ -503,6 +591,14 @@ def _apply_pico_boost(results: List[dict], query_text: str) -> None:
     results.sort(key=lambda x: x.get("similarity_score") or 0, reverse=True)
 
 
+def _attach_notes(results: List[dict], p) -> None:
+    notes = p.db.get_notes_map()
+    for a in results:
+        n = notes.get((a.get("article_id"), a.get("source"))) or {}
+        a["note"] = n.get("note") or ""
+        a["starred"] = bool(n.get("starred"))
+
+
 @app.post("/api/search")
 async def api_search(req: SearchRequest, request: Request):
     user = current_user(request)
@@ -515,17 +611,14 @@ async def api_search(req: SearchRequest, request: Request):
             p.search_similar, req.query_text,
             top_k=req.top_k, source_filter=req.source_filter,
             cluster_filter=req.cluster_filter,
+            year_min=req.year_min, year_max=req.year_max,
+            lexical_boost=req.lexical_boost,
         )
         _attach_pico(results)
         if req.pico_boost:
             _apply_pico_boost(results, req.query_text)
         sort_articles(results, req.sort_by)
-        # Attach personal notes/stars for the results list.
-        notes = p.db.get_notes_map()
-        for a in results:
-            n = notes.get((a.get("article_id"), a.get("source"))) or {}
-            a["note"] = n.get("note") or ""
-            a["starred"] = bool(n.get("starred"))
+        _attach_notes(results, p)
         return {"results": results, "total": len(results)}
     except ValueError as e:
         return JSONResponse(status_code=400, content={"detail": str(e)})
@@ -547,18 +640,48 @@ async def api_search_seed(req: SeedSearchRequest, request: Request):
         data = await run_in_thread(
             p.search_by_seed, req.seed, req.top_k,
             req.source_filter, req.cluster_filter,
+            req.year_min, req.year_max, req.lexical_boost,
         )
         results = data["results"]
         _attach_pico(results)
-        notes = p.db.get_notes_map()
-        for a in results:
-            n = notes.get((a.get("article_id"), a.get("source"))) or {}
-            a["note"] = n.get("note") or ""
-            a["starred"] = bool(n.get("starred"))
+        _attach_notes(results, p)
         return {
             "seed": data["seed"],
             "results": results,
             "total": len(results),
+        }
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"detail": str(e)})
+    except Exception as e:
+        return server_error(e)
+    finally:
+        release_pipeline(uid)
+
+
+@app.post("/api/search/starred")
+async def api_search_starred(req: StarredSearchRequest, request: Request):
+    """Rank papers near the centroid of your starred collection."""
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    uid = user["user_id"]
+    p = get_pipeline(uid)
+    try:
+        data = await run_in_thread(
+            p.search_from_starred,
+            top_k=req.top_k,
+            source_filter=req.source_filter,
+            cluster_filter=req.cluster_filter,
+            year_min=req.year_min,
+            year_max=req.year_max,
+        )
+        results = data["results"]
+        _attach_pico(results)
+        _attach_notes(results, p)
+        return {
+            "results": results,
+            "total": len(results),
+            "seed_count": data["seed_count"],
         }
     except ValueError as e:
         return JSONResponse(status_code=400, content={"detail": str(e)})
@@ -578,6 +701,9 @@ async def api_search_export(
     source_filter: str = "",
     format: str = "csv",
     pico_boost: bool = False,
+    year_min: Optional[int] = None,
+    year_max: Optional[int] = None,
+    lexical_boost: bool = True,
 ):
     user = current_user(request)
     if not user:
@@ -593,6 +719,8 @@ async def api_search_export(
         results = await run_in_thread(
             p.search_similar, query_text, top_k=top_k, source_filter=sources,
             cluster_filter=cluster_ids,
+            year_min=year_min, year_max=year_max,
+            lexical_boost=lexical_boost,
         )
         if pico_boost:
             _attach_pico(results)
@@ -651,17 +779,29 @@ async def api_export_library(
     """Export the collection with cluster membership and exclusion reasons.
 
     scope: all | included | excluded | starred
+    format: csv | txt | ris | bibtex
     """
     user = current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
     if scope not in ("all", "included", "excluded", "starred"):
         return JSONResponse(status_code=400, content={"detail": "Invalid scope"})
+    fmt = (format or "csv").lower().strip()
+    if fmt not in ("csv", "txt", "ris", "bibtex"):
+        return JSONResponse(status_code=400, content={"detail": "Invalid format"})
     uid = user["user_id"]
     p = get_pipeline(uid)
     try:
         rows = p.db.get_library_export_rows(scope=scope)
-        if format == "txt":
+        if fmt == "ris":
+            content = collection_to_ris(rows)
+            media_type = "application/x-research-info-systems"
+            filename = "library.ris"
+        elif fmt == "bibtex":
+            content = collection_to_bibtex(rows)
+            media_type = "application/x-bibtex"
+            filename = "library.bib"
+        elif fmt == "txt":
             lines = []
             for a in rows:
                 flag = "EXCLUDED" if a.get("excluded") else ("STARRED" if a.get("starred") else "INCLUDED")
@@ -711,6 +851,35 @@ async def api_export_library(
         release_pipeline(uid)
 
 
+@app.get("/api/screening-report")
+async def api_screening_report(request: Request, format: str = "json"):
+    """PRISMA-style screening accounting (read-only). format: json | txt"""
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    fmt = (format or "json").lower().strip()
+    if fmt not in ("json", "txt"):
+        return JSONResponse(status_code=400, content={"detail": "Invalid format"})
+    uid = user["user_id"]
+    p = get_pipeline(uid)
+    try:
+        report = build_screening_report(p.db)
+        if fmt == "txt":
+            content = format_screening_report_txt(report)
+            return StreamingResponse(
+                io.BytesIO(content.encode()),
+                media_type="text/plain",
+                headers={
+                    "Content-Disposition": "attachment; filename=screening_report.txt"
+                },
+            )
+        return report
+    except Exception as e:
+        return server_error(e)
+    finally:
+        release_pipeline(uid)
+
+
 @app.post("/api/clear-articles")
 async def api_clear_articles(request: Request):
     user = current_user(request)
@@ -729,6 +898,35 @@ async def api_clear_articles(request: Request):
         release_pipeline(uid)
 
 
+def _run_multi_fetch(p, *, query, sources, max_results, email, clear_first, uid):
+    """Blocking multi-source fetch for sync wait= or background jobs."""
+    update_progress(uid, 'fetch', done=0, total=len(sources))
+    if clear_first:
+        p.db.clear_all()
+
+    def on_source_done(done, total):
+        update_progress(uid, 'fetch', done=done, total=total)
+
+    results = p.fetch_articles_parallel(
+        query=query,
+        sources=sources,
+        max_results=max_results,
+        email=email or "user@example.com",
+        progress_callback=on_source_done,
+    )
+    total = sum(v['count'] for v in results.values())
+    errors = {src: v['error'] for src, v in results.items() if v['error']}
+    ok = {src: v['count'] for src, v in results.items() if not v['error']}
+    return {
+        "status": "success",
+        "total_fetched": total,
+        "by_source": {src: v['count'] for src, v in results.items()},
+        "ok_sources": ok,
+        "errors": errors,
+        "cleared_first": clear_first,
+    }
+
+
 @app.post("/api/fetch-articles-multi")
 @limiter.limit("20/minute")
 async def api_fetch_multi(req: MultiFetchRequest, request: Request):
@@ -738,38 +936,34 @@ async def api_fetch_multi(req: MultiFetchRequest, request: Request):
     if csrf_failed(request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
     uid = user["user_id"]
+    job_kwargs = dict(
+        query=req.query,
+        sources=req.sources,
+        max_results=req.max_results,
+        email=req.email,
+        clear_first=req.clear_first,
+        uid=uid,
+    )
+    if not req.wait:
+        if not start_user_job(uid, 'fetch', _run_multi_fetch, **job_kwargs):
+            return JSONResponse(
+                status_code=409,
+                content={"detail": "A fetch is already running"},
+            )
+        return JSONResponse(status_code=202, content={"status": "started"})
+
     p = get_pipeline(uid)
-    update_progress(uid, 'fetch', active=True, done=0, total=len(req.sources))
+    update_progress(uid, 'fetch', active=True, done=0, total=len(req.sources),
+                    result=None, error=None)
     try:
-        if req.clear_first:
-            await run_in_thread(p.db.clear_all)
-
-        def on_source_done(done, total):
-            update_progress(uid, 'fetch', done=done, total=total)
-
-        results = await run_in_thread(
-            p.fetch_articles_parallel,
-            query=req.query,
-            sources=req.sources,
-            max_results=req.max_results,
-            email=req.email or "user@example.com",
-            progress_callback=on_source_done,
-        )
-        total = sum(v['count'] for v in results.values())
-        errors = {src: v['error'] for src, v in results.items() if v['error']}
-        ok = {src: v['count'] for src, v in results.items() if not v['error']}
-        return {
-            "status": "success",
-            "total_fetched": total,
-            "by_source": {src: v['count'] for src, v in results.items()},
-            "ok_sources": ok,
-            "errors": errors,
-            "cleared_first": req.clear_first,
-        }
+        result = await run_in_thread(_run_multi_fetch, p, **job_kwargs)
+        update_progress(uid, 'fetch', active=False, result=result, error=None)
+        return result
     except Exception as e:
+        update_progress(uid, 'fetch', active=False, result=None, error=str(e))
         return server_error(e)
     finally:
-        update_progress(uid, 'fetch', active=False, done=0, total=0)
+        update_progress(uid, 'fetch', active=False)
         release_pipeline(uid)
 
 
@@ -796,6 +990,31 @@ async def api_fetch(req: FetchRequest, request: Request):
         release_pipeline(uid)
 
 
+def _run_create_embeddings(p, *, model, only_missing, uid):
+    """Blocking embedding pass for sync wait= or background jobs."""
+    update_progress(uid, 'embed', done=0, total=0)
+
+    def on_batch_done(done, total):
+        update_progress(uid, 'embed', done=done, total=total)
+
+    # Engine swap happens inside create_embeddings under the pipeline lock.
+    result = p.create_embeddings(
+        model=model,
+        progress_callback=on_batch_done,
+        only_missing=only_missing,
+    ) or {}
+    stats = p.get_statistics()
+    return {
+        "status": "success",
+        "articles_processed": stats["articles_with_embeddings"],
+        "embeddings_created": result.get("embeddings_created", 0),
+        "skipped_existing": result.get("skipped_existing", 0),
+        "seconds": result.get("seconds", 0),
+        "model": result.get("model") or model,
+        "device": result.get("device") or "cpu",
+    }
+
+
 @app.post("/api/create-embeddings")
 @limiter.limit("12/minute")
 async def api_create_embeddings(req: EmbeddingsRequest, request: Request):
@@ -805,35 +1024,26 @@ async def api_create_embeddings(req: EmbeddingsRequest, request: Request):
     if csrf_failed(request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
     uid = user["user_id"]
-    p = get_pipeline(uid)
-    update_progress(uid, 'embed', active=True, done=0, total=0)
-    try:
-        def on_batch_done(done, total):
-            update_progress(uid, 'embed', done=done, total=total)
+    job_kwargs = dict(model=req.model, only_missing=req.only_missing, uid=uid)
+    if not req.wait:
+        if not start_user_job(uid, 'embed', _run_create_embeddings, **job_kwargs):
+            return JSONResponse(
+                status_code=409,
+                content={"detail": "A embed is already running"},
+            )
+        return JSONResponse(status_code=202, content={"status": "started"})
 
-        # The engine swap happens inside create_embeddings under the pipeline's
-        # engine lock, so it stays atomic with the embedding pass.
-        result = await run_in_thread(
-            p.create_embeddings,
-            model=req.model,
-            progress_callback=on_batch_done,
-            only_missing=req.only_missing,
-        )
-        stats = p.get_statistics()
-        result = result or {}
-        return {
-            "status": "success",
-            "articles_processed": stats["articles_with_embeddings"],
-            "embeddings_created": result.get("embeddings_created", 0),
-            "skipped_existing": result.get("skipped_existing", 0),
-            "seconds": result.get("seconds", 0),
-            "model": result.get("model") or req.model,
-            "device": result.get("device") or "cpu",
-        }
+    p = get_pipeline(uid)
+    update_progress(uid, 'embed', active=True, done=0, total=0, result=None, error=None)
+    try:
+        result = await run_in_thread(_run_create_embeddings, p, **job_kwargs)
+        update_progress(uid, 'embed', active=False, result=result, error=None)
+        return result
     except Exception as e:
+        update_progress(uid, 'embed', active=False, result=None, error=str(e))
         return server_error(e)
     finally:
-        update_progress(uid, 'embed', active=False, done=0, total=0)
+        update_progress(uid, 'embed', active=False)
         release_pipeline(uid)
 
 
@@ -1096,6 +1306,49 @@ async def api_coverage(req: CoverageRequest, request: Request):
         return server_error(e)
     finally:
         release_pipeline(uid)
+
+
+@app.post("/api/change-password")
+async def api_change_password(req: ChangePasswordRequest, request: Request):
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+
+    record = user_db.get_by_id(user["user_id"])
+    if not record or not verify_password(req.current_password, record["hashed_password"]):
+        return JSONResponse(status_code=400, content={"detail": "Incorrect password"})
+
+    new_pw = req.new_password or ""
+    if len(new_pw) < 8:
+        return JSONResponse(
+            status_code=400,
+            content={"detail": "Password must be at least 8 characters"},
+        )
+    if len(new_pw.encode("utf-8")) > 72:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "detail": "Password is too long (max 72 bytes for secure hashing)"
+            },
+        )
+    if new_pw != (req.new_password_confirm or ""):
+        return JSONResponse(
+            status_code=400,
+            content={"detail": "Passwords do not match"},
+        )
+
+    if not user_db.update_password(user["user_id"], hash_password(new_pw)):
+        return JSONResponse(status_code=400, content={"detail": "Could not update password"})
+
+    fresh = user_db.get_by_id(user["user_id"])
+    token = create_token(
+        fresh["id"], fresh["username"], fresh.get("token_version", 0),
+    )
+    response = JSONResponse(content={"status": "success"})
+    _set_auth_cookies(response, token)
+    return response
 
 
 @app.post("/api/delete-account")

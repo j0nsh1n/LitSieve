@@ -3,8 +3,9 @@
 {% block content %}
 <section class="page-header">
  <h1>Data Management</h1>
- <p class="subtitle"><strong>Step 1 of 4.</strong> Select topics, fetch papers, then create embeddings.
- When you’re done → <a href="/clusters">Clusters</a> to group and screen topics.</p>
+ <p class="subtitle"><strong>Step 1 of 4.</strong> Select topics, fetch papers, then create embeddings
+ (both jobs keep running if you leave the tab open). When you’re done →
+ <a href="/clusters">Clusters</a> to group and screen topics.</p>
 </section>
 
 <!-- Step 1: Topics -->
@@ -35,7 +36,7 @@
 <!-- Step 3: Fetch -->
 <section class="card">
  <h2>3. Fetch Articles</h2>
- <p class="info-text">Runs your query against every selected source <strong>in parallel</strong> and saves
+ <p class="info-text">Runs your query against every selected source <strong>in parallel</strong> (background job with a progress bar) and saves
  title, abstract, authors, year, and journal into your private database. Records without an abstract are
  skipped (later steps need text). Your last query, sources, and email are remembered in this browser.</p>
  <div class="form-row">
@@ -111,5 +112,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/data_management.js?v=20260709n"></script>
+<script src="/static/js/data_management.js?v=20260713d"></script>
 {% endblock %}

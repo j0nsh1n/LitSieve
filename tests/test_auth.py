@@ -25,3 +25,11 @@ def test_expired_token_is_rejected():
     payload = {"user_id": "u", "username": "bob", "exp": expired}
     token = jwt.encode(payload, auth._SECRET_KEY, algorithm=auth.ALGORITHM)
     assert auth.decode_token(token) is None
+
+
+def test_create_token_includes_token_version():
+    token = auth.create_token("user-123", "alice", token_version=3)
+    payload = auth.decode_token(token)
+    assert payload is not None
+    assert payload["tv"] == 3
+    assert payload["user_id"] == "user-123"

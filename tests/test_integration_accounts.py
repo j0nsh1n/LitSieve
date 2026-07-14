@@ -96,12 +96,19 @@ def _register(client, username, password="tpw-fixture-0001"):
     assert client.cookies.get("csrf_token")
 
 
-def _fetch(client, query="diabetes"):
+def _fetch(client, query="diabetes", wait=True):
     # State-changing endpoint: send the CSRF header matching the cookie.
+    # wait=True keeps the historical synchronous response shape for assertions.
     csrf = client.cookies.get("csrf_token")
     return client.post(
         "/api/fetch-articles-multi",
-        json={"sources": ["pubmed"], "query": query, "max_results": 5, "email": None},
+        json={
+            "sources": ["pubmed"],
+            "query": query,
+            "max_results": 5,
+            "email": None,
+            "wait": wait,
+        },
         headers={"X-CSRF-Token": csrf},
     )
 
@@ -150,7 +157,13 @@ def test_csrf_required_for_state_change(app_module):
     # Same request as _fetch but WITHOUT the X-CSRF-Token header must be refused.
     resp = alice.post(
         "/api/fetch-articles-multi",
-        json={"sources": ["pubmed"], "query": "x", "max_results": 5, "email": None},
+        json={
+            "sources": ["pubmed"],
+            "query": "x",
+            "max_results": 5,
+            "email": None,
+            "wait": True,
+        },
     )
     assert resp.status_code == 403
 
@@ -223,3 +236,128 @@ def test_wrong_password_is_rejected(app_module):
     )
     assert resp.status_code == 400
     assert not c.cookies.get("access_token")
+
+
+def test_change_password_revokes_other_sessions(app_module):
+    main = app_module
+    first = TestClient(main.app)
+    second = TestClient(main.app)
+    _register(first, "pwchanger")
+
+    # Second client logs in with the same credentials (separate session cookies).
+    r = second.post(
+        "/login",
+        data={"username": "pwchanger", "password": "tpw-fixture-0001"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 302
+    assert second.get("/api/statistics").status_code == 200
+    assert first.get("/api/statistics").status_code == 200
+
+    csrf = first.cookies.get("csrf_token")
+    r = first.post(
+        "/api/change-password",
+        json={
+            "current_password": "tpw-fixture-0001",
+            "new_password": "tpw-fixture-0002",
+            "new_password_confirm": "tpw-fixture-0002",
+        },
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert r.status_code == 200, r.text
+
+    # First client got a fresh token and still works; second is revoked.
+    assert first.get("/api/statistics").status_code == 200
+    assert second.get("/api/statistics").status_code == 401
+
+    # New password works; old does not.
+    second.cookies.clear()
+    assert second.post(
+        "/login",
+        data={"username": "pwchanger", "password": "tpw-fixture-0001"},
+        follow_redirects=False,
+    ).status_code == 400
+    assert second.post(
+        "/login",
+        data={"username": "pwchanger", "password": "tpw-fixture-0002"},
+        follow_redirects=False,
+    ).status_code == 302
+
+    # bcrypt 72-byte limit: 100-char password rejected.
+    csrf = first.cookies.get("csrf_token")
+    r = first.post(
+        "/api/change-password",
+        json={
+            "current_password": "tpw-fixture-0002",
+            "new_password": "x" * 100,
+            "new_password_confirm": "x" * 100,
+        },
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert r.status_code == 400
+
+
+def test_fetch_async_job_and_conflict(app_module):
+    """POST without wait → 202; poll progress for result; active slot → 409."""
+    import time
+
+    main = app_module
+    c = TestClient(main.app)
+    _register(c, "jobuser")
+    csrf = c.cookies.get("csrf_token")
+    uid = main.user_db.get_by_username("jobuser")["id"]
+
+    # Force an in-flight job so the next start is rejected (deterministic under TestClient).
+    with main._progress_lock:
+        main._ensure_progress(uid)["fetch"].update(
+            {"active": True, "done": 0, "total": 1, "result": None, "error": None}
+        )
+
+    r_conflict = c.post(
+        "/api/fetch-articles-multi",
+        json={
+            "sources": ["pubmed"],
+            "query": "blocked",
+            "max_results": 5,
+            "email": None,
+            "wait": False,
+        },
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert r_conflict.status_code == 409
+    assert "already running" in r_conflict.json()["detail"].lower()
+
+    with main._progress_lock:
+        main._ensure_progress(uid)["fetch"]["active"] = False
+
+    r = c.post(
+        "/api/fetch-articles-multi",
+        json={
+            "sources": ["pubmed"],
+            "query": "async",
+            "max_results": 5,
+            "email": None,
+            "wait": False,
+        },
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert r.status_code == 202, r.text
+    assert r.json()["status"] == "started"
+
+    result = None
+    err = None
+    deadline = time.time() + 5
+    while time.time() < deadline:
+        prog = c.get("/api/progress").json()
+        fetch = prog.get("fetch") or {}
+        if not fetch.get("active"):
+            result = fetch.get("result")
+            err = fetch.get("error")
+            break
+        time.sleep(0.05)
+
+    assert result is not None, f"job never completed (error={err!r})"
+    assert result.get("total_fetched") == 1
+    # Pipeline refcount released after job done callback.
+    assert main._pipeline_refcounts.get(uid, 0) == 0
+

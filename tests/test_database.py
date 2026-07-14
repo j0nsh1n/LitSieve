@@ -124,3 +124,15 @@ def test_embeddings_roundtrip_without_pickle(article_db):
     assert ids == [("1", "pubmed")]
     assert embeddings.shape == (1, 8)
     np.testing.assert_array_equal(embeddings[0], vec)
+
+
+def test_update_password_bumps_token_version(user_db):
+    u = user_db.create_user("pwuser", "hash-old")
+    assert u["token_version"] == 0
+    assert user_db.get_by_username("pwuser")["token_version"] == 0
+    assert user_db.update_password(u["id"], "hash-new") is True
+    row = user_db.get_by_id(u["id"])
+    assert row["hashed_password"] == "hash-new"
+    assert row["token_version"] == 1
+    assert user_db.update_password(u["id"], "hash-newer") is True
+    assert user_db.get_by_id(u["id"])["token_version"] == 2

@@ -11,7 +11,39 @@ document.addEventListener('DOMContentLoaded', () => {
 
  document.getElementById('detect-btn').addEventListener('click', doDetectDuplicates);
  document.getElementById('resolve-btn').addEventListener('click', doResolveAll);
+
+ const reportBtn = document.getElementById('screening-report-btn');
+ if (reportBtn) {
+ reportBtn.addEventListener('click', loadScreeningReport);
+ }
 });
+
+async function loadScreeningReport() {
+ const btn = document.getElementById('screening-report-btn');
+ const panel = document.getElementById('screening-report-panel');
+ const body = document.getElementById('screening-report-body');
+ if (!panel || !body) return;
+ setLoading(btn, true);
+ try {
+ // Same text as Download (.txt) — one source of truth on the server.
+ const response = await fetch('/api/screening-report?format=txt', {
+ credentials: 'same-origin',
+ });
+ if (!response.ok) {
+ if (response.status === 401) {
+ window.location.href = '/login';
+ throw new Error('Not authenticated');
+ }
+ throw new Error('Request failed');
+ }
+ body.textContent = (await response.text()).trimEnd();
+ panel.hidden = false;
+ } catch (e) {
+ showNotification(`Screening report failed: ${e.message}`, 'error');
+ } finally {
+ setLoading(btn, false);
+ }
+}
 
 async function loadStatistics() {
  try {

@@ -567,6 +567,16 @@ class ArticleDatabase:
             for r in rows
         }
 
+    def get_starred_keys(self) -> List[Tuple[str, str]]:
+        """Keys of notes marked starred=1 (order stable by article_id, source)."""
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                "SELECT article_id, source FROM notes WHERE starred = 1 "
+                "ORDER BY article_id, source"
+            )
+            return [(r[0], r[1]) for r in cursor.fetchall()]
+
     def exclude_articles(self, keys: List[Tuple[str, str]], reason: str = 'manual') -> int:
         """Mark articles as screened out (excluded from search/dedup).
 
@@ -750,6 +760,54 @@ class ArticleDatabase:
             'num_clusters': cluster_count,
             'excluded_articles': excluded_count,
             'sources': sources
+        }
+
+    def build_screening_report_counts(self) -> Dict:
+        """Counts for PRISMA-style screening report (empty DB → all zeros)."""
+        with self._lock:
+            cursor = self.conn.cursor()
+
+            cursor.execute("SELECT COUNT(*) FROM articles")
+            total_articles = int(cursor.fetchone()[0] or 0)
+
+            cursor.execute("SELECT source, COUNT(*) FROM articles GROUP BY source")
+            by_source = {row[0]: int(row[1]) for row in cursor.fetchall()}
+
+            cursor.execute("SELECT COUNT(*) FROM embeddings")
+            with_embeddings = int(cursor.fetchone()[0] or 0)
+
+            cursor.execute(
+                "SELECT reason, COUNT(*) FROM screening GROUP BY reason"
+            )
+            reason_rows = cursor.fetchall()
+            excluded = {"duplicate": 0, "cluster": 0, "manual": 0, "total": 0}
+            for reason, count in reason_rows:
+                n = int(count or 0)
+                key = (reason or "manual").strip().lower()
+                if key in ("duplicate", "cluster", "manual"):
+                    excluded[key] += n
+                else:
+                    # Unknown reasons still count toward total and manual bucket.
+                    excluded["manual"] += n
+                excluded["total"] += n
+
+            cursor.execute("SELECT COUNT(*) FROM notes WHERE starred = 1")
+            starred = int(cursor.fetchone()[0] or 0)
+
+            cursor.execute(
+                "SELECT COUNT(DISTINCT cluster_id) FROM clusters WHERE cluster_id != -1"
+            )
+            clusters = int(cursor.fetchone()[0] or 0)
+
+        included = max(0, total_articles - excluded["total"])
+        return {
+            "total_articles": total_articles,
+            "by_source": by_source,
+            "with_embeddings": with_embeddings,
+            "excluded": excluded,
+            "included": included,
+            "starred": starred,
+            "clusters": clusters,
         }
 
     def close(self):

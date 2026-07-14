@@ -407,127 +407,201 @@ class LiteratureSearchPipeline:
             'heatmap': fig_heatmap
         }
 
+    def _candidate_pool(
+        self,
+        source_filter: Optional[List[str]] = None,
+        cluster_filter: Optional[List[int]] = None,
+        year_min: Optional[int] = None,
+        year_max: Optional[int] = None,
+        extra_exclude: Optional[set] = None,
+    ) -> Tuple[List[Tuple[str, str]], np.ndarray, Dict]:
+        """Embeddings + metadata after screening / source / cluster / year filters."""
+        from utils import parse_year
+
+        article_ids, article_embeddings = self.db.get_all_embeddings()
+        empty_meta: Dict = {}
+        if len(article_ids) == 0:
+            return [], article_embeddings, empty_meta
+
+        excluded = set(self.db.get_excluded_keys())
+        if extra_exclude:
+            excluded |= set(extra_exclude)
+        if excluded:
+            keep = [i for i, key in enumerate(article_ids) if key not in excluded]
+            if not keep:
+                return [], article_embeddings[:0], empty_meta
+            article_ids = [article_ids[i] for i in keep]
+            article_embeddings = article_embeddings[keep]
+
+        if source_filter:
+            allowed = set(source_filter)
+            keep = [i for i, (_, src) in enumerate(article_ids) if src in allowed]
+            if not keep:
+                return [], article_embeddings[:0], empty_meta
+            article_ids = [article_ids[i] for i in keep]
+            article_embeddings = article_embeddings[keep]
+
+        articles_all = self.db.get_all_articles_with_clusters()
+
+        if cluster_filter:
+            wanted = set(cluster_filter)
+            keep = [
+                i for i, key in enumerate(article_ids)
+                if (articles_all.get(key) or {}).get('cluster_id') in wanted
+            ]
+            if not keep:
+                return [], article_embeddings[:0], empty_meta
+            article_ids = [article_ids[i] for i in keep]
+            article_embeddings = article_embeddings[keep]
+
+        # When either year bound is set, unknown/unparseable years are excluded.
+        if year_min is not None or year_max is not None:
+            keep = []
+            for i, key in enumerate(article_ids):
+                y = parse_year((articles_all.get(key) or {}).get('year'))
+                if y == 0:
+                    continue
+                if year_min is not None and y < year_min:
+                    continue
+                if year_max is not None and y > year_max:
+                    continue
+                keep.append(i)
+            if not keep:
+                return [], article_embeddings[:0], empty_meta
+            article_ids = [article_ids[i] for i in keep]
+            article_embeddings = article_embeddings[keep]
+
+        return article_ids, article_embeddings, articles_all
+
+    @staticmethod
+    def _minmax(values: List[float]) -> List[float]:
+        if not values:
+            return []
+        lo, hi = min(values), max(values)
+        if hi - lo < 1e-12:
+            return [0.5] * len(values)
+        return [(v - lo) / (hi - lo) for v in values]
+
+    def _hybrid_rerank(
+        self,
+        query_text: str,
+        ranked: List[Tuple[Tuple[str, str], float]],
+        articles_all: Dict,
+        top_k: int,
+    ) -> List[Dict]:
+        """Blend semantic cosine with TF-IDF lexical scores; cut to top_k."""
+        from sklearn.feature_extraction.text import TfidfVectorizer
+        from sklearn.metrics.pairwise import cosine_similarity as sk_cosine
+
+        keys = [k for k, _ in ranked]
+        sem_scores = [float(s) for _, s in ranked]
+        docs = []
+        for key in keys:
+            a = articles_all.get(key) or {}
+            docs.append(f"{a.get('title') or ''} {a.get('abstract') or ''}".strip())
+
+        try:
+            vec = TfidfVectorizer(stop_words='english', ngram_range=(1, 2))
+            mat = vec.fit_transform(docs)
+            q = vec.transform([query_text or ''])
+            lex = sk_cosine(q, mat).ravel().tolist()
+        except Exception as e:
+            logger.warning("Lexical boost failed (%s); pure semantic ranking.", e)
+            lex = None
+
+        if lex is None:
+            # Keep semantic order; expose neutral lexical scores.
+            lex_norm = [0.5] * len(sem_scores)
+            order = list(range(len(keys)))
+        else:
+            sem_norm = self._minmax(sem_scores)
+            lex_norm = self._minmax(lex)
+            blended = [0.7 * s + 0.3 * L for s, L in zip(sem_norm, lex_norm)]
+            order = sorted(range(len(keys)), key=lambda i: blended[i], reverse=True)
+
+        out: List[Dict] = []
+        for i in order[:top_k]:
+            key = keys[i]
+            if key not in articles_all:
+                continue
+            article = dict(articles_all[key])
+            article['similarity_score'] = float(sem_scores[i])
+            article['lexical_score'] = round(float(lex_norm[i]), 4)
+            out.append(article)
+        return out
+
     def search_similar(
         self,
         query_text: str,
         top_k: int = 10,
         source_filter: Optional[List[str]] = None,
         cluster_filter: Optional[List[int]] = None,
+        year_min: Optional[int] = None,
+        year_max: Optional[int] = None,
+        lexical_boost: bool = True,
+        query_embedding: Optional[np.ndarray] = None,
+        extra_exclude: Optional[set] = None,
     ) -> List[Dict]:
         """
-        Search for articles similar to a query
+        Search for articles similar to a query (or a provided query embedding).
 
-        Args:
-            query_text: User's study description or search query
-            top_k: Number of results to return
-            source_filter: If given, only rank articles whose source is in this
-                list. Filtering happens BEFORE the top-k cut so a narrow source
-                selection still returns up to top_k results rather than however
-                many survive a post-hoc filter.
-            cluster_filter: If given, only rank articles whose cluster_id is in
-                this list. Like source_filter, this is applied BEFORE the top-k
-                cut so the caller still gets up to top_k results from the chosen
-                clusters.
-
-        Returns:
-            List of similar articles with similarity scores
+        Filters (screening, source, cluster, year) apply BEFORE ranking.
+        When lexical_boost is True, re-rank a wider semantic shortlist with TF-IDF.
         """
         logger.info(f"\n=== Searching for similar articles ===")
         logger.info(f"Query: {query_text}\n")
 
-        article_ids, article_embeddings = self.db.get_all_embeddings()
-
+        article_ids, article_embeddings, articles_all = self._candidate_pool(
+            source_filter=source_filter,
+            cluster_filter=cluster_filter,
+            year_min=year_min,
+            year_max=year_max,
+            extra_exclude=extra_exclude,
+        )
         if len(article_ids) == 0:
-            logger.info("No embeddings found. Create embeddings first.")
+            logger.info("No embeddings match the current filters.")
             return []
 
-        # Screened-out articles (excluded clusters, resolved duplicates, manual
-        # exclusions) never participate in ranking.
-        excluded = self.db.get_excluded_keys()
-        if excluded:
-            keep = [i for i, key in enumerate(article_ids) if key not in excluded]
-            if not keep:
-                logger.info("All embedded articles are currently excluded.")
-                return []
-            article_ids = [article_ids[i] for i in keep]
-            article_embeddings = article_embeddings[keep]
+        if query_embedding is None:
+            stored_model = self.db.get_embedding_model()
+            with self._engine_lock:
+                if stored_model and stored_model != self.embedding_model_name:
+                    logger.info(
+                        "Query embedder '%s' differs from stored embeddings' model '%s'; switching.",
+                        self.embedding_model_name, stored_model,
+                    )
+                    self.embedding_engine = EmbeddingEngine(model_name=stored_model)
+                    self.embedding_model_name = stored_model
+                query_embedding = self.embedding_engine.embed_query(query_text)
 
-        # Restrict the candidate pool to the requested sources before ranking.
-        if source_filter:
-            allowed = set(source_filter)
-            keep = [i for i, (_, src) in enumerate(article_ids) if src in allowed]
-            if not keep:
-                logger.info("No embeddings match the requested sources.")
-                return []
-            article_ids = [article_ids[i] for i in keep]
-            article_embeddings = article_embeddings[keep]
-
-        # Restrict the candidate pool to the requested clusters before ranking,
-        # for the same reason as source_filter above.
-        if cluster_filter:
-            wanted = set(cluster_filter)
-            cluster_map = self.db.get_all_articles_with_clusters()
-            keep = [
-                i for i, key in enumerate(article_ids)
-                if (cluster_map.get(key) or {}).get('cluster_id') in wanted
-            ]
-            if not keep:
-                logger.info("No embeddings match the requested clusters.")
-                return []
-            article_ids = [article_ids[i] for i in keep]
-            article_embeddings = article_embeddings[keep]
-
-        # The query must be embedded with the SAME model that built the stored
-        # vectors — different models have different dimensions, and the pipeline
-        # may have been recreated with the default model since embedding (e.g.
-        # after re-login). Re-sync to the stored model before embedding.
-        #
-        # Hold the engine lock across the re-sync AND the query embedding so a
-        # concurrent create_embeddings can't swap the engine between the two and
-        # leave us embedding the query with the wrong model.
-        stored_model = self.db.get_embedding_model()
-        with self._engine_lock:
-            if stored_model and stored_model != self.embedding_model_name:
-                logger.info(
-                    "Query embedder '%s' differs from stored embeddings' model '%s'; switching.",
-                    self.embedding_model_name, stored_model,
-                )
-                self.embedding_engine = EmbeddingEngine(model_name=stored_model)
-                self.embedding_model_name = stored_model
-
-            # Create query embedding
-            query_embedding = self.embedding_engine.embed_query(query_text)
-
-        # Defensive: if the dimensions still disagree (e.g. corrupt/mixed-model
-        # embeddings), fail with a clear, actionable message instead of a cryptic
-        # FAISS assertion deep in the search call.
         if query_embedding.shape[-1] != article_embeddings.shape[1]:
             raise ValueError(
                 "Embedding dimension mismatch between the query and stored "
                 "articles. Re-create embeddings on the Data Management page."
             )
 
-        # Find similar articles
-        results = self.embedding_engine.find_similar(
+        use_hybrid = bool(lexical_boost) and bool((query_text or "").strip())
+        k0 = min(len(article_ids), max(top_k * 5, 50)) if use_hybrid else top_k
+        ranked = self.embedding_engine.find_similar(
             query_embedding,
             article_embeddings,
             article_ids,
-            top_k=top_k
+            top_k=k0,
         )
 
-        # Batch-fetch all articles with clusters for efficiency
-        articles_all_with_clusters = self.db.get_all_articles_with_clusters()
+        if use_hybrid and ranked:
+            similar_articles = self._hybrid_rerank(
+                query_text, ranked, articles_all, top_k=top_k,
+            )
+        else:
+            similar_articles = []
+            for (article_id, source), similarity in ranked[:top_k]:
+                key = (article_id, source)
+                if key in articles_all:
+                    article = dict(articles_all[key])
+                    article['similarity_score'] = float(similarity)
+                    similar_articles.append(article)
 
-        # Get full article details
-        similar_articles = []
-        for (article_id, source), similarity in results:
-            key = (article_id, source)
-            if key in articles_all_with_clusters:
-                article = articles_all_with_clusters[key]
-                article['similarity_score'] = similarity
-                similar_articles.append(article)
-
-        # Print results
         logger.info(f"Top {len(similar_articles)} most similar articles:\n")
         for i, article in enumerate(similar_articles, 1):
             logger.info(f"{i}. [{article['similarity_score']:.3f}] {article['title']}")
@@ -535,6 +609,52 @@ class LiteratureSearchPipeline:
             logger.info(f"   ID: {article['article_id']} ({article['source']})\n")
 
         return similar_articles
+
+    def search_from_starred(
+        self,
+        top_k: int = 10,
+        source_filter: Optional[List[str]] = None,
+        cluster_filter: Optional[List[int]] = None,
+        year_min: Optional[int] = None,
+        year_max: Optional[int] = None,
+    ) -> Dict:
+        """Rank papers near the centroid of the user's starred embeddings."""
+        starred_keys = self.db.get_starred_keys()
+        if not starred_keys:
+            raise ValueError("Star some papers first")
+
+        all_ids, all_emb = self.db.get_all_embeddings()
+        if len(all_ids) == 0:
+            return {"results": [], "seed_count": len(starred_keys)}
+
+        id_to_idx = {k: i for i, k in enumerate(all_ids)}
+        star_vecs = []
+        for key in starred_keys:
+            i = id_to_idx.get(key)
+            if i is not None:
+                star_vecs.append(all_emb[i])
+        if not star_vecs:
+            raise ValueError(
+                "Starred papers have no embeddings yet. Create embeddings first."
+            )
+
+        centroid = np.mean(np.stack(star_vecs, axis=0), axis=0).astype(np.float32)
+        norm = float(np.linalg.norm(centroid))
+        if norm > 0:
+            centroid = centroid / norm
+
+        results = self.search_similar(
+            query_text="",
+            top_k=top_k,
+            source_filter=source_filter,
+            cluster_filter=cluster_filter,
+            year_min=year_min,
+            year_max=year_max,
+            lexical_boost=False,
+            query_embedding=centroid,
+            extra_exclude=set(starred_keys),
+        )
+        return {"results": results, "seed_count": len(starred_keys)}
 
     def detect_duplicates(self, threshold: float = 0.95) -> List[Tuple]:
         """
@@ -644,6 +764,9 @@ class LiteratureSearchPipeline:
         top_k: int = 10,
         source_filter: Optional[List[str]] = None,
         cluster_filter: Optional[List[int]] = None,
+        year_min: Optional[int] = None,
+        year_max: Optional[int] = None,
+        lexical_boost: bool = True,
     ) -> Dict:
         """Find a local seed article (by id/title), then rank similar papers."""
         article = self.db.find_article_by_seed(seed)
@@ -653,16 +776,16 @@ class LiteratureSearchPipeline:
                 "or try a different id / title fragment."
             )
         query = f"{article.get('title') or ''}. {article.get('abstract') or ''}".strip()
+        seed_key = (article["article_id"], article["source"])
         results = self.search_similar(
             query, top_k=top_k + 1,
             source_filter=source_filter,
             cluster_filter=cluster_filter,
-        )
-        seed_key = (article["article_id"], article["source"])
-        results = [
-            r for r in results
-            if (r.get("article_id"), r.get("source")) != seed_key
-        ][:top_k]
+            year_min=year_min,
+            year_max=year_max,
+            lexical_boost=lexical_boost,
+            extra_exclude={seed_key},
+        )[:top_k]
         return {"seed": article, "results": results}
 
     def get_cluster_briefings(self) -> List[Dict]:

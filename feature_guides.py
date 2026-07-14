@@ -39,8 +39,8 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "Type a normal research query (the kind you would type into a library site).",
             "Set max results per source and choose Replace (start fresh) or Add "
             "(keep what you already have).",
-            "Fetch runs sources in parallel. You get a ✓/✗ report per database so you "
-            "can see what worked and what failed.",
+            "Fetch runs sources in parallel in the background so you can leave the "
+            "tab open; you get a ✓/✗ report per database when it finishes.",
             "Papers without an abstract are skipped - later steps (search, clusters) "
             "need text to work with.",
             "The coverage map shows how many papers you have per source and which "
@@ -53,6 +53,8 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "without wiping your first batch.",
             "Some sources need free API keys (CORE, NASA ADS). Without a key they "
             "simply skip - the others still run.",
+            "If a fetch is already running, wait for it to finish before starting "
+            "another (the app will say so).",
         ],
         "where_in_app": "Data Management → steps 1-3 (Topics, Sources, Fetch).",
         "app_path": "/data-management",
@@ -74,9 +76,12 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "Pick a model: general (fast, mixed topics), pubmedbert / biosentbert "
             "(medical), or specter (scientific papers).",
             "By default only new papers are embedded - already-processed ones are "
-            "skipped so re-runs stay fast.",
+            "skipped so re-runs stay fast. (Replace mode turns that off so a full "
+            "re-embed is easy to request.)",
             "If you switch models, everything is re-embedded so all vectors stay "
             "compatible with each other.",
+            "Embedding runs in the background with a progress bar - safe to leave "
+            "the page open while a large batch finishes.",
             "When available, work runs on your GPU (including ROCm on supported "
             "Linux setups); otherwise it uses the CPU.",
             "You see how many papers still need vectors, which model was used, "
@@ -136,7 +141,8 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "The same study often appears in PubMed, Europe PMC, OpenAlex, and more "
             "under different ids. Near-duplicate detection finds those pairs by "
             "embedding similarity. You can compare them side by side, keep one by "
-            "hand, or auto-resolve groups."
+            "hand, or auto-resolve groups. The same page can also build a "
+            "screening report (collected / excluded / included counts) for hand-ins."
         ),
         "how_it_works": [
             "Open the Duplicates page (nav label: Duplicates).",
@@ -149,14 +155,19 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "Losers are screened out (hidden from Search), not deleted. You can "
             "restore them from Clusters if needed.",
             "Use per-group “Keep this” when you want to choose the winner yourself.",
+            "Screening report shows how many papers you collected, removed as "
+            "duplicates, excluded by cluster triage, excluded manually, and kept "
+            "in the final set - downloadable as plain text.",
         ],
         "tips": [
             "Run duplicates after a multi-source fetch and before writing - cuts "
             "double-counting in bibliographies.",
             "If Auto-Resolve feels aggressive, raise the threshold or resolve "
             "groups manually.",
+            "Teachers: ask students to attach the screening report text with a "
+            "short reflection on what they excluded.",
         ],
-        "where_in_app": "Duplicates page (statistics + detection).",
+        "where_in_app": "Duplicates page (statistics + detection + screening report).",
         "app_path": "/statistics",
         "app_label": "Open Duplicates",
     },
@@ -164,31 +175,39 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
         "slug": "similarity-search",
         "title": "Similarity search",
         "icon": "🎯",
-        "tagline": "Rank your collection by meaning - not keyword bingo.",
+        "tagline": "Rank by meaning, words, years - or like your stars.",
         "summary": (
             "Describe your study in plain language or PICO fields. The app embeds "
-            "your description with the same model as your papers and ranks the "
-            "closest matches. You can also start from a seed paper already in your "
-            "collection. This searches only your fetched library, not the whole web."
+            "your description, ranks closest papers by meaning, and (by default) "
+            "slightly boosts papers that also share your exact words. You can "
+            "filter by year, start from a seed paper, or find more papers like "
+            "everything you have starred. This searches only your fetched library, "
+            "not the whole web."
         ),
         "how_it_works": [
             "Choose Text, PICO (Population / Intervention / Comparison / Outcome), "
-            "or Seed paper.",
-            "Optional: limit by source, by cluster, sort by year/title/journal, "
-            "and Prefer PICO matches for a small ranking boost.",
+            "or Seed paper. Or click More like my starred after bookmarking papers.",
+            "Optional filters: sources, from/to year (unknown years hide when a "
+            "range is set), Prefer PICO matches, Prefer exact words (hybrid ranking).",
+            "Hybrid ranking blends embedding similarity with TF-IDF word overlap "
+            "so rare terms in your query still surface.",
             "Results show a similarity score (0-1), highlighted query words in "
             "abstracts, and PICO snippets when detected.",
             "Star papers and add private notes for your study log.",
-            "Export this ranked list (CSV/TXT) or export the whole library "
-            "(included / screened-out / starred) with cluster and exclusion info.",
-            "For formal citations, use the ZoteroBib link - you format APA/MLA "
-            "yourself so style rules stay under your control.",
+            "Export this ranked list (CSV/TXT) or export the whole library as "
+            "CSV, RIS (Zotero/EndNote), or BibTeX - by scope (all / included / "
+            "excluded / starred).",
+            "For APA/MLA/Chicago hand-formatting, use the ZoteroBib link on "
+            "titles or DOIs so style rules stay under your control.",
         ],
         "tips": [
             "Screen off-topic clusters first so the ranking pool is clean.",
             "Seed mode is great when a teacher gives one starter paper: find more "
             "like it from what you already fetched.",
-            "Need a bibliography style? Copy title/DOI into ZoteroBib from a result.",
+            "Star a handful of must-read papers, then use More like my starred to "
+            "expand the set without rewriting the query.",
+            "Need a bibliography file? Export RIS or BibTeX from Search, not just "
+            "the ranked CSV.",
         ],
         "where_in_app": "Search page.",
         "app_path": "/search",
@@ -203,17 +222,22 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "Every account has its own isolated SQLite database on the server. "
             "Fetched articles, embeddings, clusters, screening choices, stars, and "
             "notes do not mix with anyone else’s. Sessions use signed tokens; "
-            "password changes and account deletion are under your control."
+            "changing your password signs out other devices while keeping this one "
+            "signed in. Long fetches and embedding runs continue in the background "
+            "so closing a laptop mid-job is less painful."
         ),
         "how_it_works": [
-            "Register with a username and password (stored as a bcrypt hash, not "
-            "plain text).",
+            "Register with a username or school email-style login and a password "
+            "(stored as a bcrypt hash, not plain text).",
             "Log in to reach Data Management, Clusters, Search, and Duplicates.",
             "All API actions require your session; state-changing actions also "
-            "check a CSRF token.",
+            "check a CSRF token. Each signed-in user has their own rate limit "
+            "bucket (classrooms behind one network do not share one budget).",
             "Stars and notes attach to papers inside your personal database only.",
-            "Account settings let you log out or delete your account (with "
-            "password confirmation).",
+            "Account page: change password (revokes other sessions) or delete "
+            "your account with password confirmation.",
+            "Fetch and embedding jobs return immediately and finish in the "
+            "background; the progress bar follows until they complete.",
             "Theme (light/dark) and reading mode preferences stay in your browser "
             "on this device.",
         ],
@@ -222,8 +246,10 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "passwords.",
             "Teachers: each student should have their own account so corpora and "
             "notes stay separate for assessment.",
-            "Export your library CSV before wiping a collection if you need a "
-            "hand-in archive.",
+            "Export your library (CSV/RIS/BibTeX) before wiping a collection if "
+            "you need a hand-in archive.",
+            "If you change your password on a shared machine, other open tabs "
+            "for that account will need to log in again.",
         ],
         "where_in_app": "Register / Log in · Account page when signed in.",
         "app_path": "/account",
