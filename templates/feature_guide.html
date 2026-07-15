@@ -24,6 +24,7 @@
  {% if user %}
  <a href="{{ guide.app_path }}" class="btn btn-sm btn-primary">{{ guide.app_label }}</a>
  {% else %}
+ <a href="/register" class="btn btn-sm btn-secondary">Create account</a>
  <a href="/login" class="btn btn-sm btn-primary">Log in to try it</a>
  {% endif %}
  </div>

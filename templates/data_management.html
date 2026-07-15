@@ -3,23 +3,25 @@
 {% block content %}
 <section class="page-header">
  <h1>Data Management</h1>
- <p class="subtitle"><strong>Step 1 of 4.</strong> Select topics, fetch papers, then create embeddings
- (both jobs keep running if you leave the tab open). When you’re done →
- <a href="/clusters">Clusters</a> to group and screen topics.</p>
+ <p class="subtitle"><strong>Step 1 of 4.</strong> Select topics, fetch papers, then create embeddings.
+ Fetch and embed run as <strong>background jobs</strong> (progress bars; safe if you leave the tab open).
+ When you’re done → <a href="/clusters">Clusters</a> to group and screen topics.</p>
 </section>
 
 <!-- Step 1: Topics -->
 <section class="card">
  <h2>1. Select Topics</h2>
  <p class="info-text">Choose the academic areas you care about. We use this to recommend databases and to
- check your <strong>coverage map</strong> (are you missing sources teachers often expect for this topic?).</p>
+ check your <strong>coverage map</strong> (are you missing sources teachers often expect for this topic?).
+ Your collection stays private to this account.</p>
  <div class="topic-grid" id="topic-grid"></div>
 </section>
 
 <!-- Step 2: Sources -->
 <section class="card">
  <h2>2. Choose Sources</h2>
- <p class="info-text" id="source-hint">Select topics above to see recommended sources, or choose manually below.</p>
+ <p class="info-text" id="source-hint">Select topics above to see recommended sources, or choose manually below.
+ Some sources need free API keys (CORE, NASA ADS); without a key they simply skip.</p>
  <div class="source-option-grid" id="source-option-grid"></div>
 </section>
 
@@ -27,7 +29,8 @@
 <section class="card">
  <h2>Coverage map</h2>
  <p class="info-text">A quick health check: how many papers you already have per database, and which
- recommended sources are still empty. Re-run after a fetch.</p>
+ recommended sources are still empty. Re-run after a fetch finishes (background jobs update the
+ bars when you refresh).</p>
  <div id="coverage-bars"></div>
  <div id="coverage-suggestions" class="info-text" style="margin-top:0.75rem;"></div>
  <button type="button" id="coverage-refresh" class="btn btn-secondary btn-sm">Refresh coverage</button>
@@ -36,9 +39,10 @@
 <!-- Step 3: Fetch -->
 <section class="card">
  <h2>3. Fetch Articles</h2>
- <p class="info-text">Runs your query against every selected source <strong>in parallel</strong> (background job with a progress bar) and saves
- title, abstract, authors, year, and journal into your private database. Records without an abstract are
- skipped (later steps need text). Your last query, sources, and email are remembered in this browser.</p>
+ <p class="info-text">Runs your query against every selected source <strong>in parallel</strong> as a
+ <strong>background job</strong> (progress bar; if one fetch is already running you will be told to wait).
+ Saves title, abstract, authors, year, and journal into your private database. Records without an abstract
+ are skipped (later steps need text). Your last query, sources, and email are remembered in this browser.</p>
  <div class="form-row">
  <div class="form-group flex-2">
  <label>Search Query</label>
@@ -78,11 +82,13 @@
 <section class="card">
  <h2>4. Create Embeddings</h2>
  <p class="info-text">Embeddings turn each abstract into a numerical “meaning fingerprint.” They power
- Search, Clusters, and Duplicate detection - run this after every fetch. Pick <em>general</em> for speed
- or mixed topics; <em>pubmedbert</em> / <em>biosentbert</em> for medical corpora; <em>specter</em> for
- scientific papers. <strong>Only embed new papers</strong> turns on automatically when you choose
- <em>Add to collection</em> (so existing vectors are kept); for a full <em>Replace</em> fetch it stays
- off so everything is embedded. Switching models re-embeds everything. Uses your GPU when available.</p>
+ Search (hybrid ranking, seed, and more-like-starred), Clusters, and Duplicate detection - run this
+ after every fetch. The run is a <strong>background job</strong> with a progress bar (you can leave the
+ page open). Pick <em>general</em> for speed or mixed topics; <em>pubmedbert</em> / <em>biosentbert</em>
+ for medical corpora; <em>specter</em> for scientific papers. <strong>Only embed new papers</strong>
+ turns on automatically when you choose <em>Add to collection</em> (so existing vectors are kept); for a
+ full <em>Replace</em> fetch it stays off so everything is embedded. Switching models re-embeds everything.
+ Uses your GPU when available (including ROCm on supported Linux setups).</p>
  <p class="info-text" id="embedding-info">Loading article info...</p>
  <div class="form-row">
  <div class="form-group">

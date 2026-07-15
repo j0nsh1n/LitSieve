@@ -16,7 +16,10 @@
  <div class="auth-card">
  <a href="/" class="auth-home-link">← Back to home</a>
  <div class="auth-logo">Literature Research Aide</div>
- <div class="auth-subtitle">v3.5.0</div>
+ <div class="auth-subtitle">v3.5.0 · private multi-source lit review workspace</div>
+ <p class="auth-hint" style="margin:0 0 1rem;text-align:center;">
+ Fetch, embed, triage, and search your own collection - not the whole internet.
+ </p>
 
  {% if error %}
  <div class="auth-error">{{ error }}</div>
@@ -27,6 +30,7 @@
  <label>Username or email</label>
  <input type="text" name="username" autocomplete="username" autofocus required
  placeholder="alex or you@school.edu">
+ <span class="auth-hint">School email-style logins are OK (stored lowercased).</span>
  </div>
  <div class="form-group">
  <label>Password</label>

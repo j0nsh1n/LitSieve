@@ -105,11 +105,13 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
         "summary": (
             "Clustering sorts your collection into topic piles using the embeddings. "
             "Each pile gets a distinctive keyword label and a real paper title as a "
-            "headline, plus a short topic overview. Triage lets you exclude whole "
-            "off-topic groups (or single papers) so Search only sees what you kept."
+            "headline, plus a short topic overview. This is the only place for topic "
+            "triage: exclude whole off-topic groups (or single papers) so Search, "
+            "hybrid ranking, and more-like-starred only see what you kept."
         ),
         "how_it_works": [
-            "Open Clusters after embeddings exist.",
+            "Open Clusters after embeddings exist (create them on Data Management; "
+            "that job can finish in the background).",
             "Density mode (recommended) finds natural topic groups and puts odd "
             "papers in an “outliers” bucket. K-Means and Hierarchical need a count "
             "(or Auto).",
@@ -120,15 +122,17 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "Nothing is permanently deleted - Restore brings papers back anytime.",
             "Labels are built so the same keyword is not repeated across every "
             "cluster (they stay distinctive).",
+            "Exclusion reasons show up later on the Duplicates screening report "
+            "(cluster vs duplicate vs manual counts for hand-ins).",
         ],
         "tips": [
             "Students: exclude clearly off-topic piles before similarity search so "
             "rankings stay on assignment.",
-            "Teachers: ask for a short note on which clusters were excluded and why "
-            "(process evidence for a lit review).",
+            "Teachers: ask for a short note on which clusters were excluded and why, "
+            "plus the screening report text from Duplicates.",
             "Re-clustering refreshes groups but keeps your exclusion list.",
         ],
-        "where_in_app": "Clusters page.",
+        "where_in_app": "Clusters page (only place for topic/paper triage).",
         "app_path": "/clusters",
         "app_label": "Open Clusters",
     },

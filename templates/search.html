@@ -174,10 +174,11 @@
  <button id="export-txt" class="btn btn-secondary btn-sm" title="Download these results as a plain-text reading list">Download Text</button>
  </div>
  </div>
- <p class="info-text">The badge is the similarity score (0-1). Matching words from your query are
- <mark class="hl-demo">highlighted</mark> in abstracts. PICO chips show which clinical elements were
- detected, with short quotes when available. Use ★ to bookmark and the note box for private study notes
- (saved only in your account).</p>
+ <p class="info-text">The badge is the original embedding similarity (0-1), even when hybrid ranking is on.
+ Matching words from your query are <mark class="hl-demo">highlighted</mark> in abstracts. PICO chips show
+ which clinical elements were detected, with short quotes when available. Use ★ to bookmark (feeds
+ <strong>More like my starred</strong>) and the note box for private study notes (saved only in your account).
+ Export this ranked list as CSV/TXT, or the whole library as CSV / RIS / BibTeX above.</p>
  <div id="results-list"></div>
 </section>
 {% endblock %}

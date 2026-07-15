@@ -16,7 +16,11 @@
  <div class="auth-card">
  <a href="/" class="auth-home-link">← Back to home</a>
  <div class="auth-logo">Literature Research Aide</div>
- <div class="auth-subtitle">Create an account</div>
+ <div class="auth-subtitle">Create a private account</div>
+ <p class="auth-hint" style="margin:0 0 1rem;text-align:center;">
+ Free classroom-friendly workspace: 12 sources, triage, hybrid search, RIS/BibTeX export.
+ Your data stays isolated to this account.
+ </p>
 
  {% if error %}
  <div class="auth-error">{{ error }}</div>
@@ -35,7 +39,7 @@
  <div class="form-group">
  <label>Password</label>
  <input type="password" name="password" class="pw-field" autocomplete="new-password" required minlength="8">
- <span class="auth-hint">Minimum 8 characters</span>
+ <span class="auth-hint">Minimum 8 characters (you can change it later from Account; that signs out other devices).</span>
  </div>
  <div class="form-group">
  <label>Confirm Password</label>

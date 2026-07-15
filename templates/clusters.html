@@ -4,18 +4,22 @@
 {% block content %}
 <section class="page-header">
  <h1>Article Clusters</h1>
- <p class="subtitle"><strong>Step 2 of 4.</strong> Group papers by topic and exclude off-topic clusters or papers.
- Next → <a href="/statistics">Duplicates</a> to drop near-identical copies across sources.</p>
+ <p class="subtitle"><strong>Step 2 of 4.</strong> Group papers by topic and <strong>triage here only</strong>
+ (exclude off-topic clusters or single papers so Search stays clean).
+ Next → <a href="/statistics">Duplicates</a> for near-copies and a screening report, then
+ <a href="/search">Search</a> to rank what you kept.</p>
 </section>
 
 <section class="card">
  <h2>Generate Clusters</h2>
  <p class="info-text">Clustering groups your articles by topic using their embeddings - create
- embeddings on the Data Management page first. <strong>Density</strong> (default) finds natural
- topics itself and parks odd papers in an “outliers” group - you do not choose a count.
+ embeddings on the Data Management page first (that job can finish in the background).
+ <strong>Density</strong> (default) finds natural topics itself and parks odd papers in an
+ “outliers” group - you do not choose a count.
  Prefer a fixed number of groups? Switch method to <strong>K-Means</strong> or
  <strong>Hierarchical</strong>, then use <strong>Auto</strong> (app picks the cleanest count)
- or uncheck Auto and set the slider yourself. Re-clustering replaces groups but keeps exclusions.</p>
+ or uncheck Auto and set the slider yourself. Re-clustering replaces groups but keeps exclusions
+ (and your screening report will still reflect them).</p>
  <div class="form-row">
  <div class="form-group">
  <label>Method</label>
@@ -59,8 +63,10 @@
  (no shared keyword spam). Opening a cluster shows a short <strong>topic overview</strong>
  (year span + example titles) so you can decide if the group is on-topic.
  <strong>This page is where you triage:</strong> Exclude cluster (or a single paper) screens
- them out of Search entirely. Search has no second topic list - it only ranks what you kept.
- Nothing is deleted; Restore brings papers back anytime.</p>
+ them out of Search and hybrid ranking entirely. Search has no second topic list - it only ranks
+ what you kept (plus optional year range, seed paper, or more-like-starred).
+ Nothing is deleted; Restore brings papers back anytime. Counts by exclusion reason appear later
+ on the Duplicates <strong>screening report</strong> for hand-ins.</p>
  <div id="clusters-list">
  <p class="info-text">No clusters yet. Generate them above to see them here.</p>
  </div>

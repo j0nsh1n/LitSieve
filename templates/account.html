@@ -3,18 +3,23 @@
 {% block content %}
 <section class="page-header">
  <h1>Account</h1>
- <p class="subtitle">Change your password (signs out other devices), or delete your account and data.</p>
+ <p class="subtitle">Private workspace settings: change password (signs out other devices), or permanently
+ delete this account and its collection.</p>
 </section>
 
 <section class="card">
  <h2>Profile</h2>
- <p class="info-text">Signed in as <strong>{{ user.username }}</strong>.</p>
+ <p class="info-text">Signed in as <strong>{{ user.username }}</strong>. Your fetched papers, embeddings,
+ clusters, screening choices, stars, and notes live only under this account (isolated SQLite storage).
+ Fetch and embed jobs run in the background from Data Management.</p>
  <a href="/logout" class="btn btn-secondary">Log Out</a>
 </section>
 
 <section class="card">
  <h2>Change password</h2>
- <p class="info-text">Updates your password and signs out other sessions (this device stays signed in).</p>
+ <p class="info-text">Updates your password and signs out other sessions immediately (this browser stays
+ signed in with a fresh session). New password: at least 8 characters (max 72 bytes for secure hashing).
+ You can change it again anytime from this page.</p>
  <div class="form-row">
  <div class="form-group">
  <label for="pw-current">Current password</label>
@@ -41,8 +46,10 @@
 <section class="card danger-zone">
  <h2>Delete Account</h2>
  <p class="info-text">
- This permanently deletes your account and everything in your workspace - 
- all fetched articles, embeddings, and clusters. This cannot be undone.
+ This permanently deletes your account and everything in your workspace -
+ all fetched articles, embeddings, clusters, screening choices, stars, and notes.
+ Export CSV / RIS / BibTeX from Search first if you need a hand-in archive.
+ This cannot be undone.
  </p>
  <div class="form-row">
  <div class="form-group">

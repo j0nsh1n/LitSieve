@@ -6,8 +6,9 @@
  <h1>Detect Duplicates</h1>
  <p class="subtitle"><strong>Step 3 of 4.</strong> The same paper often arrives from several databases under
  different IDs - find near-duplicates and keep the best copy of each.
- Use the screening report for hand-in counts. Next →
- <a href="/search">Search</a> to rank what you kept.</p>
+ Build a <strong>screening report</strong> (collected / excluded by reason / included) for hand-ins.
+ Next → <a href="/search">Search</a> for hybrid ranking, year filters, seed or starred search, and
+ RIS/BibTeX export.</p>
 </section>
 
 <section class="stats-cards">
@@ -29,7 +30,9 @@
  <div class="screening-report-header">
  <div>
  <h2 class="screening-report-title">Screening report</h2>
- <p class="info-text screening-report-lead">Show-your-work counts for hand-ins (collected, excluded by reason, included set).</p>
+ <p class="info-text screening-report-lead">PRISMA-style show-your-work counts: papers collected, removed as
+ duplicates, excluded by cluster triage, excluded manually, included set, stars, embeddings, and clusters.
+ Same text on screen and in the download (good for teacher hand-ins).</p>
  </div>
  <button type="button" id="screening-report-btn" class="btn btn-secondary btn-sm">Screening report</button>
  </div>
@@ -48,7 +51,9 @@
 
 <section class="card">
  <h2>Duplicate Detection</h2>
- <p class="info-text">Adjust the similarity threshold - higher values find only near-identical articles, lower values find more loosely related ones.</p>
+ <p class="info-text">Needs embeddings (create them on Data Management first). Adjust the similarity
+ threshold - higher values find only near-identical articles, lower values find more loosely related ones.
+ Auto-resolve and per-group Keep this update the screening report counts above.</p>
  <div class="form-row">
  <div class="param-group">
  <label>Similarity Threshold: <strong id="threshold-display">0.95</strong></label>
