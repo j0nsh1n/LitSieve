@@ -9,25 +9,29 @@ app_port: 7860
 
 # Literature Research Aide 📚 — v3.5.0
 
-A multi-user web app for teachers and students to find, screen, and rank
-research papers across many academic databases using semantic embeddings,
-clustering, and duplicate detection.
+A multi-user web app for **teachers and students** to fetch, screen, and rank
+research papers across many academic databases. Semantic embeddings power
+clustering, duplicate detection, and hybrid search; each account gets a private
+workspace with background jobs, screening reports, and citation export.
 
 Built with **FastAPI**, sentence-transformers, FAISS, and scikit-learn.
 
 ## Features
 
-- 🔍 Fetch articles from **12 sources** in parallel (PubMed, Europe PMC,
-  ClinicalTrials.gov, OpenAlex, arXiv, Semantic Scholar, ERIC, Zenodo,
-  CrossRef, DOAJ, NASA ADS, CORE) — replace or append to your collection
-- 🧠 Semantic embeddings (only-new or full re-embed; GPU when available)
-- 🎯 Similarity search (plain text, PICO, or seed paper) with highlights & notes
-- 🧩 Clustering: Density (HDBSCAN), K-Means, Hierarchical — triage by exclude
-- 🔄 Cross-source duplicate detection with preferred-source auto-resolve
+- 🔍 Fetch from **12 sources** in parallel (PubMed, Europe PMC, ClinicalTrials.gov,
+  OpenAlex, arXiv, Semantic Scholar, ERIC, Zenodo, CrossRef, DOAJ, NASA ADS, CORE)
+  — replace or append; **background jobs** with progress bars
+- 🧠 Semantic embeddings (only-new or full re-embed; GPU when available; background job)
+- 🎯 Hybrid similarity search (meaning + exact words), **year range**, plain text /
+  PICO / **seed paper** / **more like my starred**, highlights & private notes
+- 🧩 Clustering: Density (HDBSCAN), K-Means, Hierarchical — **triage only on Clusters**
+- 🔄 Cross-source duplicate detection + preferred-source auto-resolve
+- 📋 **Screening report** (collected / excluded by reason / included) on Duplicates
 - 📈 Coverage map and per-source breakdown
-- 💾 Per-user SQLite storage, JWT auth, CSRF protection, rate limiting
-- 📤 Export search hits or full library (included / screened / starred)
-- 📖 Public feature guides on the landing page (`/learn/…`)
+- 💾 Per-user SQLite, JWT + bcrypt, CSRF, **per-user rate limits**, change password
+  (revokes other sessions via `token_version`)
+- 📤 Export ranked hits (CSV/TXT) or full library (**CSV / RIS / BibTeX**) by scope
+- 📖 Public landing + `/learn/…` feature guides (no login required to read)
 
 ## Project Structure
 
@@ -42,7 +46,8 @@ Built with **FastAPI**, sentence-transformers, FAISS, and scikit-learn.
 ├── auth.py                 # JWT + bcrypt password hashing
 ├── embeddings.py           # EmbeddingEngine + PICOExtractor
 ├── clustering.py           # Clustering, TF-IDF labels, Plotly visualizations
-├── utils.py                # Year sort, source priority, coverage, briefings
+├── utils.py                # Year sort, source priority, coverage, briefings, screening report
+├── citations.py            # RIS + BibTeX export
 ├── feature_guides.py       # Landing “learn more” page content
 ├── templates/              # Jinja2 HTML pages
 ├── static/                 # CSS + page JavaScript
@@ -84,16 +89,17 @@ cp .env.example .env
 uvicorn main:app --host 0.0.0.0 --port 7860
 ```
 
-Then open <http://localhost:7860>. You'll be redirected to `/login` — register
-an account, then use the workflow:
+Then open <http://localhost:7860>. Public landing and `/learn/…` guides need no
+account. Register/login for your private workspace, then:
 
-1. **Data Management** → pick topics/sources, **Fetch** (replace or add), then
-   **Create embeddings**.
+1. **Data Management** → topics/sources, **Fetch** (replace or add; background job),
+   then **Create embeddings** (background job).
 2. **Clusters** → Density / K-Means / Hierarchical; **exclude** off-topic groups
-   or single papers (this is where triage lives).
-3. **Duplicates** → find cross-source near-duplicates and auto-resolve or keep one.
-4. **Search** → free text, PICO, or seed paper; ranks only papers you kept;
-   notes/stars; export results or the full library.
+   or single papers (**only** place for topic triage).
+3. **Duplicates** → near-duplicates + auto-resolve; **screening report** for hand-ins.
+4. **Search** → text / PICO / seed / more-like-starred; hybrid rank + year filter;
+   notes/stars; export ranked hits or library as **CSV / RIS / BibTeX**.
+5. **Account** → change password (other sessions sign out) or delete account.
 
 ### Docker
 
