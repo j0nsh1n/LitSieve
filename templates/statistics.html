@@ -4,11 +4,8 @@
 {% block content %}
 <section class="page-header">
  <h1>Detect Duplicates</h1>
- <p class="subtitle"><strong>Step 3 of 4.</strong> The same paper often arrives from several databases under
- different IDs - find near-duplicates and keep the best copy of each.
- Build a <strong>screening report</strong> (collected / excluded by reason / included) for hand-ins.
- Next → <a href="/search">Search</a> for hybrid ranking, year filters, seed or starred search, and
- RIS/BibTeX export.</p>
+ <p class="subtitle"><strong>Step 3 of 4.</strong> The same paper often arrives from several databases -
+ find the copies and keep the best one.</p>
 </section>
 
 <section class="stats-cards">
@@ -16,9 +13,9 @@
  <div class="stat-value" id="stat-total">--</div>
  <div class="stat-label">Total Articles</div>
  </div>
- <div class="stat-card">
+ <div class="stat-card" title="Papers prepared for search (embeddings created on Data Management)">
  <div class="stat-value" id="stat-embeddings">--</div>
- <div class="stat-label">With Embeddings</div>
+ <div class="stat-label">Ready for Search</div>
  </div>
  <div class="stat-card" title="Articles you've excluded - via cluster triage, duplicate resolution, or manually. Hidden from search results but never deleted.">
  <div class="stat-value" id="stat-excluded">--</div>
@@ -30,12 +27,17 @@
  <div class="screening-report-header">
  <div>
  <h2 class="screening-report-title">Screening report</h2>
- <p class="info-text screening-report-lead">PRISMA-style show-your-work counts: papers collected, removed as
- duplicates, excluded by cluster triage, excluded manually, included set, stars, embeddings, and clusters.
- Same text on screen and in the download (good for teacher hand-ins).</p>
+ <p class="info-text screening-report-lead">Show-your-work counts for hand-ins: papers collected,
+ excluded (and why), and included.</p>
  </div>
  <button type="button" id="screening-report-btn" class="btn btn-secondary btn-sm">Screening report</button>
  </div>
+ <details class="help-details">
+  <summary>What the report includes</summary>
+  <p class="info-text">PRISMA-style counts: papers collected, removed as duplicates, excluded by
+  cluster triage, excluded manually, included set, stars, prepared papers, and clusters. The same
+  text appears on screen and in the .txt download.</p>
+ </details>
  <div id="screening-report-panel" class="screening-report-panel" hidden>
  <pre id="screening-report-body" class="screening-report-body"></pre>
  <p class="screening-report-actions">
@@ -51,26 +53,32 @@
 
 <section class="card">
  <h2>Duplicate Detection</h2>
- <p class="info-text">Needs embeddings (create them on Data Management first). Adjust the similarity
- threshold - higher values find only near-identical articles, lower values find more loosely related ones.
- Auto-resolve and per-group Keep this update the screening report counts above.</p>
+ <p class="info-text">Finds near-identical papers across your sources so you can keep one copy of each.
+ Removed copies are screened out, never deleted.</p>
+ <details class="help-details">
+  <summary>How detection and auto-resolve work</summary>
+  <p class="info-text">Detection needs prepared papers (Data Management, step 4). Match strictness:
+  higher values find only near-identical articles, lower values find more loosely related ones.
+  <strong>Auto-Resolve All</strong> keeps the most complete abstract in each group; if lengths are
+  similar it prefers higher-quality sources (PubMed &gt; Europe PMC &gt; CrossRef &gt; OpenAlex &gt; …).
+  Redundant copies are screened out (hidden from Search, not deleted) and the screening report counts
+  update. You can restore anything from its cluster on the Clusters page, or use per-group
+  <strong>Keep this</strong> to choose the winner by hand.</p>
+ </details>
  <div class="form-row">
  <div class="param-group">
- <label>Similarity Threshold: <strong id="threshold-display">0.95</strong></label>
+ <label>Match strictness: <strong id="threshold-display">0.95</strong></label>
  <input type="range" id="threshold" min="0.80" max="0.99" step="0.01" value="0.95">
+ <span class="help-text">Higher finds only near-identical papers; lower catches looser matches.</span>
  </div>
  </div>
  <button id="detect-btn" class="btn btn-primary">Detect Duplicates</button>
  <button id="resolve-btn" class="btn btn-secondary" title="Keep the best copy of every duplicate group and screen out the rest">Auto-Resolve All</button>
  <div id="duplicates-status" class="status-indicator"></div>
- <p class="info-text">Resolving keeps the most complete abstract first; if lengths are similar it prefers
- higher-quality sources (PubMed &gt; Europe PMC &gt; CrossRef &gt; OpenAlex &gt; …). Redundant copies
- are screened out (hidden from Search, not deleted). You can restore anything from its cluster on
- the Clusters page. Use per-group <strong>Keep this</strong> when you want to choose the winner by hand.</p>
  <div id="duplicates-list"></div>
 </section>
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/statistics.js?v=20260713d"></script>
+<script src="/static/js/statistics.js?v=20260715c"></script>
 {% endblock %}

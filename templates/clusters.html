@@ -4,22 +4,24 @@
 {% block content %}
 <section class="page-header">
  <h1>Article Clusters</h1>
- <p class="subtitle"><strong>Step 2 of 4.</strong> Group papers by topic and <strong>triage here only</strong>
- (exclude off-topic clusters or single papers so Search stays clean).
- Next → <a href="/statistics">Duplicates</a> for near-copies and a screening report, then
- <a href="/search">Search</a> to rank what you kept.</p>
+ <p class="subtitle"><strong>Step 2 of 4.</strong> Group your papers by topic and screen out the
+ off-topic ones.</p>
 </section>
 
 <section class="card">
  <h2>Generate Clusters</h2>
- <p class="info-text">Clustering groups your articles by topic using their embeddings - create
- embeddings on the Data Management page first (that job can finish in the background).
- <strong>Density</strong> (default) finds natural topics itself and parks odd papers in an
- “outliers” group - you do not choose a count.
- Prefer a fixed number of groups? Switch method to <strong>K-Means</strong> or
- <strong>Hierarchical</strong>, then use <strong>Auto</strong> (app picks the cleanest count)
- or uncheck Auto and set the slider yourself. Re-clustering replaces groups but keeps exclusions
- (and your screening report will still reflect them).</p>
+ <p class="info-text">Groups your prepared papers by topic. The default method finds the natural
+ topics itself - just press the button.</p>
+ <details class="help-details">
+  <summary>How clustering works and choosing a method</summary>
+  <p class="info-text">Clustering uses the embeddings from Data Management, so prepare papers first
+  (that job can finish in the background). <strong>Density</strong> (default) finds natural topics
+  itself and parks odd papers in an "outliers" group - you do not choose a count. Prefer a fixed
+  number of groups? Switch to <strong>K-Means</strong> or <strong>Hierarchical</strong>, then use
+  <strong>Auto</strong> (app picks the cleanest count) or uncheck Auto and set the slider yourself.
+  Re-clustering replaces groups but keeps exclusions (and your screening report still reflects
+  them).</p>
+ </details>
  <div class="form-row">
  <div class="form-group">
  <label>Method</label>
@@ -28,12 +30,10 @@
  <option value="kmeans">K-Means (fast, fixed or auto count)</option>
  <option value="hierarchical">Hierarchical (Ward - fixed or auto count)</option>
  </select>
+ <span class="help-text" id="density-count-note">Density picks the number of groups automatically -
+ switch to K-Means or Hierarchical to set it yourself.</span>
  </div>
  </div>
- <p class="info-text" id="density-count-note">
- Density mode chooses how many clusters automatically. To turn Auto off and set a number by hand,
- switch Method to K-Means or Hierarchical above.
- </p>
  <div id="k-controls">
  <div class="form-row">
  <div class="form-group">
@@ -59,14 +59,16 @@
  <div class="results-header">
  <h2>Clusters: <span id="cluster-count">0</span></h2>
  </div>
- <p class="info-text">Each cluster's label uses terms that most distinguish it from other clusters
- (no shared keyword spam). Opening a cluster shows a short <strong>topic overview</strong>
- (year span + example titles) so you can decide if the group is on-topic.
- <strong>This page is where you triage:</strong> Exclude cluster (or a single paper) screens
- them out of Search and hybrid ranking entirely. Search has no second topic list - it only ranks
- what you kept (plus optional year range, seed paper, or more-like-starred).
- Nothing is deleted; Restore brings papers back anytime. Counts by exclusion reason appear later
- on the Duplicates <strong>screening report</strong> for hand-ins.</p>
+ <p class="info-text"><strong>This is where you screen papers:</strong> Exclude a cluster (or a single
+ paper) to keep it out of Search. Nothing is deleted - Restore brings papers back anytime.</p>
+ <details class="help-details">
+  <summary>More about labels, overviews, and screening</summary>
+  <p class="info-text">Each cluster's label uses terms that most distinguish it from other clusters
+  (no shared keyword spam). Opening a cluster shows a short <strong>topic overview</strong>
+  (year span + example titles) so you can decide if the group is on-topic. Excluded papers are
+  screened out of Search and hybrid ranking entirely; counts by exclusion reason appear on the
+  Duplicates page's <strong>screening report</strong> for hand-ins.</p>
+ </details>
  <div id="clusters-list">
  <p class="info-text">No clusters yet. Generate them above to see them here.</p>
  </div>
@@ -74,5 +76,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/clusters.js?v=20260709c"></script>
+<script src="/static/js/clusters.js?v=20260715c"></script>
 {% endblock %}

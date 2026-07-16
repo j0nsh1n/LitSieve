@@ -49,12 +49,20 @@ def select_device() -> str:
 class EmbeddingEngine:
     """Handles creation and comparison of semantic embeddings"""
 
-    BIOMEDICAL_MODELS = {
+    # Short name -> HuggingFace path. All models here must work with plain
+    # cosine similarity (no query/passage prefixes), since search, clustering,
+    # and dedup all compare vectors directly.
+    MODELS = {
         'pubmedbert': 'pritamdeka/S-PubMedBert-MS-MARCO',
         'biosentbert': 'pritamdeka/BioBERT-mnli-snli-scinli-scitail-mednli-stsb',
         'specter': 'allenai/specter',
-        'general': 'sentence-transformers/all-MiniLM-L6-v2'
+        'general': 'sentence-transformers/all-MiniLM-L6-v2',
+        'mpnet': 'sentence-transformers/all-mpnet-base-v2',
+        'multiqa': 'sentence-transformers/multi-qa-MiniLM-L6-cos-v1',
+        'multilingual': 'sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2',
     }
+    # Backwards-compatible alias (registry outgrew the biomedical-only name).
+    BIOMEDICAL_MODELS = MODELS
 
     def __init__(self, model_name: str = 'general'):
         self.model_name = model_name
@@ -65,7 +73,7 @@ class EmbeddingEngine:
     def model(self):
         if self._model is None:
             from sentence_transformers import SentenceTransformer
-            model_path = self.BIOMEDICAL_MODELS.get(self.model_name, self.model_name)
+            model_path = self.MODELS.get(self.model_name, self.model_name)
             self.device = select_device()
             logger.info("Loading embedding model %s on device %s", model_path, self.device)
             print(f"Loading model: {model_path} (device={self.device})")

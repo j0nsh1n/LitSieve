@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Literature Research Aide{% endblock %}</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260713d">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260715d">
     <script>
         (function() {
             const root = document.documentElement;
@@ -20,10 +20,10 @@
 <body>
     {# Recommended order: Fetch/Embed → Cluster/Triage → Dedup → Search #}
     {% set workflow = [
-        ("data_management", "Data Management", "/data-management", "Step 1: fetch and embed (jobs keep running in the background)"),
-        ("clusters", "Clusters", "/clusters", "Step 2: group topics and triage - only place to screen papers"),
-        ("statistics", "Duplicates", "/statistics", "Step 3: near-duplicates + screening report for hand-ins"),
-        ("search", "Search", "/search", "Step 4: hybrid rank, year filter, seed or starred; export RIS/BibTeX"),
+        ("data_management", "Data Management", "/data-management", "Step 1: fetch papers (they are prepared for search automatically)"),
+        ("clusters", "Clusters", "/clusters", "Step 2: group papers by topic and screen out off-topic ones"),
+        ("statistics", "Duplicates", "/statistics", "Step 3: remove duplicate copies + screening report for hand-ins"),
+        ("search", "Search", "/search", "Step 4: rank the papers you kept and export your list"),
     ] %}
     {% set ns = namespace(current_label="Steps", current_num="") %}
     {% for key, label, href, tip in workflow %}
@@ -89,7 +89,7 @@
         <p>Literature Research Aide - v3.5.0</p>
     </footer>
 
-    <script src="/static/js/common.js?v=20260713d"></script>
+    <script src="/static/js/common.js?v=20260715c"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>
