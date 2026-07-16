@@ -3,8 +3,8 @@
 {% block content %}
 <section class="page-header">
  <h1>Data Management</h1>
- <p class="subtitle"><strong>Step 1 of 4.</strong> Pick topics, choose sources, and fetch papers -
- the app prepares them for search automatically.</p>
+ <p class="subtitle"><strong>Step 1 of 4.</strong> Pick topics, choose sources, and fetch papers.
+ Then prepare them for search when you are ready (step 4).</p>
 </section>
 
 <section class="card getting-started-card" id="getting-started-card" hidden>
@@ -16,7 +16,7 @@
  <ol class="getting-started-list">
   <li data-step="topics"><span class="gs-check" aria-hidden="true">○</span> Pick one or more topics below</li>
   <li data-step="query"><span class="gs-check" aria-hidden="true">○</span> Type a research question in Fetch</li>
-  <li data-step="fetch"><span class="gs-check" aria-hidden="true">○</span> Press <strong>Fetch Articles</strong> (prepare runs next)</li>
+  <li data-step="fetch"><span class="gs-check" aria-hidden="true">○</span> Press <strong>Fetch Articles</strong>, then <strong>Prepare Papers</strong> when ready</li>
  </ol>
  <p class="info-text" style="margin-top:0.75rem;">
   Prefer a dry run with no APIs?
@@ -54,15 +54,14 @@
 <section class="card">
  <h2>3. Fetch Articles</h2>
  <p class="info-text">Searches every selected source at once and saves the papers to your private
- collection. When the fetch finishes, papers are prepared for search automatically.</p>
+ collection. Preparing for search is a separate step (button below) so you control the model and timing.</p>
  <details class="help-details">
   <summary>How fetching works</summary>
   <p class="info-text">The query runs against every selected source <strong>in parallel</strong> as a
-  background job (progress bar; if one fetch is already running you will be told to wait).
-  Saves title, abstract, authors, year, and journal. Records without an abstract are skipped
-  (later steps need text). After a successful fetch the app starts the prepare step (embeddings)
-  for you; you can watch its progress in the card below. Your last query, sources, and email are
-  remembered in this browser.</p>
+  background job (progress bar; Cancel stops after the current source). Saves title, abstract,
+  authors, year, and journal. Records without an abstract are skipped (later steps need text).
+  Some sources may fail (rate limits, API rules) while others succeed — that is normal; check the
+  per-source list. Your last query, sources, and email are remembered in this browser.</p>
  </details>
  <div class="form-row">
  <div class="form-group flex-2">
@@ -71,7 +70,7 @@
  </div>
  <div class="form-group">
  <label>Max Results per Source</label>
- <input type="number" id="fetch-max" value="200" min="10" max="2000" step="50">
+ <input type="number" id="fetch-max" value="100" min="10" max="2000" step="10">
  </div>
  </div>
  <div class="form-row">
@@ -120,19 +119,17 @@
 <!-- Step 4: Prepare papers (embeddings) -->
 <section class="card">
  <h2>4. Prepare Papers for Search</h2>
- <p class="info-text">This step runs automatically after each fetch, and the analysis model is picked
- to match your selected topics. Use this card to re-run it or switch models.</p>
+ <p class="info-text">Run this after a fetch when you are ready. The analysis model follows your
+ selected topics (or your Advanced override). Nothing here starts until you press the button.</p>
  <details class="help-details">
   <summary>What preparing does (embeddings)</summary>
   <p class="info-text">Preparing creates <strong>embeddings</strong>: each abstract becomes a numerical
   "meaning fingerprint" that powers Search (hybrid ranking, seed, and more-like-starred), Clusters,
   and Duplicate detection. It runs as a background job with a progress bar (you can leave the page
-  open) and uses your GPU when available. The model is chosen automatically from your topics
-  (biomedical topics get a biomedical model, hard-science topics a scientific-paper model, anything
-  else a fast general one) - pick a different one under Advanced to override.
-  <strong>Only prepare new papers</strong> turns on automatically when you choose
-  <em>Add to collection</em> (existing fingerprints are kept); for a full <em>Replace</em> fetch it
-  stays off so everything is processed. Switching models reprocesses everything.</p>
+  open) and uses your GPU when available. The model is chosen from your topics
+  (biomedical → pubmedbert, hard science → specter, otherwise general) unless you pick one under
+  Advanced. <strong>Only prepare new papers</strong> turns on for <em>Add to collection</em> and
+  off for <em>Replace</em>. Switching models reprocesses everything so dimensions stay consistent.</p>
  </details>
  <p class="info-text" id="embedding-info">Loading article info...</p>
  <p class="help-text" id="model-auto-hint"></p>
@@ -173,5 +170,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/data_management.js?v=20260716a"></script>
+<script src="/static/js/data_management.js?v=20260716b"></script>
 {% endblock %}

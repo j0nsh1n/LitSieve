@@ -60,12 +60,10 @@ async function loadClusterEmptyState() {
  method: 'POST',
  body: { clear_first: true },
  });
- showNotification('Sample papers loaded. Preparing them for search on Data Management…', 'success');
- // Kick prepare so clustering can run soon.
- await apiCall('/api/create-embeddings', {
- method: 'POST',
- body: { model: 'general', only_missing: true },
- });
+ showNotification(
+ 'Sample papers loaded. Open Data Management and press Prepare Papers when ready.',
+ 'success'
+ );
  window.location.href = '/data-management';
  } catch (err) {
  showNotification(`Sample load failed: ${err.message}`, 'error');

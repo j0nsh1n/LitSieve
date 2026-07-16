@@ -3,16 +3,32 @@
 {% block content %}
 <section class="page-header">
  <h1>Account</h1>
- <p class="subtitle">Private workspace settings: change password (signs out other devices), or permanently
- delete this account and its collection.</p>
+ <p class="subtitle">Private workspace settings: libraries, password, or permanently delete this account.</p>
 </section>
 
 <section class="card">
  <h2>Profile</h2>
- <p class="info-text">Signed in as <strong>{{ user.username }}</strong>. Your fetched papers, embeddings,
- clusters, screening choices, stars, and notes live only under this account (isolated SQLite storage).
- Fetch and embed jobs run in the background from Data Management.</p>
+ <p class="info-text">Signed in as <strong>{{ user.username }}</strong>. Each <strong>library</strong> is a
+ separate paper collection (fetch, prepare, clusters, screening, notes). Switch libraries from the
+ nav bar. Jobs run in the background from Data Management.</p>
  <a href="/logout" class="btn btn-secondary">Log Out</a>
+</section>
+
+<section class="card">
+ <h2>Your libraries</h2>
+ <p class="info-text">Create separate collections for different units or projects. Deleting a library
+ permanently removes its papers (export first if you need them).</p>
+ <ul class="library-manage-list" id="library-manage-list">
+  <li class="info-text">Loading…</li>
+ </ul>
+ <div class="library-create-row">
+  <div class="form-group">
+   <label for="library-new-name">New library name</label>
+   <input type="text" id="library-new-name" maxlength="64" placeholder="e.g. Unit 3 climate">
+  </div>
+  <button type="button" id="library-create-btn" class="btn btn-primary">Create library</button>
+ </div>
+ <div id="library-manage-status" class="status-indicator"></div>
 </section>
 
 <section class="card">
@@ -69,5 +85,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/account.js?v=20260716a"></script>
+<script src="/static/js/account.js?v=20260716e"></script>
 {% endblock %}

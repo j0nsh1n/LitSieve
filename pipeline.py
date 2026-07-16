@@ -127,7 +127,7 @@ class LiteratureSearchPipeline:
         self,
         query: str,
         sources: List[str],
-        max_results: int = 200,
+        max_results: int = 100,
         email: str = "your.email@example.com",
         progress_callback=None,
         cancel_check=None,

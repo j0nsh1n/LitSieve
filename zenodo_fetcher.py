@@ -22,7 +22,9 @@ class ZenodoFetcher(BaseFetcher):
     def search_and_fetch(self, query: str, max_results: int = 500) -> List[Dict]:
         articles = []
         page = 1
-        per_page = min(100, max_results)
+        # Unauthenticated Zenodo caps page size at 25 (HTTP 400 above that).
+        # Authenticated tokens can go higher; we stay polite at 25 for all users.
+        per_page = min(25, max_results)
 
         while len(articles) < max_results:
             n = min(per_page, max_results - len(articles))

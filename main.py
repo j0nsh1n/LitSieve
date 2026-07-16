@@ -1,6 +1,7 @@
 """
-FastAPI Application — Literature Research Aide v3.8.0
+FastAPI Application — Literature Research Aide v4.0.0
 Multi-user web interface for literature search and analysis.
+Multiple libraries (workspaces) per account.
 """
 
 import io
@@ -15,6 +16,7 @@ from collections import OrderedDict
 from typing import List, Optional
 from functools import partial
 import asyncio
+import contextvars
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -54,6 +56,18 @@ from screening_reasons import (
     normalize_reason,
     reason_label,
 )
+from libraries import (
+    create_library,
+    delete_library,
+    get_active_library_id,
+    list_libraries,
+    library_db_path,
+    pipeline_cache_key,
+    rename_library,
+    set_active_library,
+    ensure_libraries,
+)
+from pathlib import Path
 
 logging.basicConfig(
     level=logging.INFO,
@@ -81,12 +95,12 @@ def rate_limit_key(request: Request) -> str:
 limiter = Limiter(key_func=rate_limit_key)
 
 # At top of file
-app = FastAPI(title="Literature Research Aide", version="3.8.0")
+app = FastAPI(title="Literature Research Aide", version="4.0.0")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 @app.get("/health")
 async def health():
-    return {"status": "healthy", "version": "3.8.0"}
+    return {"status": "healthy", "version": "4.0.0"}
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
@@ -94,87 +108,110 @@ templates = Jinja2Templates(directory="templates")
 # --- User account database ---
 user_db = UserDatabase()
 
-# --- Per-user pipeline cache (lazy-initialised, LRU-bounded) ---
+# --- Per-library pipeline cache (lazy-initialised, LRU-bounded) ---
+# Keys are "user_id:library_id" (see libraries.pipeline_cache_key).
 _pipelines: "OrderedDict[str, LiteratureSearchPipeline]" = OrderedDict()
 # Number of in-flight requests holding each pipeline. A pipeline is only safe
 # to close when its refcount hits 0; otherwise eviction defers the close.
 _pipeline_refcounts: "OrderedDict[str, int]" = OrderedDict()
-# Pipelines evicted while still in use, keyed by uid — closed on last release.
+# Pipelines evicted while still in use, keyed by cache key — closed on last release.
 _pending_close: "dict[str, LiteratureSearchPipeline]" = {}
 # Guards _pipelines, _pipeline_refcounts and _pending_close together.
 _pipelines_lock = threading.Lock()
 
-# --- Per-user progress tracking (LRU-bounded) ---
+# Bind library id for the current request/task so release_pipeline(uid) matches
+# the same library even if the user switches active library in another tab.
+_pipeline_lib_ctx: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
+    "pipeline_lib_id", default=None
+)
+
+# --- Per-user progress tracking (LRU-bounded; one job type at a time per user) ---
 _all_progress: "OrderedDict[str, dict]" = OrderedDict()
 _progress_lock = threading.Lock()
 
 
-def get_pipeline(user_id: str) -> LiteratureSearchPipeline:
-    """Return the user's pipeline and register an in-flight reference.
+def get_pipeline(
+    user_id: str, library_id: Optional[str] = None
+) -> LiteratureSearchPipeline:
+    """Return the pipeline for the user's active (or given) library.
 
     The caller MUST pair every get_pipeline() with a release_pipeline() in a
     finally block so deferred closes can run once the request completes.
     """
+    ensure_libraries(user_id)
+    lib_id = library_id or _pipeline_lib_ctx.get() or get_active_library_id(user_id)
+    _pipeline_lib_ctx.set(lib_id)
+    key = pipeline_cache_key(user_id, lib_id)
     with _pipelines_lock:
-        if user_id not in _pipelines:
-            user_dir = f"user_data/{user_id}"
-            os.makedirs(user_dir, exist_ok=True)
-            _pipelines[user_id] = LiteratureSearchPipeline(
-                db_path=f"{user_dir}/articles.db",
-                embedding_model="general"
+        if key not in _pipelines:
+            db_path = library_db_path(user_id, lib_id)
+            db_path.parent.mkdir(parents=True, exist_ok=True)
+            pipe = LiteratureSearchPipeline(
+                db_path=str(db_path),
+                embedding_model="general",
             )
-            # Evict least-recently-used pipelines to bound memory. Never close a
-            # pipeline that has in-flight references — defer until last release.
+            setattr(pipe, "_lra_cache_key", key)
+            setattr(pipe, "_lra_library_id", lib_id)
+            _pipelines[key] = pipe
+            # Evict least-recently-used pipelines to bound memory.
             while len(_pipelines) > MAX_CACHED_USERS:
-                old_uid, old_pipeline = _pipelines.popitem(last=False)
-                if _pipeline_refcounts.get(old_uid, 0) > 0:
-                    _pending_close[old_uid] = old_pipeline
+                old_key, old_pipeline = _pipelines.popitem(last=False)
+                if _pipeline_refcounts.get(old_key, 0) > 0:
+                    _pending_close[old_key] = old_pipeline
                     continue
                 try:
                     old_pipeline.db.close()
                 except Exception:
-                    logger.exception("Failed to close evicted pipeline for %s", old_uid)
-        _pipelines.move_to_end(user_id)
-        _pipeline_refcounts[user_id] = _pipeline_refcounts.get(user_id, 0) + 1
-        return _pipelines[user_id]
+                    logger.exception("Failed to close evicted pipeline for %s", old_key)
+        _pipelines.move_to_end(key)
+        _pipeline_refcounts[key] = _pipeline_refcounts.get(key, 0) + 1
+        return _pipelines[key]
 
 
-def release_pipeline(user_id: str) -> None:
+def release_pipeline(user_id: str, library_id: Optional[str] = None) -> None:
     """Drop an in-flight reference, closing a deferred-evicted pipeline at 0."""
+    try:
+        lib_id = library_id or _pipeline_lib_ctx.get() or get_active_library_id(user_id)
+        key = pipeline_cache_key(user_id, lib_id)
+    except Exception:
+        key = user_id
     with _pipelines_lock:
-        count = _pipeline_refcounts.get(user_id, 0) - 1
+        count = _pipeline_refcounts.get(key, 0) - 1
         if count > 0:
-            _pipeline_refcounts[user_id] = count
+            _pipeline_refcounts[key] = count
             return
-        _pipeline_refcounts.pop(user_id, None)
-        # A pipeline evicted while in use is held in _pending_close (separate
-        # from any newer live pipeline under the same uid in _pipelines). Close
-        # the deferred object only — never the current live one.
-        pipeline = _pending_close.pop(user_id, None)
+        _pipeline_refcounts.pop(key, None)
+        pipeline = _pending_close.pop(key, None)
         if pipeline is not None:
             try:
                 pipeline.db.close()
             except Exception:
-                logger.exception("Failed to close deferred pipeline for %s", user_id)
+                logger.exception("Failed to close deferred pipeline for %s", key)
+    # Clear request binding after last matching release for this task context.
+    if library_id is None or _pipeline_lib_ctx.get() == library_id:
+        _pipeline_lib_ctx.set(None)
 
 
 def _evict_pipeline(user_id: str) -> None:
-    """Forcibly drop and close a user's cached pipeline and progress state.
-
-    Used when an account is deleted: the SQLite connection must be closed before
-    the user's data directory can be removed on Windows (open file handle would
-    block rmtree).
-    """
+    """Forcibly drop and close all cached pipelines for a user (account delete)."""
+    prefix = f"{user_id}:"
     with _pipelines_lock:
-        live = _pipelines.pop(user_id, None)
-        pending = _pending_close.pop(user_id, None)
-        _pipeline_refcounts.pop(user_id, None)
-        for pipe in (live, pending):
-            if pipe is not None:
-                try:
-                    pipe.db.close()
-                except Exception:
-                    logger.exception("Failed to close pipeline for %s during deletion", user_id)
+        keys = [
+            k for k in list(_pipelines.keys())
+            if k == user_id or k.startswith(prefix)
+        ]
+        for key in keys:
+            live = _pipelines.pop(key, None)
+            pending = _pending_close.pop(key, None)
+            _pipeline_refcounts.pop(key, None)
+            for pipe in (live, pending):
+                if pipe is not None:
+                    try:
+                        pipe.db.close()
+                    except Exception:
+                        logger.exception(
+                            "Failed to close pipeline for %s during deletion", key
+                        )
     with _progress_lock:
         _all_progress.pop(user_id, None)
 
@@ -237,6 +274,7 @@ def start_user_job(uid: str, task: str, fn, /, **kwargs) -> bool:
 
     Returns False if a job of this task type is already active for uid.
     The worker holds the pipeline ref until completion (release in done callback).
+    Jobs bind to the library that was active when the job started.
     """
     with _progress_lock:
         p = _ensure_progress(uid)
@@ -247,7 +285,8 @@ def start_user_job(uid: str, task: str, fn, /, **kwargs) -> bool:
             'cancel': False, 'articles_so_far': 0, 'message': '',
         })
 
-    pipe = get_pipeline(uid)
+    lib_id = get_active_library_id(uid)
+    pipe = get_pipeline(uid, lib_id)
     loop = asyncio.get_running_loop()
 
     def worker():
@@ -263,7 +302,7 @@ def start_user_job(uid: str, task: str, fn, /, **kwargs) -> bool:
             logger.exception("Background %s job failed for %s", task, uid)
             update_progress(uid, task, active=False, result=None, error=str(exc), cancel=False)
         finally:
-            release_pipeline(uid)
+            release_pipeline(uid, lib_id)
 
     future.add_done_callback(_on_done)
     return True
@@ -352,7 +391,7 @@ class FetchRequest(BaseModel):
 class MultiFetchRequest(BaseModel):
     sources: List[str]
     query: str
-    max_results: int = Field(default=200, ge=1, le=1000)
+    max_results: int = Field(default=100, ge=1, le=1000)
     email: Optional[str] = None
     # True = wipe collection first (default classroom "start fresh").
     # False = append / update without clearing.
@@ -407,6 +446,15 @@ class ClusterScreeningRequest(BaseModel):
 class SampleCorpusRequest(BaseModel):
     # True = wipe collection first (demo reset). False = append samples.
     clear_first: bool = True
+
+class LibraryCreateRequest(BaseModel):
+    name: str = Field(default="New library", min_length=1, max_length=64)
+
+class LibraryRenameRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=64)
+
+class LibrarySwitchRequest(BaseModel):
+    library_id: str
 
 class ResolveDuplicatesRequest(BaseModel):
     threshold: float = Field(default=0.95, ge=0.5, le=1.0)
@@ -1584,6 +1632,99 @@ async def api_coverage(req: CoverageRequest, request: Request):
         return server_error(e)
     finally:
         release_pipeline(uid)
+
+
+# ---------- Libraries (multi-collection workspaces) ----------
+
+@app.get("/api/libraries")
+async def api_list_libraries(request: Request):
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    try:
+        return list_libraries(user["user_id"])
+    except Exception as e:
+        return server_error(e)
+
+
+@app.post("/api/libraries")
+@limiter.limit("30/minute")
+async def api_create_library(req: LibraryCreateRequest, request: Request):
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    try:
+        result = create_library(user["user_id"], req.name)
+        return {"status": "success", **result}
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"detail": str(e)})
+    except Exception as e:
+        return server_error(e)
+
+
+@app.post("/api/libraries/switch")
+@limiter.limit("60/minute")
+async def api_switch_library(req: LibrarySwitchRequest, request: Request):
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    try:
+        result = set_active_library(user["user_id"], req.library_id)
+        return {"status": "success", **result}
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"detail": str(e)})
+    except Exception as e:
+        return server_error(e)
+
+
+@app.patch("/api/libraries/{library_id}")
+@limiter.limit("30/minute")
+async def api_rename_library(library_id: str, req: LibraryRenameRequest, request: Request):
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    try:
+        result = rename_library(user["user_id"], library_id, req.name)
+        return {"status": "success", **result}
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"detail": str(e)})
+    except Exception as e:
+        return server_error(e)
+
+
+@app.delete("/api/libraries/{library_id}")
+@limiter.limit("20/minute")
+async def api_delete_library(library_id: str, request: Request):
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    uid = user["user_id"]
+    try:
+        # Drop cached pipeline for this library before deleting files.
+        key = pipeline_cache_key(uid, library_id)
+        with _pipelines_lock:
+            pipe = _pipelines.pop(key, None)
+            _pending_close.pop(key, None)
+            _pipeline_refcounts.pop(key, None)
+        if pipe is not None:
+            try:
+                pipe.db.close()
+            except Exception:
+                pass
+        result = delete_library(uid, library_id)
+        return {"status": "success", **result}
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"detail": str(e)})
+    except Exception as e:
+        return server_error(e)
 
 
 @app.post("/api/change-password")
