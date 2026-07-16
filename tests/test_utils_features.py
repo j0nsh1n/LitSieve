@@ -122,7 +122,10 @@ def test_screening_report_empty_and_seeded(tmp_path):
     assert er["total_articles"] == 0
     assert er["by_source"] == {}
     assert er["with_embeddings"] == 0
-    assert er["excluded"] == {"duplicate": 0, "cluster": 0, "manual": 0, "total": 0}
+    assert er["excluded"]["total"] == 0
+    assert er["excluded"]["duplicate"] == 0
+    assert er["excluded"]["cluster"] == 0
+    assert er["excluded"]["manual"] == 0
     assert er["included"] == 0
     assert er["starred"] == 0
     assert er["clusters"] == 0
@@ -174,7 +177,10 @@ def test_screening_report_empty_and_seeded(tmp_path):
     assert r["total_articles"] == 6
     assert r["by_source"] == {"pubmed": 4, "arxiv": 2}
     assert r["with_embeddings"] == 2
-    assert r["excluded"] == {"duplicate": 1, "cluster": 1, "manual": 1, "total": 3}
+    assert r["excluded"]["duplicate"] == 1
+    assert r["excluded"]["cluster"] == 1
+    assert r["excluded"]["manual"] == 1
+    assert r["excluded"]["total"] == 3
     assert r["included"] == 3
     assert r["starred"] == 1
     assert r["clusters"] == 2
@@ -182,8 +188,8 @@ def test_screening_report_empty_and_seeded(tmp_path):
     txt = format_screening_report_txt(r)
     assert "SCREENING REPORT - 6 papers collected" in txt
     assert "Duplicates removed (kept best copy): 1" in txt
-    assert "Excluded as off-topic (cluster triage): 1" in txt
-    assert "Excluded manually: 1" in txt
+    assert "Excluded as cluster triage: 1" in txt
+    assert "Excluded (Manual): 1" in txt
     assert "INCLUDED in final set: 3" in txt
     assert "Starred: 1" in txt
     assert "With embeddings: 2" in txt

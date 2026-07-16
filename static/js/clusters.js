@@ -52,6 +52,32 @@ async function loadClusterEmptyState() {
  applyEmptyState('clusters-empty-state', stats, 'embeddings', 'clusters-empty-msg');
  }
  } catch (e) { /* page still usable */ }
+ document.querySelectorAll('.load-sample-btn').forEach(btn => {
+ btn.addEventListener('click', async () => {
+ setLoading(btn, true);
+ try {
+ await apiCall('/api/load-sample-corpus', {
+ method: 'POST',
+ body: { clear_first: true },
+ });
+ showNotification('Sample papers loaded. Preparing them for search on Data Management…', 'success');
+ // Kick prepare so clustering can run soon.
+ await apiCall('/api/create-embeddings', {
+ method: 'POST',
+ body: { model: 'general', only_missing: true },
+ });
+ window.location.href = '/data-management';
+ } catch (err) {
+ showNotification(`Sample load failed: ${err.message}`, 'error');
+ setLoading(btn, false);
+ }
+ });
+ });
+}
+
+function currentExclusionReason() {
+ const el = document.getElementById('exclusion-reason');
+ return (el && el.value) || 'manual';
 }
 
 async function loadClusters() {
@@ -191,7 +217,10 @@ function renderClusters(clusters) {
  const action = fullyExcluded ? 'include' : 'exclude';
  const res = await apiCall(`/api/clusters/${cluster.cluster_id}/screening`, {
  method: 'POST',
- body: { action }
+ body: {
+ action,
+ reason: action === 'exclude' ? 'cluster' : undefined,
+ }
  });
  showNotification(
  action === 'exclude'
@@ -268,7 +297,8 @@ function buildClusterArticleItem(article) {
  method: 'POST',
  body: {
  items: [{ article_id: article.article_id, source: article.source }],
- action: excluding ? 'exclude' : 'include'
+ action: excluding ? 'exclude' : 'include',
+ reason: excluding ? currentExclusionReason() : undefined,
  }
  });
  article.excluded = excluding;

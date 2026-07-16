@@ -11,7 +11,28 @@
 <section class="card empty-state-card" id="clusters-empty-state" hidden>
  <h2>Nothing to cluster yet</h2>
  <p class="info-text" id="clusters-empty-msg">Fetch and prepare papers on Data Management first.</p>
- <p><a class="btn btn-primary btn-sm" href="/data-management">Go to Data Management</a></p>
+ <p>
+  <a class="btn btn-primary btn-sm" href="/data-management">Go to Data Management</a>
+  <button type="button" class="btn btn-secondary btn-sm load-sample-btn">Load sample papers</button>
+ </p>
+</section>
+
+<section class="card" id="exclusion-reason-card">
+ <h2>Exclusion reason</h2>
+ <p class="info-text">When you screen out a paper (or a whole cluster), pick why. Counts show up on
+ the Duplicates screening report.</p>
+ <div class="form-group">
+  <label for="exclusion-reason">Default reason for Exclude buttons</label>
+  <select id="exclusion-reason">
+   <option value="off_topic">Off topic</option>
+   <option value="wrong_population">Wrong population</option>
+   <option value="wrong_study_type">Wrong study type</option>
+   <option value="language">Language</option>
+   <option value="insufficient_info">Insufficient abstract / info</option>
+   <option value="manual" selected>Manual</option>
+   <option value="other">Other</option>
+  </select>
+ </div>
 </section>
 
 <section class="card">
@@ -82,5 +103,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/clusters.js?v=20260715f"></script>
+<script src="/static/js/clusters.js?v=20260716a"></script>
 {% endblock %}

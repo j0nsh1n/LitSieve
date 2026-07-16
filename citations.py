@@ -164,3 +164,72 @@ def collection_to_ris(articles: List[dict]) -> str:
 def collection_to_bibtex(articles: List[dict]) -> str:
     parts = [article_to_bibtex(a).rstrip("\n") for a in articles]
     return "\n\n".join(parts) + ("\n" if parts else "")
+
+
+def _apa_authors(authors: List[str]) -> str:
+    """Format author list roughly as APA 7th (best-effort for free-text names)."""
+    if not authors:
+        return ""
+    formatted = []
+    for name in authors:
+        name = name.strip()
+        if not name:
+            continue
+        # "Last F" or "Last, F." or "First Last"
+        if "," in name:
+            formatted.append(name if name.endswith(".") else name + ".")
+            continue
+        parts = name.split()
+        if len(parts) == 1:
+            formatted.append(parts[0])
+        else:
+            # Assume last token is family name when "First Middle Last"
+            # or first token is family when "Last F" (initial without period).
+            if len(parts[-1]) <= 2 and parts[-1].isalpha():
+                family = parts[0]
+                initials = " ".join(p[0].upper() + "." for p in parts[1:] if p)
+                formatted.append(f"{family}, {initials}".strip())
+            else:
+                family = parts[-1]
+                initials = " ".join(p[0].upper() + "." for p in parts[:-1] if p)
+                formatted.append(f"{family}, {initials}".strip())
+    if not formatted:
+        return ""
+    if len(formatted) == 1:
+        return formatted[0]
+    if len(formatted) == 2:
+        return f"{formatted[0]}, & {formatted[1]}"
+    return ", ".join(formatted[:-1]) + f", & {formatted[-1]}"
+
+
+def article_to_apa(article: dict) -> str:
+    """One reference in approximate APA 7th journal-article style.
+
+    Free-text author strings from academic APIs are imperfect; this is good
+    enough for classroom drafts. Prefer Zotero/RIS for polished bibliographies.
+    """
+    authors = _apa_authors(_authors_list(article))
+    year = _four_digit_year(article.get("year")) or "n.d."
+    title = _collapse_ws(article.get("title") or "Untitled")
+    # Sentence case is ideal; we keep the stored title as-is.
+    journal = _collapse_ws(article.get("journal") or "")
+    source = (article.get("source") or "").strip()
+    aid = str(article.get("article_id") or "")
+
+    head = f"{authors} ({year}). " if authors else f"({year}). "
+    body = f"{title}."
+    if journal:
+        body += f" *{journal}*."
+    # DOI for CrossRef ids
+    if source == "crossref" and aid:
+        body += f" https://doi.org/{aid}"
+    else:
+        url = article_url(article)
+        if url:
+            body += f" {url}"
+    return head + body
+
+
+def collection_to_apa(articles: List[dict]) -> str:
+    lines = [article_to_apa(a) for a in articles]
+    return "\n\n".join(lines) + ("\n" if lines else "")

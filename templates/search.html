@@ -179,9 +179,9 @@
   <summary>What exports include and citation formatting</summary>
   <p class="info-text">Exports include cluster labels, exclusion status, stars, and private notes -
   useful for spreadsheet screening logs. Screening counts for hand-ins are on the Duplicates page.
-  For APA/MLA/Chicago hand-formatting, open
-  <a href="https://zbib.org/" target="_blank" rel="noopener">ZoteroBib</a> (free, no account), paste
-  a title or DOI from a result, and pick the style yourself.</p>
+  <strong>APA (text)</strong> is a classroom draft in approximate APA 7th style (author names from
+  databases vary). For polished APA/MLA/Chicago, open
+  <a href="https://zbib.org/" target="_blank" rel="noopener">ZoteroBib</a> or import RIS/BibTeX into Zotero.</p>
  </details>
  <div class="export-scope-row">
  <label for="lib-export-scope" class="help-text export-scope-label">Scope</label>
@@ -196,10 +196,11 @@
  <button type="button" class="btn btn-secondary btn-sm" data-lib-export-format="csv">CSV</button>
  <button type="button" class="btn btn-secondary btn-sm" data-lib-export-format="ris">RIS (Zotero/EndNote)</button>
  <button type="button" class="btn btn-secondary btn-sm" data-lib-export-format="bibtex">BibTeX</button>
+ <button type="button" class="btn btn-secondary btn-sm" data-lib-export-format="apa">APA (text)</button>
  </div>
 </section>
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/search.js?v=20260715f"></script>
+<script src="/static/js/search.js?v=20260716a"></script>
 {% endblock %}

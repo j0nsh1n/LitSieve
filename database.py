@@ -741,13 +741,16 @@ class ArticleDatabase:
 
         Args:
             keys: list of (article_id, source) tuples
-            reason: 'manual' | 'cluster' | 'duplicate'
+            reason: code from screening_reasons.EXCLUSION_REASONS
+                (manual | cluster | duplicate | off_topic | …)
 
         Returns:
             Number of rows written.
         """
         if not keys:
             return 0
+        from screening_reasons import normalize_reason
+        reason = normalize_reason(reason, default="manual")
         with self._lock:
             cursor = self.conn.cursor()
             cursor.executemany(
@@ -964,15 +967,13 @@ class ArticleDatabase:
                 "SELECT reason, COUNT(*) FROM screening GROUP BY reason"
             )
             reason_rows = cursor.fetchall()
-            excluded = {"duplicate": 0, "cluster": 0, "manual": 0, "total": 0}
+            from screening_reasons import EXCLUSION_REASONS, normalize_reason
+            excluded = {code: 0 for code in EXCLUSION_REASONS}
+            excluded["total"] = 0
             for reason, count in reason_rows:
                 n = int(count or 0)
-                key = (reason or "manual").strip().lower()
-                if key in ("duplicate", "cluster", "manual"):
-                    excluded[key] += n
-                else:
-                    # Unknown reasons still count toward total and manual bucket.
-                    excluded["manual"] += n
+                key = normalize_reason(reason, default="manual")
+                excluded[key] = excluded.get(key, 0) + n
                 excluded["total"] += n
 
             cursor.execute("SELECT COUNT(*) FROM notes WHERE starred = 1")
