@@ -7,6 +7,7 @@ import sqlite3
 import json
 import logging
 import pickle
+import re
 import threading
 import numpy as np
 from typing import List, Dict, Optional, Tuple
@@ -25,6 +26,9 @@ class ArticleDatabase:
         # busy_timeout waits up to 5s before raising instead of failing immediately.
         self.conn.execute("PRAGMA journal_mode=WAL")
         self.conn.execute("PRAGMA busy_timeout=5000")
+        # Child tables use ON DELETE CASCADE; upserts use ON CONFLICT DO UPDATE
+        # (not INSERT OR REPLACE) so FKs can stay on.
+        self.conn.execute("PRAGMA foreign_keys=ON")
         self._lock = threading.Lock()
         self.create_tables()
         self.migrate_schema()
@@ -61,6 +65,7 @@ class ArticleDatabase:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (article_id, source),
                 FOREIGN KEY (article_id, source) REFERENCES articles (article_id, source)
+                    ON DELETE CASCADE
             )
         """)
 
@@ -75,6 +80,7 @@ class ArticleDatabase:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (article_id, source),
                 FOREIGN KEY (article_id, source) REFERENCES articles (article_id, source)
+                    ON DELETE CASCADE
             )
         """)
 
@@ -90,6 +96,7 @@ class ArticleDatabase:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (article_id, source),
                 FOREIGN KEY (article_id, source) REFERENCES articles (article_id, source)
+                    ON DELETE CASCADE
             )
         """)
 
@@ -103,6 +110,7 @@ class ArticleDatabase:
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (article_id, source),
                 FOREIGN KEY (article_id, source) REFERENCES articles (article_id, source)
+                    ON DELETE CASCADE
             )
         """)
 
@@ -115,6 +123,7 @@ class ArticleDatabase:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (article_id, source),
                 FOREIGN KEY (article_id, source) REFERENCES articles (article_id, source)
+                    ON DELETE CASCADE
             )
         """)
 
@@ -258,40 +267,128 @@ class ArticleDatabase:
             cursor.execute("DELETE FROM articles")
             self.conn.commit()
 
-    def insert_articles(self, articles: List[Dict]) -> int:
-        """
-        Insert articles into database.
+    @staticmethod
+    def _norm_title(title: str) -> str:
+        """Normalize title for cheap fetch-time near-duplicate checks."""
+        t = (title or "").lower()
+        t = re.sub(r"[^a-z0-9\s]", " ", t)
+        t = re.sub(r"\s+", " ", t).strip()
+        return t
 
-        Args:
-            articles: List of article dictionaries with 'article_id' and 'source' keys
+    @staticmethod
+    def _norm_doi(article_id: str, source: str) -> str:
+        """Normalize DOI-like ids (CrossRef and bare DOI strings)."""
+        raw = (article_id or "").strip().lower()
+        if not raw:
+            return ""
+        raw = raw.replace("https://doi.org/", "").replace("http://doi.org/", "")
+        raw = raw.replace("doi:", "").strip()
+        # CrossRef always uses DOI as id; others only if it looks like one.
+        if source == "crossref" or raw.startswith("10."):
+            return raw
+        return ""
+
+    def insert_articles(self, articles: List[Dict], dedupe: bool = True) -> Dict:
+        """
+        Upsert articles into the database.
+
+        Uses ON CONFLICT DO UPDATE (not REPLACE) so foreign-key children are
+        not cascade-deleted when metadata is refreshed.
+
+        When dedupe=True, skip rows whose normalized title (or DOI) already
+        exists under another source in the collection or earlier in this batch.
 
         Returns:
-            Number of articles that were dropped due to insertion errors.
+            dict with inserted, updated, skipped_duplicates, dropped counts.
         """
+        inserted = 0
+        updated = 0
+        skipped_duplicates = 0
         dropped = 0
+
         with self._lock:
             cursor = self.conn.cursor()
+            existing_titles: set = set()
+            existing_dois: set = set()
+            if dedupe:
+                cursor.execute("SELECT article_id, source, title FROM articles")
+                for aid, src, title in cursor.fetchall():
+                    nt = self._norm_title(title)
+                    if nt:
+                        existing_titles.add(nt)
+                    doi = self._norm_doi(aid, src)
+                    if doi:
+                        existing_dois.add(doi)
+
+            batch_titles: set = set()
+            batch_dois: set = set()
+
             for article in articles:
                 try:
+                    aid = article['article_id']
+                    source = article.get('source', 'pubmed')
+                    title = article.get('title', '')
+                    nt = self._norm_title(title)
+                    doi = self._norm_doi(aid, source)
+
+                    cursor.execute(
+                        "SELECT 1 FROM articles WHERE article_id = ? AND source = ?",
+                        (aid, source),
+                    )
+                    existed = cursor.fetchone() is not None
+
+                    # Same primary key → upsert OK. Cross-source title/DOI dups skip.
+                    if dedupe and not existed:
+                        if doi and (doi in existing_dois or doi in batch_dois):
+                            skipped_duplicates += 1
+                            continue
+                        if nt and (nt in existing_titles or nt in batch_titles):
+                            skipped_duplicates += 1
+                            continue
+
                     cursor.execute("""
-                        INSERT OR REPLACE INTO articles
+                        INSERT INTO articles
                         (article_id, source, title, abstract, year, authors, journal)
                         VALUES (?, ?, ?, ?, ?, ?, ?)
+                        ON CONFLICT(article_id, source) DO UPDATE SET
+                            title = excluded.title,
+                            abstract = excluded.abstract,
+                            year = excluded.year,
+                            authors = excluded.authors,
+                            journal = excluded.journal
                     """, (
-                        article['article_id'],
-                        article.get('source', 'pubmed'),
-                        article.get('title', ''),
+                        aid,
+                        source,
+                        title,
                         article.get('abstract', ''),
                         article.get('year', ''),
                         json.dumps(article.get('authors', [])),
                         article.get('journal', '')
                     ))
+                    if existed:
+                        updated += 1
+                    else:
+                        inserted += 1
+                        if nt:
+                            batch_titles.add(nt)
+                            existing_titles.add(nt)
+                        if doi:
+                            batch_dois.add(doi)
+                            existing_dois.add(doi)
                 except Exception as e:
                     dropped += 1
                     logger.warning("Error inserting article %s: %s", article.get('article_id'), e)
             self.conn.commit()
-        logger.info("Inserted %d articles (%d dropped)", len(articles) - dropped, dropped)
-        return dropped
+        logger.info(
+            "Articles upsert: inserted=%d updated=%d skipped_dups=%d dropped=%d",
+            inserted, updated, skipped_duplicates, dropped,
+        )
+        return {
+            "inserted": inserted,
+            "updated": updated,
+            "skipped_duplicates": skipped_duplicates,
+            "dropped": dropped,
+        }
 
     def get_all_articles(self) -> List[Dict]:
         """Retrieve all articles from database"""
@@ -795,6 +892,20 @@ class ArticleDatabase:
             }
         return result
 
+    def get_year_counts(self) -> Dict[str, int]:
+        """Papers per publication year (unknown years under 'unknown')."""
+        from utils import parse_year
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT year FROM articles")
+            rows = cursor.fetchall()
+        counts: Dict[str, int] = {}
+        for (year_raw,) in rows:
+            y = parse_year(year_raw)
+            key = str(y) if y else "unknown"
+            counts[key] = counts.get(key, 0) + 1
+        return counts
+
     def get_statistics(self) -> Dict:
         """Get database statistics"""
         with self._lock:
@@ -816,12 +927,23 @@ class ArticleDatabase:
             cursor.execute("SELECT source, COUNT(*) FROM articles GROUP BY source")
             sources = {row[0]: row[1] for row in cursor.fetchall()}
 
+            cursor.execute("SELECT year FROM articles")
+            year_rows = cursor.fetchall()
+
+        from utils import parse_year
+        year_counts: Dict[str, int] = {}
+        for (year_raw,) in year_rows:
+            y = parse_year(year_raw)
+            key = str(y) if y else "unknown"
+            year_counts[key] = year_counts.get(key, 0) + 1
+
         return {
             'total_articles': article_count,
             'articles_with_embeddings': embedding_count,
             'num_clusters': cluster_count,
             'excluded_articles': excluded_count,
-            'sources': sources
+            'sources': sources,
+            'year_counts': year_counts,
         }
 
     def build_screening_report_counts(self) -> Dict:
@@ -861,10 +983,21 @@ class ArticleDatabase:
             )
             clusters = int(cursor.fetchone()[0] or 0)
 
+            cursor.execute("SELECT year FROM articles")
+            year_rows = cursor.fetchall()
+
+        from utils import parse_year
+        by_year: Dict[str, int] = {}
+        for (year_raw,) in year_rows:
+            y = parse_year(year_raw)
+            key = str(y) if y else "unknown"
+            by_year[key] = by_year.get(key, 0) + 1
+
         included = max(0, total_articles - excluded["total"])
         return {
             "total_articles": total_articles,
             "by_source": by_source,
+            "by_year": by_year,
             "with_embeddings": with_embeddings,
             "excluded": excluded,
             "included": included,

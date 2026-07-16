@@ -1,5 +1,5 @@
 """
-FastAPI Application — Literature Research Aide v3.5.0
+FastAPI Application — Literature Research Aide v3.7.0
 Multi-user web interface for literature search and analysis.
 """
 
@@ -74,12 +74,12 @@ def rate_limit_key(request: Request) -> str:
 limiter = Limiter(key_func=rate_limit_key)
 
 # At top of file
-app = FastAPI(title="Literature Research Aide", version="3.5.0")
+app = FastAPI(title="Literature Research Aide", version="3.7.0")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 @app.get("/health")
 async def health():
-    return {"status": "healthy", "version": "3.5.0"}
+    return {"status": "healthy", "version": "3.7.0"}
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
@@ -176,8 +176,14 @@ def _ensure_progress(user_id: str) -> dict:
     """Return progress dict for user, creating it if needed. Must be called under _progress_lock."""
     if user_id not in _all_progress:
         _all_progress[user_id] = {
-            'fetch': {'active': False, 'done': 0, 'total': 0, 'result': None, 'error': None},
-            'embed': {'active': False, 'done': 0, 'total': 0, 'result': None, 'error': None},
+            'fetch': {
+                'active': False, 'done': 0, 'total': 0, 'result': None, 'error': None,
+                'cancel': False, 'articles_so_far': 0, 'message': '',
+            },
+            'embed': {
+                'active': False, 'done': 0, 'total': 0, 'result': None, 'error': None,
+                'cancel': False, 'articles_so_far': 0, 'message': '',
+            },
         }
         while len(_all_progress) > MAX_CACHED_USERS:
             _all_progress.popitem(last=False)
@@ -185,16 +191,38 @@ def _ensure_progress(user_id: str) -> dict:
     # Backfill keys if an older in-memory entry lacks them.
     for task in ('fetch', 'embed'):
         slot = _all_progress[user_id].setdefault(
-            task, {'active': False, 'done': 0, 'total': 0, 'result': None, 'error': None}
+            task, {
+                'active': False, 'done': 0, 'total': 0, 'result': None, 'error': None,
+                'cancel': False, 'articles_so_far': 0, 'message': '',
+            }
         )
         slot.setdefault('result', None)
         slot.setdefault('error', None)
+        slot.setdefault('cancel', False)
+        slot.setdefault('articles_so_far', 0)
+        slot.setdefault('message', '')
     return _all_progress[user_id]
 
 
 def update_progress(user_id: str, task: str, **kwargs):
     with _progress_lock:
         _ensure_progress(user_id)[task].update(kwargs)
+
+
+def is_job_cancelled(user_id: str, task: str) -> bool:
+    with _progress_lock:
+        return bool(_ensure_progress(user_id)[task].get('cancel'))
+
+
+def request_job_cancel(user_id: str, task: str) -> bool:
+    """Set cancel flag for an active job. Returns False if nothing active."""
+    with _progress_lock:
+        slot = _ensure_progress(user_id)[task]
+        if not slot.get('active'):
+            return False
+        slot['cancel'] = True
+        slot['message'] = 'Cancelling…'
+        return True
 
 
 def start_user_job(uid: str, task: str, fn, /, **kwargs) -> bool:
@@ -209,6 +237,7 @@ def start_user_job(uid: str, task: str, fn, /, **kwargs) -> bool:
             return False
         p[task].update({
             'active': True, 'done': 0, 'total': 0, 'result': None, 'error': None,
+            'cancel': False, 'articles_so_far': 0, 'message': '',
         })
 
     pipe = get_pipeline(uid)
@@ -222,10 +251,10 @@ def start_user_job(uid: str, task: str, fn, /, **kwargs) -> bool:
     def _on_done(fut):
         try:
             result = fut.result()
-            update_progress(uid, task, active=False, result=result, error=None)
+            update_progress(uid, task, active=False, result=result, error=None, cancel=False)
         except Exception as exc:
             logger.exception("Background %s job failed for %s", task, uid)
-            update_progress(uid, task, active=False, result=None, error=str(exc))
+            update_progress(uid, task, active=False, result=None, error=str(exc), cancel=False)
         finally:
             release_pipeline(uid)
 
@@ -380,7 +409,7 @@ class DeleteAccountRequest(BaseModel):
 async def login_page(request: Request):
     if current_user(request):
         return RedirectResponse(url="/data-management", status_code=302)
-    return templates.TemplateResponse(request, "login.html", context={"error": ""})
+    return templates.TemplateResponse(request, "login.html", context={"error": "", "info": ""})
 
 
 @app.post("/login")
@@ -395,7 +424,7 @@ async def login_submit(
     if not user or not verify_password(password, user["hashed_password"]):
         return templates.TemplateResponse(
             request, "login.html",
-            context={"error": "Invalid username or password"},
+            context={"error": "Invalid username or password", "info": ""},
             status_code=400,
         )
     token = create_token(
@@ -411,6 +440,92 @@ async def register_page(request: Request):
     if current_user(request):
         return RedirectResponse(url="/data-management", status_code=302)
     return templates.TemplateResponse(request, "register.html", context={"error": "", "username": ""})
+
+
+def _reset_codes_in_response() -> bool:
+    """Classroom/self-host: show the reset code when DEBUG or explicit flag is set."""
+    if os.getenv("RESET_CODES_IN_RESPONSE", "").strip().lower() in ("1", "true", "yes"):
+        return True
+    return os.getenv("DEBUG", "").strip().lower() in ("1", "true", "yes")
+
+
+@app.get("/reset-password")
+async def reset_password_page(request: Request):
+    if current_user(request):
+        return RedirectResponse(url="/data-management", status_code=302)
+    return templates.TemplateResponse(
+        request, "reset_password.html",
+        context={"error": "", "info": "", "username": "", "reset_code": ""},
+    )
+
+
+@app.post("/reset-password/request")
+@limiter.limit("5/minute")
+async def reset_password_request(request: Request, username: str = Form(...)):
+    """Issue a one-time reset code. Always looks successful (no user enum)."""
+    username = (username or "").strip().lower()
+    token = user_db.create_password_reset_token(username) if username else None
+    if token:
+        logger.info("Password reset code issued for %s", username)
+    info = (
+        "If that login exists, a reset code was created. "
+        "Enter it below with a new password."
+    )
+    reset_code = ""
+    if token and _reset_codes_in_response():
+        # Self-hosted / DEBUG: surface the code so teachers don't need SMTP.
+        reset_code = token
+        info = (
+            "Reset code created (shown once below — DEBUG/classroom mode). "
+            "Use it with your new password."
+        )
+    return templates.TemplateResponse(
+        request, "reset_password.html",
+        context={
+            "error": "",
+            "info": info,
+            "username": username,
+            "reset_code": reset_code,
+        },
+    )
+
+
+@app.post("/reset-password/confirm")
+@limiter.limit("10/minute")
+async def reset_password_confirm(
+    request: Request,
+    username: str = Form(...),
+    token: str = Form(...),
+    password: str = Form(...),
+    password_confirm: str = Form(...),
+):
+    username = (username or "").strip().lower()
+    error = None
+    if len(password) < 8:
+        error = "Password must be at least 8 characters."
+    elif password != password_confirm:
+        error = "Passwords do not match."
+    elif len(password.encode("utf-8")) > 72:
+        error = "Password is too long (max 72 bytes)."
+    if error:
+        return templates.TemplateResponse(
+            request, "reset_password.html",
+            context={"error": error, "info": "", "username": username, "reset_code": ""},
+            status_code=400,
+        )
+    ok, err = user_db.consume_password_reset_token(
+        username, token, hash_password(password),
+    )
+    if not ok:
+        return templates.TemplateResponse(
+            request, "reset_password.html",
+            context={"error": err, "info": "", "username": username, "reset_code": ""},
+            status_code=400,
+        )
+    return templates.TemplateResponse(
+        request, "login.html",
+        context={"error": "", "info": "Password updated. You can log in now."},
+    )
 
 
 @app.post("/register")
@@ -902,6 +1017,7 @@ async def api_clear_articles(request: Request):
     p = get_pipeline(uid)
     try:
         await run_in_thread(p.db.clear_all)
+        p.invalidate_corpus_cache()
         return {"status": "success"}
     except Exception as e:
         return server_error(e)
@@ -911,12 +1027,27 @@ async def api_clear_articles(request: Request):
 
 def _run_multi_fetch(p, *, query, sources, max_results, email, clear_first, uid):
     """Blocking multi-source fetch for sync wait= or background jobs."""
-    update_progress(uid, 'fetch', done=0, total=len(sources))
+    update_progress(
+        uid, 'fetch', done=0, total=len(sources),
+        articles_so_far=0, message='Starting fetch…', cancel=False,
+    )
     if clear_first:
         p.db.clear_all()
+        p.invalidate_corpus_cache()
 
-    def on_source_done(done, total):
-        update_progress(uid, 'fetch', done=done, total=total)
+    def on_source_done(done, total, **extra):
+        arts = extra.get('articles_so_far', 0)
+        src = extra.get('source') or ''
+        sc = extra.get('source_count', 0)
+        kind = extra.get('error_kind')
+        if kind and kind not in (None, 'no_results'):
+            msg = f"{done}/{total} sources · {arts} papers · {src}: {kind}"
+        else:
+            msg = f"{done}/{total} sources · {arts} papers · last: {src} (+{sc})"
+        update_progress(
+            uid, 'fetch', done=done, total=total,
+            articles_so_far=arts, message=msg,
+        )
 
     results = p.fetch_articles_parallel(
         query=query,
@@ -924,17 +1055,27 @@ def _run_multi_fetch(p, *, query, sources, max_results, email, clear_first, uid)
         max_results=max_results,
         email=email or "user@example.com",
         progress_callback=on_source_done,
+        cancel_check=lambda: is_job_cancelled(uid, 'fetch'),
     )
+    p.invalidate_corpus_cache()
     total = sum(v['count'] for v in results.values())
     errors = {src: v['error'] for src, v in results.items() if v['error']}
+    error_kinds = {
+        src: v.get('error_kind')
+        for src, v in results.items()
+        if v.get('error_kind')
+    }
     ok = {src: v['count'] for src, v in results.items() if not v['error']}
+    cancelled = is_job_cancelled(uid, 'fetch')
     return {
-        "status": "success",
+        "status": "cancelled" if cancelled else "success",
         "total_fetched": total,
         "by_source": {src: v['count'] for src, v in results.items()},
         "ok_sources": ok,
         "errors": errors,
+        "error_kinds": error_kinds,
         "cleared_first": clear_first,
+        "cancelled": cancelled,
     }
 
 
@@ -965,7 +1106,7 @@ async def api_fetch_multi(req: MultiFetchRequest, request: Request):
 
     p = get_pipeline(uid)
     update_progress(uid, 'fetch', active=True, done=0, total=len(req.sources),
-                    result=None, error=None)
+                    result=None, error=None, cancel=False, articles_so_far=0)
     try:
         result = await run_in_thread(_run_multi_fetch, p, **job_kwargs)
         update_progress(uid, 'fetch', active=False, result=result, error=None)
@@ -976,6 +1117,26 @@ async def api_fetch_multi(req: MultiFetchRequest, request: Request):
     finally:
         update_progress(uid, 'fetch', active=False)
         release_pipeline(uid)
+
+
+@app.post("/api/jobs/{task}/cancel")
+@limiter.limit("30/minute")
+async def api_cancel_job(task: str, request: Request):
+    """Request cancel for an active background job (fetch or embed)."""
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    if task not in ("fetch", "embed"):
+        return JSONResponse(status_code=400, content={"detail": "Unknown task"})
+    ok = request_job_cancel(user["user_id"], task)
+    if not ok:
+        return JSONResponse(
+            status_code=409,
+            content={"detail": f"No active {task} job to cancel"},
+        )
+    return {"status": "cancelling", "task": task}
 
 
 @app.post("/api/fetch-articles")
@@ -1228,6 +1389,7 @@ async def api_screening(req: ScreeningRequest, request: Request):
             count = p.db.exclude_articles(keys, reason='manual')
         else:
             count = p.db.include_articles(keys)
+        p.invalidate_corpus_cache()
         return {"status": "success", "action": req.action, "count": count}
     except Exception as e:
         return server_error(e)
@@ -1253,6 +1415,7 @@ async def api_cluster_screening(cluster_id: int, req: ClusterScreeningRequest, r
             count = p.db.exclude_articles(keys, reason='cluster')
         else:
             count = p.db.include_articles(keys)
+        p.invalidate_corpus_cache()
         return {"status": "success", "action": req.action, "cluster_id": cluster_id, "count": count}
     except Exception as e:
         return server_error(e)

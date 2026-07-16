@@ -3,10 +3,13 @@ User Database
 Stores user accounts in users.db, separate from per-user article data.
 """
 
+import hashlib
+import secrets
 import sqlite3
 import uuid
 import threading
-from typing import Optional, Dict
+from datetime import datetime, timedelta, timezone
+from typing import Optional, Dict, Tuple
 
 
 class UserDatabase:
@@ -36,6 +39,18 @@ class UserDatabase:
             self.conn.execute(
                 "ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0"
             )
+        # One-time password-reset codes (hashed). Classroom hosts can surface
+        # the plaintext code when DEBUG/RESET_CODES_IN_RESPONSE is set.
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                username     TEXT NOT NULL COLLATE NOCASE,
+                token_hash   TEXT NOT NULL,
+                expires_at   TEXT NOT NULL,
+                used         INTEGER NOT NULL DEFAULT 0,
+                created_at   TEXT DEFAULT (datetime('now')),
+                PRIMARY KEY (username, token_hash)
+            )
+        """)
         self.conn.commit()
 
     def create_user(self, username: str, hashed_password: str) -> Dict:
@@ -106,3 +121,72 @@ class UserDatabase:
             cur = self.conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
             self.conn.commit()
             return cur.rowcount > 0
+
+    @staticmethod
+    def _hash_reset_token(token: str) -> str:
+        return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+    def create_password_reset_token(
+        self, username: str, ttl_minutes: int = 60
+    ) -> Optional[str]:
+        """Create a one-time reset code for username. Returns plaintext token or None."""
+        user = self.get_by_username(username)
+        if not user:
+            return None
+        token = secrets.token_urlsafe(24)
+        token_hash = self._hash_reset_token(token)
+        expires = (
+            datetime.now(timezone.utc) + timedelta(minutes=ttl_minutes)
+        ).strftime("%Y-%m-%d %H:%M:%S")
+        uname = user["username"]
+        with self._lock:
+            # Invalidate prior unused tokens for this user.
+            self.conn.execute(
+                "UPDATE password_reset_tokens SET used = 1 "
+                "WHERE username = ? COLLATE NOCASE AND used = 0",
+                (uname,),
+            )
+            self.conn.execute(
+                "INSERT INTO password_reset_tokens (username, token_hash, expires_at, used) "
+                "VALUES (?, ?, ?, 0)",
+                (uname, token_hash, expires),
+            )
+            self.conn.commit()
+        return token
+
+    def consume_password_reset_token(
+        self, username: str, token: str, new_hashed_password: str
+    ) -> Tuple[bool, str]:
+        """Validate token and set password. Returns (ok, error_message)."""
+        if not token or not username:
+            return False, "Reset code and login are required."
+        token_hash = self._hash_reset_token(token.strip())
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        with self._lock:
+            row = self.conn.execute(
+                "SELECT username, expires_at, used FROM password_reset_tokens "
+                "WHERE username = ? COLLATE NOCASE AND token_hash = ?",
+                (username.strip(), token_hash),
+            ).fetchone()
+            if not row:
+                return False, "Invalid or expired reset code."
+            uname, expires_at, used = row[0], row[1], int(row[2] or 0)
+            if used:
+                return False, "This reset code was already used."
+            if expires_at < now:
+                return False, "This reset code has expired. Request a new one."
+            cur = self.conn.execute(
+                "UPDATE users SET hashed_password = ?, "
+                "token_version = token_version + 1 "
+                "WHERE username = ? COLLATE NOCASE",
+                (new_hashed_password, uname),
+            )
+            if cur.rowcount == 0:
+                return False, "Account not found."
+            self.conn.execute(
+                "UPDATE password_reset_tokens SET used = 1 "
+                "WHERE username = ? COLLATE NOCASE AND token_hash = ?",
+                (uname, token_hash),
+            )
+            self.conn.commit()
+        return True, ""

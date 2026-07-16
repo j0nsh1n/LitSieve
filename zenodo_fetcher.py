@@ -4,10 +4,9 @@ CERN open science platform — publications, preprints, datasets across all fiel
 Free API, no authentication required
 """
 
-import time
-import requests
+import re
 from typing import List, Dict
-from base_fetcher import BaseFetcher
+from base_fetcher import BaseFetcher, HttpClient, FetchError
 
 
 class ZenodoFetcher(BaseFetcher):
@@ -15,9 +14,9 @@ class ZenodoFetcher(BaseFetcher):
     BASE_URL = 'https://zenodo.org/api/records'
 
     def __init__(self, email: str = None):
-        self.session = requests.Session()
-        self.session.headers['User-Agent'] = (
-            f'LiteratureSearchTool/1.0 ({email or "research@example.com"})'
+        self.http = HttpClient(
+            delay=0.3,
+            user_agent=f'LiteratureResearchAide/3.7 ({email or "research@example.com"})',
         )
 
     def search_and_fetch(self, query: str, max_results: int = 500) -> List[Dict]:
@@ -28,7 +27,7 @@ class ZenodoFetcher(BaseFetcher):
         while len(articles) < max_results:
             n = min(per_page, max_results - len(articles))
             try:
-                r = self.session.get(
+                r = self.http.get(
                     self.BASE_URL,
                     params={
                         'q': query,
@@ -37,9 +36,7 @@ class ZenodoFetcher(BaseFetcher):
                         'type': 'publication',
                         'status': 'published',
                     },
-                    timeout=30
                 )
-                r.raise_for_status()
                 hits = r.json().get('hits', {}).get('hits', [])
                 if not hits:
                     break
@@ -50,7 +47,9 @@ class ZenodoFetcher(BaseFetcher):
                 if len(hits) < n:
                     break
                 page += 1
-                time.sleep(0.3)
+            except FetchError as e:
+                print(f"Zenodo fetch error: {e}")
+                raise
             except Exception as e:
                 print(f"Zenodo fetch error: {e}")
                 break
@@ -65,8 +64,6 @@ class ZenodoFetcher(BaseFetcher):
             if not title or not abstract:
                 return None
 
-            # Strip any HTML tags from description
-            import re
             abstract = re.sub(r'<[^>]+>', '', abstract).strip()
             if not abstract:
                 return None

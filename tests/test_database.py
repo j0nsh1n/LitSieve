@@ -89,7 +89,8 @@ def test_insert_and_get_all_articles(article_db):
             "source": "arxiv",
         },
     ]
-    dropped = article_db.insert_articles(articles)
+    result = article_db.insert_articles(articles)
+    dropped = result["dropped"] if isinstance(result, dict) else result
     assert dropped == 0
 
     stored = article_db.get_all_articles()

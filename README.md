@@ -7,7 +7,7 @@ sdk: docker
 app_port: 7860
 ---
 
-# Literature Research Aide 📚 — v3.5.0
+# Literature Research Aide 📚 — v3.7.0
 
 A multi-user web app for **teachers and students** to fetch, screen, and rank
 research papers across many academic databases. Semantic embeddings power
@@ -20,18 +20,22 @@ Built with **FastAPI**, sentence-transformers, FAISS, and scikit-learn.
 
 - 🔍 Fetch from **12 sources** in parallel (PubMed, Europe PMC, ClinicalTrials.gov,
   OpenAlex, arXiv, Semantic Scholar, ERIC, Zenodo, CrossRef, DOAJ, NASA ADS, CORE)
-  — replace or append; **background jobs** with progress bars
-- 🧠 Semantic embeddings (only-new or full re-embed; GPU when available; background job)
+  — replace or append; **background jobs** with progress, cancel, retries, and
+  per-source error classes
+- 🧠 Semantic embeddings (only-new or full re-embed; topic-based model pick; GPU when
+  available; background job) + **extractive key points** from abstracts
 - 🎯 Hybrid similarity search (meaning + exact words), **year range**, plain text /
-  PICO / **seed paper** / **more like my starred**, highlights & private notes
+  PICO / **seed paper** / **more like my starred**, highlights & private notes;
+  paginated result lists
 - 🧩 Clustering: Density (HDBSCAN), K-Means, Hierarchical — **triage only on Clusters**
+  (paginated article lists)
 - 🔄 Cross-source duplicate detection + preferred-source auto-resolve
-- 📋 **Screening report** (collected / excluded by reason / included) on Duplicates
-- 📈 Coverage map and per-source breakdown
+- 📋 **Screening report** (collected / excluded by reason / included / by year) on Duplicates
+- 📈 Coverage map, papers-by-year timeline, and per-source breakdown
 - 💾 Per-user SQLite, JWT + bcrypt, CSRF, **per-user rate limits**, change password
-  (revokes other sessions via `token_version`)
+  (revokes other sessions via `token_version`), **password reset**
 - 📤 Export ranked hits (CSV/TXT) or full library (**CSV / RIS / BibTeX**) by scope
-- 📖 Public landing + `/learn/…` feature guides (no login required to read)
+- 📖 Public landing + `/learn/…` feature guides; first-run checklist + empty states
 
 ## Project Structure
 
@@ -39,12 +43,13 @@ Built with **FastAPI**, sentence-transformers, FAISS, and scikit-learn.
 .
 ├── main.py                 # FastAPI application (entry point)
 ├── pipeline.py             # Orchestrates fetch → embed → cluster → search
-├── base_fetcher.py         # Abstract fetcher interface
+├── base_fetcher.py         # Abstract fetcher + shared HttpClient (retry/backoff)
 ├── <source>_fetcher.py     # One fetcher per source (pubmed_fetcher.py, …)
 ├── database.py             # Per-user article/embedding/cluster/notes SQLite
 ├── user_db.py              # User-account database (users.db)
 ├── auth.py                 # JWT + bcrypt password hashing
 ├── embeddings.py           # EmbeddingEngine + PICOExtractor
+├── summarize.py            # Extractive key points (structured + centroid)
 ├── clustering.py           # Clustering, TF-IDF labels, Plotly visualizations
 ├── utils.py                # Year sort, source priority, coverage, briefings, screening report
 ├── citations.py            # RIS + BibTeX export

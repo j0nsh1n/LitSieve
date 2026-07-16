@@ -4,10 +4,9 @@ Directory of Open Access Journals — peer-reviewed open access across all field
 Free API, no authentication required
 """
 
-import time
-import requests
+from urllib.parse import quote
 from typing import List, Dict
-from base_fetcher import BaseFetcher
+from base_fetcher import BaseFetcher, HttpClient, FetchError
 
 
 class DOAJFetcher(BaseFetcher):
@@ -15,9 +14,9 @@ class DOAJFetcher(BaseFetcher):
     BASE_URL = 'https://doaj.org/api/v3/search/articles'
 
     def __init__(self, email: str = None):
-        self.session = requests.Session()
-        self.session.headers['User-Agent'] = (
-            f'LiteratureSearchTool/1.0 ({email or "research@example.com"})'
+        self.http = HttpClient(
+            delay=0.3,
+            user_agent=f'LiteratureResearchAide/3.7 ({email or "research@example.com"})',
         )
 
     def search_and_fetch(self, query: str, max_results: int = 500) -> List[Dict]:
@@ -28,12 +27,10 @@ class DOAJFetcher(BaseFetcher):
         while len(articles) < max_results:
             n = min(page_size, max_results - len(articles))
             try:
-                r = self.session.get(
-                    f'{self.BASE_URL}/{requests.utils.quote(query)}',
+                r = self.http.get(
+                    f'{self.BASE_URL}/{quote(query)}',
                     params={'page': page, 'pageSize': n},
-                    timeout=30
                 )
-                r.raise_for_status()
                 data = r.json()
                 results = data.get('results', [])
                 if not results:
@@ -45,7 +42,9 @@ class DOAJFetcher(BaseFetcher):
                 if len(results) < n:
                     break
                 page += 1
-                time.sleep(0.3)
+            except FetchError as e:
+                print(f"DOAJ fetch error: {e}")
+                raise
             except Exception as e:
                 print(f"DOAJ fetch error: {e}")
                 break

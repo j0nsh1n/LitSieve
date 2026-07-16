@@ -61,8 +61,19 @@ document.addEventListener('DOMContentLoaded', () => {
  loadPageData();
  refreshCoverage();
  document.getElementById('fetch-btn').addEventListener('click', doFetch);
+ const cancelBtn = document.getElementById('fetch-cancel-btn');
+ if (cancelBtn) cancelBtn.addEventListener('click', cancelFetch);
  document.getElementById('embeddings-btn').addEventListener('click', doCreateEmbeddings);
  document.getElementById('coverage-refresh').addEventListener('click', refreshCoverage);
+ const dismissGs = document.getElementById('dismiss-getting-started');
+ if (dismissGs) dismissGs.addEventListener('click', () => {
+ if (typeof dismissGettingStarted === 'function') dismissGettingStarted();
+ });
+ // Live checklist ticks as the student fills the form.
+ ['fetch-query'].forEach(id => {
+ const el = document.getElementById(id);
+ if (el) el.addEventListener('input', updateGettingStartedChecklist);
+ });
 
     // Persist prefs as the user edits.
  ['fetch-query', 'fetch-max', 'fetch-email', 'embedding-model'].forEach(id => {
@@ -289,8 +300,54 @@ async function loadPageData() {
  // Keep the hint truthful after syncing to the corpus model.
  updateModelHint();
  }
+ updateGettingStartedCard(stats.total_articles || 0);
  } catch (e) {
  document.getElementById('embedding-info').textContent = 'Unable to load article info.';
+ updateGettingStartedCard(0);
+ }
+}
+
+function updateGettingStartedCard(totalArticles) {
+ const card = document.getElementById('getting-started-card');
+ if (!card) return;
+ // Hide once the user has any papers, or if they dismissed it.
+ if (totalArticles > 0 || (typeof isGettingStartedDismissed === 'function' && isGettingStartedDismissed())) {
+ card.hidden = true;
+ return;
+ }
+ card.hidden = false;
+ updateGettingStartedChecklist();
+}
+
+function updateGettingStartedChecklist() {
+ const card = document.getElementById('getting-started-card');
+ if (!card || card.hidden) return;
+ const hasTopics = selectedTopics.size > 0;
+ const query = (document.getElementById('fetch-query') || {}).value || '';
+ const hasQuery = query.trim().length >= 3;
+ const steps = {
+ topics: hasTopics,
+ query: hasQuery,
+ fetch: false, // completed only after a successful fetch (collection non-empty)
+ };
+ card.querySelectorAll('.getting-started-list li').forEach(li => {
+ const key = li.getAttribute('data-step');
+ const done = !!steps[key];
+ li.classList.toggle('is-done', done);
+ const mark = li.querySelector('.gs-check');
+ if (mark) mark.textContent = done ? '●' : '○';
+ });
+}
+
+async function cancelFetch() {
+ const btn = document.getElementById('fetch-cancel-btn');
+ if (btn) btn.disabled = true;
+ try {
+ await apiCall('/api/jobs/fetch/cancel', { method: 'POST', body: {} });
+ showNotification('Cancel requested — finishing the current source…', 'info');
+ } catch (e) {
+ showNotification(`Could not cancel: ${e.message}`, 'error');
+ if (btn) btn.disabled = false;
  }
 }
 
@@ -367,7 +424,10 @@ function waitForJob(task, fillId, labelId, wrapId, formatLabel, timeoutMs = 6000
  if (p.active) {
  const pct = p.total > 0 ? Math.round((p.done / p.total) * 100) : 0;
  fill.style.width = pct + '%';
- label.textContent = formatLabel(p.done, p.total, pct);
+ // Prefer server message (includes paper counts) when present.
+ label.textContent = p.message
+ ? p.message
+ : formatLabel(p.done, p.total, pct, p);
  return;
  }
  clearInterval(interval);
@@ -396,8 +456,18 @@ function applyFetchResult(data, sources) {
  const okLines = Object.entries(data.by_source || {})
  .filter(([src]) => !(data.errors || {})[src])
  .map(([src, count]) => `✓ ${getSourceName(src)}: ${count}`);
+ const kinds = data.error_kinds || {};
  const errLines = Object.entries(data.errors || {})
- .map(([src, msg]) => `✗ ${getSourceName(src)}: ${msg}`);
+ .map(([src, msg]) => {
+ const kind = kinds[src] ? ` [${kinds[src]}]` : '';
+ return `✗ ${getSourceName(src)}${kind}: ${msg}`;
+ });
+ // Surface no-results sources gently
+ Object.entries(kinds).forEach(([src, kind]) => {
+ if (kind === 'no_results' && !(data.errors || {})[src]) {
+ errLines.push(`· ${getSourceName(src)}: no results`);
+ }
+ });
  const report = document.getElementById('fetch-source-report');
  report.style.display = 'block';
  report.innerHTML = [...okLines, ...errLines].map(escapeHtml).join('<br>');
@@ -407,7 +477,10 @@ function applyFetchResult(data, sources) {
  .map(([src, count]) => `${getSourceName(src)}: ${count}`)
  .join(' · ');
 
- if (errorCount === 0) {
+ if (data.cancelled) {
+ setStatus('fetch-status', `Fetch cancelled after ${data.total_fetched || 0} articles - ${breakdown}`, 'warning');
+ showNotification(`Fetch cancelled (${data.total_fetched || 0} papers kept).`, 'warning');
+ } else if (errorCount === 0) {
  setStatus('fetch-status', `Fetched ${data.total_fetched} articles - ${breakdown}`, 'success');
  showNotification(`Fetched ${data.total_fetched} articles!`, 'success');
  } else if (errorCount < sources.length) {
@@ -435,7 +508,12 @@ async function doFetch() {
  saveFetchPrefs();
 
  const btn = document.getElementById('fetch-btn');
+ const cancelBtn = document.getElementById('fetch-cancel-btn');
  setLoading(btn, true);
+ if (cancelBtn) {
+ cancelBtn.hidden = false;
+ cancelBtn.disabled = false;
+ }
  document.getElementById('fetch-source-report').style.display = 'none';
  setStatus(
  'fetch-status',
@@ -461,14 +539,17 @@ async function doFetch() {
  if (started && started.status === 'started') {
  data = await waitForJob(
  'fetch', 'fetch-progress-fill', 'fetch-progress-label', 'fetch-progress-wrap',
- (done, total) => `${done} of ${total} source(s) done`
+ (done, total, _pct, p) => {
+ const arts = (p && p.articles_so_far) || 0;
+ return `${done} of ${total} source(s) · ${arts} paper(s) so far`;
+ }
  );
  }
  applyFetchResult(data, sources);
  // Chain the prepare step so students don't have to remember it.
  // doCreateEmbeddings handles its own errors; a prepare failure
  // never marks the fetch as failed.
- if ((data.total_fetched || 0) > 0) {
+ if ((data.total_fetched || 0) > 0 && !data.cancelled) {
  await doCreateEmbeddings(true);
  }
  } catch (e) {
@@ -482,6 +563,10 @@ async function doFetch() {
  }
  } finally {
  setLoading(btn, false);
+ if (cancelBtn) {
+ cancelBtn.hidden = true;
+ cancelBtn.disabled = false;
+ }
  }
 }
 

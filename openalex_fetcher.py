@@ -3,12 +3,10 @@ OpenAlex Fetcher
 Fetches scholarly works from OpenAlex API
 """
 
-import requests
-import time
 from typing import List, Dict, Optional
 from tqdm import tqdm
 
-from base_fetcher import BaseFetcher
+from base_fetcher import BaseFetcher, HttpClient, FetchError
 
 
 class OpenAlexFetcher(BaseFetcher):
@@ -20,6 +18,9 @@ class OpenAlexFetcher(BaseFetcher):
     def __init__(self, email: str = None, **kwargs):
         """Email is optional but gets you into the polite pool"""
         self.email = email
+
+        self.http = HttpClient(delay=0.2)
+
 
     def search(self, query: str, max_results: int = 1000) -> List[str]:
         """Search OpenAlex, return work IDs"""
@@ -39,8 +40,7 @@ class OpenAlexFetcher(BaseFetcher):
                 params["mailto"] = self.email
 
             try:
-                resp = requests.get(f"{self.BASE_URL}/works", params=params, timeout=30)
-                resp.raise_for_status()
+                resp = self.http.get(f"{self.BASE_URL}/works", params=params, timeout=30)
                 data = resp.json()
 
                 results = data.get("results", [])
@@ -53,7 +53,6 @@ class OpenAlexFetcher(BaseFetcher):
                         ids.append(openalex_id)
 
                 page += 1
-                time.sleep(0.2)
 
             except Exception as e:
                 print(f"Error searching OpenAlex: {e}")
@@ -80,8 +79,7 @@ class OpenAlexFetcher(BaseFetcher):
                 params["mailto"] = self.email
 
             try:
-                resp = requests.get(f"{self.BASE_URL}/works", params=params, timeout=30)
-                resp.raise_for_status()
+                resp = self.http.get(f"{self.BASE_URL}/works", params=params, timeout=30)
                 results = resp.json().get("results", [])
 
                 if not results:
@@ -93,7 +91,6 @@ class OpenAlexFetcher(BaseFetcher):
                         articles.append(parsed)
 
                 page += 1
-                time.sleep(0.2)
 
             except Exception as e:
                 print(f"Error fetching from OpenAlex: {e}")
@@ -118,13 +115,11 @@ class OpenAlexFetcher(BaseFetcher):
                 params["mailto"] = self.email
 
             try:
-                resp = requests.get(f"{self.BASE_URL}/works", params=params, timeout=30)
-                resp.raise_for_status()
+                resp = self.http.get(f"{self.BASE_URL}/works", params=params, timeout=30)
                 for work in resp.json().get("results", []):
                     parsed = self._parse_work(work)
                     if parsed:
                         articles.append(parsed)
-                time.sleep(0.2)
             except Exception as e:
                 print(f"Error fetching batch: {e}")
 

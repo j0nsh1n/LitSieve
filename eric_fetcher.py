@@ -5,10 +5,8 @@ Covers: education, psychology, social sciences, history, literature
 Free API, no authentication required
 """
 
-import time
-import requests
 from typing import List, Dict
-from base_fetcher import BaseFetcher
+from base_fetcher import BaseFetcher, HttpClient, FetchError
 
 
 class ERICFetcher(BaseFetcher):
@@ -17,6 +15,7 @@ class ERICFetcher(BaseFetcher):
 
     def __init__(self, email: str = None):
         self.email = email
+        self.http = HttpClient(delay=0.3)
 
     def search_and_fetch(self, query: str, max_results: int = 500) -> List[Dict]:
         articles = []
@@ -26,7 +25,7 @@ class ERICFetcher(BaseFetcher):
         while len(articles) < max_results:
             n = min(rows, max_results - len(articles))
             try:
-                r = requests.get(
+                r = self.http.get(
                     self.BASE_URL,
                     params={
                         'search': query,
@@ -35,9 +34,7 @@ class ERICFetcher(BaseFetcher):
                         'rows': n,
                         'start': start,
                     },
-                    timeout=30
                 )
-                r.raise_for_status()
                 docs = r.json().get('response', {}).get('docs', [])
                 if not docs:
                     break
@@ -48,7 +45,9 @@ class ERICFetcher(BaseFetcher):
                 if len(docs) < n:
                     break
                 start += len(docs)
-                time.sleep(0.3)
+            except FetchError as e:
+                print(f"ERIC fetch error: {e}")
+                raise
             except Exception as e:
                 print(f"ERIC fetch error: {e}")
                 break

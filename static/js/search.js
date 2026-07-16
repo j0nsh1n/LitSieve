@@ -6,6 +6,7 @@ let lastQueryTokens = [];
 document.addEventListener('DOMContentLoaded', () => {
  applyAvailableSources();
  refreshStarredCount();
+ loadSearchEmptyState();
 
  document.querySelectorAll('input[name="input_method"]').forEach(radio => {
  radio.addEventListener('change', () => {
@@ -71,6 +72,15 @@ function collectSearchFilters() {
  year_min: parseOptionalYear('year-min'),
  year_max: parseOptionalYear('year-max'),
  };
+}
+
+async function loadSearchEmptyState() {
+ try {
+ const stats = await apiCall('/api/statistics');
+ if (typeof applyEmptyState === 'function') {
+ applyEmptyState('search-empty-state', stats, 'embeddings', 'search-empty-msg');
+ }
+ } catch (e) { /* ignore */ }
 }
 
 async function refreshStarredCount() {

@@ -42,7 +42,17 @@ document.addEventListener('DOMContentLoaded', () => {
  document.getElementById('cluster-btn').addEventListener('click', doGenerateClusters);
 
  loadClusters();
+ loadClusterEmptyState();
 });
+
+async function loadClusterEmptyState() {
+ try {
+ const stats = await apiCall('/api/statistics');
+ if (typeof applyEmptyState === 'function') {
+ applyEmptyState('clusters-empty-state', stats, 'embeddings', 'clusters-empty-msg');
+ }
+ } catch (e) { /* page still usable */ }
+}
 
 async function loadClusters() {
  try {

@@ -1274,6 +1274,56 @@ input[type="range"]::-moz-range-thumb:hover {
     text-align: center;
 }
 
+/* Getting-started checklist + empty states */
+.getting-started-card,
+.empty-state-card {
+    border-left: 4px solid var(--accent, #2a5f6e);
+}
+.getting-started-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.35rem;
+}
+.getting-started-header h2 {
+    margin: 0;
+}
+.getting-started-list {
+    margin: 0.5rem 0 0;
+    padding-left: 0;
+    list-style: none;
+}
+.getting-started-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin-bottom: 0.4rem;
+    color: var(--text-body, var(--text));
+}
+.getting-started-list li.is-done {
+    color: var(--text-soft, #5f5a52);
+}
+.gs-check {
+    color: var(--accent, #2a5f6e);
+    font-size: 0.85rem;
+    line-height: 1.5;
+}
+.fetch-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+}
+.year-timeline-plot {
+    margin-top: 0.5rem;
+}
+
+/* Reading mode: key points stay readable */
+html[data-reading="on"] .key-points {
+    font-size: 1.05em;
+}
+
 /* Long abstracts: clamp by line count, expand on demand */
 .abstract-wrap {
     margin-bottom: 0.5rem;

@@ -5,11 +5,10 @@ Fetches research articles from PubMed using the Entrez API
 
 from Bio import Entrez
 import socket
-import time
 from typing import List, Dict, Optional
 from tqdm import tqdm
 
-from base_fetcher import BaseFetcher
+from base_fetcher import BaseFetcher, polite_sleep
 
 # Entrez uses urllib under the hood, which has no default timeout. Without this,
 # a stalled NCBI connection hangs the worker thread indefinitely.
@@ -77,7 +76,7 @@ class PubMedFetcher(BaseFetcher):
                     if article:
                         articles.append(article)
 
-                time.sleep(0.5)
+                polite_sleep(0.5)
 
             except Exception as e:
                 print(f"Error fetching batch: {e}")

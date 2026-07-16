@@ -177,9 +177,25 @@ def format_screening_report_txt(report: Dict[str, Any]) -> str:
     else:
         sources_str = "(none)"
     excluded = report.get("excluded") or {}
+    by_year = report.get("by_year") or {}
+    if by_year:
+        # Stable year order; unknown last.
+        def _year_key(k: str):
+            if k == "unknown":
+                return (1, 0)
+            try:
+                return (0, -int(k))
+            except ValueError:
+                return (1, 0)
+        years_str = "; ".join(
+            f"{y}: {by_year[y]}" for y in sorted(by_year.keys(), key=_year_key)
+        )
+    else:
+        years_str = "(none)"
     lines = [
         f"SCREENING REPORT - {total} papers collected",
         f"Sources: {sources_str}",
+        f"By year: {years_str}",
         f"Duplicates removed (kept best copy): {int(excluded.get('duplicate') or 0)}",
         f"Excluded as off-topic (cluster triage): {int(excluded.get('cluster') or 0)}",
         f"Excluded manually: {int(excluded.get('manual') or 0)}",
