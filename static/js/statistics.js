@@ -53,6 +53,10 @@ async function loadStatistics() {
  document.getElementById('stat-embeddings').textContent = stats.articles_with_embeddings;
  document.getElementById('stat-excluded').textContent = stats.excluded_articles ?? 0;
 
+ if (typeof applyEmptyState === 'function') {
+ applyEmptyState('dup-empty-state', stats, 'embeddings', 'dup-empty-msg');
+ }
+
  const sources = stats.sources || {};
  const sourceKeys = Object.keys(sources);
  if (sourceKeys.length > 0) {
@@ -77,9 +81,49 @@ async function loadStatistics() {
  });
  document.getElementById('source-breakdown-section').style.display = 'block';
  }
+
+ renderYearTimeline(stats.year_counts || {});
  } catch (e) {
  showNotification('Failed to load statistics.', 'error');
  }
+}
+
+function renderYearTimeline(yearCounts) {
+ const section = document.getElementById('year-timeline-section');
+ const container = document.getElementById('year-timeline');
+ if (!section || !container) return;
+
+ const keys = Object.keys(yearCounts || {});
+ if (!keys.length) {
+ section.style.display = 'none';
+ return;
+ }
+
+ // Sort years ascending; "unknown" last.
+ keys.sort((a, b) => {
+ if (a === 'unknown') return 1;
+ if (b === 'unknown') return -1;
+ return parseInt(a, 10) - parseInt(b, 10);
+ });
+ const maxCount = Math.max(...keys.map(k => yearCounts[k]), 1);
+ container.innerHTML = '';
+ keys.forEach(year => {
+ const count = yearCounts[year];
+ const pct = Math.max(4, (count / maxCount) * 100);
+ const div = document.createElement('div');
+ div.className = 'source-bar year-bar';
+ div.innerHTML = `
+ <span class="source-name">${escapeHtml(year)}</span>
+ <div class="source-bar-fill">
+ <div class="source-track">
+ <div class="source-bar-inner" style="width: ${pct}%"></div>
+ </div>
+ </div>
+ <span class="source-count">${count}</span>
+ `;
+ container.appendChild(div);
+ });
+ section.style.display = 'block';
 }
 
 async function doDetectDuplicates() {

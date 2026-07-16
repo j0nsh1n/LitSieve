@@ -5,10 +5,8 @@ Free API, no authentication required (mailto improves rate limits)
 """
 
 import re
-import time
-import requests
 from typing import List, Dict
-from base_fetcher import BaseFetcher
+from base_fetcher import BaseFetcher, HttpClient, FetchError
 
 _JATS_TAG = re.compile(r'<[^>]+>')
 
@@ -19,10 +17,13 @@ class CrossRefFetcher(BaseFetcher):
 
     def __init__(self, email: str = None):
         self.email = email
-        self.session = requests.Session()
-        # Using the Polite Pool gives better rate limits
-        ua = f'LiteratureSearchTool/1.0 (mailto:{email})' if email else 'LiteratureSearchTool/1.0'
-        self.session.headers['User-Agent'] = ua
+        # Polite Pool UA improves rate limits when mailto is present.
+        ua = (
+            f'LiteratureResearchAide/3.7 (mailto:{email})'
+            if email else 'LiteratureResearchAide/3.7'
+        )
+        self.http = HttpClient(delay=0.5, user_agent=ua)
+
 
     def search_and_fetch(self, query: str, max_results: int = 500) -> List[Dict]:
         articles = []
@@ -42,8 +43,7 @@ class CrossRefFetcher(BaseFetcher):
                 params['mailto'] = self.email
 
             try:
-                r = self.session.get(self.BASE_URL, params=params, timeout=30)
-                r.raise_for_status()
+                r = self.http.get(self.BASE_URL, params=params, timeout=30)
                 items = r.json().get('message', {}).get('items', [])
                 if not items:
                     break
@@ -54,7 +54,6 @@ class CrossRefFetcher(BaseFetcher):
                 if len(items) < n:
                     break
                 offset += n
-                time.sleep(0.5)
             except Exception as e:
                 print(f"CrossRef fetch error: {e}")
                 break

@@ -46,9 +46,21 @@
  </div>
 </section>
 
+<section class="card empty-state-card" id="dup-empty-state" hidden>
+ <h2>No papers to check yet</h2>
+ <p class="info-text" id="dup-empty-msg">Fetch papers on Data Management, then prepare them for search so duplicates can be detected.</p>
+ <p><a class="btn btn-primary btn-sm" href="/data-management">Go to Data Management</a></p>
+</section>
+
 <section class="card" id="source-breakdown-section" style="display:none;">
  <h2>Articles by Source</h2>
  <div id="source-breakdown"></div>
+</section>
+
+<section class="card" id="year-timeline-section" style="display:none;">
+ <h2>Papers by year</h2>
+ <p class="info-text">How your collection is spread across publication years.</p>
+ <div id="year-timeline" class="year-timeline-plot"></div>
 </section>
 
 <section class="card">
@@ -80,5 +92,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/statistics.js?v=20260715e"></script>
+<script src="/static/js/statistics.js?v=20260715f"></script>
 {% endblock %}

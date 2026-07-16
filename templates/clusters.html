@@ -8,6 +8,12 @@
  off-topic ones.</p>
 </section>
 
+<section class="card empty-state-card" id="clusters-empty-state" hidden>
+ <h2>Nothing to cluster yet</h2>
+ <p class="info-text" id="clusters-empty-msg">Fetch and prepare papers on Data Management first.</p>
+ <p><a class="btn btn-primary btn-sm" href="/data-management">Go to Data Management</a></p>
+</section>
+
 <section class="card">
  <h2>Generate Clusters</h2>
  <p class="info-text">Groups your prepared papers by topic. The default method finds the natural
@@ -76,5 +82,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/clusters.js?v=20260715e"></script>
+<script src="/static/js/clusters.js?v=20260715f"></script>
 {% endblock %}

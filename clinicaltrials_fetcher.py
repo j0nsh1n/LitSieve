@@ -3,12 +3,10 @@ ClinicalTrials.gov Fetcher
 Fetches clinical trial records from the ClinicalTrials.gov v2 API
 """
 
-import requests
-import time
 from typing import List, Dict, Optional
 from tqdm import tqdm
 
-from base_fetcher import BaseFetcher
+from base_fetcher import BaseFetcher, HttpClient, FetchError
 
 
 class ClinicalTrialsFetcher(BaseFetcher):
@@ -19,6 +17,9 @@ class ClinicalTrialsFetcher(BaseFetcher):
 
     def __init__(self, email: str = None, **kwargs):
         self.email = email
+
+        self.http = HttpClient(delay=0.3)
+
 
     def search(self, query: str, max_results: int = 1000) -> List[str]:
         """Search ClinicalTrials.gov, return NCT IDs"""
@@ -36,8 +37,7 @@ class ClinicalTrialsFetcher(BaseFetcher):
                 params["pageToken"] = page_token
 
             try:
-                resp = requests.get(f"{self.BASE_URL}/studies", params=params, timeout=30)
-                resp.raise_for_status()
+                resp = self.http.get(f"{self.BASE_URL}/studies", params=params, timeout=30)
                 data = resp.json()
 
                 studies = data.get("studies", [])
@@ -54,7 +54,6 @@ class ClinicalTrialsFetcher(BaseFetcher):
                 page_token = data.get("nextPageToken")
                 if not page_token:
                     break
-                time.sleep(0.3)
 
             except Exception as e:
                 print(f"Error searching ClinicalTrials.gov: {e}")
@@ -79,8 +78,7 @@ class ClinicalTrialsFetcher(BaseFetcher):
                 params["pageToken"] = page_token
 
             try:
-                resp = requests.get(f"{self.BASE_URL}/studies", params=params, timeout=30)
-                resp.raise_for_status()
+                resp = self.http.get(f"{self.BASE_URL}/studies", params=params, timeout=30)
                 data = resp.json()
 
                 studies = data.get("studies", [])
@@ -95,7 +93,6 @@ class ClinicalTrialsFetcher(BaseFetcher):
                 page_token = data.get("nextPageToken")
                 if not page_token:
                     break
-                time.sleep(0.3)
 
             except Exception as e:
                 print(f"Error fetching from ClinicalTrials.gov: {e}")
@@ -110,16 +107,14 @@ class ClinicalTrialsFetcher(BaseFetcher):
 
         for nct_id in tqdm(ids, desc="Fetching from ClinicalTrials.gov"):
             try:
-                resp = requests.get(
+                resp = self.http.get(
                     f"{self.BASE_URL}/studies/{nct_id}",
                     params={"format": "json"},
                     timeout=30
                 )
-                resp.raise_for_status()
                 parsed = self._parse_study(resp.json())
                 if parsed:
                     articles.append(parsed)
-                time.sleep(0.2)
             except Exception as e:
                 print(f"Error fetching {nct_id}: {e}")
 

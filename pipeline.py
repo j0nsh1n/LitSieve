@@ -72,6 +72,20 @@ class LiteratureSearchPipeline:
         # in-flight embedding job (or vice versa), which would otherwise mix
         # vectors from two different models.
         self._engine_lock = threading.Lock()
+        # Search hot-path cache: embeddings matrix + excluded set. Bumped when
+        # the corpus changes (fetch / embed / screening).
+        self._corpus_cache_lock = threading.Lock()
+        self._corpus_cache_gen = 0
+        self._cached_emb_ids = None
+        self._cached_emb_matrix = None
+        self._cached_excluded = None
+        self._cached_excluded_gen = -1
+        self._cached_emb_gen = -1
+
+    def invalidate_corpus_cache(self) -> None:
+        """Call after mutations that change embeddings, screening, or articles."""
+        with self._corpus_cache_lock:
+            self._corpus_cache_gen += 1
 
     def fetch_articles(
         self,
@@ -103,7 +117,8 @@ class LiteratureSearchPipeline:
             return []
 
         # Save to database
-        self.db.insert_articles(articles)
+        self.db.insert_articles(articles, dedupe=True)
+        self.invalidate_corpus_cache()
 
         logger.info(f"Fetched and stored {len(articles)} articles from {source}")
         return articles
@@ -115,50 +130,124 @@ class LiteratureSearchPipeline:
         max_results: int = 200,
         email: str = "your.email@example.com",
         progress_callback=None,
+        cancel_check=None,
     ) -> Dict:
         """
-        Fetch from multiple sources concurrently, insert results sequentially.
-        progress_callback: callable(done, total) called each time a source completes.
+        Fetch from multiple sources concurrently; insert each source as it completes.
+
+        progress_callback: callable(done, total, **extra) — extra may include
+            articles_so_far, source, source_count, error_kind.
+        cancel_check: optional zero-arg callable returning True if the job
+            should stop between sources.
         """
+        from base_fetcher import FetchError, classify_error
+
         logger.info(f"\n=== Fetching from {len(sources)} sources in parallel ===")
         lock = threading.Lock()
         completed = [0]
+        articles_so_far = [0]
         total = len(sources)
+        cancelled = [False]
 
         def fetch_one(source):
+            if cancel_check and cancel_check():
+                return (source, [], "Cancelled", "cancelled")
             fetcher_cls = FETCHERS.get(source)
             if not fetcher_cls:
-                result = (source, [], f"Unknown source: {source}")
-            else:
-                try:
-                    fetcher = fetcher_cls(email=email)
-                    articles = fetcher.search_and_fetch(query, max_results)
-                    result = (source, articles or [], None)
-                except Exception as e:
-                    logger.error(f"Error fetching {source}: {e}")
-                    result = (source, [], str(e))
-
-            with lock:
-                completed[0] += 1
-                done = completed[0]
-            if progress_callback:
-                progress_callback(done, total)
-            return result
+                return (source, [], "Unknown source", "error")
+            try:
+                fetcher = fetcher_cls(email=email)
+                articles = fetcher.search_and_fetch(query, max_results) or []
+                if not articles:
+                    return (source, [], None, "no_results")
+                return (source, articles, None, None)
+            except FetchError as e:
+                logger.error("Error fetching %s: %s", source, e)
+                return (source, [], str(e), e.kind)
+            except Exception as e:
+                logger.error("Error fetching %s: %s", source, e)
+                return (source, [], str(e), classify_error(e))
 
         results = {}
         with ThreadPoolExecutor(max_workers=min(len(sources), 6)) as executor:
             futures = {executor.submit(fetch_one, src): src for src in sources}
             for future in as_completed(futures):
-                source, articles, error = future.result()
-                results[source] = {'articles': articles, 'error': error}
-                logger.info(f"  {source}: {len(articles)} articles")
+                if cancel_check and cancel_check():
+                    cancelled[0] = True
+                    # Best-effort: do not wait on remaining futures beyond this.
+                    for f in futures:
+                        f.cancel()
 
-        for source, data in results.items():
-            if data['articles']:
-                self.db.insert_articles(data['articles'])
+                source, articles, error, error_kind = future.result()
+                # Insert immediately so a hung source does not block others' data.
+                inserted = 0
+                skipped_dups = 0
+                if articles and not (cancel_check and cancel_check() and error == "Cancelled"):
+                    insert_stats = self.db.insert_articles(articles, dedupe=True)
+                    if isinstance(insert_stats, dict):
+                        inserted = int(insert_stats.get("inserted") or 0)
+                        skipped_dups = int(insert_stats.get("skipped_duplicates") or 0)
+                    else:
+                        inserted = len(articles)
+
+                # Prefer stored count; fall back to fetched length when insert
+                # only reports dropped rows (legacy).
+                count = inserted if articles else 0
+                if articles and inserted == 0 and not skipped_dups:
+                    count = len(articles)
+
+                # no_results is not a hard error for the report
+                report_error = error
+                if error_kind == "no_results" and not error:
+                    report_error = None
+
+                results[source] = {
+                    'count': count,
+                    'fetched': len(articles),
+                    'skipped_duplicates': skipped_dups,
+                    'error': report_error,
+                    'error_kind': error_kind if report_error or error_kind == "no_results" else None,
+                }
+                logger.info(
+                    "  %s: %d articles (kind=%s)",
+                    source, count, error_kind or "ok",
+                )
+
+                with lock:
+                    completed[0] += 1
+                    articles_so_far[0] += count
+                    done = completed[0]
+                    total_arts = articles_so_far[0]
+                if progress_callback:
+                    progress_callback(
+                        done, total,
+                        articles_so_far=total_arts,
+                        source=source,
+                        source_count=count,
+                        error_kind=error_kind,
+                    )
+
+                if cancelled[0]:
+                    break
+
+        # Ensure every requested source appears in the report
+        for src in sources:
+            if src not in results:
+                results[src] = {
+                    'count': 0,
+                    'fetched': 0,
+                    'skipped_duplicates': 0,
+                    'error': 'Cancelled' if cancelled[0] else None,
+                    'error_kind': 'cancelled' if cancelled[0] else None,
+                }
 
         return {
-            source: {'count': len(data['articles']), 'error': data['error']}
+            source: {
+                'count': data['count'],
+                'error': data['error'],
+                'error_kind': data.get('error_kind'),
+                'skipped_duplicates': data.get('skipped_duplicates', 0),
+            }
             for source, data in results.items()
         }
 
@@ -251,6 +340,7 @@ class LiteratureSearchPipeline:
             device = getattr(self.embedding_engine, "device", None) or select_device()
 
         self.db.insert_embeddings(embeddings, model_name)
+        self.invalidate_corpus_cache()
 
         # Extractive key points reuse the loaded model (structured abstracts
         # skip encoding). On model switch re-generate everything; otherwise
@@ -465,6 +555,30 @@ class LiteratureSearchPipeline:
             'heatmap': fig_heatmap
         }
 
+    def _load_embeddings_cached(self) -> Tuple[List[Tuple[str, str]], np.ndarray]:
+        """Return (ids, matrix), reusing the last load until cache invalidation."""
+        with self._corpus_cache_lock:
+            gen = self._corpus_cache_gen
+            if self._cached_emb_gen == gen and self._cached_emb_ids is not None:
+                return self._cached_emb_ids, self._cached_emb_matrix
+        ids, matrix = self.db.get_all_embeddings()
+        with self._corpus_cache_lock:
+            self._cached_emb_ids = ids
+            self._cached_emb_matrix = matrix
+            self._cached_emb_gen = self._corpus_cache_gen
+        return ids, matrix
+
+    def _load_excluded_cached(self) -> set:
+        with self._corpus_cache_lock:
+            gen = self._corpus_cache_gen
+            if self._cached_excluded_gen == gen and self._cached_excluded is not None:
+                return set(self._cached_excluded)
+        excluded = set(self.db.get_excluded_keys())
+        with self._corpus_cache_lock:
+            self._cached_excluded = set(excluded)
+            self._cached_excluded_gen = self._corpus_cache_gen
+        return excluded
+
     def _candidate_pool(
         self,
         source_filter: Optional[List[str]] = None,
@@ -476,11 +590,13 @@ class LiteratureSearchPipeline:
         """Embeddings + metadata after screening / source / cluster / year filters."""
         from utils import parse_year
 
-        article_ids, article_embeddings = self.db.get_all_embeddings()
+        article_ids, article_embeddings = self._load_embeddings_cached()
         empty_meta: Dict = {}
         if len(article_ids) == 0:
             return [], article_embeddings, empty_meta
 
+        # Excluded keys are cheap to load and change often during triage —
+        # always read fresh. Embeddings stay cached.
         excluded = set(self.db.get_excluded_keys())
         if extra_exclude:
             excluded |= set(extra_exclude)
@@ -547,7 +663,13 @@ class LiteratureSearchPipeline:
         articles_all: Dict,
         top_k: int,
     ) -> List[Dict]:
-        """Blend semantic cosine with TF-IDF lexical scores; cut to top_k."""
+        """Blend semantic cosine with TF-IDF lexical scores; cut to top_k.
+
+        TF-IDF is fit only on the semantic shortlist (typically <= ~250 docs),
+        not the full corpus, so rebuilding per query is intentional and cheap.
+        Full-corpus embedding loads are cached on the pipeline (see
+        _load_embeddings_cached) and invalidated when the corpus changes.
+        """
         from sklearn.feature_extraction.text import TfidfVectorizer
         from sklearn.metrics.pairwise import cosine_similarity as sk_cosine
 
@@ -812,6 +934,7 @@ class LiteratureSearchPipeline:
             losers.extend(k for k in members if k != keeper)
 
         self.db.exclude_articles(losers, reason='duplicate')
+        self.invalidate_corpus_cache()
         logger.info("Resolved %d duplicate groups: excluded %d redundant copies",
                     n_groups, len(losers))
         return {'groups': n_groups, 'excluded': len(losers)}

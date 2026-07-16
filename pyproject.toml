@@ -1,0 +1,23 @@
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+exclude = [
+    "venv",
+    ".venv",
+    "__pycache__",
+    "user_data",
+]
+
+[tool.ruff.lint]
+# Start with a focused rule set so CI stays green while pre-existing style
+# noise (E501, import order, etc.) is cleaned gradually.
+select = [
+    "E9",   # runtime syntax errors
+    "F63",  # invalid print syntax
+    "F7",   # syntax errors in type comments
+    "F82",  # undefined names
+]
+ignore = []
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["F401"]

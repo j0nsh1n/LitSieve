@@ -4,11 +4,9 @@ Covers physics, mathematics, computer science, quantitative biology, economics
 Free API, no authentication required
 """
 
-import time
-import requests
 import xml.etree.ElementTree as ET
 from typing import List, Dict, Optional
-from base_fetcher import BaseFetcher
+from base_fetcher import BaseFetcher, HttpClient, FetchError
 
 ATOM_NS = 'http://www.w3.org/2005/Atom'
 ARXIV_NS = 'http://arxiv.org/schemas/atom'
@@ -21,6 +19,9 @@ class ArXivFetcher(BaseFetcher):
     def __init__(self, email: str = None):
         self.email = email
 
+        self.http = HttpClient(delay=0.3)
+
+
     def search(self, query: str, max_results: int = 500) -> List[str]:
         ids = []
         batch = min(200, max_results)
@@ -30,12 +31,11 @@ class ArXivFetcher(BaseFetcher):
         while len(ids) < max_results:
             n = min(batch, max_results - len(ids))
             try:
-                r = requests.get(
+                r = self.http.get(
                     self.BASE_URL,
                     params={'search_query': f'all:{query}', 'start': start, 'max_results': n},
                     timeout=30
                 )
-                r.raise_for_status()
                 root = ET.fromstring(r.text)
                 entries = root.findall('a:entry', ns)
                 if not entries:
@@ -47,7 +47,6 @@ class ArXivFetcher(BaseFetcher):
                 if len(entries) < n:
                     break
                 start += len(entries)
-                time.sleep(0.3)
             except Exception as e:
                 print(f"arXiv search error: {e}")
                 break
@@ -61,18 +60,16 @@ class ArXivFetcher(BaseFetcher):
         for i in range(0, len(ids), batch_size):
             batch = ids[i:i + batch_size]
             try:
-                r = requests.get(
+                r = self.http.get(
                     self.BASE_URL,
                     params={'id_list': ','.join(batch), 'max_results': len(batch)},
                     timeout=30
                 )
-                r.raise_for_status()
                 root = ET.fromstring(r.text)
                 for entry in root.findall('a:entry', ns):
                     article = self._parse_entry(entry, ns)
                     if article:
                         articles.append(article)
-                time.sleep(0.3)
             except Exception as e:
                 print(f"arXiv fetch_details error: {e}")
 

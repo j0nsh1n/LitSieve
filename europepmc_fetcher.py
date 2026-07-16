@@ -3,12 +3,10 @@ Europe PMC Fetcher
 Fetches articles from Europe PMC REST API
 """
 
-import requests
-import time
 from typing import List, Dict, Optional
 from tqdm import tqdm
 
-from base_fetcher import BaseFetcher
+from base_fetcher import BaseFetcher, HttpClient, FetchError
 
 
 class EuropePMCFetcher(BaseFetcher):
@@ -19,6 +17,9 @@ class EuropePMCFetcher(BaseFetcher):
 
     def __init__(self, email: str = None, **kwargs):
         self.email = email
+
+        self.http = HttpClient(delay=0.3)
+
 
     def search(self, query: str, max_results: int = 1000) -> List[str]:
         """Search Europe PMC, return list of IDs"""
@@ -36,8 +37,7 @@ class EuropePMCFetcher(BaseFetcher):
             }
 
             try:
-                resp = requests.get(f"{self.BASE_URL}/search", params=params, timeout=30)
-                resp.raise_for_status()
+                resp = self.http.get(f"{self.BASE_URL}/search", params=params, timeout=30)
                 data = resp.json()
 
                 results = data.get("resultList", {}).get("result", [])
@@ -53,7 +53,6 @@ class EuropePMCFetcher(BaseFetcher):
                 if not next_cursor or next_cursor == cursor_mark:
                     break
                 cursor_mark = next_cursor
-                time.sleep(0.3)
 
             except Exception as e:
                 print(f"Error searching Europe PMC: {e}")
@@ -79,8 +78,7 @@ class EuropePMCFetcher(BaseFetcher):
             }
 
             try:
-                resp = requests.get(f"{self.BASE_URL}/search", params=params, timeout=30)
-                resp.raise_for_status()
+                resp = self.http.get(f"{self.BASE_URL}/search", params=params, timeout=30)
                 data = resp.json()
 
                 results = data.get("resultList", {}).get("result", [])
@@ -96,7 +94,6 @@ class EuropePMCFetcher(BaseFetcher):
                 if not next_cursor or next_cursor == cursor_mark:
                     break
                 cursor_mark = next_cursor
-                time.sleep(0.3)
 
             except Exception as e:
                 print(f"Error fetching from Europe PMC: {e}")
@@ -111,7 +108,7 @@ class EuropePMCFetcher(BaseFetcher):
 
         for article_id in tqdm(ids, desc="Fetching from Europe PMC"):
             try:
-                resp = requests.get(
+                resp = self.http.get(
                     f"{self.BASE_URL}/search",
                     params={
                         "query": f"EXT_ID:{article_id}",
@@ -120,13 +117,11 @@ class EuropePMCFetcher(BaseFetcher):
                     },
                     timeout=30
                 )
-                resp.raise_for_status()
                 results = resp.json().get("resultList", {}).get("result", [])
                 if results:
                     parsed = self._parse_article(results[0])
                     if parsed:
                         articles.append(parsed)
-                time.sleep(0.2)
             except Exception as e:
                 print(f"Error fetching {article_id}: {e}")
 

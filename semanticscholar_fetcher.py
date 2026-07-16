@@ -4,10 +4,8 @@ Covers all academic disciplines — broad cross-domain coverage
 Free API, no key required for basic use (rate limited)
 """
 
-import time
-import requests
 from typing import List, Dict
-from base_fetcher import BaseFetcher
+from base_fetcher import BaseFetcher, HttpClient, FetchError
 
 
 class SemanticScholarFetcher(BaseFetcher):
@@ -16,36 +14,23 @@ class SemanticScholarFetcher(BaseFetcher):
     FIELDS = 'paperId,title,abstract,year,authors,venue'
 
     def __init__(self, email: str = None):
-        self.session = requests.Session()
-        self.session.headers['User-Agent'] = (
-            f'LiteratureSearchTool/1.0 ({email or "research@example.com"})'
+        self.http = HttpClient(
+            delay=0.5,
+            user_agent=f'LiteratureResearchAide/3.7 ({email or "research@example.com"})',
         )
-
-    MAX_429_RETRIES = 5
 
     def search(self, query: str, max_results: int = 500) -> List[str]:
         ids = []
         limit = 100
         offset = 0
-        retries_429 = 0
 
         while len(ids) < max_results:
             n = min(limit, max_results - len(ids))
             try:
-                r = self.session.get(
+                r = self.http.get(
                     f'{self.BASE_URL}/paper/search',
                     params={'query': query, 'limit': n, 'offset': offset, 'fields': 'paperId'},
-                    timeout=30
                 )
-                if r.status_code == 429:
-                    retries_429 += 1
-                    if retries_429 > self.MAX_429_RETRIES:
-                        print(f"Semantic Scholar: giving up after {self.MAX_429_RETRIES} consecutive 429s")
-                        break
-                    time.sleep(3 * retries_429)
-                    continue
-                retries_429 = 0
-                r.raise_for_status()
                 papers = r.json().get('data', [])
                 if not papers:
                     break
@@ -53,7 +38,9 @@ class SemanticScholarFetcher(BaseFetcher):
                 if len(papers) < n:
                     break
                 offset += n
-                time.sleep(0.5)
+            except FetchError as e:
+                print(f"Semantic Scholar search error: {e}")
+                raise
             except Exception as e:
                 print(f"Semantic Scholar search error: {e}")
                 break
@@ -62,37 +49,25 @@ class SemanticScholarFetcher(BaseFetcher):
 
     def fetch_details(self, ids: List[str], batch_size: int = 100) -> List[Dict]:
         articles = []
-        i = 0
-        retries_429 = 0
-
-        while i < len(ids):
+        for i in range(0, len(ids), batch_size):
             batch = ids[i:i + batch_size]
             try:
-                r = self.session.post(
+                r = self.http.post(
                     f'{self.BASE_URL}/paper/batch',
                     params={'fields': self.FIELDS},
                     json={'ids': batch},
-                    timeout=30
                 )
-                if r.status_code == 429:
-                    retries_429 += 1
-                    if retries_429 > self.MAX_429_RETRIES:
-                        print(f"Semantic Scholar: giving up after {self.MAX_429_RETRIES} consecutive 429s")
-                        break
-                    time.sleep(3 * retries_429)
-                    continue
-                retries_429 = 0
-                r.raise_for_status()
                 for paper in r.json():
                     if paper is None:
                         continue
                     article = self._parse_paper(paper)
                     if article:
                         articles.append(article)
-                time.sleep(0.5)
+            except FetchError as e:
+                print(f"Semantic Scholar fetch error: {e}")
+                raise
             except Exception as e:
                 print(f"Semantic Scholar fetch error: {e}")
-            i += batch_size
 
         return articles
 

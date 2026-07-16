@@ -4,7 +4,7 @@
  <meta charset="UTF-8">
  <meta name="viewport" content="width=device-width, initial-scale=1.0">
  <title>Login - Literature Research Aide</title>
- <link rel="stylesheet" href="/static/css/style.css?v=20260715e">
+ <link rel="stylesheet" href="/static/css/style.css?v=20260715f">
  <script>
  (function() {
  const saved = localStorage.getItem('theme');
@@ -16,7 +16,10 @@
  <div class="auth-card">
  <a href="/" class="auth-home-link">← Back to home</a>
  <div class="auth-logo">Literature Research Aide</div>
- <div class="auth-subtitle">v3.5.0 · private multi-source lit review workspace</div>
+ <div class="auth-subtitle">v3.7.0 · private multi-source lit review workspace</div>
+ {% if info %}
+ <div class="auth-info" style="background:color-mix(in srgb, var(--accent,#2a5f6e) 12%, transparent);padding:0.65rem 0.8rem;border-radius:6px;margin-bottom:0.8rem;color:var(--text);">{{ info }}</div>
+ {% endif %}
  <p class="auth-hint" style="margin:0 0 1rem;text-align:center;">
  Fetch, embed, triage, and search your own collection - not the whole internet.
  </p>
@@ -49,6 +52,7 @@
  });
  </script>
 
+ <p class="auth-switch"><a href="/reset-password">Forgot password?</a></p>
  <p class="auth-switch">Don't have an account? <a href="/register">Create one</a></p>
  <p class="auth-switch auth-home-foot"><a href="/">Learn about the app without logging in</a></p>
  </div>

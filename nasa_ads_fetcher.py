@@ -5,10 +5,8 @@ Requires API token (free at https://ui.adsabs.harvard.edu/user/settings/token)
 """
 
 import os
-import time
-import requests
 from typing import List, Dict
-from base_fetcher import BaseFetcher
+from base_fetcher import BaseFetcher, HttpClient, FetchError
 
 
 class NASAADSFetcher(BaseFetcher):
@@ -17,13 +15,12 @@ class NASAADSFetcher(BaseFetcher):
 
     def __init__(self, email: str = None):
         self.token = os.getenv('NASA_ADS_TOKEN', '').strip()
-        self.session = requests.Session()
-        headers = {
-            'User-Agent': f'LiteratureSearchTool/1.0 ({email or "research@example.com"})',
-        }
-        if self.token:
+
+        headers = {}
+        if getattr(self, 'token', None):
             headers['Authorization'] = f'Bearer {self.token}'
-        self.session.headers.update(headers)
+        self.http = HttpClient(delay=0.2, headers=headers)
+
 
     def search_and_fetch(self, query: str, max_results: int = 500) -> List[Dict]:
         if not self.token:
@@ -36,7 +33,7 @@ class NASAADSFetcher(BaseFetcher):
         while len(articles) < max_results:
             n = min(rows, max_results - len(articles))
             try:
-                r = self.session.get(
+                r = self.http.get(
                     self.BASE_URL,
                     params={
                         'q': query,
@@ -47,7 +44,6 @@ class NASAADSFetcher(BaseFetcher):
                     },
                     timeout=30
                 )
-                r.raise_for_status()
                 data = r.json()
                 docs = data.get('response', {}).get('docs', [])
                 if not docs:
@@ -59,7 +55,6 @@ class NASAADSFetcher(BaseFetcher):
                 if len(docs) < n:
                     break
                 start += len(docs)
-                time.sleep(0.2)
             except Exception as e:
                 print(f"NASA ADS fetch error: {e}")
                 break

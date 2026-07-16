@@ -134,6 +134,48 @@ function getSourceName(source) {
     return names[source] || source;
 }
 
+// === First-run / empty-state helpers ===
+const GS_DISMISS_KEY = 'lra_dismiss_getting_started';
+
+function isGettingStartedDismissed() {
+    try { return localStorage.getItem(GS_DISMISS_KEY) === '1'; } catch (e) { return false; }
+}
+
+function dismissGettingStarted() {
+    try { localStorage.setItem(GS_DISMISS_KEY, '1'); } catch (e) { /* ignore */ }
+    const el = document.getElementById('getting-started-card');
+    if (el) el.hidden = true;
+}
+
+/**
+ * Show a contextual empty-state card when the collection is missing a prerequisite.
+ * @param {string} cardId
+ * @param {object} stats - from /api/statistics
+ * @param {'articles'|'embeddings'} need
+ * @param {string} msgId - element for the message text
+ */
+function applyEmptyState(cardId, stats, need, msgId) {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+    const total = stats.total_articles || 0;
+    const emb = stats.articles_with_embeddings || 0;
+    let show = false;
+    let msg = '';
+    if (need === 'articles' && total === 0) {
+        show = true;
+        msg = 'No papers in your collection yet. Start on Data Management: pick topics, type a question, and fetch.';
+    } else if (need === 'embeddings' && total === 0) {
+        show = true;
+        msg = 'No papers yet. Fetch on Data Management first; preparing for search runs automatically afterward.';
+    } else if (need === 'embeddings' && emb === 0) {
+        show = true;
+        msg = `You have ${total} paper(s), but none are prepared for search yet. Open Data Management and press “Prepare papers for search” (or wait if a job is still running).`;
+    }
+    card.hidden = !show;
+    const msgEl = msgId ? document.getElementById(msgId) : null;
+    if (msgEl && msg) msgEl.textContent = msg;
+}
+
 // === List pagination (large collections) ===
 // Render PAGE_SIZE items at a time with a "Show N more" control. Counts stay
 // accurate via the total length of the source array.
