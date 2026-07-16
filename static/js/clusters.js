@@ -219,21 +219,16 @@ async function loadClusterArticles(clusterId, bodyEl) {
  }
 }
 
-function renderClusterArticles(articles, bodyEl) {
- bodyEl.innerHTML = '';
-
- if (articles.length === 0) {
- bodyEl.innerHTML = '<p class="info-text">No articles in this cluster.</p>';
- return;
- }
-
- articles.forEach(article => {
+function buildClusterArticleItem(article) {
  const url = getArticleUrl(article.article_id, article.source);
  const idText = escapeHtml(article.article_id || '');
  const idLink = url
  ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" class="article-link">${idText}</a>`
  : idText;
  const authors = (article.authors || []).join('; ');
+ const keyPointsHtml = typeof renderKeyPointsHtml === 'function'
+ ? renderKeyPointsHtml(article.key_points)
+ : '';
 
  const item = document.createElement('div');
  item.className = 'cluster-article' + (article.excluded ? ' excluded' : '');
@@ -251,6 +246,7 @@ function renderClusterArticles(articles, bodyEl) {
  <div class="article-meta meta-authors">
  <span><strong>Authors:</strong> ${escapeHtml(authors)}</span>
  </div>
+ ${keyPointsHtml}
  `;
 
  item.querySelector('.screen-toggle').addEventListener('click', async (e) => {
@@ -277,6 +273,22 @@ function renderClusterArticles(articles, bodyEl) {
  }
  });
 
- bodyEl.appendChild(item);
+ return item;
+}
+
+function renderClusterArticles(articles, bodyEl) {
+ bodyEl.innerHTML = '';
+
+ if (articles.length === 0) {
+ bodyEl.innerHTML = '<p class="info-text">No articles in this cluster.</p>';
+ return;
+ }
+
+ if (typeof renderPaginatedList === 'function') {
+ renderPaginatedList(bodyEl, articles, (a) => buildClusterArticleItem(a), {
+ noun: 'articles',
  });
+ } else {
+ articles.forEach((a) => bodyEl.appendChild(buildClusterArticleItem(a)));
+ }
 }

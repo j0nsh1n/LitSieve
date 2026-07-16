@@ -221,9 +221,13 @@ class LiteratureSearchPipeline:
 
         if not to_embed:
             logger.info("All articles already have embeddings; nothing to do.")
+            # Still fill any missing key points (e.g. corpus prepared before
+            # this feature shipped).
+            kp = self._generate_key_points(articles=articles, only_missing=True)
             return {
                 "embeddings_created": 0,
                 "skipped_existing": skipped,
+                "key_points_created": kp,
                 "seconds": round(time.perf_counter() - t0, 2),
                 "model": stored_model or target_model,
                 "device": select_device(),
@@ -247,16 +251,70 @@ class LiteratureSearchPipeline:
             device = getattr(self.embedding_engine, "device", None) or select_device()
 
         self.db.insert_embeddings(embeddings, model_name)
+
+        # Extractive key points reuse the loaded model (structured abstracts
+        # skip encoding). On model switch re-generate everything; otherwise
+        # only fill missing rows so stragglers from older corpora catch up.
+        key_points_created = self._generate_key_points(
+            articles=articles,
+            only_missing=not force_all,
+        )
+
         seconds = round(time.perf_counter() - t0, 2)
 
         logger.info("Created and stored embeddings in %.2fs on %s", seconds, device)
         return {
             "embeddings_created": len(embeddings),
             "skipped_existing": skipped,
+            "key_points_created": key_points_created,
             "seconds": seconds,
             "model": model_name,
             "device": device,
         }
+
+    def _encode_texts(self, texts: List[str]) -> np.ndarray:
+        """Encode plain strings with the current embedding engine (normalized)."""
+        if not texts:
+            return np.zeros((0, 1), dtype=np.float32)
+        with self._engine_lock:
+            return self.embedding_engine.model.encode(
+                texts,
+                convert_to_numpy=True,
+                show_progress_bar=False,
+                normalize_embeddings=True,
+            )
+
+    def _generate_key_points(
+        self,
+        articles: Optional[List[Dict]] = None,
+        only_missing: bool = True,
+    ) -> int:
+        """Compute and store extractive key points for articles.
+
+        Returns the number of articles written to the key_points table.
+        """
+        from summarize import extract_key_points_batch
+
+        pool = articles if articles is not None else self.db.get_all_articles()
+        if not pool:
+            return 0
+        if only_missing:
+            existing = self.db.get_key_points_keys()
+            pool = [
+                a for a in pool
+                if (a["article_id"], a["source"]) not in existing
+            ]
+        if not pool:
+            return 0
+
+        logger.info("Generating key points for %d articles…", len(pool))
+        points = extract_key_points_batch(pool, encode_fn=self._encode_texts)
+        return self.db.insert_key_points(points)
+
+    def generate_key_points(self, only_missing: bool = True) -> Dict:
+        """Public backfill: generate key points for stragglers (or all)."""
+        n = self._generate_key_points(articles=None, only_missing=only_missing)
+        return {"key_points_created": n, "only_missing": only_missing}
 
     def cluster_articles(self, n_clusters: Optional[int] = None, method: str = 'kmeans'):
         """Step 3: Cluster articles.

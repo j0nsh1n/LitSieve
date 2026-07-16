@@ -213,11 +213,7 @@ function groupDuplicates(pairs) {
 }
 
 // === Render grouped duplicate list ===
-function renderDuplicates(groups) {
- const container = document.getElementById('duplicates-list');
- container.innerHTML = '';
-
- groups.forEach(group => {
+function buildDupGroupCard(group) {
  const { articles, maxSim } = group;
  const details = document.createElement('details');
  details.className = 'dup-group';
@@ -238,9 +234,22 @@ function renderDuplicates(groups) {
  body.className = 'dup-body';
  body.appendChild(buildCompareTable(articles, group, details));
  details.appendChild(body);
+ return details;
+}
 
- container.appendChild(details);
+function renderDuplicates(groups) {
+ const container = document.getElementById('duplicates-list');
+ container.innerHTML = '';
+
+ if (!groups.length) return;
+
+ if (typeof renderPaginatedList === 'function') {
+ renderPaginatedList(container, groups, (g) => buildDupGroupCard(g), {
+ noun: 'groups',
  });
+ } else {
+ groups.forEach((g) => container.appendChild(buildDupGroupCard(g)));
+ }
 }
 
 // === Side-by-side compare table ===

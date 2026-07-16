@@ -599,6 +599,14 @@ def _attach_notes(results: List[dict], p) -> None:
         a["starred"] = bool(n.get("starred"))
 
 
+def _attach_key_points(results: List[dict], p) -> None:
+    """Attach stored extractive bullets (may be empty list)."""
+    kp = p.db.get_key_points_map()
+    for a in results:
+        bullets = kp.get((a.get("article_id"), a.get("source")))
+        a["key_points"] = list(bullets) if bullets else []
+
+
 @app.post("/api/search")
 async def api_search(req: SearchRequest, request: Request):
     user = current_user(request)
@@ -619,6 +627,7 @@ async def api_search(req: SearchRequest, request: Request):
             _apply_pico_boost(results, req.query_text)
         sort_articles(results, req.sort_by)
         _attach_notes(results, p)
+        _attach_key_points(results, p)
         return {"results": results, "total": len(results)}
     except ValueError as e:
         return JSONResponse(status_code=400, content={"detail": str(e)})
@@ -645,6 +654,7 @@ async def api_search_seed(req: SeedSearchRequest, request: Request):
         results = data["results"]
         _attach_pico(results)
         _attach_notes(results, p)
+        _attach_key_points(results, p)
         return {
             "seed": data["seed"],
             "results": results,
@@ -678,6 +688,7 @@ async def api_search_starred(req: StarredSearchRequest, request: Request):
         results = data["results"]
         _attach_pico(results)
         _attach_notes(results, p)
+        _attach_key_points(results, p)
         return {
             "results": results,
             "total": len(results),
@@ -1118,9 +1129,30 @@ async def api_get_cluster_articles(cluster_id: int, request: Request):
     try:
         articles = p.db.get_articles_by_cluster(cluster_id)
         label = articles[0].get('cluster_label', f'Cluster {cluster_id}') if articles else f'Cluster {cluster_id}'
+        _attach_key_points(articles, p)
         for a in articles:
             a.pop('abstract', None)
         return {"cluster_id": cluster_id, "cluster_label": label, "articles": articles}
+    except Exception as e:
+        return server_error(e)
+    finally:
+        release_pipeline(uid)
+
+
+@app.post("/api/generate-key-points")
+@limiter.limit("6/minute")
+async def api_generate_key_points(request: Request, only_missing: bool = True):
+    """Backfill extractive key points for articles missing them (or regenerate all)."""
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    uid = user["user_id"]
+    p = get_pipeline(uid)
+    try:
+        result = await run_in_thread(p.generate_key_points, only_missing=only_missing)
+        return {"status": "success", **result}
     except Exception as e:
         return server_error(e)
     finally:

@@ -106,6 +106,18 @@ class ArticleDatabase:
             )
         """)
 
+        # Extractive key points (bullets JSON) derived from the abstract.
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS key_points (
+                article_id TEXT NOT NULL,
+                source TEXT NOT NULL DEFAULT 'pubmed',
+                bullets TEXT NOT NULL DEFAULT '[]',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (article_id, source),
+                FOREIGN KEY (article_id, source) REFERENCES articles (article_id, source)
+            )
+        """)
+
         self.conn.commit()
 
     def migrate_schema(self):
@@ -235,9 +247,10 @@ class ArticleDatabase:
             logger.info("Schema migration complete.")
 
     def clear_all(self):
-        """Delete all articles, embeddings, clusters, screening, and notes."""
+        """Delete all articles, embeddings, clusters, screening, notes, key points."""
         with self._lock:
             cursor = self.conn.cursor()
+            cursor.execute("DELETE FROM key_points")
             cursor.execute("DELETE FROM notes")
             cursor.execute("DELETE FROM screening")
             cursor.execute("DELETE FROM clusters")
@@ -576,6 +589,55 @@ class ArticleDatabase:
                 "ORDER BY article_id, source"
             )
             return [(r[0], r[1]) for r in cursor.fetchall()]
+
+    def insert_key_points(self, points: Dict[Tuple[str, str], List[str]]) -> int:
+        """Store extractive key-point bullets for (article_id, source) keys.
+
+        Empty bullet lists are still stored so we do not re-process short
+        abstracts on every embed pass.
+        """
+        if not points:
+            return 0
+        with self._lock:
+            cursor = self.conn.cursor()
+            for (article_id, source), bullets in points.items():
+                cursor.execute(
+                    """
+                    INSERT INTO key_points (article_id, source, bullets, created_at)
+                    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                    ON CONFLICT(article_id, source) DO UPDATE SET
+                        bullets = excluded.bullets,
+                        created_at = CURRENT_TIMESTAMP
+                    """,
+                    (article_id, source, json.dumps(list(bullets or []))),
+                )
+            self.conn.commit()
+        logger.info("Stored key points for %d articles", len(points))
+        return len(points)
+
+    def get_key_points_map(self) -> Dict[Tuple[str, str], List[str]]:
+        """Map (article_id, source) -> list of bullet strings."""
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT article_id, source, bullets FROM key_points")
+            rows = cursor.fetchall()
+        out: Dict[Tuple[str, str], List[str]] = {}
+        for article_id, source, bullets_json in rows:
+            try:
+                bullets = json.loads(bullets_json) if bullets_json else []
+            except (TypeError, json.JSONDecodeError):
+                bullets = []
+            if not isinstance(bullets, list):
+                bullets = []
+            out[(article_id, source)] = [str(b) for b in bullets if b]
+        return out
+
+    def get_key_points_keys(self) -> set:
+        """Set of (article_id, source) that already have a key_points row."""
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT article_id, source FROM key_points")
+            return {(row[0], row[1]) for row in cursor.fetchall()}
 
     def exclude_articles(self, keys: List[Tuple[str, str]], reason: str = 'manual') -> int:
         """Mark articles as screened out (excluded from search/dedup).

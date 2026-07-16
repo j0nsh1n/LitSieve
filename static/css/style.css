@@ -1235,6 +1235,45 @@ input[type="range"]::-moz-range-thumb:hover {
                 opacity var(--dur-fast) var(--ease-soft);
 }
 
+/* Extractive key points (from the abstract — not AI-generated) */
+.key-points {
+    margin: 0.4rem 0 0.75rem;
+    padding: 0.55rem 0.75rem;
+    border-left: 3px solid var(--accent, #2a5f6e);
+    background: color-mix(in srgb, var(--accent, #2a5f6e) 8%, transparent);
+    border-radius: 0 6px 6px 0;
+}
+.key-points-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--text-soft, #5f5a52);
+    margin-bottom: 0.3rem;
+}
+.key-points-list {
+    margin: 0;
+    padding-left: 1.15rem;
+    color: var(--text-body, var(--text));
+    line-height: 1.55;
+}
+.key-points-list li {
+    margin-bottom: 0.25rem;
+}
+.key-points-list li:last-child {
+    margin-bottom: 0;
+}
+.cluster-article .key-points {
+    margin-top: 0.5rem;
+}
+
+/* Progressive "Show N more" for large lists */
+.show-more-btn {
+    display: block;
+    width: 100%;
+    margin: 0.75rem 0 0.25rem;
+    text-align: center;
+}
+
 /* Long abstracts: clamp by line count, expand on demand */
 .abstract-wrap {
     margin-bottom: 0.5rem;

@@ -348,16 +348,7 @@ function renderPicoBlock(pico) {
  return `<div class="pico-detail">${parts.join('')}</div>`;
 }
 
-function renderResults(results) {
- const container = document.getElementById('results-list');
- container.innerHTML = '';
-
- if (results.length === 0) {
- container.innerHTML = '<p class="info-text">No results found. Try a different query or check that embeddings have been created.</p>';
- return;
- }
-
- results.forEach((article, idx) => {
+function buildResultCard(article, idx) {
  const details = document.createElement('details');
  details.className = 'article-card';
  if (idx < 3) details.setAttribute('open', '');
@@ -377,6 +368,9 @@ function renderResults(results) {
  const authors = (article.authors || []).join('; ');
  const abstractHtml = highlightText(article.abstract || '', lastQueryTokens);
  const picoHtml = renderPicoBlock(article.pico);
+ const keyPointsHtml = typeof renderKeyPointsHtml === 'function'
+ ? renderKeyPointsHtml(article.key_points)
+ : '';
  const starred = !!article.starred;
  const noteVal = article.note || '';
  const clusterBit = article.cluster_label
@@ -400,6 +394,7 @@ function renderResults(results) {
  <div class="article-meta meta-authors">
  <span><strong>Authors:</strong> ${escapeHtml(authors)}</span>
  </div>
+ ${keyPointsHtml}
  <div class="article-abstract">${abstractHtml}</div>
  ${picoHtml}
  <button type="button" class="note-toggle" ${noteVal ? 'hidden' : ''}>✎ Add note</button>
@@ -463,8 +458,23 @@ function renderResults(results) {
  }
  });
 
- container.appendChild(details);
- });
+ return details;
+}
+
+function renderResults(results) {
+ const container = document.getElementById('results-list');
+ container.innerHTML = '';
+
+ if (results.length === 0) {
+ container.innerHTML = '<p class="info-text">No results found. Try a different query or check that embeddings have been created.</p>';
+ return;
+ }
+
+ if (typeof renderPaginatedList === 'function') {
+ renderPaginatedList(container, results, buildResultCard, { noun: 'results' });
+ } else {
+ results.forEach((article, idx) => container.appendChild(buildResultCard(article, idx)));
+ }
 
  if (typeof enhanceAbstracts === 'function') {
  enhanceAbstracts(container);
