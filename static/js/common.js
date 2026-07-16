@@ -134,6 +134,66 @@ function getSourceName(source) {
     return names[source] || source;
 }
 
+// === List pagination (large collections) ===
+// Render PAGE_SIZE items at a time with a "Show N more" control. Counts stay
+// accurate via the total length of the source array.
+const LIST_PAGE_SIZE = 50;
+
+/**
+ * Progressive list renderer.
+ * @param {HTMLElement} container - parent to append items + button into
+ * @param {Array} items - full ordered list
+ * @param {function(item, index): HTMLElement} renderItem - builds one DOM node
+ * @param {object} [opts]
+ * @param {number} [opts.pageSize=LIST_PAGE_SIZE]
+ * @param {string} [opts.noun='items'] - for the button label
+ */
+function renderPaginatedList(container, items, renderItem, opts) {
+    const pageSize = (opts && opts.pageSize) || LIST_PAGE_SIZE;
+    const noun = (opts && opts.noun) || 'items';
+    let shown = 0;
+
+    function appendBatch() {
+        const end = Math.min(shown + pageSize, items.length);
+        for (let i = shown; i < end; i++) {
+            container.appendChild(renderItem(items[i], i));
+        }
+        shown = end;
+        updateMoreBtn();
+    }
+
+    let moreBtn = null;
+    function updateMoreBtn() {
+        if (moreBtn) {
+            moreBtn.remove();
+            moreBtn = null;
+        }
+        const remaining = items.length - shown;
+        if (remaining <= 0) return;
+        const next = Math.min(pageSize, remaining);
+        moreBtn = document.createElement('button');
+        moreBtn.type = 'button';
+        moreBtn.className = 'btn btn-secondary btn-sm show-more-btn';
+        moreBtn.textContent = `Show ${next} more (${shown} of ${items.length} ${noun})`;
+        moreBtn.addEventListener('click', () => appendBatch());
+        container.appendChild(moreBtn);
+    }
+
+    appendBatch();
+}
+
+/** HTML for extractive key points (honest "from the abstract" label). */
+function renderKeyPointsHtml(bullets) {
+    if (!bullets || !bullets.length) return '';
+    const items = bullets
+        .map(b => `<li>${escapeHtml(String(b))}</li>`)
+        .join('');
+    return `<div class="key-points">
+      <div class="key-points-label">Key points (from the abstract)</div>
+      <ul class="key-points-list">${items}</ul>
+    </div>`;
+}
+
 // === Update nav article count ===
 // Raw fetch (not apiCall) so a missing session never triggers a redirect loop
 // if this somehow runs outside the app shell.

@@ -30,9 +30,29 @@ const ALL_SOURCES = {
  core: { name: 'CORE', desc: 'Open-access full text, all disciplines' },
 };
 
+// Which analysis model suits each topic. Mixed categories fall back to
+// 'general' (fast and neutral). Advanced dropdown always overrides.
+const TOPIC_MODEL = {
+ health: 'pubmedbert', biology: 'pubmedbert', psychology: 'pubmedbert',
+ chemistry: 'specter', physics: 'specter', math: 'specter', cs: 'specter', earth: 'specter',
+ history: 'general', economics: 'general', polisci: 'general',
+ literature: 'general', education: 'general',
+};
+
+const MODEL_LABELS = {
+ general: 'general (fast, any topic)',
+ mpnet: 'mpnet (best general quality)',
+ pubmedbert: 'pubmedbert (biomedical)',
+ biosentbert: 'biosentbert (medical)',
+ specter: 'specter (scientific papers)',
+ multiqa: 'multiqa (question-style queries)',
+ multilingual: 'multilingual (non-English collections)',
+};
+
 const FETCH_PREFS_KEY = 'lra_fetch_prefs_v1';
 
 let selectedTopics = new Set();
+let modelManual = false; // true once the user picks a model under Advanced
 
 document.addEventListener('DOMContentLoaded', () => {
  renderTopicGrid();
@@ -49,6 +69,13 @@ document.addEventListener('DOMContentLoaded', () => {
  const el = document.getElementById(id);
  if (el) el.addEventListener('change', saveFetchPrefs);
  });
+    // A hand-picked model overrides the automatic topic-based choice.
+ document.getElementById('embedding-model').addEventListener('change', () => {
+ modelManual = true;
+ updateModelHint();
+ saveFetchPrefs();
+ });
+ updateModelHint();
  document.querySelectorAll('input[name="fetch-mode"]').forEach(el => {
  el.addEventListener('change', () => {
             // Append → prefer only-new; Replace → re-embed all by default.
@@ -77,8 +104,8 @@ function syncOnlyMissingFromFetchMode() {
  const hint = document.getElementById('only-missing-hint');
  if (hint) {
  hint.textContent = mode === 'append'
- ? 'On because you chose “Add to collection” - existing vectors are kept.'
- : 'Off for “Replace collection” - all papers will be embedded. Switch to Add to auto-check this.';
+ ? 'On because you chose “Add to collection” - already-prepared papers are kept.'
+ : 'Off for “Replace collection” - all papers will be prepared. Switch to Add to auto-check this.';
  }
 }
 
@@ -103,8 +130,54 @@ function toggleTopic(topicId, card) {
  card.classList.add('selected');
  }
  updateRecommendedSources();
+ applyModelRecommendation();
  saveFetchPrefs();
  refreshCoverage();
+}
+
+/** Model that best matches the selected topics ('general' when mixed or none). */
+function recommendModel() {
+ if (selectedTopics.size === 0) return 'general';
+ const models = new Set([...selectedTopics].map(t => TOPIC_MODEL[t] || 'general'));
+ return models.size === 1 ? models.values().next().value : 'general';
+}
+
+/** Set the model dropdown from the topic recommendation unless the user chose one by hand. */
+function applyModelRecommendation() {
+ if (!modelManual) {
+ document.getElementById('embedding-model').value = recommendModel();
+ }
+ updateModelHint();
+}
+
+function updateModelHint() {
+ const hint = document.getElementById('model-auto-hint');
+ if (!hint) return;
+ const sel = document.getElementById('embedding-model');
+ const current = MODEL_LABELS[sel.value] || sel.value;
+ const rec = recommendModel();
+ hint.innerHTML = '';
+ if (modelManual) {
+ hint.append(`Analysis model chosen by hand: ${current}. `);
+ const reset = document.createElement('a');
+ reset.href = '#';
+ reset.textContent = 'Switch back to automatic';
+ reset.addEventListener('click', (e) => {
+ e.preventDefault();
+ modelManual = false;
+ applyModelRecommendation();
+ saveFetchPrefs();
+ });
+ hint.append(reset, '.');
+ } else if (sel.value === rec) {
+ hint.append(selectedTopics.size
+ ? `Analysis model picked automatically for your topics: ${current}. Change it under Advanced below.`
+ : `Analysis model: ${current}. Select topics above to pick one automatically, or change it under Advanced below.`);
+ } else {
+ // Dropdown was synced to the model your prepared papers already use.
+ hint.append(`Analysis model: ${current} (matches your already-prepared papers). ` +
+ `Your topics suggest ${MODEL_LABELS[rec] || rec} - change it under Advanced below.`);
+ }
 }
 
 function updateRecommendedSources() {
@@ -160,6 +233,7 @@ function saveFetchPrefs() {
  mode,
  topics: [...selectedTopics],
  model: document.getElementById('embedding-model').value,
+ modelManual,
  onlyMissing: document.getElementById('only-missing').checked,
  };
  try { localStorage.setItem(FETCH_PREFS_KEY, JSON.stringify(prefs)); } catch (e) { /* ignore */ }
@@ -173,6 +247,7 @@ function restoreFetchPrefs() {
  if (prefs.max) document.getElementById('fetch-max').value = prefs.max;
  if (prefs.email) document.getElementById('fetch-email').value = prefs.email;
  if (prefs.model) document.getElementById('embedding-model').value = prefs.model;
+ modelManual = !!prefs.modelManual;
  if (prefs.mode) {
  const radio = document.querySelector(`input[name="fetch-mode"][value="${prefs.mode}"]`);
  if (radio) radio.checked = true;
@@ -194,6 +269,7 @@ function restoreFetchPrefs() {
  if (cb) cb.checked = prefs.sources.includes(id);
  });
  }
+ updateModelHint();
 }
 
 async function loadPageData() {
@@ -202,14 +278,16 @@ async function loadPageData() {
  const model = stats.embedding_model || ' - ';
  const missing = stats.missing_embeddings ?? Math.max(0, (stats.total_articles || 0) - (stats.articles_with_embeddings || 0));
  document.getElementById('embedding-info').textContent =
- `${stats.articles_with_embeddings} of ${stats.total_articles} articles have embeddings` +
+ `${stats.articles_with_embeddings} of ${stats.total_articles} papers are ready for search` +
  (stats.articles_with_embeddings ? ` (model: ${model})` : '') +
- (missing ? ` · ${missing} still need embedding` : '') + '.';
+ (missing ? ` · ${missing} still need preparing` : '') + '.';
  if (stats.embedding_model) {
  const sel = document.getElementById('embedding-model');
  if ([...sel.options].some(o => o.value === stats.embedding_model)) {
  sel.value = stats.embedding_model;
  }
+ // Keep the hint truthful after syncing to the corpus model.
+ updateModelHint();
  }
  } catch (e) {
  document.getElementById('embedding-info').textContent = 'Unable to load article info.';
@@ -387,6 +465,12 @@ async function doFetch() {
  );
  }
  applyFetchResult(data, sources);
+ // Chain the prepare step so students don't have to remember it.
+ // doCreateEmbeddings handles its own errors; a prepare failure
+ // never marks the fetch as failed.
+ if ((data.total_fetched || 0) > 0) {
+ await doCreateEmbeddings(true);
+ }
  } catch (e) {
  const msg = e.message || '';
  if (msg.toLowerCase().includes('already running')) {
@@ -401,13 +485,19 @@ async function doFetch() {
  }
 }
 
-async function doCreateEmbeddings() {
+async function doCreateEmbeddings(chained = false) {
  const model = document.getElementById('embedding-model').value;
  const onlyMissing = document.getElementById('only-missing').checked;
  const btn = document.getElementById('embeddings-btn');
  saveFetchPrefs();
  setLoading(btn, true);
- setStatus('embeddings-status', 'Creating embeddings… this may take a few minutes on large collections.', 'info');
+ setStatus(
+ 'embeddings-status',
+ chained
+ ? 'Fetch done - preparing papers for search (embeddings)…'
+ : 'Preparing papers for search (embeddings)… this may take a few minutes on large collections.',
+ 'info'
+ );
 
  try {
  const started = await apiCall('/api/create-embeddings', {
@@ -427,12 +517,12 @@ async function doCreateEmbeddings() {
  const skipped = data.skipped_existing || 0;
  setStatus(
  'embeddings-status',
- `Done: ${created} embedded, ${skipped} skipped (already had vectors). ` +
+ `Done: ${created} prepared, ${skipped} skipped (already prepared). ` +
  `Model ${data.model || model} on ${device} in ${secs}. ` +
- `Corpus total with embeddings: ${data.articles_processed}.`,
+ `Total ready for search: ${data.articles_processed}.`,
  'success'
  );
- showNotification('Embeddings created successfully!', 'success');
+ showNotification(chained ? 'Papers fetched and prepared for search!' : 'Papers prepared for search!', 'success');
  loadPageData();
  } catch (e) {
  const msg = e.message || '';

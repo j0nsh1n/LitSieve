@@ -348,24 +348,16 @@ function renderPicoBlock(pico) {
  return `<div class="pico-detail">${parts.join('')}</div>`;
 }
 
-function renderResults(results) {
- const container = document.getElementById('results-list');
- container.innerHTML = '';
-
- if (results.length === 0) {
- container.innerHTML = '<p class="info-text">No results found. Try a different query or check that embeddings have been created.</p>';
- return;
- }
-
- results.forEach((article, idx) => {
+function buildResultCard(article, idx) {
  const details = document.createElement('details');
  details.className = 'article-card';
  if (idx < 3) details.setAttribute('open', '');
 
  const sim = article.similarity_score || 0;
  let simClass = 'sim-low';
- if (sim >= 0.7) simClass = 'sim-high';
- else if (sim >= 0.4) simClass = 'sim-med';
+ let simTier = 'Low';
+ if (sim >= 0.7) { simClass = 'sim-high'; simTier = 'High'; }
+ else if (sim >= 0.4) { simClass = 'sim-med'; simTier = 'Medium'; }
 
  const url = getArticleUrl(article.article_id, article.source);
  const idText = escapeHtml(article.article_id || '');
@@ -376,6 +368,9 @@ function renderResults(results) {
  const authors = (article.authors || []).join('; ');
  const abstractHtml = highlightText(article.abstract || '', lastQueryTokens);
  const picoHtml = renderPicoBlock(article.pico);
+ const keyPointsHtml = typeof renderKeyPointsHtml === 'function'
+ ? renderKeyPointsHtml(article.key_points)
+ : '';
  const starred = !!article.starred;
  const noteVal = article.note || '';
  const clusterBit = article.cluster_label
@@ -384,7 +379,7 @@ function renderResults(results) {
 
  details.innerHTML = `
  <summary>
- <span class="sim-badge ${simClass}">${Number(sim).toFixed(3)}</span>
+ <span class="sim-badge ${simClass}" title="Similarity score: ${Number(sim).toFixed(3)} (0-1)">${simTier}</span>
  <span class="article-title">${escapeHtml(article.title || '')}</span>
  <button type="button" class="star-btn ${starred ? 'is-starred' : ''}" title="Bookmark" aria-label="Star article">${starred ? '★' : '☆'}</button>
  </summary>
@@ -399,9 +394,11 @@ function renderResults(results) {
  <div class="article-meta meta-authors">
  <span><strong>Authors:</strong> ${escapeHtml(authors)}</span>
  </div>
+ ${keyPointsHtml}
  <div class="article-abstract">${abstractHtml}</div>
  ${picoHtml}
- <div class="note-row">
+ <button type="button" class="note-toggle" ${noteVal ? 'hidden' : ''}>✎ Add note</button>
+ <div class="note-row" ${noteVal ? '' : 'hidden'}>
  <label class="help-text">Private note</label>
  <textarea class="note-field" rows="2" placeholder="Optional study note (saved to your account)…"></textarea>
  <button type="button" class="btn btn-sm btn-secondary note-save">Save note</button>
@@ -411,6 +408,15 @@ function renderResults(results) {
 
  const noteField = details.querySelector('.note-field');
  noteField.value = noteVal;
+
+ const noteToggle = details.querySelector('.note-toggle');
+ const noteRow = details.querySelector('.note-row');
+ noteToggle.addEventListener('click', (e) => {
+ e.preventDefault();
+ noteToggle.hidden = true;
+ noteRow.hidden = false;
+ noteField.focus();
+ });
 
  const starBtn = details.querySelector('.star-btn');
  starBtn.addEventListener('click', async (e) => {
@@ -452,8 +458,23 @@ function renderResults(results) {
  }
  });
 
- container.appendChild(details);
- });
+ return details;
+}
+
+function renderResults(results) {
+ const container = document.getElementById('results-list');
+ container.innerHTML = '';
+
+ if (results.length === 0) {
+ container.innerHTML = '<p class="info-text">No results found. Try a different query or check that embeddings have been created.</p>';
+ return;
+ }
+
+ if (typeof renderPaginatedList === 'function') {
+ renderPaginatedList(container, results, buildResultCard, { noun: 'results' });
+ } else {
+ results.forEach((article, idx) => container.appendChild(buildResultCard(article, idx)));
+ }
 
  if (typeof enhanceAbstracts === 'function') {
  enhanceAbstracts(container);

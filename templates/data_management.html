@@ -3,46 +3,49 @@
 {% block content %}
 <section class="page-header">
  <h1>Data Management</h1>
- <p class="subtitle"><strong>Step 1 of 4.</strong> Select topics, fetch papers, then create embeddings.
- Fetch and embed run as <strong>background jobs</strong> (progress bars; safe if you leave the tab open).
- When you’re done → <a href="/clusters">Clusters</a> to group and screen topics.</p>
+ <p class="subtitle"><strong>Step 1 of 4.</strong> Pick topics, choose sources, and fetch papers -
+ the app prepares them for search automatically.</p>
 </section>
 
 <!-- Step 1: Topics -->
 <section class="card">
  <h2>1. Select Topics</h2>
- <p class="info-text">Choose the academic areas you care about. We use this to recommend databases and to
- check your <strong>coverage map</strong> (are you missing sources teachers often expect for this topic?).
- Your collection stays private to this account.</p>
+ <p class="info-text">Choose the academic areas you care about - we use them to recommend sources.</p>
+ <details class="help-details">
+  <summary>How topics are used</summary>
+  <p class="info-text">Topics drive two things: which databases get recommended below, and the
+  <strong>coverage map</strong> after a fetch (are you missing sources teachers often expect for this
+  topic?). Your collection stays private to this account.</p>
+ </details>
  <div class="topic-grid" id="topic-grid"></div>
 </section>
 
 <!-- Step 2: Sources -->
 <section class="card">
  <h2>2. Choose Sources</h2>
- <p class="info-text" id="source-hint">Select topics above to see recommended sources, or choose manually below.
- Some sources need free API keys (CORE, NASA ADS); without a key they simply skip.</p>
+ <p class="info-text" id="source-hint">Select topics above to see recommended sources, or choose manually below.</p>
+ <details class="help-details">
+  <summary>About the sources</summary>
+  <p class="info-text">Each source is a free academic database. Some need free API keys (CORE, NASA ADS);
+  without a key they simply skip - the rest still run.</p>
+ </details>
  <div class="source-option-grid" id="source-option-grid"></div>
-</section>
-
-<!-- Coverage map -->
-<section class="card">
- <h2>Coverage map</h2>
- <p class="info-text">A quick health check: how many papers you already have per database, and which
- recommended sources are still empty. Re-run after a fetch finishes (background jobs update the
- bars when you refresh).</p>
- <div id="coverage-bars"></div>
- <div id="coverage-suggestions" class="info-text" style="margin-top:0.75rem;"></div>
- <button type="button" id="coverage-refresh" class="btn btn-secondary btn-sm">Refresh coverage</button>
 </section>
 
 <!-- Step 3: Fetch -->
 <section class="card">
  <h2>3. Fetch Articles</h2>
- <p class="info-text">Runs your query against every selected source <strong>in parallel</strong> as a
- <strong>background job</strong> (progress bar; if one fetch is already running you will be told to wait).
- Saves title, abstract, authors, year, and journal into your private database. Records without an abstract
- are skipped (later steps need text). Your last query, sources, and email are remembered in this browser.</p>
+ <p class="info-text">Searches every selected source at once and saves the papers to your private
+ collection. When the fetch finishes, papers are prepared for search automatically.</p>
+ <details class="help-details">
+  <summary>How fetching works</summary>
+  <p class="info-text">The query runs against every selected source <strong>in parallel</strong> as a
+  background job (progress bar; if one fetch is already running you will be told to wait).
+  Saves title, abstract, authors, year, and journal. Records without an abstract are skipped
+  (later steps need text). After a successful fetch the app starts the prepare step (embeddings)
+  for you; you can watch its progress in the card below. Your last query, sources, and email are
+  remembered in this browser.</p>
+ </details>
  <div class="form-row">
  <div class="form-group flex-2">
  <label>Search Query</label>
@@ -51,10 +54,6 @@
  <div class="form-group">
  <label>Max Results per Source</label>
  <input type="number" id="fetch-max" value="200" min="10" max="2000" step="50">
- </div>
- <div class="form-group">
- <label>Email <span class="help-text">(for PubMed / Europe PMC)</span></label>
- <input type="email" id="fetch-email" placeholder="your.email@example.com">
  </div>
  </div>
  <div class="form-row">
@@ -69,6 +68,15 @@
  </label>
  </div>
  </div>
+ <details class="advanced-details">
+  <summary>Advanced fetch options</summary>
+  <div class="advanced-body">
+   <div class="form-group">
+   <label>Email <span class="help-text">(optional - PubMed and Europe PMC ask for a contact email)</span></label>
+   <input type="email" id="fetch-email" placeholder="your.email@example.com">
+   </div>
+  </div>
+ </details>
  <button id="fetch-btn" class="btn btn-primary">Fetch Articles</button>
  <div id="fetch-status" class="status-indicator"></div>
  <div id="fetch-source-report" class="info-text" style="display:none;margin-top:0.5rem;"></div>
@@ -78,37 +86,63 @@
  </div>
 </section>
 
-<!-- Step 4: Embeddings -->
+<!-- Coverage map (health check after a fetch) -->
 <section class="card">
- <h2>4. Create Embeddings</h2>
- <p class="info-text">Embeddings turn each abstract into a numerical “meaning fingerprint.” They power
- Search (hybrid ranking, seed, and more-like-starred), Clusters, and Duplicate detection - run this
- after every fetch. The run is a <strong>background job</strong> with a progress bar (you can leave the
- page open). Pick <em>general</em> for speed or mixed topics; <em>pubmedbert</em> / <em>biosentbert</em>
- for medical corpora; <em>specter</em> for scientific papers. <strong>Only embed new papers</strong>
- turns on automatically when you choose <em>Add to collection</em> (so existing vectors are kept); for a
- full <em>Replace</em> fetch it stays off so everything is embedded. Switching models re-embeds everything.
- Uses your GPU when available (including ROCm on supported Linux setups).</p>
+ <h2>Coverage map</h2>
+ <p class="info-text">A quick health check after a fetch: papers per source, and which recommended
+ sources are still empty.</p>
+ <div id="coverage-bars"></div>
+ <div id="coverage-suggestions" class="info-text" style="margin-top:0.75rem;"></div>
+ <button type="button" id="coverage-refresh" class="btn btn-secondary btn-sm">Refresh coverage</button>
+</section>
+
+<!-- Step 4: Prepare papers (embeddings) -->
+<section class="card">
+ <h2>4. Prepare Papers for Search</h2>
+ <p class="info-text">This step runs automatically after each fetch, and the analysis model is picked
+ to match your selected topics. Use this card to re-run it or switch models.</p>
+ <details class="help-details">
+  <summary>What preparing does (embeddings)</summary>
+  <p class="info-text">Preparing creates <strong>embeddings</strong>: each abstract becomes a numerical
+  "meaning fingerprint" that powers Search (hybrid ranking, seed, and more-like-starred), Clusters,
+  and Duplicate detection. It runs as a background job with a progress bar (you can leave the page
+  open) and uses your GPU when available. The model is chosen automatically from your topics
+  (biomedical topics get a biomedical model, hard-science topics a scientific-paper model, anything
+  else a fast general one) - pick a different one under Advanced to override.
+  <strong>Only prepare new papers</strong> turns on automatically when you choose
+  <em>Add to collection</em> (existing fingerprints are kept); for a full <em>Replace</em> fetch it
+  stays off so everything is processed. Switching models reprocesses everything.</p>
+ </details>
  <p class="info-text" id="embedding-info">Loading article info...</p>
- <div class="form-row">
- <div class="form-group">
- <label>Embedding Model</label>
- <select id="embedding-model">
- <option value="general">general (fastest)</option>
- <option value="pubmedbert">pubmedbert (biomedical)</option>
- <option value="biosentbert">biosentbert (medical)</option>
- <option value="specter">specter (scientific)</option>
- </select>
- </div>
- <div class="form-group">
- <label class="radio-label" style="margin-top:1.4rem;">
- <input type="checkbox" id="only-missing">
- Only embed new papers (skip ones that already have vectors)
- </label>
- <span class="help-text" id="only-missing-hint">Checked automatically after “Add to collection”; off for “Replace”.</span>
- </div>
- </div>
- <button id="embeddings-btn" class="btn btn-primary">Create Embeddings</button>
+ <p class="help-text" id="model-auto-hint"></p>
+ <details class="advanced-details">
+  <summary>Advanced preparation options</summary>
+  <div class="advanced-body">
+   <div class="form-row">
+   <div class="form-group">
+   <label>Analysis model</label>
+   <select id="embedding-model">
+   <option value="general">general (fastest, any topic)</option>
+   <option value="mpnet">mpnet (best general quality, slower)</option>
+   <option value="pubmedbert">pubmedbert (biomedical)</option>
+   <option value="biosentbert">biosentbert (medical)</option>
+   <option value="specter">specter (scientific papers)</option>
+   <option value="multiqa">multiqa (tuned for question-style queries)</option>
+   <option value="multilingual">multilingual (non-English collections)</option>
+   </select>
+   <span class="help-text">Picking a model here overrides the automatic choice from your topics.</span>
+   </div>
+   <div class="form-group">
+   <label class="radio-label" style="margin-top:1.4rem;">
+   <input type="checkbox" id="only-missing">
+   Only prepare new papers (skip ones already processed)
+   </label>
+   <span class="help-text" id="only-missing-hint">Checked automatically after "Add to collection"; off for "Replace".</span>
+   </div>
+   </div>
+  </div>
+ </details>
+ <button id="embeddings-btn" class="btn btn-primary">Prepare Papers</button>
  <div id="embeddings-status" class="status-indicator"></div>
  <div id="embed-progress-wrap" style="display:none;">
  <div class="progress-bar-track"><div class="progress-bar-fill" id="embed-progress-fill"></div></div>
@@ -118,5 +152,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/data_management.js?v=20260713d"></script>
+<script src="/static/js/data_management.js?v=20260715e"></script>
 {% endblock %}

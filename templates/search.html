@@ -4,19 +4,22 @@
 {% block content %}
 <section class="page-header">
  <h1>Search for Similar Articles</h1>
- <p class="subtitle"><strong>Step 4 of 4 (last).</strong> Rank papers you kept by meaning (plus exact-word boost),
- year range, a seed paper, or papers like your stars. Screen on
- <a href="/clusters">Clusters</a> and clean copies on <a href="/statistics">Duplicates</a> first.</p>
+ <p class="subtitle"><strong>Step 4 of 4 (last).</strong> Rank the papers you kept by how well they
+ match your question, then export your list.</p>
 </section>
 
 <section class="card">
- <p class="info-text">This searches <strong>your fetched &amp; embedded articles only</strong> - not the whole internet.
- Plain language works: the app compares meaning, then slightly boosts papers that also share your exact words.
- <strong>Text</strong> is a free research question;
- <strong>PICO</strong> is for clinical-style questions (Population / Intervention / Comparison / Outcome);
- <strong>Seed</strong> starts from one paper already in your collection.
- You can also run <strong>More like my starred</strong> after bookmarking papers with ★.
- Screen out off-topic groups on <a href="/clusters">Clusters</a> (or resolve duplicates first) - those never appear here.</p>
+ <p class="info-text">Searches <strong>your collection only</strong> (not the whole internet). Plain
+ language works - the app compares meaning, not just keywords.</p>
+ <details class="help-details">
+  <summary>The three input modes and what gets searched</summary>
+  <p class="info-text"><strong>Text</strong> is a free research question; <strong>PICO</strong> is for
+  clinical-style questions (Population / Intervention / Comparison / Outcome); <strong>Seed</strong>
+  starts from one paper already in your collection. You can also run <strong>More like my
+  starred</strong> after bookmarking papers with ★. The app compares meaning, then slightly boosts
+  papers that also share your exact words. Papers you screened out on Clusters (or resolved as
+  duplicates) never appear here.</p>
+ </details>
  <div class="input-method-toggle">
  <label class="radio-label">
  <input type="radio" name="input_method" value="text" checked> Text Input
@@ -34,7 +37,7 @@
  </div>
 
  <div id="pico-input-panel" style="display:none;">
- <p class="info-text">Fill in the parts you know. Optional: turn on <em>Prefer PICO matches</em> below so abstracts that mention your terms rank a little higher.</p>
+ <p class="info-text">Fill in the parts you know.</p>
  <div class="pico-grid">
  <div class="form-group">
  <label>Population</label>
@@ -56,9 +59,9 @@
  </div>
 
  <div id="seed-input-panel" style="display:none;">
- <p class="info-text"><strong>Seed paper:</strong> paste an article id (e.g. PubMed ID or DOI) or part of a
- title from a paper already in your collection. The app finds that paper, then ranks others that are
- most like it - useful when a teacher gives you one starter citation.</p>
+ <p class="info-text"><strong>Seed paper:</strong> paste an article id (e.g. PubMed ID or DOI) or part
+ of a title from a paper already in your collection - the app ranks the rest by similarity to it.
+ Useful when a teacher gives you one starter citation.</p>
  <div class="form-group">
  <label>Seed id or title fragment</label>
  <input type="text" id="seed-query" placeholder="e.g. 10.1038/... or climate warming oceans">
@@ -81,18 +84,6 @@
  <option value="title">Title (A-Z)</option>
  </select>
  </div>
- <div class="param-group">
- <label class="radio-label" style="margin-top:1.4rem;">
- <input type="checkbox" id="pico-boost"> Prefer PICO matches
- </label>
- <span class="help-text">Slight boost when abstract text overlaps your query terms (does not replace similarity).</span>
- </div>
- <div class="param-group">
- <label class="radio-label" style="margin-top:1.4rem;">
- <input type="checkbox" id="lexical-boost" checked> Prefer exact words (hybrid)
- </label>
- <span class="help-text">Blend meaning similarity with TF-IDF word overlap (on by default).</span>
- </div>
  <div class="param-group year-range-group">
  <label>From year</label>
  <input type="number" id="year-min" class="year-input" min="1900" max="2100" step="1" placeholder="e.g. 2015">
@@ -100,65 +91,53 @@
  <div class="param-group year-range-group">
  <label>To year</label>
  <input type="number" id="year-max" class="year-input" min="1900" max="2100" step="1" placeholder="e.g. 2024">
- </div>
- <div class="param-group">
- <label>Sources</label>
- <div class="source-selector">
- <label class="radio-label"><input type="checkbox" name="search-source" value="pubmed" checked> PubMed</label>
- <label class="radio-label"><input type="checkbox" name="search-source" value="europepmc" checked> Europe PMC</label>
- <label class="radio-label"><input type="checkbox" name="search-source" value="clinicaltrials" checked> ClinicalTrials.gov</label>
- <label class="radio-label"><input type="checkbox" name="search-source" value="openalex" checked> OpenAlex</label>
- <label class="radio-label"><input type="checkbox" name="search-source" value="arxiv" checked> arXiv</label>
- <label class="radio-label"><input type="checkbox" name="search-source" value="semanticscholar" checked> Semantic Scholar</label>
- <label class="radio-label"><input type="checkbox" name="search-source" value="eric" checked> ERIC</label>
- <label class="radio-label"><input type="checkbox" name="search-source" value="zenodo" checked> Zenodo</label>
- <label class="radio-label"><input type="checkbox" name="search-source" value="crossref" checked> CrossRef</label>
- <label class="radio-label"><input type="checkbox" name="search-source" value="doaj" checked> DOAJ</label>
- <label class="radio-label"><input type="checkbox" name="search-source" value="nasa_ads" checked> NASA ADS</label>
- <label class="radio-label"><input type="checkbox" name="search-source" value="core" checked> CORE</label>
- </div>
- <div class="help-text" id="source-availability-hint" style="margin-top:0.4rem;"></div>
  <p class="help-text year-range-hint">Papers with unknown year are hidden when a range is set.</p>
  </div>
  </div>
+
+ <details class="advanced-details">
+  <summary>Advanced: ranking options and source filter</summary>
+  <div class="advanced-body">
+   <div class="param-row">
+   <div class="param-group">
+   <label class="radio-label">
+   <input type="checkbox" id="lexical-boost" checked> Prefer exact words (hybrid)
+   </label>
+   <span class="help-text">Blend meaning similarity with TF-IDF word overlap (on by default).</span>
+   </div>
+   <div class="param-group">
+   <label class="radio-label">
+   <input type="checkbox" id="pico-boost"> Prefer PICO matches
+   </label>
+   <span class="help-text">Slight boost when abstract text overlaps your query terms (does not replace similarity).</span>
+   </div>
+   </div>
+   <div class="param-group">
+   <label>Sources (all included by default)</label>
+   <div class="source-selector">
+   <label class="radio-label"><input type="checkbox" name="search-source" value="pubmed" checked> PubMed</label>
+   <label class="radio-label"><input type="checkbox" name="search-source" value="europepmc" checked> Europe PMC</label>
+   <label class="radio-label"><input type="checkbox" name="search-source" value="clinicaltrials" checked> ClinicalTrials.gov</label>
+   <label class="radio-label"><input type="checkbox" name="search-source" value="openalex" checked> OpenAlex</label>
+   <label class="radio-label"><input type="checkbox" name="search-source" value="arxiv" checked> arXiv</label>
+   <label class="radio-label"><input type="checkbox" name="search-source" value="semanticscholar" checked> Semantic Scholar</label>
+   <label class="radio-label"><input type="checkbox" name="search-source" value="eric" checked> ERIC</label>
+   <label class="radio-label"><input type="checkbox" name="search-source" value="zenodo" checked> Zenodo</label>
+   <label class="radio-label"><input type="checkbox" name="search-source" value="crossref" checked> CrossRef</label>
+   <label class="radio-label"><input type="checkbox" name="search-source" value="doaj" checked> DOAJ</label>
+   <label class="radio-label"><input type="checkbox" name="search-source" value="nasa_ads" checked> NASA ADS</label>
+   <label class="radio-label"><input type="checkbox" name="search-source" value="core" checked> CORE</label>
+   </div>
+   <div class="help-text" id="source-availability-hint" style="margin-top:0.4rem;"></div>
+   </div>
+  </div>
+ </details>
+
  <button id="search-btn" class="btn btn-primary btn-block">Search</button>
  <button type="button" id="starred-search-btn" class="btn btn-secondary btn-block" style="margin-top:0.6rem;">
  More like my starred (<span id="starred-count">0</span>)
  </button>
- <p class="help-text">Uses the average of your starred papers' embeddings (excludes the starred papers themselves from results).</p>
-</section>
-
-<section class="card">
- <h2>Citations</h2>
- <p class="info-text">Download RIS or BibTeX from <strong>Export your library</strong> below for Zotero, EndNote, or Mendeley.
- For APA/MLA/Chicago hand-formatting, open ZoteroBib, paste a title or DOI from a result, and pick the style yourself:</p>
- <p>
- <a class="btn btn-secondary" href="https://zbib.org/" target="_blank" rel="noopener">
- Open ZoteroBib (zbib.org)
- </a>
- <span class="help-text" style="display:inline;margin-left:0.6rem;">No account required · good for students</span>
- </p>
-</section>
-
-<section class="card">
- <h2>Export your library</h2>
- <p class="info-text">Download your whole collection (not just the last search), including cluster labels,
- exclusion status, stars, and private notes. Useful for hand-ins or spreadsheet screening logs.
- Choose a scope, then a format (CSV spreadsheet, RIS, or BibTeX). Screening counts for hand-ins are on the Duplicates page.</p>
- <div class="export-scope-row">
- <label for="lib-export-scope" class="help-text export-scope-label">Scope</label>
- <select id="lib-export-scope" class="export-scope-select">
- <option value="all">All articles</option>
- <option value="included">Included only</option>
- <option value="excluded">Screened out only</option>
- <option value="starred">Starred only</option>
- </select>
- </div>
- <div class="export-row export-row-formats">
- <button type="button" class="btn btn-secondary btn-sm" data-lib-export-format="csv">CSV</button>
- <button type="button" class="btn btn-secondary btn-sm" data-lib-export-format="ris">RIS (Zotero/EndNote)</button>
- <button type="button" class="btn btn-secondary btn-sm" data-lib-export-format="bibtex">BibTeX</button>
- </div>
+ <p class="help-text">Finds papers similar to the ones you starred (the starred papers themselves are left out).</p>
 </section>
 
 <section id="seed-banner" class="card" style="display:none;">
@@ -174,15 +153,47 @@
  <button id="export-txt" class="btn btn-secondary btn-sm" title="Download these results as a plain-text reading list">Download Text</button>
  </div>
  </div>
- <p class="info-text">The badge is the original embedding similarity (0-1), even when hybrid ranking is on.
- Matching words from your query are <mark class="hl-demo">highlighted</mark> in abstracts. PICO chips show
- which clinical elements were detected, with short quotes when available. Use ★ to bookmark (feeds
- <strong>More like my starred</strong>) and the note box for private study notes (saved only in your account).
- Export this ranked list as CSV/TXT, or the whole library as CSV / RIS / BibTeX above.</p>
+ <details class="help-details">
+  <summary>Reading the results</summary>
+  <p class="info-text">The badge shows how strong the match is (hover for the exact 0-1 similarity
+  score, always the original meaning-based similarity even when hybrid ranking is on). Matching
+  words from your query are <mark class="hl-demo">highlighted</mark> in abstracts. PICO chips show
+  which clinical elements were detected, with short quotes when available. Use ★ to bookmark (feeds
+  <strong>More like my starred</strong>) and <em>Add note</em> for private study notes (saved only
+  in your account). Export this ranked list with the buttons above, or your whole library below.</p>
+ </details>
  <div id="results-list"></div>
+</section>
+
+<section class="card">
+ <h2>Export your library</h2>
+ <p class="info-text">Download your whole collection (not just the last search) for hand-ins or a
+ bibliography manager like Zotero, EndNote, or Mendeley.</p>
+ <details class="help-details">
+  <summary>What exports include and citation formatting</summary>
+  <p class="info-text">Exports include cluster labels, exclusion status, stars, and private notes -
+  useful for spreadsheet screening logs. Screening counts for hand-ins are on the Duplicates page.
+  For APA/MLA/Chicago hand-formatting, open
+  <a href="https://zbib.org/" target="_blank" rel="noopener">ZoteroBib</a> (free, no account), paste
+  a title or DOI from a result, and pick the style yourself.</p>
+ </details>
+ <div class="export-scope-row">
+ <label for="lib-export-scope" class="help-text export-scope-label">Scope</label>
+ <select id="lib-export-scope" class="export-scope-select">
+ <option value="all">All articles</option>
+ <option value="included">Included only</option>
+ <option value="excluded">Screened out only</option>
+ <option value="starred">Starred only</option>
+ </select>
+ </div>
+ <div class="export-row export-row-formats">
+ <button type="button" class="btn btn-secondary btn-sm" data-lib-export-format="csv">CSV</button>
+ <button type="button" class="btn btn-secondary btn-sm" data-lib-export-format="ris">RIS (Zotero/EndNote)</button>
+ <button type="button" class="btn btn-secondary btn-sm" data-lib-export-format="bibtex">BibTeX</button>
+ </div>
 </section>
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/search.js?v=20260713d"></script>
+<script src="/static/js/search.js?v=20260715e"></script>
 {% endblock %}
