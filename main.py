@@ -1,5 +1,5 @@
 """
-FastAPI Application — Literature Research Aide v3.7.0
+FastAPI Application — Literature Research Aide v3.8.0
 Multi-user web interface for literature search and analysis.
 """
 
@@ -45,8 +45,15 @@ from utils import (
     build_screening_report,
     format_screening_report_txt,
 )
-from citations import collection_to_ris, collection_to_bibtex
+from citations import collection_to_ris, collection_to_bibtex, collection_to_apa
 from feature_guides import get_guide, list_guides, neighbors
+from sample_corpus import get_sample_articles
+from screening_reasons import (
+    EXCLUSION_REASONS,
+    USER_SELECTABLE_REASONS,
+    normalize_reason,
+    reason_label,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -74,12 +81,12 @@ def rate_limit_key(request: Request) -> str:
 limiter = Limiter(key_func=rate_limit_key)
 
 # At top of file
-app = FastAPI(title="Literature Research Aide", version="3.7.0")
+app = FastAPI(title="Literature Research Aide", version="3.8.0")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 @app.get("/health")
 async def health():
-    return {"status": "healthy", "version": "3.7.0"}
+    return {"status": "healthy", "version": "3.8.0"}
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
@@ -390,9 +397,16 @@ class ScreeningItem(BaseModel):
 class ScreeningRequest(BaseModel):
     items: List[ScreeningItem]
     action: str = Field(default="exclude", pattern="^(exclude|include)$")
+    # Exclusion reason code (see screening_reasons.EXCLUSION_REASONS).
+    reason: Optional[str] = "manual"
 
 class ClusterScreeningRequest(BaseModel):
     action: str = Field(default="exclude", pattern="^(exclude|include)$")
+    reason: Optional[str] = "cluster"
+
+class SampleCorpusRequest(BaseModel):
+    # True = wipe collection first (demo reset). False = append samples.
+    clear_first: bool = True
 
 class ResolveDuplicatesRequest(BaseModel):
     threshold: float = Field(default=0.95, ge=0.5, le=1.0)
@@ -905,7 +919,7 @@ async def api_export_library(
     """Export the collection with cluster membership and exclusion reasons.
 
     scope: all | included | excluded | starred
-    format: csv | txt | ris | bibtex
+    format: csv | txt | ris | bibtex | apa
     """
     user = current_user(request)
     if not user:
@@ -913,7 +927,7 @@ async def api_export_library(
     if scope not in ("all", "included", "excluded", "starred"):
         return JSONResponse(status_code=400, content={"detail": "Invalid scope"})
     fmt = (format or "csv").lower().strip()
-    if fmt not in ("csv", "txt", "ris", "bibtex"):
+    if fmt not in ("csv", "txt", "ris", "bibtex", "apa"):
         return JSONResponse(status_code=400, content={"detail": "Invalid format"})
     uid = user["user_id"]
     p = get_pipeline(uid)
@@ -927,6 +941,10 @@ async def api_export_library(
             content = collection_to_bibtex(rows)
             media_type = "application/x-bibtex"
             filename = "library.bib"
+        elif fmt == "apa":
+            content = collection_to_apa(rows)
+            media_type = "text/plain"
+            filename = "library_apa.txt"
         elif fmt == "txt":
             lines = []
             for a in rows:
@@ -1386,11 +1404,18 @@ async def api_screening(req: ScreeningRequest, request: Request):
     try:
         keys = [(item.article_id, item.source) for item in req.items]
         if req.action == "exclude":
-            count = p.db.exclude_articles(keys, reason='manual')
+            reason = normalize_reason(req.reason, default="manual")
+            count = p.db.exclude_articles(keys, reason=reason)
         else:
             count = p.db.include_articles(keys)
+            reason = None
         p.invalidate_corpus_cache()
-        return {"status": "success", "action": req.action, "count": count}
+        return {
+            "status": "success",
+            "action": req.action,
+            "count": count,
+            "reason": reason,
+        }
     except Exception as e:
         return server_error(e)
     finally:
@@ -1412,11 +1437,69 @@ async def api_cluster_screening(cluster_id: int, req: ClusterScreeningRequest, r
         if not keys:
             return JSONResponse(status_code=404, content={"detail": f"Cluster {cluster_id} has no articles"})
         if req.action == "exclude":
-            count = p.db.exclude_articles(keys, reason='cluster')
+            reason = normalize_reason(req.reason, default="cluster")
+            count = p.db.exclude_articles(keys, reason=reason)
         else:
             count = p.db.include_articles(keys)
+            reason = None
         p.invalidate_corpus_cache()
-        return {"status": "success", "action": req.action, "cluster_id": cluster_id, "count": count}
+        return {
+            "status": "success",
+            "action": req.action,
+            "cluster_id": cluster_id,
+            "count": count,
+            "reason": reason,
+        }
+    except Exception as e:
+        return server_error(e)
+    finally:
+        release_pipeline(uid)
+
+
+@app.get("/api/screening-reasons")
+async def api_screening_reasons(request: Request):
+    """List exclusion reason codes for UI dropdowns."""
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    return {
+        "reasons": [
+            {"code": c, "label": reason_label(c)}
+            for c in USER_SELECTABLE_REASONS
+        ],
+        "all": [
+            {"code": c, "label": EXCLUSION_REASONS[c]}
+            for c in EXCLUSION_REASONS
+        ],
+    }
+
+
+@app.post("/api/load-sample-corpus")
+@limiter.limit("6/minute")
+async def api_load_sample_corpus(req: SampleCorpusRequest, request: Request):
+    """Load the built-in demo paper set (no external API calls)."""
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    uid = user["user_id"]
+    p = get_pipeline(uid)
+    try:
+        if req.clear_first:
+            p.db.clear_all()
+        articles = get_sample_articles()
+        stats = p.db.insert_articles(articles, dedupe=True)
+        p.invalidate_corpus_cache()
+        inserted = stats.get("inserted", 0) if isinstance(stats, dict) else 0
+        return {
+            "status": "success",
+            "loaded": len(articles),
+            "inserted": inserted,
+            "updated": stats.get("updated", 0) if isinstance(stats, dict) else 0,
+            "cleared_first": req.clear_first,
+            "hint": "Prepare papers for search next (or it auto-runs after a normal fetch).",
+        }
     except Exception as e:
         return server_error(e)
     finally:

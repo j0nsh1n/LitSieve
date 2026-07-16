@@ -7,7 +7,7 @@ sdk: docker
 app_port: 7860
 ---
 
-# Literature Research Aide 📚 — v3.7.0
+# Literature Research Aide 📚 — v3.8.0
 
 A multi-user web app for **teachers and students** to fetch, screen, and rank
 research papers across many academic databases. Semantic embeddings power
@@ -36,6 +36,8 @@ Built with **FastAPI**, sentence-transformers, FAISS, and scikit-learn.
   (revokes other sessions via `token_version`), **password reset**
 - 📤 Export ranked hits (CSV/TXT) or full library (**CSV / RIS / BibTeX**) by scope
 - 📖 Public landing + `/learn/…` feature guides; first-run checklist + empty states
+- 🧪 **Sample demo corpus** (no APIs) for classroom dry runs
+- 📄 Library export: CSV / RIS / BibTeX / **APA (text)**; richer exclusion reason codes
 
 ## Project Structure
 

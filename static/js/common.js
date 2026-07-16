@@ -110,6 +110,8 @@ function getArticleUrl(articleId, source) {
             return `https://ui.adsabs.harvard.edu/abs/${articleId}`;
         case 'core':
             return `https://core.ac.uk/works/${articleId}`;
+        case 'sample':
+            return null; // demo corpus — no external page
         default:
             return null;
     }
@@ -130,6 +132,7 @@ function getSourceName(source) {
         doaj: 'DOAJ',
         nasa_ads: 'NASA ADS',
         core: 'CORE',
+        sample: 'Sample demo',
     };
     return names[source] || source;
 }

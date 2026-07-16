@@ -192,18 +192,31 @@ def format_screening_report_txt(report: Dict[str, Any]) -> str:
         )
     else:
         years_str = "(none)"
+    from screening_reasons import EXCLUSION_REASONS, reason_label
+
     lines = [
         f"SCREENING REPORT - {total} papers collected",
         f"Sources: {sources_str}",
         f"By year: {years_str}",
         f"Duplicates removed (kept best copy): {int(excluded.get('duplicate') or 0)}",
-        f"Excluded as off-topic (cluster triage): {int(excluded.get('cluster') or 0)}",
-        f"Excluded manually: {int(excluded.get('manual') or 0)}",
+        f"Excluded as cluster triage: {int(excluded.get('cluster') or 0)}",
+    ]
+    # Remaining reason codes with non-zero counts (stable label order).
+    for code in EXCLUSION_REASONS:
+        if code in ("duplicate", "cluster"):
+            continue
+        n = int(excluded.get(code) or 0)
+        if n:
+            lines.append(f"Excluded ({reason_label(code)}): {n}")
+    # Always show manual even if zero for continuity with older reports.
+    if not int(excluded.get("manual") or 0):
+        lines.append("Excluded (Manual): 0")
+    lines.extend([
         f"INCLUDED in final set: {int(report.get('included') or 0)}",
         f"Starred: {int(report.get('starred') or 0)}",
         f"With embeddings: {int(report.get('with_embeddings') or 0)}",
         f"Clusters (excl. noise): {int(report.get('clusters') or 0)}",
         "Note: counts reflect the current collection state.",
         "",
-    ]
+    ])
     return "\n".join(lines)

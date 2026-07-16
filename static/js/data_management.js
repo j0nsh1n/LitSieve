@@ -69,6 +69,8 @@ document.addEventListener('DOMContentLoaded', () => {
  if (dismissGs) dismissGs.addEventListener('click', () => {
  if (typeof dismissGettingStarted === 'function') dismissGettingStarted();
  });
+ const sampleBtn = document.getElementById('load-sample-btn');
+ if (sampleBtn) sampleBtn.addEventListener('click', () => loadSampleCorpus(true));
  // Live checklist ticks as the student fills the form.
  ['fetch-query'].forEach(id => {
  const el = document.getElementById(id);
@@ -337,6 +339,30 @@ function updateGettingStartedChecklist() {
  const mark = li.querySelector('.gs-check');
  if (mark) mark.textContent = done ? '●' : '○';
  });
+}
+
+async function loadSampleCorpus(clearFirst) {
+ const btn = document.getElementById('load-sample-btn');
+ if (btn) setLoading(btn, true);
+ try {
+ const data = await apiCall('/api/load-sample-corpus', {
+ method: 'POST',
+ body: { clear_first: !!clearFirst },
+ });
+ showNotification(
+ `Loaded ${data.inserted || data.loaded || 0} sample papers. Preparing for search…`,
+ 'success'
+ );
+ await loadPageData();
+ refreshCoverage();
+ updateNavStats();
+ // Prepare embeddings so Search/Clusters work immediately.
+ await doCreateEmbeddings(true);
+ } catch (e) {
+ showNotification(`Could not load sample corpus: ${e.message}`, 'error');
+ } finally {
+ if (btn) setLoading(btn, false);
+ }
 }
 
 async function cancelFetch() {
