@@ -1125,30 +1125,68 @@ async def api_export_library(
             content = "\n".join(lines)
             media_type, filename = "text/plain", f"library_{scope}.txt"
         else:
-            output = io.StringIO()
-            writer = csv.writer(output)
-            writer.writerow([
-                "Title", "Year", "Journal", "Authors", "Source", "ID",
-                "Cluster ID", "Cluster Label", "Excluded", "Exclusion Reason",
-                "Starred", "Note",
-            ])
-            for a in rows:
-                writer.writerow([
-                    a.get("title", ""), a.get("year", ""), a.get("journal", ""),
-                    "; ".join(a.get("authors") or []),
-                    a.get("source", ""), a.get("article_id", ""),
-                    a.get("cluster_id", ""), a.get("cluster_label", ""),
-                    "yes" if a.get("excluded") else "no",
-                    a.get("exclusion_reason", ""),
-                    "yes" if a.get("starred") else "no",
-                    a.get("note", ""),
-                ])
-            content = output.getvalue()
+            from assignment_pack import library_rows_to_csv
+            content = library_rows_to_csv(rows)
             media_type, filename = "text/csv", f"library_{scope}.csv"
         return StreamingResponse(
             io.BytesIO(content.encode()),
             media_type=media_type,
             headers={"Content-Disposition": f"attachment; filename={filename}"},
+        )
+    except Exception as e:
+        return server_error(e)
+    finally:
+        release_pipeline(uid)
+
+
+@app.get("/api/export/assignment-pack")
+async def api_export_assignment_pack(request: Request):
+    """One-click hand-in zip: screening report + included CSV + included RIS.
+
+    Soft process evidence for teachers — not a polished bibliography.
+    """
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    uid = user["user_id"]
+    p = get_pipeline(uid)
+    try:
+        from assignment_pack import build_assignment_zip
+        payload = await run_in_thread(build_assignment_zip, p.db)
+        return StreamingResponse(
+            io.BytesIO(payload),
+            media_type="application/zip",
+            headers={
+                "Content-Disposition": "attachment; filename=assignment_handin_pack.zip"
+            },
+        )
+    except Exception as e:
+        return server_error(e)
+    finally:
+        release_pipeline(uid)
+
+
+@app.get("/api/assignment-checklist")
+async def api_assignment_checklist(
+    request: Request,
+    min_sources: int = 3,
+    min_included: int = 5,
+    require_review: bool = True,
+):
+    """Soft assignment hints (never blocks export). Query params set targets."""
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    uid = user["user_id"]
+    p = get_pipeline(uid)
+    try:
+        from assignment_pack import evaluate_assignment_checklist
+        return await run_in_thread(
+            evaluate_assignment_checklist,
+            p.db,
+            min_sources=min_sources,
+            min_included=min_included,
+            require_review=require_review,
         )
     except Exception as e:
         return server_error(e)

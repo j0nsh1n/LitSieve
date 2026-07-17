@@ -2177,6 +2177,61 @@ html[data-reading="on"] .key-points {
     line-height: 1.4;
 }
 
+/* Assignment hand-in pack + soft checklist (Phase R3) */
+.assignment-checklist-heading {
+    margin: 1.1rem 0 0.35rem;
+    font-size: 1rem;
+    font-weight: 600;
+}
+.assignment-checklist-controls {
+    align-items: flex-end;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+.assignment-checklist-list {
+    list-style: none;
+    margin: 0.5rem 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+.assignment-check-item {
+    display: flex;
+    gap: 0.55rem;
+    align-items: flex-start;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    background: var(--surface);
+}
+.assignment-check-item.is-ok {
+    border-color: color-mix(in srgb, var(--ok, #2d6a4f) 45%, var(--rule));
+    background: color-mix(in srgb, var(--ok, #2d6a4f) 8%, var(--surface));
+}
+.assignment-check-item.is-soft-miss {
+    border-color: color-mix(in srgb, var(--warn, #b08900) 50%, var(--rule));
+    background: color-mix(in srgb, var(--warn, #b08900) 8%, var(--surface));
+}
+.assignment-check-mark {
+    font-weight: 700;
+    line-height: 1.3;
+    min-width: 1.1rem;
+}
+.assignment-check-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+}
+.assignment-check-detail {
+    font-size: 0.82rem;
+    color: var(--text-soft);
+    line-height: 1.35;
+}
+.help-text.check-all-ok { color: color-mix(in srgb, var(--ok, #2d6a4f) 70%, var(--text)); }
+.help-text.check-soft-miss { color: color-mix(in srgb, var(--warn, #b08900) 75%, var(--text)); }
+
 /* HS unit topic packs */
 .topic-packs-heading {
     margin: 1.1rem 0 0.35rem;

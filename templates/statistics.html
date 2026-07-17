@@ -71,15 +71,19 @@
   papers collected, removed as duplicates, excluded by cluster triage, excluded manually, included
   set, stars, prepared papers, clusters, and papers-by-year. The on-screen view and
   <strong>Download (.txt)</strong> use the same text - good to attach to a reflection or lab report.</p>
-  <p class="info-text">It is <strong>not</strong> a bibliography. For citations or a reference manager,
-  go to Search → Export your library and pick <strong>RIS</strong>, <strong>BibTeX</strong>, or
-  <strong>APA (text)</strong>. For a spreadsheet of individual papers, use <strong>CSV</strong> there.</p>
+  <p class="info-text">It is <strong>not</strong> a bibliography. For a full teacher hand-in
+  (report + included CSV + RIS in one zip), use <strong>Download hand-in pack</strong> below or the
+  same control on Search. CSV library exports include <strong>Starred</strong> and <strong>Note</strong>
+  columns for optional process evidence.</p>
  </details>
  <div id="screening-report-panel" class="screening-report-panel" hidden>
  <pre id="screening-report-body" class="screening-report-body"></pre>
  <p class="screening-report-actions">
  <a id="screening-report-download" class="btn btn-secondary btn-sm" href="/api/screening-report?format=txt"
   title="Plain-text counts for hand-ins, not a bibliography">Download (.txt)</a>
+ <a id="assignment-pack-download" class="btn btn-primary btn-sm"
+  href="/api/export/assignment-pack"
+  title="Zip: screening report + included CSV + RIS">Download hand-in pack (.zip)</a>
  </p>
  </div>
 </section>
@@ -97,5 +101,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/statistics.js?v=20260717r2"></script>
+<script src="/static/js/statistics.js?v=20260717r3"></script>
 {% endblock %}

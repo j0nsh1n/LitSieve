@@ -190,16 +190,65 @@
  <div id="results-list"></div>
 </section>
 
+<section class="card" id="assignment-pack-section">
+ <h2>Assignment hand-in pack</h2>
+ <p class="info-text">One click downloads a <strong>.zip</strong> teachers often want:
+ screening report counts, plus your <strong>included-only</strong> papers as CSV and RIS.
+ Soft checklist below is hints only — it never blocks download.</p>
+ <details class="help-details">
+  <summary>What is inside the zip?</summary>
+  <ul class="export-format-list">
+   <li><strong>screening_report.txt</strong> — collected / excluded / included counts (process).</li>
+   <li><strong>included_papers.csv</strong> — final set spreadsheet. Columns include
+   <strong>Starred</strong> (★ bookmarks) and <strong>Note</strong> (private study notes) so
+   teachers can see optional process evidence. Not a grade.</li>
+   <li><strong>included_papers.ris</strong> — import into Zotero/EndNote for a real bibliography.</li>
+   <li><strong>README_handin.txt</strong> — short explanation of each file.</li>
+  </ul>
+ </details>
+ <div class="export-row" style="margin-top:0.5rem;">
+  <button type="button" id="assignment-pack-btn" class="btn btn-primary btn-sm"
+   title="Zip: screening report + included CSV + included RIS">Download hand-in pack (.zip)</button>
+ </div>
+ <div id="assignment-pack-status" class="status-indicator"></div>
+
+ <h3 class="assignment-checklist-heading">Soft checklist (hints only)</h3>
+ <p class="info-text">Set optional targets your teacher mentioned. These never auto-fail or block export.</p>
+ <div class="assignment-checklist-controls form-row">
+  <div class="form-group">
+   <label for="check-min-included">Min included papers</label>
+   <input type="number" id="check-min-included" min="0" max="500" value="5" step="1">
+  </div>
+  <div class="form-group">
+   <label for="check-min-sources">Min different sources</label>
+   <input type="number" id="check-min-sources" min="0" max="20" value="3" step="1">
+  </div>
+  <div class="form-group" style="align-self:flex-end;">
+   <label class="radio-label">
+    <input type="checkbox" id="check-require-review" checked>
+    Hint if no review-type paper
+   </label>
+  </div>
+  <div class="form-group" style="align-self:flex-end;">
+   <button type="button" id="assignment-checklist-btn" class="btn btn-secondary btn-sm">Check</button>
+  </div>
+ </div>
+ <p class="help-text" id="assignment-checklist-summary"></p>
+ <ul class="assignment-checklist-list" id="assignment-checklist-list" aria-live="polite"></ul>
+</section>
+
 <section class="card">
  <h2>Export your library</h2>
  <p class="info-text">Download your <strong>whole collection</strong> (or a scope you pick), not just
- the last search. Choose a format based on what you will do next.</p>
+ the last search. Choose a format based on what you will do next. Prefer the
+ <strong>Assignment hand-in pack</strong> above when a teacher wants process + final list together.</p>
  <details class="help-details" open>
   <summary>Which file format should I pick?</summary>
   <ul class="export-format-list">
    <li><strong>CSV</strong> - spreadsheet of your library with cluster labels, screened-out status,
-   stars, and notes. Best for hand-in logs, teachers reviewing process, or working in Excel /
-   Google Sheets. Not a bibliography style.</li>
+   <strong>Starred</strong>, and <strong>Note</strong> columns. Best for hand-in logs, teachers
+   reviewing process, or working in Excel / Google Sheets. Not a bibliography style. Teachers:
+   sort on Starred / Note to see which papers students marked for follow-up.</li>
    <li><strong>RIS (Zotero / EndNote / Mendeley)</strong> - standard citation exchange file. Import
    into a reference manager, then generate APA, MLA, Chicago, etc. there. Prefer this when you need
    a real bibliography database.</li>
@@ -215,11 +264,12 @@
    <li><strong>All articles</strong> - everything you fetched in this library.</li>
    <li><strong>Included only</strong> - papers still in your final set (not screened out).</li>
    <li><strong>Screened out only</strong> - papers you excluded (duplicates, cluster triage, manual).</li>
-   <li><strong>Starred only</strong> - papers you bookmarked with ★.</li>
+   <li><strong>Starred only</strong> - papers you bookmarked with ★ (private; appears as the CSV
+   Starred column when you export a wider scope).</li>
   </ul>
   <p class="info-text">Need counts for a screening hand-in (how many collected / excluded / kept)?
-  Use the <strong>Screening report</strong> on the Duplicates page (JSON view or <code>.txt</code>
-  download), not these citation formats.</p>
+  Use the <strong>hand-in pack</strong> above or the <strong>Screening report</strong> on the
+  Duplicates page, not these citation formats alone.</p>
  </details>
  <div class="export-scope-row">
  <label for="lib-export-scope" class="help-text export-scope-label">Scope</label>
@@ -243,11 +293,11 @@
  </div>
  <p class="help-text" style="margin-top:0.65rem;">
  Tip: most students use <strong>RIS</strong> or <strong>BibTeX</strong> for a reference manager, and
- <strong>CSV</strong> when a teacher wants a screening spreadsheet.
+ <strong>CSV</strong> when a teacher wants a screening spreadsheet with notes and stars.
  </p>
 </section>
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/search.js?v=20260717r2"></script>
+<script src="/static/js/search.js?v=20260717r3"></script>
 {% endblock %}

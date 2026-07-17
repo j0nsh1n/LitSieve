@@ -202,29 +202,32 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "abstracts, and PICO snippets when detected.",
             "Star papers and add private notes for your study log.",
             "Export this ranked list as CSV (spreadsheet) or Text (reading list), or "
-            "export the whole library: CSV (screening log), RIS (Zotero/EndNote/"
-            "Mendeley), BibTeX (LaTeX / many managers), or APA text (classroom draft). "
-            "Pick a scope: all / included / screened out / starred.",
+            "export the whole library: CSV (screening log with Starred and Note "
+            "columns), RIS (Zotero/EndNote/Mendeley), BibTeX (LaTeX / many managers), "
+            "or APA text (classroom draft). Pick a scope: all / included / screened "
+            "out / starred.",
+            "Assignment hand-in pack (one zip): screening report + included-only "
+            "CSV + RIS — preferred when a teacher wants process and final list together.",
             "For polished APA/MLA/Chicago, import RIS or BibTeX into Zotero (or use "
             "ZoteroBib). APA (text) is a quick draft only.",
-            "Screening counts for hand-ins (how many collected / excluded) live on "
-            "Duplicates as a .txt report - that is not a citation file.",
+            "Screening counts alone also live on Duplicates as a .txt report.",
         ],
         "tips": [
             "Search only ranks papers already in your collection (from public "
             "databases you fetched). It is not Google Scholar and not a full library "
             "search. Use it to prioritise candidates, then verify in original sources.",
-            "Each result may show a study Type tag (review, trial, survey, …). That is "
-            "an automated guess from title and abstract - often wrong when confidence "
-            "is low (exclamation mark). It is not an evidence grade.",
+            "Each result may show a study Type tag (plain-language guess from title "
+            "and abstract - often wrong when confidence is low). It is not an evidence "
+            "grade.",
             "Screen off-topic clusters first so the ranking pool is clean.",
             "Seed mode is great when a teacher gives one starter paper: find more "
             "like it from what you already fetched.",
             "Star a handful of must-read papers, then use More like my starred to "
-            "expand the set without rewriting the query.",
+            "expand the set without rewriting the query. Stars and notes appear as "
+            "CSV columns on library export (optional process evidence for teachers).",
             "Need a real bibliography? Export RIS or BibTeX and open it in Zotero. "
-            "Need a spreadsheet log? Use CSV. Need counts for a process hand-in? "
-            "Use the Duplicates screening report (.txt).",
+            "Need process + final list for a hand-in? Use Assignment hand-in pack "
+            "(.zip). Soft checklist on Search is hints only and never blocks download.",
         ],
         "where_in_app": "Search page.",
         "app_path": "/search",
@@ -272,6 +275,9 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "passwords.",
             "Teachers: keep one library per unit or class so papers do not mix; "
             "share a finished unit library via class code so everyone starts equal.",
+            "For hand-ins, use Search → Assignment hand-in pack (zip with screening "
+            "report + included CSV/RIS). CSV columns Starred and Note show optional "
+            "process evidence (bookmarks and private notes) — not automatic grades.",
             "Export a library (CSV/RIS/BibTeX) before deleting it if you need a "
             "hand-in archive.",
             "If you change your password on a shared machine, other open tabs "
