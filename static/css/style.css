@@ -2162,6 +2162,24 @@ html[data-reading="on"] .key-points {
     line-height: 1.35;
     color: var(--text-soft);
     margin-top: 0.15rem;
+    display: block;
+}
+.coverage-suggest-list {
+    list-style: none;
+    margin: 0.45rem 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+.coverage-suggest-item {
+    padding: 0.45rem 0.6rem;
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    background: var(--surface);
+}
+.coverage-suggest-item .source-tip {
+    margin-top: 0.2rem;
 }
 .source-option.src-badge-preprint,
 .source-option.src-badge-not-peer-reviewed {

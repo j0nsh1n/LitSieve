@@ -49,10 +49,13 @@
  <p class="info-text" id="source-hint">Select topics above to see recommended sources, or choose manually below.</p>
  <details class="help-details">
   <summary>About the sources</summary>
-  <p class="info-text">Each source is a free academic database. Some need free API keys (CORE, NASA ADS);
-  without a key they simply skip - the rest still run. <strong>bioRxiv / medRxiv</strong> are
-  preprints (not peer-reviewed; recent window only). <strong>DBLP</strong> is strong on CS
-  titles/venues but many records have no real abstract (those are skipped).</p>
+  <p class="info-text">Each source is a <strong>free public</strong> academic database (not a college
+  library package). Every checkbox has a <strong>Student tip</strong> (what it is good for and what
+  it misses). Some need free server API keys (CORE, NASA ADS) — without a key they simply skip.
+  <strong>bioRxiv / medRxiv</strong> are preprints (not peer-reviewed; recent window only).
+  <strong>DBLP</strong> is strong on CS titles/venues but many records have no real abstract
+  (those are skipped). Topics + coverage map use the same recommended source lists so they stay
+  aligned.</p>
  </details>
  <div class="source-option-grid" id="source-option-grid"></div>
 </section>
@@ -177,5 +180,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/data_management.js?v=20260717r3"></script>
+<script src="/static/js/data_management.js?v=20260717r4"></script>
 {% endblock %}

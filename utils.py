@@ -7,52 +7,13 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
-# Higher = preferred when auto-resolving near-duplicates (tie-break after
-# abstract length). Curated for a typical multi-source student corpus.
-SOURCE_PRIORITY: Dict[str, int] = {
-    "pubmed": 100,
-    "europepmc": 90,
-    "clinicaltrials": 85,
-    "crossref": 80,
-    "openalex": 75,
-    "semanticscholar": 70,
-    "plos": 68,
-    "doaj": 65,
-    "arxiv": 60,
-    "dblp": 58,
-    "eric": 55,
-    "openaire": 52,
-    "core": 50,
-    "hal": 48,
-    "zenodo": 45,
-    "nasa_ads": 40,
-    "biorxiv": 35,
-    "medrxiv": 34,
-}
-
-# Topic id → sources that usually matter for classroom coverage checks.
-# Mirrors the Data Management topic grid recommendations.
-TOPIC_SOURCE_HINTS: Dict[str, List[str]] = {
-    "health": [
-        "pubmed", "europepmc", "clinicaltrials", "medrxiv", "plos",
-        "openalex", "semanticscholar",
-    ],
-    "biology": [
-        "pubmed", "europepmc", "biorxiv", "plos", "openalex", "arxiv",
-        "semanticscholar",
-    ],
-    "chemistry": ["openalex", "arxiv", "semanticscholar", "crossref", "openaire"],
-    "physics": ["arxiv", "openalex", "semanticscholar", "nasa_ads", "openaire"],
-    "math": ["arxiv", "openalex", "semanticscholar", "openaire"],
-    "cs": ["dblp", "arxiv", "openalex", "semanticscholar", "openaire"],
-    "earth": ["openalex", "semanticscholar", "nasa_ads", "zenodo", "openaire", "hal"],
-    "history": ["openalex", "semanticscholar", "eric", "crossref", "hal", "openaire"],
-    "economics": ["arxiv", "openalex", "semanticscholar", "eric", "openaire"],
-    "psychology": ["pubmed", "openalex", "semanticscholar", "eric", "openaire"],
-    "polisci": ["openalex", "semanticscholar", "eric", "hal", "openaire"],
-    "literature": ["openalex", "semanticscholar", "eric", "hal", "openaire"],
-    "education": ["eric", "openalex", "semanticscholar", "hal", "openaire"],
-}
+# Source priority + topic recommendations live in source_catalog (Phase R4).
+from source_catalog import (
+    SOURCE_PRIORITY,
+    TOPIC_SOURCE_HINTS,
+    coverage_reason,
+    source_display_name,
+)
 
 _YEAR_RE = re.compile(r"(?:19|20)\d{2}")
 
@@ -151,7 +112,7 @@ def coverage_suggestions(
     topic_ids = topic_ids or []
     if not topic_ids:
         # Generic high-value sources if no topics chosen.
-        recommended = ["pubmed", "openalex", "semanticscholar", "crossref"]
+        recommended = ["pubmed", "openalex", "semanticscholar", "crossref", "eric"]
     else:
         recommended = []
         seen = set()
@@ -164,9 +125,15 @@ def coverage_suggestions(
     suggestions = []
     for src in recommended:
         if (sources_present.get(src) or 0) == 0:
+            tip = coverage_reason(src)
             suggestions.append({
                 "source": src,
-                "reason": "Usually useful for your selected topic(s), but you have no articles from it yet.",
+                "name": source_display_name(src),
+                "reason": (
+                    f"Usually useful for your selected topic(s), but you have no "
+                    f"articles from it yet. {tip}"
+                ).strip(),
+                "tip": tip,
             })
     return suggestions[:6]
 

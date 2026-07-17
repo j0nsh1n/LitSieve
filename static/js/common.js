@@ -172,29 +172,49 @@ function getArticleUrl(articleId, source) {
 }
 
 // === Source display name ===
+// Prefer names from GET /api/sources (source_catalog.py) when loaded.
+window.LRA_SOURCE_NAMES = window.LRA_SOURCE_NAMES || {
+    pubmed: 'PubMed',
+    europepmc: 'Europe PMC',
+    clinicaltrials: 'ClinicalTrials.gov',
+    openalex: 'OpenAlex',
+    arxiv: 'arXiv',
+    semanticscholar: 'Semantic Scholar',
+    eric: 'ERIC',
+    zenodo: 'Zenodo',
+    crossref: 'CrossRef',
+    doaj: 'DOAJ',
+    nasa_ads: 'NASA ADS',
+    core: 'CORE',
+    biorxiv: 'bioRxiv',
+    medrxiv: 'medRxiv',
+    dblp: 'DBLP',
+    openaire: 'OpenAIRE',
+    plos: 'PLOS',
+    hal: 'HAL',
+    sample: 'Sample demo',
+};
+
 function getSourceName(source) {
-    const names = {
-        pubmed: 'PubMed',
-        europepmc: 'Europe PMC',
-        clinicaltrials: 'ClinicalTrials.gov',
-        openalex: 'OpenAlex',
-        arxiv: 'arXiv',
-        semanticscholar: 'Semantic Scholar',
-        eric: 'ERIC',
-        zenodo: 'Zenodo',
-        crossref: 'CrossRef',
-        doaj: 'DOAJ',
-        nasa_ads: 'NASA ADS',
-        core: 'CORE',
-        biorxiv: 'bioRxiv',
-        medrxiv: 'medRxiv',
-        dblp: 'DBLP',
-        openaire: 'OpenAIRE',
-        plos: 'PLOS',
-        hal: 'HAL',
-        sample: 'Sample demo',
-    };
-    return names[source] || source;
+    if (window.LRA_SOURCE_NAMES && window.LRA_SOURCE_NAMES[source]) {
+        return window.LRA_SOURCE_NAMES[source];
+    }
+    return source;
+}
+
+/** Load display names (and optional tips) from the server catalog. */
+async function loadSourceNames() {
+    try {
+        const data = await fetch('/api/sources', {
+            headers: { Accept: 'application/json' },
+            credentials: 'same-origin',
+        }).then((r) => (r.ok ? r.json() : null));
+        if (!data || !Array.isArray(data.sources)) return;
+        data.sources.forEach((s) => {
+            if (s && s.id) window.LRA_SOURCE_NAMES[s.id] = s.name || s.id;
+        });
+        window.LRA_SOURCE_NAMES.sample = window.LRA_SOURCE_NAMES.sample || 'Sample demo';
+    } catch (e) { /* keep defaults */ }
 }
 
 // === First-run / empty-state helpers ===
@@ -477,8 +497,11 @@ async function updateNavStats() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Flags first so Search/Account render with the correct classroom surface.
-    loadUiFlags().finally(() => {
+    // Flags + source names first so Search/Account match server catalog.
+    Promise.all([
+        typeof loadUiFlags === 'function' ? loadUiFlags() : Promise.resolve(),
+        typeof loadSourceNames === 'function' ? loadSourceNames() : Promise.resolve(),
+    ]).finally(() => {
         updateNavStats();
         initLibrarySwitcher();
     });

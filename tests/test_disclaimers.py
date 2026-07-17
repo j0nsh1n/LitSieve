@@ -12,7 +12,7 @@ from main import app
 
 
 TEMPLATES = Path(__file__).resolve().parents[1] / "templates"
-CACHE_BUST = "20260717r3"
+CACHE_BUST = "20260717r4"
 
 # Canonical phrases that must appear in the full banner (single source of truth).
 FULL_PHRASES = (

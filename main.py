@@ -116,6 +116,18 @@ async def api_ui_flags():
     from ui_flags import get_ui_flags
     return get_ui_flags()
 
+
+@app.get("/api/sources")
+async def api_sources():
+    """Public source catalog: names, student tips, topics, HS packs (Phase R4).
+
+    Single source of truth is source_catalog.py so Data Management, coverage,
+    and duplicate priority stay aligned.
+    """
+    from source_catalog import public_catalog
+    return public_catalog()
+
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
