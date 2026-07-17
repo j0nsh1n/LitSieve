@@ -7,7 +7,7 @@ sdk: docker
 app_port: 7860
 ---
 
-# Literature Research Aide 📚 — v3.8.0
+# Literature Research Aide 📚 — v4.0.0
 
 A multi-user web app for **teachers and students** to fetch, screen, and rank
 research papers across many academic databases. Semantic embeddings power
@@ -38,6 +38,8 @@ Built with **FastAPI**, sentence-transformers, FAISS, and scikit-learn.
 - 📖 Public landing + `/learn/…` feature guides; first-run checklist + empty states
 - 🧪 **Sample demo corpus** (no APIs) for classroom dry runs
 - 📄 Library export: CSV / RIS / BibTeX / **APA (text)**; richer exclusion reason codes
+- 📚 **Multiple libraries** per account (separate collections; switch in the nav)
+- 🔗 **Share a library** via class code (teacher publishes; students get their own clone)
 
 ## Project Structure
 
@@ -45,9 +47,11 @@ Built with **FastAPI**, sentence-transformers, FAISS, and scikit-learn.
 .
 ├── main.py                 # FastAPI application (entry point)
 ├── pipeline.py             # Orchestrates fetch → embed → cluster → search
+├── libraries.py            # Multi-library workspaces per account
+├── shares.py               # Class share codes → clone library into student account
 ├── base_fetcher.py         # Abstract fetcher + shared HttpClient (retry/backoff)
 ├── <source>_fetcher.py     # One fetcher per source (pubmed_fetcher.py, …)
-├── database.py             # Per-user article/embedding/cluster/notes SQLite
+├── database.py             # Per-library article/embedding/cluster/notes SQLite
 ├── user_db.py              # User-account database (users.db)
 ├── auth.py                 # JWT + bcrypt password hashing
 ├── embeddings.py           # EmbeddingEngine + PICOExtractor

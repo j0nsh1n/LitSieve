@@ -1274,6 +1274,100 @@ input[type="range"]::-moz-range-thumb:hover {
     text-align: center;
 }
 
+/* Library switcher in the nav */
+.nav-library-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0 0.25rem;
+    max-width: 14rem;
+}
+.nav-library-label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-soft, #a39e93);
+    white-space: nowrap;
+}
+.nav-library-select {
+    max-width: 11rem;
+    min-width: 6rem;
+    font-size: 0.85rem;
+    padding: 0.25rem 0.4rem;
+    border-radius: 6px;
+    border: 1px solid var(--border, #3a3a3a);
+    background: var(--surface, #1e1e1e);
+    color: var(--text, #eee);
+}
+.library-manage-list {
+    list-style: none;
+    margin: 0.75rem 0 0;
+    padding: 0;
+}
+.library-manage-list li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 0;
+    border-bottom: 1px solid var(--border, rgba(128,128,128,0.25));
+}
+.library-manage-list li:last-child {
+    border-bottom: none;
+}
+.library-manage-name {
+    flex: 1 1 8rem;
+    font-weight: 600;
+}
+.library-manage-badge {
+    font-size: 0.75rem;
+    color: var(--accent, #7eb8c4);
+    font-weight: 600;
+}
+.library-create-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: flex-end;
+    margin-top: 0.75rem;
+}
+.library-create-row .form-group {
+    flex: 1 1 12rem;
+    margin-bottom: 0;
+}
+.join-preview-card {
+    margin-top: 0.85rem;
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--border, rgba(128,128,128,0.3));
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--accent, #2a5f6e) 8%, transparent);
+}
+.join-preview-title {
+    margin: 0 0 0.25rem;
+    font-size: 1.05rem;
+}
+.join-preview-stats {
+    margin: 0.5rem 0 0;
+    padding-left: 1.1rem;
+    color: var(--text-muted, #888);
+    font-size: 0.92rem;
+}
+.join-preview-stats li {
+    margin: 0.15rem 0;
+}
+
+@media (max-width: 900px) {
+    .nav-library-wrap {
+        max-width: 100%;
+        width: 100%;
+        order: 5;
+    }
+    .nav-library-select {
+        max-width: none;
+        flex: 1;
+    }
+}
+
 /* Getting-started checklist + empty states */
 .getting-started-card,
 .empty-state-card {

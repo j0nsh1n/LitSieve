@@ -258,7 +258,68 @@ async function updateNavStats() {
     }
 }
 
-document.addEventListener('DOMContentLoaded', updateNavStats);
+document.addEventListener('DOMContentLoaded', () => {
+    updateNavStats();
+    initLibrarySwitcher();
+});
+
+// === Multi-library switcher (nav) ===
+async function initLibrarySwitcher() {
+    const sel = document.getElementById('nav-library-select');
+    if (!sel || !document.querySelector('nav.navbar')) return;
+    try {
+        const data = await apiCall('/api/libraries');
+        populateLibrarySelect(sel, data);
+        sel.addEventListener('change', async () => {
+            const id = sel.value;
+            if (!id) return;
+            sel.disabled = true;
+            try {
+                await apiCall('/api/libraries/switch', {
+                    method: 'POST',
+                    body: { library_id: id },
+                });
+                // Reload so every page reflects the new library's data.
+                window.location.reload();
+            } catch (e) {
+                showNotification(`Could not switch library: ${e.message}`, 'error');
+                sel.disabled = false;
+                // Restore previous selection from a data attribute if set
+                if (sel.dataset.activeId) sel.value = sel.dataset.activeId;
+            }
+        });
+    } catch (e) {
+        sel.innerHTML = '<option value="">—</option>';
+    }
+}
+
+function populateLibrarySelect(sel, data) {
+    const libs = (data && data.libraries) || [];
+    const active = (data && data.active_id) || '';
+    sel.innerHTML = '';
+    if (!libs.length) {
+        sel.innerHTML = '<option value="">No libraries</option>';
+        return;
+    }
+    libs.forEach(L => {
+        const opt = document.createElement('option');
+        opt.value = L.id;
+        opt.textContent = L.name || 'Library';
+        if (L.id === active) opt.selected = true;
+        sel.appendChild(opt);
+    });
+    sel.dataset.activeId = active;
+}
+
+/** Refresh library dropdown after create/rename/delete on Account page. */
+async function refreshLibrarySwitcher() {
+    const sel = document.getElementById('nav-library-select');
+    if (!sel) return;
+    try {
+        const data = await apiCall('/api/libraries');
+        populateLibrarySelect(sel, data);
+    } catch (e) { /* ignore */ }
+}
 
 // === Range input fill ===
 function updateRangeFill(input) {

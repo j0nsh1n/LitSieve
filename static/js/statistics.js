@@ -89,13 +89,15 @@ async function loadStatistics() {
 }
 
 function renderYearTimeline(yearCounts) {
- const section = document.getElementById('year-timeline-section');
+ // Nested under "Articles by Source" as a collapsed disclosure.
+ const details = document.getElementById('year-timeline-details');
  const container = document.getElementById('year-timeline');
- if (!section || !container) return;
+ if (!details || !container) return;
 
  const keys = Object.keys(yearCounts || {});
  if (!keys.length) {
- section.style.display = 'none';
+ details.hidden = true;
+ container.innerHTML = '';
  return;
  }
 
@@ -123,7 +125,7 @@ function renderYearTimeline(yearCounts) {
  `;
  container.appendChild(div);
  });
- section.style.display = 'block';
+ details.hidden = false;
 }
 
 async function doDetectDuplicates() {

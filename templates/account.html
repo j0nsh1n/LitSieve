@@ -3,16 +3,63 @@
 {% block content %}
 <section class="page-header">
  <h1>Account</h1>
- <p class="subtitle">Private workspace settings: change password (signs out other devices), or permanently
- delete this account and its collection.</p>
+ <p class="subtitle">Private workspace settings: libraries, password, or permanently delete this account.</p>
 </section>
 
 <section class="card">
  <h2>Profile</h2>
- <p class="info-text">Signed in as <strong>{{ user.username }}</strong>. Your fetched papers, embeddings,
- clusters, screening choices, stars, and notes live only under this account (isolated SQLite storage).
- Fetch and embed jobs run in the background from Data Management.</p>
+ <p class="info-text">Signed in as <strong>{{ user.username }}</strong>. Each <strong>library</strong> is a
+ separate paper collection (fetch, prepare, clusters, screening, notes). Switch libraries from the
+ nav bar. Jobs run in the background from Data Management.</p>
  <a href="/logout" class="btn btn-secondary">Log Out</a>
+</section>
+
+<section class="card">
+ <h2>Your libraries</h2>
+ <p class="info-text">Create separate collections for different units or projects. Use <strong>Share</strong>
+ to give a class a copy of a library via a short code. Deleting a library permanently removes its papers
+ (export first if you need them).</p>
+ <ul class="library-manage-list" id="library-manage-list">
+  <li class="info-text">Loading…</li>
+ </ul>
+ <div class="library-create-row">
+  <div class="form-group">
+   <label for="library-new-name">New library name</label>
+   <input type="text" id="library-new-name" maxlength="64" placeholder="e.g. Unit 3 climate">
+  </div>
+  <button type="button" id="library-create-btn" class="btn btn-primary">Create library</button>
+ </div>
+ <div id="library-manage-status" class="status-indicator"></div>
+</section>
+
+<section class="card" id="share-join-section">
+ <h2>Join with a class code</h2>
+ <p class="info-text">Your teacher shares a code (for example <code>ABCD-EFGH</code>). You get a
+  <strong>new library</strong> that is a full copy of their papers and screening - not live access to theirs.
+  Your notes and stars stay private.</p>
+ <div class="library-create-row">
+  <div class="form-group">
+   <label for="account-join-code">Class code</label>
+   <input type="text" id="account-join-code" maxlength="16" placeholder="e.g. ABCD-EFGH"
+    autocomplete="off" spellcheck="false"
+    style="text-transform:uppercase; letter-spacing:0.06em; font-weight:600;">
+  </div>
+  <button type="button" id="account-join-preview-btn" class="btn btn-secondary">Preview</button>
+  <button type="button" id="account-join-btn" class="btn btn-primary" disabled>Add as new library</button>
+ </div>
+ <div id="account-join-preview" class="join-preview-card" hidden></div>
+ <div id="account-join-status" class="status-indicator"></div>
+ <p class="info-text" style="margin-top:0.75rem;">Or open a join link: <a href="/join">/join</a></p>
+</section>
+
+<section class="card">
+ <h2>Your active shares</h2>
+ <p class="info-text">Codes you created for classes. Revoke a code if it was posted somewhere public
+  by mistake. Students who already joined keep their copy.</p>
+ <ul class="library-manage-list" id="shares-list">
+  <li class="info-text">Loading…</li>
+ </ul>
+ <div id="shares-status" class="status-indicator"></div>
 </section>
 
 <section class="card">
@@ -69,5 +116,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/account.js?v=20260716a"></script>
+<script src="/static/js/account.js?v=20260716s"></script>
 {% endblock %}

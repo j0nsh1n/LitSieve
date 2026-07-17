@@ -169,6 +169,7 @@ function updateModelHint() {
  const sel = document.getElementById('embedding-model');
  const current = MODEL_LABELS[sel.value] || sel.value;
  const rec = recommendModel();
+ const corpus = window._corpusEmbeddingModel || null;
  hint.innerHTML = '';
  if (modelManual) {
  hint.append(`Analysis model chosen by hand: ${current}. `);
@@ -182,14 +183,17 @@ function updateModelHint() {
  saveFetchPrefs();
  });
  hint.append(reset, '.');
- } else if (sel.value === rec) {
- hint.append(selectedTopics.size
- ? `Analysis model picked automatically for your topics: ${current}. Change it under Advanced below.`
- : `Analysis model: ${current}. Select topics above to pick one automatically, or change it under Advanced below.`);
+ } else if (selectedTopics.size) {
+ hint.append(`Analysis model for your topics: ${current}. Change it under Advanced if you want.`);
  } else {
- // Dropdown was synced to the model your prepared papers already use.
- hint.append(`Analysis model: ${current} (matches your already-prepared papers). ` +
- `Your topics suggest ${MODEL_LABELS[rec] || rec} - change it under Advanced below.`);
+ hint.append(`Analysis model: ${current}. Select topics above to pick one automatically, or change it under Advanced.`);
+ }
+ // Note when prepared papers use a different model (re-prepare will re-embed all).
+ if (corpus && corpus !== sel.value) {
+ hint.append(
+ ` Papers already prepared with ${MODEL_LABELS[corpus] || corpus} — ` +
+ `press Prepare Papers to rebuild with ${current} (full re-run).`
+ );
  }
 }
 
@@ -294,14 +298,11 @@ async function loadPageData() {
  `${stats.articles_with_embeddings} of ${stats.total_articles} papers are ready for search` +
  (stats.articles_with_embeddings ? ` (model: ${model})` : '') +
  (missing ? ` · ${missing} still need preparing` : '') + '.';
- if (stats.embedding_model) {
- const sel = document.getElementById('embedding-model');
- if ([...sel.options].some(o => o.value === stats.embedding_model)) {
- sel.value = stats.embedding_model;
- }
- // Keep the hint truthful after syncing to the corpus model.
- updateModelHint();
- }
+ // Topic recommendation drives the dropdown (unless the user overrode it).
+ // Do NOT force the corpus's stored model into the select — that made
+ // pubmedbert "stick" after a biomedical prep even when topics say specter.
+ window._corpusEmbeddingModel = stats.embedding_model || null;
+ applyModelRecommendation();
  updateGettingStartedCard(stats.total_articles || 0);
  } catch (e) {
  document.getElementById('embedding-info').textContent = 'Unable to load article info.';
@@ -350,14 +351,18 @@ async function loadSampleCorpus(clearFirst) {
  body: { clear_first: !!clearFirst },
  });
  showNotification(
- `Loaded ${data.inserted || data.loaded || 0} sample papers. Preparing for search…`,
+ `Loaded ${data.inserted || data.loaded || 0} sample papers. Press Prepare Papers when you are ready.`,
  'success'
  );
  await loadPageData();
  refreshCoverage();
  updateNavStats();
- // Prepare embeddings so Search/Clusters work immediately.
- await doCreateEmbeddings(true);
+ applyModelRecommendation();
+ setStatus(
+ 'embeddings-status',
+ 'Sample papers loaded. Choose a model if needed, then press Prepare Papers.',
+ 'info'
+ );
  } catch (e) {
  showNotification(`Could not load sample corpus: ${e.message}`, 'error');
  } finally {
@@ -572,11 +577,16 @@ async function doFetch() {
  );
  }
  applyFetchResult(data, sources);
- // Chain the prepare step so students don't have to remember it.
- // doCreateEmbeddings handles its own errors; a prepare failure
- // never marks the fetch as failed.
+ // Embeddings are manual: topics may update the model dropdown, but the
+ // student presses "Prepare Papers" when ready (avoids surprise long jobs
+ // and wrong-model re-embeds).
  if ((data.total_fetched || 0) > 0 && !data.cancelled) {
- await doCreateEmbeddings(true);
+ applyModelRecommendation();
+ setStatus(
+ 'embeddings-status',
+ 'Fetch finished. Check the analysis model above, then press Prepare Papers when you are ready.',
+ 'info'
+ );
  }
  } catch (e) {
  const msg = e.message || '';
@@ -596,7 +606,7 @@ async function doFetch() {
  }
 }
 
-async function doCreateEmbeddings(chained = false) {
+async function doCreateEmbeddings() {
  const model = document.getElementById('embedding-model').value;
  const onlyMissing = document.getElementById('only-missing').checked;
  const btn = document.getElementById('embeddings-btn');
@@ -604,9 +614,7 @@ async function doCreateEmbeddings(chained = false) {
  setLoading(btn, true);
  setStatus(
  'embeddings-status',
- chained
- ? 'Fetch done - preparing papers for search (embeddings)…'
- : 'Preparing papers for search (embeddings)… this may take a few minutes on large collections.',
+ 'Preparing papers for search (embeddings)… this may take a few minutes on large collections.',
  'info'
  );
 
@@ -633,7 +641,7 @@ async function doCreateEmbeddings(chained = false) {
  `Total ready for search: ${data.articles_processed}.`,
  'success'
  );
- showNotification(chained ? 'Papers fetched and prepared for search!' : 'Papers prepared for search!', 'success');
+ showNotification('Papers prepared for search!', 'success');
  loadPageData();
  } catch (e) {
  const msg = e.message || '';

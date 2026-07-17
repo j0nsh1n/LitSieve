@@ -23,44 +23,10 @@
  </div>
 </section>
 
-<section class="card">
- <div class="screening-report-header">
- <div>
- <h2 class="screening-report-title">Screening report</h2>
- <p class="info-text screening-report-lead">Show-your-work counts for hand-ins: papers collected,
- excluded (and why), and included.</p>
- </div>
- <button type="button" id="screening-report-btn" class="btn btn-secondary btn-sm">Screening report</button>
- </div>
- <details class="help-details">
-  <summary>What the report includes</summary>
-  <p class="info-text">PRISMA-style counts: papers collected, removed as duplicates, excluded by
-  cluster triage, excluded manually, included set, stars, prepared papers, and clusters. The same
-  text appears on screen and in the .txt download.</p>
- </details>
- <div id="screening-report-panel" class="screening-report-panel" hidden>
- <pre id="screening-report-body" class="screening-report-body"></pre>
- <p class="screening-report-actions">
- <a id="screening-report-download" class="btn btn-secondary btn-sm" href="/api/screening-report?format=txt">Download (.txt)</a>
- </p>
- </div>
-</section>
-
 <section class="card empty-state-card" id="dup-empty-state" hidden>
  <h2>No papers to check yet</h2>
  <p class="info-text" id="dup-empty-msg">Fetch papers on Data Management, then prepare them for search so duplicates can be detected.</p>
  <p><a class="btn btn-primary btn-sm" href="/data-management">Go to Data Management</a></p>
-</section>
-
-<section class="card" id="source-breakdown-section" style="display:none;">
- <h2>Articles by Source</h2>
- <div id="source-breakdown"></div>
-</section>
-
-<section class="card" id="year-timeline-section" style="display:none;">
- <h2>Papers by year</h2>
- <p class="info-text">How your collection is spread across publication years.</p>
- <div id="year-timeline" class="year-timeline-plot"></div>
 </section>
 
 <section class="card">
@@ -89,8 +55,42 @@
  <div id="duplicates-status" class="status-indicator"></div>
  <div id="duplicates-list"></div>
 </section>
+
+<section class="card">
+ <div class="screening-report-header">
+ <div>
+ <h2 class="screening-report-title">Screening report</h2>
+ <p class="info-text screening-report-lead">Show-your-work counts for hand-ins: papers collected,
+ excluded (and why), and included.</p>
+ </div>
+ <button type="button" id="screening-report-btn" class="btn btn-secondary btn-sm">Screening report</button>
+ </div>
+ <details class="help-details">
+  <summary>What the report includes</summary>
+  <p class="info-text">PRISMA-style counts: papers collected, removed as duplicates, excluded by
+  cluster triage, excluded manually, included set, stars, prepared papers, and clusters. The same
+  text appears on screen and in the .txt download.</p>
+ </details>
+ <div id="screening-report-panel" class="screening-report-panel" hidden>
+ <pre id="screening-report-body" class="screening-report-body"></pre>
+ <p class="screening-report-actions">
+ <a id="screening-report-download" class="btn btn-secondary btn-sm" href="/api/screening-report?format=txt">Download (.txt)</a>
+ </p>
+ </div>
+</section>
+
+<section class="card" id="source-breakdown-section" style="display:none;">
+ <h2>Articles by Source</h2>
+ <p class="info-text">How many papers came from each database in your collection.</p>
+ <div id="source-breakdown"></div>
+ <details class="help-details" id="year-timeline-details" hidden>
+  <summary>Papers by year</summary>
+  <p class="info-text">How your collection is spread across publication years.</p>
+  <div id="year-timeline" class="year-timeline-plot"></div>
+ </details>
+</section>
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/statistics.js?v=20260716a"></script>
+<script src="/static/js/statistics.js?v=20260716d"></script>
 {% endblock %}

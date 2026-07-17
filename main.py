@@ -1,6 +1,7 @@
 """
-FastAPI Application — Literature Research Aide v3.8.0
+FastAPI Application — Literature Research Aide v4.0.0
 Multi-user web interface for literature search and analysis.
+Multiple libraries (workspaces) per account.
 """
 
 import io
@@ -12,9 +13,11 @@ import secrets
 import logging
 import threading
 from collections import OrderedDict
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 from functools import partial
 import asyncio
+import contextvars
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -54,6 +57,20 @@ from screening_reasons import (
     normalize_reason,
     reason_label,
 )
+from libraries import (
+    create_library,
+    delete_library,
+    get_active_library_id,
+    list_libraries,
+    library_db_path,
+    pipeline_cache_key,
+    rename_library,
+    set_active_library,
+    ensure_libraries,
+)
+import shares as shares_mod
+from pathlib import Path
+from urllib.parse import quote, unquote
 
 logging.basicConfig(
     level=logging.INFO,
@@ -81,12 +98,12 @@ def rate_limit_key(request: Request) -> str:
 limiter = Limiter(key_func=rate_limit_key)
 
 # At top of file
-app = FastAPI(title="Literature Research Aide", version="3.8.0")
+app = FastAPI(title="Literature Research Aide", version="4.0.0")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 @app.get("/health")
 async def health():
-    return {"status": "healthy", "version": "3.8.0"}
+    return {"status": "healthy", "version": "4.0.0"}
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
@@ -94,87 +111,110 @@ templates = Jinja2Templates(directory="templates")
 # --- User account database ---
 user_db = UserDatabase()
 
-# --- Per-user pipeline cache (lazy-initialised, LRU-bounded) ---
+# --- Per-library pipeline cache (lazy-initialised, LRU-bounded) ---
+# Keys are "user_id:library_id" (see libraries.pipeline_cache_key).
 _pipelines: "OrderedDict[str, LiteratureSearchPipeline]" = OrderedDict()
 # Number of in-flight requests holding each pipeline. A pipeline is only safe
 # to close when its refcount hits 0; otherwise eviction defers the close.
 _pipeline_refcounts: "OrderedDict[str, int]" = OrderedDict()
-# Pipelines evicted while still in use, keyed by uid — closed on last release.
+# Pipelines evicted while still in use, keyed by cache key — closed on last release.
 _pending_close: "dict[str, LiteratureSearchPipeline]" = {}
 # Guards _pipelines, _pipeline_refcounts and _pending_close together.
 _pipelines_lock = threading.Lock()
 
-# --- Per-user progress tracking (LRU-bounded) ---
+# Bind library id for the current request/task so release_pipeline(uid) matches
+# the same library even if the user switches active library in another tab.
+_pipeline_lib_ctx: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
+    "pipeline_lib_id", default=None
+)
+
+# --- Per-user progress tracking (LRU-bounded; one job type at a time per user) ---
 _all_progress: "OrderedDict[str, dict]" = OrderedDict()
 _progress_lock = threading.Lock()
 
 
-def get_pipeline(user_id: str) -> LiteratureSearchPipeline:
-    """Return the user's pipeline and register an in-flight reference.
+def get_pipeline(
+    user_id: str, library_id: Optional[str] = None
+) -> LiteratureSearchPipeline:
+    """Return the pipeline for the user's active (or given) library.
 
     The caller MUST pair every get_pipeline() with a release_pipeline() in a
     finally block so deferred closes can run once the request completes.
     """
+    ensure_libraries(user_id)
+    lib_id = library_id or _pipeline_lib_ctx.get() or get_active_library_id(user_id)
+    _pipeline_lib_ctx.set(lib_id)
+    key = pipeline_cache_key(user_id, lib_id)
     with _pipelines_lock:
-        if user_id not in _pipelines:
-            user_dir = f"user_data/{user_id}"
-            os.makedirs(user_dir, exist_ok=True)
-            _pipelines[user_id] = LiteratureSearchPipeline(
-                db_path=f"{user_dir}/articles.db",
-                embedding_model="general"
+        if key not in _pipelines:
+            db_path = library_db_path(user_id, lib_id)
+            db_path.parent.mkdir(parents=True, exist_ok=True)
+            pipe = LiteratureSearchPipeline(
+                db_path=str(db_path),
+                embedding_model="general",
             )
-            # Evict least-recently-used pipelines to bound memory. Never close a
-            # pipeline that has in-flight references — defer until last release.
+            setattr(pipe, "_lra_cache_key", key)
+            setattr(pipe, "_lra_library_id", lib_id)
+            _pipelines[key] = pipe
+            # Evict least-recently-used pipelines to bound memory.
             while len(_pipelines) > MAX_CACHED_USERS:
-                old_uid, old_pipeline = _pipelines.popitem(last=False)
-                if _pipeline_refcounts.get(old_uid, 0) > 0:
-                    _pending_close[old_uid] = old_pipeline
+                old_key, old_pipeline = _pipelines.popitem(last=False)
+                if _pipeline_refcounts.get(old_key, 0) > 0:
+                    _pending_close[old_key] = old_pipeline
                     continue
                 try:
                     old_pipeline.db.close()
                 except Exception:
-                    logger.exception("Failed to close evicted pipeline for %s", old_uid)
-        _pipelines.move_to_end(user_id)
-        _pipeline_refcounts[user_id] = _pipeline_refcounts.get(user_id, 0) + 1
-        return _pipelines[user_id]
+                    logger.exception("Failed to close evicted pipeline for %s", old_key)
+        _pipelines.move_to_end(key)
+        _pipeline_refcounts[key] = _pipeline_refcounts.get(key, 0) + 1
+        return _pipelines[key]
 
 
-def release_pipeline(user_id: str) -> None:
+def release_pipeline(user_id: str, library_id: Optional[str] = None) -> None:
     """Drop an in-flight reference, closing a deferred-evicted pipeline at 0."""
+    try:
+        lib_id = library_id or _pipeline_lib_ctx.get() or get_active_library_id(user_id)
+        key = pipeline_cache_key(user_id, lib_id)
+    except Exception:
+        key = user_id
     with _pipelines_lock:
-        count = _pipeline_refcounts.get(user_id, 0) - 1
+        count = _pipeline_refcounts.get(key, 0) - 1
         if count > 0:
-            _pipeline_refcounts[user_id] = count
+            _pipeline_refcounts[key] = count
             return
-        _pipeline_refcounts.pop(user_id, None)
-        # A pipeline evicted while in use is held in _pending_close (separate
-        # from any newer live pipeline under the same uid in _pipelines). Close
-        # the deferred object only — never the current live one.
-        pipeline = _pending_close.pop(user_id, None)
+        _pipeline_refcounts.pop(key, None)
+        pipeline = _pending_close.pop(key, None)
         if pipeline is not None:
             try:
                 pipeline.db.close()
             except Exception:
-                logger.exception("Failed to close deferred pipeline for %s", user_id)
+                logger.exception("Failed to close deferred pipeline for %s", key)
+    # Clear request binding after last matching release for this task context.
+    if library_id is None or _pipeline_lib_ctx.get() == library_id:
+        _pipeline_lib_ctx.set(None)
 
 
 def _evict_pipeline(user_id: str) -> None:
-    """Forcibly drop and close a user's cached pipeline and progress state.
-
-    Used when an account is deleted: the SQLite connection must be closed before
-    the user's data directory can be removed on Windows (open file handle would
-    block rmtree).
-    """
+    """Forcibly drop and close all cached pipelines for a user (account delete)."""
+    prefix = f"{user_id}:"
     with _pipelines_lock:
-        live = _pipelines.pop(user_id, None)
-        pending = _pending_close.pop(user_id, None)
-        _pipeline_refcounts.pop(user_id, None)
-        for pipe in (live, pending):
-            if pipe is not None:
-                try:
-                    pipe.db.close()
-                except Exception:
-                    logger.exception("Failed to close pipeline for %s during deletion", user_id)
+        keys = [
+            k for k in list(_pipelines.keys())
+            if k == user_id or k.startswith(prefix)
+        ]
+        for key in keys:
+            live = _pipelines.pop(key, None)
+            pending = _pending_close.pop(key, None)
+            _pipeline_refcounts.pop(key, None)
+            for pipe in (live, pending):
+                if pipe is not None:
+                    try:
+                        pipe.db.close()
+                    except Exception:
+                        logger.exception(
+                            "Failed to close pipeline for %s during deletion", key
+                        )
     with _progress_lock:
         _all_progress.pop(user_id, None)
 
@@ -237,6 +277,7 @@ def start_user_job(uid: str, task: str, fn, /, **kwargs) -> bool:
 
     Returns False if a job of this task type is already active for uid.
     The worker holds the pipeline ref until completion (release in done callback).
+    Jobs bind to the library that was active when the job started.
     """
     with _progress_lock:
         p = _ensure_progress(uid)
@@ -247,7 +288,8 @@ def start_user_job(uid: str, task: str, fn, /, **kwargs) -> bool:
             'cancel': False, 'articles_so_far': 0, 'message': '',
         })
 
-    pipe = get_pipeline(uid)
+    lib_id = get_active_library_id(uid)
+    pipe = get_pipeline(uid, lib_id)
     loop = asyncio.get_running_loop()
 
     def worker():
@@ -263,7 +305,7 @@ def start_user_job(uid: str, task: str, fn, /, **kwargs) -> bool:
             logger.exception("Background %s job failed for %s", task, uid)
             update_progress(uid, task, active=False, result=None, error=str(exc), cancel=False)
         finally:
-            release_pipeline(uid)
+            release_pipeline(uid, lib_id)
 
     future.add_done_callback(_on_done)
     return True
@@ -352,7 +394,7 @@ class FetchRequest(BaseModel):
 class MultiFetchRequest(BaseModel):
     sources: List[str]
     query: str
-    max_results: int = Field(default=200, ge=1, le=1000)
+    max_results: int = Field(default=100, ge=1, le=1000)
     email: Optional[str] = None
     # True = wipe collection first (default classroom "start fresh").
     # False = append / update without clearing.
@@ -408,11 +450,45 @@ class SampleCorpusRequest(BaseModel):
     # True = wipe collection first (demo reset). False = append samples.
     clear_first: bool = True
 
+class LibraryCreateRequest(BaseModel):
+    name: str = Field(default="New library", min_length=1, max_length=64)
+
+class LibraryRenameRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=64)
+
+class LibrarySwitchRequest(BaseModel):
+    library_id: str
+
 class ResolveDuplicatesRequest(BaseModel):
     threshold: float = Field(default=0.95, ge=0.5, le=1.0)
 
 class DeleteAccountRequest(BaseModel):
     password: str
+
+
+class ShareCreateRequest(BaseModel):
+    library_id: Optional[str] = None
+    expires_days: Optional[int] = Field(default=14, ge=1, le=365)
+    max_uses: Optional[int] = Field(default=None, ge=1, le=10000)
+    include_embeddings: bool = True
+
+
+class ShareJoinRequest(BaseModel):
+    code: str = Field(..., min_length=4, max_length=32)
+
+
+def _safe_next_url(raw: Optional[str]) -> str:
+    """Allow only same-origin relative paths (open-redirect safe)."""
+    if not raw:
+        return "/data-management"
+    path = unquote(raw).strip()
+    if not path.startswith("/") or path.startswith("//"):
+        return "/data-management"
+    if any(c in path for c in ("\n", "\r", "\\")):
+        return "/data-management"
+    if "://" in path:
+        return "/data-management"
+    return path
 
 
 # ============================================================
@@ -421,9 +497,13 @@ class DeleteAccountRequest(BaseModel):
 
 @app.get("/login")
 async def login_page(request: Request):
+    next_url = _safe_next_url(request.query_params.get("next"))
     if current_user(request):
-        return RedirectResponse(url="/data-management", status_code=302)
-    return templates.TemplateResponse(request, "login.html", context={"error": "", "info": ""})
+        return RedirectResponse(url=next_url, status_code=302)
+    return templates.TemplateResponse(
+        request, "login.html",
+        context={"error": "", "info": "", "next": next_url if next_url != "/data-management" else ""},
+    )
 
 
 @app.post("/login")
@@ -432,19 +512,25 @@ async def login_submit(
     request: Request,
     username: str = Form(...),
     password: str = Form(...),
+    next: str = Form(""),
 ):
+    next_url = _safe_next_url(next or request.query_params.get("next"))
     username = username.strip().lower()
     user = user_db.get_by_username(username)
     if not user or not verify_password(password, user["hashed_password"]):
         return templates.TemplateResponse(
             request, "login.html",
-            context={"error": "Invalid username or password", "info": ""},
+            context={
+                "error": "Invalid username or password",
+                "info": "",
+                "next": next if next else "",
+            },
             status_code=400,
         )
     token = create_token(
         user["id"], user["username"], user.get("token_version", 0),
     )
-    response = RedirectResponse(url="/data-management", status_code=302)
+    response = RedirectResponse(url=next_url, status_code=302)
     _set_auth_cookies(response, token)
     return response
 
@@ -538,7 +624,7 @@ async def reset_password_confirm(
         )
     return templates.TemplateResponse(
         request, "login.html",
-        context={"error": "", "info": "Password updated. You can log in now."},
+        context={"error": "", "info": "Password updated. You can log in now.", "next": ""},
     )
 
 
@@ -663,6 +749,28 @@ async def account_page(request: Request):
     if not user:
         return RedirectResponse(url="/login", status_code=302)
     return templates.TemplateResponse(request, "account.html", context={"active_page": "account", "user": user})
+
+
+@app.get("/join")
+async def join_page(request: Request):
+    """Join a shared library by class code (auth required)."""
+    code = (request.query_params.get("code") or "").strip()
+    user = current_user(request)
+    if not user:
+        next_path = "/join" + (f"?code={quote(code)}" if code else "")
+        return RedirectResponse(
+            url=f"/login?next={quote(next_path, safe='')}",
+            status_code=302,
+        )
+    return templates.TemplateResponse(
+        request,
+        "join.html",
+        context={
+            "active_page": "account",
+            "user": user,
+            "join_code": code,
+        },
+    )
 
 
 # ============================================================
@@ -1586,6 +1694,239 @@ async def api_coverage(req: CoverageRequest, request: Request):
         release_pipeline(uid)
 
 
+# ---------- Libraries (multi-collection workspaces) ----------
+
+@app.get("/api/libraries")
+async def api_list_libraries(request: Request):
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    try:
+        return list_libraries(user["user_id"])
+    except Exception as e:
+        return server_error(e)
+
+
+@app.post("/api/libraries")
+@limiter.limit("30/minute")
+async def api_create_library(req: LibraryCreateRequest, request: Request):
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    try:
+        result = create_library(user["user_id"], req.name)
+        return {"status": "success", **result}
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"detail": str(e)})
+    except Exception as e:
+        return server_error(e)
+
+
+@app.post("/api/libraries/switch")
+@limiter.limit("60/minute")
+async def api_switch_library(req: LibrarySwitchRequest, request: Request):
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    try:
+        result = set_active_library(user["user_id"], req.library_id)
+        return {"status": "success", **result}
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"detail": str(e)})
+    except Exception as e:
+        return server_error(e)
+
+
+@app.patch("/api/libraries/{library_id}")
+@limiter.limit("30/minute")
+async def api_rename_library(library_id: str, req: LibraryRenameRequest, request: Request):
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    try:
+        result = rename_library(user["user_id"], library_id, req.name)
+        return {"status": "success", **result}
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"detail": str(e)})
+    except Exception as e:
+        return server_error(e)
+
+
+@app.delete("/api/libraries/{library_id}")
+@limiter.limit("20/minute")
+async def api_delete_library(library_id: str, request: Request):
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    uid = user["user_id"]
+    try:
+        # Drop cached pipeline for this library before deleting files.
+        key = pipeline_cache_key(uid, library_id)
+        with _pipelines_lock:
+            pipe = _pipelines.pop(key, None)
+            _pending_close.pop(key, None)
+            _pipeline_refcounts.pop(key, None)
+        if pipe is not None:
+            try:
+                pipe.db.close()
+            except Exception:
+                pass
+        result = delete_library(uid, library_id)
+        return {"status": "success", **result}
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"detail": str(e)})
+    except Exception as e:
+        return server_error(e)
+
+
+# ---------- Shares (class codes → clone library) ----------
+
+@app.post("/api/shares")
+@limiter.limit("10/hour")
+async def api_create_share(req: ShareCreateRequest, request: Request):
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    uid = user["user_id"]
+    try:
+        ensure_libraries(uid)
+        lib_id = (req.library_id or "").strip() or get_active_library_id(uid)
+        if not shares_mod.library_exists(uid, lib_id):
+            return JSONResponse(status_code=400, content={"detail": "Library not found."})
+        title = shares_mod.library_name(uid, lib_id) or "Shared library"
+        expires_at = None
+        if req.expires_days is not None:
+            expires_at = (
+                datetime.now(timezone.utc) + timedelta(days=int(req.expires_days))
+            ).strftime("%Y-%m-%dT%H:%M:%SZ")
+        # Retry a few times on rare code collision.
+        share = None
+        last_err = None
+        for _ in range(5):
+            code = shares_mod.generate_share_code()
+            try:
+                share = user_db.create_share(
+                    owner_user_id=uid,
+                    owner_library_id=lib_id,
+                    title_snapshot=title,
+                    code=code,
+                    include_embeddings=bool(req.include_embeddings),
+                    expires_at=expires_at,
+                    max_uses=req.max_uses,
+                )
+                break
+            except ValueError as e:
+                last_err = e
+                continue
+        if share is None:
+            raise last_err or ValueError("Could not create share code.")
+        return {
+            "status": "success",
+            "share": {
+                **share,
+                "join_path": f"/join?code={share['code']}",
+            },
+        }
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"detail": str(e)})
+    except Exception as e:
+        return server_error(e)
+
+
+@app.get("/api/shares")
+@limiter.limit("60/minute")
+async def api_list_shares(request: Request):
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    try:
+        items = user_db.list_shares_for_owner(user["user_id"])
+        out = []
+        for s in items:
+            out.append({
+                **s,
+                "join_path": f"/join?code={s['code']}",
+                "active": (
+                    not s.get("revoked_at")
+                    and shares_mod.is_share_usable(s)[0]
+                ),
+            })
+        return {"shares": out}
+    except Exception as e:
+        return server_error(e)
+
+
+@app.delete("/api/shares/{share_id}")
+@limiter.limit("30/minute")
+async def api_revoke_share(share_id: str, request: Request):
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    try:
+        ok = user_db.revoke_share(share_id, user["user_id"])
+        if not ok:
+            existing = user_db.get_share_by_id(share_id)
+            if existing and existing.get("owner_user_id") == user["user_id"]:
+                return {"status": "success", "revoked": True, "already": True}
+            return JSONResponse(status_code=404, content={"detail": "Share not found."})
+        return {"status": "success", "revoked": True}
+    except Exception as e:
+        return server_error(e)
+
+
+@app.get("/api/shares/preview")
+@limiter.limit("30/minute")
+async def api_preview_share(request: Request):
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    code = request.query_params.get("code") or ""
+    try:
+        preview = await run_in_thread(
+            shares_mod.preview_share, user_db, user["user_id"], code
+        )
+        return preview
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"detail": str(e)})
+    except Exception as e:
+        return server_error(e)
+
+
+@app.post("/api/shares/join")
+@limiter.limit("20/hour")
+async def api_join_share(req: ShareJoinRequest, request: Request):
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    try:
+        result = await run_in_thread(
+            shares_mod.join_share,
+            user_db,
+            user["user_id"],
+            user["username"],
+            req.code,
+        )
+        return {"status": "success", **result}
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"detail": str(e)})
+    except Exception as e:
+        return server_error(e)
+
+
 @app.post("/api/change-password")
 async def api_change_password(req: ChangePasswordRequest, request: Request):
     user = current_user(request)
@@ -1644,12 +1985,14 @@ async def api_delete_account(req: DeleteAccountRequest, request: Request):
         return JSONResponse(status_code=400, content={"detail": "Incorrect password"})
 
     try:
-        # 1. Close + drop the cached pipeline so the SQLite file is released.
+        # 1. Close + drop every cached pipeline for this user (all libraries).
         _evict_pipeline(uid)
-        # 2. Remove the user's data directory (articles/embeddings/clusters).
-        user_dir = os.path.join("user_data", uid)
-        if os.path.isdir(user_dir):
-            shutil.rmtree(user_dir, ignore_errors=True)
+        # 2. Remove the user's data directory (all libraries + meta).
+        # Honour USER_DATA_DIR the same way libraries.py does.
+        from libraries import user_dir as lib_user_dir
+        udir = lib_user_dir(uid)
+        if udir.is_dir():
+            shutil.rmtree(udir, ignore_errors=True)
         # 3. Delete the account record.
         user_db.delete_user(uid)
     except Exception as e:
