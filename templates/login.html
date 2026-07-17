@@ -4,7 +4,7 @@
  <meta charset="UTF-8">
  <meta name="viewport" content="width=device-width, initial-scale=1.0">
  <title>Login - Literature Research Aide</title>
- <link rel="stylesheet" href="/static/css/style.css?v=20260716a">
+ <link rel="stylesheet" href="/static/css/style.css?v=20260717r1">
  <script>
  (function() {
  const saved = localStorage.getItem('theme');
@@ -20,9 +20,11 @@
  {% if info %}
  <div class="auth-info" style="background:color-mix(in srgb, var(--accent,#2a5f6e) 12%, transparent);padding:0.65rem 0.8rem;border-radius:6px;margin-bottom:0.8rem;color:var(--text);">{{ info }}</div>
  {% endif %}
- <p class="auth-hint" style="margin:0 0 1rem;text-align:center;">
+ <p class="auth-hint" style="margin:0 0 0.65rem;text-align:center;">
  Fetch, embed, triage, and search your own collection - not the whole internet.
  </p>
+ {% from "macros/disclaimers.html" import scope_auth %}
+ {{ scope_auth() }}
 
  {% if error %}
  <div class="auth-error">{{ error }}</div>

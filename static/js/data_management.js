@@ -1,18 +1,18 @@
 // === Topic and source definitions ===
 const TOPICS = [
- { id: 'health', name: 'Health & Medicine', icon: '🏥', sources: ['pubmed', 'europepmc', 'clinicaltrials', 'openalex', 'semanticscholar', 'doaj', 'zenodo', 'core'] },
- { id: 'biology', name: 'Biology', icon: '🧬', sources: ['pubmed', 'europepmc', 'openalex', 'arxiv', 'semanticscholar', 'crossref', 'zenodo', 'doaj', 'core'] },
- { id: 'chemistry', name: 'Chemistry', icon: '⚗️', sources: ['openalex', 'arxiv', 'semanticscholar', 'crossref', 'zenodo', 'doaj', 'core'] },
- { id: 'physics', name: 'Physics', icon: '⚛️', sources: ['arxiv', 'openalex', 'semanticscholar', 'crossref', 'zenodo', 'nasa_ads', 'core'] },
- { id: 'math', name: 'Mathematics', icon: '📐', sources: ['arxiv', 'openalex', 'semanticscholar', 'crossref', 'zenodo', 'core'] },
- { id: 'cs', name: 'Computer Science', icon: '💻', sources: ['arxiv', 'openalex', 'semanticscholar', 'crossref', 'zenodo', 'doaj', 'core'] },
- { id: 'earth', name: 'Earth & Environment', icon: '🌍', sources: ['openalex', 'semanticscholar', 'zenodo', 'crossref', 'doaj', 'nasa_ads', 'core'] },
- { id: 'history', name: 'History', icon: '📜', sources: ['openalex', 'semanticscholar', 'eric', 'crossref', 'doaj', 'core'] },
- { id: 'economics', name: 'Economics', icon: '📊', sources: ['arxiv', 'openalex', 'semanticscholar', 'eric', 'crossref', 'doaj', 'core'] },
- { id: 'psychology', name: 'Psychology', icon: '🧠', sources: ['pubmed', 'openalex', 'semanticscholar', 'eric', 'crossref', 'doaj', 'core'] },
- { id: 'polisci', name: 'Political Science', icon: '🏛️', sources: ['openalex', 'semanticscholar', 'eric', 'crossref', 'doaj', 'core'] },
- { id: 'literature', name: 'Literature & Language',icon: '📖', sources: ['openalex', 'semanticscholar', 'eric', 'crossref', 'doaj', 'core'] },
- { id: 'education', name: 'Education', icon: '🎓', sources: ['eric', 'openalex', 'semanticscholar', 'crossref', 'doaj', 'core'] },
+ { id: 'health', name: 'Health & Medicine', icon: '🏥', sources: ['pubmed', 'europepmc', 'clinicaltrials', 'medrxiv', 'plos', 'openalex', 'semanticscholar', 'doaj', 'zenodo', 'core'] },
+ { id: 'biology', name: 'Biology', icon: '🧬', sources: ['pubmed', 'europepmc', 'biorxiv', 'plos', 'openalex', 'arxiv', 'semanticscholar', 'crossref', 'zenodo', 'doaj', 'core'] },
+ { id: 'chemistry', name: 'Chemistry', icon: '⚗️', sources: ['openalex', 'arxiv', 'semanticscholar', 'crossref', 'zenodo', 'doaj', 'core', 'openaire'] },
+ { id: 'physics', name: 'Physics', icon: '⚛️', sources: ['arxiv', 'openalex', 'semanticscholar', 'crossref', 'zenodo', 'nasa_ads', 'core', 'openaire'] },
+ { id: 'math', name: 'Mathematics', icon: '📐', sources: ['arxiv', 'openalex', 'semanticscholar', 'crossref', 'zenodo', 'core', 'openaire'] },
+ { id: 'cs', name: 'Computer Science', icon: '💻', sources: ['dblp', 'arxiv', 'openalex', 'semanticscholar', 'crossref', 'zenodo', 'doaj', 'core', 'openaire'] },
+ { id: 'earth', name: 'Earth & Environment', icon: '🌍', sources: ['openalex', 'semanticscholar', 'zenodo', 'crossref', 'doaj', 'nasa_ads', 'core', 'openaire', 'hal'] },
+ { id: 'history', name: 'History', icon: '📜', sources: ['openalex', 'semanticscholar', 'eric', 'crossref', 'doaj', 'core', 'hal', 'openaire'] },
+ { id: 'economics', name: 'Economics', icon: '📊', sources: ['arxiv', 'openalex', 'semanticscholar', 'eric', 'crossref', 'doaj', 'core', 'openaire'] },
+ { id: 'psychology', name: 'Psychology', icon: '🧠', sources: ['pubmed', 'openalex', 'semanticscholar', 'eric', 'crossref', 'doaj', 'core', 'openaire'] },
+ { id: 'polisci', name: 'Political Science', icon: '🏛️', sources: ['openalex', 'semanticscholar', 'eric', 'crossref', 'doaj', 'core', 'hal', 'openaire'] },
+ { id: 'literature', name: 'Literature & Language',icon: '📖', sources: ['openalex', 'semanticscholar', 'eric', 'crossref', 'doaj', 'core', 'hal', 'openaire'] },
+ { id: 'education', name: 'Education', icon: '🎓', sources: ['eric', 'openalex', 'semanticscholar', 'crossref', 'doaj', 'core', 'hal', 'openaire'] },
 ];
 
 const ALL_SOURCES = {
@@ -28,6 +28,12 @@ const ALL_SOURCES = {
  doaj: { name: 'DOAJ', desc: 'Peer-reviewed open access journals' },
  nasa_ads: { name: 'NASA ADS', desc: 'Astronomy, astrophysics & geosciences' },
  core: { name: 'CORE', desc: 'Open-access full text, all disciplines' },
+ biorxiv: { name: 'bioRxiv', desc: 'Biology preprints (recent posts; not peer-reviewed)' },
+ medrxiv: { name: 'medRxiv', desc: 'Health preprints (recent posts; not peer-reviewed)' },
+ dblp: { name: 'DBLP', desc: 'Computer science papers & conferences (titles)' },
+ openaire: { name: 'OpenAIRE', desc: 'European open research aggregator' },
+ plos: { name: 'PLOS', desc: 'Fully open-access science journals' },
+ hal: { name: 'HAL', desc: 'French national open archive (multi-discipline)' },
 };
 
 // Which analysis model suits each topic. Mixed categories fall back to

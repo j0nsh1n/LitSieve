@@ -423,6 +423,31 @@ class NoteRequest(BaseModel):
     note: Optional[str] = None
     starred: Optional[bool] = None
 
+class AIArticleRequest(BaseModel):
+    """Identify one paper in the active library for optional AI assist."""
+    article_id: str
+    source: str
+    # When true, store refined key_points in the library (overwrites extractive).
+    save_key_points: bool = False
+
+class AIAskRequest(BaseModel):
+    article_id: str
+    source: str
+    question: str
+
+class AISettingsUpdate(BaseModel):
+    """Server-wide AI deploy settings (keys stored in user_data/ai_settings.json)."""
+    llm_provider: Optional[str] = None
+    ollama_host: Optional[str] = None
+    ollama_model: Optional[str] = None
+    ollama_models_dir: Optional[str] = None
+    openai_api_key: Optional[str] = None
+    openai_base_url: Optional[str] = None
+    openai_model: Optional[str] = None
+    anthropic_api_key: Optional[str] = None
+    llm_model: Optional[str] = None
+    llm_timeout_seconds: Optional[str] = None
+
 class CoverageRequest(BaseModel):
     topics: Optional[List[str]] = None
 
@@ -848,6 +873,22 @@ def _attach_key_points(results: List[dict], p) -> None:
         a["key_points"] = list(bullets) if bullets else []
 
 
+def _attach_study_types(results: List[dict]) -> None:
+    """Heuristic study-type tags at search time (cheap; may be wrong)."""
+    from study_type import attach_study_types
+    attach_study_types(results)
+
+
+def _enrich_search_results(results: List[dict], p, *, query_text: str = "", pico_boost: bool = False) -> None:
+    """Shared post-rank enrichment for search / seed / starred."""
+    _attach_pico(results)
+    if pico_boost and query_text:
+        _apply_pico_boost(results, query_text)
+    _attach_notes(results, p)
+    _attach_key_points(results, p)
+    _attach_study_types(results)
+
+
 @app.post("/api/search")
 async def api_search(req: SearchRequest, request: Request):
     user = current_user(request)
@@ -863,12 +904,10 @@ async def api_search(req: SearchRequest, request: Request):
             year_min=req.year_min, year_max=req.year_max,
             lexical_boost=req.lexical_boost,
         )
-        _attach_pico(results)
-        if req.pico_boost:
-            _apply_pico_boost(results, req.query_text)
+        _enrich_search_results(
+            results, p, query_text=req.query_text, pico_boost=req.pico_boost,
+        )
         sort_articles(results, req.sort_by)
-        _attach_notes(results, p)
-        _attach_key_points(results, p)
         return {"results": results, "total": len(results)}
     except ValueError as e:
         return JSONResponse(status_code=400, content={"detail": str(e)})
@@ -893,9 +932,7 @@ async def api_search_seed(req: SeedSearchRequest, request: Request):
             req.year_min, req.year_max, req.lexical_boost,
         )
         results = data["results"]
-        _attach_pico(results)
-        _attach_notes(results, p)
-        _attach_key_points(results, p)
+        _enrich_search_results(results, p)
         return {
             "seed": data["seed"],
             "results": results,
@@ -927,9 +964,7 @@ async def api_search_starred(req: StarredSearchRequest, request: Request):
             year_max=req.year_max,
         )
         results = data["results"]
-        _attach_pico(results)
-        _attach_notes(results, p)
-        _attach_key_points(results, p)
+        _enrich_search_results(results, p)
         return {
             "results": results,
             "total": len(results),
@@ -1444,6 +1479,200 @@ async def api_generate_key_points(request: Request, only_missing: bool = True):
     try:
         result = await run_in_thread(p.generate_key_points, only_missing=only_missing)
         return {"status": "success", **result}
+    except Exception as e:
+        return server_error(e)
+    finally:
+        release_pipeline(uid)
+
+
+@app.get("/api/ai/status")
+async def api_ai_status(request: Request):
+    """Honest AI provider status (Ollama / OpenAI-compatible / Anthropic)."""
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    from llm_service import status as ai_status
+    return ai_status()
+
+
+@app.get("/api/ai/settings")
+async def api_ai_settings_get(request: Request):
+    """Masked AI deploy settings for the Account page."""
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    from llm_service import public_ai_settings, status as ai_status
+    return {"settings": public_ai_settings(), "status": ai_status()}
+
+
+@app.post("/api/ai/settings")
+@limiter.limit("20/minute")
+async def api_ai_settings_save(req: AISettingsUpdate, request: Request):
+    """Save server-wide AI keys/models (user_data/ai_settings.json)."""
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    from llm_service import public_ai_settings, save_ai_settings, status as ai_status
+    payload = {k: v for k, v in req.model_dump().items() if v is not None}
+    if "llm_provider" in payload:
+        prov = str(payload["llm_provider"]).strip().lower()
+        if prov not in ("auto", "ollama", "openai", "anthropic"):
+            return JSONResponse(
+                status_code=400,
+                content={"detail": "llm_provider must be auto, ollama, openai, or anthropic"},
+            )
+        payload["llm_provider"] = prov
+    save_ai_settings(payload)
+    return {
+        "status": "success",
+        "settings": public_ai_settings(),
+        "status_detail": ai_status(),
+    }
+
+
+@app.post("/api/ai/ollama/start")
+@limiter.limit("6/minute")
+async def api_ai_ollama_start(request: Request):
+    """Start local Ollama (detached), using OLLAMA_MODELS when set."""
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    from llm_service import start_ollama, status as ai_status
+    ok, msg = await run_in_thread(start_ollama)
+    return {
+        "ok": ok,
+        "message": msg,
+        "status": ai_status(),
+    }
+
+
+@app.post("/api/ai/ollama/stop")
+@limiter.limit("6/minute")
+async def api_ai_ollama_stop(request: Request):
+    """Stop Ollama server and model runners (frees VRAM)."""
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    from llm_service import stop_ollama, status as ai_status
+    ok, msg = await run_in_thread(stop_ollama)
+    return {
+        "ok": ok,
+        "message": msg,
+        "status": ai_status(),
+    }
+
+
+@app.post("/api/ai/refine-article")
+@limiter.limit("10/minute")
+async def api_ai_refine_article(req: AIArticleRequest, request: Request):
+    """Optional LLM rewrite of summary/key points from the abstract only.
+
+    Default corpus key points stay extractive. AI is opt-in and labeled.
+    """
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    uid = user["user_id"]
+    p = get_pipeline(uid)
+    try:
+        from llm_service import LLMError, LLMUnavailable, is_configured, refine_article
+
+        if not is_configured():
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "detail": (
+                        "No AI configured. Start Ollama and pick a model, or add an "
+                        "OpenAI-compatible / Anthropic API key on Account → AI study aid."
+                    )
+                },
+            )
+        article = p.db.get_article_by_id(req.article_id, req.source)
+        if not article:
+            return JSONResponse(status_code=404, content={"detail": "Article not found"})
+        existing = (p.db.get_key_points_map().get((req.article_id, req.source)) or [])
+
+        def _work():
+            return refine_article(
+                title=article.get("title") or "",
+                abstract=article.get("abstract") or "",
+                existing_key_points=existing,
+            )
+
+        result = await run_in_thread(_work)
+        if req.save_key_points and result.get("key_points"):
+            p.db.insert_key_points({
+                (req.article_id, req.source): result["key_points"],
+            })
+            result["saved"] = True
+        else:
+            result["saved"] = False
+        result["article_id"] = req.article_id
+        result["source"] = req.source
+        result["label"] = "AI rewrite (from the abstract only — not extractive)"
+        return result
+    except LLMUnavailable as e:
+        return JSONResponse(status_code=503, content={"detail": str(e)})
+    except LLMError as e:
+        return JSONResponse(status_code=400, content={"detail": str(e)})
+    except Exception as e:
+        return server_error(e)
+    finally:
+        release_pipeline(uid)
+
+
+@app.post("/api/ai/ask-article")
+@limiter.limit("10/minute")
+async def api_ai_ask_article(req: AIAskRequest, request: Request):
+    """Answer a question using only this paper's title + abstract (opt-in AI)."""
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    uid = user["user_id"]
+    p = get_pipeline(uid)
+    try:
+        from llm_service import LLMError, LLMUnavailable, ask_article, is_configured
+
+        if not is_configured():
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "detail": (
+                        "No AI configured. Start Ollama and pick a model, or add an "
+                        "OpenAI-compatible / Anthropic API key on Account → AI study aid."
+                    )
+                },
+            )
+        article = p.db.get_article_by_id(req.article_id, req.source)
+        if not article:
+            return JSONResponse(status_code=404, content={"detail": "Article not found"})
+
+        def _work():
+            return ask_article(
+                question=req.question,
+                title=article.get("title") or "",
+                abstract=article.get("abstract") or "",
+            )
+
+        result = await run_in_thread(_work)
+        result["article_id"] = req.article_id
+        result["source"] = req.source
+        result["label"] = "AI answer (title + abstract only)"
+        return result
+    except LLMUnavailable as e:
+        return JSONResponse(status_code=503, content={"detail": str(e)})
+    except LLMError as e:
+        return JSONResponse(status_code=400, content={"detail": str(e)})
     except Exception as e:
         return server_error(e)
     finally:

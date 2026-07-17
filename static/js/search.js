@@ -358,6 +358,25 @@ function renderPicoBlock(pico) {
  return `<div class="pico-detail">${parts.join('')}</div>`;
 }
 
+/** Study-type badge from search-time heuristics (may be wrong — show warning). */
+function renderStudyTypeBadge(article) {
+ const label = article.study_type_label;
+ if (!label) return '';
+ const band = article.study_type_confidence_band || 'none';
+ const conf = article.study_type_confidence != null
+ ? Number(article.study_type_confidence).toFixed(2)
+ : '?';
+ const warn = article.study_type_warning || '';
+ const disc = article.study_type_disclaimer
+ || 'Automated guess from title and abstract only. May be wrong.';
+ const matched = article.study_type_matched
+ ? ` Matched: “${article.study_type_matched}”.`
+ : '';
+ const title = `${disc}${matched}${warn ? ' ' + warn : ''} Confidence: ${conf}.`;
+ const warnMark = (band === 'high') ? '' : ' <span class="study-type-warn" aria-hidden="true">!</span>';
+ return `<span class="study-type-badge band-${escapeHtml(band)}" title="${escapeHtml(title)}"><strong>Type:</strong> ${escapeHtml(label)}${warnMark}</span>`;
+}
+
 function buildResultCard(article, idx) {
  const details = document.createElement('details');
  details.className = 'article-card';
@@ -379,8 +398,12 @@ function buildResultCard(article, idx) {
  const abstractHtml = highlightText(article.abstract || '', lastQueryTokens);
  const picoHtml = renderPicoBlock(article.pico);
  const keyPointsHtml = typeof renderKeyPointsHtml === 'function'
- ? renderKeyPointsHtml(article.key_points)
+ ? renderKeyPointsHtml(article.key_points, {
+ articleId: article.article_id,
+ source: article.source,
+ })
  : '';
+ const studyTypeHtml = renderStudyTypeBadge(article);
  const starred = !!article.starred;
  const noteVal = article.note || '';
  const clusterBit = article.cluster_label
@@ -400,6 +423,7 @@ function buildResultCard(article, idx) {
  <span><strong>Source:</strong> ${escapeHtml(getSourceName(article.source))}</span>
  <span><strong>ID:</strong> ${idLink}</span>
  ${clusterBit}
+ ${studyTypeHtml}
  </div>
  <div class="article-meta meta-authors">
  <span><strong>Authors:</strong> ${escapeHtml(authors)}</span>
@@ -427,6 +451,10 @@ function buildResultCard(article, idx) {
  noteRow.hidden = false;
  noteField.focus();
  });
+
+ if (typeof bindAiArticleActions === 'function') {
+ bindAiArticleActions(details, article);
+ }
 
  const starBtn = details.querySelector('.star-btn');
  starBtn.addEventListener('click', async (e) => {

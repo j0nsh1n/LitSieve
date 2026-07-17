@@ -16,10 +16,20 @@ workspace with background jobs, screening reports, and citation export.
 
 Built with **FastAPI**, sentence-transformers, FAISS, and scikit-learn.
 
+> **Starting point only.** This tool searches a set of **publicly accessible**
+> research databases and helps you organise what you fetch. It is **not** a
+> complete library search, not a substitute for your school library or librarian,
+> and not medical, legal, or professional advice. Always verify important papers
+> in the original sources and with your teacher or assignment requirements.
+>
+> *(In-app copy lives in `templates/macros/disclaimers.html` so landing, app,
+> guides, and auth pages stay in sync.)*
+
 ## Features
 
-- 🔍 Fetch from **12 sources** in parallel (PubMed, Europe PMC, ClinicalTrials.gov,
-  OpenAlex, arXiv, Semantic Scholar, ERIC, Zenodo, CrossRef, DOAJ, NASA ADS, CORE)
+- 🔍 Fetch from **18 sources** in parallel (PubMed, Europe PMC, ClinicalTrials.gov,
+  OpenAlex, arXiv, Semantic Scholar, ERIC, Zenodo, CrossRef, DOAJ, NASA ADS, CORE,
+  bioRxiv, medRxiv, DBLP, OpenAIRE, PLOS, HAL)
   — replace or append; **background jobs** with progress, cancel, retries, and
   per-source error classes
 - 🧠 Semantic embeddings (only-new or full re-embed; topic-based model pick; GPU when

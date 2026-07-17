@@ -16,30 +16,42 @@ SOURCE_PRIORITY: Dict[str, int] = {
     "crossref": 80,
     "openalex": 75,
     "semanticscholar": 70,
+    "plos": 68,
     "doaj": 65,
     "arxiv": 60,
+    "dblp": 58,
     "eric": 55,
+    "openaire": 52,
     "core": 50,
+    "hal": 48,
     "zenodo": 45,
     "nasa_ads": 40,
+    "biorxiv": 35,
+    "medrxiv": 34,
 }
 
 # Topic id → sources that usually matter for classroom coverage checks.
 # Mirrors the Data Management topic grid recommendations.
 TOPIC_SOURCE_HINTS: Dict[str, List[str]] = {
-    "health": ["pubmed", "europepmc", "clinicaltrials", "openalex", "semanticscholar"],
-    "biology": ["pubmed", "europepmc", "openalex", "arxiv", "semanticscholar"],
-    "chemistry": ["openalex", "arxiv", "semanticscholar", "crossref"],
-    "physics": ["arxiv", "openalex", "semanticscholar", "nasa_ads"],
-    "math": ["arxiv", "openalex", "semanticscholar"],
-    "cs": ["arxiv", "openalex", "semanticscholar"],
-    "earth": ["openalex", "semanticscholar", "nasa_ads", "zenodo"],
-    "history": ["openalex", "semanticscholar", "eric", "crossref"],
-    "economics": ["arxiv", "openalex", "semanticscholar", "eric"],
-    "psychology": ["pubmed", "openalex", "semanticscholar", "eric"],
-    "polisci": ["openalex", "semanticscholar", "eric"],
-    "literature": ["openalex", "semanticscholar", "eric"],
-    "education": ["eric", "openalex", "semanticscholar"],
+    "health": [
+        "pubmed", "europepmc", "clinicaltrials", "medrxiv", "plos",
+        "openalex", "semanticscholar",
+    ],
+    "biology": [
+        "pubmed", "europepmc", "biorxiv", "plos", "openalex", "arxiv",
+        "semanticscholar",
+    ],
+    "chemistry": ["openalex", "arxiv", "semanticscholar", "crossref", "openaire"],
+    "physics": ["arxiv", "openalex", "semanticscholar", "nasa_ads", "openaire"],
+    "math": ["arxiv", "openalex", "semanticscholar", "openaire"],
+    "cs": ["dblp", "arxiv", "openalex", "semanticscholar", "openaire"],
+    "earth": ["openalex", "semanticscholar", "nasa_ads", "zenodo", "openaire", "hal"],
+    "history": ["openalex", "semanticscholar", "eric", "crossref", "hal", "openaire"],
+    "economics": ["arxiv", "openalex", "semanticscholar", "eric", "openaire"],
+    "psychology": ["pubmed", "openalex", "semanticscholar", "eric", "openaire"],
+    "polisci": ["openalex", "semanticscholar", "eric", "hal", "openaire"],
+    "literature": ["openalex", "semanticscholar", "eric", "hal", "openaire"],
+    "education": ["eric", "openalex", "semanticscholar", "hal", "openaire"],
 }
 
 _YEAR_RE = re.compile(r"(?:19|20)\d{2}")

@@ -47,6 +47,9 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "recommended sources are still empty.",
         ],
         "tips": [
+            "Starting point only: publicly accessible research databases you select. "
+            "Paywalled or unindexed work will not appear. Not a complete library search. "
+            "Finish important work with your school library and teacher’s required sources.",
             "Teachers: assign a topic pack (e.g. “use ERIC + OpenAlex”) so every "
             "student’s corpus is comparable.",
             "Students: start broad, then re-fetch with Add to deepen a sub-topic "
@@ -198,20 +201,30 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "Results show a similarity score (0-1), highlighted query words in "
             "abstracts, and PICO snippets when detected.",
             "Star papers and add private notes for your study log.",
-            "Export this ranked list (CSV/TXT) or export the whole library as "
-            "CSV, RIS (Zotero/EndNote), or BibTeX - by scope (all / included / "
-            "excluded / starred).",
-            "For APA/MLA/Chicago hand-formatting, use the ZoteroBib link on "
-            "titles or DOIs so style rules stay under your control.",
+            "Export this ranked list as CSV (spreadsheet) or Text (reading list), or "
+            "export the whole library: CSV (screening log), RIS (Zotero/EndNote/"
+            "Mendeley), BibTeX (LaTeX / many managers), or APA text (classroom draft). "
+            "Pick a scope: all / included / screened out / starred.",
+            "For polished APA/MLA/Chicago, import RIS or BibTeX into Zotero (or use "
+            "ZoteroBib). APA (text) is a quick draft only.",
+            "Screening counts for hand-ins (how many collected / excluded) live on "
+            "Duplicates as a .txt report - that is not a citation file.",
         ],
         "tips": [
+            "Search only ranks papers already in your collection (from public "
+            "databases you fetched). It is not Google Scholar and not a full library "
+            "search. Use it to prioritise candidates, then verify in original sources.",
+            "Each result may show a study Type tag (review, trial, survey, …). That is "
+            "an automated guess from title and abstract - often wrong when confidence "
+            "is low (exclamation mark). It is not an evidence grade.",
             "Screen off-topic clusters first so the ranking pool is clean.",
             "Seed mode is great when a teacher gives one starter paper: find more "
             "like it from what you already fetched.",
             "Star a handful of must-read papers, then use More like my starred to "
             "expand the set without rewriting the query.",
-            "Need a bibliography file? Export RIS or BibTeX from Search, not just "
-            "the ranked CSV.",
+            "Need a real bibliography? Export RIS or BibTeX and open it in Zotero. "
+            "Need a spreadsheet log? Use CSV. Need counts for a process hand-in? "
+            "Use the Duplicates screening report (.txt).",
         ],
         "where_in_app": "Search page.",
         "app_path": "/search",

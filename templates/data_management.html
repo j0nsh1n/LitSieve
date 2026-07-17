@@ -5,6 +5,8 @@
  <h1>Data Management</h1>
  <p class="subtitle"><strong>Step 1 of 4.</strong> Pick topics, choose sources, and fetch papers.
  Then prepare them for search when you are ready (step 4).</p>
+ {% from "macros/disclaimers.html" import scope_fetch %}
+ {{ scope_fetch() }}
 </section>
 
 <section class="card getting-started-card" id="getting-started-card" hidden>
@@ -170,5 +172,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/data_management.js?v=20260717a"></script>
+<script src="/static/js/data_management.js?v=20260717r1"></script>
 {% endblock %}

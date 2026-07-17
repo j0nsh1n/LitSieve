@@ -24,6 +24,11 @@ from crossref_fetcher import CrossRefFetcher
 from doaj_fetcher import DOAJFetcher
 from nasa_ads_fetcher import NASAADSFetcher
 from core_fetcher import COREFetcher
+from biorxiv_fetcher import BioRxivFetcher, MedRxivFetcher
+from dblp_fetcher import DBLPFetcher
+from openaire_fetcher import OpenAIREFetcher
+from plos_fetcher import PLOSFetcher
+from hal_fetcher import HALFetcher
 from database import ArticleDatabase
 from embeddings import EmbeddingEngine
 from clustering import (
@@ -44,6 +49,12 @@ FETCHERS = {
     'doaj': DOAJFetcher,
     'nasa_ads': NASAADSFetcher,
     'core': COREFetcher,
+    'biorxiv': BioRxivFetcher,
+    'medrxiv': MedRxivFetcher,
+    'dblp': DBLPFetcher,
+    'openaire': OpenAIREFetcher,
+    'plos': PLOSFetcher,
+    'hal': HALFetcher,
 }
 
 

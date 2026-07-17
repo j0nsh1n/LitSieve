@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Literature Research Aide{% endblock %}</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260716e">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260717r1">
     <script>
         (function() {
             const root = document.documentElement;
@@ -93,11 +93,13 @@
         {% block content %}{% endblock %}
     </main>
 
+    {% from "macros/disclaimers.html" import scope_footer %}
     <footer class="footer">
         <p>Literature Research Aide - v4.0.0</p>
+        {{ scope_footer() }}
     </footer>
 
-    <script src="/static/js/common.js?v=20260716e"></script>
+    <script src="/static/js/common.js?v=20260717r1"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

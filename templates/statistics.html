@@ -60,21 +60,26 @@
  <div class="screening-report-header">
  <div>
  <h2 class="screening-report-title">Screening report</h2>
- <p class="info-text screening-report-lead">Show-your-work counts for hand-ins: papers collected,
- excluded (and why), and included.</p>
+ <p class="info-text screening-report-lead">Show-your-work <strong>counts</strong> for hand-ins
+ (not a citation list). Use this when a teacher asks how many papers you collected, excluded, and kept.</p>
  </div>
  <button type="button" id="screening-report-btn" class="btn btn-secondary btn-sm">Screening report</button>
  </div>
  <details class="help-details">
-  <summary>What the report includes</summary>
-  <p class="info-text">PRISMA-style counts: papers collected, removed as duplicates, excluded by
-  cluster triage, excluded manually, included set, stars, prepared papers, and clusters. The same
-  text appears on screen and in the .txt download.</p>
+  <summary>What this file is for (vs Search exports)</summary>
+  <p class="info-text">This is a <strong>plain-text accounting report</strong> (PRISMA-style numbers):
+  papers collected, removed as duplicates, excluded by cluster triage, excluded manually, included
+  set, stars, prepared papers, clusters, and papers-by-year. The on-screen view and
+  <strong>Download (.txt)</strong> use the same text - good to attach to a reflection or lab report.</p>
+  <p class="info-text">It is <strong>not</strong> a bibliography. For citations or a reference manager,
+  go to Search → Export your library and pick <strong>RIS</strong>, <strong>BibTeX</strong>, or
+  <strong>APA (text)</strong>. For a spreadsheet of individual papers, use <strong>CSV</strong> there.</p>
  </details>
  <div id="screening-report-panel" class="screening-report-panel" hidden>
  <pre id="screening-report-body" class="screening-report-body"></pre>
  <p class="screening-report-actions">
- <a id="screening-report-download" class="btn btn-secondary btn-sm" href="/api/screening-report?format=txt">Download (.txt)</a>
+ <a id="screening-report-download" class="btn btn-secondary btn-sm" href="/api/screening-report?format=txt"
+  title="Plain-text counts for hand-ins, not a bibliography">Download (.txt)</a>
  </p>
  </div>
 </section>
@@ -92,5 +97,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/statistics.js?v=20260716d"></script>
+<script src="/static/js/statistics.js?v=20260717r1"></script>
 {% endblock %}

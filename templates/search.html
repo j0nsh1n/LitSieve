@@ -6,6 +6,8 @@
  <h1>Search for Similar Articles</h1>
  <p class="subtitle"><strong>Step 4 of 4 (last).</strong> Rank the papers you kept by how well they
  match your question, then export your list.</p>
+ {% from "macros/disclaimers.html" import scope_search %}
+ {{ scope_search() }}
 </section>
 
 <section class="card empty-state-card" id="search-empty-state" hidden>
@@ -133,6 +135,12 @@
    <label class="radio-label"><input type="checkbox" name="search-source" value="doaj" checked> DOAJ</label>
    <label class="radio-label"><input type="checkbox" name="search-source" value="nasa_ads" checked> NASA ADS</label>
    <label class="radio-label"><input type="checkbox" name="search-source" value="core" checked> CORE</label>
+   <label class="radio-label"><input type="checkbox" name="search-source" value="biorxiv" checked> bioRxiv</label>
+   <label class="radio-label"><input type="checkbox" name="search-source" value="medrxiv" checked> medRxiv</label>
+   <label class="radio-label"><input type="checkbox" name="search-source" value="dblp" checked> DBLP</label>
+   <label class="radio-label"><input type="checkbox" name="search-source" value="openaire" checked> OpenAIRE</label>
+   <label class="radio-label"><input type="checkbox" name="search-source" value="plos" checked> PLOS</label>
+   <label class="radio-label"><input type="checkbox" name="search-source" value="hal" checked> HAL</label>
    </div>
    <div class="help-text" id="source-availability-hint" style="margin-top:0.4rem;"></div>
    </div>
@@ -155,37 +163,68 @@
  <div class="results-header">
  <h2>Results: <span id="result-count">0</span> articles found</h2>
  <div class="export-row">
- <button id="export-csv" class="btn btn-secondary btn-sm" title="Download these results as a spreadsheet-ready CSV file">Download CSV</button>
- <button id="export-txt" class="btn btn-secondary btn-sm" title="Download these results as a plain-text reading list">Download Text</button>
+ <button id="export-csv" class="btn btn-secondary btn-sm"
+  title="Spreadsheet of this ranked list only (Excel, Google Sheets)">Download CSV</button>
+ <button id="export-txt" class="btn btn-secondary btn-sm"
+  title="Simple reading list of this ranked list (titles and ids)">Download Text</button>
  </div>
  </div>
  <details class="help-details">
-  <summary>Reading the results</summary>
-  <p class="info-text">The badge shows how strong the match is (hover for the exact 0-1 similarity
-  score, always the original meaning-based similarity even when hybrid ranking is on). Matching
-  words from your query are <mark class="hl-demo">highlighted</mark> in abstracts. PICO chips show
-  which clinical elements were detected, with short quotes when available. Use ★ to bookmark (feeds
-  <strong>More like my starred</strong>) and <em>Add note</em> for private study notes (saved only
-  in your account). Export this ranked list with the buttons above, or your whole library below.</p>
+  <summary>Reading the results and exporting this list</summary>
+  <p class="info-text">The match badge shows how strong the similarity is (hover for the exact 0-1
+  score). A <strong>Type</strong> tag is a rough automated guess from the title and abstract
+  (review, trial, survey, …). An exclamation mark means low or medium confidence - the tag is
+  often wrong. It is <strong>not</strong> an evidence grade or quality score. Matching words from
+  your query are <mark class="hl-demo">highlighted</mark> in abstracts. Use ★ to bookmark and
+  <em>Add note</em> for private notes.</p>
+  <p class="info-text"><strong>These two buttons export only the current search results</strong>
+  (the ranked list above), not your whole library:</p>
+  <ul class="export-format-list">
+   <li><strong>CSV</strong> - opens in Excel or Google Sheets. Good for sorting, highlighting, or a
+   screening table of <em>this</em> ranked set.</li>
+   <li><strong>Text</strong> - plain reading list (easy to paste into a doc or print). Not for Zotero.</li>
+  </ul>
+  <p class="info-text">For the full collection or bibliography-manager files (RIS/BibTeX/APA), use
+  <strong>Export your library</strong> below.</p>
  </details>
  <div id="results-list"></div>
 </section>
 
 <section class="card">
  <h2>Export your library</h2>
- <p class="info-text">Download your whole collection (not just the last search) for hand-ins or a
- bibliography manager like Zotero, EndNote, or Mendeley.</p>
- <details class="help-details">
-  <summary>What exports include and citation formatting</summary>
-  <p class="info-text">Exports include cluster labels, exclusion status, stars, and private notes -
-  useful for spreadsheet screening logs. Screening counts for hand-ins are on the Duplicates page.
-  <strong>APA (text)</strong> is a classroom draft in approximate APA 7th style (author names from
-  databases vary). For polished APA/MLA/Chicago, open
-  <a href="https://zbib.org/" target="_blank" rel="noopener">ZoteroBib</a> or import RIS/BibTeX into Zotero.</p>
+ <p class="info-text">Download your <strong>whole collection</strong> (or a scope you pick), not just
+ the last search. Choose a format based on what you will do next.</p>
+ <details class="help-details" open>
+  <summary>Which file format should I pick?</summary>
+  <ul class="export-format-list">
+   <li><strong>CSV</strong> - spreadsheet of your library with cluster labels, screened-out status,
+   stars, and notes. Best for hand-in logs, teachers reviewing process, or working in Excel /
+   Google Sheets. Not a bibliography style.</li>
+   <li><strong>RIS (Zotero / EndNote / Mendeley)</strong> - standard citation exchange file. Import
+   into a reference manager, then generate APA, MLA, Chicago, etc. there. Prefer this when you need
+   a real bibliography database.</li>
+   <li><strong>BibTeX</strong> - standard for LaTeX and many managers (including Zotero). Use for
+   papers written in LaTeX or when a teacher asks for a <code>.bib</code> file.</li>
+   <li><strong>APA (text)</strong> - plain-text draft in approximate APA 7th style for quick classroom
+   reading lists. Author names and punctuation from databases can be imperfect - treat as a draft,
+   not a final reference list. For polished styles, import RIS/BibTeX into Zotero or use
+   <a href="https://zbib.org/" target="_blank" rel="noopener">ZoteroBib</a>.</li>
+  </ul>
+  <p class="info-text"><strong>Scope</strong> filters which papers go in the file:</p>
+  <ul class="export-format-list">
+   <li><strong>All articles</strong> - everything you fetched in this library.</li>
+   <li><strong>Included only</strong> - papers still in your final set (not screened out).</li>
+   <li><strong>Screened out only</strong> - papers you excluded (duplicates, cluster triage, manual).</li>
+   <li><strong>Starred only</strong> - papers you bookmarked with ★.</li>
+  </ul>
+  <p class="info-text">Need counts for a screening hand-in (how many collected / excluded / kept)?
+  Use the <strong>Screening report</strong> on the Duplicates page (JSON view or <code>.txt</code>
+  download), not these citation formats.</p>
  </details>
  <div class="export-scope-row">
  <label for="lib-export-scope" class="help-text export-scope-label">Scope</label>
- <select id="lib-export-scope" class="export-scope-select">
+ <select id="lib-export-scope" class="export-scope-select"
+  title="Which papers to include in the download">
  <option value="all">All articles</option>
  <option value="included">Included only</option>
  <option value="excluded">Screened out only</option>
@@ -193,14 +232,22 @@
  </select>
  </div>
  <div class="export-row export-row-formats">
- <button type="button" class="btn btn-secondary btn-sm" data-lib-export-format="csv">CSV</button>
- <button type="button" class="btn btn-secondary btn-sm" data-lib-export-format="ris">RIS (Zotero/EndNote)</button>
- <button type="button" class="btn btn-secondary btn-sm" data-lib-export-format="bibtex">BibTeX</button>
- <button type="button" class="btn btn-secondary btn-sm" data-lib-export-format="apa">APA (text)</button>
+ <button type="button" class="btn btn-secondary btn-sm" data-lib-export-format="csv"
+  title="Spreadsheet log with clusters, screening, notes">CSV</button>
+ <button type="button" class="btn btn-secondary btn-sm" data-lib-export-format="ris"
+  title="Import into Zotero, EndNote, or Mendeley">RIS (Zotero/EndNote)</button>
+ <button type="button" class="btn btn-secondary btn-sm" data-lib-export-format="bibtex"
+  title="For LaTeX or Zotero (.bib)">BibTeX</button>
+ <button type="button" class="btn btn-secondary btn-sm" data-lib-export-format="apa"
+  title="Plain-text APA-style draft for class (not final)">APA (text)</button>
  </div>
+ <p class="help-text" style="margin-top:0.65rem;">
+ Tip: most students use <strong>RIS</strong> or <strong>BibTeX</strong> for a reference manager, and
+ <strong>CSV</strong> when a teacher wants a screening spreadsheet.
+ </p>
 </section>
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/search.js?v=20260716a"></script>
+<script src="/static/js/search.js?v=20260717r1"></script>
 {% endblock %}

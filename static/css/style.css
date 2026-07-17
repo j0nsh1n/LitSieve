@@ -1053,6 +1053,23 @@ input[type="range"]::-moz-range-thumb:hover {
     margin-top: 0.5rem;
 }
 
+.export-format-list {
+    margin: 0.4rem 0 0.75rem 1.1rem;
+    padding: 0;
+    color: var(--text-body, var(--text));
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+.export-format-list li {
+    margin-bottom: 0.45rem;
+}
+.export-format-list li:last-child {
+    margin-bottom: 0;
+}
+.export-format-list strong {
+    color: var(--text);
+}
+
 .export-row {
     display: flex;
     gap: 0.5rem;
@@ -1236,6 +1253,58 @@ input[type="range"]::-moz-range-thumb:hover {
 }
 
 /* Extractive key points (from the abstract — not AI-generated) */
+/* Account: AI settings */
+.ai-settings-subhead {
+    font-size: 0.95rem;
+    margin: 1rem 0 0.4rem;
+    color: var(--text-body, var(--text));
+}
+.ai-ollama-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0.5rem 0 0.75rem;
+}
+
+/* Optional AI study-aid panels (opt-in; extractive key points remain default) */
+.ai-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    margin-top: 0.55rem;
+}
+
+.ai-panel {
+    margin-top: 0.65rem;
+    padding: 0.75rem 0.85rem;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--surface) 92%, var(--accent) 8%);
+}
+
+.ai-label {
+    margin-bottom: 0.4rem;
+    font-weight: 600;
+}
+
+.ai-summary,
+.ai-answer,
+.ai-question,
+.ai-limitations {
+    margin: 0.35rem 0;
+    color: var(--text-body, var(--text));
+    line-height: 1.45;
+}
+
+.ai-quote {
+    margin: 0.4rem 0;
+    padding: 0.35rem 0.65rem;
+    border-left: 3px solid var(--accent);
+    color: var(--text-soft);
+    font-size: 0.9rem;
+}
+
 .key-points {
     margin: 0.4rem 0 0.75rem;
     padding: 0.55rem 0.75rem;
@@ -2016,6 +2085,76 @@ html[data-reading="on"] .key-points {
 .notification-error { border-left-color: var(--err); }
 .notification-warning { border-left-color: var(--warn); }
 .notification-info { border-left-color: var(--accent); }
+
+/* Study-type tags (search-time heuristics) */
+.study-type-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0.12rem 0.45rem;
+    border-radius: 999px;
+    border: 1px solid var(--rule);
+    font-size: 0.78rem;
+    background: var(--surface);
+    color: var(--text-body, var(--text));
+    max-width: 100%;
+}
+.study-type-badge.band-high {
+    border-color: color-mix(in srgb, var(--ok, #2d6a4f) 45%, var(--rule));
+}
+.study-type-badge.band-medium {
+    border-color: color-mix(in srgb, var(--warn, #b08900) 50%, var(--rule));
+}
+.study-type-badge.band-low,
+.study-type-badge.band-none {
+    border-color: color-mix(in srgb, var(--err, #9b2226) 40%, var(--rule));
+}
+.study-type-warn {
+    color: var(--warn, #b08900);
+    font-weight: 700;
+}
+
+/* Product scope / research-use disclaimer */
+.site-disclaimer {
+    margin: 0.85rem 0 0;
+    padding: 0.7rem 0.9rem;
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--accent, #2a5f6e);
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--surface) 88%, var(--accent, #2a5f6e) 12%);
+    color: var(--text-body, var(--text));
+    font-size: 0.9rem;
+    line-height: 1.45;
+}
+.site-disclaimer strong {
+    color: var(--text);
+}
+.landing .site-disclaimer {
+    max-width: 42rem;
+    margin-left: auto;
+    margin-right: auto;
+    text-align: left;
+}
+.footer .site-disclaimer-foot,
+.landing-footer .site-disclaimer-foot {
+    margin: 0.35rem 0 0;
+    font-size: 0.78rem;
+    color: var(--text-soft);
+    max-width: 40rem;
+    margin-left: auto;
+    margin-right: auto;
+    line-height: 1.4;
+}
+.auth-disclaimer {
+    margin: 0 0 1rem;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    font-size: 0.82rem;
+    line-height: 1.4;
+    color: var(--text-soft);
+    text-align: left;
+}
 
 /* === Info text === */
 .info-text {
