@@ -43,7 +43,7 @@ async function doPreview() {
   try {
     const data = await apiCall(`/api/shares/preview?code=${encodeURIComponent(code)}`);
     renderPreview(data);
-    setStatus('join-status', data.can_join ? 'Looks good — confirm to add a copy to your account.' : (data.block_reason || ''), data.can_join ? 'success' : 'error');
+    setStatus('join-status', data.can_join ? 'Looks good — confirm to add a copy to your account.' : (data.block_reason || 'Cannot join.'), data.can_join ? 'success' : 'error');
     if (confirmBtn) confirmBtn.disabled = !data.can_join;
   } catch (e) {
     if (card) {

@@ -83,6 +83,15 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+class LibrariesMetaError(RuntimeError):
+    """libraries.json exists but is unreadable or invalid.
+
+    Distinct from a missing file: overwriting corrupt metadata with a fresh
+    default would orphan existing library directories, so callers must fail
+    closed instead of re-initialising.
+    """
+
+
 def _read_meta_unlocked(user_id: str) -> Optional[Dict]:
     path = meta_path(user_id)
     if not path.is_file():
@@ -90,12 +99,19 @@ def _read_meta_unlocked(user_id: str) -> Optional[Dict]:
     try:
         with path.open("r", encoding="utf-8") as f:
             data = json.load(f)
-        if not isinstance(data, dict) or "libraries" not in data:
-            return None
-        return data
     except (OSError, json.JSONDecodeError) as e:
-        logger.warning("Corrupt libraries.json for %s: %s", user_id, e)
-        return None
+        logger.error("Corrupt libraries.json for %s: %s", user_id, e)
+        raise LibrariesMetaError(
+            f"Library metadata for this account is unreadable ({e}). "
+            "Refusing to reset it; restore or remove libraries.json manually."
+        ) from e
+    if not isinstance(data, dict) or "libraries" not in data:
+        logger.error("Invalid libraries.json structure for %s", user_id)
+        raise LibrariesMetaError(
+            "Library metadata for this account is invalid. "
+            "Refusing to reset it; restore or remove libraries.json manually."
+        )
+    return data
 
 
 def _write_meta_unlocked(user_id: str, meta: Dict) -> None:
@@ -109,8 +125,48 @@ def _write_meta_unlocked(user_id: str, meta: Dict) -> None:
     tmp.replace(path)
 
 
+def _transfer_legacy_db(legacy: Path, dest_db: Path) -> None:
+    """Move legacy articles.db (+ WAL/SHM sidecars) into a library directory.
+
+    Stage copies first and publish them atomically, so a failure at any point
+    leaves the legacy layout intact and retryable. Raises OSError on failure;
+    the caller must not publish metadata until this returns.
+    """
+    pairs = [(legacy, dest_db)]
+    for suffix in ("-wal", "-shm"):
+        side = Path(str(legacy) + suffix)
+        if side.is_file():
+            pairs.append((side, Path(str(dest_db) + suffix)))
+    staged = []
+    try:
+        for src, dst in pairs:
+            tmp = dst.with_name(dst.name + ".migrating")
+            shutil.copy2(src, tmp)
+            staged.append((tmp, dst))
+        for tmp, dst in staged:
+            os.replace(tmp, dst)
+    except OSError:
+        logger.exception("Failed to migrate legacy db %s for → %s", legacy, dest_db)
+        for tmp, _ in staged:
+            tmp.unlink(missing_ok=True)
+        raise
+    # Copies are live; drop the originals. Best effort: metadata will point at
+    # the new layout regardless, so leftovers are unreachable but harmless.
+    for src, _ in pairs:
+        try:
+            src.unlink()
+        except OSError:
+            logger.warning("Migrated %s but could not remove the legacy file", src)
+    logger.info("Migrated legacy articles.db → %s", dest_db)
+
+
 def _migrate_legacy_unlocked(user_id: str) -> Dict:
-    """Create default library; move legacy articles.db if present."""
+    """Create default library; move legacy articles.db if present.
+
+    Metadata is only written after the database (and sidecars) transferred
+    successfully — a failed transfer raises and leaves the legacy layout for
+    the next attempt.
+    """
     lib_id = str(uuid.uuid4())
     dest_dir = libraries_dir(user_id) / lib_id
     dest_dir.mkdir(parents=True, exist_ok=True)
@@ -118,20 +174,10 @@ def _migrate_legacy_unlocked(user_id: str) -> Dict:
     dest_db = dest_dir / "articles.db"
     if legacy.is_file() and not dest_db.exists():
         try:
-            legacy.rename(dest_db)
-            logger.info("Migrated legacy articles.db for %s → library %s", user_id, lib_id)
-            # Move WAL/SHM sidecars if present
-            for suffix in ("-wal", "-shm"):
-                side = Path(str(legacy) + suffix)
-                if side.is_file():
-                    side.rename(Path(str(dest_db) + suffix))
-        except OSError as e:
-            logger.exception("Failed to migrate legacy db for %s: %s", user_id, e)
-            # Fall back to copy so we never lose data
-            try:
-                shutil.copy2(legacy, dest_db)
-            except OSError:
-                pass
+            _transfer_legacy_db(legacy, dest_db)
+        except OSError:
+            shutil.rmtree(dest_dir, ignore_errors=True)
+            raise
     meta = _empty_meta(lib_id, DEFAULT_LIBRARY_NAME)
     _write_meta_unlocked(user_id, meta)
     return meta
@@ -242,18 +288,17 @@ def delete_library(user_id: str, library_id: str) -> Dict:
             raise ValueError("You must keep at least one library.")
         if not any(L.get("id") == library_id for L in libs):
             raise ValueError("Library not found.")
+        # Remove on-disk data first: if this fails the metadata is untouched,
+        # the library stays listed, and the delete can be retried. Never
+        # report success while private data is still on disk.
+        lib_path = libraries_dir(user_id) / library_id
+        if lib_path.is_dir():
+            shutil.rmtree(lib_path)
         libs = [L for L in libs if L.get("id") != library_id]
         meta["libraries"] = libs
         if meta.get("active_id") == library_id:
             meta["active_id"] = libs[0]["id"]
         _write_meta_unlocked(user_id, meta)
-        # Remove on-disk data
-        lib_path = libraries_dir(user_id) / library_id
-        if lib_path.is_dir():
-            try:
-                shutil.rmtree(lib_path)
-            except OSError:
-                logger.exception("Failed to remove library dir %s", lib_path)
         return {
             "active_id": meta["active_id"],
             "libraries": libs,

@@ -608,7 +608,7 @@ async function doFetch() {
 
 async function doCreateEmbeddings() {
  const model = document.getElementById('embedding-model').value;
- const onlyMissing = document.getElementById('only-missing').checked;
+ const onlyMissing = document.getElementById('only-missing')?.checked || false;
  const btn = document.getElementById('embeddings-btn');
  saveFetchPrefs();
  setLoading(btn, true);

@@ -117,8 +117,10 @@ _pipelines: "OrderedDict[str, LiteratureSearchPipeline]" = OrderedDict()
 # Number of in-flight requests holding each pipeline. A pipeline is only safe
 # to close when its refcount hits 0; otherwise eviction defers the close.
 _pipeline_refcounts: "OrderedDict[str, int]" = OrderedDict()
-# Pipelines evicted while still in use, keyed by cache key — closed on last release.
-_pending_close: "dict[str, LiteratureSearchPipeline]" = {}
+# Pipelines evicted while still in use, keyed by cache key — closed on last
+# release. A key can accumulate several evicted generations (evict → recreate
+# → evict again while requests still hold references), so each entry is a list.
+_pending_close: "dict[str, list[LiteratureSearchPipeline]]" = {}
 # Guards _pipelines, _pipeline_refcounts and _pending_close together.
 _pipelines_lock = threading.Lock()
 
@@ -160,7 +162,7 @@ def get_pipeline(
             while len(_pipelines) > MAX_CACHED_USERS:
                 old_key, old_pipeline = _pipelines.popitem(last=False)
                 if _pipeline_refcounts.get(old_key, 0) > 0:
-                    _pending_close[old_key] = old_pipeline
+                    _pending_close.setdefault(old_key, []).append(old_pipeline)
                     continue
                 try:
                     old_pipeline.db.close()
@@ -184,8 +186,7 @@ def release_pipeline(user_id: str, library_id: Optional[str] = None) -> None:
             _pipeline_refcounts[key] = count
             return
         _pipeline_refcounts.pop(key, None)
-        pipeline = _pending_close.pop(key, None)
-        if pipeline is not None:
+        for pipeline in _pending_close.pop(key, []):
             try:
                 pipeline.db.close()
             except Exception:
@@ -199,15 +200,18 @@ def _evict_pipeline(user_id: str) -> None:
     """Forcibly drop and close all cached pipelines for a user (account delete)."""
     prefix = f"{user_id}:"
     with _pipelines_lock:
-        keys = [
-            k for k in list(_pipelines.keys())
+        # Union of live, pending-close, and refcount keys: an entry can exist
+        # in _pending_close (or hold a refcount) without a live counterpart.
+        keys = {
+            k
+            for k in [*_pipelines, *_pending_close, *_pipeline_refcounts]
             if k == user_id or k.startswith(prefix)
-        ]
+        }
         for key in keys:
             live = _pipelines.pop(key, None)
-            pending = _pending_close.pop(key, None)
+            pending = _pending_close.pop(key, [])
             _pipeline_refcounts.pop(key, None)
-            for pipe in (live, pending):
+            for pipe in [live, *pending]:
                 if pipe is not None:
                     try:
                         pipe.db.close()
@@ -1768,17 +1772,28 @@ async def api_delete_library(library_id: str, request: Request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
     uid = user["user_id"]
     try:
-        # Drop cached pipeline for this library before deleting files.
+        # Refuse to delete while requests or background jobs still hold the
+        # pipeline (jobs keep a reference until completion): closing the DB
+        # under them would abort work or remove the file mid-write.
         key = pipeline_cache_key(uid, library_id)
         with _pipelines_lock:
+            if _pipeline_refcounts.get(key, 0) > 0:
+                return JSONResponse(
+                    status_code=409,
+                    content={
+                        "detail": "This library is in use (an active job or "
+                        "request). Wait for it to finish, then try again."
+                    },
+                )
+            # Drop cached pipeline for this library before deleting files.
             pipe = _pipelines.pop(key, None)
-            _pending_close.pop(key, None)
-            _pipeline_refcounts.pop(key, None)
-        if pipe is not None:
-            try:
-                pipe.db.close()
-            except Exception:
-                pass
+            pending = _pending_close.pop(key, [])
+        for p in [pipe, *pending]:
+            if p is not None:
+                try:
+                    p.db.close()
+                except Exception:
+                    pass
         result = delete_library(uid, library_id)
         return {"status": "success", **result}
     except ValueError as e:
@@ -1987,12 +2002,15 @@ async def api_delete_account(req: DeleteAccountRequest, request: Request):
     try:
         # 1. Close + drop every cached pipeline for this user (all libraries).
         _evict_pipeline(uid)
-        # 2. Remove the user's data directory (all libraries + meta).
+        # 2. Remove the user's data directory (all libraries + meta). Errors
+        # propagate: the account record is only deleted after the private data
+        # is confirmed gone, so a failed removal keeps the account (and this
+        # endpoint retryable) instead of orphaning data with no owner.
         # Honour USER_DATA_DIR the same way libraries.py does.
         from libraries import user_dir as lib_user_dir
         udir = lib_user_dir(uid)
         if udir.is_dir():
-            shutil.rmtree(udir, ignore_errors=True)
+            shutil.rmtree(udir)
         # 3. Delete the account record.
         user_db.delete_user(uid)
     except Exception as e:

@@ -119,3 +119,59 @@ def test_pipeline_opens_active_library_db(user_id, tmp_path, monkeypatch):
         assert db2.get_statistics()["total_articles"] == 0
     finally:
         db2.close()
+
+
+def test_corrupt_meta_fails_closed(user_id):
+    """Malformed libraries.json must raise, not be silently re-initialised."""
+    lib.ensure_libraries(user_id)
+    lib.meta_path(user_id).write_text("{not json", encoding="utf-8")
+    with pytest.raises(lib.LibrariesMetaError):
+        lib.ensure_libraries(user_id)
+    # The corrupt file is preserved for manual recovery, not overwritten.
+    assert lib.meta_path(user_id).read_text(encoding="utf-8") == "{not json"
+
+
+def test_invalid_meta_structure_fails_closed(user_id):
+    lib.ensure_libraries(user_id)
+    lib.meta_path(user_id).write_text(json.dumps({"wrong": "shape"}), encoding="utf-8")
+    with pytest.raises(lib.LibrariesMetaError):
+        lib.list_libraries(user_id)
+
+
+def test_migrate_moves_wal_shm_sidecars(user_id):
+    root = lib.user_dir(user_id)
+    root.mkdir(parents=True)
+    (root / "articles.db").write_bytes(b"db-bytes")
+    (root / "articles.db-wal").write_bytes(b"wal-bytes")
+    (root / "articles.db-shm").write_bytes(b"shm-bytes")
+    meta = lib.ensure_libraries(user_id)
+    dest = lib.library_db_path(user_id, meta["active_id"])
+    assert dest.read_bytes() == b"db-bytes"
+    assert Path(str(dest) + "-wal").read_bytes() == b"wal-bytes"
+    assert Path(str(dest) + "-shm").read_bytes() == b"shm-bytes"
+    for suffix in ("", "-wal", "-shm"):
+        assert not (root / f"articles.db{suffix}").exists()
+
+
+def test_migration_failure_keeps_legacy_and_meta_unpublished(user_id, monkeypatch):
+    root = lib.user_dir(user_id)
+    root.mkdir(parents=True)
+    legacy = root / "articles.db"
+    legacy.write_bytes(b"db-bytes")
+
+    def boom(src, dst):
+        raise OSError("disk full")
+
+    with monkeypatch.context() as mp:
+        mp.setattr("libraries.shutil.copy2", boom)
+        with pytest.raises(OSError):
+            lib.ensure_libraries(user_id)
+        # Retryable: legacy layout intact, metadata never published.
+        assert legacy.read_bytes() == b"db-bytes"
+        assert not lib.meta_path(user_id).exists()
+
+    # Once the failure clears, migration succeeds on retry.
+    meta = lib.ensure_libraries(user_id)
+    dest = lib.library_db_path(user_id, meta["active_id"])
+    assert dest.read_bytes() == b"db-bytes"
+    assert not legacy.exists()

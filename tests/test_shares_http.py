@@ -49,7 +49,8 @@ def app_module(tmp_path, monkeypatch):
     main = importlib.import_module("main")
 
     from user_db import UserDatabase
-    main.user_db = UserDatabase(db_path=str(tmp_path / "users.db"))
+    test_db = UserDatabase(db_path=str(tmp_path / "users.db"))
+    monkeypatch.setattr(main, "user_db", test_db)
     main._pipelines.clear()
     main._pipeline_refcounts.clear()
     main._all_progress.clear()
@@ -58,7 +59,8 @@ def app_module(tmp_path, monkeypatch):
     except Exception:
         pass
     monkeypatch.setitem(pipeline.FETCHERS, "pubmed", _FakeFetcher)
-    return main
+    yield main
+    test_db.conn.close()
 
 
 def _register(client, username, password="tpw-fixture-0001"):
