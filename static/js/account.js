@@ -93,7 +93,7 @@ async function doCreateLibrary() {
  setStatus('library-manage-status', 'Library created and set as active.', 'success');
  showNotification('Library created.', 'success');
  if (typeof refreshLibrarySwitcher === 'function') await refreshLibrarySwitcher();
- // New library is active and empty — reload so Data Management reflects it.
+ // New library is active and empty; reload so Data Management reflects it.
  window.location.reload();
  } catch (e) {
  setStatus('library-manage-status', e.message, 'error');
@@ -140,15 +140,15 @@ async function doDeleteLibrary(lib, count) {
  showNotification('You must keep at least one library.', 'error');
  return;
  }
- if (!confirm(`Delete library “${lib.name}” and all of its papers? This cannot be undone.`)) {
+ if (!confirm(`Delete library "${lib.name}" and all of its papers? This cannot be undone.`)) {
  return;
  }
  try {
- const data = await apiCall(`/api/libraries/${encodeURIComponent(lib.id)}`, {
+ await apiCall(`/api/libraries/${encodeURIComponent(lib.id)}`, {
  method: 'DELETE',
  });
  if (typeof refreshLibrarySwitcher === 'function') await refreshLibrarySwitcher();
- // If we deleted the active library, server switched active — reload.
+ // If we deleted the active library, server switched active; reload.
  window.location.reload();
  } catch (e) {
  showNotification(e.message, 'error');

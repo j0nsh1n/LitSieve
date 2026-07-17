@@ -223,39 +223,45 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
         "icon": "🔒",
         "tagline": "Your papers, embeddings, notes - only your account.",
         "summary": (
-            "Every account has its own isolated SQLite database on the server. "
-            "Fetched articles, embeddings, clusters, screening choices, stars, and "
-            "notes do not mix with anyone else’s. Sessions use signed tokens; "
-            "changing your password signs out other devices while keeping this one "
-            "signed in. Long fetches and embedding runs continue in the background "
-            "so closing a laptop mid-job is less painful."
+            "Every account is private on the server. Within an account you can "
+            "keep several named libraries (for example one per class unit). "
+            "Fetched articles, embeddings, clusters, screening choices, stars, "
+            "and notes stay inside the active library and never mix with other "
+            "users. Sessions use signed tokens; changing your password signs out "
+            "other devices while keeping this one signed in. Long fetches and "
+            "embedding runs continue in the background so closing a laptop "
+            "mid-job is less painful."
         ),
         "how_it_works": [
             "Register with a username or school email-style login and a password "
             "(stored as a bcrypt hash, not plain text).",
             "Log in to reach Data Management, Clusters, Search, and Duplicates.",
+            "Use the Library switcher in the nav (or Account) to create and "
+            "switch collections. Fetch, prepare, cluster, and search only touch "
+            "the active library.",
             "All API actions require your session; state-changing actions also "
             "check a CSRF token. Each signed-in user has their own rate limit "
             "bucket (classrooms behind one network do not share one budget).",
-            "Stars and notes attach to papers inside your personal database only.",
-            "Account page: change password (revokes other sessions) or delete "
-            "your account with password confirmation.",
+            "Stars and notes attach to papers inside the active library only.",
+            "Account page: manage libraries, change password (revokes other "
+            "sessions), or delete your account with password confirmation.",
             "Fetch and embedding jobs return immediately and finish in the "
-            "background; the progress bar follows until they complete.",
+            "background on the library that was active when they started; "
+            "the progress bar follows until they complete.",
             "Theme (light/dark) and reading mode preferences stay in your browser "
             "on this device.",
         ],
         "tips": [
             "School lab computers: log out when finished; do not reuse simple "
             "passwords.",
-            "Teachers: each student should have their own account so corpora and "
-            "notes stay separate for assessment.",
-            "Export your library (CSV/RIS/BibTeX) before wiping a collection if "
-            "you need a hand-in archive.",
+            "Teachers: keep one library per unit or class so papers do not mix; "
+            "each student still uses their own account for assessment.",
+            "Export a library (CSV/RIS/BibTeX) before deleting it if you need a "
+            "hand-in archive.",
             "If you change your password on a shared machine, other open tabs "
             "for that account will need to log in again.",
         ],
-        "where_in_app": "Register / Log in · Account page when signed in.",
+        "where_in_app": "Register / Log in · Library switcher in the nav · Account.",
         "app_path": "/account",
         "app_label": "Open Account",
     },

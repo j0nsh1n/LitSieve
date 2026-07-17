@@ -46,9 +46,10 @@ Built with **FastAPI**, sentence-transformers, FAISS, and scikit-learn.
 .
 ├── main.py                 # FastAPI application (entry point)
 ├── pipeline.py             # Orchestrates fetch → embed → cluster → search
+├── libraries.py            # Multi-library workspaces per account
 ├── base_fetcher.py         # Abstract fetcher + shared HttpClient (retry/backoff)
 ├── <source>_fetcher.py     # One fetcher per source (pubmed_fetcher.py, …)
-├── database.py             # Per-user article/embedding/cluster/notes SQLite
+├── database.py             # Per-library article/embedding/cluster/notes SQLite
 ├── user_db.py              # User-account database (users.db)
 ├── auth.py                 # JWT + bcrypt password hashing
 ├── embeddings.py           # EmbeddingEngine + PICOExtractor

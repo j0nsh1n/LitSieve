@@ -1785,12 +1785,14 @@ async def api_delete_account(req: DeleteAccountRequest, request: Request):
         return JSONResponse(status_code=400, content={"detail": "Incorrect password"})
 
     try:
-        # 1. Close + drop the cached pipeline so the SQLite file is released.
+        # 1. Close + drop every cached pipeline for this user (all libraries).
         _evict_pipeline(uid)
-        # 2. Remove the user's data directory (articles/embeddings/clusters).
-        user_dir = os.path.join("user_data", uid)
-        if os.path.isdir(user_dir):
-            shutil.rmtree(user_dir, ignore_errors=True)
+        # 2. Remove the user's data directory (all libraries + meta).
+        # Honour USER_DATA_DIR the same way libraries.py does.
+        from libraries import user_dir as lib_user_dir
+        udir = lib_user_dir(uid)
+        if udir.is_dir():
+            shutil.rmtree(udir, ignore_errors=True)
         # 3. Delete the account record.
         user_db.delete_user(uid)
     except Exception as e:

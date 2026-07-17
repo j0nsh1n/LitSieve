@@ -78,6 +78,15 @@ def test_duplicate_names_rejected(user_id):
         lib.create_library(user_id, "alpha")
 
 
+def test_max_libraries_enforced(user_id, monkeypatch):
+    monkeypatch.setattr(lib, "MAX_LIBRARIES", 3)
+    lib.ensure_libraries(user_id)
+    lib.create_library(user_id, "Two")
+    lib.create_library(user_id, "Three")
+    with pytest.raises(ValueError, match="At most"):
+        lib.create_library(user_id, "Four")
+
+
 def test_pipeline_opens_active_library_db(user_id, tmp_path, monkeypatch):
     monkeypatch.setenv("USER_DATA_DIR", str(tmp_path / "ud"))
     os.environ["SECRET_KEY"] = "pytest-only-not-a-secret-32b-min!!"
