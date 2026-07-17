@@ -245,6 +245,9 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "Stars and notes attach to papers inside the active library only.",
             "Account page: manage libraries, change password (revokes other "
             "sessions), or delete your account with password confirmation.",
+            "Teachers can Share a library to create a short class code. Students "
+            "Join with the code and receive their own copy (papers + screening + "
+            "optional embeddings) — not live write access to the teacher.",
             "Fetch and embedding jobs return immediately and finish in the "
             "background on the library that was active when they started; "
             "the progress bar follows until they complete.",
@@ -255,13 +258,13 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "School lab computers: log out when finished; do not reuse simple "
             "passwords.",
             "Teachers: keep one library per unit or class so papers do not mix; "
-            "each student still uses their own account for assessment.",
+            "share a finished unit library via class code so everyone starts equal.",
             "Export a library (CSV/RIS/BibTeX) before deleting it if you need a "
             "hand-in archive.",
             "If you change your password on a shared machine, other open tabs "
             "for that account will need to log in again.",
         ],
-        "where_in_app": "Register / Log in · Library switcher in the nav · Account.",
+        "where_in_app": "Register / Log in · Library switcher · Account · /join.",
         "app_path": "/account",
         "app_label": "Open Account",
     },

@@ -39,6 +39,7 @@ Built with **FastAPI**, sentence-transformers, FAISS, and scikit-learn.
 - 🧪 **Sample demo corpus** (no APIs) for classroom dry runs
 - 📄 Library export: CSV / RIS / BibTeX / **APA (text)**; richer exclusion reason codes
 - 📚 **Multiple libraries** per account (separate collections; switch in the nav)
+- 🔗 **Share a library** via class code (teacher publishes; students get their own clone)
 
 ## Project Structure
 
@@ -47,6 +48,7 @@ Built with **FastAPI**, sentence-transformers, FAISS, and scikit-learn.
 ├── main.py                 # FastAPI application (entry point)
 ├── pipeline.py             # Orchestrates fetch → embed → cluster → search
 ├── libraries.py            # Multi-library workspaces per account
+├── shares.py               # Class share codes → clone library into student account
 ├── base_fetcher.py         # Abstract fetcher + shared HttpClient (retry/backoff)
 ├── <source>_fetcher.py     # One fetcher per source (pubmed_fetcher.py, …)
 ├── database.py             # Per-library article/embedding/cluster/notes SQLite

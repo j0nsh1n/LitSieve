@@ -13,6 +13,7 @@ import secrets
 import logging
 import threading
 from collections import OrderedDict
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 from functools import partial
 import asyncio
@@ -67,7 +68,9 @@ from libraries import (
     set_active_library,
     ensure_libraries,
 )
+import shares as shares_mod
 from pathlib import Path
+from urllib.parse import quote, unquote
 
 logging.basicConfig(
     level=logging.INFO,
@@ -463,15 +466,44 @@ class DeleteAccountRequest(BaseModel):
     password: str
 
 
+class ShareCreateRequest(BaseModel):
+    library_id: Optional[str] = None
+    expires_days: Optional[int] = Field(default=14, ge=1, le=365)
+    max_uses: Optional[int] = Field(default=None, ge=1, le=10000)
+    include_embeddings: bool = True
+
+
+class ShareJoinRequest(BaseModel):
+    code: str = Field(..., min_length=4, max_length=32)
+
+
+def _safe_next_url(raw: Optional[str]) -> str:
+    """Allow only same-origin relative paths (open-redirect safe)."""
+    if not raw:
+        return "/data-management"
+    path = unquote(raw).strip()
+    if not path.startswith("/") or path.startswith("//"):
+        return "/data-management"
+    if any(c in path for c in ("\n", "\r", "\\")):
+        return "/data-management"
+    if "://" in path:
+        return "/data-management"
+    return path
+
+
 # ============================================================
 # Auth routes
 # ============================================================
 
 @app.get("/login")
 async def login_page(request: Request):
+    next_url = _safe_next_url(request.query_params.get("next"))
     if current_user(request):
-        return RedirectResponse(url="/data-management", status_code=302)
-    return templates.TemplateResponse(request, "login.html", context={"error": "", "info": ""})
+        return RedirectResponse(url=next_url, status_code=302)
+    return templates.TemplateResponse(
+        request, "login.html",
+        context={"error": "", "info": "", "next": next_url if next_url != "/data-management" else ""},
+    )
 
 
 @app.post("/login")
@@ -480,19 +512,25 @@ async def login_submit(
     request: Request,
     username: str = Form(...),
     password: str = Form(...),
+    next: str = Form(""),
 ):
+    next_url = _safe_next_url(next or request.query_params.get("next"))
     username = username.strip().lower()
     user = user_db.get_by_username(username)
     if not user or not verify_password(password, user["hashed_password"]):
         return templates.TemplateResponse(
             request, "login.html",
-            context={"error": "Invalid username or password", "info": ""},
+            context={
+                "error": "Invalid username or password",
+                "info": "",
+                "next": next if next else "",
+            },
             status_code=400,
         )
     token = create_token(
         user["id"], user["username"], user.get("token_version", 0),
     )
-    response = RedirectResponse(url="/data-management", status_code=302)
+    response = RedirectResponse(url=next_url, status_code=302)
     _set_auth_cookies(response, token)
     return response
 
@@ -586,7 +624,7 @@ async def reset_password_confirm(
         )
     return templates.TemplateResponse(
         request, "login.html",
-        context={"error": "", "info": "Password updated. You can log in now."},
+        context={"error": "", "info": "Password updated. You can log in now.", "next": ""},
     )
 
 
@@ -711,6 +749,28 @@ async def account_page(request: Request):
     if not user:
         return RedirectResponse(url="/login", status_code=302)
     return templates.TemplateResponse(request, "account.html", context={"active_page": "account", "user": user})
+
+
+@app.get("/join")
+async def join_page(request: Request):
+    """Join a shared library by class code (auth required)."""
+    code = (request.query_params.get("code") or "").strip()
+    user = current_user(request)
+    if not user:
+        next_path = "/join" + (f"?code={quote(code)}" if code else "")
+        return RedirectResponse(
+            url=f"/login?next={quote(next_path, safe='')}",
+            status_code=302,
+        )
+    return templates.TemplateResponse(
+        request,
+        "join.html",
+        context={
+            "active_page": "account",
+            "user": user,
+            "join_code": code,
+        },
+    )
 
 
 # ============================================================
@@ -1720,6 +1780,146 @@ async def api_delete_library(library_id: str, request: Request):
             except Exception:
                 pass
         result = delete_library(uid, library_id)
+        return {"status": "success", **result}
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"detail": str(e)})
+    except Exception as e:
+        return server_error(e)
+
+
+# ---------- Shares (class codes → clone library) ----------
+
+@app.post("/api/shares")
+@limiter.limit("10/hour")
+async def api_create_share(req: ShareCreateRequest, request: Request):
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    uid = user["user_id"]
+    try:
+        ensure_libraries(uid)
+        lib_id = (req.library_id or "").strip() or get_active_library_id(uid)
+        if not shares_mod.library_exists(uid, lib_id):
+            return JSONResponse(status_code=400, content={"detail": "Library not found."})
+        title = shares_mod.library_name(uid, lib_id) or "Shared library"
+        expires_at = None
+        if req.expires_days is not None:
+            expires_at = (
+                datetime.now(timezone.utc) + timedelta(days=int(req.expires_days))
+            ).strftime("%Y-%m-%dT%H:%M:%SZ")
+        # Retry a few times on rare code collision.
+        share = None
+        last_err = None
+        for _ in range(5):
+            code = shares_mod.generate_share_code()
+            try:
+                share = user_db.create_share(
+                    owner_user_id=uid,
+                    owner_library_id=lib_id,
+                    title_snapshot=title,
+                    code=code,
+                    include_embeddings=bool(req.include_embeddings),
+                    expires_at=expires_at,
+                    max_uses=req.max_uses,
+                )
+                break
+            except ValueError as e:
+                last_err = e
+                continue
+        if share is None:
+            raise last_err or ValueError("Could not create share code.")
+        return {
+            "status": "success",
+            "share": {
+                **share,
+                "join_path": f"/join?code={share['code']}",
+            },
+        }
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"detail": str(e)})
+    except Exception as e:
+        return server_error(e)
+
+
+@app.get("/api/shares")
+@limiter.limit("60/minute")
+async def api_list_shares(request: Request):
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    try:
+        items = user_db.list_shares_for_owner(user["user_id"])
+        out = []
+        for s in items:
+            out.append({
+                **s,
+                "join_path": f"/join?code={s['code']}",
+                "active": (
+                    not s.get("revoked_at")
+                    and shares_mod.is_share_usable(s)[0]
+                ),
+            })
+        return {"shares": out}
+    except Exception as e:
+        return server_error(e)
+
+
+@app.delete("/api/shares/{share_id}")
+@limiter.limit("30/minute")
+async def api_revoke_share(share_id: str, request: Request):
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    try:
+        ok = user_db.revoke_share(share_id, user["user_id"])
+        if not ok:
+            existing = user_db.get_share_by_id(share_id)
+            if existing and existing.get("owner_user_id") == user["user_id"]:
+                return {"status": "success", "revoked": True, "already": True}
+            return JSONResponse(status_code=404, content={"detail": "Share not found."})
+        return {"status": "success", "revoked": True}
+    except Exception as e:
+        return server_error(e)
+
+
+@app.get("/api/shares/preview")
+@limiter.limit("30/minute")
+async def api_preview_share(request: Request):
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    code = request.query_params.get("code") or ""
+    try:
+        preview = await run_in_thread(
+            shares_mod.preview_share, user_db, user["user_id"], code
+        )
+        return preview
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"detail": str(e)})
+    except Exception as e:
+        return server_error(e)
+
+
+@app.post("/api/shares/join")
+@limiter.limit("20/hour")
+async def api_join_share(req: ShareJoinRequest, request: Request):
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    try:
+        result = await run_in_thread(
+            shares_mod.join_share,
+            user_db,
+            user["user_id"],
+            user["username"],
+            req.code,
+        )
         return {"status": "success", **result}
     except ValueError as e:
         return JSONResponse(status_code=400, content={"detail": str(e)})

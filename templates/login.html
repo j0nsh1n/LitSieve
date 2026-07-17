@@ -29,6 +29,9 @@
  {% endif %}
 
  <form method="post" action="/login" class="auth-form">
+ {% if next %}
+ <input type="hidden" name="next" value="{{ next }}">
+ {% endif %}
  <div class="form-group">
  <label>Username or email</label>
  <input type="text" name="username" autocomplete="username" autofocus required

@@ -1335,6 +1335,26 @@ input[type="range"]::-moz-range-thumb:hover {
     flex: 1 1 12rem;
     margin-bottom: 0;
 }
+.join-preview-card {
+    margin-top: 0.85rem;
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--border, rgba(128,128,128,0.3));
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--accent, #2a5f6e) 8%, transparent);
+}
+.join-preview-title {
+    margin: 0 0 0.25rem;
+    font-size: 1.05rem;
+}
+.join-preview-stats {
+    margin: 0.5rem 0 0;
+    padding-left: 1.1rem;
+    color: var(--text-muted, #888);
+    font-size: 0.92rem;
+}
+.join-preview-stats li {
+    margin: 0.15rem 0;
+}
 
 @media (max-width: 900px) {
     .nav-library-wrap {
