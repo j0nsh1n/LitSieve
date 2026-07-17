@@ -1715,6 +1715,13 @@ html[data-reading="on"] .key-points {
     gap: 0.1rem;
 }
 
+.source-name-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+}
+
 .source-name-label {
     font-weight: 600;
     font-size: 0.88rem;
@@ -2086,7 +2093,15 @@ html[data-reading="on"] .key-points {
 .notification-warning { border-left-color: var(--warn); }
 .notification-info { border-left-color: var(--accent); }
 
-/* Study-type tags (search-time heuristics) */
+/* Study-type tags (search-time heuristics; plain-language labels) */
+.study-type-wrap {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.15rem;
+    max-width: 22rem;
+    vertical-align: top;
+}
 .study-type-badge {
     display: inline-flex;
     align-items: center;
@@ -2112,6 +2127,104 @@ html[data-reading="on"] .key-points {
 .study-type-warn {
     color: var(--warn, #b08900);
     font-weight: 700;
+}
+.study-type-meaning {
+    font-size: 0.72rem;
+    line-height: 1.3;
+    color: var(--text-soft);
+    max-width: 22rem;
+}
+
+/* Source chips (preprint / DBLP title-only) + post-fetch tips */
+.source-chip {
+    display: inline-block;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    padding: 0.08rem 0.4rem;
+    border-radius: 999px;
+    border: 1px solid var(--rule);
+    line-height: 1.2;
+    white-space: nowrap;
+}
+.source-chip-preprint {
+    border-color: color-mix(in srgb, var(--warn, #b08900) 55%, var(--rule));
+    color: color-mix(in srgb, var(--warn, #b08900) 80%, var(--text));
+    background: color-mix(in srgb, var(--warn, #b08900) 12%, var(--surface));
+}
+.source-chip-titleonly {
+    border-color: color-mix(in srgb, var(--accent, #2a5f6e) 40%, var(--rule));
+    color: var(--text-body, var(--text));
+    background: color-mix(in srgb, var(--accent, #2a5f6e) 10%, var(--surface));
+}
+.source-tip {
+    font-size: 0.75rem;
+    line-height: 1.35;
+    color: var(--text-soft);
+    margin-top: 0.15rem;
+}
+.source-option.src-badge-preprint,
+.source-option.src-badge-not-peer-reviewed {
+    border-left: 3px solid color-mix(in srgb, var(--warn, #b08900) 65%, var(--rule));
+}
+.fetch-source-tips {
+    margin-top: 0.55rem;
+    padding: 0.55rem 0.7rem;
+    border-left: 3px solid var(--warn, #b08900);
+    background: color-mix(in srgb, var(--warn, #b08900) 10%, var(--surface));
+    color: var(--text-body, var(--text));
+    font-size: 0.88rem;
+    line-height: 1.4;
+}
+
+/* HS unit topic packs */
+.topic-packs-heading {
+    margin: 1.1rem 0 0.35rem;
+    font-size: 1rem;
+    font-weight: 600;
+}
+.topic-pack-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 0.55rem;
+    margin-top: 0.45rem;
+}
+.topic-pack-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.55rem;
+    text-align: left;
+    padding: 0.7rem 0.8rem;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    font: inherit;
+    transition:
+        border-color var(--dur-fast) var(--ease-soft),
+        box-shadow var(--dur-med) var(--ease-soft),
+        transform var(--dur-med) var(--ease-out);
+}
+.topic-pack-card:hover {
+    border-color: var(--accent);
+    box-shadow: var(--elev-1);
+    transform: translateY(-1px);
+}
+.topic-pack-card:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+.topic-pack-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+}
+.topic-pack-blurb {
+    font-size: 0.78rem;
+    color: var(--text-soft);
+    line-height: 1.35;
 }
 
 /* Product scope / research-use disclaimer */

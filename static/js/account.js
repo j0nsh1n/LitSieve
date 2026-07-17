@@ -49,8 +49,16 @@ document.addEventListener('DOMContentLoaded', () => {
  if (joinPreviewBtn) joinPreviewBtn.addEventListener('click', doAccountJoinPreview);
  if (joinBtn) joinBtn.addEventListener('click', doAccountJoin);
 
- // Optional AI study aid (Ollama lifecycle + multi-provider keys)
- if (document.getElementById('ai-settings-section')) {
+ // Optional AI study aid (Ollama lifecycle + multi-provider keys).
+ // Classroom deployers can hide this card with HIDE_AI_BUTTONS=true.
+ const aiSection = document.getElementById('ai-settings-section');
+ if (aiSection) {
+ const wireAi = () => {
+ if (typeof uiFlag === 'function' && !uiFlag('show_ai_buttons', true)) {
+ aiSection.hidden = true;
+ return;
+ }
+ aiSection.hidden = false;
  loadAiSettings();
  const startBtn = document.getElementById('ai-ollama-start');
  const stopBtn = document.getElementById('ai-ollama-stop');
@@ -60,6 +68,14 @@ document.addEventListener('DOMContentLoaded', () => {
  if (stopBtn) stopBtn.addEventListener('click', () => doOllamaControl('stop'));
  if (refreshBtn) refreshBtn.addEventListener('click', loadAiSettings);
  if (saveBtn) saveBtn.addEventListener('click', saveAiSettings);
+ };
+ if (window.LRA_UI && window.LRA_UI._loaded) {
+ wireAi();
+ } else if (typeof loadUiFlags === 'function') {
+ loadUiFlags().finally(wireAi);
+ } else {
+ wireAi();
+ }
  }
  if (joinInput) {
  joinInput.addEventListener('keydown', (e) => {

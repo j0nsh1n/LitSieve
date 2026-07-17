@@ -105,6 +105,17 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 async def health():
     return {"status": "healthy", "version": "4.0.0"}
 
+
+@app.get("/api/ui-flags")
+async def api_ui_flags():
+    """Deployer toggles for classroom UI (env: HIDE_STUDY_TYPE_TAGS, HIDE_AI_BUTTONS).
+
+    Public so the app shell can load flags before authenticated API calls.
+    Extractive key points are never gated by these flags.
+    """
+    from ui_flags import get_ui_flags
+    return get_ui_flags()
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
@@ -875,6 +886,9 @@ def _attach_key_points(results: List[dict], p) -> None:
 
 def _attach_study_types(results: List[dict]) -> None:
     """Heuristic study-type tags at search time (cheap; may be wrong)."""
+    from ui_flags import get_ui_flags
+    if not get_ui_flags().get("show_study_type_tags", True):
+        return
     from study_type import attach_study_types
     attach_study_types(results)
 

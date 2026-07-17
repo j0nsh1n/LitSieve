@@ -6,6 +6,9 @@ hints only — confidence can be low and patterns mis-fire. Always surface a
 warning when confidence is not high.
 
 Designed to run cheaply at search time (pure functions, no I/O).
+
+Phase R2: default labels are plain-language for younger students, with a short
+"what this means" line and the older formal name kept for tooltips.
 """
 
 from __future__ import annotations
@@ -13,8 +16,21 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
-# Student-facing type id -> short label for badges.
+# Student-facing type id -> short plain-language label (default UI).
 STUDY_TYPE_LABELS: Dict[str, str] = {
+    "synthesis": "Likely a review paper",
+    "trial": "Likely an experiment or trial",
+    "observational": "Likely an observational study",
+    "survey": "Likely a survey",
+    "qualitative": "Likely interviews / qualitative",
+    "methods": "Likely methods or theory",
+    "narrative_review": "Likely a literature overview",
+    "opinion": "Likely opinion or commentary",
+    "unclear": "Type unclear",
+}
+
+# Older / more formal names (tooltip / advanced).
+STUDY_TYPE_FORMAL_LABELS: Dict[str, str] = {
     "synthesis": "Review / synthesis",
     "trial": "Trial / experiment",
     "observational": "Observational",
@@ -24,6 +40,19 @@ STUDY_TYPE_LABELS: Dict[str, str] = {
     "narrative_review": "Narrative review",
     "opinion": "Opinion / commentary",
     "unclear": "Unclear type",
+}
+
+# One-line "what this means" for younger grades.
+STUDY_TYPE_MEANINGS: Dict[str, str] = {
+    "synthesis": "Combines findings from many papers (for example a systematic review or meta-analysis).",
+    "trial": "Tests something with groups (often with a control or random assignment).",
+    "observational": "Watches people or events over time without assigning a treatment.",
+    "survey": "Asks people questions at a point in time (questionnaire).",
+    "qualitative": "Uses interviews, focus groups, or themes rather than large number tables.",
+    "methods": "Proposes a method, model, framework, or simulation more than new field data.",
+    "narrative_review": "Summarises a topic without a full systematic search protocol.",
+    "opinion": "Commentary, editorial, or expert view rather than new primary data.",
+    "unclear": "Title and abstract did not match a clear study-type pattern.",
 }
 
 # Ordered most-specific first. (type_id, confidence, patterns)
@@ -168,8 +197,9 @@ def classify_study_type(
     Return a study-type tag from title+abstract heuristics.
 
     Fields:
-      study_type, study_type_label, confidence (0-1), confidence_band,
-      matched_phrase, warning (always set when band != high), disclaimer
+      study_type, study_type_label (plain language), study_type_label_formal,
+      study_type_meaning, confidence (0-1), confidence_band, matched_phrase,
+      warning (always set when band != high), disclaimer
     """
     text = f"{title or ''}. {abstract or ''}".strip()
     haystack = text.lower()
@@ -198,6 +228,8 @@ def _result(
 ) -> Dict[str, Any]:
     band = _confidence_band(confidence, type_id)
     label = STUDY_TYPE_LABELS.get(type_id, STUDY_TYPE_LABELS["unclear"])
+    formal = STUDY_TYPE_FORMAL_LABELS.get(type_id, STUDY_TYPE_FORMAL_LABELS["unclear"])
+    meaning = STUDY_TYPE_MEANINGS.get(type_id, STUDY_TYPE_MEANINGS["unclear"])
     disclaimer = (
         "Automated guess from title and abstract only. Often incomplete or wrong. "
         "Not an evidence grade or quality score. Check the full paper."
@@ -216,6 +248,8 @@ def _result(
     return {
         "study_type": type_id,
         "study_type_label": label,
+        "study_type_label_formal": formal,
+        "study_type_meaning": meaning,
         "confidence": round(float(confidence), 3),
         "confidence_band": band,
         "matched_phrase": matched_phrase,
@@ -233,6 +267,8 @@ def attach_study_types(articles: List[dict]) -> None:
         )
         a["study_type"] = info["study_type"]
         a["study_type_label"] = info["study_type_label"]
+        a["study_type_label_formal"] = info["study_type_label_formal"]
+        a["study_type_meaning"] = info["study_type_meaning"]
         a["study_type_confidence"] = info["confidence"]
         a["study_type_confidence_band"] = info["confidence_band"]
         a["study_type_matched"] = info["matched_phrase"]

@@ -5,6 +5,44 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+// === Classroom UI flags (env: HIDE_STUDY_TYPE_TAGS, HIDE_AI_BUTTONS) ===
+// Defaults keep features on until /api/ui-flags loads.
+window.LRA_UI = window.LRA_UI || {
+    show_study_type_tags: true,
+    show_ai_buttons: true,
+    _loaded: false,
+};
+
+function uiFlag(name, fallback) {
+    if (fallback === undefined) fallback = true;
+    const v = window.LRA_UI && window.LRA_UI[name];
+    return v === undefined ? fallback : !!v;
+}
+
+async function loadUiFlags() {
+    try {
+        const data = await fetch('/api/ui-flags', {
+            headers: { Accept: 'application/json' },
+            credentials: 'same-origin',
+        }).then((r) => (r.ok ? r.json() : null));
+        if (data && typeof data === 'object') {
+            window.LRA_UI.show_study_type_tags = data.show_study_type_tags !== false;
+            window.LRA_UI.show_ai_buttons = data.show_ai_buttons !== false;
+        }
+    } catch (e) {
+        // Keep defaults (features visible).
+    }
+    window.LRA_UI._loaded = true;
+    document.documentElement.dataset.showAi = uiFlag('show_ai_buttons') ? '1' : '0';
+    document.documentElement.dataset.showStudyTypes = uiFlag('show_study_type_tags') ? '1' : '0';
+    // Hide Account AI card without waiting for account.js if already in DOM.
+    if (!uiFlag('show_ai_buttons')) {
+        const aiSec = document.getElementById('ai-settings-section');
+        if (aiSec) aiSec.hidden = true;
+    }
+    return window.LRA_UI;
+}
+
 // === CSRF token (double-submit cookie) ===
 function getCsrfToken() {
     const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
@@ -265,7 +303,9 @@ function renderKeyPointsHtml(bullets, options) {
     const list = items ? `<ul class="key-points-list">${items}</ul>` : '';
     const aid = options.articleId ? escapeHtml(String(options.articleId)) : '';
     const src = options.source ? escapeHtml(String(options.source)) : '';
-    const actions = (aid && src)
+    // Extractive key points always show; AI buttons are optional (classroom toggle).
+    const showAi = typeof uiFlag === 'function' ? uiFlag('show_ai_buttons', true) : true;
+    const actions = (aid && src && showAi)
         ? `<div class="ai-actions" data-article-id="${aid}" data-source="${src}">
             <button type="button" class="btn btn-secondary btn-sm ai-refine-btn" title="Optional AI rewrite of summary and bullets from this abstract only">Refine with AI</button>
             <button type="button" class="btn btn-secondary btn-sm ai-ask-btn" title="Ask a question answered only from this abstract">Ask about this paper</button>
@@ -286,6 +326,7 @@ function renderKeyPointsHtml(bullets, options) {
  */
 function bindAiArticleActions(rootEl, article) {
     if (!rootEl || !article) return;
+    if (typeof uiFlag === 'function' && !uiFlag('show_ai_buttons', true)) return;
     const wrap = rootEl.querySelector('.ai-actions');
     if (!wrap || wrap.dataset.bound === '1') return;
     wrap.dataset.bound = '1';
@@ -436,8 +477,11 @@ async function updateNavStats() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    updateNavStats();
-    initLibrarySwitcher();
+    // Flags first so Search/Account render with the correct classroom surface.
+    loadUiFlags().finally(() => {
+        updateNavStats();
+        initLibrarySwitcher();
+    });
 });
 
 // === Multi-library switcher (nav) ===

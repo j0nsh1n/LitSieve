@@ -358,8 +358,11 @@ function renderPicoBlock(pico) {
  return `<div class="pico-detail">${parts.join('')}</div>`;
 }
 
-/** Study-type badge from search-time heuristics (may be wrong — show warning). */
+/** Study-type badge from search-time heuristics (may be wrong — show warning).
+ *  Plain-language label + optional “what this means” line for younger students.
+ */
 function renderStudyTypeBadge(article) {
+ if (typeof uiFlag === 'function' && !uiFlag('show_study_type_tags', true)) return '';
  const label = article.study_type_label;
  if (!label) return '';
  const band = article.study_type_confidence_band || 'none';
@@ -367,14 +370,24 @@ function renderStudyTypeBadge(article) {
  ? Number(article.study_type_confidence).toFixed(2)
  : '?';
  const warn = article.study_type_warning || '';
+ const meaning = article.study_type_meaning || '';
+ const formal = article.study_type_label_formal || '';
  const disc = article.study_type_disclaimer
  || 'Automated guess from title and abstract only. May be wrong.';
  const matched = article.study_type_matched
  ? ` Matched: “${article.study_type_matched}”.`
  : '';
- const title = `${disc}${matched}${warn ? ' ' + warn : ''} Confidence: ${conf}.`;
+ const formalBit = formal && formal !== label ? ` Formal name: ${formal}.` : '';
+ const title = `${disc}${formalBit}${matched}${warn ? ' ' + warn : ''} Confidence: ${conf}.`;
  const warnMark = (band === 'high') ? '' : ' <span class="study-type-warn" aria-hidden="true">!</span>';
- return `<span class="study-type-badge band-${escapeHtml(band)}" title="${escapeHtml(title)}"><strong>Type:</strong> ${escapeHtml(label)}${warnMark}</span>`;
+ const meaningLine = meaning
+ ? `<span class="study-type-meaning">${escapeHtml(meaning)}</span>`
+ : '';
+ return `<span class="study-type-wrap">`
+ + `<span class="study-type-badge band-${escapeHtml(band)}" title="${escapeHtml(title)}">`
+ + `${escapeHtml(label)}${warnMark}</span>`
+ + meaningLine
+ + `</span>`;
 }
 
 function buildResultCard(article, idx) {

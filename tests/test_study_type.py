@@ -69,4 +69,15 @@ def test_attach_study_types_mutates_articles():
     attach_study_types(arts)
     assert arts[0]["study_type"] == "synthesis"
     assert arts[0]["study_type_label"]
+    assert arts[0]["study_type_meaning"]
+    assert arts[0]["study_type_label_formal"]
     assert "study_type_disclaimer" in arts[0]
+
+
+def test_plain_language_labels_for_hs():
+    r = classify_study_type(
+        title="A meta-analysis of tutoring",
+        abstract="We conducted a meta-analysis of 40 RCTs.",
+    )
+    assert "Likely" in r["study_type_label"]
+    assert len(r["study_type_meaning"]) > 20

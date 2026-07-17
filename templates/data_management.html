@@ -38,6 +38,9 @@
   topic?). Your collection stays private to this account.</p>
  </details>
  <div class="topic-grid" id="topic-grid"></div>
+ <h3 class="topic-packs-heading">Quick packs for class units</h3>
+ <p class="info-text">One click sets topics and checks common free sources for that unit. You can still adjust checkboxes.</p>
+ <div class="topic-pack-grid" id="topic-pack-grid" role="group" aria-label="Class unit topic packs"></div>
 </section>
 
 <!-- Step 2: Sources -->
@@ -47,7 +50,9 @@
  <details class="help-details">
   <summary>About the sources</summary>
   <p class="info-text">Each source is a free academic database. Some need free API keys (CORE, NASA ADS);
-  without a key they simply skip - the rest still run.</p>
+  without a key they simply skip - the rest still run. <strong>bioRxiv / medRxiv</strong> are
+  preprints (not peer-reviewed; recent window only). <strong>DBLP</strong> is strong on CS
+  titles/venues but many records have no real abstract (those are skipped).</p>
  </details>
  <div class="source-option-grid" id="source-option-grid"></div>
 </section>
@@ -172,5 +177,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/data_management.js?v=20260717r1"></script>
+<script src="/static/js/data_management.js?v=20260717r2"></script>
 {% endblock %}
