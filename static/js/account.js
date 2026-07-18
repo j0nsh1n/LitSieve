@@ -136,12 +136,41 @@ function normalizeJoinCode(raw) {
 }
 
 async function doShareLibrary(lib) {
+ // R6: assignment-pack wording + optional expiry / max uses.
  if (!confirm(
-  `Create a share code for "${lib.name}"?\n\n` +
-  'Students who join get a full copy of papers and screening (not live access to yours). ' +
-  'Code expires in 14 days by default.'
+  `Create a class share code for "${lib.name}"?\n\n` +
+  'ASSIGNMENT PACK (clone, not live view):\n' +
+  '• Students join with the code and get their own copy of papers + screening.\n' +
+  '• Suggested student steps after join: Clusters → Duplicates → Search (RIS) → hand-in pack.\n' +
+  '• Notes/stars are NOT copied (private to each student).\n\n' +
+  'Continue to set expiry and options?'
  )) {
   return;
+ }
+ let expiresDays = 14;
+ const daysRaw = window.prompt('Days until the code expires (1–90). Blank = 14.', '14');
+ if (daysRaw === null) return;
+ if (String(daysRaw).trim() !== '') {
+  const n = parseInt(daysRaw, 10);
+  if (!Number.isFinite(n) || n < 1 || n > 90) {
+   showNotification('Expiry must be between 1 and 90 days.', 'error');
+   return;
+  }
+  expiresDays = n;
+ }
+ let maxUses = null;
+ const usesRaw = window.prompt(
+  'Max student joins for this code (e.g. class size). Blank = unlimited.',
+  ''
+ );
+ if (usesRaw === null) return;
+ if (String(usesRaw).trim() !== '') {
+  const n = parseInt(usesRaw, 10);
+  if (!Number.isFinite(n) || n < 1 || n > 500) {
+   showNotification('Max uses must be between 1 and 500, or blank for unlimited.', 'error');
+   return;
+  }
+  maxUses = n;
  }
  const emb = confirm(
   'Include embeddings so students can search immediately without Prepare papers?\n\n' +
@@ -149,18 +178,38 @@ async function doShareLibrary(lib) {
  );
  setStatus('library-manage-status', 'Creating share code…', 'info');
  try {
+  const body = {
+   library_id: lib.id,
+   expires_days: expiresDays,
+   include_embeddings: emb,
+  };
+  if (maxUses != null) body.max_uses = maxUses;
   const data = await apiCall('/api/shares', {
    method: 'POST',
-   body: {
-    library_id: lib.id,
-    expires_days: 14,
-    include_embeddings: emb,
-   },
+   body,
   });
   const share = data.share || {};
   const code = share.code || '';
   const path = share.join_path || (`/join?code=${code}`);
-  const msg = `Share code: ${code}\n\nLink path: ${path}\n\nCopy the code and share it with your class.`;
+  const expLabel = share.expires_at
+   ? `Expires: ${String(share.expires_at).slice(0, 10)}`
+   : `Expires in ~${expiresDays} days`;
+  const useLabel = maxUses != null ? `Max joins: ${maxUses}` : 'Max joins: unlimited';
+  const msg = [
+   'CLASS SHARE CODE (assignment pack)',
+   '',
+   `Code: ${code}`,
+   `Link: ${path}`,
+   expLabel,
+   useLabel,
+   '',
+   'Tell students:',
+   '1) Open Join (or /join) and enter the code while logged in.',
+   '2) Switch to the new library in the nav Library menu.',
+   '3) Clusters → Duplicates → Search; export RIS; optional hand-in pack on Duplicates.',
+   '',
+   'Starting point only (public databases) — finish important work with the school library.',
+  ].join('\n');
   if (navigator.clipboard && code) {
    try { await navigator.clipboard.writeText(code); } catch (_) { /* ignore */ }
   }
@@ -202,15 +251,20 @@ function renderSharesList(shares) {
    : (active
     ? '<span class="library-manage-badge">Active</span>'
     : '<span class="library-manage-badge">Expired / full</span>');
+  const useCount = s.use_count != null ? Number(s.use_count) : 0;
   const uses = s.max_uses != null
-   ? `${s.use_count || 0}/${s.max_uses} uses`
-   : `${s.use_count || 0} uses`;
+   ? `${useCount} / ${s.max_uses} joins used`
+   : `${useCount} join${useCount === 1 ? '' : 's'} (no max)`;
+  const exp = s.expires_at
+   ? `Expires ${escapeHtml(String(s.expires_at).slice(0, 10))}`
+   : 'No expiry date';
   li.innerHTML = `
    <span class="library-manage-name"><code>${escapeHtml(s.code || '')}</code>
     · ${escapeHtml(s.title_snapshot || 'Library')}</span>
    ${badge}
-   <span class="info-text" style="margin:0;">${escapeHtml(uses)}</span>
+   <span class="info-text share-usage-line" style="margin:0;">${escapeHtml(uses)} · ${exp}</span>
    <button type="button" class="btn btn-sm btn-secondary share-copy" ${revoked ? 'disabled' : ''}>Copy code</button>
+   <button type="button" class="btn btn-sm btn-secondary share-copy-brief" ${revoked ? 'disabled' : ''}>Copy student brief</button>
    <button type="button" class="btn btn-sm btn-danger share-revoke" ${revoked ? 'disabled' : ''}>Revoke</button>
   `;
   const copyBtn = li.querySelector('.share-copy');
@@ -221,6 +275,29 @@ function renderSharesList(shares) {
      showNotification(`Copied ${s.code}`, 'success');
     } catch (_) {
      prompt('Copy this code:', s.code || '');
+    }
+   });
+  }
+  const briefBtn = li.querySelector('.share-copy-brief');
+  if (briefBtn) {
+   briefBtn.addEventListener('click', async () => {
+    const brief = [
+     `Class code: ${s.code || ''}`,
+     `Library: ${s.title_snapshot || 'shared library'}`,
+     '',
+     'Steps:',
+     '1. Log in → Join (or open /join) and enter the code.',
+     '2. Switch to the new library in the nav Library menu.',
+     '3. Clusters (screen) → Duplicates → Search; export RIS for Zotero.',
+     '4. Optional: Duplicates → hand-in pack for process counts.',
+     '',
+     'This is a starting point from public databases — finish with your school library when needed.',
+    ].join('\n');
+    try {
+     if (navigator.clipboard) await navigator.clipboard.writeText(brief);
+     showNotification('Student brief copied', 'success');
+    } catch (_) {
+     prompt('Copy this brief for students:', brief);
     }
    });
   }

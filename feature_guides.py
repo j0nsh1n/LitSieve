@@ -8,7 +8,14 @@ from __future__ import annotations
 from typing import Dict, List, Optional, TypedDict
 
 
-class FeatureGuide(TypedDict):
+class ChecklistBlock(TypedDict):
+    title: str
+    intro: str
+    # Named "checks" (not "items") so Jinja does not hit dict.items().
+    checks: List[str]
+
+
+class FeatureGuide(TypedDict, total=False):
     slug: str
     title: str
     icon: str  # HTML entity or emoji
@@ -19,6 +26,8 @@ class FeatureGuide(TypedDict):
     where_in_app: str
     app_path: str  # path for CTA when logged in
     app_label: str
+    # Optional R7 checklists (citation quality, weak appraisal, etc.)
+    checklists: List[ChecklistBlock]
 
 
 FEATURE_GUIDES: Dict[str, FeatureGuide] = {
@@ -282,6 +291,144 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
         "app_path": "/account",
         "app_label": "Open Account",
     },
+    "finish-your-research": {
+        "slug": "finish-your-research",
+        "title": "Finish your research",
+        "icon": "📚",
+        "tagline": "This app is a starting point — here is how to finish well.",
+        "summary": (
+            "Literature Research Aide only queries free public research APIs. "
+            "That is great for gathering candidates and practising screening, but it "
+            "is not a complete literature search and not a college library. After you "
+            "export RIS and a screening report, plan a short path to stronger sources "
+            "with people and tools that do have broader access."
+        ),
+        "how_it_works": [
+            "Use this app to collect candidates, screen off-topic groups, remove "
+            "duplicates, rank what remains, and export RIS + a hand-in pack.",
+            "Write down what you still need (for example: a peer-reviewed review, "
+            "a local newspaper archive, or a book chapter your teacher assigned).",
+            "Search your school library catalogue and any databases your school "
+            "subscribes to (often available only on campus or via a school login).",
+            "Use Google Scholar to find citation trails and PDF links — but verify "
+            "the version (preprint vs published) and access rights.",
+            "Ask a librarian or teacher when something important is paywalled or "
+            "missing. Bring your shortlist and your screening notes.",
+            "Check author, year, venue, and abstract again before you cite. Prefer "
+            "peer-reviewed sources over preprints when the assignment expects them.",
+        ],
+        "tips": [
+            "Do not pretend this tool covers Web of Science, JSTOR, EBSCO, or other "
+            "campus packages — those need institutional access we do not provide.",
+            "Teachers: grade process (screening report, notes, source mix) as well as "
+            "final citations so students are not punished for honest public-DB limits.",
+            "If a paper is central to your claim, get the full text through legal "
+            "channels (library, OA link, author site) — never scrape paywalls.",
+            "See also: Citation quality guide for peer-reviewed vs preprint vs website.",
+        ],
+        "where_in_app": "Landing /learn/finish-your-research · after Search export.",
+        "app_path": "/search",
+        "app_label": "Open Search",
+        "checklists": [
+            {
+                "title": "Hand-off checklist (after this app)",
+                "intro": (
+                    "Use this when you leave the public-database starting point and "
+                    "finish with school tools."
+                ),
+                "checks": [
+                    "I exported RIS (and/or a Duplicates hand-in pack) for what I kept.",
+                    "I searched the school library catalogue or databases for gaps.",
+                    "I used Google Scholar for citation trails and verified access rights.",
+                    "I asked a librarian or teacher about paywalled or missing sources.",
+                    "I know this app does not replace campus packages (JSTOR, EBSCO, "
+                    "Web of Science, SSO proxy full-text).",
+                ],
+            },
+        ],
+    },
+    "citation-quality": {
+        "slug": "citation-quality",
+        "title": "Citation quality checklist",
+        "icon": "✅",
+        "tagline": "Manual signals only — not an evidence grade.",
+        "summary": (
+            "A short checklist to help students judge whether a candidate is a "
+            "peer-reviewed paper, a preprint, or a weaker web source. This is a "
+            "thinking aid for class, not clinical A–D grading and not a substitute "
+            "for reading the full work."
+        ),
+        "how_it_works": [
+            "Identify the source type: journal article, preprint server (arXiv, "
+            "bioRxiv, medRxiv), conference paper, report, or website.",
+            "Peer-reviewed journals usually name a journal, volume/issue, and often "
+            "a DOI. Preprints say preprint or list a server and may not be final.",
+            "Check year, authors, and venue. Unknown year or missing abstract is a "
+            "yellow flag for classroom use (this app already skips abstract-less rows).",
+            "Use the weak appraisal signals below only as reading questions — never "
+            "as automatic grades or clinical evidence levels.",
+            "Match the assignment: some units want peer-reviewed only; others allow "
+            "preprints with clear labeling. Your teacher’s rubric wins.",
+            "Export RIS into Zotero (or similar) and fix author/title details before "
+            "the final bibliography. APA text generators outside this app are drafts.",
+        ],
+        "tips": [
+            "Study-type tags in Search are rough guesses from title+abstract — never "
+            "use them as clinical evidence levels or auto-excludes.",
+            "Preprints can be useful early research but are not peer-reviewed yet.",
+            "Websites and news pieces may help context; they are not the same as "
+            "journal research for most science/social-science hand-ins.",
+            "Out of scope for this product: campus proxy full-text, Web of Science, "
+            "JSTOR/EBSCO packages, SSO into university systems.",
+        ],
+        "where_in_app": "Landing /learn/citation-quality · use while screening on Clusters.",
+        "app_path": "/clusters",
+        "app_label": "Open Clusters",
+        "checklists": [
+            {
+                "title": "Citation quality (manual)",
+                "intro": (
+                    "Judge each candidate before you cite it. Teacher rubric wins "
+                    "over any default here."
+                ),
+                "checks": [
+                    "Peer-reviewed journal or scholarly book chapter? (Usually stronger "
+                    "than a blog, news site, or commercial page.)",
+                    "Preprint (bioRxiv, medRxiv, arXiv, etc.)? Label it as a preprint; "
+                    "find a peer-reviewed version if required.",
+                    "Authors and year clear? Prefer named researchers or institutions "
+                    "over anonymous posts.",
+                    "Can you open the abstract (or full text via school access) and "
+                    "confirm the claim matches what you wrote?",
+                    "DOI or stable library link when available — better than a "
+                    "fragile homepage URL.",
+                    "Does the source match the assignment (topic, date range, "
+                    "discipline)?",
+                    "Website / government / NGO pages: fine for background if you say "
+                    "what kind of source it is — do not pretend it is a journal trial.",
+                ],
+            },
+            {
+                "title": "Weak appraisal signals (not evidence grades)",
+                "intro": (
+                    "Optional questions while you read an abstract. Weak signals only "
+                    "— not clinical A–D grades, not CASP certification, and not a "
+                    "reason to auto-exclude papers in the app."
+                ),
+                "checks": [
+                    "What question did the authors try to answer? (Restate in one line.)",
+                    "Who or what was studied (people, animals, cells, documents, models)?",
+                    "Is this primarily a review, a trial/experiment, a survey, or "
+                    "an opinion piece? (Study-type tags in Search are approximate.)",
+                    "Do results sound measured (samples, comparisons) or only claimed?",
+                    "Do the authors mention limitations or uncertainty?",
+                    "Could funding, conflicts, or venue bias matter for this claim?",
+                    "Would you still trust this claim if the abstract were the only "
+                    "text you had? If not, get full text via the library first.",
+                ],
+            },
+        ],
+    },
 }
 
 # Stable order matching the landing page grid.
@@ -292,6 +439,8 @@ FEATURE_ORDER: List[str] = [
     "duplicate-resolution",
     "similarity-search",
     "private-workspace",
+    "finish-your-research",
+    "citation-quality",
 ]
 
 

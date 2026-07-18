@@ -430,7 +430,14 @@ function bindAiArticleActions(rootEl, article) {
                 setStatus('', false);
             } catch (err) {
                 setStatus('', false);
-                showNotification(`AI refine failed: ${err.message}`, 'error');
+                const msg = err && err.message ? String(err.message) : 'AI refine failed';
+                const soft = /503|unavailable|not running|not configured|ollama/i.test(msg);
+                showNotification(
+                    soft
+                        ? `${msg} Extractive key points still work without AI.`
+                        : `AI refine failed: ${msg}`,
+                    soft ? 'warning' : 'error'
+                );
             } finally {
                 refineBtn.disabled = false;
             }
@@ -469,7 +476,14 @@ function bindAiArticleActions(rootEl, article) {
                 setStatus('', false);
             } catch (err) {
                 setStatus('', false);
-                showNotification(`AI ask failed: ${err.message}`, 'error');
+                const msg = err && err.message ? String(err.message) : 'AI ask failed';
+                const soft = /503|unavailable|not running|not configured|ollama/i.test(msg);
+                showNotification(
+                    soft
+                        ? `${msg} Extractive key points still work without AI.`
+                        : `AI ask failed: ${msg}`,
+                    soft ? 'warning' : 'error'
+                );
             } finally {
                 askBtn.disabled = false;
             }

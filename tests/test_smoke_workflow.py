@@ -156,4 +156,4 @@ def test_smoke_register_sample_cluster_search_export(app_module):
     for path in ("/data-management", "/clusters", "/statistics", "/search", "/account"):
         page = c.get(path)
         assert page.status_code == 200, path
-        assert "20260717r4" in page.text or "Literature Research Aide" in page.text
+        assert "20260717r5" in page.text or "Literature Research Aide" in page.text

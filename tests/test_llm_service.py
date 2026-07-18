@@ -139,6 +139,30 @@ def test_refine_rejects_short_abstract(monkeypatch):
         llm_service.refine_article(title="T", abstract="Too short.")
 
 
+def test_ollama_down_raises_unavailable(monkeypatch):
+    """R5: Ollama stopped → LLMUnavailable (HTTP 503 path), not a generic 400."""
+    _clear_providers(monkeypatch)
+    monkeypatch.setenv("OLLAMA_MODEL", "llama3.1")
+    monkeypatch.setenv("LLM_PROVIDER", "ollama")
+    monkeypatch.setattr(llm_service, "ollama_running", lambda: False)
+    with pytest.raises(llm_service.LLMUnavailable) as ei:
+        llm_service.refine_article(
+            title="A trial of Y for adults with condition X",
+            abstract=(
+                "In this randomized trial of 200 adults with condition X, "
+                "drug Y improved the primary endpoint versus placebo over 12 weeks."
+            ),
+        )
+    assert "ollama" in str(ei.value).lower()
+
+
+def test_connection_failure_classifier():
+    """R5: transport failures map to LLMUnavailable → clear HTTP 503."""
+    assert llm_service._is_connection_failure(ConnectionError("Connection refused"))
+    assert llm_service._is_connection_failure(TimeoutError("timed out"))
+    assert not llm_service._is_connection_failure(ValueError("bad json"))
+
+
 def test_extract_json_object_fenced():
     raw = '```json\n{"answer": "yes", "quotes": []}\n```'
     cleaned = llm_service._extract_json_object(raw)

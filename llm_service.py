@@ -10,6 +10,11 @@ Providers (any combination; auto picks the first ready):
 Extractive key points (summarize.py) remain the default. LLM only rewrites
 or answers from the supplied abstract — never invents findings.
 
+Phase R5 policy (do not break without product review):
+  • One article at a time (refine / ask) — no whole-library auto-summaries.
+  • No AI evidence grades; no silent rewrite of stored key points without an
+    explicit user save action; no paywall / full-text scraping.
+
 Settings load from environment, then optional ``user_data/ai_settings.json``
 (server-wide deploy file; never commit it).
 
@@ -501,10 +506,37 @@ def _structured_call(system: str, prompt: str, schema_model: Type[BaseModel]):
             "No LLM provider configured. Start Ollama or set an API key."
         )
     if selected == "ollama":
+        # Fail fast with 503-class unavailable when the local daemon is down.
+        if not ollama_running():
+            raise LLMUnavailable(
+                "Ollama is not running. Start it from Account → AI study aid, "
+                "or switch to an API key provider."
+            )
         return _structured_ollama(system, prompt, schema_model)
     if selected == "openai":
         return _structured_openai(system, prompt, schema_model)
     return _structured_anthropic(system, prompt, schema_model)
+
+
+def _is_connection_failure(exc: BaseException) -> bool:
+    """True when the provider is down / unreachable (map to LLMUnavailable → 503)."""
+    import httpx
+
+    if isinstance(exc, (httpx.ConnectError, httpx.ConnectTimeout, httpx.TimeoutException)):
+        return True
+    msg = str(exc).lower()
+    needles = (
+        "connection refused",
+        "connect error",
+        "connecttimeout",
+        "timed out",
+        "name or service not known",
+        "temporary failure in name resolution",
+        "network is unreachable",
+        "failed to establish",
+        "connection reset",
+    )
+    return any(n in msg for n in needles)
 
 
 def _structured_ollama(system: str, prompt: str, schema_model: Type[BaseModel]):
@@ -530,6 +562,11 @@ def _structured_ollama(system: str, prompt: str, schema_model: Type[BaseModel]):
         response.raise_for_status()
         content = (response.json().get("message") or {}).get("content") or ""
     except Exception as exc:
+        if _is_connection_failure(exc):
+            raise LLMUnavailable(
+                "Ollama is not running or not reachable. "
+                "Start it from Account → AI study aid, or use an API key."
+            ) from exc
         raise LLMError(f"Ollama request failed: {exc}") from exc
     return _parse_schema(content, schema_model, "Ollama")
 

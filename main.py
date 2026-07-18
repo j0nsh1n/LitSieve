@@ -1633,11 +1633,12 @@ async def api_ai_ollama_stop(request: Request):
 
 
 @app.post("/api/ai/refine-article")
-@limiter.limit("10/minute")
+@limiter.limit("8/minute")
 async def api_ai_refine_article(req: AIArticleRequest, request: Request):
     """Optional LLM rewrite of summary/key points from the abstract only.
 
     Default corpus key points stay extractive. AI is opt-in and labeled.
+    Never bulk-rewrites a library — one article per request (R5).
     """
     user = current_user(request)
     if not user:
@@ -1654,8 +1655,9 @@ async def api_ai_refine_article(req: AIArticleRequest, request: Request):
                 status_code=503,
                 content={
                     "detail": (
-                        "No AI configured. Start Ollama and pick a model, or add an "
-                        "OpenAI-compatible / Anthropic API key on Account → AI study aid."
+                        "AI is unavailable (not configured). Open Account → AI study aid "
+                        "(optional setup), start Ollama and pick a model, or add an "
+                        "OpenAI-compatible / Anthropic API key. Extractive key points still work."
                     )
                 },
             )
@@ -1684,7 +1686,15 @@ async def api_ai_refine_article(req: AIArticleRequest, request: Request):
         result["label"] = "AI rewrite (from the abstract only — not extractive)"
         return result
     except LLMUnavailable as e:
-        return JSONResponse(status_code=503, content={"detail": str(e)})
+        detail = str(e) or "AI provider unavailable."
+        low = detail.lower()
+        if "ollama" in low and ("not running" in low or "unavailable" in low or "connection" in low):
+            detail = (
+                "Ollama is not running or not reachable (503). "
+                "Open Account → AI study aid → Start Ollama, or use an API key. "
+                "Extractive key points still work without AI."
+            )
+        return JSONResponse(status_code=503, content={"detail": detail})
     except LLMError as e:
         return JSONResponse(status_code=400, content={"detail": str(e)})
     except Exception as e:
@@ -1694,9 +1704,12 @@ async def api_ai_refine_article(req: AIArticleRequest, request: Request):
 
 
 @app.post("/api/ai/ask-article")
-@limiter.limit("10/minute")
+@limiter.limit("8/minute")
 async def api_ai_ask_article(req: AIAskRequest, request: Request):
-    """Answer a question using only this paper's title + abstract (opt-in AI)."""
+    """Answer a question using only this paper's title + abstract (opt-in AI).
+
+    One paper per request — no whole-library Q&A (R5).
+    """
     user = current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
@@ -1712,8 +1725,9 @@ async def api_ai_ask_article(req: AIAskRequest, request: Request):
                 status_code=503,
                 content={
                     "detail": (
-                        "No AI configured. Start Ollama and pick a model, or add an "
-                        "OpenAI-compatible / Anthropic API key on Account → AI study aid."
+                        "AI is unavailable (not configured). Open Account → AI study aid "
+                        "(optional setup), start Ollama and pick a model, or add an "
+                        "OpenAI-compatible / Anthropic API key. Extractive key points still work."
                     )
                 },
             )
@@ -1734,7 +1748,15 @@ async def api_ai_ask_article(req: AIAskRequest, request: Request):
         result["label"] = "AI answer (title + abstract only)"
         return result
     except LLMUnavailable as e:
-        return JSONResponse(status_code=503, content={"detail": str(e)})
+        detail = str(e) or "AI provider unavailable."
+        low = detail.lower()
+        if "ollama" in low and ("not running" in low or "unavailable" in low or "connection" in low):
+            detail = (
+                "Ollama is not running or not reachable (503). "
+                "Open Account → AI study aid → Start Ollama, or use an API key. "
+                "Extractive key points still work without AI."
+            )
+        return JSONResponse(status_code=503, content={"detail": detail})
     except LLMError as e:
         return JSONResponse(status_code=400, content={"detail": str(e)})
     except Exception as e:

@@ -17,8 +17,9 @@
 <section class="card">
  <h2>Your libraries</h2>
  <p class="info-text">Create separate collections for different units or projects. Use <strong>Share</strong>
- to give a class a copy of a library via a short code. Deleting a library permanently removes its papers
- (export first if you need them).</p>
+ to give a class a <strong>clone</strong> (not live access) via a short code — students can then
+ screen, search, and download an <strong>assignment hand-in pack</strong> from Duplicates.
+ Deleting a library permanently removes its papers (export first if you need them).</p>
  <ul class="library-manage-list" id="library-manage-list">
   <li class="info-text">Loading…</li>
  </ul>
@@ -54,8 +55,19 @@
 
 <section class="card">
  <h2>Your active shares</h2>
- <p class="info-text">Codes you created for classes. Revoke a code if it was posted somewhere public
-  by mistake. Students who already joined keep their copy.</p>
+ <p class="info-text">Class codes you created. Each student who joins gets a <strong>clone</strong>
+  (their own copy), not live access to yours. Revoke if a code was posted publicly by mistake —
+  students who already joined keep their copy.</p>
+ <details class="help-details">
+  <summary>Teacher assignment pack (what to tell students)</summary>
+  <ol class="export-format-list" style="padding-left:1.2rem;">
+   <li>Share the code (or <code>/join?code=…</code> link) and the library name/unit.</li>
+   <li>Students: Join → open the new library in the nav switcher.</li>
+   <li>Suggested next steps: screen on Clusters → clean duplicates → Search &amp; export RIS
+    → optional hand-in pack on Duplicates.</li>
+   <li>Remind them: public databases only (starting point), not a full library search.</li>
+  </ol>
+ </details>
  <ul class="library-manage-list" id="shares-list">
   <li class="info-text">Loading…</li>
  </ul>
@@ -63,91 +75,96 @@
 </section>
 
 <section class="card" id="ai-settings-section">
- <h2>AI study aid (optional)</h2>
- <p class="info-text">
- Extractive key points always work without AI. Optional cloud or local models can
- <strong>rewrite</strong> summaries and <strong>answer questions</strong> from an abstract
- only - clearly labeled in Search/Clusters. Local Ollama can be started and stopped here
- (frees GPU memory when off).
- </p>
- <p class="info-text" id="ai-status-detail">Checking AI status…</p>
- <div class="form-row ai-ollama-controls" id="ai-ollama-controls">
-  <button type="button" id="ai-ollama-start" class="btn btn-primary btn-sm">Start Ollama</button>
-  <button type="button" id="ai-ollama-stop" class="btn btn-secondary btn-sm">Stop Ollama</button>
-  <button type="button" id="ai-status-refresh" class="btn btn-secondary btn-sm">Refresh status</button>
- </div>
- <p class="help-text" id="ai-ollama-models-line" style="margin-top:0.5rem;"></p>
-
- <details class="advanced-details" open>
-  <summary>Provider &amp; API keys</summary>
+ {# R5: collapsed by default — AI is optional and needs explicit setup. #}
+ <details class="advanced-details" id="ai-settings-details">
+  <summary>AI study aid (optional — needs setup)</summary>
   <div class="advanced-body">
-   <div class="form-row">
-    <div class="form-group">
-     <label for="ai-llm-provider">Provider</label>
-     <select id="ai-llm-provider">
-      <option value="auto">auto (Ollama → OpenAI-compatible → Anthropic)</option>
-      <option value="ollama">Ollama (local)</option>
-      <option value="openai">OpenAI-compatible (OpenAI, OpenRouter, Groq, …)</option>
-      <option value="anthropic">Anthropic (Claude)</option>
-     </select>
-    </div>
+   <p class="info-text ai-first-run-note" role="note">
+    <strong>Optional study aid.</strong> Extractive key points always work without AI.
+    Open this only if a teacher or deployer has set up local Ollama or an API key.
+    AI never rewrites your whole library or invents evidence grades — Refine and Ask
+    work on <em>one abstract at a time</em>, and you choose when to save.
+   </p>
+   <p class="info-text" id="ai-status-detail">Checking AI status…</p>
+   <div class="form-row ai-ollama-controls" id="ai-ollama-controls">
+    <button type="button" id="ai-ollama-start" class="btn btn-primary btn-sm">Start Ollama</button>
+    <button type="button" id="ai-ollama-stop" class="btn btn-secondary btn-sm">Stop Ollama</button>
+    <button type="button" id="ai-status-refresh" class="btn btn-secondary btn-sm">Refresh status</button>
    </div>
-   <h3 class="ai-settings-subhead">Ollama (local)</h3>
-   <div class="form-row">
-    <div class="form-group">
-     <label for="ai-ollama-model">Model tag</label>
-     <input type="text" id="ai-ollama-model" list="ai-ollama-model-list"
-      placeholder="e.g. qwen2.5:14b">
-     <datalist id="ai-ollama-model-list"></datalist>
+   <p class="help-text" id="ai-ollama-models-line" style="margin-top:0.5rem;"></p>
+
+   <details class="advanced-details">
+    <summary>Provider &amp; API keys</summary>
+    <div class="advanced-body">
+     <div class="form-row">
+      <div class="form-group">
+       <label for="ai-llm-provider">Provider</label>
+       <select id="ai-llm-provider">
+        <option value="auto">auto (Ollama → OpenAI-compatible → Anthropic)</option>
+        <option value="ollama">Ollama (local)</option>
+        <option value="openai">OpenAI-compatible (OpenAI, OpenRouter, Groq, …)</option>
+        <option value="anthropic">Anthropic (Claude)</option>
+       </select>
+      </div>
+     </div>
+     <h3 class="ai-settings-subhead">Ollama (local)</h3>
+     <div class="form-row">
+      <div class="form-group">
+       <label for="ai-ollama-model">Model tag</label>
+       <input type="text" id="ai-ollama-model" list="ai-ollama-model-list"
+        placeholder="e.g. qwen2.5:14b">
+       <datalist id="ai-ollama-model-list"></datalist>
+      </div>
+      <div class="form-group">
+       <label for="ai-ollama-host">Host</label>
+       <input type="text" id="ai-ollama-host" placeholder="http://localhost:11434">
+      </div>
+     </div>
+     <div class="form-row">
+      <div class="form-group flex-2">
+       <label for="ai-ollama-models-dir">Models directory (OLLAMA_MODELS when this app starts Ollama)</label>
+       <input type="text" id="ai-ollama-models-dir"
+        placeholder="/var/mnt/games/LLM_Models">
+       <span class="help-text">Only applies when you use Start Ollama above. Leave blank for Ollama default.</span>
+      </div>
+     </div>
+     <h3 class="ai-settings-subhead">OpenAI-compatible</h3>
+     <div class="form-row">
+      <div class="form-group">
+       <label for="ai-openai-key">API key</label>
+       <input type="password" id="ai-openai-key" autocomplete="off"
+        placeholder="Leave blank to keep existing">
+       <span class="help-text" id="ai-openai-key-hint"></span>
+      </div>
+      <div class="form-group">
+       <label for="ai-openai-model">Model</label>
+       <input type="text" id="ai-openai-model" placeholder="gpt-4o-mini">
+      </div>
+     </div>
+     <div class="form-row">
+      <div class="form-group flex-2">
+       <label for="ai-openai-base">Base URL</label>
+       <input type="text" id="ai-openai-base"
+        placeholder="https://api.openai.com/v1 or https://openrouter.ai/api/v1">
+      </div>
+     </div>
+     <h3 class="ai-settings-subhead">Anthropic</h3>
+     <div class="form-row">
+      <div class="form-group">
+       <label for="ai-anthropic-key">API key</label>
+       <input type="password" id="ai-anthropic-key" autocomplete="off"
+        placeholder="Leave blank to keep existing">
+       <span class="help-text" id="ai-anthropic-key-hint"></span>
+      </div>
+      <div class="form-group">
+       <label for="ai-anthropic-model">Model</label>
+       <input type="text" id="ai-anthropic-model" placeholder="claude-sonnet-4-6">
+      </div>
+     </div>
+     <button type="button" id="ai-settings-save" class="btn btn-primary">Save AI settings</button>
+     <div id="ai-settings-status" class="status-indicator"></div>
     </div>
-    <div class="form-group">
-     <label for="ai-ollama-host">Host</label>
-     <input type="text" id="ai-ollama-host" placeholder="http://localhost:11434">
-    </div>
-   </div>
-   <div class="form-row">
-    <div class="form-group flex-2">
-     <label for="ai-ollama-models-dir">Models directory (OLLAMA_MODELS when this app starts Ollama)</label>
-     <input type="text" id="ai-ollama-models-dir"
-      placeholder="/var/mnt/games/LLM_Models">
-     <span class="help-text">Only applies when you use Start Ollama above. Leave blank for Ollama default.</span>
-    </div>
-   </div>
-   <h3 class="ai-settings-subhead">OpenAI-compatible</h3>
-   <div class="form-row">
-    <div class="form-group">
-     <label for="ai-openai-key">API key</label>
-     <input type="password" id="ai-openai-key" autocomplete="off"
-      placeholder="Leave blank to keep existing">
-     <span class="help-text" id="ai-openai-key-hint"></span>
-    </div>
-    <div class="form-group">
-     <label for="ai-openai-model">Model</label>
-     <input type="text" id="ai-openai-model" placeholder="gpt-4o-mini">
-    </div>
-   </div>
-   <div class="form-row">
-    <div class="form-group flex-2">
-     <label for="ai-openai-base">Base URL</label>
-     <input type="text" id="ai-openai-base"
-      placeholder="https://api.openai.com/v1 or https://openrouter.ai/api/v1">
-    </div>
-   </div>
-   <h3 class="ai-settings-subhead">Anthropic</h3>
-   <div class="form-row">
-    <div class="form-group">
-     <label for="ai-anthropic-key">API key</label>
-     <input type="password" id="ai-anthropic-key" autocomplete="off"
-      placeholder="Leave blank to keep existing">
-     <span class="help-text" id="ai-anthropic-key-hint"></span>
-    </div>
-    <div class="form-group">
-     <label for="ai-anthropic-model">Model</label>
-     <input type="text" id="ai-anthropic-model" placeholder="claude-sonnet-4-6">
-    </div>
-   </div>
-   <button type="button" id="ai-settings-save" class="btn btn-primary">Save AI settings</button>
-   <div id="ai-settings-status" class="status-indicator"></div>
+   </details>
   </div>
  </details>
 </section>
@@ -206,5 +223,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/account.js?v=20260717r4"></script>
+<script src="/static/js/account.js?v=20260717r5"></script>
 {% endblock %}
