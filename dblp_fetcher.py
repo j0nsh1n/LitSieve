@@ -115,6 +115,3 @@ class DBLPFetcher(BaseFetcher):
 
     def search(self, query: str, max_results: int = 500) -> List[str]:
         return [a["article_id"] for a in self.search_and_fetch(query, max_results)]
-
-    def fetch_details(self, ids: List[str], batch_size: int = 100) -> List[Dict]:
-        return []

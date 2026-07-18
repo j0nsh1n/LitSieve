@@ -41,3 +41,12 @@ def test_finish_research_and_citation_guides_exist():
         r = client.get(f"/learn/{slug}")
         assert r.status_code == 200, slug
         assert "Starting point" in r.text or "starting point" in r.text.lower() or "peer" in r.text.lower()
+
+
+def test_ai_key_points_save_requires_auth():
+    client = TestClient(app)
+    r = client.post(
+        "/api/ai/key-points",
+        json={"article_id": "x", "source": "pubmed", "key_points": ["A finding."]},
+    )
+    assert r.status_code in (401, 403)

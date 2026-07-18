@@ -215,3 +215,44 @@ def test_delete_library_while_in_use_conflicts(app_module):
     # Once the reference is gone the delete succeeds.
     r = c.delete(f"/api/libraries/{lib_id}", headers=_csrf(c))
     assert r.status_code == 200, r.text
+
+
+def test_ai_key_points_saves_displayed_bullets(app_module):
+    """/api/ai/key-points stores what the student saw - no model re-run."""
+    c = TestClient(app_module.app)
+    _register(c, "kpsave")
+    uid = app_module.user_db.get_by_username("kpsave")["id"]
+    assert _fetch(c, "sleep").status_code == 200  # inserts fake-sleep/pubmed
+
+    r = c.post(
+        "/api/ai/key-points",
+        json={
+            "article_id": "fake-sleep",
+            "source": "pubmed",
+            "key_points": ["  First point. ", "", "Second point."],
+        },
+        headers=_csrf(c),
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["key_points"] == ["First point.", "Second point."]
+
+    p = app_module.get_pipeline(uid)
+    try:
+        stored = p.db.get_key_points_map().get(("fake-sleep", "pubmed"))
+        assert stored == ["First point.", "Second point."]
+    finally:
+        app_module.release_pipeline(uid)
+
+    r = c.post(
+        "/api/ai/key-points",
+        json={"article_id": "fake-sleep", "source": "pubmed", "key_points": ["", "  "]},
+        headers=_csrf(c),
+    )
+    assert r.status_code == 400
+
+    r = c.post(
+        "/api/ai/key-points",
+        json={"article_id": "nope", "source": "pubmed", "key_points": ["X."]},
+        headers=_csrf(c),
+    )
+    assert r.status_code == 404

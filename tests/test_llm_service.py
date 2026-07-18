@@ -79,7 +79,7 @@ def test_save_and_load_ai_settings(tmp_path, monkeypatch):
 
 def test_start_ollama_already_running(monkeypatch):
     monkeypatch.setenv("AI_ALLOW_OLLAMA_CONTROL", "true")
-    monkeypatch.setattr(llm_service, "ollama_running", lambda: True)
+    monkeypatch.setattr(llm_service, "ollama_running", lambda force=False: True)
     ok, msg = llm_service.start_ollama()
     assert ok is True
     assert "already running" in msg.lower()
@@ -100,7 +100,7 @@ def test_builtin_ephemeral_starts_and_stops(monkeypatch):
     monkeypatch.setenv("AI_ALLOW_OLLAMA_CONTROL", "true")
     state = {"running": False, "starts": 0, "stops": 0}
 
-    def fake_running():
+    def fake_running(force=False):
         return state["running"]
 
     def fake_start():
@@ -134,7 +134,7 @@ def test_builtin_concurrent_ops_share_one_start(monkeypatch):
     monkeypatch.setenv("AI_ALLOW_OLLAMA_CONTROL", "true")
     state = {"running": False, "stops": 0}
 
-    monkeypatch.setattr(llm_service, "ollama_running", lambda: state["running"])
+    monkeypatch.setattr(llm_service, "ollama_running", lambda force=False: state["running"])
     monkeypatch.setattr(
         llm_service, "start_ollama",
         lambda: (state.update(running=True) or True, "started"),
@@ -264,7 +264,7 @@ def test_ollama_down_raises_unavailable(monkeypatch):
     _clear_providers(monkeypatch)
     monkeypatch.setenv("OLLAMA_MODEL", "llama3.1")
     monkeypatch.setenv("LLM_PROVIDER", "ollama")
-    monkeypatch.setattr(llm_service, "ollama_running", lambda: False)
+    monkeypatch.setattr(llm_service, "ollama_running", lambda force=False: False)
     with pytest.raises(llm_service.LLMUnavailable) as ei:
         llm_service.refine_article(
             title="A trial of Y for adults with condition X",

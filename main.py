@@ -1,5 +1,5 @@
 """
-FastAPI Application — Literature Research Aide v4.0.0
+FastAPI Application — Literature Research Aide v4.1.1
 Multi-user web interface for literature search and analysis.
 Multiple libraries (workspaces) per account.
 """
@@ -98,12 +98,12 @@ def rate_limit_key(request: Request) -> str:
 limiter = Limiter(key_func=rate_limit_key)
 
 # At top of file
-app = FastAPI(title="Literature Research Aide", version="4.0.0")
+app = FastAPI(title="Literature Research Aide", version="4.1.1")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 @app.get("/health")
 async def health():
-    return {"status": "healthy", "version": "4.0.0"}
+    return {"status": "healthy", "version": "4.1.1"}
 
 
 @app.get("/api/ui-flags")
@@ -412,12 +412,6 @@ class StarredSearchRequest(BaseModel):
     year_min: Optional[int] = None
     year_max: Optional[int] = None
 
-class FetchRequest(BaseModel):
-    source: str = "pubmed"
-    query: str
-    max_results: int = Field(default=500, ge=1, le=1000)
-    email: Optional[str] = None
-
 class MultiFetchRequest(BaseModel):
     sources: List[str]
     query: str
@@ -451,7 +445,16 @@ class AIArticleRequest(BaseModel):
     article_id: str
     source: str
     # When true, store refined key_points in the library (overwrites extractive).
+    # API convenience only — the UI saves the displayed points via
+    # /api/ai/key-points instead, so a second generation can't diverge from
+    # what the student approved.
     save_key_points: bool = False
+
+class AISaveKeyPointsRequest(BaseModel):
+    """Persist the AI key points the student actually saw (no regeneration)."""
+    article_id: str
+    source: str
+    key_points: List[str]
 
 class AIAskRequest(BaseModel):
     article_id: str
@@ -1053,60 +1056,6 @@ def _format_ranked_export(results: List[dict], fmt: str):
     return "\n".join(lines), "text/plain", "search_results.txt"
 
 
-@app.get("/api/search/export")
-async def api_search_export(
-    request: Request,
-    query_text: str = "",
-    top_k: int = 10,
-    sort_by: str = "similarity",
-    cluster_filter: str = "",
-    source_filter: str = "",
-    format: str = "csv",
-    pico_boost: bool = False,
-    year_min: Optional[int] = None,
-    year_max: Optional[int] = None,
-    lexical_boost: bool = True,
-):
-    """Re-run a text search and export that ranked list (csv/txt/ris/bibtex)."""
-    user = current_user(request)
-    if not user:
-        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
-    fmt = (format or "csv").lower().strip()
-    if fmt not in ("csv", "txt", "ris", "bibtex"):
-        return JSONResponse(status_code=400, content={"detail": "Invalid format"})
-    uid = user["user_id"]
-    p = get_pipeline(uid)
-    try:
-        sources = [s for s in source_filter.split(",") if s.strip()] or None
-        try:
-            cluster_ids = [int(x) for x in cluster_filter.split(",") if x.strip()] if cluster_filter else None
-        except ValueError:
-            return JSONResponse(status_code=400, content={"error": "Invalid cluster_filter"})
-        results = await run_in_thread(
-            p.search_similar, query_text, top_k=top_k, source_filter=sources,
-            cluster_filter=cluster_ids,
-            year_min=year_min, year_max=year_max,
-            lexical_boost=lexical_boost,
-        )
-        if pico_boost:
-            _attach_pico(results)
-            _apply_pico_boost(results, query_text)
-        sort_articles(results, sort_by)
-
-        content, media_type, filename = _format_ranked_export(results, fmt)
-        return StreamingResponse(
-            io.BytesIO(content.encode()),
-            media_type=media_type,
-            headers={"Content-Disposition": f"attachment; filename={filename}"},
-        )
-    except ValueError as e:
-        return JSONResponse(status_code=400, content={"detail": str(e)})
-    except Exception as e:
-        return server_error(e)
-    finally:
-        release_pipeline(uid)
-
-
 @app.post("/api/export/selection")
 @limiter.limit("30/minute")
 async def api_export_selection(req: ExportSelectionRequest, request: Request):
@@ -1279,25 +1228,6 @@ async def api_screening_report(request: Request, format: str = "json"):
         release_pipeline(uid)
 
 
-@app.post("/api/clear-articles")
-async def api_clear_articles(request: Request):
-    user = current_user(request)
-    if not user:
-        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
-    if csrf_failed(request):
-        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
-    uid = user["user_id"]
-    p = get_pipeline(uid)
-    try:
-        await run_in_thread(p.db.clear_all)
-        p.invalidate_corpus_cache()
-        return {"status": "success"}
-    except Exception as e:
-        return server_error(e)
-    finally:
-        release_pipeline(uid)
-
-
 def _run_multi_fetch(p, *, query, sources, max_results, email, clear_first, uid):
     """Blocking multi-source fetch for sync wait= or background jobs."""
     update_progress(
@@ -1412,29 +1342,6 @@ async def api_cancel_job(task: str, request: Request):
     return {"status": "cancelling", "task": task}
 
 
-@app.post("/api/fetch-articles")
-@limiter.limit("20/minute")
-async def api_fetch(req: FetchRequest, request: Request):
-    user = current_user(request)
-    if not user:
-        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
-    if csrf_failed(request):
-        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
-    uid = user["user_id"]
-    p = get_pipeline(uid)
-    try:
-        articles = await run_in_thread(
-            p.fetch_articles,
-            query=req.query, max_results=req.max_results,
-            email=req.email or "user@example.com", source=req.source,
-        )
-        return {"status": "success", "articles_fetched": len(articles) if articles else 0, "source": req.source}
-    except Exception as e:
-        return server_error(e)
-    finally:
-        release_pipeline(uid)
-
-
 def _run_create_embeddings(p, *, model, only_missing, uid):
     """Blocking embedding pass for sync wait= or background jobs."""
     update_progress(uid, 'embed', done=0, total=0)
@@ -1538,21 +1445,6 @@ async def api_get_clusters(request: Request):
         release_pipeline(uid)
 
 
-@app.get("/api/clusters/briefings")
-async def api_cluster_briefings(request: Request):
-    user = current_user(request)
-    if not user:
-        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
-    uid = user["user_id"]
-    p = get_pipeline(uid)
-    try:
-        return {"briefings": await run_in_thread(p.get_cluster_briefings)}
-    except Exception as e:
-        return server_error(e)
-    finally:
-        release_pipeline(uid)
-
-
 @app.get("/api/clusters/{cluster_id}/articles")
 async def api_get_cluster_articles(cluster_id: int, request: Request):
     user = current_user(request)
@@ -1571,36 +1463,6 @@ async def api_get_cluster_articles(cluster_id: int, request: Request):
         return server_error(e)
     finally:
         release_pipeline(uid)
-
-
-@app.post("/api/generate-key-points")
-@limiter.limit("6/minute")
-async def api_generate_key_points(request: Request, only_missing: bool = True):
-    """Backfill extractive key points for articles missing them (or regenerate all)."""
-    user = current_user(request)
-    if not user:
-        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
-    if csrf_failed(request):
-        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
-    uid = user["user_id"]
-    p = get_pipeline(uid)
-    try:
-        result = await run_in_thread(p.generate_key_points, only_missing=only_missing)
-        return {"status": "success", **result}
-    except Exception as e:
-        return server_error(e)
-    finally:
-        release_pipeline(uid)
-
-
-@app.get("/api/ai/status")
-async def api_ai_status(request: Request):
-    """Honest AI provider status (Ollama / OpenAI-compatible / Anthropic)."""
-    user = current_user(request)
-    if not user:
-        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
-    from llm_service import status as ai_status
-    return ai_status()
 
 
 @app.get("/api/ai/settings")
@@ -1643,7 +1505,12 @@ async def api_ai_settings_save(req: AISettingsUpdate, request: Request):
 @app.post("/api/ai/ollama/start")
 @limiter.limit("6/minute")
 async def api_ai_ollama_start(request: Request):
-    """Start local Ollama (detached), using OLLAMA_MODELS when set."""
+    """Start local Ollama (detached), using OLLAMA_MODELS when set.
+
+    Internal/ops endpoint: no UI caller (Refine/Ask auto-start the built-in
+    service themselves). Kept as a deployer escape hatch, gated by
+    ollama_control_allowed().
+    """
     user = current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
@@ -1661,7 +1528,11 @@ async def api_ai_ollama_start(request: Request):
 @app.post("/api/ai/ollama/stop")
 @limiter.limit("6/minute")
 async def api_ai_ollama_stop(request: Request):
-    """Stop Ollama server and model runners (frees VRAM)."""
+    """Stop Ollama server and model runners (frees VRAM).
+
+    Internal/ops endpoint: no UI caller. Kept as a deployer escape hatch,
+    gated the same way as /api/ai/ollama/start.
+    """
     user = current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
@@ -1751,6 +1622,37 @@ async def api_ai_refine_article(req: AIArticleRequest, request: Request):
         return JSONResponse(status_code=503, content={"detail": _friendly_ai_unavailable(str(e))})
     except LLMError as e:
         return JSONResponse(status_code=400, content={"detail": str(e)})
+    except Exception as e:
+        return server_error(e)
+    finally:
+        release_pipeline(uid)
+
+
+@app.post("/api/ai/key-points")
+@limiter.limit("30/minute")
+async def api_ai_save_key_points(req: AISaveKeyPointsRequest, request: Request):
+    """Save the displayed AI key points for one article (explicit user action).
+
+    Deliberately does not re-run the model: what the student approved is
+    exactly what gets stored.
+    """
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    uid = user["user_id"]
+    p = get_pipeline(uid)
+    try:
+        points = [str(x).strip()[:500] for x in (req.key_points or []) if str(x).strip()]
+        points = points[:6]
+        if not points:
+            return JSONResponse(status_code=400, content={"detail": "No key points to save."})
+        article = p.db.get_article_by_id(req.article_id, req.source)
+        if not article:
+            return JSONResponse(status_code=404, content={"detail": "Article not found"})
+        p.db.insert_key_points({(req.article_id, req.source): points})
+        return {"status": "success", "saved": True, "key_points": points}
     except Exception as e:
         return server_error(e)
     finally:
@@ -1929,24 +1831,6 @@ async def api_cluster_screening(cluster_id: int, req: ClusterScreeningRequest, r
         return server_error(e)
     finally:
         release_pipeline(uid)
-
-
-@app.get("/api/screening-reasons")
-async def api_screening_reasons(request: Request):
-    """List exclusion reason codes for UI dropdowns."""
-    user = current_user(request)
-    if not user:
-        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
-    return {
-        "reasons": [
-            {"code": c, "label": reason_label(c)}
-            for c in USER_SELECTABLE_REASONS
-        ],
-        "all": [
-            {"code": c, "label": EXCLUSION_REASONS[c]}
-            for c in EXCLUSION_REASONS
-        ],
-    }
 
 
 @app.post("/api/load-sample-corpus")
