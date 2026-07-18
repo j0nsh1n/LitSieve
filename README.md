@@ -44,10 +44,10 @@ Built with **FastAPI**, sentence-transformers, FAISS, and scikit-learn.
 - 📈 Coverage map, papers-by-year timeline, and per-source breakdown
 - 💾 Per-user SQLite, JWT + bcrypt, CSRF, **per-user rate limits**, change password
   (revokes other sessions via `token_version`), **password reset**
-- 📤 Export ranked hits (CSV/TXT) or full library (**CSV / RIS / BibTeX**) by scope
+- 📤 Export ranked hits (CSV/TXT) or full library as **RIS** (Zotero / EndNote / Mendeley)
 - 📖 Public landing + `/learn/…` feature guides; first-run checklist + empty states
 - 🧪 **Sample demo corpus** (no APIs) for classroom dry runs
-- 📄 Library export: CSV / RIS / BibTeX / **APA (text)**; richer exclusion reason codes
+- 📄 Assignment hand-in pack on Duplicates (screening report + included CSV/RIS zip)
 - 📚 **Multiple libraries** per account (separate collections; switch in the nav)
 - 🔗 **Share a library** via class code (teacher publishes; students get their own clone)
 
@@ -119,7 +119,7 @@ account. Register/login for your private workspace, then:
    or single papers (**only** place for topic triage).
 3. **Duplicates** → near-duplicates + auto-resolve; **screening report** for hand-ins.
 4. **Search** → text / PICO / seed / more-like-starred; hybrid rank + year filter;
-   notes/stars; export ranked hits or library as **CSV / RIS / BibTeX**.
+   notes/stars; export ranked hits (CSV/TXT) or library as **RIS**.
 5. **Account** → change password (other sessions sign out) or delete account.
 
 ### Docker

@@ -192,64 +192,41 @@
 
 <section class="card">
  <h2>Export your library</h2>
- <p class="info-text">Download your <strong>whole collection</strong> (or a scope you pick), not just
- the last search. Choose a format based on what you will do next.</p>
- <details class="help-details" open>
-  <summary>Which file format should I pick?</summary>
-  <ul class="export-format-list">
-   <li><strong>CSV</strong> - spreadsheet of your library with cluster labels, screened-out status,
-   <strong>Starred</strong>, and <strong>Note</strong> columns. Best for hand-in logs, teachers
-   reviewing process, or working in Excel / Google Sheets. Not a bibliography style. Teachers:
-   sort on Starred / Note to see which papers students marked for follow-up.</li>
-   <li><strong>RIS (Zotero / EndNote / Mendeley)</strong> - standard citation exchange file. Import
-   into a reference manager, then generate APA, MLA, Chicago, etc. there. Prefer this when you need
-   a real bibliography database.</li>
-   <li><strong>BibTeX</strong> - standard for LaTeX and many managers (including Zotero). Use for
-   papers written in LaTeX or when a teacher asks for a <code>.bib</code> file.</li>
-   <li><strong>APA (text)</strong> - plain-text draft in approximate APA 7th style for quick classroom
-   reading lists. Author names and punctuation from databases can be imperfect - treat as a draft,
-   not a final reference list. For polished styles, import RIS/BibTeX into Zotero or use
-   <a href="https://zbib.org/" target="_blank" rel="noopener">ZoteroBib</a>.</li>
-  </ul>
-  <p class="info-text"><strong>Scope</strong> filters which papers go in the file:</p>
+ <p class="info-text">Download papers from this library as <strong>RIS</strong> for Zotero, EndNote,
+ or Mendeley. Generate APA/MLA/Chicago in the manager (or
+ <a href="https://zbib.org/" target="_blank" rel="noopener">ZoteroBib</a>), not here.</p>
+ <details class="help-details">
+  <summary>What is RIS and which papers are included?</summary>
+  <p class="info-text"><strong>RIS</strong> is a standard citation file. Import it into a reference
+  manager, then format the bibliography for class. One format keeps this step simple for high school
+  use (Zotero handles APA and other styles after import).</p>
+  <p class="info-text"><strong>Scope</strong> chooses which papers go in the file:</p>
   <ul class="export-format-list">
    <li><strong>All articles</strong> - everything you fetched in this library.</li>
    <li><strong>Included only</strong> - papers still in your final set (not screened out).</li>
    <li><strong>Screened out only</strong> - papers you excluded (duplicates, cluster triage, manual).</li>
-   <li><strong>Starred only</strong> - papers you bookmarked with ★ (private; appears as the CSV
-   Starred column when you export a wider scope).</li>
+   <li><strong>Starred only</strong> - papers you bookmarked with ★.</li>
   </ul>
-  <p class="info-text">Need a teacher process pack (screening counts + included CSV/RIS in one zip)
-  or a soft checklist? That lives on <a href="/statistics">Duplicates</a> next to the screening
-  report — Search stays focused on ranking and exporting what you kept.</p>
+  <p class="info-text">Need screening counts or a teacher process zip (report + spreadsheet)?
+  That lives on <a href="/statistics">Duplicates</a> — separate from this citation export.</p>
  </details>
  <div class="export-scope-row">
  <label for="lib-export-scope" class="help-text export-scope-label">Scope</label>
  <select id="lib-export-scope" class="export-scope-select"
   title="Which papers to include in the download">
  <option value="all">All articles</option>
- <option value="included">Included only</option>
+ <option value="included" selected>Included only</option>
  <option value="excluded">Screened out only</option>
  <option value="starred">Starred only</option>
  </select>
  </div>
  <div class="export-row export-row-formats">
- <button type="button" class="btn btn-secondary btn-sm" data-lib-export-format="csv"
-  title="Spreadsheet log with clusters, screening, notes">CSV</button>
- <button type="button" class="btn btn-secondary btn-sm" data-lib-export-format="ris"
-  title="Import into Zotero, EndNote, or Mendeley">RIS (Zotero/EndNote)</button>
- <button type="button" class="btn btn-secondary btn-sm" data-lib-export-format="bibtex"
-  title="For LaTeX or Zotero (.bib)">BibTeX</button>
- <button type="button" class="btn btn-secondary btn-sm" data-lib-export-format="apa"
-  title="Plain-text APA-style draft for class (not final)">APA (text)</button>
+ <button type="button" class="btn btn-primary btn-sm" data-lib-export-format="ris"
+  title="Import into Zotero, EndNote, or Mendeley">Download RIS</button>
  </div>
- <p class="help-text" style="margin-top:0.65rem;">
- Tip: most students use <strong>RIS</strong> or <strong>BibTeX</strong> for a reference manager, and
- <strong>CSV</strong> when a teacher wants a screening spreadsheet with notes and stars.
- </p>
 </section>
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/search.js?v=20260717r4b"></script>
+<script src="/static/js/search.js?v=20260717r4c"></script>
 {% endblock %}

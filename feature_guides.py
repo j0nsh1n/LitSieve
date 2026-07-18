@@ -202,12 +202,9 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "abstracts, and PICO snippets when detected.",
             "Star papers and add private notes for your study log.",
             "Export this ranked list as CSV (spreadsheet) or Text (reading list), or "
-            "export the whole library: CSV (screening log with Starred and Note "
-            "columns), RIS (Zotero/EndNote/Mendeley), BibTeX (LaTeX / many managers), "
-            "or APA text (classroom draft). Pick a scope: all / included / screened "
-            "out / starred.",
-            "For polished APA/MLA/Chicago, import RIS or BibTeX into Zotero (or use "
-            "ZoteroBib). APA (text) is a quick draft only.",
+            "export the whole library as RIS for Zotero / EndNote / Mendeley "
+            "(scope: all / included / screened out / starred). Format APA or MLA in "
+            "the manager, not in this app.",
             "Process hand-ins (screening counts + included CSV/RIS zip, soft checklist) "
             "live on Duplicates next to the screening report — not on Search.",
         ],
@@ -222,10 +219,10 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "Seed mode is great when a teacher gives one starter paper: find more "
             "like it from what you already fetched.",
             "Star a handful of must-read papers, then use More like my starred to "
-            "expand the set without rewriting the query. Stars and notes appear as "
-            "CSV columns on library export (optional process evidence for teachers).",
-            "Need a real bibliography? Export RIS or BibTeX from Search. Need process "
-            "evidence for a hand-in? Use Duplicates → Assignment hand-in pack (.zip).",
+            "expand the set without rewriting the query.",
+            "Need a real bibliography? Export RIS from Search and open it in Zotero "
+            "(or ZoteroBib). Need process evidence for a hand-in? Use Duplicates → "
+            "Assignment hand-in pack (.zip).",
         ],
         "where_in_app": "Search page.",
         "app_path": "/search",
@@ -276,8 +273,8 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "For process hand-ins, use Duplicates → Assignment hand-in pack (zip with "
             "screening report + included CSV/RIS). Search keeps ranking and library "
             "export. CSV Starred/Note columns are optional process evidence, not grades.",
-            "Export a library (CSV/RIS/BibTeX) before deleting it if you need a "
-            "hand-in archive.",
+            "Export a library as RIS (or the Duplicates hand-in pack) before deleting "
+            "it if you need a hand-in archive.",
             "If you change your password on a shared machine, other open tabs "
             "for that account will need to log in again.",
         ],
