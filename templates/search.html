@@ -190,58 +190,10 @@
  <div id="results-list"></div>
 </section>
 
-<section class="card" id="assignment-pack-section">
- <h2>Assignment hand-in pack</h2>
- <p class="info-text">One click downloads a <strong>.zip</strong> teachers often want:
- screening report counts, plus your <strong>included-only</strong> papers as CSV and RIS.
- Soft checklist below is hints only — it never blocks download.</p>
- <details class="help-details">
-  <summary>What is inside the zip?</summary>
-  <ul class="export-format-list">
-   <li><strong>screening_report.txt</strong> — collected / excluded / included counts (process).</li>
-   <li><strong>included_papers.csv</strong> — final set spreadsheet. Columns include
-   <strong>Starred</strong> (★ bookmarks) and <strong>Note</strong> (private study notes) so
-   teachers can see optional process evidence. Not a grade.</li>
-   <li><strong>included_papers.ris</strong> — import into Zotero/EndNote for a real bibliography.</li>
-   <li><strong>README_handin.txt</strong> — short explanation of each file.</li>
-  </ul>
- </details>
- <div class="export-row" style="margin-top:0.5rem;">
-  <button type="button" id="assignment-pack-btn" class="btn btn-primary btn-sm"
-   title="Zip: screening report + included CSV + included RIS">Download hand-in pack (.zip)</button>
- </div>
- <div id="assignment-pack-status" class="status-indicator"></div>
-
- <h3 class="assignment-checklist-heading">Soft checklist (hints only)</h3>
- <p class="info-text">Set optional targets your teacher mentioned. These never auto-fail or block export.</p>
- <div class="assignment-checklist-controls form-row">
-  <div class="form-group">
-   <label for="check-min-included">Min included papers</label>
-   <input type="number" id="check-min-included" min="0" max="500" value="5" step="1">
-  </div>
-  <div class="form-group">
-   <label for="check-min-sources">Min different sources</label>
-   <input type="number" id="check-min-sources" min="0" max="20" value="3" step="1">
-  </div>
-  <div class="form-group" style="align-self:flex-end;">
-   <label class="radio-label">
-    <input type="checkbox" id="check-require-review" checked>
-    Hint if no review-type paper
-   </label>
-  </div>
-  <div class="form-group" style="align-self:flex-end;">
-   <button type="button" id="assignment-checklist-btn" class="btn btn-secondary btn-sm">Check</button>
-  </div>
- </div>
- <p class="help-text" id="assignment-checklist-summary"></p>
- <ul class="assignment-checklist-list" id="assignment-checklist-list" aria-live="polite"></ul>
-</section>
-
 <section class="card">
  <h2>Export your library</h2>
  <p class="info-text">Download your <strong>whole collection</strong> (or a scope you pick), not just
- the last search. Choose a format based on what you will do next. Prefer the
- <strong>Assignment hand-in pack</strong> above when a teacher wants process + final list together.</p>
+ the last search. Choose a format based on what you will do next.</p>
  <details class="help-details" open>
   <summary>Which file format should I pick?</summary>
   <ul class="export-format-list">
@@ -267,9 +219,9 @@
    <li><strong>Starred only</strong> - papers you bookmarked with ★ (private; appears as the CSV
    Starred column when you export a wider scope).</li>
   </ul>
-  <p class="info-text">Need counts for a screening hand-in (how many collected / excluded / kept)?
-  Use the <strong>hand-in pack</strong> above or the <strong>Screening report</strong> on the
-  Duplicates page, not these citation formats alone.</p>
+  <p class="info-text">Need a teacher process pack (screening counts + included CSV/RIS in one zip)
+  or a soft checklist? That lives on <a href="/statistics">Duplicates</a> next to the screening
+  report — Search stays focused on ranking and exporting what you kept.</p>
  </details>
  <div class="export-scope-row">
  <label for="lib-export-scope" class="help-text export-scope-label">Scope</label>
@@ -299,5 +251,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/search.js?v=20260717r4"></script>
+<script src="/static/js/search.js?v=20260717r4b"></script>
 {% endblock %}

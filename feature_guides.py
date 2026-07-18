@@ -206,11 +206,10 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "columns), RIS (Zotero/EndNote/Mendeley), BibTeX (LaTeX / many managers), "
             "or APA text (classroom draft). Pick a scope: all / included / screened "
             "out / starred.",
-            "Assignment hand-in pack (one zip): screening report + included-only "
-            "CSV + RIS — preferred when a teacher wants process and final list together.",
             "For polished APA/MLA/Chicago, import RIS or BibTeX into Zotero (or use "
             "ZoteroBib). APA (text) is a quick draft only.",
-            "Screening counts alone also live on Duplicates as a .txt report.",
+            "Process hand-ins (screening counts + included CSV/RIS zip, soft checklist) "
+            "live on Duplicates next to the screening report — not on Search.",
         ],
         "tips": [
             "Search only ranks papers already in your collection (from public "
@@ -225,9 +224,8 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "Star a handful of must-read papers, then use More like my starred to "
             "expand the set without rewriting the query. Stars and notes appear as "
             "CSV columns on library export (optional process evidence for teachers).",
-            "Need a real bibliography? Export RIS or BibTeX and open it in Zotero. "
-            "Need process + final list for a hand-in? Use Assignment hand-in pack "
-            "(.zip). Soft checklist on Search is hints only and never blocks download.",
+            "Need a real bibliography? Export RIS or BibTeX from Search. Need process "
+            "evidence for a hand-in? Use Duplicates → Assignment hand-in pack (.zip).",
         ],
         "where_in_app": "Search page.",
         "app_path": "/search",
@@ -275,9 +273,9 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "passwords.",
             "Teachers: keep one library per unit or class so papers do not mix; "
             "share a finished unit library via class code so everyone starts equal.",
-            "For hand-ins, use Search → Assignment hand-in pack (zip with screening "
-            "report + included CSV/RIS). CSV columns Starred and Note show optional "
-            "process evidence (bookmarks and private notes) — not automatic grades.",
+            "For process hand-ins, use Duplicates → Assignment hand-in pack (zip with "
+            "screening report + included CSV/RIS). Search keeps ranking and library "
+            "export. CSV Starred/Note columns are optional process evidence, not grades.",
             "Export a library (CSV/RIS/BibTeX) before deleting it if you need a "
             "hand-in archive.",
             "If you change your password on a shared machine, other open tabs "

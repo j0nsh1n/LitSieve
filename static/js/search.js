@@ -39,18 +39,6 @@ document.addEventListener('DOMContentLoaded', () => {
  });
  });
 
- const packBtn = document.getElementById('assignment-pack-btn');
- if (packBtn) {
- packBtn.addEventListener('click', downloadAssignmentPack);
- }
- const checkBtn = document.getElementById('assignment-checklist-btn');
- if (checkBtn) {
- checkBtn.addEventListener('click', refreshAssignmentChecklist);
- }
- restoreChecklistPrefs();
- // Soft hints load once; never block the page if the API is slow.
- refreshAssignmentChecklist().catch(() => {});
-
  document.getElementById('query-text').addEventListener('keydown', (e) => {
  if (e.key === 'Enter' && !e.shiftKey) {
  e.preventDefault();
@@ -58,83 +46,6 @@ document.addEventListener('DOMContentLoaded', () => {
  }
  });
 });
-
-const CHECKLIST_PREFS_KEY = 'lra_assignment_checklist_v1';
-
-function restoreChecklistPrefs() {
- let prefs;
- try { prefs = JSON.parse(localStorage.getItem(CHECKLIST_PREFS_KEY) || 'null'); } catch (e) { prefs = null; }
- if (!prefs) return;
- const inc = document.getElementById('check-min-included');
- const src = document.getElementById('check-min-sources');
- const rev = document.getElementById('check-require-review');
- if (inc && prefs.min_included != null) inc.value = prefs.min_included;
- if (src && prefs.min_sources != null) src.value = prefs.min_sources;
- if (rev && prefs.require_review != null) rev.checked = !!prefs.require_review;
-}
-
-function saveChecklistPrefs() {
- const prefs = {
- min_included: parseInt((document.getElementById('check-min-included') || {}).value, 10) || 0,
- min_sources: parseInt((document.getElementById('check-min-sources') || {}).value, 10) || 0,
- require_review: !!(document.getElementById('check-require-review') || {}).checked,
- };
- try { localStorage.setItem(CHECKLIST_PREFS_KEY, JSON.stringify(prefs)); } catch (e) { /* ignore */ }
- return prefs;
-}
-
-function downloadAssignmentPack() {
- const status = document.getElementById('assignment-pack-status');
- if (status) {
- status.textContent = 'Preparing hand-in pack…';
- status.className = 'status-indicator loading';
- }
- // Navigate so the browser downloads the zip (session cookies included).
- window.location.href = '/api/export/assignment-pack';
- setTimeout(() => {
- if (status) {
- status.textContent = 'Download started (screening report + included CSV + RIS).';
- status.className = 'status-indicator success';
- }
- }, 600);
-}
-
-async function refreshAssignmentChecklist() {
- const list = document.getElementById('assignment-checklist-list');
- const summary = document.getElementById('assignment-checklist-summary');
- if (!list) return;
- const prefs = saveChecklistPrefs();
- const params = new URLSearchParams({
- min_included: String(prefs.min_included),
- min_sources: String(prefs.min_sources),
- require_review: prefs.require_review ? 'true' : 'false',
- });
- try {
- const data = await apiCall(`/api/assignment-checklist?${params.toString()}`);
- list.innerHTML = '';
- (data.hints || []).forEach((h) => {
- const li = document.createElement('li');
- li.className = 'assignment-check-item ' + (h.ok ? 'is-ok' : 'is-soft-miss');
- const mark = h.ok ? '✓' : '○';
- li.innerHTML =
- `<span class="assignment-check-mark" aria-hidden="true">${mark}</span>` +
- `<span class="assignment-check-body">` +
- `<strong>${escapeHtml(h.label || '')}</strong>` +
- `<span class="assignment-check-detail">${escapeHtml(h.detail || '')}</span>` +
- `</span>`;
- list.appendChild(li);
- });
- if (summary) {
- summary.textContent = data.message || (data.all_ok
- ? 'Soft targets look met.'
- : 'Some soft targets are open — download still allowed.');
- summary.className = 'help-text ' + (data.all_ok ? 'check-all-ok' : 'check-soft-miss');
- }
- } catch (e) {
- list.innerHTML = `<li class="info-text">Could not load checklist: ${escapeHtml(e.message || 'error')}</li>`;
- if (summary) summary.textContent = '';
- }
-}
 
 function parseOptionalYear(id) {
  const el = document.getElementById(id);

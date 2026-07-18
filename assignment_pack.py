@@ -48,6 +48,8 @@ Tips
 - Scope is "included only" — screened-out duplicates and triage are out.
 - CSV notes/stars stay in *your* library export; they are not shared when
   a teacher shares a class-code clone (notes/stars are not copied).
+- In the app: download this pack from Duplicates (step 3), next to the
+  screening report. Search (step 4) is for ranking and citation-style export.
 - This is a starting point over public databases, not a complete library search.
 """
 
