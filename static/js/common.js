@@ -497,8 +497,8 @@ function bindAiArticleActions(rootEl, article) {
                   <div class="ai-label help-text">${escapeHtml(data.label || 'AI rewrite (from the abstract only)')}</div>
                   <p class="ai-summary">${escapeHtml(data.summary || '')}</p>
                   ${lim}
-                  ${bullets ? `<ul class="key-points-list">${bullets}</ul>` : ''}
-                  <button type="button" class="btn btn-secondary btn-sm ai-save-kp">Save these as key points</button>
+                  ${bullets ? `<ul class="key-points-list">${bullets}</ul>
+                  <button type="button" class="btn btn-secondary btn-sm ai-save-kp">Save these as key points</button>` : ''}
                 `);
                 const saveBtn = panel.querySelector('.ai-save-kp');
                 if (saveBtn) {
@@ -506,12 +506,15 @@ function bindAiArticleActions(rootEl, article) {
                         ev.preventDefault();
                         saveBtn.disabled = true;
                         try {
-                            await apiCall('/api/ai/refine-article', {
+                            // Save exactly the bullets on screen - never
+                            // re-run the model (a second generation could
+                            // differ from what the student approved).
+                            await apiCall('/api/ai/key-points', {
                                 method: 'POST',
                                 body: {
                                     article_id: aid,
                                     source: source,
-                                    save_key_points: true,
+                                    key_points: data.key_points || [],
                                 },
                             });
                             showNotification('Key points updated (AI rewrite saved).', 'success');

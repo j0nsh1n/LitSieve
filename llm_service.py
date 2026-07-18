@@ -283,13 +283,13 @@ def ensure_builtin_service() -> Tuple[bool, str]:
     global _builtin_hold_count, _builtin_started_by_app
     if provider() != "ollama":
         return True, "Using cloud API study aid."
-    if not ollama_control_allowed() and not ollama_running():
+    if not ollama_control_allowed() and not ollama_running(force=True):
         return False, (
             "Built-in study aid is not available on this server. "
             "Ask a teacher to enable it, or switch to API key mode on Account."
         )
     with _builtin_lock:
-        was_running = ollama_running()
+        was_running = ollama_running(force=True)
         if not was_running:
             if not ollama_control_allowed():
                 return False, (
@@ -363,28 +363,51 @@ def _timeout() -> float:
         return 120.0
 
 
-def list_ollama_models() -> List[str]:
-    """Installed model tags via HTTP /api/tags (no CLI — avoids hang)."""
+# One /api/tags request answers both "running?" and "which models?". Cached
+# briefly so a status() call (or rapid Account refreshes) probes once instead
+# of three times — and a down service costs one timeout, not several.
+OLLAMA_PROBE_TTL_SECONDS = 3.0
+_probe_lock = threading.Lock()
+_probe_cache: Dict[str, Any] = {"at": 0.0, "host": None, "running": False, "models": []}
+
+
+def _probe_ollama(force: bool = False) -> Tuple[bool, List[str]]:
+    """Probe Ollama via HTTP /api/tags (no CLI — avoids hang).
+
+    Returns (running, model_tags). Control-flow decisions (start/stop waits,
+    ephemeral auto-start) must pass force=True; the cache is for UI status.
+    """
     host = _env("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
+    with _probe_lock:
+        fresh = (
+            _probe_cache["host"] == host
+            and time.monotonic() - _probe_cache["at"] < OLLAMA_PROBE_TTL_SECONDS
+        )
+        if fresh and not force:
+            return _probe_cache["running"], list(_probe_cache["models"])
     try:
         import httpx
 
         r = httpx.get(f"{host}/api/tags", timeout=2.0)
         r.raise_for_status()
-        return [m["name"] for m in r.json().get("models", []) if m.get("name")]
+        models = [m["name"] for m in r.json().get("models", []) if m.get("name")]
+        running = True
     except Exception:
-        return []
+        running, models = False, []
+    with _probe_lock:
+        _probe_cache.update(
+            {"at": time.monotonic(), "host": host, "running": running, "models": models}
+        )
+    return running, models
 
 
-def ollama_running() -> bool:
-    host = _env("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
-    try:
-        import httpx
+def list_ollama_models() -> List[str]:
+    """Installed model tags (cached probe; see _probe_ollama)."""
+    return _probe_ollama()[1]
 
-        r = httpx.get(f"{host}/api/tags", timeout=1.5)
-        return r.status_code == 200
-    except Exception:
-        return False
+
+def ollama_running(force: bool = False) -> bool:
+    return _probe_ollama(force)[0]
 
 
 def ollama_env_for_serve() -> Dict[str, str]:
@@ -406,7 +429,7 @@ def start_ollama() -> Tuple[bool, str]:
     """Launch local Ollama server detached. Returns (ok, message)."""
     if not ollama_control_allowed():
         return False, "Ollama control is disabled (AI_ALLOW_OLLAMA_CONTROL=false)."
-    if ollama_running():
+    if ollama_running(force=True):
         return True, "Ollama is already running."
     binary = shutil.which("ollama")
     if not binary:
@@ -438,7 +461,7 @@ def start_ollama() -> Tuple[bool, str]:
     # Brief wait for the HTTP port.
     for _ in range(20):
         time.sleep(0.25)
-        if ollama_running():
+        if ollama_running(force=True):
             mid = env.get("OLLAMA_MODELS", "")
             msg = "Ollama started."
             if mid:
@@ -478,10 +501,10 @@ def stop_ollama() -> Tuple[bool, str]:
         subprocess.run(["pkill", "-f", "ollama"], capture_output=True, text=True)
         subprocess.run(["pkill", "-f", "llama-server"], capture_output=True, text=True)
         # pkill returns 0 if something was signalled
-        if a.returncode == 0 or not ollama_running():
+        if a.returncode == 0 or not ollama_running(force=True):
             # Give the process a moment to die
             time.sleep(0.4)
-            if ollama_running():
+            if ollama_running(force=True):
                 return False, "Ollama still responds — stop it from the system tray/service."
             return True, "Ollama stopped."
         return False, "Ollama wasn't running."
@@ -493,8 +516,7 @@ def status() -> Dict[str, Any]:
     """Honest multi-provider status for the UI (student copy avoids engine names)."""
     apply_ai_settings_to_env()
     selected = provider()
-    models = list_ollama_models() if ollama_running() else []
-    ollama_on = ollama_running()
+    ollama_on, models = _probe_ollama()
     mode = study_aid_mode()
     base = {
         "provider": selected,
@@ -694,7 +716,7 @@ def _structured_call(system: str, prompt: str, schema_model: Type[BaseModel]):
     if selected == "ollama":
         # Fail fast with 503 when the local service is down (ephemeral start should
         # have warmed it; this catches races / control-disabled cases).
-        if not ollama_running():
+        if not ollama_running(force=True):
             raise LLMUnavailable(
                 "Built-in study aid is not running. Try Refine/Ask again, "
                 "or switch to Cloud API key on Account."

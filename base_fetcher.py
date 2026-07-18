@@ -184,7 +184,18 @@ def polite_sleep(seconds: float = DEFAULT_DELAY) -> None:
 
 
 class BaseFetcher(ABC):
-    """Abstract base for article fetchers from different sources"""
+    """Abstract base for article fetchers from different sources.
+
+    Two implementation patterns:
+    - Two-step (e.g. PubMed, arXiv): implement search() + fetch_details();
+      the default search_and_fetch() chains them.
+    - One-shot (most APIs, where one request returns full records): override
+      search_and_fetch() directly. fetch_details() is then never called and
+      must NOT be stubbed out — the base default raises if something does
+      call it, which beats silently returning no articles.
+
+    The pipeline only ever calls search_and_fetch().
+    """
 
     SOURCE_NAME: str = ""
 
@@ -193,16 +204,17 @@ class BaseFetcher(ABC):
         """Search for articles and return list of source-specific IDs"""
         pass
 
-    @abstractmethod
     def fetch_details(self, ids: List[str], batch_size: int = 200) -> List[Dict]:
         """
-        Fetch article details for given IDs
+        Fetch article details for given IDs (two-step fetchers only).
 
         Returns:
             List of article dicts with keys:
             article_id, source, title, abstract, year, authors, journal
         """
-        pass
+        raise NotImplementedError(
+            f"{type(self).__name__} is a one-shot fetcher: use search_and_fetch()."
+        )
 
     def search_and_fetch(self, query: str, max_results: int = 1000) -> List[Dict]:
         """Complete workflow: search then fetch details"""
