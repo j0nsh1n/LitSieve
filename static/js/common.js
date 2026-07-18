@@ -341,8 +341,102 @@ function renderKeyPointsHtml(bullets, options) {
 }
 
 /**
- * Wire Refine / Ask buttons inside a result card. Uses /api/ai/* when configured.
- * Extractive key points remain the default; AI is opt-in and clearly labeled.
+ * Site-styled modal for Ask about this paper (replaces window.prompt).
+ * Resolves with trimmed question string, or null if cancelled.
+ */
+function openAiAskModal(paperTitle) {
+    return new Promise((resolve) => {
+        const existing = document.getElementById('ai-ask-modal-root');
+        if (existing) existing.remove();
+
+        const root = document.createElement('div');
+        root.id = 'ai-ask-modal-root';
+        root.className = 'lra-modal-root';
+        root.setAttribute('role', 'dialog');
+        root.setAttribute('aria-modal', 'true');
+        root.setAttribute('aria-labelledby', 'ai-ask-modal-title');
+        const titleBit = paperTitle
+            ? `<p class="lra-modal-paper info-text">About: <strong>${escapeHtml(String(paperTitle).slice(0, 160))}</strong></p>`
+            : '';
+        root.innerHTML = `
+          <div class="lra-modal-backdrop" data-ai-ask-dismiss></div>
+          <div class="lra-modal-card card">
+            <h2 id="ai-ask-modal-title" class="lra-modal-title">Ask about this paper</h2>
+            <p class="info-text">Answered only from this paper’s <strong>title and abstract</strong>
+              (not the full text). The study aid starts for this question, then stops.</p>
+            ${titleBit}
+            <div class="form-group">
+              <label for="ai-ask-modal-input">Your question</label>
+              <textarea id="ai-ask-modal-input" class="lra-modal-textarea" rows="3"
+                placeholder="e.g. Who was studied? What was the main finding?"
+                maxlength="500"></textarea>
+            </div>
+            <div class="lra-modal-actions">
+              <button type="button" class="btn btn-secondary" data-ai-ask-dismiss>Cancel</button>
+              <button type="button" class="btn btn-primary" id="ai-ask-modal-submit">Ask</button>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(root);
+        document.body.classList.add('lra-modal-open');
+
+        const input = root.querySelector('#ai-ask-modal-input');
+        const submit = root.querySelector('#ai-ask-modal-submit');
+        let settled = false;
+
+        const close = (value) => {
+            if (settled) return;
+            settled = true;
+            document.body.classList.remove('lra-modal-open');
+            root.remove();
+            document.removeEventListener('keydown', onKey);
+            resolve(value);
+        };
+
+        const onKey = (ev) => {
+            if (ev.key === 'Escape') {
+                ev.preventDefault();
+                close(null);
+            }
+        };
+        document.addEventListener('keydown', onKey);
+
+        root.querySelectorAll('[data-ai-ask-dismiss]').forEach((el) => {
+            el.addEventListener('click', (ev) => {
+                ev.preventDefault();
+                close(null);
+            });
+        });
+
+        const doSubmit = () => {
+            const q = (input && input.value || '').trim();
+            if (!q || q.length < 3) {
+                showNotification('Type a slightly longer question (at least a few words).', 'error');
+                if (input) input.focus();
+                return;
+            }
+            close(q);
+        };
+
+        if (submit) submit.addEventListener('click', (ev) => {
+            ev.preventDefault();
+            doSubmit();
+        });
+        if (input) {
+            input.addEventListener('keydown', (ev) => {
+                if (ev.key === 'Enter' && !ev.shiftKey) {
+                    ev.preventDefault();
+                    doSubmit();
+                }
+            });
+            setTimeout(() => input.focus(), 30);
+        }
+    });
+}
+
+/**
+ * Wire Refine + Ask on a result card.
+ * Built-in mode (both): start study aid → work on selected paper → stop when done.
  */
 function bindAiArticleActions(rootEl, article) {
     if (!rootEl || !article) return;
@@ -367,12 +461,22 @@ function bindAiArticleActions(rootEl, article) {
         panel.innerHTML = html;
     };
 
+    const softAiError = (msg, verb) => {
+        const soft = /503|unavailable|not running|not configured|study aid|api key/i.test(msg);
+        showNotification(
+            soft
+                ? `${msg} Extractive key points still work without AI.`
+                : `AI ${verb} failed: ${msg}`,
+            soft ? 'warning' : 'error'
+        );
+    };
+
     const refineBtn = wrap.querySelector('.ai-refine-btn');
     if (refineBtn) {
         refineBtn.addEventListener('click', async (e) => {
             e.preventDefault();
             e.stopPropagation();
-            setStatus('Running AI refine…', true);
+            setStatus('Starting study aid and refining this paper…', true);
             refineBtn.disabled = true;
             try {
                 const data = await apiCall('/api/ai/refine-article', {
@@ -411,7 +515,6 @@ function bindAiArticleActions(rootEl, article) {
                                 },
                             });
                             showNotification('Key points updated (AI rewrite saved).', 'success');
-                            // Refresh list UI label in-place.
                             const lab = rootEl.querySelector('.key-points-label');
                             if (lab) lab.textContent = 'Key points (AI rewrite — from the abstract only)';
                             const ul = rootEl.querySelector('.key-points-list');
@@ -430,14 +533,7 @@ function bindAiArticleActions(rootEl, article) {
                 setStatus('', false);
             } catch (err) {
                 setStatus('', false);
-                const msg = err && err.message ? String(err.message) : 'AI refine failed';
-                const soft = /503|unavailable|not running|not configured|ollama/i.test(msg);
-                showNotification(
-                    soft
-                        ? `${msg} Extractive key points still work without AI.`
-                        : `AI refine failed: ${msg}`,
-                    soft ? 'warning' : 'error'
-                );
+                softAiError(err && err.message ? String(err.message) : 'AI refine failed', 'refine');
             } finally {
                 refineBtn.disabled = false;
             }
@@ -449,19 +545,18 @@ function bindAiArticleActions(rootEl, article) {
         askBtn.addEventListener('click', async (e) => {
             e.preventDefault();
             e.stopPropagation();
-            const question = window.prompt(
-                'Ask a question about this paper (answered from the abstract only):'
-            );
-            if (!question || !question.trim()) return;
-            setStatus('Asking AI…', true);
+            const question = await openAiAskModal(article.title || '');
+            if (!question) return;
+            setStatus('Starting study aid and answering…', true);
             askBtn.disabled = true;
             try {
+                // Same ephemeral lifecycle as Refine: start → answer → stop.
                 const data = await apiCall('/api/ai/ask-article', {
                     method: 'POST',
                     body: {
                         article_id: aid,
                         source: source,
-                        question: question.trim(),
+                        question: question,
                     },
                 });
                 const quotes = (data.quotes || [])
@@ -469,21 +564,14 @@ function bindAiArticleActions(rootEl, article) {
                     .join('');
                 showPanel(`
                   <div class="ai-label help-text">${escapeHtml(data.label || 'AI answer (abstract only)')}</div>
-                  <p class="ai-question"><strong>Q:</strong> ${escapeHtml(question.trim())}</p>
+                  <p class="ai-question"><strong>Q:</strong> ${escapeHtml(question)}</p>
                   <p class="ai-answer">${escapeHtml(data.answer || '')}</p>
                   ${quotes}
                 `);
                 setStatus('', false);
             } catch (err) {
                 setStatus('', false);
-                const msg = err && err.message ? String(err.message) : 'AI ask failed';
-                const soft = /503|unavailable|not running|not configured|ollama/i.test(msg);
-                showNotification(
-                    soft
-                        ? `${msg} Extractive key points still work without AI.`
-                        : `AI ask failed: ${msg}`,
-                    soft ? 'warning' : 'error'
-                );
+                softAiError(err && err.message ? String(err.message) : 'AI ask failed', 'ask');
             } finally {
                 askBtn.disabled = false;
             }

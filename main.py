@@ -1676,13 +1676,30 @@ async def api_ai_ollama_stop(request: Request):
     }
 
 
+def _ai_unconfigured_detail() -> str:
+    return (
+        "AI is unavailable (not configured). Open Account → AI study aid and choose "
+        "Built-in study aid or Cloud API key. Extractive key points still work."
+    )
+
+
+def _friendly_ai_unavailable(detail: str) -> str:
+    low = (detail or "").lower()
+    if "ollama" in low or "not running" in low or "not reachable" in low:
+        return (
+            "Built-in study aid is not ready (503). Try again in a moment, or switch "
+            "to Cloud API key on Account. Extractive key points still work without AI."
+        )
+    return detail or "AI study aid unavailable."
+
+
 @app.post("/api/ai/refine-article")
 @limiter.limit("8/minute")
 async def api_ai_refine_article(req: AIArticleRequest, request: Request):
     """Optional LLM rewrite of summary/key points from the abstract only.
 
-    Default corpus key points stay extractive. AI is opt-in and labeled.
-    Never bulk-rewrites a library — one article per request (R5).
+    Built-in mode: start local service → refine → stop when idle (ephemeral).
+    Default corpus key points stay extractive. Never bulk-rewrites a library.
     """
     user = current_user(request)
     if not user:
@@ -1692,29 +1709,30 @@ async def api_ai_refine_article(req: AIArticleRequest, request: Request):
     uid = user["user_id"]
     p = get_pipeline(uid)
     try:
-        from llm_service import LLMError, LLMUnavailable, is_configured, refine_article
+        from llm_service import (
+            LLMError,
+            LLMUnavailable,
+            is_configured,
+            refine_article,
+            run_with_ephemeral_builtin,
+        )
 
         if not is_configured():
-            return JSONResponse(
-                status_code=503,
-                content={
-                    "detail": (
-                        "AI is unavailable (not configured). Open Account → AI study aid "
-                        "(optional setup), start Ollama and pick a model, or add an "
-                        "OpenAI-compatible / Anthropic API key. Extractive key points still work."
-                    )
-                },
-            )
+            return JSONResponse(status_code=503, content={"detail": _ai_unconfigured_detail()})
         article = p.db.get_article_by_id(req.article_id, req.source)
         if not article:
             return JSONResponse(status_code=404, content={"detail": "Article not found"})
         existing = (p.db.get_key_points_map().get((req.article_id, req.source)) or [])
 
         def _work():
-            return refine_article(
-                title=article.get("title") or "",
-                abstract=article.get("abstract") or "",
-                existing_key_points=existing,
+            return run_with_ephemeral_builtin(
+                lambda: refine_article(
+                    title=article.get("title") or "",
+                    abstract=article.get("abstract") or "",
+                    existing_key_points=existing,
+                    source=req.source or "",
+                    article_id=req.article_id or "",
+                )
             )
 
         result = await run_in_thread(_work)
@@ -1730,15 +1748,7 @@ async def api_ai_refine_article(req: AIArticleRequest, request: Request):
         result["label"] = "AI rewrite (from the abstract only — not extractive)"
         return result
     except LLMUnavailable as e:
-        detail = str(e) or "AI provider unavailable."
-        low = detail.lower()
-        if "ollama" in low and ("not running" in low or "unavailable" in low or "connection" in low):
-            detail = (
-                "Ollama is not running or not reachable (503). "
-                "Open Account → AI study aid → Start Ollama, or use an API key. "
-                "Extractive key points still work without AI."
-            )
-        return JSONResponse(status_code=503, content={"detail": detail})
+        return JSONResponse(status_code=503, content={"detail": _friendly_ai_unavailable(str(e))})
     except LLMError as e:
         return JSONResponse(status_code=400, content={"detail": str(e)})
     except Exception as e:
@@ -1752,6 +1762,7 @@ async def api_ai_refine_article(req: AIArticleRequest, request: Request):
 async def api_ai_ask_article(req: AIAskRequest, request: Request):
     """Answer a question using only this paper's title + abstract (opt-in AI).
 
+    Same lifecycle as Refine for built-in mode: start → answer → stop when idle.
     One paper per request — no whole-library Q&A (R5).
     """
     user = current_user(request)
@@ -1762,28 +1773,29 @@ async def api_ai_ask_article(req: AIAskRequest, request: Request):
     uid = user["user_id"]
     p = get_pipeline(uid)
     try:
-        from llm_service import LLMError, LLMUnavailable, ask_article, is_configured
+        from llm_service import (
+            LLMError,
+            LLMUnavailable,
+            ask_article,
+            is_configured,
+            run_with_ephemeral_builtin,
+        )
 
         if not is_configured():
-            return JSONResponse(
-                status_code=503,
-                content={
-                    "detail": (
-                        "AI is unavailable (not configured). Open Account → AI study aid "
-                        "(optional setup), start Ollama and pick a model, or add an "
-                        "OpenAI-compatible / Anthropic API key. Extractive key points still work."
-                    )
-                },
-            )
+            return JSONResponse(status_code=503, content={"detail": _ai_unconfigured_detail()})
         article = p.db.get_article_by_id(req.article_id, req.source)
         if not article:
             return JSONResponse(status_code=404, content={"detail": "Article not found"})
 
         def _work():
-            return ask_article(
-                question=req.question,
-                title=article.get("title") or "",
-                abstract=article.get("abstract") or "",
+            return run_with_ephemeral_builtin(
+                lambda: ask_article(
+                    question=req.question,
+                    title=article.get("title") or "",
+                    abstract=article.get("abstract") or "",
+                    source=req.source or "",
+                    article_id=req.article_id or "",
+                )
             )
 
         result = await run_in_thread(_work)
@@ -1792,15 +1804,7 @@ async def api_ai_ask_article(req: AIAskRequest, request: Request):
         result["label"] = "AI answer (title + abstract only)"
         return result
     except LLMUnavailable as e:
-        detail = str(e) or "AI provider unavailable."
-        low = detail.lower()
-        if "ollama" in low and ("not running" in low or "unavailable" in low or "connection" in low):
-            detail = (
-                "Ollama is not running or not reachable (503). "
-                "Open Account → AI study aid → Start Ollama, or use an API key. "
-                "Extractive key points still work without AI."
-            )
-        return JSONResponse(status_code=503, content={"detail": detail})
+        return JSONResponse(status_code=503, content={"detail": _friendly_ai_unavailable(str(e))})
     except LLMError as e:
         return JSONResponse(status_code=400, content={"detail": str(e)})
     except Exception as e:

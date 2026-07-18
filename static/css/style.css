@@ -1329,6 +1329,75 @@ input[type="range"]::-moz-range-thumb:hover {
 
 /* Extractive key points (from the abstract — not AI-generated) */
 /* Account: AI settings */
+/* === AI Ask modal (Campus Editorial) === */
+body.lra-modal-open {
+    overflow: hidden;
+}
+.lra-modal-root {
+    position: fixed;
+    inset: 0;
+    z-index: 1200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25rem;
+    box-sizing: border-box;
+}
+.lra-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: color-mix(in srgb, var(--text) 45%, transparent);
+    backdrop-filter: blur(2px);
+}
+.lra-modal-card {
+    position: relative;
+    z-index: 1;
+    width: min(32rem, 100%);
+    max-height: min(90vh, 36rem);
+    overflow: auto;
+    margin: 0;
+    padding: 1.25rem 1.35rem 1.15rem;
+    box-shadow: var(--elev-2, 0 12px 40px color-mix(in srgb, var(--text) 18%, transparent));
+    border: 1px solid var(--rule);
+    background: var(--surface, var(--bg));
+}
+.lra-modal-title {
+    margin: 0 0 0.5rem;
+    font-size: 1.25rem;
+    font-family: var(--font-serif, Georgia, serif);
+    font-weight: 600;
+    color: var(--text);
+}
+.lra-modal-paper {
+    margin: 0.35rem 0 0.75rem;
+}
+.lra-modal-textarea {
+    width: 100%;
+    min-height: 5rem;
+    resize: vertical;
+    font: inherit;
+    font-size: 1rem;
+    line-height: 1.4;
+    padding: 0.65rem 0.75rem;
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--text);
+    box-sizing: border-box;
+}
+.lra-modal-textarea:focus {
+    outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+    outline-offset: 1px;
+    border-color: var(--accent);
+}
+.lra-modal-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.55rem;
+    margin-top: 1rem;
+}
+
 .ai-settings-subhead {
     font-size: 0.95rem;
     margin: 1rem 0 0.4rem;

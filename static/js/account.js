@@ -49,7 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
  if (joinPreviewBtn) joinPreviewBtn.addEventListener('click', doAccountJoinPreview);
  if (joinBtn) joinBtn.addEventListener('click', doAccountJoin);
 
- // Optional AI study aid (Ollama lifecycle + multi-provider keys).
+ // Optional AI study aid: Built-in (auto start/stop) vs Cloud API key.
  // Classroom deployers can hide this card with HIDE_AI_BUTTONS=true.
  const aiSection = document.getElementById('ai-settings-section');
  if (aiSection) {
@@ -60,12 +60,10 @@ document.addEventListener('DOMContentLoaded', () => {
  }
  aiSection.hidden = false;
  loadAiSettings();
- const startBtn = document.getElementById('ai-ollama-start');
- const stopBtn = document.getElementById('ai-ollama-stop');
+ const modeSel = document.getElementById('ai-study-mode');
+ if (modeSel) modeSel.addEventListener('change', syncAiModePanels);
  const refreshBtn = document.getElementById('ai-status-refresh');
  const saveBtn = document.getElementById('ai-settings-save');
- if (startBtn) startBtn.addEventListener('click', () => doOllamaControl('start'));
- if (stopBtn) stopBtn.addEventListener('click', () => doOllamaControl('stop'));
  if (refreshBtn) refreshBtn.addEventListener('click', loadAiSettings);
  if (saveBtn) saveBtn.addEventListener('click', saveAiSettings);
  };
@@ -520,89 +518,64 @@ async function doDeleteAccount() {
  }
 }
 
-function applyAiStatus(st) {
- const detail = document.getElementById('ai-status-detail');
- if (detail) {
- const run = st.ollama_running ? 'running' : 'stopped';
- detail.textContent = `${st.detail || '—'} · Ollama ${run}`
- + (st.provider ? ` · active provider: ${st.provider}` : '');
- }
- const modelsLine = document.getElementById('ai-ollama-models-line');
- const list = document.getElementById('ai-ollama-model-list');
- const models = st.ollama_models || [];
- if (modelsLine) {
- modelsLine.textContent = models.length
- ? `Installed models: ${models.join(', ')}`
- : (st.ollama_running
- ? 'Ollama is running but no models are listed.'
- : 'Start Ollama to list installed models.');
- }
- if (list) {
- list.innerHTML = models.map(m => `<option value="${escapeHtml(m)}"></option>`).join('');
- }
- const controls = document.getElementById('ai-ollama-controls');
- if (controls && st.ollama_control_allowed === false) {
- controls.querySelectorAll('button').forEach(b => {
- if (b.id === 'ai-status-refresh') return;
- b.disabled = true;
- b.title = 'Ollama control disabled (AI_ALLOW_OLLAMA_CONTROL=false)';
- });
+function syncAiModePanels() {
+ const mode = (document.getElementById('ai-study-mode') || {}).value || 'built_in';
+ const builtin = document.getElementById('ai-builtin-panel');
+ const apikey = document.getElementById('ai-apikey-panel');
+ if (builtin) builtin.hidden = mode !== 'built_in';
+ if (apikey) apikey.hidden = mode !== 'api_key';
+ const hiddenProv = document.getElementById('ai-llm-provider');
+ if (hiddenProv) {
+  hiddenProv.value = mode === 'api_key' ? 'openai' : 'ollama';
  }
 }
 
-function fillAiSettingsForm(settings) {
+function applyAiStatus(st) {
+ const detail = document.getElementById('ai-status-detail');
+ if (detail) {
+  detail.textContent = st.detail || '—';
+ }
+}
+
+function fillAiSettingsForm(settings, status) {
  if (!settings) return;
  const set = (id, val) => {
- const el = document.getElementById(id);
- if (el && val != null && val !== '') el.value = val;
+  const el = document.getElementById(id);
+  if (el && val != null && val !== '') el.value = val;
  };
- set('ai-llm-provider', settings.llm_provider || 'auto');
- set('ai-ollama-model', settings.ollama_model || '');
- set('ai-ollama-host', settings.ollama_host || 'http://localhost:11434');
- set('ai-ollama-models-dir', settings.ollama_models_dir || '');
+ const modeSel = document.getElementById('ai-study-mode');
+ const mode = (status && status.study_aid_mode)
+  || (settings.study_aid_mode)
+  || ((settings.llm_provider === 'openai' || settings.llm_provider === 'anthropic')
+   ? 'api_key' : 'built_in');
+ if (modeSel) modeSel.value = mode === 'api_key' ? 'api_key' : 'built_in';
+ // Do not touch ollama host/model/dir here — deployer env only (no UI fields).
  set('ai-openai-model', settings.openai_model || '');
  set('ai-openai-base', settings.openai_base_url || '');
  set('ai-anthropic-model', settings.llm_model || '');
  const oh = document.getElementById('ai-openai-key-hint');
  if (oh) {
- oh.textContent = settings.openai_api_key_set
- ? `Saved key: ${settings.openai_api_key_masked || '••••'}`
- : 'No OpenAI-compatible key saved yet.';
+  oh.textContent = settings.openai_api_key_set
+   ? `Saved key: ${settings.openai_api_key_masked || '••••'}`
+   : 'No OpenAI-compatible key saved yet.';
  }
  const ah = document.getElementById('ai-anthropic-key-hint');
  if (ah) {
- ah.textContent = settings.anthropic_api_key_set
- ? `Saved key: ${settings.anthropic_api_key_masked || '••••'}`
- : 'No Anthropic key saved yet.';
+  ah.textContent = settings.anthropic_api_key_set
+   ? `Saved key: ${settings.anthropic_api_key_masked || '••••'}`
+   : 'No Anthropic key saved yet.';
  }
+ syncAiModePanels();
 }
 
 async function loadAiSettings() {
  try {
- const data = await apiCall('/api/ai/settings');
- fillAiSettingsForm(data.settings || {});
- applyAiStatus(data.status || {});
+  const data = await apiCall('/api/ai/settings');
+  fillAiSettingsForm(data.settings || {}, data.status || {});
+  applyAiStatus(data.status || {});
  } catch (e) {
- const detail = document.getElementById('ai-status-detail');
- if (detail) detail.textContent = `Could not load AI status: ${e.message}`;
- }
-}
-
-async function doOllamaControl(action) {
- const startBtn = document.getElementById('ai-ollama-start');
- const stopBtn = document.getElementById('ai-ollama-stop');
- const btn = action === 'start' ? startBtn : stopBtn;
- if (btn) setLoading(btn, true);
- try {
- const data = await apiCall(`/api/ai/ollama/${action}`, { method: 'POST', body: {} });
- showNotification(data.message || (action === 'start' ? 'Start requested' : 'Stop requested'),
- data.ok ? 'success' : 'warning');
- if (data.status) applyAiStatus(data.status);
- else await loadAiSettings();
- } catch (e) {
- showNotification(`Ollama ${action} failed: ${e.message}`, 'error');
- } finally {
- if (btn) setLoading(btn, false);
+  const detail = document.getElementById('ai-status-detail');
+  if (detail) detail.textContent = `Could not load AI status: ${e.message}`;
  }
 }
 
@@ -610,32 +583,45 @@ async function saveAiSettings() {
  const btn = document.getElementById('ai-settings-save');
  setLoading(btn, true);
  setStatus('ai-settings-status', 'Saving…', 'info');
+ const mode = (document.getElementById('ai-study-mode') || {}).value || 'built_in';
+ let llmProvider = 'ollama';
+ if (mode === 'api_key') {
+  // Prefer OpenAI-compatible when a key is typed or already saved; else Anthropic.
+  const oaiTyped = ((document.getElementById('ai-openai-key') || {}).value || '').trim();
+  const antTyped = ((document.getElementById('ai-anthropic-key') || {}).value || '').trim();
+  const oh = document.getElementById('ai-openai-key-hint');
+  const ah = document.getElementById('ai-anthropic-key-hint');
+  const oaiSaved = oh && /Saved key/i.test(oh.textContent || '');
+  const antSaved = ah && /Saved key/i.test(ah.textContent || '');
+  if (antTyped || (antSaved && !oaiTyped && !oaiSaved)) {
+   llmProvider = 'anthropic';
+  } else {
+   llmProvider = 'openai';
+  }
+ }
+ // Only send fields the user can edit. Never wipe deployer ollama host/model/dir.
  const body = {
- llm_provider: (document.getElementById('ai-llm-provider') || {}).value || 'auto',
- ollama_model: (document.getElementById('ai-ollama-model') || {}).value || '',
- ollama_host: (document.getElementById('ai-ollama-host') || {}).value || '',
- ollama_models_dir: (document.getElementById('ai-ollama-models-dir') || {}).value || '',
- openai_model: (document.getElementById('ai-openai-model') || {}).value || '',
- openai_base_url: (document.getElementById('ai-openai-base') || {}).value || '',
- llm_model: (document.getElementById('ai-anthropic-model') || {}).value || '',
+  llm_provider: llmProvider,
+  openai_model: (document.getElementById('ai-openai-model') || {}).value || '',
+  openai_base_url: (document.getElementById('ai-openai-base') || {}).value || '',
+  llm_model: (document.getElementById('ai-anthropic-model') || {}).value || '',
  };
  const oai = (document.getElementById('ai-openai-key') || {}).value;
  const ant = (document.getElementById('ai-anthropic-key') || {}).value;
- // Only send keys when the user typed something (blank = keep existing).
  if (oai) body.openai_api_key = oai;
  if (ant) body.anthropic_api_key = ant;
  try {
- const data = await apiCall('/api/ai/settings', { method: 'POST', body });
- setStatus('ai-settings-status', 'AI settings saved.', 'success');
- showNotification('AI settings saved.', 'success');
- fillAiSettingsForm(data.settings || {});
- if (data.status_detail) applyAiStatus(data.status_detail);
- if (document.getElementById('ai-openai-key')) document.getElementById('ai-openai-key').value = '';
- if (document.getElementById('ai-anthropic-key')) document.getElementById('ai-anthropic-key').value = '';
+  const data = await apiCall('/api/ai/settings', { method: 'POST', body });
+  setStatus('ai-settings-status', 'AI settings saved.', 'success');
+  showNotification('AI settings saved.', 'success');
+  fillAiSettingsForm(data.settings || {}, data.status_detail || {});
+  if (data.status_detail) applyAiStatus(data.status_detail);
+  if (document.getElementById('ai-openai-key')) document.getElementById('ai-openai-key').value = '';
+  if (document.getElementById('ai-anthropic-key')) document.getElementById('ai-anthropic-key').value = '';
  } catch (e) {
- setStatus('ai-settings-status', `Error: ${e.message}`, 'error');
- showNotification(`Could not save AI settings: ${e.message}`, 'error');
+  setStatus('ai-settings-status', `Error: ${e.message}`, 'error');
+  showNotification(`Could not save AI settings: ${e.message}`, 'error');
  } finally {
- setLoading(btn, false);
+  setLoading(btn, false);
  }
 }

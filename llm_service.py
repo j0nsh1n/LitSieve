@@ -32,9 +32,10 @@ import platform
 import re
 import shutil
 import subprocess
+import threading
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Type
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 
 from pydantic import BaseModel, Field
 
@@ -44,6 +45,13 @@ logger = logging.getLogger(__name__)
 AI_SETTINGS_PATH = Path("user_data") / "ai_settings.json"
 
 _SETTINGS_CACHE: Optional[Dict[str, Any]] = None
+
+# Built-in local service (Ollama under the hood; keep UI wording generic).
+# hold_count: concurrent Refine/Ask ops share one started process; stop only
+# when the last op finishes. _started_by_app: only stop what we started.
+_builtin_lock = threading.Lock()
+_builtin_hold_count = 0
+_builtin_started_by_app = False
 
 
 class LLMUnavailable(RuntimeError):
@@ -150,6 +158,24 @@ def apply_ai_settings_to_env(settings: Optional[Dict[str, Any]] = None) -> None:
         os.environ[env_key] = str(val)
 
 
+def study_aid_mode() -> str:
+    """Student-facing mode: built_in (local service) or api_key (cloud)."""
+    apply_ai_settings_to_env()
+    pref = (_env("LLM_PROVIDER", "auto") or "auto").lower()
+    if pref == "ollama":
+        return "built_in"
+    if pref in ("openai", "anthropic"):
+        return "api_key"
+    # auto: prefer built-in when a local model is configured, else API keys.
+    if _env("OLLAMA_MODEL") or load_ai_settings().get("ollama_model"):
+        return "built_in"
+    if _env("OPENAI_API_KEY") or _env("ANTHROPIC_API_KEY"):
+        return "api_key"
+    if load_ai_settings().get("openai_api_key") or load_ai_settings().get("anthropic_api_key"):
+        return "api_key"
+    return "built_in"
+
+
 def public_ai_settings() -> Dict[str, Any]:
     """Settings safe to show in the UI (keys masked)."""
     apply_ai_settings_to_env()
@@ -184,6 +210,7 @@ def public_ai_settings() -> Dict[str, Any]:
             "LLM_TIMEOUT_SECONDS", str(data.get("llm_timeout_seconds") or "120")
         ),
         "ollama_control_allowed": ollama_control_allowed(),
+        "study_aid_mode": study_aid_mode(),
         "settings_path": str(_settings_path()),
     }
 
@@ -205,18 +232,21 @@ def provider() -> Optional[str]:
     """Pick active provider: auto prefers Ollama, then OpenAI-compatible, then Anthropic."""
     apply_ai_settings_to_env()
     pref = _env("LLM_PROVIDER", "auto").lower() or "auto"
-    has_ollama = bool(_env("OLLAMA_MODEL"))
+    # Built-in: model may be filled after the local service starts (first installed tag).
+    has_ollama = bool(_env("OLLAMA_MODEL") or load_ai_settings().get("ollama_model"))
     has_openai = bool(_env("OPENAI_API_KEY"))
     has_anthropic = bool(_env("ANTHROPIC_API_KEY"))
     if pref in ("ollama", "openai", "anthropic"):
-        if pref == "ollama" and has_ollama:
-            return "ollama"
+        if pref == "ollama":
+            # Built-in mode is selected even before a model tag is known — ensure
+            # will pick the first installed model after the service starts.
+            return "ollama" if (has_ollama or ollama_control_allowed()) else None
         if pref == "openai" and has_openai:
             return "openai"
         if pref == "anthropic" and has_anthropic:
             return "anthropic"
         return None
-    # auto
+    # auto: only claim ollama when a model is configured (or file has one).
     if has_ollama:
         return "ollama"
     if has_openai:
@@ -228,6 +258,102 @@ def provider() -> Optional[str]:
 
 def is_configured() -> bool:
     return provider() is not None
+
+
+def _ensure_ollama_model_env() -> Optional[str]:
+    """Return a usable model tag, preferring env/settings, else first installed."""
+    apply_ai_settings_to_env()
+    model = _env("OLLAMA_MODEL") or str(load_ai_settings().get("ollama_model") or "").strip()
+    if model:
+        os.environ["OLLAMA_MODEL"] = model
+        return model
+    models = list_ollama_models()
+    if models:
+        os.environ["OLLAMA_MODEL"] = models[0]
+        return models[0]
+    return None
+
+
+def ensure_builtin_service() -> Tuple[bool, str]:
+    """Start the built-in local study aid if needed and take a hold.
+
+    Used by run_with_ephemeral_builtin for Refine/Ask (start → work → release).
+    Concurrent ops share one process via hold_count; we only stop what we started.
+    """
+    global _builtin_hold_count, _builtin_started_by_app
+    if provider() != "ollama":
+        return True, "Using cloud API study aid."
+    if not ollama_control_allowed() and not ollama_running():
+        return False, (
+            "Built-in study aid is not available on this server. "
+            "Ask a teacher to enable it, or switch to API key mode on Account."
+        )
+    with _builtin_lock:
+        was_running = ollama_running()
+        if not was_running:
+            if not ollama_control_allowed():
+                return False, (
+                    "Built-in study aid is stopped and this server cannot start it. "
+                    "Use API key mode on Account, or ask a teacher for help."
+                )
+            ok, msg = start_ollama()
+            if not ok:
+                friendly = msg
+                low = msg.lower()
+                if "not found" in low or "path" in low:
+                    friendly = (
+                        "Built-in study aid is not installed on this computer. "
+                        "Use API key mode on Account, or ask a teacher."
+                    )
+                elif "disabled" in low:
+                    friendly = (
+                        "Built-in study aid is disabled on this server. "
+                        "Use API key mode on Account."
+                    )
+                return False, friendly
+            _builtin_started_by_app = True
+        model = _ensure_ollama_model_env()
+        if not model:
+            return False, (
+                "Built-in study aid has no model installed yet. "
+                "Ask a teacher to install a model, or use API key mode."
+            )
+        _builtin_hold_count += 1
+        return True, "Built-in study aid ready."
+
+
+def release_builtin_service() -> Tuple[bool, str]:
+    """Drop a hold; stop the local service when no holds remain and we started it."""
+    global _builtin_hold_count, _builtin_started_by_app
+    with _builtin_lock:
+        _builtin_hold_count = max(0, _builtin_hold_count - 1)
+        if _builtin_hold_count > 0:
+            return True, "Study aid still in use."
+        if not _builtin_started_by_app:
+            return True, "Study aid left as it was (not started by this app)."
+        if not ollama_control_allowed():
+            _builtin_started_by_app = False
+            return True, "Study aid hold released."
+        ok, msg = stop_ollama()
+        _builtin_started_by_app = False
+        return ok, (
+            "Built-in study aid stopped."
+            if ok
+            else (msg or "Could not stop built-in study aid.")
+        )
+
+
+def run_with_ephemeral_builtin(fn: Callable[[], Any]) -> Any:
+    """Start built-in if needed, run fn, then release (stops when last op finishes)."""
+    if provider() != "ollama":
+        return fn()
+    ok, msg = ensure_builtin_service()
+    if not ok:
+        raise LLMUnavailable(msg)
+    try:
+        return fn()
+    finally:
+        release_builtin_service()
 
 
 def _timeout() -> float:
@@ -364,14 +490,17 @@ def stop_ollama() -> Tuple[bool, str]:
 
 
 def status() -> Dict[str, Any]:
-    """Honest multi-provider status for the UI."""
+    """Honest multi-provider status for the UI (student copy avoids engine names)."""
     apply_ai_settings_to_env()
     selected = provider()
     models = list_ollama_models() if ollama_running() else []
     ollama_on = ollama_running()
+    mode = study_aid_mode()
     base = {
         "provider": selected,
+        "study_aid_mode": mode,
         "ollama_running": ollama_on,
+        "builtin_running": ollama_on,
         "ollama_models": models,
         "ollama_control_allowed": ollama_control_allowed(),
         "configured": is_configured(),
@@ -383,38 +512,46 @@ def status() -> Dict[str, Any]:
             "reachable": False,
             "model_available": False,
             "detail": (
-                "No AI configured. Start Ollama and set a model, or add an "
-                "OpenAI-compatible / Anthropic API key on the Account page."
+                "No AI study aid configured. On Account, choose Built-in study aid "
+                "or add a cloud API key."
             ),
         })
         return base
     if selected == "ollama":
-        model = _env("OLLAMA_MODEL")
+        model = _env("OLLAMA_MODEL") or str(load_ai_settings().get("ollama_model") or "")
         available = any(
-            n == model or n.split(":")[0] == model.split(":")[0]
+            n == model or n.split(":")[0] == (model.split(":")[0] if model else "")
             for n in models
-        ) if ollama_on else False
-        if not ollama_on:
-            detail = "Ollama is not running — use Start Ollama on the Account page."
-        elif not available:
-            detail = f"Ollama is running but '{model}' is not installed (ollama pull {model})."
+        ) if (ollama_on and model) else False
+        if mode == "built_in":
+            if not ollama_control_allowed() and not ollama_on:
+                detail = "Built-in study aid is unavailable on this server."
+            elif not model and not models:
+                detail = (
+                    "Built-in study aid is selected — it starts when you Refine or Ask "
+                    "(a model must be installed on the server), then stops."
+                )
+            else:
+                detail = (
+                    "Built-in study aid is selected. It starts for each Refine or Ask "
+                    "on Search, then stops when that request finishes."
+                )
         else:
-            detail = f"Local AI ready ({model})."
+            detail = "Local study aid selected."
         base.update({
-            "model": model,
+            "model": model or None,
             "reachable": ollama_on,
-            "model_available": available,
+            "model_available": available or bool(model) or ollama_control_allowed(),
             "detail": detail,
         })
         return base
     if selected == "openai":
         model = _env("OPENAI_MODEL", "gpt-4o-mini")
-        base_url = _env("OPENAI_BASE_URL", "https://api.openai.com/v1")
         base.update({
             "model": model,
             "reachable": True,
             "model_available": True,
-            "detail": f"OpenAI-compatible API ready ({model} @ {base_url}).",
+            "detail": f"Cloud API study aid ready ({model}).",
         })
         return base
     # anthropic
@@ -423,26 +560,45 @@ def status() -> Dict[str, Any]:
         "model": model,
         "reachable": True,
         "model_available": True,
-        "detail": f"Anthropic API ({model}) configured.",
+        "detail": f"Cloud API study aid ready ({model}).",
     })
     return base
 
 
 _REFINE_SYSTEM = (
-    "You are a careful study-aid for students reading academic abstracts. "
-    "Summarize ONLY what the abstract states — never invent results, numbers, "
-    "populations, or claims that are not present. Be plain-language and concise. "
-    "Do NOT invent a study design grade or evidence hierarchy. Hedge appropriately. "
-    "This is a study aid, not medical, legal, or professional advice. "
-    "Respond with JSON matching the requested schema only."
+    "You are a careful classroom study aid for high school and early college "
+    "students using a literature research app.\n\n"
+    "CONTEXT / ROLE:\n"
+    "- The student selected ONE paper from their personal library in this app.\n"
+    "- You are given that paper's title and abstract only (not the full PDF or "
+    "paywalled text). Treat that supplied text as your entire knowledge of the paper.\n"
+    "- Your job is to help them understand and take notes on this selected paper: "
+    "a plain-language summary, honest limitations, and short key points.\n\n"
+    "RULES:\n"
+    "- Use ONLY the title and abstract provided in the user message. Never invent "
+    "results, numbers, populations, methods, or claims that are not there.\n"
+    "- If the abstract is vague, say so; do not fill gaps with outside knowledge.\n"
+    "- Write clear language suitable for high school. Be concise.\n"
+    "- Do NOT invent a study design grade, clinical evidence level (A–D), or "
+    "quality score.\n"
+    "- Do NOT give medical, legal, or professional advice.\n"
+    "- Respond with JSON matching the requested schema only (no markdown fences)."
 )
 
 _ASK_SYSTEM = (
-    "You answer a student's question about ONE academic paper using ONLY the "
-    "title and abstract provided. Quote 1-3 short verbatim snippets that support "
-    "your answer. If the abstract does not address the question, say so plainly. "
-    "Do not use outside knowledge, do not speculate, and do not give professional advice. "
-    "Respond with JSON matching the requested schema only."
+    "You are a careful classroom study aid for high school and early college "
+    "students using a literature research app.\n\n"
+    "CONTEXT / ROLE:\n"
+    "- The student selected ONE paper from their personal library and typed a question.\n"
+    "- You are given that paper's title and abstract only (not the full PDF).\n"
+    "- Answer only from that supplied text.\n\n"
+    "RULES:\n"
+    "- Use ONLY the title and abstract in the user message. Never invent facts.\n"
+    "- Quote 1–3 short verbatim snippets from the abstract when they support the answer.\n"
+    "- If the abstract does not address the question, say so plainly.\n"
+    "- No outside knowledge, no speculation, no medical/legal/professional advice.\n"
+    "- No evidence grades (A–D) or quality scores.\n"
+    "- Respond with JSON matching the requested schema only (no markdown fences)."
 )
 
 
@@ -450,6 +606,9 @@ def refine_article(
     title: str,
     abstract: str,
     existing_key_points: Optional[List[str]] = None,
+    *,
+    source: str = "",
+    article_id: str = "",
 ) -> Dict[str, Any]:
     abstract = (abstract or "").strip()
     if len(abstract) < 40:
@@ -457,16 +616,28 @@ def refine_article(
     kp_block = ""
     if existing_key_points:
         kp_block = (
-            "\nExisting extractive key points (rewrite/improve, still abstract-only):\n"
+            "\nExisting extractive key points from the app (improve if useful, "
+            "still abstract-only; do not invent beyond the abstract):\n"
             + "\n".join(f"- {b}" for b in existing_key_points[:8])
             + "\n"
         )
+    loc = ""
+    if source or article_id:
+        loc = f"Library record: source={source or 'unknown'}, id={article_id or 'unknown'}\n"
     prompt = (
-        f"Title: {title or 'Untitled'}\n\n"
-        f"Abstract:\n{abstract}\n"
+        "TASK: The student clicked “Refine with AI” on the paper below. "
+        "Help them understand THIS selected paper only.\n\n"
+        f"{loc}"
+        f"SELECTED PAPER TITLE:\n{title or 'Untitled'}\n\n"
+        f"SELECTED PAPER ABSTRACT (sole evidence — do not go beyond this text):\n"
+        f"{abstract}\n"
         f"{kp_block}\n"
-        "Write a faithful plain-language summary, a short limitations note, "
-        "and 3-6 bullet key points. Do not invent anything beyond the abstract."
+        "OUTPUT REQUIREMENTS:\n"
+        "- summary: 2–4 plain-language sentences of what the paper did and found "
+        "(only if stated in the abstract).\n"
+        "- limitations: 1–2 sentences on limits or missing info, hedged honestly.\n"
+        "- key_points: 3–6 short bullets a student could paste into notes.\n"
+        "Stay faithful to the abstract. If something is unclear, say so."
     )
     parsed: RefinedArticle = _structured_call(_REFINE_SYSTEM, prompt, RefinedArticle)
     return {
@@ -478,17 +649,32 @@ def refine_article(
     }
 
 
-def ask_article(question: str, title: str, abstract: str) -> Dict[str, Any]:
+def ask_article(
+    question: str,
+    title: str,
+    abstract: str,
+    *,
+    source: str = "",
+    article_id: str = "",
+) -> Dict[str, Any]:
     question = (question or "").strip()
     abstract = (abstract or "").strip()
     if len(question) < 3:
         raise LLMError("Ask a longer question.")
     if len(abstract) < 40:
         raise LLMError("Abstract is too short for AI Q&A.")
+    loc = ""
+    if source or article_id:
+        loc = f"Library record: source={source or 'unknown'}, id={article_id or 'unknown'}\n"
     prompt = (
-        f"Article title: {title or 'Untitled'}\n\n"
-        f"Abstract:\n{abstract}\n\n"
-        f"Question: {question}"
+        "TASK: The student clicked “Ask about this paper” and typed the question below. "
+        "Answer using ONLY the selected paper’s title and abstract.\n\n"
+        f"{loc}"
+        f"SELECTED PAPER TITLE:\n{title or 'Untitled'}\n\n"
+        f"SELECTED PAPER ABSTRACT (sole evidence):\n{abstract}\n\n"
+        f"STUDENT QUESTION:\n{question}\n\n"
+        "OUTPUT: plain-language answer + up to 3 short verbatim quotes from the abstract "
+        "(empty quotes list if nothing supports the answer)."
     )
     parsed: ArticleAnswer = _structured_call(_ASK_SYSTEM, prompt, ArticleAnswer)
     return {
@@ -503,14 +689,15 @@ def _structured_call(system: str, prompt: str, schema_model: Type[BaseModel]):
     selected = provider()
     if selected is None:
         raise LLMUnavailable(
-            "No LLM provider configured. Start Ollama or set an API key."
+            "No LLM provider configured. Choose Built-in or Cloud API key on Account."
         )
     if selected == "ollama":
-        # Fail fast with 503-class unavailable when the local daemon is down.
+        # Fail fast with 503 when the local service is down (ephemeral start should
+        # have warmed it; this catches races / control-disabled cases).
         if not ollama_running():
             raise LLMUnavailable(
-                "Ollama is not running. Start it from Account → AI study aid, "
-                "or switch to an API key provider."
+                "Built-in study aid is not running. Try Refine/Ask again, "
+                "or switch to Cloud API key on Account."
             )
         return _structured_ollama(system, prompt, schema_model)
     if selected == "openai":

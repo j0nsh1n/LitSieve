@@ -21,7 +21,7 @@ def test_account_ai_card_collapsed_by_default():
     assert 'id="ai-settings-section"' in html
     assert 'id="ai-settings-details"' in html
     assert "optional" in html.lower()
-    assert "needs setup" in html.lower()
+    assert "built-in" in html.lower() or "study aid" in html.lower()
     # Must not force the outer AI panel open on first visit.
     assert 'id="ai-settings-details" open' not in html
     assert 'ai-settings-details" open' not in html
@@ -40,6 +40,9 @@ def test_no_bulk_ai_library_endpoints():
     assert not (paths & forbidden)
     assert "/api/ai/refine-article" in paths
     assert "/api/ai/ask-article" in paths
+    # Long-lived ask sessions removed — ephemeral start/stop only.
+    assert "/api/ai/session/begin" not in paths
+    assert "/api/ai/session/end" not in paths
 
 
 def test_finish_research_and_citation_guides():
