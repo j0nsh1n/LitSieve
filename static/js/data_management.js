@@ -1,34 +1,131 @@
 // === Topic and source definitions ===
-const TOPICS = [
- { id: 'health', name: 'Health & Medicine', icon: '🏥', sources: ['pubmed', 'europepmc', 'clinicaltrials', 'openalex', 'semanticscholar', 'doaj', 'zenodo', 'core'] },
- { id: 'biology', name: 'Biology', icon: '🧬', sources: ['pubmed', 'europepmc', 'openalex', 'arxiv', 'semanticscholar', 'crossref', 'zenodo', 'doaj', 'core'] },
- { id: 'chemistry', name: 'Chemistry', icon: '⚗️', sources: ['openalex', 'arxiv', 'semanticscholar', 'crossref', 'zenodo', 'doaj', 'core'] },
- { id: 'physics', name: 'Physics', icon: '⚛️', sources: ['arxiv', 'openalex', 'semanticscholar', 'crossref', 'zenodo', 'nasa_ads', 'core'] },
- { id: 'math', name: 'Mathematics', icon: '📐', sources: ['arxiv', 'openalex', 'semanticscholar', 'crossref', 'zenodo', 'core'] },
- { id: 'cs', name: 'Computer Science', icon: '💻', sources: ['arxiv', 'openalex', 'semanticscholar', 'crossref', 'zenodo', 'doaj', 'core'] },
- { id: 'earth', name: 'Earth & Environment', icon: '🌍', sources: ['openalex', 'semanticscholar', 'zenodo', 'crossref', 'doaj', 'nasa_ads', 'core'] },
- { id: 'history', name: 'History', icon: '📜', sources: ['openalex', 'semanticscholar', 'eric', 'crossref', 'doaj', 'core'] },
- { id: 'economics', name: 'Economics', icon: '📊', sources: ['arxiv', 'openalex', 'semanticscholar', 'eric', 'crossref', 'doaj', 'core'] },
- { id: 'psychology', name: 'Psychology', icon: '🧠', sources: ['pubmed', 'openalex', 'semanticscholar', 'eric', 'crossref', 'doaj', 'core'] },
- { id: 'polisci', name: 'Political Science', icon: '🏛️', sources: ['openalex', 'semanticscholar', 'eric', 'crossref', 'doaj', 'core'] },
- { id: 'literature', name: 'Literature & Language',icon: '📖', sources: ['openalex', 'semanticscholar', 'eric', 'crossref', 'doaj', 'core'] },
- { id: 'education', name: 'Education', icon: '🎓', sources: ['eric', 'openalex', 'semanticscholar', 'crossref', 'doaj', 'core'] },
+// Fallbacks used if GET /api/sources fails. Canonical data lives in source_catalog.py.
+let TOPICS = [
+ { id: 'health', name: 'Health & Medicine', icon: '🏥', sources: ['pubmed', 'europepmc', 'clinicaltrials', 'medrxiv', 'plos', 'openalex', 'semanticscholar', 'doaj', 'zenodo', 'core'] },
+ { id: 'biology', name: 'Biology', icon: '🧬', sources: ['pubmed', 'europepmc', 'biorxiv', 'plos', 'openalex', 'arxiv', 'semanticscholar', 'crossref', 'zenodo', 'doaj', 'core'] },
+ { id: 'chemistry', name: 'Chemistry', icon: '⚗️', sources: ['openalex', 'arxiv', 'semanticscholar', 'crossref', 'zenodo', 'doaj', 'core', 'openaire'] },
+ { id: 'physics', name: 'Physics', icon: '⚛️', sources: ['arxiv', 'openalex', 'semanticscholar', 'crossref', 'zenodo', 'nasa_ads', 'core', 'openaire'] },
+ { id: 'math', name: 'Mathematics', icon: '📐', sources: ['arxiv', 'openalex', 'semanticscholar', 'crossref', 'zenodo', 'core', 'openaire'] },
+ { id: 'cs', name: 'Computer Science', icon: '💻', sources: ['dblp', 'arxiv', 'openalex', 'semanticscholar', 'crossref', 'zenodo', 'doaj', 'core', 'openaire'] },
+ { id: 'earth', name: 'Earth & Environment', icon: '🌍', sources: ['openalex', 'semanticscholar', 'zenodo', 'crossref', 'doaj', 'nasa_ads', 'core', 'openaire', 'hal'] },
+ { id: 'history', name: 'History', icon: '📜', sources: ['openalex', 'semanticscholar', 'eric', 'crossref', 'doaj', 'core', 'hal', 'openaire'] },
+ { id: 'economics', name: 'Economics', icon: '📊', sources: ['arxiv', 'openalex', 'semanticscholar', 'eric', 'crossref', 'doaj', 'core', 'openaire'] },
+ { id: 'psychology', name: 'Psychology', icon: '🧠', sources: ['pubmed', 'openalex', 'semanticscholar', 'eric', 'crossref', 'doaj', 'core', 'openaire'] },
+ { id: 'polisci', name: 'Political Science', icon: '🏛️', sources: ['openalex', 'semanticscholar', 'eric', 'crossref', 'doaj', 'core', 'hal', 'openaire'] },
+ { id: 'literature', name: 'Literature & Language',icon: '📖', sources: ['openalex', 'semanticscholar', 'eric', 'crossref', 'doaj', 'core', 'hal', 'openaire'] },
+ { id: 'education', name: 'Education', icon: '🎓', sources: ['eric', 'openalex', 'semanticscholar', 'crossref', 'doaj', 'core', 'hal', 'openaire'] },
 ];
 
-const ALL_SOURCES = {
- pubmed: { name: 'PubMed', desc: 'Biomedical & life sciences' },
- europepmc: { name: 'Europe PMC', desc: 'European biomedical literature' },
- clinicaltrials: { name: 'ClinicalTrials.gov', desc: 'Clinical trial registrations' },
- openalex: { name: 'OpenAlex', desc: 'Broad multi-discipline academic' },
- arxiv: { name: 'arXiv', desc: 'Physics, math, CS, econ preprints' },
- semanticscholar: { name: 'Semantic Scholar', desc: 'AI-curated cross-discipline research' },
- eric: { name: 'ERIC', desc: 'Education, psychology, social sciences' },
- zenodo: { name: 'Zenodo', desc: 'Open science: all fields + datasets' },
- crossref: { name: 'CrossRef', desc: 'Broad academic metadata registry' },
- doaj: { name: 'DOAJ', desc: 'Peer-reviewed open access journals' },
- nasa_ads: { name: 'NASA ADS', desc: 'Astronomy, astrophysics & geosciences' },
- core: { name: 'CORE', desc: 'Open-access full text, all disciplines' },
+let TOPIC_PACKS = [
+ {
+ id: 'pack_climate',
+ name: 'Climate unit',
+ icon: '🌡️',
+ blurb: 'Earth & environment sources for climate projects',
+ topics: ['earth'],
+ sources: ['openalex', 'semanticscholar', 'nasa_ads', 'zenodo', 'crossref', 'doaj', 'core', 'openaire'],
+ queryHint: 'climate change impacts on ecosystems',
+ },
+ {
+ id: 'pack_health_ed',
+ name: 'Health education',
+ icon: '❤️',
+ blurb: 'Health + classroom education databases',
+ topics: ['health', 'education'],
+ sources: ['pubmed', 'europepmc', 'eric', 'openalex', 'semanticscholar', 'plos', 'doaj', 'core'],
+ queryHint: 'school-based health education programs',
+ },
+ {
+ id: 'pack_history',
+ name: 'History unit',
+ icon: '📜',
+ blurb: 'History and social-science open sources',
+ topics: ['history'],
+ sources: ['openalex', 'semanticscholar', 'eric', 'crossref', 'doaj', 'hal', 'core', 'openaire'],
+ queryHint: 'civil rights movement oral history',
+ },
+ {
+ id: 'pack_cs_intro',
+ name: 'CS intro',
+ icon: '💻',
+ blurb: 'CS bibliography + arXiv (many DBLP hits lack abstracts)',
+ topics: ['cs'],
+ sources: ['dblp', 'arxiv', 'openalex', 'semanticscholar', 'crossref', 'doaj', 'core'],
+ queryHint: 'introductory computer science education',
+ },
+];
+
+/** @type {Record<string, {name:string, desc:string, tip?:string, good_for?:string, misses?:string, badges?:string[], needs_key?:boolean}>} */
+let ALL_SOURCES = {
+ pubmed: { name: 'PubMed', desc: 'Biomedical & life sciences', tip: 'Strong for health/biology abstracts.' },
+ europepmc: { name: 'Europe PMC', desc: 'European biomedical literature', tip: 'Biomedical; may overlap PubMed.' },
+ clinicaltrials: { name: 'ClinicalTrials.gov', desc: 'Clinical trial registrations', tip: 'Trial registries, not journal articles.' },
+ openalex: { name: 'OpenAlex', desc: 'Broad multi-discipline academic', tip: 'Best all-round free starter.' },
+ arxiv: { name: 'arXiv', desc: 'Physics, math, CS, econ preprints', tip: 'Preprints — not always peer-reviewed yet.', badges: ['preprint'] },
+ semanticscholar: { name: 'Semantic Scholar', desc: 'AI-curated cross-discipline research', tip: 'Strong free cross-discipline search.' },
+ eric: { name: 'ERIC', desc: 'Education, psychology, social sciences', tip: 'Best free education database.' },
+ zenodo: { name: 'Zenodo', desc: 'Open science: all fields + datasets', tip: 'Open deposits (papers + data).' },
+ crossref: { name: 'CrossRef', desc: 'Broad academic metadata registry', tip: 'Huge DOI registry; skips no-abstract items.' },
+ doaj: { name: 'DOAJ', desc: 'Peer-reviewed open access journals', tip: 'Peer-reviewed open access journals.' },
+ nasa_ads: { name: 'NASA ADS', desc: 'Astronomy, astrophysics & geosciences', tip: 'Space & geoscience (token required).', needs_key: true },
+ core: { name: 'CORE', desc: 'Open-access full text, all disciplines', tip: 'OA full text (API key required).', needs_key: true },
+ biorxiv: { name: 'bioRxiv', desc: 'Biology preprints', tip: 'Not peer-reviewed; recent window only.', badges: ['preprint', 'not-peer-reviewed'] },
+ medrxiv: { name: 'medRxiv', desc: 'Health preprints', tip: 'Not peer-reviewed; recent window only.', badges: ['preprint', 'not-peer-reviewed'] },
+ dblp: { name: 'DBLP', desc: 'Computer science papers & conferences', tip: 'Title/venue often; many abstracts skipped.', badges: ['title-only'] },
+ openaire: { name: 'OpenAIRE', desc: 'European open research aggregator', tip: 'European open research graph.' },
+ plos: { name: 'PLOS', desc: 'Fully open-access science journals', tip: 'Open-access science journals.' },
+ hal: { name: 'HAL', desc: 'French national open archive (multi-discipline)', tip: 'French open archive; language mix varies.' },
 };
+
+/** Apply server catalog (source_catalog.py) so tips / topics / packs cannot drift. */
+async function loadSourceCatalog() {
+ try {
+ const data = await fetch('/api/sources', {
+ headers: { Accept: 'application/json' },
+ credentials: 'same-origin',
+ }).then((r) => (r.ok ? r.json() : null));
+ if (data && Array.isArray(data.sources) && data.sources.length) {
+ const next = {};
+ const names = window.LRA_SOURCE_NAMES || {};
+ data.sources.forEach((s) => {
+ if (!s || !s.id) return;
+ next[s.id] = {
+ name: s.name || s.id,
+ desc: s.desc || '',
+ tip: s.tip || '',
+ good_for: s.good_for || '',
+ misses: s.misses || '',
+ badges: s.badges || [],
+ needs_key: !!s.needs_key,
+ };
+ names[s.id] = s.name || s.id;
+ });
+ ALL_SOURCES = next;
+ window.LRA_SOURCE_NAMES = names;
+ }
+ if (data && Array.isArray(data.topics) && data.topics.length) {
+ TOPICS = data.topics.map((t) => ({
+ id: t.id,
+ name: t.name,
+ icon: t.icon || '',
+ sources: t.sources || [],
+ }));
+ }
+ if (data && Array.isArray(data.packs) && data.packs.length) {
+ TOPIC_PACKS = data.packs.map((p) => ({
+ id: p.id,
+ name: p.name,
+ icon: p.icon || '',
+ blurb: p.blurb || '',
+ topics: p.topics || [],
+ sources: p.sources || [],
+ queryHint: p.queryHint || p.query_hint || '',
+ }));
+ }
+ } catch (e) {
+ // Keep hardcoded fallbacks.
+ }
+}
 
 // Which analysis model suits each topic. Mixed categories fall back to
 // 'general' (fast and neutral). Advanced dropdown always overrides.
@@ -55,11 +152,15 @@ let selectedTopics = new Set();
 let modelManual = false; // true once the user picks a model under Advanced
 
 document.addEventListener('DOMContentLoaded', () => {
+ // Catalog first so tips/topics match source_catalog.py (Phase R4).
+ loadSourceCatalog().finally(() => {
  renderTopicGrid();
+ renderTopicPacks();
  renderSourceGrid();
  restoreFetchPrefs();
  loadPageData();
  refreshCoverage();
+ });
  document.getElementById('fetch-btn').addEventListener('click', doFetch);
  const cancelBtn = document.getElementById('fetch-cancel-btn');
  if (cancelBtn) cancelBtn.addEventListener('click', cancelFetch);
@@ -124,6 +225,7 @@ function syncOnlyMissingFromFetchMode() {
 
 function renderTopicGrid() {
  const grid = document.getElementById('topic-grid');
+ if (!grid) return;
  TOPICS.forEach(topic => {
  const card = document.createElement('div');
  card.className = 'topic-card';
@@ -132,6 +234,59 @@ function renderTopicGrid() {
  card.addEventListener('click', () => toggleTopic(topic.id, card));
  grid.appendChild(card);
  });
+}
+
+function renderTopicPacks() {
+ const grid = document.getElementById('topic-pack-grid');
+ if (!grid) return;
+ TOPIC_PACKS.forEach(pack => {
+ const card = document.createElement('button');
+ card.type = 'button';
+ card.className = 'topic-pack-card';
+ card.dataset.packId = pack.id;
+ card.title = pack.blurb || pack.name;
+ card.innerHTML = `
+ <span class="topic-icon">${pack.icon}</span>
+ <span class="topic-pack-text">
+ <span class="topic-name">${pack.name}</span>
+ <span class="topic-pack-blurb">${pack.blurb || ''}</span>
+ </span>
+ `;
+ card.addEventListener('click', () => applyTopicPack(pack.id));
+ grid.appendChild(card);
+ });
+}
+
+/** One-click classroom pack: select topics + pre-check suggested sources. */
+function applyTopicPack(packId) {
+ const pack = TOPIC_PACKS.find(p => p.id === packId);
+ if (!pack) return;
+ selectedTopics = new Set(pack.topics || []);
+ document.querySelectorAll('#topic-grid .topic-card').forEach(card => {
+ card.classList.toggle('selected', selectedTopics.has(card.dataset.topicId));
+ });
+ // Pre-check pack sources (replace current checkboxes for a clean unit start).
+ Object.keys(ALL_SOURCES).forEach(sourceId => {
+ const checkbox = document.getElementById(`source-${sourceId}`);
+ if (!checkbox) return;
+ const on = (pack.sources || []).includes(sourceId);
+ checkbox.checked = on;
+ const option = checkbox.closest('.source-option');
+ if (option) option.classList.toggle('recommended', on);
+ });
+ const hint = document.getElementById('source-hint');
+ if (hint) {
+ hint.textContent = `Pack “${pack.name}”: suggested sources are checked. Adjust as needed.`;
+ }
+ const q = document.getElementById('fetch-query');
+ if (q && !q.value.trim() && pack.queryHint) {
+ q.placeholder = `e.g., ${pack.queryHint}`;
+ }
+ applyModelRecommendation();
+ saveFetchPrefs();
+ refreshCoverage();
+ updateGettingStartedChecklist();
+ showNotification(`Applied pack: ${pack.name}`, 'success');
 }
 
 function toggleTopic(topicId, card) {
@@ -222,14 +377,47 @@ function updateRecommendedSources() {
 
 function renderSourceGrid() {
  const grid = document.getElementById('source-option-grid');
+ if (!grid) return;
  Object.entries(ALL_SOURCES).forEach(([id, info]) => {
  const label = document.createElement('label');
  label.className = 'source-option';
+ if (info.badges && info.badges.length) {
+ label.classList.add(...info.badges.map(b => `src-badge-${b}`));
+ }
+ const badges = info.badges || [];
+ const chipParts = [];
+ if (badges.includes('preprint') || badges.includes('not-peer-reviewed')) {
+ chipParts.push(
+ '<span class="source-chip source-chip-preprint" title="Not peer-reviewed / recent window only">Not peer-reviewed</span>'
+ );
+ }
+ if (badges.includes('title-only')) {
+ chipParts.push(
+ '<span class="source-chip source-chip-titleonly" title="Many records are title/venue only">Title/venue</span>'
+ );
+ }
+ const chips = chipParts.join('');
+ // Student tip: good for / what it misses (Phase R4).
+ let tipText = info.tip || '';
+ if (!tipText && (info.good_for || info.misses)) {
+ tipText = [info.good_for, info.misses ? `Misses: ${info.misses}` : '']
+ .filter(Boolean).join(' ');
+ }
+ if (info.needs_key && tipText && !/key|token/i.test(tipText)) {
+ tipText += ' (free API key may be required on the server.)';
+ }
+ const tipHtml = tipText
+ ? `<span class="source-tip" title="${escapeHtml(tipText)}"><strong>Student tip:</strong> ${escapeHtml(tipText)}</span>`
+ : '';
  label.innerHTML = `
  <input type="checkbox" id="source-${id}" value="${id}">
  <div class="source-info">
- <span class="source-name-label">${info.name}</span>
- <span class="source-desc">${info.desc}</span>
+ <span class="source-name-row">
+ <span class="source-name-label">${escapeHtml(info.name)}</span>
+ ${chips}
+ </span>
+ <span class="source-desc">${escapeHtml(info.desc || '')}</span>
+ ${tipHtml}
  </div>
  `;
  label.querySelector('input').addEventListener('change', saveFetchPrefs);
@@ -416,9 +604,16 @@ async function refreshCoverage() {
  }
  const suggestions = data.suggestions || [];
  if (suggestions.length) {
- sug.innerHTML = '<strong>Suggested sources you are missing:</strong> ' +
- suggestions.map(s => escapeHtml(getSourceName(s.source))).join(' · ') +
- '. Consider adding them on the next fetch.';
+ const items = suggestions.map((s) => {
+ const name = escapeHtml(s.name || getSourceName(s.source));
+ const tip = escapeHtml(s.tip || s.reason || '');
+ return `<li class="coverage-suggest-item"><strong>${name}</strong>`
+ + (tip ? `<span class="source-tip">${tip}</span>` : '')
+ + `</li>`;
+ }).join('');
+ sug.innerHTML = '<strong>Suggested sources you are missing:</strong>'
+ + `<ul class="coverage-suggest-list">${items}</ul>`
+ + '<p class="help-text" style="margin-top:0.4rem;">Check them under Choose Sources on the next fetch.</p>';
  } else if (keys.length) {
  sug.textContent = selectedTopics.size
  ? 'Coverage looks good for your selected topics - recommended sources each have at least one paper.'
@@ -499,9 +694,31 @@ function applyFetchResult(data, sources) {
  errLines.push(`· ${getSourceName(src)}: no results`);
  }
  });
+ // Classroom notes for tricky sources (preprints / DBLP abstracts).
+ const tipLines = [];
+ const used = new Set(sources || []);
+ const counts = data.by_source || {};
+ if ((used.has('biorxiv') || used.has('medrxiv')) &&
+ ((counts.biorxiv || 0) + (counts.medrxiv || 0) > 0 || used.has('biorxiv') || used.has('medrxiv'))) {
+ tipLines.push(
+ 'Note: bioRxiv / medRxiv are preprints — not peer-reviewed, and only recent posts in a rolling date window.'
+ );
+ }
+ if (used.has('dblp')) {
+ tipLines.push(
+ 'Note: DBLP often has title and venue only; papers without a real abstract are skipped, so counts can look low.'
+ );
+ }
+ if (used.has('arxiv') && (counts.arxiv || 0) > 0) {
+ tipLines.push('Note: arXiv items are preprints and may not be peer-reviewed yet.');
+ }
+
  const report = document.getElementById('fetch-source-report');
  report.style.display = 'block';
- report.innerHTML = [...okLines, ...errLines].map(escapeHtml).join('<br>');
+ const tipHtml = tipLines.length
+ ? `<div class="fetch-source-tips">${tipLines.map(escapeHtml).join('<br>')}</div>`
+ : '';
+ report.innerHTML = [...okLines, ...errLines].map(escapeHtml).join('<br>') + tipHtml;
 
  const errorCount = Object.keys(data.errors || {}).length;
  const breakdown = Object.entries(data.by_source || {})
@@ -608,7 +825,7 @@ async function doFetch() {
 
 async function doCreateEmbeddings() {
  const model = document.getElementById('embedding-model').value;
- const onlyMissing = document.getElementById('only-missing').checked;
+ const onlyMissing = document.getElementById('only-missing')?.checked || false;
  const btn = document.getElementById('embeddings-btn');
  saveFetchPrefs();
  setLoading(btn, true);

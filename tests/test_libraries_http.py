@@ -51,7 +51,8 @@ def app_module(tmp_path, monkeypatch):
     main = importlib.import_module("main")
 
     from user_db import UserDatabase
-    main.user_db = UserDatabase(db_path=str(tmp_path / "users.db"))
+    test_db = UserDatabase(db_path=str(tmp_path / "users.db"))
+    monkeypatch.setattr(main, "user_db", test_db)
     main._pipelines.clear()
     main._pipeline_refcounts.clear()
     main._all_progress.clear()
@@ -61,7 +62,8 @@ def app_module(tmp_path, monkeypatch):
     except Exception:
         pass
     monkeypatch.setitem(pipeline.FETCHERS, "pubmed", _FakeFetcher)
-    return main
+    yield main
+    test_db.conn.close()
 
 
 def _register(client, username, password="tpw-fixture-0001"):
@@ -185,3 +187,31 @@ def test_max_libraries_enforced(app_module, monkeypatch):
     r = c.post("/api/libraries", json={"name": "Four"}, headers=_csrf(c))
     assert r.status_code == 400
     assert "At most" in r.json()["detail"]
+
+
+def test_delete_library_while_in_use_conflicts(app_module):
+    """Deleting a library with an active job/request must 409, not close the DB mid-write."""
+    c = TestClient(app_module.app)
+    _register(c, "libbusy")
+    uid = app_module.user_db.get_by_username("libbusy")["id"]
+
+    r = c.post("/api/libraries", json={"name": "Busy lib"}, headers=_csrf(c))
+    assert r.status_code == 200, r.text
+    lib_id = r.json()["library"]["id"]
+
+    key = app_module.pipeline_cache_key(uid, lib_id)
+    # Simulate an in-flight background job holding the pipeline reference.
+    app_module._pipeline_refcounts[key] = 1
+    try:
+        r = c.delete(f"/api/libraries/{lib_id}", headers=_csrf(c))
+        assert r.status_code == 409, r.text
+        assert "in use" in r.json()["detail"]
+        # Still listed: nothing was deleted.
+        ids = [L["id"] for L in c.get("/api/libraries").json()["libraries"]]
+        assert lib_id in ids
+    finally:
+        app_module._pipeline_refcounts.pop(key, None)
+
+    # Once the reference is gone the delete succeeds.
+    r = c.delete(f"/api/libraries/{lib_id}", headers=_csrf(c))
+    assert r.status_code == 200, r.text

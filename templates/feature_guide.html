@@ -4,7 +4,7 @@
  <meta charset="UTF-8">
  <meta name="viewport" content="width=device-width, initial-scale=1.0">
  <title>{{ guide.title }} - Literature Research Aide</title>
- <link rel="stylesheet" href="/static/css/style.css?v=20260716a">
+ <link rel="stylesheet" href="/static/css/style.css?v=20260717r15">
  <script>
  (function() {
  const saved = localStorage.getItem('theme');
@@ -36,6 +36,9 @@
  <p class="subtitle">{{ guide.tagline }}</p>
  </header>
 
+ {% from "macros/disclaimers.html" import scope_banner %}
+ {{ scope_banner() }}
+
  <section class="card guide-section">
  <h2>What it is</h2>
  <p class="guide-prose">{{ guide.summary }}</p>
@@ -58,6 +61,22 @@
  {% endfor %}
  </ul>
  </section>
+
+ {% if guide.checklists %}
+ {% for block in guide.checklists %}
+ <section class="card guide-section">
+  <h2>{{ block.title }}</h2>
+  {% if block.intro %}
+  <p class="guide-prose">{{ block.intro }}</p>
+  {% endif %}
+  <ul class="guide-tips guide-checklist">
+   {% for item in block.checks %}
+   <li>{{ item }}</li>
+   {% endfor %}
+  </ul>
+ </section>
+ {% endfor %}
+ {% endif %}
 
  <section class="card guide-section">
  <h2>Where to find it</h2>

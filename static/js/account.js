@@ -48,6 +48,33 @@ document.addEventListener('DOMContentLoaded', () => {
  const joinInput = document.getElementById('account-join-code');
  if (joinPreviewBtn) joinPreviewBtn.addEventListener('click', doAccountJoinPreview);
  if (joinBtn) joinBtn.addEventListener('click', doAccountJoin);
+
+ // Optional AI study aid: Built-in (auto start/stop) vs Cloud API key.
+ // Classroom deployers can hide this card with HIDE_AI_BUTTONS=true.
+ const aiSection = document.getElementById('ai-settings-section');
+ if (aiSection) {
+ const wireAi = () => {
+ if (typeof uiFlag === 'function' && !uiFlag('show_ai_buttons', true)) {
+ aiSection.hidden = true;
+ return;
+ }
+ aiSection.hidden = false;
+ loadAiSettings();
+ const modeSel = document.getElementById('ai-study-mode');
+ if (modeSel) modeSel.addEventListener('change', syncAiModePanels);
+ const refreshBtn = document.getElementById('ai-status-refresh');
+ const saveBtn = document.getElementById('ai-settings-save');
+ if (refreshBtn) refreshBtn.addEventListener('click', loadAiSettings);
+ if (saveBtn) saveBtn.addEventListener('click', saveAiSettings);
+ };
+ if (window.LRA_UI && window.LRA_UI._loaded) {
+ wireAi();
+ } else if (typeof loadUiFlags === 'function') {
+ loadUiFlags().finally(wireAi);
+ } else {
+ wireAi();
+ }
+ }
  if (joinInput) {
  joinInput.addEventListener('keydown', (e) => {
  if (e.key === 'Enter') {
@@ -107,12 +134,41 @@ function normalizeJoinCode(raw) {
 }
 
 async function doShareLibrary(lib) {
+ // R6: class share wording + optional expiry / max uses.
  if (!confirm(
-  `Create a share code for "${lib.name}"?\n\n` +
-  'Students who join get a full copy of papers and screening (not live access to yours). ' +
-  'Code expires in 14 days by default.'
+  `Create a class share code for "${lib.name}"?\n\n` +
+  'CLASS SHARE (clone, not live view):\n' +
+  '• Students join with the code and get their own copy of papers + screening.\n' +
+  '• Suggested student steps after join: Clusters → Duplicates → Search (export RIS).\n' +
+  '• Notes/stars are NOT copied (private to each student).\n\n' +
+  'Continue to set expiry and options?'
  )) {
   return;
+ }
+ let expiresDays = 14;
+ const daysRaw = window.prompt('Days until the code expires (1–90). Blank = 14.', '14');
+ if (daysRaw === null) return;
+ if (String(daysRaw).trim() !== '') {
+  const n = parseInt(daysRaw, 10);
+  if (!Number.isFinite(n) || n < 1 || n > 90) {
+   showNotification('Expiry must be between 1 and 90 days.', 'error');
+   return;
+  }
+  expiresDays = n;
+ }
+ let maxUses = null;
+ const usesRaw = window.prompt(
+  'Max student joins for this code (e.g. class size). Blank = unlimited.',
+  ''
+ );
+ if (usesRaw === null) return;
+ if (String(usesRaw).trim() !== '') {
+  const n = parseInt(usesRaw, 10);
+  if (!Number.isFinite(n) || n < 1 || n > 500) {
+   showNotification('Max uses must be between 1 and 500, or blank for unlimited.', 'error');
+   return;
+  }
+  maxUses = n;
  }
  const emb = confirm(
   'Include embeddings so students can search immediately without Prepare papers?\n\n' +
@@ -120,18 +176,38 @@ async function doShareLibrary(lib) {
  );
  setStatus('library-manage-status', 'Creating share code…', 'info');
  try {
+  const body = {
+   library_id: lib.id,
+   expires_days: expiresDays,
+   include_embeddings: emb,
+  };
+  if (maxUses != null) body.max_uses = maxUses;
   const data = await apiCall('/api/shares', {
    method: 'POST',
-   body: {
-    library_id: lib.id,
-    expires_days: 14,
-    include_embeddings: emb,
-   },
+   body,
   });
   const share = data.share || {};
   const code = share.code || '';
   const path = share.join_path || (`/join?code=${code}`);
-  const msg = `Share code: ${code}\n\nLink path: ${path}\n\nCopy the code and share it with your class.`;
+  const expLabel = share.expires_at
+   ? `Expires: ${String(share.expires_at).slice(0, 10)}`
+   : `Expires in ~${expiresDays} days`;
+  const useLabel = maxUses != null ? `Max joins: ${maxUses}` : 'Max joins: unlimited';
+  const msg = [
+   'CLASS SHARE CODE',
+   '',
+   `Code: ${code}`,
+   `Link: ${path}`,
+   expLabel,
+   useLabel,
+   '',
+   'Tell students:',
+   '1) Open Join (or /join) and enter the code while logged in.',
+   '2) Switch to the new library in the nav Library menu.',
+   '3) Clusters → Duplicates → Search; export RIS; optional screening report on Duplicates.',
+   '',
+   'Starting point only (public databases) — finish important work with the school library.',
+  ].join('\n');
   if (navigator.clipboard && code) {
    try { await navigator.clipboard.writeText(code); } catch (_) { /* ignore */ }
   }
@@ -173,15 +249,20 @@ function renderSharesList(shares) {
    : (active
     ? '<span class="library-manage-badge">Active</span>'
     : '<span class="library-manage-badge">Expired / full</span>');
+  const useCount = s.use_count != null ? Number(s.use_count) : 0;
   const uses = s.max_uses != null
-   ? `${s.use_count || 0}/${s.max_uses} uses`
-   : `${s.use_count || 0} uses`;
+   ? `${useCount} / ${s.max_uses} joins used`
+   : `${useCount} join${useCount === 1 ? '' : 's'} (no max)`;
+  const exp = s.expires_at
+   ? `Expires ${escapeHtml(String(s.expires_at).slice(0, 10))}`
+   : 'No expiry date';
   li.innerHTML = `
    <span class="library-manage-name"><code>${escapeHtml(s.code || '')}</code>
     · ${escapeHtml(s.title_snapshot || 'Library')}</span>
    ${badge}
-   <span class="info-text" style="margin:0;">${escapeHtml(uses)}</span>
+   <span class="info-text share-usage-line" style="margin:0;">${escapeHtml(uses)} · ${exp}</span>
    <button type="button" class="btn btn-sm btn-secondary share-copy" ${revoked ? 'disabled' : ''}>Copy code</button>
+   <button type="button" class="btn btn-sm btn-secondary share-copy-brief" ${revoked ? 'disabled' : ''}>Copy student brief</button>
    <button type="button" class="btn btn-sm btn-danger share-revoke" ${revoked ? 'disabled' : ''}>Revoke</button>
   `;
   const copyBtn = li.querySelector('.share-copy');
@@ -192,6 +273,29 @@ function renderSharesList(shares) {
      showNotification(`Copied ${s.code}`, 'success');
     } catch (_) {
      prompt('Copy this code:', s.code || '');
+    }
+   });
+  }
+  const briefBtn = li.querySelector('.share-copy-brief');
+  if (briefBtn) {
+   briefBtn.addEventListener('click', async () => {
+    const brief = [
+     `Class code: ${s.code || ''}`,
+     `Library: ${s.title_snapshot || 'shared library'}`,
+     '',
+     'Steps:',
+     '1. Log in → Join (or open /join) and enter the code.',
+     '2. Switch to the new library in the nav Library menu.',
+     '3. Clusters (screen) → Duplicates → Search; export RIS for Zotero.',
+     '4. Optional: Duplicates → screening report for process counts.',
+     '',
+     'This is a starting point from public databases — finish with your school library when needed.',
+    ].join('\n');
+    try {
+     if (navigator.clipboard) await navigator.clipboard.writeText(brief);
+     showNotification('Student brief copied', 'success');
+    } catch (_) {
+     prompt('Copy this brief for students:', brief);
     }
    });
   }
@@ -411,5 +515,113 @@ async function doDeleteAccount() {
  setStatus('delete-status', `Error: ${e.message}`, 'error');
  showNotification(`Could not delete account: ${e.message}`, 'error');
  setLoading(btn, false);
+ }
+}
+
+function syncAiModePanels() {
+ const mode = (document.getElementById('ai-study-mode') || {}).value || 'built_in';
+ const builtin = document.getElementById('ai-builtin-panel');
+ const apikey = document.getElementById('ai-apikey-panel');
+ if (builtin) builtin.hidden = mode !== 'built_in';
+ if (apikey) apikey.hidden = mode !== 'api_key';
+ const hiddenProv = document.getElementById('ai-llm-provider');
+ if (hiddenProv) {
+  hiddenProv.value = mode === 'api_key' ? 'openai' : 'ollama';
+ }
+}
+
+function applyAiStatus(st) {
+ const detail = document.getElementById('ai-status-detail');
+ if (detail) {
+  detail.textContent = st.detail || '—';
+ }
+}
+
+function fillAiSettingsForm(settings, status) {
+ if (!settings) return;
+ const set = (id, val) => {
+  const el = document.getElementById(id);
+  if (el && val != null && val !== '') el.value = val;
+ };
+ const modeSel = document.getElementById('ai-study-mode');
+ const mode = (status && status.study_aid_mode)
+  || (settings.study_aid_mode)
+  || ((settings.llm_provider === 'openai' || settings.llm_provider === 'anthropic')
+   ? 'api_key' : 'built_in');
+ if (modeSel) modeSel.value = mode === 'api_key' ? 'api_key' : 'built_in';
+ // Do not touch ollama host/model/dir here — deployer env only (no UI fields).
+ set('ai-openai-model', settings.openai_model || '');
+ set('ai-openai-base', settings.openai_base_url || '');
+ set('ai-anthropic-model', settings.llm_model || '');
+ const oh = document.getElementById('ai-openai-key-hint');
+ if (oh) {
+  oh.textContent = settings.openai_api_key_set
+   ? `Saved key: ${settings.openai_api_key_masked || '••••'}`
+   : 'No OpenAI-compatible key saved yet.';
+ }
+ const ah = document.getElementById('ai-anthropic-key-hint');
+ if (ah) {
+  ah.textContent = settings.anthropic_api_key_set
+   ? `Saved key: ${settings.anthropic_api_key_masked || '••••'}`
+   : 'No Anthropic key saved yet.';
+ }
+ syncAiModePanels();
+}
+
+async function loadAiSettings() {
+ try {
+  const data = await apiCall('/api/ai/settings');
+  fillAiSettingsForm(data.settings || {}, data.status || {});
+  applyAiStatus(data.status || {});
+ } catch (e) {
+  const detail = document.getElementById('ai-status-detail');
+  if (detail) detail.textContent = `Could not load AI status: ${e.message}`;
+ }
+}
+
+async function saveAiSettings() {
+ const btn = document.getElementById('ai-settings-save');
+ setLoading(btn, true);
+ setStatus('ai-settings-status', 'Saving…', 'info');
+ const mode = (document.getElementById('ai-study-mode') || {}).value || 'built_in';
+ let llmProvider = 'ollama';
+ if (mode === 'api_key') {
+  // Prefer OpenAI-compatible when a key is typed or already saved; else Anthropic.
+  const oaiTyped = ((document.getElementById('ai-openai-key') || {}).value || '').trim();
+  const antTyped = ((document.getElementById('ai-anthropic-key') || {}).value || '').trim();
+  const oh = document.getElementById('ai-openai-key-hint');
+  const ah = document.getElementById('ai-anthropic-key-hint');
+  const oaiSaved = oh && /Saved key/i.test(oh.textContent || '');
+  const antSaved = ah && /Saved key/i.test(ah.textContent || '');
+  if (antTyped || (antSaved && !oaiTyped && !oaiSaved)) {
+   llmProvider = 'anthropic';
+  } else {
+   llmProvider = 'openai';
+  }
+ }
+ // Only send fields the user can edit. Never wipe deployer ollama host/model/dir.
+ const body = {
+  llm_provider: llmProvider,
+  openai_model: (document.getElementById('ai-openai-model') || {}).value || '',
+  openai_base_url: (document.getElementById('ai-openai-base') || {}).value || '',
+  llm_model: (document.getElementById('ai-anthropic-model') || {}).value || '',
+ };
+ const oai = (document.getElementById('ai-openai-key') || {}).value;
+ const ant = (document.getElementById('ai-anthropic-key') || {}).value;
+ if (oai) body.openai_api_key = oai;
+ if (ant) body.anthropic_api_key = ant;
+ try {
+  const data = await apiCall('/api/ai/settings', { method: 'POST', body });
+  setStatus('ai-settings-status', 'AI settings saved.', 'success');
+  showNotification('AI settings saved.', 'success');
+  fillAiSettingsForm(data.settings || {}, data.status_detail || {});
+  if (data.status_detail) applyAiStatus(data.status_detail);
+  if (document.getElementById('ai-openai-key')) document.getElementById('ai-openai-key').value = '';
+  if (document.getElementById('ai-anthropic-key')) document.getElementById('ai-anthropic-key').value = '';
+ } catch (e) {
+  setStatus('ai-settings-status', `Error: ${e.message}`, 'error');
+  showNotification(`Could not save AI settings: ${e.message}`, 'error');
+ } finally {
+  setLoading(btn, false);
  }
 }

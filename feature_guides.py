@@ -8,7 +8,14 @@ from __future__ import annotations
 from typing import Dict, List, Optional, TypedDict
 
 
-class FeatureGuide(TypedDict):
+class ChecklistBlock(TypedDict):
+    title: str
+    intro: str
+    # Named "checks" (not "items") so Jinja does not hit dict.items().
+    checks: List[str]
+
+
+class FeatureGuide(TypedDict, total=False):
     slug: str
     title: str
     icon: str  # HTML entity or emoji
@@ -19,6 +26,8 @@ class FeatureGuide(TypedDict):
     where_in_app: str
     app_path: str  # path for CTA when logged in
     app_label: str
+    # Optional R7 checklists (citation quality, weak appraisal, etc.)
+    checklists: List[ChecklistBlock]
 
 
 FEATURE_GUIDES: Dict[str, FeatureGuide] = {
@@ -47,6 +56,9 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "recommended sources are still empty.",
         ],
         "tips": [
+            "Starting point only: publicly accessible research databases you select. "
+            "Paywalled or unindexed work will not appear. Not a complete library search. "
+            "Finish important work with your school library and teacher’s required sources.",
             "Teachers: assign a topic pack (e.g. “use ERIC + OpenAlex”) so every "
             "student’s corpus is comparable.",
             "Students: start broad, then re-fetch with Add to deepen a sub-topic "
@@ -198,20 +210,28 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "Results show a similarity score (0-1), highlighted query words in "
             "abstracts, and PICO snippets when detected.",
             "Star papers and add private notes for your study log.",
-            "Export this ranked list (CSV/TXT) or export the whole library as "
-            "CSV, RIS (Zotero/EndNote), or BibTeX - by scope (all / included / "
-            "excluded / starred).",
-            "For APA/MLA/Chicago hand-formatting, use the ZoteroBib link on "
-            "titles or DOIs so style rules stay under your control.",
+            "Export this ranked list as CSV (spreadsheet) or Text (reading list), or "
+            "export the whole library as RIS or BibTeX (scope: all / included / "
+            "screened out / starred). Format APA or MLA in Zotero or an online "
+            "converter linked from Search — not in this app.",
+            "Process counts for hand-ins live on Duplicates as the screening report "
+            "(plain-text collected / excluded / included numbers) — not on Search.",
         ],
         "tips": [
+            "Search only ranks papers already in your collection (from public "
+            "databases you fetched). It is not Google Scholar and not a full library "
+            "search. Use it to prioritise candidates, then verify in original sources.",
+            "Each result may show a study Type tag (plain-language guess from title "
+            "and abstract - often wrong when confidence is low). It is not an evidence "
+            "grade.",
             "Screen off-topic clusters first so the ranking pool is clean.",
             "Seed mode is great when a teacher gives one starter paper: find more "
             "like it from what you already fetched.",
             "Star a handful of must-read papers, then use More like my starred to "
             "expand the set without rewriting the query.",
-            "Need a bibliography file? Export RIS or BibTeX from Search, not just "
-            "the ranked CSV.",
+            "Need a real bibliography? Export RIS of the search results from Search, then "
+            "Zotero → File → Import… (not drag-and-drop) → Create Bibliography. "
+            "Need process counts? Duplicates → Screening report (.txt).",
         ],
         "where_in_app": "Search page.",
         "app_path": "/search",
@@ -259,14 +279,154 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "passwords.",
             "Teachers: keep one library per unit or class so papers do not mix; "
             "share a finished unit library via class code so everyone starts equal.",
-            "Export a library (CSV/RIS/BibTeX) before deleting it if you need a "
-            "hand-in archive.",
+            "For process counts, use Duplicates → Screening report. Search keeps ranking "
+            "and library RIS export. Notes/stars stay private process evidence, not grades.",
+            "Export a library as RIS (Search) and/or a screening report (Duplicates) "
+            "before deleting it if you need a hand-in archive.",
             "If you change your password on a shared machine, other open tabs "
             "for that account will need to log in again.",
         ],
         "where_in_app": "Register / Log in · Library switcher · Account · /join.",
         "app_path": "/account",
         "app_label": "Open Account",
+    },
+    "finish-your-research": {
+        "slug": "finish-your-research",
+        "title": "Finish your research",
+        "icon": "📚",
+        "tagline": "This app is a starting point — here is how to finish well.",
+        "summary": (
+            "Literature Research Aide only queries free public research APIs. "
+            "That is great for gathering candidates and practising screening, but it "
+            "is not a complete literature search and not a college library. After you "
+            "export RIS and a screening report, plan a short path to stronger sources "
+            "with people and tools that do have broader access."
+        ),
+        "how_it_works": [
+            "Use this app to collect candidates, screen off-topic groups, remove "
+            "duplicates, rank what remains, and export RIS plus a screening report.",
+            "Write down what you still need (for example: a peer-reviewed review, "
+            "a local newspaper archive, or a book chapter your teacher assigned).",
+            "Search your school library catalogue and any databases your school "
+            "subscribes to (often available only on campus or via a school login).",
+            "Use Google Scholar to find citation trails and PDF links — but verify "
+            "the version (preprint vs published) and access rights.",
+            "Ask a librarian or teacher when something important is paywalled or "
+            "missing. Bring your shortlist and your screening notes.",
+            "Check author, year, venue, and abstract again before you cite. Prefer "
+            "peer-reviewed sources over preprints when the assignment expects them.",
+        ],
+        "tips": [
+            "Do not pretend this tool covers Web of Science, JSTOR, EBSCO, or other "
+            "campus packages — those need institutional access we do not provide.",
+            "Teachers: grade process (screening report, notes, source mix) as well as "
+            "final citations so students are not punished for honest public-DB limits.",
+            "If a paper is central to your claim, get the full text through legal "
+            "channels (library, OA link, author site) — never scrape paywalls.",
+            "See also: Citation quality guide for peer-reviewed vs preprint vs website.",
+        ],
+        "where_in_app": "Landing /learn/finish-your-research · after Search export.",
+        "app_path": "/search",
+        "app_label": "Open Search",
+        "checklists": [
+            {
+                "title": "Hand-off checklist (after this app)",
+                "intro": (
+                    "Use this when you leave the public-database starting point and "
+                    "finish with school tools."
+                ),
+                "checks": [
+                    "I exported RIS and/or a screening report for what I kept.",
+                    "I searched the school library catalogue or databases for gaps.",
+                    "I used Google Scholar for citation trails and verified access rights.",
+                    "I asked a librarian or teacher about paywalled or missing sources.",
+                    "I know this app does not replace campus packages (JSTOR, EBSCO, "
+                    "Web of Science, SSO proxy full-text).",
+                ],
+            },
+        ],
+    },
+    "citation-quality": {
+        "slug": "citation-quality",
+        "title": "Citation quality checklist",
+        "icon": "✅",
+        "tagline": "Manual signals only — not an evidence grade.",
+        "summary": (
+            "A short checklist to help students judge whether a candidate is a "
+            "peer-reviewed paper, a preprint, or a weaker web source. This is a "
+            "thinking aid for class, not clinical A–D grading and not a substitute "
+            "for reading the full work."
+        ),
+        "how_it_works": [
+            "Identify the source type: journal article, preprint server (arXiv, "
+            "bioRxiv, medRxiv), conference paper, report, or website.",
+            "Peer-reviewed journals usually name a journal, volume/issue, and often "
+            "a DOI. Preprints say preprint or list a server and may not be final.",
+            "Check year, authors, and venue. Unknown year or missing abstract is a "
+            "yellow flag for classroom use (this app already skips abstract-less rows).",
+            "Use the weak appraisal signals below only as reading questions — never "
+            "as automatic grades or clinical evidence levels.",
+            "Match the assignment: some units want peer-reviewed only; others allow "
+            "preprints with clear labeling. Your teacher’s rubric wins.",
+            "Export RIS into Zotero (or similar) and fix author/title details before "
+            "the final bibliography. APA text generators outside this app are drafts.",
+        ],
+        "tips": [
+            "Study-type tags in Search are rough guesses from title+abstract — never "
+            "use them as clinical evidence levels or auto-excludes.",
+            "Preprints can be useful early research but are not peer-reviewed yet.",
+            "Websites and news pieces may help context; they are not the same as "
+            "journal research for most science/social-science hand-ins.",
+            "Out of scope for this product: campus proxy full-text, Web of Science, "
+            "JSTOR/EBSCO packages, SSO into university systems.",
+        ],
+        "where_in_app": "Landing /learn/citation-quality · use while screening on Clusters.",
+        "app_path": "/clusters",
+        "app_label": "Open Clusters",
+        "checklists": [
+            {
+                "title": "Citation quality (manual)",
+                "intro": (
+                    "Judge each candidate before you cite it. Teacher rubric wins "
+                    "over any default here."
+                ),
+                "checks": [
+                    "Peer-reviewed journal or scholarly book chapter? (Usually stronger "
+                    "than a blog, news site, or commercial page.)",
+                    "Preprint (bioRxiv, medRxiv, arXiv, etc.)? Label it as a preprint; "
+                    "find a peer-reviewed version if required.",
+                    "Authors and year clear? Prefer named researchers or institutions "
+                    "over anonymous posts.",
+                    "Can you open the abstract (or full text via school access) and "
+                    "confirm the claim matches what you wrote?",
+                    "DOI or stable library link when available — better than a "
+                    "fragile homepage URL.",
+                    "Does the source match the assignment (topic, date range, "
+                    "discipline)?",
+                    "Website / government / NGO pages: fine for background if you say "
+                    "what kind of source it is — do not pretend it is a journal trial.",
+                ],
+            },
+            {
+                "title": "Weak appraisal signals (not evidence grades)",
+                "intro": (
+                    "Optional questions while you read an abstract. Weak signals only "
+                    "— not clinical A–D grades, not CASP certification, and not a "
+                    "reason to auto-exclude papers in the app."
+                ),
+                "checks": [
+                    "What question did the authors try to answer? (Restate in one line.)",
+                    "Who or what was studied (people, animals, cells, documents, models)?",
+                    "Is this primarily a review, a trial/experiment, a survey, or "
+                    "an opinion piece? (Study-type tags in Search are approximate.)",
+                    "Do results sound measured (samples, comparisons) or only claimed?",
+                    "Do the authors mention limitations or uncertainty?",
+                    "Could funding, conflicts, or venue bias matter for this claim?",
+                    "Would you still trust this claim if the abstract were the only "
+                    "text you had? If not, get full text via the library first.",
+                ],
+            },
+        ],
     },
 }
 
@@ -278,6 +438,8 @@ FEATURE_ORDER: List[str] = [
     "duplicate-resolution",
     "similarity-search",
     "private-workspace",
+    "finish-your-research",
+    "citation-quality",
 ]
 
 

@@ -155,21 +155,16 @@ class UserDatabase:
         """Delete a user account. Returns True if a row was removed."""
         with self._lock:
             # Drop shares owned by this user and any of their redemptions.
-            share_ids = [
-                row[0]
-                for row in self.conn.execute(
-                    "SELECT id FROM shares WHERE owner_user_id = ?", (user_id,)
-                ).fetchall()
-            ]
-            if share_ids:
-                placeholders = ",".join("?" * len(share_ids))
-                self.conn.execute(
-                    f"DELETE FROM share_redemptions WHERE share_id IN ({placeholders})",
-                    share_ids,
-                )
-                self.conn.execute(
-                    "DELETE FROM shares WHERE owner_user_id = ?", (user_id,)
-                )
+            # Subquery instead of expanded placeholders: a long share history
+            # would exceed SQLite's host-parameter limit and abort the delete.
+            self.conn.execute(
+                "DELETE FROM share_redemptions WHERE share_id IN "
+                "(SELECT id FROM shares WHERE owner_user_id = ?)",
+                (user_id,),
+            )
+            self.conn.execute(
+                "DELETE FROM shares WHERE owner_user_id = ?", (user_id,)
+            )
             self.conn.execute(
                 "DELETE FROM share_redemptions WHERE student_user_id = ?",
                 (user_id,),
@@ -348,6 +343,9 @@ class UserDatabase:
                     (share_id, student_user_id, student_library_id, redeemed_at),
                 )
             except sqlite3.IntegrityError as e:
+                # Close the failed write transaction; leaving it open keeps
+                # the database locked until some later commit/rollback.
+                self.conn.rollback()
                 raise ValueError(
                     "You already joined with this code. "
                     "Switch to that library from Account."

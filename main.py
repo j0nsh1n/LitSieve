@@ -105,6 +105,29 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 async def health():
     return {"status": "healthy", "version": "4.0.0"}
 
+
+@app.get("/api/ui-flags")
+async def api_ui_flags():
+    """Deployer toggles for classroom UI (env: HIDE_STUDY_TYPE_TAGS, HIDE_AI_BUTTONS).
+
+    Public so the app shell can load flags before authenticated API calls.
+    Extractive key points are never gated by these flags.
+    """
+    from ui_flags import get_ui_flags
+    return get_ui_flags()
+
+
+@app.get("/api/sources")
+async def api_sources():
+    """Public source catalog: names, student tips, topics, HS packs (Phase R4).
+
+    Single source of truth is source_catalog.py so Data Management, coverage,
+    and duplicate priority stay aligned.
+    """
+    from source_catalog import public_catalog
+    return public_catalog()
+
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
@@ -117,8 +140,10 @@ _pipelines: "OrderedDict[str, LiteratureSearchPipeline]" = OrderedDict()
 # Number of in-flight requests holding each pipeline. A pipeline is only safe
 # to close when its refcount hits 0; otherwise eviction defers the close.
 _pipeline_refcounts: "OrderedDict[str, int]" = OrderedDict()
-# Pipelines evicted while still in use, keyed by cache key — closed on last release.
-_pending_close: "dict[str, LiteratureSearchPipeline]" = {}
+# Pipelines evicted while still in use, keyed by cache key — closed on last
+# release. A key can accumulate several evicted generations (evict → recreate
+# → evict again while requests still hold references), so each entry is a list.
+_pending_close: "dict[str, list[LiteratureSearchPipeline]]" = {}
 # Guards _pipelines, _pipeline_refcounts and _pending_close together.
 _pipelines_lock = threading.Lock()
 
@@ -160,7 +185,7 @@ def get_pipeline(
             while len(_pipelines) > MAX_CACHED_USERS:
                 old_key, old_pipeline = _pipelines.popitem(last=False)
                 if _pipeline_refcounts.get(old_key, 0) > 0:
-                    _pending_close[old_key] = old_pipeline
+                    _pending_close.setdefault(old_key, []).append(old_pipeline)
                     continue
                 try:
                     old_pipeline.db.close()
@@ -184,8 +209,7 @@ def release_pipeline(user_id: str, library_id: Optional[str] = None) -> None:
             _pipeline_refcounts[key] = count
             return
         _pipeline_refcounts.pop(key, None)
-        pipeline = _pending_close.pop(key, None)
-        if pipeline is not None:
+        for pipeline in _pending_close.pop(key, []):
             try:
                 pipeline.db.close()
             except Exception:
@@ -199,15 +223,18 @@ def _evict_pipeline(user_id: str) -> None:
     """Forcibly drop and close all cached pipelines for a user (account delete)."""
     prefix = f"{user_id}:"
     with _pipelines_lock:
-        keys = [
-            k for k in list(_pipelines.keys())
+        # Union of live, pending-close, and refcount keys: an entry can exist
+        # in _pending_close (or hold a refcount) without a live counterpart.
+        keys = {
+            k
+            for k in [*_pipelines, *_pending_close, *_pipeline_refcounts]
             if k == user_id or k.startswith(prefix)
-        ]
+        }
         for key in keys:
             live = _pipelines.pop(key, None)
-            pending = _pending_close.pop(key, None)
+            pending = _pending_close.pop(key, [])
             _pipeline_refcounts.pop(key, None)
-            for pipe in (live, pending):
+            for pipe in [live, *pending]:
                 if pipe is not None:
                     try:
                         pipe.db.close()
@@ -419,6 +446,31 @@ class NoteRequest(BaseModel):
     note: Optional[str] = None
     starred: Optional[bool] = None
 
+class AIArticleRequest(BaseModel):
+    """Identify one paper in the active library for optional AI assist."""
+    article_id: str
+    source: str
+    # When true, store refined key_points in the library (overwrites extractive).
+    save_key_points: bool = False
+
+class AIAskRequest(BaseModel):
+    article_id: str
+    source: str
+    question: str
+
+class AISettingsUpdate(BaseModel):
+    """Server-wide AI deploy settings (keys stored in user_data/ai_settings.json)."""
+    llm_provider: Optional[str] = None
+    ollama_host: Optional[str] = None
+    ollama_model: Optional[str] = None
+    ollama_models_dir: Optional[str] = None
+    openai_api_key: Optional[str] = None
+    openai_base_url: Optional[str] = None
+    openai_model: Optional[str] = None
+    anthropic_api_key: Optional[str] = None
+    llm_model: Optional[str] = None
+    llm_timeout_seconds: Optional[str] = None
+
 class CoverageRequest(BaseModel):
     topics: Optional[List[str]] = None
 
@@ -471,6 +523,17 @@ class ShareCreateRequest(BaseModel):
     expires_days: Optional[int] = Field(default=14, ge=1, le=365)
     max_uses: Optional[int] = Field(default=None, ge=1, le=10000)
     include_embeddings: bool = True
+
+
+class ExportArticleKey(BaseModel):
+    article_id: str
+    source: str
+
+
+class ExportSelectionRequest(BaseModel):
+    """Export an ordered list of library papers (e.g. current search hits)."""
+    format: str = "ris"  # ris | bibtex | csv | txt
+    items: List[ExportArticleKey] = Field(default_factory=list)
 
 
 class ShareJoinRequest(BaseModel):
@@ -844,6 +907,25 @@ def _attach_key_points(results: List[dict], p) -> None:
         a["key_points"] = list(bullets) if bullets else []
 
 
+def _attach_study_types(results: List[dict]) -> None:
+    """Heuristic study-type tags at search time (cheap; may be wrong)."""
+    from ui_flags import get_ui_flags
+    if not get_ui_flags().get("show_study_type_tags", True):
+        return
+    from study_type import attach_study_types
+    attach_study_types(results)
+
+
+def _enrich_search_results(results: List[dict], p, *, query_text: str = "", pico_boost: bool = False) -> None:
+    """Shared post-rank enrichment for search / seed / starred."""
+    _attach_pico(results)
+    if pico_boost and query_text:
+        _apply_pico_boost(results, query_text)
+    _attach_notes(results, p)
+    _attach_key_points(results, p)
+    _attach_study_types(results)
+
+
 @app.post("/api/search")
 async def api_search(req: SearchRequest, request: Request):
     user = current_user(request)
@@ -859,12 +941,10 @@ async def api_search(req: SearchRequest, request: Request):
             year_min=req.year_min, year_max=req.year_max,
             lexical_boost=req.lexical_boost,
         )
-        _attach_pico(results)
-        if req.pico_boost:
-            _apply_pico_boost(results, req.query_text)
+        _enrich_search_results(
+            results, p, query_text=req.query_text, pico_boost=req.pico_boost,
+        )
         sort_articles(results, req.sort_by)
-        _attach_notes(results, p)
-        _attach_key_points(results, p)
         return {"results": results, "total": len(results)}
     except ValueError as e:
         return JSONResponse(status_code=400, content={"detail": str(e)})
@@ -889,9 +969,7 @@ async def api_search_seed(req: SeedSearchRequest, request: Request):
             req.year_min, req.year_max, req.lexical_boost,
         )
         results = data["results"]
-        _attach_pico(results)
-        _attach_notes(results, p)
-        _attach_key_points(results, p)
+        _enrich_search_results(results, p)
         return {
             "seed": data["seed"],
             "results": results,
@@ -923,9 +1001,7 @@ async def api_search_starred(req: StarredSearchRequest, request: Request):
             year_max=req.year_max,
         )
         results = data["results"]
-        _attach_pico(results)
-        _attach_notes(results, p)
-        _attach_key_points(results, p)
+        _enrich_search_results(results, p)
         return {
             "results": results,
             "total": len(results),
@@ -937,6 +1013,44 @@ async def api_search_starred(req: StarredSearchRequest, request: Request):
         return server_error(e)
     finally:
         release_pipeline(uid)
+
+
+def _format_ranked_export(results: List[dict], fmt: str):
+    """Build download body for an ordered result list (search hits or selection)."""
+    fmt = (fmt or "csv").lower().strip()
+    if fmt == "ris":
+        return collection_to_ris(results), "application/x-research-info-systems", "search_results.ris"
+    if fmt == "bibtex":
+        return collection_to_bibtex(results), "application/x-bibtex", "search_results.bib"
+    if fmt == "csv":
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow([
+            "Rank", "Similarity", "Title", "Year", "Journal", "Authors",
+            "Source", "ID", "Cluster ID", "Cluster Label",
+        ])
+        for i, a in enumerate(results, 1):
+            writer.writerow([
+                i, f"{a.get('similarity_score', 0):.3f}" if a.get("similarity_score") is not None else "",
+                a.get("title", ""), a.get("year", ""),
+                a.get("journal", ""), "; ".join(a.get("authors") or []),
+                a.get("source", ""), a.get("article_id", ""),
+                a.get("cluster_id", ""), a.get("cluster_label", ""),
+            ])
+        return output.getvalue(), "text/csv", "search_results.csv"
+    # txt
+    lines = []
+    for i, a in enumerate(results, 1):
+        sim = a.get("similarity_score")
+        rank_bit = f"[{sim:.3f}] " if isinstance(sim, (int, float)) else ""
+        lines.append(f"{i}. {rank_bit}{a.get('title', '')}")
+        lines.append(f"   Year: {a.get('year', '')} | Journal: {a.get('journal', '')}")
+        lines.append(f"   Authors: {'; '.join(a.get('authors') or [])}")
+        lines.append(f"   Source: {a.get('source', '')} | ID: {a.get('article_id', '')}")
+        if a.get("cluster_label"):
+            lines.append(f"   Cluster: {a.get('cluster_label')}")
+        lines.append("")
+    return "\n".join(lines), "text/plain", "search_results.txt"
 
 
 @app.get("/api/search/export")
@@ -953,9 +1067,13 @@ async def api_search_export(
     year_max: Optional[int] = None,
     lexical_boost: bool = True,
 ):
+    """Re-run a text search and export that ranked list (csv/txt/ris/bibtex)."""
     user = current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    fmt = (format or "csv").lower().strip()
+    if fmt not in ("csv", "txt", "ris", "bibtex"):
+        return JSONResponse(status_code=400, content={"detail": "Invalid format"})
     uid = user["user_id"]
     p = get_pipeline(uid)
     try:
@@ -975,40 +1093,11 @@ async def api_search_export(
             _apply_pico_boost(results, query_text)
         sort_articles(results, sort_by)
 
-        if format == "csv":
-            output = io.StringIO()
-            writer = csv.writer(output)
-            writer.writerow([
-                "Rank", "Similarity", "Title", "Year", "Journal", "Authors",
-                "Source", "ID", "Cluster ID", "Cluster Label",
-            ])
-            for i, a in enumerate(results, 1):
-                writer.writerow([
-                    i, f"{a.get('similarity_score', 0):.3f}",
-                    a.get('title', ''), a.get('year', ''),
-                    a.get('journal', ''), "; ".join(a.get('authors', [])),
-                    a.get('source', ''), a.get('article_id', ''),
-                    a.get('cluster_id', ''), a.get('cluster_label', ''),
-                ])
-            content = output.getvalue()
-            media_type, filename = "text/csv", "search_results.csv"
-        else:
-            lines = []
-            for i, a in enumerate(results, 1):
-                lines.append(f"{i}. [{a.get('similarity_score', 0):.3f}] {a.get('title', '')}")
-                lines.append(f"   Year: {a.get('year', '')} | Journal: {a.get('journal', '')}")
-                lines.append(f"   Authors: {'; '.join(a.get('authors', []))}")
-                lines.append(f"   Source: {a.get('source', '')} | ID: {a.get('article_id', '')}")
-                if a.get("cluster_label"):
-                    lines.append(f"   Cluster: {a.get('cluster_label')}")
-                lines.append("")
-            content = "\n".join(lines)
-            media_type, filename = "text/plain", "search_results.txt"
-
+        content, media_type, filename = _format_ranked_export(results, fmt)
         return StreamingResponse(
             io.BytesIO(content.encode()),
             media_type=media_type,
-            headers={"Content-Disposition": f"attachment; filename={filename}"}
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
         )
     except ValueError as e:
         return JSONResponse(status_code=400, content={"detail": str(e)})
@@ -1016,6 +1105,82 @@ async def api_search_export(
         return server_error(e)
     finally:
         release_pipeline(uid)
+
+
+@app.post("/api/export/selection")
+@limiter.limit("30/minute")
+async def api_export_selection(req: ExportSelectionRequest, request: Request):
+    """Export the exact ordered list of papers shown in Search (what you see is what you get)."""
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    fmt = (req.format or "ris").lower().strip()
+    if fmt not in ("csv", "txt", "ris", "bibtex"):
+        return JSONResponse(status_code=400, content={"detail": "Invalid format"})
+    items = list(req.items or [])
+    if not items:
+        return JSONResponse(
+            status_code=400,
+            content={"detail": "No papers to export. Run a search first."},
+        )
+    if len(items) > 2000:
+        return JSONResponse(status_code=400, content={"detail": "Too many papers (max 2000)."})
+    uid = user["user_id"]
+    p = get_pipeline(uid)
+    try:
+        def _load():
+            rows = []
+            for key in items:
+                art = p.db.get_article_by_id(key.article_id, key.source)
+                if art:
+                    rows.append(art)
+            return rows
+
+        results = await run_in_thread(_load)
+        if not results:
+            return JSONResponse(
+                status_code=400,
+                content={"detail": "None of those papers were found in the active library."},
+            )
+        content, media_type, filename = _format_ranked_export(results, fmt)
+        return StreamingResponse(
+            io.BytesIO(content.encode()),
+            media_type=media_type,
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
+        )
+    except Exception as e:
+        return server_error(e)
+    finally:
+        release_pipeline(uid)
+
+
+def _library_rows_to_csv(rows: List[dict]) -> str:
+    """CSV for GET /api/export/library?format=csv (includes Starred / Note columns)."""
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "Title", "Year", "Journal", "Authors", "Source", "ID",
+        "Cluster ID", "Cluster Label", "Excluded", "Exclusion Reason",
+        "Starred", "Note",
+    ])
+    for a in rows:
+        writer.writerow([
+            a.get("title", ""),
+            a.get("year", ""),
+            a.get("journal", ""),
+            "; ".join(a.get("authors") or []),
+            a.get("source", ""),
+            a.get("article_id", ""),
+            a.get("cluster_id", ""),
+            a.get("cluster_label", ""),
+            "yes" if a.get("excluded") else "no",
+            a.get("exclusion_reason", ""),
+            "yes" if a.get("starred") else "no",
+            a.get("note", ""),
+        ])
+    return output.getvalue()
 
 
 @app.get("/api/export/library")
@@ -1072,25 +1237,7 @@ async def api_export_library(
             content = "\n".join(lines)
             media_type, filename = "text/plain", f"library_{scope}.txt"
         else:
-            output = io.StringIO()
-            writer = csv.writer(output)
-            writer.writerow([
-                "Title", "Year", "Journal", "Authors", "Source", "ID",
-                "Cluster ID", "Cluster Label", "Excluded", "Exclusion Reason",
-                "Starred", "Note",
-            ])
-            for a in rows:
-                writer.writerow([
-                    a.get("title", ""), a.get("year", ""), a.get("journal", ""),
-                    "; ".join(a.get("authors") or []),
-                    a.get("source", ""), a.get("article_id", ""),
-                    a.get("cluster_id", ""), a.get("cluster_label", ""),
-                    "yes" if a.get("excluded") else "no",
-                    a.get("exclusion_reason", ""),
-                    "yes" if a.get("starred") else "no",
-                    a.get("note", ""),
-                ])
-            content = output.getvalue()
+            content = _library_rows_to_csv(rows)
             media_type, filename = "text/csv", f"library_{scope}.csv"
         return StreamingResponse(
             io.BytesIO(content.encode()),
@@ -1446,6 +1593,226 @@ async def api_generate_key_points(request: Request, only_missing: bool = True):
         release_pipeline(uid)
 
 
+@app.get("/api/ai/status")
+async def api_ai_status(request: Request):
+    """Honest AI provider status (Ollama / OpenAI-compatible / Anthropic)."""
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    from llm_service import status as ai_status
+    return ai_status()
+
+
+@app.get("/api/ai/settings")
+async def api_ai_settings_get(request: Request):
+    """Masked AI deploy settings for the Account page."""
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    from llm_service import public_ai_settings, status as ai_status
+    return {"settings": public_ai_settings(), "status": ai_status()}
+
+
+@app.post("/api/ai/settings")
+@limiter.limit("20/minute")
+async def api_ai_settings_save(req: AISettingsUpdate, request: Request):
+    """Save server-wide AI keys/models (user_data/ai_settings.json)."""
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    from llm_service import public_ai_settings, save_ai_settings, status as ai_status
+    payload = {k: v for k, v in req.model_dump().items() if v is not None}
+    if "llm_provider" in payload:
+        prov = str(payload["llm_provider"]).strip().lower()
+        if prov not in ("auto", "ollama", "openai", "anthropic"):
+            return JSONResponse(
+                status_code=400,
+                content={"detail": "llm_provider must be auto, ollama, openai, or anthropic"},
+            )
+        payload["llm_provider"] = prov
+    save_ai_settings(payload)
+    return {
+        "status": "success",
+        "settings": public_ai_settings(),
+        "status_detail": ai_status(),
+    }
+
+
+@app.post("/api/ai/ollama/start")
+@limiter.limit("6/minute")
+async def api_ai_ollama_start(request: Request):
+    """Start local Ollama (detached), using OLLAMA_MODELS when set."""
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    from llm_service import start_ollama, status as ai_status
+    ok, msg = await run_in_thread(start_ollama)
+    return {
+        "ok": ok,
+        "message": msg,
+        "status": ai_status(),
+    }
+
+
+@app.post("/api/ai/ollama/stop")
+@limiter.limit("6/minute")
+async def api_ai_ollama_stop(request: Request):
+    """Stop Ollama server and model runners (frees VRAM)."""
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    from llm_service import stop_ollama, status as ai_status
+    ok, msg = await run_in_thread(stop_ollama)
+    return {
+        "ok": ok,
+        "message": msg,
+        "status": ai_status(),
+    }
+
+
+def _ai_unconfigured_detail() -> str:
+    return (
+        "AI is unavailable (not configured). Open Account → AI study aid and choose "
+        "Built-in study aid or Cloud API key. Extractive key points still work."
+    )
+
+
+def _friendly_ai_unavailable(detail: str) -> str:
+    low = (detail or "").lower()
+    if "ollama" in low or "not running" in low or "not reachable" in low:
+        return (
+            "Built-in study aid is not ready (503). Try again in a moment, or switch "
+            "to Cloud API key on Account. Extractive key points still work without AI."
+        )
+    return detail or "AI study aid unavailable."
+
+
+@app.post("/api/ai/refine-article")
+@limiter.limit("8/minute")
+async def api_ai_refine_article(req: AIArticleRequest, request: Request):
+    """Optional LLM rewrite of summary/key points from the abstract only.
+
+    Built-in mode: start local service → refine → stop when idle (ephemeral).
+    Default corpus key points stay extractive. Never bulk-rewrites a library.
+    """
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    uid = user["user_id"]
+    p = get_pipeline(uid)
+    try:
+        from llm_service import (
+            LLMError,
+            LLMUnavailable,
+            is_configured,
+            refine_article,
+            run_with_ephemeral_builtin,
+        )
+
+        if not is_configured():
+            return JSONResponse(status_code=503, content={"detail": _ai_unconfigured_detail()})
+        article = p.db.get_article_by_id(req.article_id, req.source)
+        if not article:
+            return JSONResponse(status_code=404, content={"detail": "Article not found"})
+        existing = (p.db.get_key_points_map().get((req.article_id, req.source)) or [])
+
+        def _work():
+            return run_with_ephemeral_builtin(
+                lambda: refine_article(
+                    title=article.get("title") or "",
+                    abstract=article.get("abstract") or "",
+                    existing_key_points=existing,
+                    source=req.source or "",
+                    article_id=req.article_id or "",
+                )
+            )
+
+        result = await run_in_thread(_work)
+        if req.save_key_points and result.get("key_points"):
+            p.db.insert_key_points({
+                (req.article_id, req.source): result["key_points"],
+            })
+            result["saved"] = True
+        else:
+            result["saved"] = False
+        result["article_id"] = req.article_id
+        result["source"] = req.source
+        result["label"] = "AI rewrite (from the abstract only — not extractive)"
+        return result
+    except LLMUnavailable as e:
+        return JSONResponse(status_code=503, content={"detail": _friendly_ai_unavailable(str(e))})
+    except LLMError as e:
+        return JSONResponse(status_code=400, content={"detail": str(e)})
+    except Exception as e:
+        return server_error(e)
+    finally:
+        release_pipeline(uid)
+
+
+@app.post("/api/ai/ask-article")
+@limiter.limit("8/minute")
+async def api_ai_ask_article(req: AIAskRequest, request: Request):
+    """Answer a question using only this paper's title + abstract (opt-in AI).
+
+    Same lifecycle as Refine for built-in mode: start → answer → stop when idle.
+    One paper per request — no whole-library Q&A (R5).
+    """
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    uid = user["user_id"]
+    p = get_pipeline(uid)
+    try:
+        from llm_service import (
+            LLMError,
+            LLMUnavailable,
+            ask_article,
+            is_configured,
+            run_with_ephemeral_builtin,
+        )
+
+        if not is_configured():
+            return JSONResponse(status_code=503, content={"detail": _ai_unconfigured_detail()})
+        article = p.db.get_article_by_id(req.article_id, req.source)
+        if not article:
+            return JSONResponse(status_code=404, content={"detail": "Article not found"})
+
+        def _work():
+            return run_with_ephemeral_builtin(
+                lambda: ask_article(
+                    question=req.question,
+                    title=article.get("title") or "",
+                    abstract=article.get("abstract") or "",
+                    source=req.source or "",
+                    article_id=req.article_id or "",
+                )
+            )
+
+        result = await run_in_thread(_work)
+        result["article_id"] = req.article_id
+        result["source"] = req.source
+        result["label"] = "AI answer (title + abstract only)"
+        return result
+    except LLMUnavailable as e:
+        return JSONResponse(status_code=503, content={"detail": _friendly_ai_unavailable(str(e))})
+    except LLMError as e:
+        return JSONResponse(status_code=400, content={"detail": str(e)})
+    except Exception as e:
+        return server_error(e)
+    finally:
+        release_pipeline(uid)
+
+
 @app.get("/api/statistics")
 async def api_statistics(request: Request):
     user = current_user(request)
@@ -1768,17 +2135,28 @@ async def api_delete_library(library_id: str, request: Request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
     uid = user["user_id"]
     try:
-        # Drop cached pipeline for this library before deleting files.
+        # Refuse to delete while requests or background jobs still hold the
+        # pipeline (jobs keep a reference until completion): closing the DB
+        # under them would abort work or remove the file mid-write.
         key = pipeline_cache_key(uid, library_id)
         with _pipelines_lock:
+            if _pipeline_refcounts.get(key, 0) > 0:
+                return JSONResponse(
+                    status_code=409,
+                    content={
+                        "detail": "This library is in use (an active job or "
+                        "request). Wait for it to finish, then try again."
+                    },
+                )
+            # Drop cached pipeline for this library before deleting files.
             pipe = _pipelines.pop(key, None)
-            _pending_close.pop(key, None)
-            _pipeline_refcounts.pop(key, None)
-        if pipe is not None:
-            try:
-                pipe.db.close()
-            except Exception:
-                pass
+            pending = _pending_close.pop(key, [])
+        for p in [pipe, *pending]:
+            if p is not None:
+                try:
+                    p.db.close()
+                except Exception:
+                    pass
         result = delete_library(uid, library_id)
         return {"status": "success", **result}
     except ValueError as e:
@@ -1987,12 +2365,15 @@ async def api_delete_account(req: DeleteAccountRequest, request: Request):
     try:
         # 1. Close + drop every cached pipeline for this user (all libraries).
         _evict_pipeline(uid)
-        # 2. Remove the user's data directory (all libraries + meta).
+        # 2. Remove the user's data directory (all libraries + meta). Errors
+        # propagate: the account record is only deleted after the private data
+        # is confirmed gone, so a failed removal keeps the account (and this
+        # endpoint retryable) instead of orphaning data with no owner.
         # Honour USER_DATA_DIR the same way libraries.py does.
         from libraries import user_dir as lib_user_dir
         udir = lib_user_dir(uid)
         if udir.is_dir():
-            shutil.rmtree(udir, ignore_errors=True)
+            shutil.rmtree(udir)
         # 3. Delete the account record.
         user_db.delete_user(uid)
     except Exception as e:

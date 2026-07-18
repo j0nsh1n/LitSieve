@@ -5,6 +5,44 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+// === Classroom UI flags (env: HIDE_STUDY_TYPE_TAGS, HIDE_AI_BUTTONS) ===
+// Defaults keep features on until /api/ui-flags loads.
+window.LRA_UI = window.LRA_UI || {
+    show_study_type_tags: true,
+    show_ai_buttons: true,
+    _loaded: false,
+};
+
+function uiFlag(name, fallback) {
+    if (fallback === undefined) fallback = true;
+    const v = window.LRA_UI && window.LRA_UI[name];
+    return v === undefined ? fallback : !!v;
+}
+
+async function loadUiFlags() {
+    try {
+        const data = await fetch('/api/ui-flags', {
+            headers: { Accept: 'application/json' },
+            credentials: 'same-origin',
+        }).then((r) => (r.ok ? r.json() : null));
+        if (data && typeof data === 'object') {
+            window.LRA_UI.show_study_type_tags = data.show_study_type_tags !== false;
+            window.LRA_UI.show_ai_buttons = data.show_ai_buttons !== false;
+        }
+    } catch (e) {
+        // Keep defaults (features visible).
+    }
+    window.LRA_UI._loaded = true;
+    document.documentElement.dataset.showAi = uiFlag('show_ai_buttons') ? '1' : '0';
+    document.documentElement.dataset.showStudyTypes = uiFlag('show_study_type_tags') ? '1' : '0';
+    // Hide Account AI card without waiting for account.js if already in DOM.
+    if (!uiFlag('show_ai_buttons')) {
+        const aiSec = document.getElementById('ai-settings-section');
+        if (aiSec) aiSec.hidden = true;
+    }
+    return window.LRA_UI;
+}
+
 // === CSRF token (double-submit cookie) ===
 function getCsrfToken() {
     const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
@@ -110,6 +148,22 @@ function getArticleUrl(articleId, source) {
             return `https://ui.adsabs.harvard.edu/abs/${articleId}`;
         case 'core':
             return `https://core.ac.uk/works/${articleId}`;
+        case 'biorxiv':
+            return `https://www.biorxiv.org/content/${articleId}`;
+        case 'medrxiv':
+            return `https://www.medrxiv.org/content/${articleId}`;
+        case 'dblp':
+            return `https://dblp.org/rec/${articleId}`;
+        case 'openaire':
+            return String(articleId).startsWith('http')
+                ? String(articleId)
+                : `https://doi.org/${articleId}`;
+        case 'plos':
+            return `https://doi.org/${articleId}`;
+        case 'hal':
+            return String(articleId).startsWith('10.')
+                ? `https://doi.org/${articleId}`
+                : `https://hal.science/${articleId}`;
         case 'sample':
             return null; // demo corpus — no external page
         default:
@@ -118,23 +172,49 @@ function getArticleUrl(articleId, source) {
 }
 
 // === Source display name ===
+// Prefer names from GET /api/sources (source_catalog.py) when loaded.
+window.LRA_SOURCE_NAMES = window.LRA_SOURCE_NAMES || {
+    pubmed: 'PubMed',
+    europepmc: 'Europe PMC',
+    clinicaltrials: 'ClinicalTrials.gov',
+    openalex: 'OpenAlex',
+    arxiv: 'arXiv',
+    semanticscholar: 'Semantic Scholar',
+    eric: 'ERIC',
+    zenodo: 'Zenodo',
+    crossref: 'CrossRef',
+    doaj: 'DOAJ',
+    nasa_ads: 'NASA ADS',
+    core: 'CORE',
+    biorxiv: 'bioRxiv',
+    medrxiv: 'medRxiv',
+    dblp: 'DBLP',
+    openaire: 'OpenAIRE',
+    plos: 'PLOS',
+    hal: 'HAL',
+    sample: 'Sample demo',
+};
+
 function getSourceName(source) {
-    const names = {
-        pubmed: 'PubMed',
-        europepmc: 'Europe PMC',
-        clinicaltrials: 'ClinicalTrials.gov',
-        openalex: 'OpenAlex',
-        arxiv: 'arXiv',
-        semanticscholar: 'Semantic Scholar',
-        eric: 'ERIC',
-        zenodo: 'Zenodo',
-        crossref: 'CrossRef',
-        doaj: 'DOAJ',
-        nasa_ads: 'NASA ADS',
-        core: 'CORE',
-        sample: 'Sample demo',
-    };
-    return names[source] || source;
+    if (window.LRA_SOURCE_NAMES && window.LRA_SOURCE_NAMES[source]) {
+        return window.LRA_SOURCE_NAMES[source];
+    }
+    return source;
+}
+
+/** Load display names (and optional tips) from the server catalog. */
+async function loadSourceNames() {
+    try {
+        const data = await fetch('/api/sources', {
+            headers: { Accept: 'application/json' },
+            credentials: 'same-origin',
+        }).then((r) => (r.ok ? r.json() : null));
+        if (!data || !Array.isArray(data.sources)) return;
+        data.sources.forEach((s) => {
+            if (s && s.id) window.LRA_SOURCE_NAMES[s.id] = s.name || s.id;
+        });
+        window.LRA_SOURCE_NAMES.sample = window.LRA_SOURCE_NAMES.sample || 'Sample demo';
+    } catch (e) { /* keep defaults */ }
 }
 
 // === First-run / empty-state helpers ===
@@ -228,15 +308,275 @@ function renderPaginatedList(container, items, renderItem, opts) {
 }
 
 /** HTML for extractive key points (honest "from the abstract" label). */
-function renderKeyPointsHtml(bullets) {
-    if (!bullets || !bullets.length) return '';
-    const items = bullets
+function renderKeyPointsHtml(bullets, options) {
+    options = options || {};
+    if (!bullets || !bullets.length) {
+        // Still allow AI actions when there are no extractive bullets yet.
+        if (!options.articleId) return '';
+    }
+    const label = options.aiLabel
+        ? 'Key points (AI rewrite — from the abstract only)'
+        : 'Key points (from the abstract)';
+    const items = (bullets || [])
         .map(b => `<li>${escapeHtml(String(b))}</li>`)
         .join('');
+    const list = items ? `<ul class="key-points-list">${items}</ul>` : '';
+    const aid = options.articleId ? escapeHtml(String(options.articleId)) : '';
+    const src = options.source ? escapeHtml(String(options.source)) : '';
+    // Extractive key points always show; AI buttons are optional (classroom toggle).
+    const showAi = typeof uiFlag === 'function' ? uiFlag('show_ai_buttons', true) : true;
+    const actions = (aid && src && showAi)
+        ? `<div class="ai-actions" data-article-id="${aid}" data-source="${src}">
+            <button type="button" class="btn btn-secondary btn-sm ai-refine-btn" title="Optional AI rewrite of summary and bullets from this abstract only">Refine with AI</button>
+            <button type="button" class="btn btn-secondary btn-sm ai-ask-btn" title="Ask a question answered only from this abstract">Ask about this paper</button>
+            <span class="ai-status-line help-text" hidden></span>
+           </div>
+           <div class="ai-panel" hidden></div>`
+        : '';
     return `<div class="key-points">
-      <div class="key-points-label">Key points (from the abstract)</div>
-      <ul class="key-points-list">${items}</ul>
+      <div class="key-points-label">${escapeHtml(label)}</div>
+      ${list}
+      ${actions}
     </div>`;
+}
+
+/**
+ * Site-styled modal for Ask about this paper (replaces window.prompt).
+ * Resolves with trimmed question string, or null if cancelled.
+ */
+function openAiAskModal(paperTitle) {
+    return new Promise((resolve) => {
+        const existing = document.getElementById('ai-ask-modal-root');
+        if (existing) existing.remove();
+
+        const root = document.createElement('div');
+        root.id = 'ai-ask-modal-root';
+        root.className = 'lra-modal-root';
+        root.setAttribute('role', 'dialog');
+        root.setAttribute('aria-modal', 'true');
+        root.setAttribute('aria-labelledby', 'ai-ask-modal-title');
+        const titleBit = paperTitle
+            ? `<p class="lra-modal-paper info-text">About: <strong>${escapeHtml(String(paperTitle).slice(0, 160))}</strong></p>`
+            : '';
+        root.innerHTML = `
+          <div class="lra-modal-backdrop" data-ai-ask-dismiss></div>
+          <div class="lra-modal-card card">
+            <h2 id="ai-ask-modal-title" class="lra-modal-title">Ask about this paper</h2>
+            <p class="info-text">Answered only from this paper’s <strong>title and abstract</strong>
+              (not the full text). The study aid starts for this question, then stops.</p>
+            ${titleBit}
+            <div class="form-group">
+              <label for="ai-ask-modal-input">Your question</label>
+              <textarea id="ai-ask-modal-input" class="lra-modal-textarea" rows="3"
+                placeholder="e.g. Who was studied? What was the main finding?"
+                maxlength="500"></textarea>
+            </div>
+            <div class="lra-modal-actions">
+              <button type="button" class="btn btn-secondary" data-ai-ask-dismiss>Cancel</button>
+              <button type="button" class="btn btn-primary" id="ai-ask-modal-submit">Ask</button>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(root);
+        document.body.classList.add('lra-modal-open');
+
+        const input = root.querySelector('#ai-ask-modal-input');
+        const submit = root.querySelector('#ai-ask-modal-submit');
+        let settled = false;
+
+        const close = (value) => {
+            if (settled) return;
+            settled = true;
+            document.body.classList.remove('lra-modal-open');
+            root.remove();
+            document.removeEventListener('keydown', onKey);
+            resolve(value);
+        };
+
+        const onKey = (ev) => {
+            if (ev.key === 'Escape') {
+                ev.preventDefault();
+                close(null);
+            }
+        };
+        document.addEventListener('keydown', onKey);
+
+        root.querySelectorAll('[data-ai-ask-dismiss]').forEach((el) => {
+            el.addEventListener('click', (ev) => {
+                ev.preventDefault();
+                close(null);
+            });
+        });
+
+        const doSubmit = () => {
+            const q = (input && input.value || '').trim();
+            if (!q || q.length < 3) {
+                showNotification('Type a slightly longer question (at least a few words).', 'error');
+                if (input) input.focus();
+                return;
+            }
+            close(q);
+        };
+
+        if (submit) submit.addEventListener('click', (ev) => {
+            ev.preventDefault();
+            doSubmit();
+        });
+        if (input) {
+            input.addEventListener('keydown', (ev) => {
+                if (ev.key === 'Enter' && !ev.shiftKey) {
+                    ev.preventDefault();
+                    doSubmit();
+                }
+            });
+            setTimeout(() => input.focus(), 30);
+        }
+    });
+}
+
+/**
+ * Wire Refine + Ask on a result card.
+ * Built-in mode (both): start study aid → work on selected paper → stop when done.
+ */
+function bindAiArticleActions(rootEl, article) {
+    if (!rootEl || !article) return;
+    if (typeof uiFlag === 'function' && !uiFlag('show_ai_buttons', true)) return;
+    const wrap = rootEl.querySelector('.ai-actions');
+    if (!wrap || wrap.dataset.bound === '1') return;
+    wrap.dataset.bound = '1';
+    const panel = rootEl.querySelector('.ai-panel');
+    const statusEl = wrap.querySelector('.ai-status-line');
+    const aid = article.article_id;
+    const source = article.source;
+
+    const setStatus = (msg, show) => {
+        if (!statusEl) return;
+        statusEl.hidden = !show;
+        statusEl.textContent = msg || '';
+    };
+
+    const showPanel = (html) => {
+        if (!panel) return;
+        panel.hidden = false;
+        panel.innerHTML = html;
+    };
+
+    const softAiError = (msg, verb) => {
+        const soft = /503|unavailable|not running|not configured|study aid|api key/i.test(msg);
+        showNotification(
+            soft
+                ? `${msg} Extractive key points still work without AI.`
+                : `AI ${verb} failed: ${msg}`,
+            soft ? 'warning' : 'error'
+        );
+    };
+
+    const refineBtn = wrap.querySelector('.ai-refine-btn');
+    if (refineBtn) {
+        refineBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setStatus('Starting study aid and refining this paper…', true);
+            refineBtn.disabled = true;
+            try {
+                const data = await apiCall('/api/ai/refine-article', {
+                    method: 'POST',
+                    body: {
+                        article_id: aid,
+                        source: source,
+                        save_key_points: false,
+                    },
+                });
+                const lim = data.limitations
+                    ? `<p class="ai-limitations"><strong>Limitations (AI):</strong> ${escapeHtml(data.limitations)}</p>`
+                    : '';
+                const bullets = (data.key_points || [])
+                    .map(b => `<li>${escapeHtml(String(b))}</li>`)
+                    .join('');
+                showPanel(`
+                  <div class="ai-label help-text">${escapeHtml(data.label || 'AI rewrite (from the abstract only)')}</div>
+                  <p class="ai-summary">${escapeHtml(data.summary || '')}</p>
+                  ${lim}
+                  ${bullets ? `<ul class="key-points-list">${bullets}</ul>` : ''}
+                  <button type="button" class="btn btn-secondary btn-sm ai-save-kp">Save these as key points</button>
+                `);
+                const saveBtn = panel.querySelector('.ai-save-kp');
+                if (saveBtn) {
+                    saveBtn.addEventListener('click', async (ev) => {
+                        ev.preventDefault();
+                        saveBtn.disabled = true;
+                        try {
+                            await apiCall('/api/ai/refine-article', {
+                                method: 'POST',
+                                body: {
+                                    article_id: aid,
+                                    source: source,
+                                    save_key_points: true,
+                                },
+                            });
+                            showNotification('Key points updated (AI rewrite saved).', 'success');
+                            const lab = rootEl.querySelector('.key-points-label');
+                            if (lab) lab.textContent = 'Key points (AI rewrite — from the abstract only)';
+                            const ul = rootEl.querySelector('.key-points-list');
+                            if (ul && data.key_points) {
+                                ul.innerHTML = data.key_points
+                                    .map(b => `<li>${escapeHtml(String(b))}</li>`)
+                                    .join('');
+                            }
+                            saveBtn.textContent = 'Saved';
+                        } catch (err) {
+                            showNotification(`Could not save: ${err.message}`, 'error');
+                            saveBtn.disabled = false;
+                        }
+                    });
+                }
+                setStatus('', false);
+            } catch (err) {
+                setStatus('', false);
+                softAiError(err && err.message ? String(err.message) : 'AI refine failed', 'refine');
+            } finally {
+                refineBtn.disabled = false;
+            }
+        });
+    }
+
+    const askBtn = wrap.querySelector('.ai-ask-btn');
+    if (askBtn) {
+        askBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const question = await openAiAskModal(article.title || '');
+            if (!question) return;
+            setStatus('Starting study aid and answering…', true);
+            askBtn.disabled = true;
+            try {
+                // Same ephemeral lifecycle as Refine: start → answer → stop.
+                const data = await apiCall('/api/ai/ask-article', {
+                    method: 'POST',
+                    body: {
+                        article_id: aid,
+                        source: source,
+                        question: question,
+                    },
+                });
+                const quotes = (data.quotes || [])
+                    .map(q => `<blockquote class="ai-quote">${escapeHtml(String(q))}</blockquote>`)
+                    .join('');
+                showPanel(`
+                  <div class="ai-label help-text">${escapeHtml(data.label || 'AI answer (abstract only)')}</div>
+                  <p class="ai-question"><strong>Q:</strong> ${escapeHtml(question)}</p>
+                  <p class="ai-answer">${escapeHtml(data.answer || '')}</p>
+                  ${quotes}
+                `);
+                setStatus('', false);
+            } catch (err) {
+                setStatus('', false);
+                softAiError(err && err.message ? String(err.message) : 'AI ask failed', 'ask');
+            } finally {
+                askBtn.disabled = false;
+            }
+        });
+    }
 }
 
 // === Update nav article count ===
@@ -259,8 +599,14 @@ async function updateNavStats() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    updateNavStats();
-    initLibrarySwitcher();
+    // Flags + source names first so Search/Account match server catalog.
+    Promise.all([
+        typeof loadUiFlags === 'function' ? loadUiFlags() : Promise.resolve(),
+        typeof loadSourceNames === 'function' ? loadSourceNames() : Promise.resolve(),
+    ]).finally(() => {
+        updateNavStats();
+        initLibrarySwitcher();
+    });
 });
 
 // === Multi-library switcher (nav) ===

@@ -17,8 +17,9 @@
 <section class="card">
  <h2>Your libraries</h2>
  <p class="info-text">Create separate collections for different units or projects. Use <strong>Share</strong>
- to give a class a copy of a library via a short code. Deleting a library permanently removes its papers
- (export first if you need them).</p>
+ to give a class a <strong>clone</strong> (not live access) via a short code — students can then
+ screen, search, and export RIS or a screening report for hand-ins.
+ Deleting a library permanently removes its papers (export first if you need them).</p>
  <ul class="library-manage-list" id="library-manage-list">
   <li class="info-text">Loading…</li>
  </ul>
@@ -54,12 +55,102 @@
 
 <section class="card">
  <h2>Your active shares</h2>
- <p class="info-text">Codes you created for classes. Revoke a code if it was posted somewhere public
-  by mistake. Students who already joined keep their copy.</p>
+ <p class="info-text">Class codes you created. Each student who joins gets a <strong>clone</strong>
+  (their own copy), not live access to yours. Revoke if a code was posted publicly by mistake —
+  students who already joined keep their copy.</p>
+ <details class="help-details">
+  <summary>What to tell students after you share</summary>
+  <ol class="export-format-list" style="padding-left:1.2rem;">
+   <li>Share the code (or <code>/join?code=…</code> link) and the library name/unit.</li>
+   <li>Students: Join → open the new library in the nav switcher.</li>
+   <li>Suggested next steps: screen on Clusters → clean duplicates → Search &amp; export RIS;
+    optional screening report on Duplicates for process counts.</li>
+   <li>Remind them: public databases only (starting point), not a full library search.</li>
+  </ol>
+ </details>
  <ul class="library-manage-list" id="shares-list">
   <li class="info-text">Loading…</li>
  </ul>
  <div id="shares-status" class="status-indicator"></div>
+</section>
+
+<section class="card" id="ai-settings-section">
+ {# Optional AI: pick Built-in (local, auto start/stop) or Cloud API key. #}
+ <details class="advanced-details" id="ai-settings-details">
+  <summary>AI study aid (optional — choose how it runs)</summary>
+  <div class="advanced-body">
+   <p class="info-text ai-first-run-note" role="note">
+    <strong>Optional.</strong> Extractive key points always work without AI.
+    On Search, <strong>Refine with AI</strong> and <strong>Ask about this paper</strong> each use
+    one abstract at a time. Pick how the study aid runs:
+   </p>
+   <div class="form-row">
+    <div class="form-group flex-2">
+     <label for="ai-study-mode">How should AI run?</label>
+     <select id="ai-study-mode">
+      <option value="built_in">Built-in study aid (starts only when you use Refine or Ask)</option>
+      <option value="api_key">Cloud API key (you provide a key)</option>
+     </select>
+     <span class="help-text">
+      <strong>Built-in:</strong> turns on for that one Refine or Ask, then turns off when finished.
+      <strong>API key:</strong> uses your cloud key; nothing local is started.
+     </span>
+    </div>
+   </div>
+   <p class="info-text" id="ai-status-detail">Checking AI status…</p>
+   <button type="button" id="ai-status-refresh" class="btn btn-secondary btn-sm">Refresh status</button>
+
+   <div id="ai-builtin-panel" class="ai-mode-panel" style="margin-top:0.85rem;">
+    <p class="help-text">
+     No key needed. A teacher or deployer installs the study-aid software on this computer once.
+     You only use Refine or Ask on Search — nothing else to start or stop.
+    </p>
+    {# Model/host/models-dir are deployer env (.env / ai_settings.json) only. #}
+   </div>
+
+   <div id="ai-apikey-panel" class="ai-mode-panel" hidden style="margin-top:0.85rem;">
+    <h3 class="ai-settings-subhead">OpenAI-compatible (OpenAI, OpenRouter, Groq, …)</h3>
+    <div class="form-row">
+     <div class="form-group">
+      <label for="ai-openai-key">API key</label>
+      <input type="password" id="ai-openai-key" autocomplete="off"
+       placeholder="Leave blank to keep existing">
+      <span class="help-text" id="ai-openai-key-hint"></span>
+     </div>
+     <div class="form-group">
+      <label for="ai-openai-model">Model</label>
+      <input type="text" id="ai-openai-model" placeholder="gpt-4o-mini">
+     </div>
+    </div>
+    <div class="form-row">
+     <div class="form-group flex-2">
+      <label for="ai-openai-base">Base URL</label>
+      <input type="text" id="ai-openai-base"
+       placeholder="https://api.openai.com/v1 or https://openrouter.ai/api/v1">
+     </div>
+    </div>
+    <h3 class="ai-settings-subhead">Anthropic (optional)</h3>
+    <div class="form-row">
+     <div class="form-group">
+      <label for="ai-anthropic-key">API key</label>
+      <input type="password" id="ai-anthropic-key" autocomplete="off"
+       placeholder="Leave blank to keep existing">
+      <span class="help-text" id="ai-anthropic-key-hint"></span>
+     </div>
+     <div class="form-group">
+      <label for="ai-anthropic-model">Model</label>
+      <input type="text" id="ai-anthropic-model" placeholder="claude-sonnet-4-6">
+     </div>
+    </div>
+   </div>
+
+   <button type="button" id="ai-settings-save" class="btn btn-primary" style="margin-top:0.75rem;">
+    Save AI settings</button>
+   <div id="ai-settings-status" class="status-indicator"></div>
+   {# Hidden legacy field so older code paths stay safe if present. #}
+   <input type="hidden" id="ai-llm-provider" value="ollama">
+  </div>
+ </details>
 </section>
 
 <section class="card">
@@ -116,5 +207,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/account.js?v=20260716s"></script>
+<script src="/static/js/account.js?v=20260717r15"></script>
 {% endblock %}

@@ -6,6 +6,8 @@
  <h1>Search for Similar Articles</h1>
  <p class="subtitle"><strong>Step 4 of 4 (last).</strong> Rank the papers you kept by how well they
  match your question, then export your list.</p>
+ {% from "macros/disclaimers.html" import scope_search %}
+ {{ scope_search() }}
 </section>
 
 <section class="card empty-state-card" id="search-empty-state" hidden>
@@ -133,6 +135,12 @@
    <label class="radio-label"><input type="checkbox" name="search-source" value="doaj" checked> DOAJ</label>
    <label class="radio-label"><input type="checkbox" name="search-source" value="nasa_ads" checked> NASA ADS</label>
    <label class="radio-label"><input type="checkbox" name="search-source" value="core" checked> CORE</label>
+   <label class="radio-label"><input type="checkbox" name="search-source" value="biorxiv" checked> bioRxiv</label>
+   <label class="radio-label"><input type="checkbox" name="search-source" value="medrxiv" checked> medRxiv</label>
+   <label class="radio-label"><input type="checkbox" name="search-source" value="dblp" checked> DBLP</label>
+   <label class="radio-label"><input type="checkbox" name="search-source" value="openaire" checked> OpenAIRE</label>
+   <label class="radio-label"><input type="checkbox" name="search-source" value="plos" checked> PLOS</label>
+   <label class="radio-label"><input type="checkbox" name="search-source" value="hal" checked> HAL</label>
    </div>
    <div class="help-text" id="source-availability-hint" style="margin-top:0.4rem;"></div>
    </div>
@@ -154,53 +162,80 @@
 <section id="results-section" style="display:none;">
  <div class="results-header">
  <h2>Results: <span id="result-count">0</span> articles found</h2>
- <div class="export-row">
- <button id="export-csv" class="btn btn-secondary btn-sm" title="Download these results as a spreadsheet-ready CSV file">Download CSV</button>
- <button id="export-txt" class="btn btn-secondary btn-sm" title="Download these results as a plain-text reading list">Download Text</button>
- </div>
  </div>
  <details class="help-details">
-  <summary>Reading the results</summary>
-  <p class="info-text">The badge shows how strong the match is (hover for the exact 0-1 similarity
-  score, always the original meaning-based similarity even when hybrid ranking is on). Matching
-  words from your query are <mark class="hl-demo">highlighted</mark> in abstracts. PICO chips show
-  which clinical elements were detected, with short quotes when available. Use ★ to bookmark (feeds
-  <strong>More like my starred</strong>) and <em>Add note</em> for private study notes (saved only
-  in your account). Export this ranked list with the buttons above, or your whole library below.</p>
+  <summary>Reading these results</summary>
+  <p class="info-text">The match badge shows how strong the similarity is (hover for the exact 0-1
+  score). A <strong>Type</strong> tag is a rough automated guess from the title and abstract
+  (review, trial, survey, …). An exclamation mark means low or medium confidence - the tag is
+  often wrong. It is <strong>not</strong> an evidence grade or quality score. Matching words from
+  your query are <mark class="hl-demo">highlighted</mark> in abstracts. Use ★ to bookmark and
+  <em>Add note</em> for private notes.</p>
  </details>
  <div id="results-list"></div>
 </section>
 
-<section class="card">
- <h2>Export your library</h2>
- <p class="info-text">Download your whole collection (not just the last search) for hand-ins or a
- bibliography manager like Zotero, EndNote, or Mendeley.</p>
- <details class="help-details">
-  <summary>What exports include and citation formatting</summary>
-  <p class="info-text">Exports include cluster labels, exclusion status, stars, and private notes -
-  useful for spreadsheet screening logs. Screening counts for hand-ins are on the Duplicates page.
-  <strong>APA (text)</strong> is a classroom draft in approximate APA 7th style (author names from
-  databases vary). For polished APA/MLA/Chicago, open
-  <a href="https://zbib.org/" target="_blank" rel="noopener">ZoteroBib</a> or import RIS/BibTeX into Zotero.</p>
+<section class="card" id="export-results-section">
+ <h2>Export these search results</h2>
+ <p class="info-text">Download the papers <strong>currently shown above</strong> as one RIS file
+ for free <a href="https://www.zotero.org/download/" target="_blank" rel="noopener">Zotero</a>
+ (APA / MLA / Chicago after import). Only this ranked list — not your whole library.</p>
+ <div class="export-row export-row-primary">
+  <button type="button" id="export-results-ris" class="btn btn-primary btn-lg btn-download"
+   title="Citation file of the search results on screen — for Zotero File → Import">
+   Download RIS (these results)</button>
+ </div>
+ <div id="export-results-status" class="status-indicator"></div>
+
+ <div class="citation-tools" aria-label="Import into Zotero">
+  <h3 class="citation-tools-heading">Then format citations in Zotero (free)</h3>
+  <ol class="export-format-list zotero-steps">
+   <li>Click <strong>Download RIS (these results)</strong> above.</li>
+   <li>Open the <a href="https://www.zotero.org/download/" target="_blank" rel="noopener">Zotero</a>
+    desktop app (install once if needed).</li>
+   <li>In Zotero’s <strong>top menu bar</strong> (not a right‑click): choose
+    <strong>File → Import…</strong>.</li>
+   <li>Select <strong>A file (BibTeX, RIS, Zotero RDF, etc.)</strong> → <strong>Next</strong>.</li>
+   <li>Browse to the downloaded <code>search_results.ris</code> → <strong>Open</strong> →
+    <strong>Next / Finish</strong>.</li>
+   <li>You should now see <strong>many paper titles</strong> in your library — not a single row
+    named “library” or “search_results” with a paperclip/file icon.</li>
+   <li>Click the first paper, then Shift‑click the last to select them all (or Ctrl/Cmd‑A in the
+    list). Right‑click → <strong>Create Bibliography from Items…</strong> → choose APA or MLA →
+    copy into your document.</li>
+  </ol>
+  <p class="help-text"><strong>If you only see one item called “library” or “search_results”:</strong>
+  you attached the file instead of importing it. Delete that row, then use
+  <strong>File → Import…</strong> again — do <em>not</em> drag the file into the middle of the
+  Zotero window.</p>
+ </div>
+
+ <details class="advanced-details" style="margin-top:1rem;">
+  <summary>Export whole library instead (not just this search)</summary>
+  <div class="advanced-body">
+   <p class="info-text">Use this only if you need every paper in a scope (all / included / screened
+   out / starred), not the ranked list above. Same Zotero import steps.</p>
+   <div class="export-scope-row">
+    <label for="lib-export-scope" class="help-text export-scope-label">Scope</label>
+    <select id="lib-export-scope" class="export-scope-select"
+     title="Which papers to include in the library download">
+     <option value="all">All articles</option>
+     <option value="included" selected>Included only</option>
+     <option value="excluded">Screened out only</option>
+     <option value="starred">Starred only</option>
+    </select>
+   </div>
+   <div class="export-row export-row-primary">
+    <button type="button" class="btn btn-primary btn-lg btn-download" data-lib-export-format="ris"
+     title="Whole-library RIS for Zotero File → Import">Download library RIS</button>
+   </div>
+   <p class="help-text">Process counts (how many collected / excluded / kept) are on
+   <a href="/statistics">Duplicates → Screening report</a>.</p>
+  </div>
  </details>
- <div class="export-scope-row">
- <label for="lib-export-scope" class="help-text export-scope-label">Scope</label>
- <select id="lib-export-scope" class="export-scope-select">
- <option value="all">All articles</option>
- <option value="included">Included only</option>
- <option value="excluded">Screened out only</option>
- <option value="starred">Starred only</option>
- </select>
- </div>
- <div class="export-row export-row-formats">
- <button type="button" class="btn btn-secondary btn-sm" data-lib-export-format="csv">CSV</button>
- <button type="button" class="btn btn-secondary btn-sm" data-lib-export-format="ris">RIS (Zotero/EndNote)</button>
- <button type="button" class="btn btn-secondary btn-sm" data-lib-export-format="bibtex">BibTeX</button>
- <button type="button" class="btn btn-secondary btn-sm" data-lib-export-format="apa">APA (text)</button>
- </div>
 </section>
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/search.js?v=20260716a"></script>
+<script src="/static/js/search.js?v=20260717r12"></script>
 {% endblock %}

@@ -1,0 +1,55 @@
+{# Single source of truth for product-scope / research-use disclaimers.
+   Edit ONLY this file when the classroom starting-point copy changes.
+   Import: {% from "macros/disclaimers.html" import scope_banner, scope_footer, scope_auth %}
+#}
+
+{# Full banner used on landing + feature guides (canonical wording). #}
+{% macro scope_banner() -%}
+<p class="site-disclaimer" role="note">
+ <strong>Starting point only.</strong> This tool searches a set of
+ <strong>publicly accessible</strong> research databases and helps you organise
+ what you fetch. It is <strong>not</strong> a complete library search, not a
+ substitute for your school library or librarian, and not medical, legal, or
+ professional advice. Always verify important papers in the original sources and
+ with your teacher or assignment requirements.
+</p>
+{%- endmacro %}
+
+{# Compact auth-card line (login / register). Same limits, fewer words. #}
+{% macro scope_auth() -%}
+<p class="auth-disclaimer" role="note">
+ <strong>Starting point only.</strong> Public research databases only. Not a complete
+ library search or medical, legal, or professional advice. Always verify with your
+ teacher or library.
+</p>
+{%- endmacro %}
+
+{# App footer (base layout). #}
+{% macro scope_footer(compact=false) -%}
+{%- if compact -%}
+<p class="site-disclaimer-foot">Public research databases only · classroom study aid · not a full literature search</p>
+{%- else -%}
+<p class="site-disclaimer-foot">Public research databases only. A starting point for classroom research, not a complete library search or professional advice.</p>
+{%- endif -%}
+{%- endmacro %}
+
+{# Data Management: fetch scope (same limits + paywall note). #}
+{% macro scope_fetch() -%}
+<p class="site-disclaimer" role="note">
+ <strong>Starting point only.</strong> Fetches only from the <strong>public research
+ databases</strong> you select (and only what those APIs return). Paywalled or
+ unindexed work will not appear. It is <strong>not</strong> a complete library
+ search or professional advice. Cross-check important sources with your school
+ library and assignment rules.
+</p>
+{%- endmacro %}
+
+{# Search: collection-only ranking note. #}
+{% macro scope_search() -%}
+<p class="site-disclaimer" role="note">
+ <strong>Starting point only.</strong> Ranks <strong>only papers already in your
+ collection</strong> (from public databases you fetched). It does not search the whole
+ web or every journal. Not a complete library search. Follow up in original sources
+ and your library for a full review.
+</p>
+{%- endmacro %}

@@ -23,6 +23,18 @@ SOURCE_URL: Dict[str, Callable[[str], str]] = {
     "doaj": lambda aid: f"https://doaj.org/article/{aid}",
     "nasa_ads": lambda aid: f"https://ui.adsabs.harvard.edu/abs/{aid}",
     "core": lambda aid: f"https://core.ac.uk/works/{aid}",
+    "biorxiv": lambda aid: f"https://www.biorxiv.org/content/{aid}",
+    "medrxiv": lambda aid: f"https://www.medrxiv.org/content/{aid}",
+    "dblp": lambda aid: f"https://dblp.org/rec/{aid}",
+    "openaire": lambda aid: (
+        f"https://doi.org/{aid}" if not str(aid).startswith("http") else str(aid)
+    ),
+    "plos": lambda aid: f"https://doi.org/{aid}",
+    "hal": lambda aid: (
+        f"https://doi.org/{aid}"
+        if str(aid).startswith("10.")
+        else f"https://hal.science/{aid}"
+    ),
 }
 
 # Single-pass translate; include backslash so it is not left raw for LaTeX.

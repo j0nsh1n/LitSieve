@@ -4,7 +4,7 @@
  <meta charset="UTF-8">
  <meta name="viewport" content="width=device-width, initial-scale=1.0">
  <title>Register - Literature Research Aide</title>
- <link rel="stylesheet" href="/static/css/style.css?v=20260716a">
+ <link rel="stylesheet" href="/static/css/style.css?v=20260717r15">
  <script>
  (function() {
  const saved = localStorage.getItem('theme');
@@ -17,10 +17,12 @@
  <a href="/" class="auth-home-link">← Back to home</a>
  <div class="auth-logo">Literature Research Aide</div>
  <div class="auth-subtitle">Create a private account</div>
- <p class="auth-hint" style="margin:0 0 1rem;text-align:center;">
- Free classroom-friendly workspace: 12 sources, triage, hybrid search, RIS/BibTeX export.
+ <p class="auth-hint" style="margin:0 0 0.65rem;text-align:center;">
+ Free classroom-friendly workspace: 18 sources, triage, hybrid search, RIS/BibTeX export.
  Your data stays isolated to this account.
  </p>
+ {% from "macros/disclaimers.html" import scope_auth %}
+ {{ scope_auth() }}
 
  {% if error %}
  <div class="auth-error">{{ error }}</div>

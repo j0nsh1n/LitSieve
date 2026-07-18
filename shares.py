@@ -9,8 +9,8 @@ Notes, stars, and clusters are never copied.
 from __future__ import annotations
 
 import logging
+import os
 import secrets
-import shutil
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -20,7 +20,9 @@ from database import ArticleDatabase
 from libraries import (
     NAME_MAX,
     create_library,
+    delete_library,
     ensure_libraries,
+    get_active_library_id,
     library_db_path,
     list_libraries,
     set_active_library,
@@ -171,32 +173,44 @@ def clone_library_data(
         # Empty source → leave empty dest (pipeline will create schema on open).
         return {"articles": 0, "embeddings": 0, "screening": 0, "key_points": 0}
 
-    # Flush WAL so the main file has a consistent snapshot.
-    src_conn = sqlite3.connect(str(src))
-    try:
-        src_conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-    except sqlite3.Error as e:
-        logger.warning("WAL checkpoint before clone failed: %s", e)
-    finally:
-        src_conn.close()
-
-    for path in (dest, Path(str(dest) + "-wal"), Path(str(dest) + "-shm")):
+    # Build the clone in a temp DB, sanitize it there, then atomically move it
+    # into place. The sqlite backup API yields a consistent snapshot including
+    # committed WAL frames (a wal_checkpoint can silently return busy), and
+    # sanitize-then-VACUUM before publishing means the student's file never
+    # contains the teacher's private notes/clusters, even transiently.
+    tmp = dest.with_name(dest.name + ".cloning")
+    for path in (tmp, dest, Path(str(dest) + "-wal"), Path(str(dest) + "-shm")):
         if path.exists():
             try:
                 path.unlink()
             except OSError:
                 pass
 
-    shutil.copy2(src, dest)
+    try:
+        src_conn = sqlite3.connect(f"file:{src}?mode=ro", uri=True)
+        try:
+            tmp_conn = sqlite3.connect(str(tmp))
+            try:
+                src_conn.backup(tmp_conn)
+                tmp_conn.execute("DELETE FROM notes")
+                tmp_conn.execute("DELETE FROM clusters")
+                if not include_embeddings:
+                    tmp_conn.execute("DELETE FROM embeddings")
+                tmp_conn.commit()
+                # Compact so the deleted rows are not recoverable from the file.
+                tmp_conn.execute("VACUUM")
+            finally:
+                tmp_conn.close()
+        finally:
+            src_conn.close()
+        os.replace(tmp, dest)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
 
     db = ArticleDatabase(str(dest))
     try:
         with db._lock:
-            db.conn.execute("DELETE FROM notes")
-            db.conn.execute("DELETE FROM clusters")
-            if not include_embeddings:
-                db.conn.execute("DELETE FROM embeddings")
-            db.conn.commit()
 
             def _count(table: str) -> int:
                 row = db.conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
@@ -253,11 +267,30 @@ def join_share(
     title = share.get("title_snapshot") or library_name(owner_id, owner_lib) or "Shared library"
     preferred = _join_display_name(title, teacher)
 
+    # Capture the pre-join active library so any rollback can restore it.
+    prev_active = get_active_library_id(student_user_id)
+
+    def _rollback_new_library(new_id: str) -> None:
+        """Best-effort removal of the new library + restore of prev active."""
+        try:
+            # Only delete if we still have another library (create made ≥2).
+            libs = list_libraries(student_user_id).get("libraries") or []
+            if len(libs) > 1:
+                delete_library(student_user_id, new_id)
+            if any(L.get("id") == prev_active for L in
+                   list_libraries(student_user_id).get("libraries") or []):
+                set_active_library(student_user_id, prev_active)
+        except Exception:
+            logger.exception("Failed to roll back library after join error")
+
     # create_library enforces MAX_LIBRARIES.
     created = create_library_with_unique_name(student_user_id, preferred)
     new_lib = created["library"]
     new_id = new_lib["id"]
 
+    # Prepare everything fallible *before* consuming the code: clone, set the
+    # active library, and build the response. record_redemption commits last,
+    # so a filesystem failure can't burn the student's code without a retry.
     try:
         counts = clone_library_data(
             owner_id,
@@ -266,29 +299,27 @@ def join_share(
             new_id,
             include_embeddings=bool(share.get("include_embeddings", True)),
         )
+        set_active_library(student_user_id, new_id)
+        libraries = list_libraries(student_user_id)["libraries"]
+    except Exception:
+        _rollback_new_library(new_id)
+        raise
+
+    try:
         user_db.record_redemption(
             share_id=share["id"],
             student_user_id=student_user_id,
             student_library_id=new_id,
         )
     except Exception:
-        # Best-effort rollback of the empty/partial library.
-        try:
-            from libraries import delete_library
-
-            # Only delete if we still have another library (create made ≥2).
-            libs = list_libraries(student_user_id).get("libraries") or []
-            if len(libs) > 1:
-                delete_library(student_user_id, new_id)
-        except Exception:
-            logger.exception("Failed to roll back library after join error")
+        # Code was not consumed; remove the clone so a retry starts clean.
+        _rollback_new_library(new_id)
         raise
 
-    set_active_library(student_user_id, new_id)
     return {
         "library": new_lib,
         "active_id": new_id,
-        "libraries": list_libraries(student_user_id)["libraries"],
+        "libraries": libraries,
         "counts": counts,
         "share_id": share["id"],
         "code": share["code"],

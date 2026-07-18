@@ -147,6 +147,21 @@ def test_export_library_ris_endpoint(app_module):
     assert "TY  - JOUR" in resp.text
     assert "Endpoint Paper" in resp.text
 
+    # Selection export (what Search uses for "these results")
+    csrf = c.cookies.get("csrf_token")
+    sel = c.post(
+        "/api/export/selection",
+        json={
+            "format": "ris",
+            "items": [{"article_id": "999", "source": "pubmed"}],
+        },
+        headers={"X-CSRF-Token": csrf} if csrf else {},
+    )
+    assert sel.status_code == 200, sel.text
+    assert "search_results.ris" in (sel.headers.get("content-disposition") or "")
+    assert "Endpoint Paper" in sel.text
+    assert "TY  - JOUR" in sel.text
+
 
 def test_screening_report_endpoint_empty(app_module):
     main = app_module

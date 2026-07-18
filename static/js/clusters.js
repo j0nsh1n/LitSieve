@@ -264,7 +264,10 @@ function buildClusterArticleItem(article) {
  : idText;
  const authors = (article.authors || []).join('; ');
  const keyPointsHtml = typeof renderKeyPointsHtml === 'function'
- ? renderKeyPointsHtml(article.key_points)
+ ? renderKeyPointsHtml(article.key_points, {
+ articleId: article.article_id,
+ source: article.source,
+ })
  : '';
 
  const item = document.createElement('div');
@@ -285,6 +288,10 @@ function buildClusterArticleItem(article) {
  </div>
  ${keyPointsHtml}
  `;
+
+ if (typeof bindAiArticleActions === 'function') {
+ bindAiArticleActions(item, article);
+ }
 
  item.querySelector('.screen-toggle').addEventListener('click', async (e) => {
  const btn = e.target;

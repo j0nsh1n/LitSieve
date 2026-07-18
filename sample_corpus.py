@@ -1,8 +1,9 @@
 """
 Demo sample corpus for first-run classroom use.
 
-Real educational abstracts (short) so teachers can try Clusters / Search /
-Duplicates without waiting on external APIs. Source tag is "sample".
+Short realistic abstracts so teachers can try Clusters / Search / Duplicates
+without waiting on external APIs. Mix of education, science, and civics themes.
+Source tag is "sample".
 """
 
 from __future__ import annotations
@@ -301,6 +302,133 @@ SAMPLE_ARTICLES: List[Dict] = [
         "year": "2022",
         "authors": ["Grant E", "Osei K", "Fernandez L"],
         "journal": "CBE Life Sciences Education",
+    },
+    # --- Science / environment (non-education demos) ---
+    {
+        "article_id": "sample-021",
+        "source": SAMPLE_SOURCE,
+        "title": "Urban heat islands and summer mortality risk in mid-sized cities",
+        "abstract": (
+            "BACKGROUND: Heat extremes are increasing in urban cores. "
+            "METHODS: We linked satellite land-surface temperature with daily mortality "
+            "for 12 mid-sized U.S. cities (2010-2019). "
+            "RESULTS: A 1°C rise in neighborhood heat-island intensity associated with "
+            "higher summer mortality among adults over 65 after adjusting for air quality. "
+            "Tree-canopy cover moderated the association. "
+            "CONCLUSIONS: Cooling investments should prioritize low-canopy neighborhoods."
+        ),
+        "year": "2021",
+        "authors": ["Haddad R", "Nguyen P", "Cole S"],
+        "journal": "Environmental Research Letters",
+    },
+    {
+        "article_id": "sample-022",
+        "source": SAMPLE_SOURCE,
+        "title": "Microplastics in freshwater food webs: a systematic review",
+        "abstract": (
+            "This systematic review synthesizes 67 studies of microplastic transfer from "
+            "invertebrates to fish in lakes and rivers. Evidence for trophic magnification "
+            "is mixed; smaller particles appear more often in higher trophic levels. "
+            "Standardized sampling remains rare. Authors recommend open protocols and "
+            "pre-registration of field surveys."
+        ),
+        "year": "2020",
+        "authors": ["Bergman L", "Okada T"],
+        "journal": "Freshwater Biology Notes",
+    },
+    {
+        "article_id": "sample-023",
+        "source": SAMPLE_SOURCE,
+        "title": "Community solar adoption and household energy burden",
+        "abstract": (
+            "OBJECTIVE: Estimate whether community solar subscriptions reduce energy burden "
+            "for low-income households. "
+            "METHODS: Difference-in-differences using utility bills for 4,100 subscribers "
+            "and matched controls. "
+            "RESULTS: Average energy burden fell by 1.4 percentage points; larger gains "
+            "where bill credits arrived monthly. "
+            "CONCLUSIONS: Program design (credit timing) matters as much as capacity."
+        ),
+        "year": "2022",
+        "authors": ["Patel A", "Romero J", "Singh K"],
+        "journal": "Energy Policy Briefs",
+    },
+    {
+        "article_id": "sample-024",
+        "source": SAMPLE_SOURCE,
+        "title": "Ocean acidification and shellfish hatchery practices on the Pacific coast",
+        "abstract": (
+            "We report observational monitoring of carbonate chemistry at three hatcheries "
+            "alongside larval survival. Periods of low aragonite saturation coincided with "
+            "higher mortality in oyster larvae. Buffered intake water improved survival in "
+            "pilot trials. The paper discusses adaptation options for coastal aquaculture."
+        ),
+        "year": "2019",
+        "authors": ["Walsh M", "Ito H"],
+        "journal": "Marine Resource Economics Practice",
+    },
+    # --- Civics / social studies demos ---
+    {
+        "article_id": "sample-025",
+        "source": SAMPLE_SOURCE,
+        "title": "Youth voter turnout after same-day registration reforms: a quasi-experiment",
+        "abstract": (
+            "Several states expanded same-day voter registration between 2012 and 2018. "
+            "Using a staggered difference-in-differences design, we find a 2-4 percentage-point "
+            "rise in turnout among 18-24 year olds relative to comparison states. "
+            "Effects were larger in counties with early college polling places. "
+            "Results inform debates on access-oriented election administration."
+        ),
+        "year": "2021",
+        "authors": ["Coleman D", "Ruiz F"],
+        "journal": "Election Law and Democracy",
+    },
+    {
+        "article_id": "sample-026",
+        "source": SAMPLE_SOURCE,
+        "title": "Local news deserts and municipal meeting attendance",
+        "abstract": (
+            "BACKGROUND: Local newspaper closures reduce civic information. "
+            "METHODS: Panel of 180 municipalities before and after a local daily closed. "
+            "RESULTS: Attendance at city council meetings fell and agenda items on development "
+            "drew fewer public comments. Online-only outlets partially offset the drop where "
+            "they hired beat reporters. "
+            "CONCLUSIONS: Civic infrastructure includes local reporting capacity."
+        ),
+        "year": "2020",
+        "authors": ["Hart L", "Mensah K", "Byrne T"],
+        "journal": "Urban Affairs Research Notes",
+    },
+    {
+        "article_id": "sample-027",
+        "source": SAMPLE_SOURCE,
+        "title": "Public comment periods and environmental justice concerns in siting decisions",
+        "abstract": (
+            "Qualitative analysis of 40 public hearings on industrial siting found that "
+            "residents of overburdened neighborhoods raised cumulative-impact arguments more "
+            "often than technical risk models. Agencies rarely coded these themes in final "
+            "records of decision. The study proposes a simple coding checklist for clerks "
+            "and a student-facing civics exercise on comment evidence."
+        ),
+        "year": "2023",
+        "authors": ["Diaz S", "Okafor N"],
+        "journal": "Journal of Environmental Justice Studies",
+    },
+    {
+        "article_id": "sample-028",
+        "source": SAMPLE_SOURCE,
+        "title": "Classroom simulations of legislative bargaining: a randomized trial",
+        "abstract": (
+            "METHODS: RCT of a two-day legislative bargaining simulation in 28 high school "
+            "civics classes. "
+            "RESULTS: Treated students scored higher on items about committee power and "
+            "compromise; self-reported political efficacy rose modestly. "
+            "CONCLUSIONS: Short simulations can complement textbook units on Congress without "
+            "replacing primary-source analysis."
+        ),
+        "year": "2022",
+        "authors": ["Keller P", "Amin R"],
+        "journal": "Civic Education Review",
     },
 ]
 
