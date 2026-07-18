@@ -4,36 +4,41 @@ Classroom demos are usually hundreds of papers per library, not millions.
 Pagination (page size 50) was added so Search / Clusters / Duplicates stay
 usable as corpora grow.
 
-## Measuring ~1k+ papers
+## Measured results (2026-07-18, tools/bench_scale.py)
 
-After a fetch that reaches ~1000 included articles (or load sample repeatedly
-is not enough — use real multi-source fetch or a seeded test DB):
+Seeded corpora (synthetic articles + random unit 384-dim embeddings; query
+embedding injected so no model load), Linux desktop CPU, median of 5:
 
-1. **Prepare papers** once so embeddings exist.
-2. Open **Search**, run a broad query, expand several cards; note:
-   - time to first results paint
-   - scroll / pagination click responsiveness
-   - browser memory (devtools Performance / Memory)
-3. Open **Clusters** article lists and **Duplicates** groups with pagination.
-4. Record device (CPU vs GPU), model name, and approximate article count.
+| stage (ms)     | n=200 | n=1000 | n=2000 | notes |
+|----------------|------:|-------:|-------:|-------|
+| emb_cold       | 0.4   | 2.2    | 4.1    | once per corpus change (cached after) |
+| emb_warm       | 0.0   | 0.0    | 0.0    | every search |
+| articles_map   | 0.3   | 1.6    | 3.3    | every search (full corpus) |
+| keypoints_map  | 0.2   | 1.1    | 2.2    | every search (full corpus) |
+| notes_map      | 0.0   | 0.0    | 0.0    | every search |
+| search_hybrid  | 2.5   | 3.9    | 5.9    | cosine + shortlist TF-IDF |
+| dedup_095      | 6.3   | 7.4    | 17.2   | O(N²) cosine |
+| kmeans_10      | 24.7  | 53.7   | 114.7  | incl. TF-IDF labels |
+| hdbscan (warm) | ~150  | ~1100  | ~3100  | UMAP reduce dominates |
 
-Optional local script (offline, no models):
+**Conclusions:**
+- The whole per-search server cost at n=2000 is ~11ms + query encode
+  (~10–50ms CPU). **TF-IDF caching, corpus-load reduction, and FAISS are all
+  unnecessary at classroom scale (≤2k)** — parked permanently unless corpora
+  grow 10×. Hybrid TF-IDF already fits only the ≤~250-doc shortlist.
+- The one real cost was **UMAP's first call per process: ~8s of numba JIT**
+  (7.8s cold vs 0.15s warm at n=200 — that's why naive first-click Density
+  clustering felt slow). Fixed: `clustering.warm_density_reducer()` runs in a
+  daemon thread at app startup, so the first Generate Clusters click costs
+  ~0.15s/1.1s/3.1s at 200/1k/2k instead of +8s.
+
+Re-run with:
 
 ```bash
-SECRET_KEY=x DEBUG=true python tools/bench_corpus_memory.py
+SECRET_KEY=x DEBUG=true python tools/bench_scale.py --sizes 200,1000,2000 --repeats 5
 ```
 
-This builds an in-memory list of N fake article dicts and reports rough
-process RSS before/after. It is a **smoke check**, not a full load test.
-
-## Hybrid TF-IDF / FAISS
-
-No micro-opts landed in R8. If Search feels slow at 2k+ embeddings:
-
-- Profile `pipeline.search_similar` with a local corpus.
-- Consider caching the TF-IDF matrix per library generation (invalidate on
-  embed job complete).
-- FAISS is optional; keep cosine correctness first.
+(`tools/bench_corpus_memory.py` remains as a rough RSS-only smoke check.)
 
 ## Ruff / CI
 

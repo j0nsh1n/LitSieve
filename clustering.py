@@ -36,6 +36,30 @@ DENSITY_PCA_DIMS = 5
 DENSITY_UMAP_DIMS = 10
 
 
+def warm_density_reducer() -> None:
+    """Pre-compile UMAP's numba kernels with a tiny throwaway fit.
+
+    The first UMAP call in a process pays ~8s of JIT compilation (measured in
+    tools/bench_scale.py); without this, that lands on whichever student first
+    clicks Generate Clusters after a server restart. Call from a background
+    thread at startup. No-op when UMAP is not installed.
+    """
+    try:
+        import umap
+
+        rs = np.random.RandomState(0)
+        pts = rs.normal(size=(50, 16)).astype(np.float32)
+        # Mirror the production parameters so the same kernel specialisations
+        # get compiled (metric/min_dist/random_state match _reduce_for_density).
+        umap.UMAP(
+            n_components=2, n_neighbors=10, min_dist=0.0,
+            metric='cosine', random_state=0,
+        ).fit(pts)
+        logger.info("UMAP warm-up complete (numba kernels compiled)")
+    except Exception as e:
+        logger.info("UMAP warm-up skipped (%s)", type(e).__name__)
+
+
 class ArticleClusterer:
     """Clusters articles based on their embeddings"""
 
