@@ -63,7 +63,7 @@
  <p class="info-text screening-report-lead">Show-your-work <strong>counts</strong> for hand-ins
  (not a citation list). Use this when a teacher asks how many papers you collected, excluded, and kept.</p>
  </div>
- <button type="button" id="screening-report-btn" class="btn btn-secondary btn-sm">Screening report</button>
+ <button type="button" id="screening-report-btn" class="btn btn-secondary btn-lg">Screening report</button>
  </div>
  <details class="help-details">
   <summary>What this file is for (vs Search exports)</summary>
@@ -71,65 +71,16 @@
   papers collected, removed as duplicates, excluded by cluster triage, excluded manually, included
   set, stars, prepared papers, clusters, and papers-by-year. The on-screen view and
   <strong>Download (.txt)</strong> use the same text - good to attach to a reflection or lab report.</p>
-  <p class="info-text">It is <strong>not</strong> a bibliography. For a full teacher hand-in
-  (report + included CSV + RIS in one zip), use the <strong>Assignment hand-in pack</strong> card
-  below. For a citation file alone, use Search → Export your library (RIS for Zotero).</p>
+  <p class="info-text">It is <strong>not</strong> a bibliography. For citation files, use Search →
+  Export your library (RIS for Zotero).</p>
  </details>
  <div id="screening-report-panel" class="screening-report-panel" hidden>
  <pre id="screening-report-body" class="screening-report-body"></pre>
  <p class="screening-report-actions">
- <a id="screening-report-download" class="btn btn-secondary btn-sm" href="/api/screening-report?format=txt"
+ <a id="screening-report-download" class="btn btn-secondary btn-lg btn-download" href="/api/screening-report?format=txt"
   title="Plain-text counts for hand-ins, not a bibliography">Download (.txt)</a>
  </p>
  </div>
-</section>
-
-<section class="card" id="assignment-pack-section">
- <h2>Assignment hand-in pack</h2>
- <p class="info-text">One click downloads a <strong>.zip</strong> for process hand-ins:
- screening report counts plus your <strong>included-only</strong> papers as CSV and RIS.
- Soft checklist below is hints only — it never blocks download. Ranking and citation-style
- exports stay on <a href="/search">Search</a>.</p>
- <details class="help-details">
-  <summary>What is inside the zip?</summary>
-  <ul class="export-format-list">
-   <li><strong>screening_report.txt</strong> — collected / excluded / included counts (process).</li>
-   <li><strong>included_papers.csv</strong> — final set spreadsheet. Columns include
-   <strong>Starred</strong> (★ bookmarks) and <strong>Note</strong> (private study notes) so
-   teachers can see optional process evidence. Not a grade.</li>
-   <li><strong>included_papers.ris</strong> — import into Zotero/EndNote for a real bibliography.</li>
-   <li><strong>README_handin.txt</strong> — short explanation of each file.</li>
-  </ul>
- </details>
- <div class="export-row" style="margin-top:0.5rem;">
-  <button type="button" id="assignment-pack-btn" class="btn btn-primary btn-sm"
-   title="Zip: screening report + included CSV + included RIS">Download hand-in pack (.zip)</button>
- </div>
- <div id="assignment-pack-status" class="status-indicator"></div>
-
- <h3 class="assignment-checklist-heading">Soft checklist (hints only)</h3>
- <p class="info-text">Optional targets your teacher mentioned. These never auto-fail or block export.</p>
- <div class="assignment-checklist-controls form-row">
-  <div class="form-group">
-   <label for="check-min-included">Min included papers</label>
-   <input type="number" id="check-min-included" min="0" max="500" value="5" step="1">
-  </div>
-  <div class="form-group">
-   <label for="check-min-sources">Min different sources</label>
-   <input type="number" id="check-min-sources" min="0" max="20" value="3" step="1">
-  </div>
-  <div class="form-group" style="align-self:flex-end;">
-   <label class="radio-label">
-    <input type="checkbox" id="check-require-review" checked>
-    Hint if no review-type paper
-   </label>
-  </div>
-  <div class="form-group" style="align-self:flex-end;">
-   <button type="button" id="assignment-checklist-btn" class="btn btn-secondary btn-sm">Check</button>
-  </div>
- </div>
- <p class="help-text" id="assignment-checklist-summary"></p>
- <ul class="assignment-checklist-list" id="assignment-checklist-list" aria-live="polite"></ul>
 </section>
 
 <section class="card" id="source-breakdown-section" style="display:none;">
@@ -145,5 +96,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/statistics.js?v=20260717r5"></script>
+<script src="/static/js/statistics.js?v=20260717r12"></script>
 {% endblock %}

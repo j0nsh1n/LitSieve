@@ -2,6 +2,8 @@
 
 let lastSearchParams = null;
 let lastQueryTokens = [];
+/** Last on-screen result list (export “these results” uses this exact order). */
+let lastResults = [];
 
 document.addEventListener('DOMContentLoaded', () => {
  applyAvailableSources();
@@ -26,12 +28,13 @@ document.addEventListener('DOMContentLoaded', () => {
  document.getElementById('search-btn').addEventListener('click', doSearch);
  const starredBtn = document.getElementById('starred-search-btn');
  if (starredBtn) starredBtn.addEventListener('click', doStarredSearch);
- document.getElementById('export-csv').addEventListener('click', () => doExport('csv'));
- document.getElementById('export-txt').addEventListener('click', () => doExport('txt'));
+
+ const risBtn = document.getElementById('export-results-ris');
+ if (risBtn) risBtn.addEventListener('click', () => doExportResults('ris'));
 
  document.querySelectorAll('[data-lib-export-format]').forEach(btn => {
  btn.addEventListener('click', () => {
- const format = btn.getAttribute('data-lib-export-format') || 'csv';
+ const format = btn.getAttribute('data-lib-export-format') || 'ris';
  const scopeEl = document.getElementById('lib-export-scope');
  const scope = scopeEl ? scopeEl.value : 'all';
  window.location.href =
@@ -253,9 +256,13 @@ async function doSearch() {
  });
  }
 
- renderResults(data.results || []);
- document.getElementById('result-count').textContent = (data.results || []).length;
+ const results = data.results || [];
+ lastResults = results;
+ renderResults(results);
+ document.getElementById('result-count').textContent = results.length;
  document.getElementById('results-section').style.display = 'block';
+ const exportSec = document.getElementById('export-results-section');
+ if (exportSec) exportSec.style.display = results.length ? 'block' : 'none';
  } catch (e) {
  showNotification(`Search failed: ${e.message}`, 'error');
  } finally {
@@ -305,9 +312,12 @@ async function doStarredSearch() {
  if (filters.sort_by !== 'similarity') {
  results = clientSort(results, filters.sort_by);
  }
+ lastResults = results;
  renderResults(results);
  document.getElementById('result-count').textContent = results.length;
  document.getElementById('results-section').style.display = 'block';
+ const exportSec = document.getElementById('export-results-section');
+ if (exportSec) exportSec.style.display = results.length ? 'block' : 'none';
  await refreshStarredCount();
  } catch (e) {
  showNotification(`Starred search failed: ${e.message}`, 'error');
@@ -532,26 +542,70 @@ function renderResults(results) {
  }
 }
 
-function doExport(format) {
- if (!lastSearchParams || lastSearchParams.mode === 'seed' || lastSearchParams.mode === 'starred') {
- if (lastSearchParams && (lastSearchParams.mode === 'seed' || lastSearchParams.mode === 'starred')) {
- showNotification('For seed/starred search, use the library export buttons above, or search with Text/PICO to export ranked results.', 'info');
- return;
+/**
+ * Download exactly the papers currently on screen (lastResults), in that order.
+ * Primary path for RIS → Zotero File → Import.
+ */
+async function doExportResults(format) {
+ if (!lastResults || !lastResults.length) {
+  showNotification('Run a search first, then export the results shown on screen.', 'error');
+  return;
  }
- showNotification('Please perform a search first.', 'error');
- return;
+ const status = document.getElementById('export-results-status');
+ if (status) {
+  status.textContent = 'Preparing download…';
+  status.className = 'status-indicator loading';
  }
-
- const params = new URLSearchParams({
- query_text: lastSearchParams.query_text,
- top_k: lastSearchParams.top_k,
- sort_by: lastSearchParams.sort_by,
- source_filter: (lastSearchParams.source_filter || []).join(','),
- format: format,
- pico_boost: lastSearchParams.pico_boost ? 'true' : 'false',
- lexical_boost: lastSearchParams.lexical_boost !== false ? 'true' : 'false',
- });
- if (lastSearchParams.year_min != null) params.set('year_min', String(lastSearchParams.year_min));
- if (lastSearchParams.year_max != null) params.set('year_max', String(lastSearchParams.year_max));
- window.location.href = `/api/search/export?${params.toString()}`;
+ const items = lastResults.map((a) => ({
+  article_id: a.article_id,
+  source: a.source,
+ }));
+ try {
+  const headers = {
+   Accept: '*/*',
+   'Content-Type': 'application/json',
+  };
+  if (typeof getCsrfToken === 'function') {
+   headers['X-CSRF-Token'] = getCsrfToken();
+  }
+  const response = await fetch('/api/export/selection', {
+   method: 'POST',
+   headers,
+   credentials: 'same-origin',
+   body: JSON.stringify({ format: format || 'ris', items }),
+  });
+  if (!response.ok) {
+   const err = await response.json().catch(() => ({ detail: response.statusText }));
+   throw new Error(err.detail || 'Export failed');
+  }
+  const blob = await response.blob();
+  const cd = response.headers.get('Content-Disposition') || '';
+  const match = /filename="?([^";]+)"?/i.exec(cd);
+  const fallback = {
+   ris: 'search_results.ris',
+   bibtex: 'search_results.bib',
+   csv: 'search_results.csv',
+   txt: 'search_results.txt',
+  }[format] || 'search_results.bin';
+  const filename = (match && match[1]) || fallback;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  if (status) {
+   status.textContent = `Downloaded ${filename} (${items.length} paper${items.length === 1 ? '' : 's'}). Import with Zotero → File → Import…`;
+   status.className = 'status-indicator success';
+  }
+  showNotification(`Downloaded ${filename}`, 'success');
+ } catch (e) {
+  if (status) {
+   status.textContent = e.message || 'Export failed';
+   status.className = 'status-indicator error';
+  }
+  showNotification(`Export failed: ${e.message}`, 'error');
+ }
 }

@@ -211,11 +211,11 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "abstracts, and PICO snippets when detected.",
             "Star papers and add private notes for your study log.",
             "Export this ranked list as CSV (spreadsheet) or Text (reading list), or "
-            "export the whole library as RIS for Zotero / EndNote / Mendeley "
-            "(scope: all / included / screened out / starred). Format APA or MLA in "
-            "the manager, not in this app.",
-            "Process hand-ins (screening counts + included CSV/RIS zip, soft checklist) "
-            "live on Duplicates next to the screening report — not on Search.",
+            "export the whole library as RIS or BibTeX (scope: all / included / "
+            "screened out / starred). Format APA or MLA in Zotero or an online "
+            "converter linked from Search — not in this app.",
+            "Process counts for hand-ins live on Duplicates as the screening report "
+            "(plain-text collected / excluded / included numbers) — not on Search.",
         ],
         "tips": [
             "Search only ranks papers already in your collection (from public "
@@ -229,9 +229,9 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "like it from what you already fetched.",
             "Star a handful of must-read papers, then use More like my starred to "
             "expand the set without rewriting the query.",
-            "Need a real bibliography? Export RIS from Search and open it in Zotero "
-            "(or ZoteroBib). Need process evidence for a hand-in? Use Duplicates → "
-            "Assignment hand-in pack (.zip).",
+            "Need a real bibliography? Export RIS of the search results from Search, then "
+            "Zotero → File → Import… (not drag-and-drop) → Create Bibliography. "
+            "Need process counts? Duplicates → Screening report (.txt).",
         ],
         "where_in_app": "Search page.",
         "app_path": "/search",
@@ -279,11 +279,10 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "passwords.",
             "Teachers: keep one library per unit or class so papers do not mix; "
             "share a finished unit library via class code so everyone starts equal.",
-            "For process hand-ins, use Duplicates → Assignment hand-in pack (zip with "
-            "screening report + included CSV/RIS). Search keeps ranking and library "
-            "export. CSV Starred/Note columns are optional process evidence, not grades.",
-            "Export a library as RIS (or the Duplicates hand-in pack) before deleting "
-            "it if you need a hand-in archive.",
+            "For process counts, use Duplicates → Screening report. Search keeps ranking "
+            "and library RIS export. Notes/stars stay private process evidence, not grades.",
+            "Export a library as RIS (Search) and/or a screening report (Duplicates) "
+            "before deleting it if you need a hand-in archive.",
             "If you change your password on a shared machine, other open tabs "
             "for that account will need to log in again.",
         ],
@@ -305,7 +304,7 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
         ),
         "how_it_works": [
             "Use this app to collect candidates, screen off-topic groups, remove "
-            "duplicates, rank what remains, and export RIS + a hand-in pack.",
+            "duplicates, rank what remains, and export RIS plus a screening report.",
             "Write down what you still need (for example: a peer-reviewed review, "
             "a local newspaper archive, or a book chapter your teacher assigned).",
             "Search your school library catalogue and any databases your school "
@@ -337,7 +336,7 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
                     "finish with school tools."
                 ),
                 "checks": [
-                    "I exported RIS (and/or a Duplicates hand-in pack) for what I kept.",
+                    "I exported RIS and/or a screening report for what I kept.",
                     "I searched the school library catalogue or databases for gaps.",
                     "I used Google Scholar for citation trails and verified access rights.",
                     "I asked a librarian or teacher about paywalled or missing sources.",

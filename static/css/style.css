@@ -1016,6 +1016,25 @@ input[type="range"]::-moz-range-thumb:hover {
     font-size: 0.7rem;
 }
 
+/* Larger call-to-action (exports / primary downloads) */
+.btn-lg {
+    padding: 0.7rem 1.35rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    min-height: 2.75rem;
+}
+.btn-download {
+    min-width: min(100%, 18rem);
+}
+.export-row-primary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin: 0.75rem 0 0.5rem;
+    align-items: center;
+}
+
 /* Loading spinner inside buttons */
 .btn.is-loading::before {
     content: "";
@@ -1089,6 +1108,62 @@ input[type="range"]::-moz-range-thumb:hover {
 
 .export-scope-label {
     margin: 0;
+}
+
+/* Shown after a successful search (search.js toggles display). */
+#export-results-section {
+    display: none;
+}
+.zotero-steps {
+    padding-left: 1.25rem;
+    margin: 0.5rem 0 0.35rem;
+}
+.zotero-steps li {
+    margin: 0.4rem 0;
+    line-height: 1.4;
+}
+
+.citation-tools {
+    margin-top: 1rem;
+    padding-top: 0.85rem;
+    border-top: 1px solid var(--rule);
+}
+.citation-tools-heading {
+    margin: 0 0 0.35rem;
+    font-size: 1rem;
+    font-weight: 600;
+}
+.citation-tools-list {
+    list-style: none;
+    margin: 0.5rem 0 0.35rem;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+}
+.citation-tools-list li {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    background: var(--surface);
+}
+.citation-tools-list a {
+    font-weight: 600;
+    color: var(--accent);
+    text-decoration: none;
+}
+.citation-tools-list a:hover {
+    text-decoration: underline;
+}
+.citation-tools-meta {
+    font-size: 0.82rem;
+    color: var(--text-soft);
+}
+.citation-tools-list .help-text {
+    margin: 0.1rem 0 0;
 }
 
 .export-scope-select {
@@ -2195,61 +2270,6 @@ html[data-reading="on"] .key-points {
     line-height: 1.4;
 }
 
-/* Assignment hand-in pack + soft checklist (Phase R3) */
-.assignment-checklist-heading {
-    margin: 1.1rem 0 0.35rem;
-    font-size: 1rem;
-    font-weight: 600;
-}
-.assignment-checklist-controls {
-    align-items: flex-end;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-}
-.assignment-checklist-list {
-    list-style: none;
-    margin: 0.5rem 0 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.45rem;
-}
-.assignment-check-item {
-    display: flex;
-    gap: 0.55rem;
-    align-items: flex-start;
-    padding: 0.55rem 0.7rem;
-    border: 1px solid var(--rule);
-    border-radius: 6px;
-    background: var(--surface);
-}
-.assignment-check-item.is-ok {
-    border-color: color-mix(in srgb, var(--ok, #2d6a4f) 45%, var(--rule));
-    background: color-mix(in srgb, var(--ok, #2d6a4f) 8%, var(--surface));
-}
-.assignment-check-item.is-soft-miss {
-    border-color: color-mix(in srgb, var(--warn, #b08900) 50%, var(--rule));
-    background: color-mix(in srgb, var(--warn, #b08900) 8%, var(--surface));
-}
-.assignment-check-mark {
-    font-weight: 700;
-    line-height: 1.3;
-    min-width: 1.1rem;
-}
-.assignment-check-body {
-    display: flex;
-    flex-direction: column;
-    gap: 0.15rem;
-    min-width: 0;
-}
-.assignment-check-detail {
-    font-size: 0.82rem;
-    color: var(--text-soft);
-    line-height: 1.35;
-}
-.help-text.check-all-ok { color: color-mix(in srgb, var(--ok, #2d6a4f) 70%, var(--text)); }
-.help-text.check-soft-miss { color: color-mix(in srgb, var(--warn, #b08900) 75%, var(--text)); }
-
 /* HS unit topic packs */
 .topic-packs-heading {
     margin: 1.1rem 0 0.35rem;
@@ -2364,14 +2384,30 @@ html[data-reading="on"] .key-points {
     list-style: none;
     display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
-    font-size: 0.82rem;
-    color: var(--text-soft);
-    transition: color var(--dur-fast) var(--ease-soft);
+    gap: 0.5rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    line-height: 1.35;
+    padding: 0.45rem 0.7rem;
+    margin: 0.15rem 0;
+    border-radius: 6px;
+    border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--rule));
+    background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+    color: var(--text);
+    transition:
+        color var(--dur-fast) var(--ease-soft),
+        border-color var(--dur-fast) var(--ease-soft),
+        background var(--dur-fast) var(--ease-soft),
+        box-shadow var(--dur-fast) var(--ease-soft);
 }
 
 .help-details > summary:hover,
-.advanced-details > summary:hover { color: var(--accent); }
+.advanced-details > summary:hover {
+    color: var(--accent);
+    border-color: color-mix(in srgb, var(--accent) 55%, var(--rule));
+    background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+    box-shadow: var(--elev-1);
+}
 
 .help-details > summary::-webkit-details-marker,
 .advanced-details > summary::-webkit-details-marker { display: none; }
@@ -2380,11 +2416,13 @@ html[data-reading="on"] .key-points {
 .advanced-details > summary::before {
     content: "+";
     font-family: var(--font-serif);
-    font-size: 0.95rem;
+    font-size: 1.15rem;
+    font-weight: 700;
     line-height: 1;
-    width: 1em;
+    width: 1.1em;
     text-align: center;
     flex-shrink: 0;
+    color: var(--accent);
     transition: transform var(--dur-med) var(--ease-out);
 }
 
@@ -2396,7 +2434,11 @@ html[data-reading="on"] .key-points {
 }
 
 .help-details[open] > summary,
-.advanced-details[open] > summary { color: var(--accent); }
+.advanced-details[open] > summary {
+    color: var(--accent);
+    border-color: color-mix(in srgb, var(--accent) 50%, var(--rule));
+    background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+}
 
 .help-details .info-text,
 .advanced-details .info-text {

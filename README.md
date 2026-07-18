@@ -47,7 +47,6 @@ Built with **FastAPI**, sentence-transformers, FAISS, and scikit-learn.
 - 📤 Export ranked hits (CSV/TXT) or full library as **RIS** (Zotero / EndNote / Mendeley)
 - 📖 Public landing + `/learn/…` feature guides; first-run checklist + empty states
 - 🧪 **Sample demo corpus** (no APIs) for classroom dry runs
-- 📄 Assignment hand-in pack on Duplicates (screening report + included CSV/RIS zip)
 - 📚 **Multiple libraries** per account (separate collections; switch in the nav)
 - 🔗 **Share a library** via class code (teacher publishes; students get their own clone)
 

@@ -136,12 +136,12 @@ function normalizeJoinCode(raw) {
 }
 
 async function doShareLibrary(lib) {
- // R6: assignment-pack wording + optional expiry / max uses.
+ // R6: class share wording + optional expiry / max uses.
  if (!confirm(
   `Create a class share code for "${lib.name}"?\n\n` +
-  'ASSIGNMENT PACK (clone, not live view):\n' +
+  'CLASS SHARE (clone, not live view):\n' +
   '• Students join with the code and get their own copy of papers + screening.\n' +
-  '• Suggested student steps after join: Clusters → Duplicates → Search (RIS) → hand-in pack.\n' +
+  '• Suggested student steps after join: Clusters → Duplicates → Search (export RIS).\n' +
   '• Notes/stars are NOT copied (private to each student).\n\n' +
   'Continue to set expiry and options?'
  )) {
@@ -196,7 +196,7 @@ async function doShareLibrary(lib) {
    : `Expires in ~${expiresDays} days`;
   const useLabel = maxUses != null ? `Max joins: ${maxUses}` : 'Max joins: unlimited';
   const msg = [
-   'CLASS SHARE CODE (assignment pack)',
+   'CLASS SHARE CODE',
    '',
    `Code: ${code}`,
    `Link: ${path}`,
@@ -206,7 +206,7 @@ async function doShareLibrary(lib) {
    'Tell students:',
    '1) Open Join (or /join) and enter the code while logged in.',
    '2) Switch to the new library in the nav Library menu.',
-   '3) Clusters → Duplicates → Search; export RIS; optional hand-in pack on Duplicates.',
+   '3) Clusters → Duplicates → Search; export RIS; optional screening report on Duplicates.',
    '',
    'Starting point only (public databases) — finish important work with the school library.',
   ].join('\n');
@@ -289,7 +289,7 @@ function renderSharesList(shares) {
      '1. Log in → Join (or open /join) and enter the code.',
      '2. Switch to the new library in the nav Library menu.',
      '3. Clusters (screen) → Duplicates → Search; export RIS for Zotero.',
-     '4. Optional: Duplicates → hand-in pack for process counts.',
+     '4. Optional: Duplicates → screening report for process counts.',
      '',
      'This is a starting point from public databases — finish with your school library when needed.',
     ].join('\n');
