@@ -508,8 +508,10 @@ function bindAiArticleActions(rootEl, article) {
                         try {
                             // Save exactly the bullets on screen - never
                             // re-run the model (a second generation could
-                            // differ from what the student approved).
-                            await apiCall('/api/ai/key-points', {
+                            // differ from what the student approved). The
+                            // server may trim/cap bullets, so render what it
+                            // actually stored, not what we submitted.
+                            const savedResp = await apiCall('/api/ai/key-points', {
                                 method: 'POST',
                                 body: {
                                     article_id: aid,
@@ -517,14 +519,19 @@ function bindAiArticleActions(rootEl, article) {
                                     key_points: data.key_points || [],
                                 },
                             });
+                            const savedPoints = (savedResp && savedResp.key_points) || data.key_points || [];
                             showNotification('Key points updated (AI rewrite saved).', 'success');
                             const lab = rootEl.querySelector('.key-points-label');
                             if (lab) lab.textContent = 'Key points (AI rewrite — from the abstract only)';
-                            const ul = rootEl.querySelector('.key-points-list');
-                            if (ul && data.key_points) {
-                                ul.innerHTML = data.key_points
+                            if (savedPoints.length) {
+                                const savedHtml = savedPoints
                                     .map(b => `<li>${escapeHtml(String(b))}</li>`)
                                     .join('');
+                                // Update every rendered copy (result card +
+                                // AI panel preview) to match what was stored.
+                                rootEl.querySelectorAll('.key-points-list').forEach(ul => {
+                                    ul.innerHTML = savedHtml;
+                                });
                             }
                             saveBtn.textContent = 'Saved';
                         } catch (err) {
