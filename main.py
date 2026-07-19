@@ -101,6 +101,14 @@ limiter = Limiter(key_func=rate_limit_key)
 app = FastAPI(title="Literature Research Aide", version="4.1.1")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+@app.on_event("startup")
+async def _warm_umap_kernels():
+    # UMAP's first fit pays ~8s of numba JIT; absorb it at boot in a daemon
+    # thread so the first Generate Clusters click stays ~1s (bench_scale.py).
+    from clustering import warm_density_reducer
+    threading.Thread(target=warm_density_reducer, daemon=True, name="umap-warmup").start()
 @app.get("/health")
 async def health():
     return {"status": "healthy", "version": "4.1.1"}
