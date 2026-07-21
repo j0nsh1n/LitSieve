@@ -78,6 +78,7 @@ def test_cluster_labels_drop_foreign_and_short_tokens():
 
 def test_representative_title_is_most_central():
     import numpy as np
+
     from clustering import ClusterLabeler
 
     ids = [("1", "s"), ("2", "s"), ("3", "s")]
@@ -93,6 +94,7 @@ def test_representative_title_is_most_central():
 
 def test_auto_select_k_finds_natural_group_count():
     import numpy as np
+
     from clustering import ArticleClusterer
 
     rng = np.random.default_rng(0)
@@ -109,6 +111,7 @@ def test_auto_select_k_finds_natural_group_count():
 
 def test_hdbscan_finds_dense_groups():
     import numpy as np
+
     from clustering import ArticleClusterer
 
     rng = np.random.default_rng(1)
@@ -129,11 +132,14 @@ def test_noise_bucket_is_relabelled_in_pipeline(monkeypatch):
     """The HDBSCAN noise bucket gets a fixed, honest label and no headline."""
     for _dep in ("requests", "Bio", "plotly", "tqdm", "dotenv"):
         pytest.importorskip(_dep)
+    import os
+    import tempfile
+
     import numpy as np
+
     import clustering
-    from pipeline import LiteratureSearchPipeline
     from clustering import NOISE_CLUSTER_ID, NOISE_CLUSTER_LABEL
-    import tempfile, os
+    from pipeline import LiteratureSearchPipeline
 
     p = LiteratureSearchPipeline(db_path=os.path.join(tempfile.mkdtemp(), "a.db"))
     p.db.insert_articles([_article(str(i)) for i in range(6)])

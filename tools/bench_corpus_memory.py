@@ -10,7 +10,6 @@ Not a full browser load test. Run from repo root:
 from __future__ import annotations
 
 import argparse
-import os
 import resource
 import sys
 

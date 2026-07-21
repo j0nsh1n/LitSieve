@@ -6,8 +6,9 @@ Requires a free API key: https://core.ac.uk/services/api  (set CORE_API_KEY).
 """
 
 import os
-from typing import List, Dict, Optional
-from base_fetcher import BaseFetcher, HttpClient, FetchError
+from typing import Dict, List, Optional
+
+from base_fetcher import BaseFetcher, FetchError, HttpClient
 
 
 class COREFetcher(BaseFetcher):

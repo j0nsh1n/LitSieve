@@ -4,9 +4,10 @@ Directory of Open Access Journals — peer-reviewed open access across all field
 Free API, no authentication required
 """
 
+from typing import Dict, List
 from urllib.parse import quote
-from typing import List, Dict
-from base_fetcher import BaseFetcher, HttpClient, FetchError
+
+from base_fetcher import BaseFetcher, FetchError, HttpClient
 
 
 class DOAJFetcher(BaseFetcher):

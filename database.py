@@ -3,14 +3,15 @@ Database Module
 Handles storage and retrieval of articles and embeddings
 """
 
-import sqlite3
 import json
 import logging
 import pickle
 import re
+import sqlite3
 import threading
+from typing import Dict, List, Optional, Tuple
+
 import numpy as np
-from typing import List, Dict, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 

@@ -3,10 +3,11 @@ OpenAlex Fetcher
 Fetches scholarly works from OpenAlex API
 """
 
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional
+
 from tqdm import tqdm
 
-from base_fetcher import BaseFetcher, HttpClient, FetchError
+from base_fetcher import BaseFetcher, HttpClient
 
 
 class OpenAlexFetcher(BaseFetcher):

@@ -3,10 +3,11 @@ Europe PMC Fetcher
 Fetches articles from Europe PMC REST API
 """
 
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional
+
 from tqdm import tqdm
 
-from base_fetcher import BaseFetcher, HttpClient, FetchError
+from base_fetcher import BaseFetcher, HttpClient
 
 
 class EuropePMCFetcher(BaseFetcher):

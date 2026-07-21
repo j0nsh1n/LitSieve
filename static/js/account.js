@@ -537,6 +537,26 @@ function applyAiStatus(st) {
  }
 }
 
+function applyAiWriteGate(settings) {
+ const allowed = !settings || settings.settings_write_allowed !== false;
+ const saveBtn = document.getElementById('ai-settings-save');
+ const note = document.getElementById('ai-settings-write-note');
+ const modeSel = document.getElementById('ai-study-mode');
+ if (saveBtn) {
+  saveBtn.disabled = !allowed;
+  saveBtn.title = allowed
+   ? ''
+   : 'Saving AI settings is disabled on this server (AI_ALLOW_SETTINGS_WRITE=false)';
+ }
+ if (note) note.hidden = allowed;
+ if (modeSel) modeSel.disabled = !allowed;
+ ['ai-openai-key', 'ai-openai-model', 'ai-openai-base',
+  'ai-anthropic-key', 'ai-anthropic-model'].forEach((id) => {
+  const el = document.getElementById(id);
+  if (el) el.disabled = !allowed;
+ });
+}
+
 function fillAiSettingsForm(settings, status) {
  if (!settings) return;
  const set = (id, val) => {
@@ -566,6 +586,7 @@ function fillAiSettingsForm(settings, status) {
    : 'No Anthropic key saved yet.';
  }
  syncAiModePanels();
+ applyAiWriteGate(settings);
 }
 
 async function loadAiSettings() {
@@ -581,6 +602,10 @@ async function loadAiSettings() {
 
 async function saveAiSettings() {
  const btn = document.getElementById('ai-settings-save');
+ if (btn && btn.disabled) {
+  showNotification('Saving AI settings is disabled on this server.', 'warning');
+  return;
+ }
  setLoading(btn, true);
  setStatus('ai-settings-status', 'Saving…', 'info');
  const mode = (document.getElementById('ai-study-mode') || {}).value || 'built_in';

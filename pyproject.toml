@@ -9,15 +9,21 @@ exclude = [
 ]
 
 [tool.ruff.lint]
-# Start with a focused rule set so CI stays green while pre-existing style
-# noise (E501, import order, etc.) is cleaned gradually.
+# Gradual ratchet: critical safety + unused imports + import order.
+# Still deferred: E501 line length, full UP typing modernization, E402
+# (many files intentionally set env before importing app modules).
 select = [
     "E9",   # runtime syntax errors
     "F63",  # invalid print syntax
     "F7",   # syntax errors in type comments
     "F82",  # undefined names
+    "F401", # unused imports
+    "F541", # f-string without placeholders
+    "E401", # multiple imports on one line
+    "I",    # isort import order
 ]
 ignore = []
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["F401"]
+# Test fixtures often import for side effects / future assertions.
+"tests/*" = []

@@ -5,36 +5,40 @@ Orchestrates the complete workflow from data fetching to visualization
 
 import logging
 import os
-from typing import List, Dict, Optional, Tuple
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Dict, List, Optional, Tuple
+
 import numpy as np
 
 logger = logging.getLogger(__name__)
 
-from pubmed_fetcher import PubMedFetcher
-from europepmc_fetcher import EuropePMCFetcher
-from clinicaltrials_fetcher import ClinicalTrialsFetcher
-from openalex_fetcher import OpenAlexFetcher
 from arxiv_fetcher import ArXivFetcher
-from semanticscholar_fetcher import SemanticScholarFetcher
-from eric_fetcher import ERICFetcher
-from zenodo_fetcher import ZenodoFetcher
-from crossref_fetcher import CrossRefFetcher
-from doaj_fetcher import DOAJFetcher
-from nasa_ads_fetcher import NASAADSFetcher
-from core_fetcher import COREFetcher
 from biorxiv_fetcher import BioRxivFetcher, MedRxivFetcher
-from dblp_fetcher import DBLPFetcher
-from openaire_fetcher import OpenAIREFetcher
-from plos_fetcher import PLOSFetcher
-from hal_fetcher import HALFetcher
-from database import ArticleDatabase
-from embeddings import EmbeddingEngine
+from clinicaltrials_fetcher import ClinicalTrialsFetcher
 from clustering import (
-    ArticleClusterer, ClusterLabeler, ClusterVisualizer,
-    NOISE_CLUSTER_ID, NOISE_CLUSTER_LABEL,
+    NOISE_CLUSTER_ID,
+    NOISE_CLUSTER_LABEL,
+    ArticleClusterer,
+    ClusterLabeler,
+    ClusterVisualizer,
 )
+from core_fetcher import COREFetcher
+from crossref_fetcher import CrossRefFetcher
+from database import ArticleDatabase
+from dblp_fetcher import DBLPFetcher
+from doaj_fetcher import DOAJFetcher
+from embeddings import EmbeddingEngine
+from eric_fetcher import ERICFetcher
+from europepmc_fetcher import EuropePMCFetcher
+from hal_fetcher import HALFetcher
+from nasa_ads_fetcher import NASAADSFetcher
+from openaire_fetcher import OpenAIREFetcher
+from openalex_fetcher import OpenAlexFetcher
+from plos_fetcher import PLOSFetcher
+from pubmed_fetcher import PubMedFetcher
+from semanticscholar_fetcher import SemanticScholarFetcher
+from zenodo_fetcher import ZenodoFetcher
 
 FETCHERS = {
     'pubmed': PubMedFetcher,
@@ -281,6 +285,7 @@ class LiteratureSearchPipeline:
                 re-embedded so dimensions stay consistent.
         """
         import time
+
         from embeddings import select_device
 
         logger.info("\n=== Step 2: Creating Embeddings ===")
@@ -739,7 +744,7 @@ class LiteratureSearchPipeline:
         Filters (screening, source, cluster, year) apply BEFORE ranking.
         When lexical_boost is True, re-rank a wider semantic shortlist with TF-IDF.
         """
-        logger.info(f"\n=== Searching for similar articles ===")
+        logger.info("\n=== Searching for similar articles ===")
         logger.info(f"Query: {query_text}\n")
 
         article_ids, article_embeddings, articles_all = self._candidate_pool(

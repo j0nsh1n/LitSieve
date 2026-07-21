@@ -2,8 +2,8 @@
 
 from citations import article_to_apa, collection_to_apa
 from database import ArticleDatabase
-from sample_corpus import get_sample_articles, SAMPLE_SOURCE
-from screening_reasons import normalize_reason, reason_label, USER_SELECTABLE_REASONS
+from sample_corpus import SAMPLE_SOURCE, get_sample_articles
+from screening_reasons import USER_SELECTABLE_REASONS, normalize_reason, reason_label
 from utils import build_screening_report, format_screening_report_txt
 
 

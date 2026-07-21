@@ -68,6 +68,7 @@ def app_module(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
 
     import importlib
+
     import pipeline
     main = importlib.import_module("main")
 

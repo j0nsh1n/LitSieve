@@ -210,14 +210,25 @@ def public_ai_settings() -> Dict[str, Any]:
             "LLM_TIMEOUT_SECONDS", str(data.get("llm_timeout_seconds") or "120")
         ),
         "ollama_control_allowed": ollama_control_allowed(),
+        "settings_write_allowed": ai_settings_write_allowed(),
         "study_aid_mode": study_aid_mode(),
         "settings_path": str(_settings_path()),
     }
 
 
 def ollama_control_allowed() -> bool:
-    """Whether the web UI may start/stop Ollama (default: yes unless disabled)."""
+    """Whether the app may start/stop the built-in local service (default: yes)."""
     flag = _env("AI_ALLOW_OLLAMA_CONTROL", "true").lower()
+    return flag not in ("0", "false", "no", "off")
+
+
+def ai_settings_write_allowed() -> bool:
+    """Whether authenticated users may POST /api/ai/settings (default: yes).
+
+    Set AI_ALLOW_SETTINGS_WRITE=false on multi-user shared hosts so students
+    cannot change server-wide keys; configure via env / ai_settings.json only.
+    """
+    flag = _env("AI_ALLOW_SETTINGS_WRITE", "true").lower()
     return flag not in ("0", "false", "no", "off")
 
 

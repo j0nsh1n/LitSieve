@@ -10,7 +10,6 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from main import app
 
-
 TEMPLATES = Path(__file__).resolve().parents[1] / "templates"
 CACHE_BUST = "20260717r15"
 

@@ -92,6 +92,30 @@ def test_start_ollama_disabled(monkeypatch):
     assert "disabled" in msg.lower()
 
 
+def test_ai_settings_write_allowed_default_true(monkeypatch):
+    monkeypatch.delenv("AI_ALLOW_SETTINGS_WRITE", raising=False)
+    assert llm_service.ai_settings_write_allowed() is True
+
+
+@pytest.mark.parametrize("flag", ("0", "false", "no", "off", "FALSE", "No"))
+def test_ai_settings_write_allowed_false_values(monkeypatch, flag):
+    monkeypatch.setenv("AI_ALLOW_SETTINGS_WRITE", flag)
+    assert llm_service.ai_settings_write_allowed() is False
+
+
+@pytest.mark.parametrize("flag", ("1", "true", "yes", "on", "TRUE"))
+def test_ai_settings_write_allowed_true_values(monkeypatch, flag):
+    monkeypatch.setenv("AI_ALLOW_SETTINGS_WRITE", flag)
+    assert llm_service.ai_settings_write_allowed() is True
+
+
+def test_public_ai_settings_exposes_write_flag(monkeypatch):
+    monkeypatch.setenv("AI_ALLOW_SETTINGS_WRITE", "false")
+    monkeypatch.setattr(llm_service, "load_ai_settings", lambda force=False: {})
+    pub = llm_service.public_ai_settings()
+    assert pub["settings_write_allowed"] is False
+
+
 def test_builtin_ephemeral_starts_and_stops(monkeypatch):
     """Refine lifecycle: start → work → stop when we own the process."""
     _clear_providers(monkeypatch)

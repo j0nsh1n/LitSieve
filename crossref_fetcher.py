@@ -5,8 +5,9 @@ Free API, no authentication required (mailto improves rate limits)
 """
 
 import re
-from typing import List, Dict
-from base_fetcher import BaseFetcher, HttpClient, FetchError
+from typing import Dict, List
+
+from base_fetcher import BaseFetcher, HttpClient
 
 _JATS_TAG = re.compile(r'<[^>]+>')
 

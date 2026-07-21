@@ -12,8 +12,9 @@ for _dep in (
 ):
     pytest.importorskip(_dep)
 
-from citations import article_to_ris, article_to_bibtex, collection_to_ris
 from fastapi.testclient import TestClient
+
+from citations import article_to_bibtex, article_to_ris, collection_to_ris
 
 
 def _sample_crossref():

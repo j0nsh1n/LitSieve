@@ -1,7 +1,6 @@
 """Tests for extractive key points (structured parser + centroid fallback)."""
 
 import numpy as np
-import pytest
 
 from summarize import (
     bullets_from_structured,
@@ -13,7 +12,6 @@ from summarize import (
     rank_sentences_by_centroid,
     split_sentences,
 )
-
 
 STRUCTURED = (
     "BACKGROUND: Smoking is a major risk factor for cardiovascular disease. "

@@ -37,7 +37,7 @@ jobs:
             requests \
             python-dotenv
 
-      - name: Ruff (critical rules)
+      - name: Ruff (critical + unused imports + import order)
         run: ruff check .
 
       - name: Run tests
