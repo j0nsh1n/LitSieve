@@ -5,9 +5,10 @@ Now uses FAISS for fast similarity search (v2.3.0)
 """
 
 import logging
-import numpy as np
-from typing import List, Dict, Tuple
 import os
+from typing import Dict, List, Tuple
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
 

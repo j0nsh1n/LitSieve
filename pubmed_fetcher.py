@@ -3,9 +3,10 @@ PubMed Fetcher Module
 Fetches research articles from PubMed using the Entrez API
 """
 
-from Bio import Entrez
 import socket
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional
+
+from Bio import Entrez
 from tqdm import tqdm
 
 from base_fetcher import BaseFetcher, polite_sleep

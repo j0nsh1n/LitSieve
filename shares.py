@@ -12,9 +12,9 @@ import logging
 import os
 import secrets
 import sqlite3
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 from database import ArticleDatabase
 from libraries import (

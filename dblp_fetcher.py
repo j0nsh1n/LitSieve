@@ -9,9 +9,9 @@ the pipeline (which requires abstract text) can still embed and search.
 
 from __future__ import annotations
 
-from typing import List, Dict, Optional, Any
+from typing import Dict, List, Optional
 
-from base_fetcher import BaseFetcher, HttpClient, FetchError
+from base_fetcher import BaseFetcher, FetchError, HttpClient
 
 
 class DBLPFetcher(BaseFetcher):

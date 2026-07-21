@@ -10,7 +10,6 @@ import random
 import time
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Union
-from urllib.parse import urljoin
 
 import requests
 

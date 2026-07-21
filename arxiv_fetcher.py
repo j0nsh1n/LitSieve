@@ -5,8 +5,9 @@ Free API, no authentication required
 """
 
 import xml.etree.ElementTree as ET
-from typing import List, Dict, Optional
-from base_fetcher import BaseFetcher, HttpClient, FetchError
+from typing import Dict, List, Optional
+
+from base_fetcher import BaseFetcher, HttpClient
 
 ATOM_NS = 'http://www.w3.org/2005/Atom'
 ARXIV_NS = 'http://arxiv.org/schemas/atom'

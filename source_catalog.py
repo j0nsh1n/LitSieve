@@ -16,7 +16,7 @@ Do not add campus/paywalled DBs. Propose candidates to the maintainer first.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 # id → display + classroom tip fields.
 # priority: higher wins near-duplicate ties after abstract length.

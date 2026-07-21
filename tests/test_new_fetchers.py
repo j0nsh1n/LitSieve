@@ -1,15 +1,13 @@
 """Offline unit tests for new public source fetchers (HTTP mocked)."""
 
-from unittest.mock import MagicMock
 
-import pytest
 
 from biorxiv_fetcher import BioRxivFetcher, MedRxivFetcher, _matches
 from dblp_fetcher import DBLPFetcher
-from plos_fetcher import PLOSFetcher
 from hal_fetcher import HALFetcher
 from openaire_fetcher import OpenAIREFetcher, _node_text
 from pipeline import FETCHERS
+from plos_fetcher import PLOSFetcher
 
 
 def test_all_new_sources_registered():

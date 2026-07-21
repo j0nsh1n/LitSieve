@@ -8,9 +8,9 @@ No key for basic classroom use. Aggregates European open-access deposits.
 from __future__ import annotations
 
 import re
-from typing import List, Dict, Optional, Any
+from typing import Any, Dict, List, Optional
 
-from base_fetcher import BaseFetcher, HttpClient, FetchError
+from base_fetcher import BaseFetcher, FetchError, HttpClient
 
 
 def _node_text(node: Any) -> str:

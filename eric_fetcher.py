@@ -5,8 +5,9 @@ Covers: education, psychology, social sciences, history, literature
 Free API, no authentication required
 """
 
-from typing import List, Dict
-from base_fetcher import BaseFetcher, HttpClient, FetchError
+from typing import Dict, List
+
+from base_fetcher import BaseFetcher, FetchError, HttpClient
 
 
 class ERICFetcher(BaseFetcher):

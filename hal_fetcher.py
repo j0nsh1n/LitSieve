@@ -8,9 +8,9 @@ No key required. Multidisciplinary open-access / institutional deposit.
 from __future__ import annotations
 
 import re
-from typing import List, Dict, Optional, Any
+from typing import Any, Dict, List, Optional
 
-from base_fetcher import BaseFetcher, HttpClient, FetchError
+from base_fetcher import BaseFetcher, FetchError, HttpClient
 
 
 class HALFetcher(BaseFetcher):

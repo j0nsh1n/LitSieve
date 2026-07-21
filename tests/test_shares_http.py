@@ -45,6 +45,7 @@ def app_module(tmp_path, monkeypatch):
     monkeypatch.setenv("USER_DATA_DIR", str(tmp_path / "user_data"))
 
     import importlib
+
     import pipeline
     main = importlib.import_module("main")
 

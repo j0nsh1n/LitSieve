@@ -1,12 +1,11 @@
 """Tests for fetch helpers, insert dedupe, and password-reset flow."""
 
-import pytest
 
-from base_fetcher import HttpClient, FetchError, classify_error
+from auth import hash_password, verify_password
+from base_fetcher import FetchError, HttpClient, classify_error
 from database import ArticleDatabase
 from user_db import UserDatabase
-from auth import hash_password, verify_password
-from utils import format_screening_report_txt, build_screening_report
+from utils import build_screening_report, format_screening_report_txt
 
 
 def test_classify_error_kinds():

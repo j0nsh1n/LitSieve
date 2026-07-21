@@ -3,10 +3,11 @@ ClinicalTrials.gov Fetcher
 Fetches clinical trial records from the ClinicalTrials.gov v2 API
 """
 
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional
+
 from tqdm import tqdm
 
-from base_fetcher import BaseFetcher, HttpClient, FetchError
+from base_fetcher import BaseFetcher, HttpClient
 
 
 class ClinicalTrialsFetcher(BaseFetcher):

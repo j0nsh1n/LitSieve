@@ -4,73 +4,70 @@ Multi-user web interface for literature search and analysis.
 Multiple libraries (workspaces) per account.
 """
 
-import io
+import asyncio
+import contextvars
 import csv
+import io
+import logging
 import os
 import re
-import shutil
 import secrets
-import logging
+import shutil
 import threading
 from collections import OrderedDict
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional
 from functools import partial
-import asyncio
-import contextvars
+from typing import List, Optional
 
 from dotenv import load_dotenv
+
 load_dotenv()
 
-from fastapi import FastAPI, Request, Form
+from urllib.parse import quote, unquote
+
+from fastapi import FastAPI, Form, Request
+from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import RedirectResponse, StreamingResponse, JSONResponse
 from pydantic import BaseModel, Field
-from slowapi import Limiter
-from slowapi.util import get_remote_address
+from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from slowapi import _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
 
-from pipeline import LiteratureSearchPipeline
-from embeddings import PICOExtractor
-from user_db import UserDatabase
+import shares as shares_mod
 from auth import (
-    hash_password,
-    verify_password,
     create_token,
     get_current_user,
+    hash_password,
     validate_login_name,
+    verify_password,
 )
-from utils import (
-    sort_articles,
-    coverage_suggestions,
-    build_screening_report,
-    format_screening_report_txt,
-)
-from citations import collection_to_ris, collection_to_bibtex, collection_to_apa
+from citations import collection_to_apa, collection_to_bibtex, collection_to_ris
+from embeddings import PICOExtractor
 from feature_guides import get_guide, list_guides, neighbors
-from sample_corpus import get_sample_articles
-from screening_reasons import (
-    EXCLUSION_REASONS,
-    USER_SELECTABLE_REASONS,
-    normalize_reason,
-    reason_label,
-)
 from libraries import (
     create_library,
     delete_library,
+    ensure_libraries,
     get_active_library_id,
-    list_libraries,
     library_db_path,
+    list_libraries,
     pipeline_cache_key,
     rename_library,
     set_active_library,
-    ensure_libraries,
 )
-import shares as shares_mod
-from pathlib import Path
-from urllib.parse import quote, unquote
+from pipeline import LiteratureSearchPipeline
+from sample_corpus import get_sample_articles
+from screening_reasons import (
+    normalize_reason,
+)
+from user_db import UserDatabase
+from utils import (
+    build_screening_report,
+    coverage_suggestions,
+    format_screening_report_txt,
+    sort_articles,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -1479,20 +1476,40 @@ async def api_ai_settings_get(request: Request):
     user = current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
-    from llm_service import public_ai_settings, status as ai_status
+    from llm_service import public_ai_settings
+    from llm_service import status as ai_status
     return {"settings": public_ai_settings(), "status": ai_status()}
 
 
 @app.post("/api/ai/settings")
 @limiter.limit("20/minute")
 async def api_ai_settings_save(req: AISettingsUpdate, request: Request):
-    """Save server-wide AI keys/models (user_data/ai_settings.json)."""
+    """Save server-wide AI keys/models (user_data/ai_settings.json).
+
+    Gated by AI_ALLOW_SETTINGS_WRITE (default true for single-teacher hosts).
+    """
     user = current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
     if csrf_failed(request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
-    from llm_service import public_ai_settings, save_ai_settings, status as ai_status
+    from llm_service import (
+        ai_settings_write_allowed,
+        public_ai_settings,
+        save_ai_settings,
+    )
+    from llm_service import status as ai_status
+    if not ai_settings_write_allowed():
+        return JSONResponse(
+            status_code=403,
+            content={
+                "detail": (
+                    "Saving AI settings is disabled on this server "
+                    "(AI_ALLOW_SETTINGS_WRITE=false). Ask a teacher or deployer "
+                    "to change env / ai_settings.json."
+                )
+            },
+        )
     payload = {k: v for k, v in req.model_dump().items() if v is not None}
     if "llm_provider" in payload:
         prov = str(payload["llm_provider"]).strip().lower()
@@ -1515,16 +1532,21 @@ async def api_ai_settings_save(req: AISettingsUpdate, request: Request):
 async def api_ai_ollama_start(request: Request):
     """Start local Ollama (detached), using OLLAMA_MODELS when set.
 
-    Internal/ops endpoint: no UI caller (Refine/Ask auto-start the built-in
-    service themselves). Kept as a deployer escape hatch, gated by
-    ollama_control_allowed().
+    Internal/ops endpoint: no UI caller (Refine/Ask auto-start). Gated by
+    AI_ALLOW_SETTINGS_WRITE and AI_ALLOW_OLLAMA_CONTROL.
     """
     user = current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
     if csrf_failed(request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
-    from llm_service import start_ollama, status as ai_status
+    from llm_service import ai_settings_write_allowed, start_ollama
+    from llm_service import status as ai_status
+    if not ai_settings_write_allowed():
+        return JSONResponse(
+            status_code=403,
+            content={"detail": "AI process control is disabled (AI_ALLOW_SETTINGS_WRITE=false)."},
+        )
     ok, msg = await run_in_thread(start_ollama)
     return {
         "ok": ok,
@@ -1538,15 +1560,20 @@ async def api_ai_ollama_start(request: Request):
 async def api_ai_ollama_stop(request: Request):
     """Stop Ollama server and model runners (frees VRAM).
 
-    Internal/ops endpoint: no UI caller. Kept as a deployer escape hatch,
-    gated the same way as /api/ai/ollama/start.
+    Internal/ops endpoint: no UI caller. Gated like /api/ai/ollama/start.
     """
     user = current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
     if csrf_failed(request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
-    from llm_service import stop_ollama, status as ai_status
+    from llm_service import ai_settings_write_allowed, stop_ollama
+    from llm_service import status as ai_status
+    if not ai_settings_write_allowed():
+        return JSONResponse(
+            status_code=403,
+            content={"detail": "AI process control is disabled (AI_ALLOW_SETTINGS_WRITE=false)."},
+        )
     ok, msg = await run_in_thread(stop_ollama)
     return {
         "ok": ok,

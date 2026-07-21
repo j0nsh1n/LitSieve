@@ -1,17 +1,16 @@
 """Unit tests for year sort, source priority, coverage, notes, seed lookup."""
 
 import numpy as np
-import pytest
 
 from database import ArticleDatabase
 from utils import (
-    parse_year,
-    sort_articles,
-    duplicate_quality_key,
-    coverage_suggestions,
     build_cluster_briefing,
     build_screening_report,
+    coverage_suggestions,
+    duplicate_quality_key,
     format_screening_report_txt,
+    parse_year,
+    sort_articles,
 )
 
 

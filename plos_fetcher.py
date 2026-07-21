@@ -8,9 +8,9 @@ API key optional for higher rate limits (not required for classroom use).
 from __future__ import annotations
 
 import re
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional
 
-from base_fetcher import BaseFetcher, HttpClient, FetchError
+from base_fetcher import BaseFetcher, FetchError, HttpClient
 
 
 class PLOSFetcher(BaseFetcher):

@@ -4,15 +4,16 @@ Groups similar articles and creates visualizations
 """
 
 import logging
-import numpy as np
-from sklearn.cluster import KMeans, AgglomerativeClustering, HDBSCAN
-from sklearn.decomposition import PCA
-from sklearn.metrics import silhouette_score
 from collections import Counter
-from typing import List, Dict, Optional
-import plotly.graph_objects as go
+from typing import Dict, List, Optional
+
+import numpy as np
 import plotly.express as px
+import plotly.graph_objects as go
+from sklearn.cluster import HDBSCAN, AgglomerativeClustering, KMeans
+from sklearn.decomposition import PCA
 from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics import silhouette_score
 
 logger = logging.getLogger(__name__)
 
@@ -403,7 +404,7 @@ class ClusterVisualizer:
         Returns:
             Reduced embeddings
         """
-        print(f"Reducing dimensions using PCA...")
+        print("Reducing dimensions using PCA...")
         reducer = PCA(n_components=n_components, random_state=42)
         reduced = reducer.fit_transform(embeddings)
         return reduced

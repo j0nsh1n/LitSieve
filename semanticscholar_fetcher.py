@@ -4,8 +4,9 @@ Covers all academic disciplines — broad cross-domain coverage
 Free API, no key required for basic use (rate limited)
 """
 
-from typing import List, Dict
-from base_fetcher import BaseFetcher, HttpClient, FetchError
+from typing import Dict, List
+
+from base_fetcher import BaseFetcher, FetchError, HttpClient
 
 
 class SemanticScholarFetcher(BaseFetcher):

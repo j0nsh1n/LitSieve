@@ -6,10 +6,10 @@ Stores user accounts in users.db, separate from per-user article data.
 import hashlib
 import secrets
 import sqlite3
-import uuid
 import threading
+import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 
 class UserDatabase:
