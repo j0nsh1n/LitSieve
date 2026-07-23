@@ -31,6 +31,7 @@ from app.routes import (  # noqa: E402
     search,
     shares,
 )
+from app.security import SecurityHeadersMiddleware  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -41,6 +42,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="Literature Research Aide", version="4.2.0")
 app.state.limiter = core.limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SecurityHeadersMiddleware)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 

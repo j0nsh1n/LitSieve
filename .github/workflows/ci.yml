@@ -30,6 +30,8 @@ jobs:
             tqdm \
             slowapi \
             PyJWT \
+            cryptography \
+            sqlcipher3-binary \
             "passlib[bcrypt]" \
             "bcrypt<4.1" \
             python-multipart \
