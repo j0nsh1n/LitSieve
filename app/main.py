@@ -1,5 +1,5 @@
 """
-FastAPI Application — Literature Research Aide v4.1.1
+FastAPI Application — Literature Research Aide v4.2.0
 Multi-user web interface for literature search and analysis.
 
 This module only wires the app together: configuration, static files, the
@@ -38,7 +38,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Literature Research Aide", version="4.1.1")
+app = FastAPI(title="Literature Research Aide", version="4.2.0")
 app.state.limiter = core.limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
