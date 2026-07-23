@@ -269,3 +269,47 @@ def test_resolve_duplicates_keeps_longest_abstract(pipe):
 
     # And resolving again is a no-op.
     assert pipe.resolve_duplicates(threshold=0.95) == {"groups": 0, "excluded": 0}
+
+
+def test_normalize_reason_codes():
+    from app.content.screening_reasons import (
+        USER_SELECTABLE_REASONS,
+        normalize_reason,
+        reason_label,
+    )
+
+    assert normalize_reason("off_topic") == "off_topic"
+    assert normalize_reason("OFF-TOPIC") == "off_topic"
+    assert normalize_reason("nope") == "manual"
+    assert normalize_reason(None) == "manual"
+    assert "Off topic" in reason_label("off_topic")
+    assert "off_topic" in USER_SELECTABLE_REASONS
+
+
+def test_exclusion_reason_in_report(tmp_path):
+    from app.storage.database import ArticleDatabase
+    from app.utils import build_screening_report, format_screening_report_txt
+
+    db = ArticleDatabase(db_path=str(tmp_path / "r.db"))
+    try:
+        db.insert_articles([
+            {
+                "article_id": "1", "source": "pubmed", "title": "A",
+                "abstract": "abs", "year": "2020", "authors": [], "journal": "",
+            },
+            {
+                "article_id": "2", "source": "pubmed", "title": "B",
+                "abstract": "abs", "year": "2020", "authors": [], "journal": "",
+            },
+        ], dedupe=False)
+        db.exclude_articles([("1", "pubmed")], reason="off_topic")
+        db.exclude_articles([("2", "pubmed")], reason="wrong_population")
+        report = build_screening_report(db)
+        assert report["excluded"]["off_topic"] == 1
+        assert report["excluded"]["wrong_population"] == 1
+        assert report["excluded"]["total"] == 2
+        txt = format_screening_report_txt(report)
+        assert "Off topic" in txt
+        assert "Wrong population" in txt
+    finally:
+        db.close()

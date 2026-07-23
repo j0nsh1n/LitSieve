@@ -256,7 +256,7 @@ async def api_ai_ask_article(req: AIAskRequest, request: Request):
     """Answer a question using only this paper's title + abstract (opt-in AI).
 
     Same lifecycle as Refine for built-in mode: start → answer → stop when idle.
-    One paper per request — no whole-library Q&A (R5).
+    One paper per request — no whole-library Q&A.
     """
     user = current_user(request)
     if not user:

@@ -1,5 +1,5 @@
 """
-Phase R1 smoke path (no live network):
+End-to-end smoke path (no live network):
 
   register → load sample corpus → (stub embeddings) → cluster → search → export
 

@@ -1,5 +1,5 @@
 """
-Single source of truth for public academic sources (Phase R4).
+Single source of truth for public academic sources.
 
 - Student tips: what each database is good for / what it misses
 - Topic → recommended sources (coverage map + Data Management grid)

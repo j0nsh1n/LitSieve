@@ -35,7 +35,7 @@ async def api_ui_flags():
 
 @router.get("/api/sources")
 async def api_sources():
-    """Public source catalog: names, student tips, topics, HS packs (Phase R4).
+    """Public source catalog: names, student tips, topics, high-school packs.
 
     Single source of truth is source_catalog.py so Data Management, coverage,
     and duplicate priority stay aligned.

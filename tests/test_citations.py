@@ -182,3 +182,24 @@ def test_screening_report_endpoint_empty(app_module):
     assert "SCREENING REPORT - 0 papers collected" in txt.text
     assert "attachment" in txt.headers.get("content-disposition", "").lower()
     assert "screening_report.txt" in txt.headers.get("content-disposition", "")
+
+
+def test_apa_export_basic():
+    from app.services.citations import article_to_apa, collection_to_apa
+
+    art = {
+        "article_id": "10.1234/ex",
+        "source": "crossref",
+        "title": "An example study of widgets",
+        "year": "2020",
+        "authors": ["Rivera M", "Chen L"],
+        "journal": "Demo Journal",
+        "abstract": "x",
+    }
+    line = article_to_apa(art)
+    assert "2020" in line
+    assert "widgets" in line.lower()
+    assert "Demo Journal" in line or "Demo" in line
+    assert "doi.org" in line
+    block = collection_to_apa([art, art])
+    assert block.count("2020") == 2

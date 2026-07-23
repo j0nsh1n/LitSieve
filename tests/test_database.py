@@ -137,3 +137,35 @@ def test_update_password_bumps_token_version(user_db):
     assert row["token_version"] == 1
     assert user_db.update_password(u["id"], "hash-newer") is True
     assert user_db.get_by_id(u["id"])["token_version"] == 2
+
+
+def test_large_corpus_read_stays_fast(tmp_path):
+    """Guards against an accidental per-row query in get_all_articles().
+
+    The real latency numbers live in tools/bench_scale.py; this is just a
+    regression tripwire with a deliberately generous CI bound.
+    """
+    import time
+
+    db = ArticleDatabase(db_path=str(tmp_path / "scale.db"))
+    try:
+        db.insert_articles([
+            {
+                "article_id": f"scale-{i}",
+                "source": "pubmed" if i % 3 else "openalex",
+                "title": f"Scale test paper {i} on climate and health outcomes",
+                "abstract": f"Synthetic abstract {i} used only for scale testing. " * 2,
+                "year": str(2000 + (i % 25)),
+                "authors": [f"Author {i % 40}"],
+                "journal": "Journal of Scale Tests",
+            }
+            for i in range(1200)
+        ], dedupe=False)
+
+        t0 = time.perf_counter()
+        articles = db.get_all_articles()
+        elapsed = time.perf_counter() - t0
+        assert len(articles) == 1200
+        assert elapsed < 5.0, f"get_all_articles too slow: {elapsed:.2f}s"
+    finally:
+        db.close()

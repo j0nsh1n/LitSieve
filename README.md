@@ -128,7 +128,7 @@ docker run -p 7860:7860 -e SECRET_KEY="$(python -c 'import secrets;print(secrets
 The web app is the primary interface, but the pipeline can be driven directly:
 
 ```python
-from pipeline import LiteratureSearchPipeline
+from app.services.pipeline import LiteratureSearchPipeline
 
 pipeline = LiteratureSearchPipeline(db_path="articles.db", embedding_model="general")
 
@@ -185,14 +185,20 @@ Start with `general`; switch to a biomedical model for medical corpora.
 
 ## Database Schema
 
-Each user gets their own `user_data/<user_id>/articles.db` with three tables,
-all keyed by the composite `(article_id, source)`:
+Each **library** is its own SQLite file at
+`user_data/<user_id>/libraries/<library_id>/articles.db`, so collections are
+fully isolated. Which libraries exist (and which is active) is tracked in
+`user_data/<user_id>/libraries.json`. Tables are keyed by the composite
+`(article_id, source)`:
 
 - **articles** — `article_id`, `source`, `title`, `abstract`, `year`, `authors`, `journal`
 - **embeddings** — raw numpy bytes + `dtype` + `shape` + `model_name` (no pickle)
 - **clusters** — `cluster_id`, `cluster_label`
+- **screening** — exclusion state + reason (`manual` / `cluster` / `duplicate`)
+- **notes** — private note text + starred flag
+- **key_points** — extractive bullets generated after embedding
 
-User accounts live in a separate `users.db`.
+User accounts and class share codes live in a separate `users.db`.
 
 ## Testing
 

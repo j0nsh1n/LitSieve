@@ -1,4 +1,4 @@
-"""Phase R2 classroom UI flags and plain-language study types."""
+"""Classroom UI flags and plain-language study types."""
 
 from __future__ import annotations
 

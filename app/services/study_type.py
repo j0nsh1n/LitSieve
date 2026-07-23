@@ -7,7 +7,7 @@ warning when confidence is not high.
 
 Designed to run cheaply at search time (pure functions, no I/O).
 
-Phase R2: default labels are plain-language for younger students, with a short
+Default labels are plain-language for younger students, with a short
 "what this means" line and the older formal name kept for tooltips.
 """
 

@@ -7,7 +7,7 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
-# Source priority + topic recommendations live in source_catalog (Phase R4).
+# Source priority + topic recommendations live in source_catalog.py.
 from app.content.source_catalog import (
     SOURCE_PRIORITY,
     TOPIC_SOURCE_HINTS,

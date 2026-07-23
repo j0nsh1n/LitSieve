@@ -10,7 +10,7 @@ Providers (any combination; auto picks the first ready):
 Extractive key points (summarize.py) remain the default. LLM only rewrites
 or answers from the supplied abstract — never invents findings.
 
-Phase R5 policy (do not break without product review):
+Policy (do not break without product review):
   • One article at a time (refine / ask) — no whole-library auto-summaries.
   • No AI evidence grades; no silent rewrite of stored key points without an
     explicit user save action; no paywall / full-text scraping.

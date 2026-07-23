@@ -1,4 +1,4 @@
-# Scale & engineering hygiene notes (Phase R8)
+# Scale & engineering hygiene notes
 
 Classroom demos are usually hundreds of papers per library, not millions.
 Pagination (page size 50) was added so Search / Clusters / Duplicates stay

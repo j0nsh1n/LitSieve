@@ -1,4 +1,4 @@
-"""Phase R4: source catalog alignment (tips, topics, fetchers, URLs)."""
+"""Source catalog alignment (tips, topics, fetchers, URLs)."""
 
 from __future__ import annotations
 
