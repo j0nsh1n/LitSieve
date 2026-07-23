@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from conftest import route_paths
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -9,7 +10,7 @@ from app.main import app
 
 def test_no_bulk_ai_library_routes():
     """Guardrail: do not add silent whole-library AI rewrite endpoints."""
-    paths = {getattr(r, "path", None) for r in app.routes}
+    paths = route_paths(app)
     forbidden_substrings = (
         "/api/ai/summarize-library",
         "/api/ai/bulk",

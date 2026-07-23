@@ -65,7 +65,7 @@ def test_api_ui_flags_respect_env(monkeypatch):
 
 def test_attach_skipped_when_hidden(monkeypatch):
     monkeypatch.setenv("HIDE_STUDY_TYPE_TAGS", "true")
-    from app.main import _attach_study_types
+    from app.services.enrich import attach_study_types as _attach_study_types
 
     arts = [
         {
@@ -80,7 +80,7 @@ def test_attach_skipped_when_hidden(monkeypatch):
 def test_attach_runs_when_visible(monkeypatch):
     monkeypatch.delenv("HIDE_STUDY_TYPE_TAGS", raising=False)
     monkeypatch.setenv("HIDE_STUDY_TYPE_TAGS", "false")
-    from app.main import _attach_study_types
+    from app.services.enrich import attach_study_types as _attach_study_types
 
     arts = [
         {

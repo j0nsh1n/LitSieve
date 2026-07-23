@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 
+from conftest import route_paths
 from fastapi.testclient import TestClient
 
 from app.content.feature_guides import FEATURE_ORDER, get_guide, list_guides
@@ -29,7 +30,7 @@ def test_account_ai_card_collapsed_by_default():
 
 def test_no_bulk_ai_library_endpoints():
     """R5: refuse whole-library AI rewrite / bulk Q&A routes."""
-    paths = {getattr(r, "path", None) for r in app.routes}
+    paths = route_paths(app)
     forbidden = {
         "/api/ai/refine-library",
         "/api/ai/summarize-library",

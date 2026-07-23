@@ -14,6 +14,7 @@ for _dep in (
 
 from fastapi.testclient import TestClient
 
+from app import core
 from app.services.citations import article_to_bibtex, article_to_ris, collection_to_ris
 
 
@@ -101,11 +102,11 @@ def app_module(tmp_path, monkeypatch):
     import importlib
     main = importlib.import_module("app.main")
     from app.storage.user_db import UserDatabase
-    main.user_db = UserDatabase(db_path=str(tmp_path / "users.db"))
-    main._pipelines.clear()
-    main._pipeline_refcounts.clear()
-    main._all_progress.clear()
-    main._pending_close.clear()
+    core.user_db = UserDatabase(db_path=str(tmp_path / "users.db"))
+    core._pipelines.clear()
+    core._pipeline_refcounts.clear()
+    core._all_progress.clear()
+    core._pending_close.clear()
     return main
 
 
@@ -125,8 +126,8 @@ def test_export_library_ris_endpoint(app_module):
 
     # Touch pipeline so user_data dir exists, then seed one article.
     assert c.get("/api/statistics").status_code == 200
-    uid = main.user_db.get_by_username("citeuser")["id"]
-    p = main.get_pipeline(uid)
+    uid = core.user_db.get_by_username("citeuser")["id"]
+    p = core.get_pipeline(uid)
     try:
         p.db.insert_articles([{
             "article_id": "999",
@@ -138,7 +139,7 @@ def test_export_library_ris_endpoint(app_module):
             "journal": "J Test",
         }])
     finally:
-        main.release_pipeline(uid)
+        core.release_pipeline(uid)
 
     resp = c.get("/api/export/library?format=ris&scope=all")
     assert resp.status_code == 200
