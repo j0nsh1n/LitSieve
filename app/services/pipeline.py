@@ -12,31 +12,31 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-from arxiv_fetcher import ArXivFetcher
-from biorxiv_fetcher import BioRxivFetcher, MedRxivFetcher
-from clinicaltrials_fetcher import ClinicalTrialsFetcher
-from clustering import (
+from app.fetchers.arxiv import ArXivFetcher
+from app.fetchers.biorxiv import BioRxivFetcher, MedRxivFetcher
+from app.fetchers.clinicaltrials import ClinicalTrialsFetcher
+from app.fetchers.core import COREFetcher
+from app.fetchers.crossref import CrossRefFetcher
+from app.fetchers.dblp import DBLPFetcher
+from app.fetchers.doaj import DOAJFetcher
+from app.fetchers.eric import ERICFetcher
+from app.fetchers.europepmc import EuropePMCFetcher
+from app.fetchers.hal import HALFetcher
+from app.fetchers.nasa_ads import NASAADSFetcher
+from app.fetchers.openaire import OpenAIREFetcher
+from app.fetchers.openalex import OpenAlexFetcher
+from app.fetchers.plos import PLOSFetcher
+from app.fetchers.pubmed import PubMedFetcher
+from app.fetchers.semanticscholar import SemanticScholarFetcher
+from app.fetchers.zenodo import ZenodoFetcher
+from app.services.clustering import (
     NOISE_CLUSTER_ID,
     NOISE_CLUSTER_LABEL,
     ArticleClusterer,
     ClusterLabeler,
 )
-from core_fetcher import COREFetcher
-from crossref_fetcher import CrossRefFetcher
-from database import ArticleDatabase
-from dblp_fetcher import DBLPFetcher
-from doaj_fetcher import DOAJFetcher
-from embeddings import EmbeddingEngine
-from eric_fetcher import ERICFetcher
-from europepmc_fetcher import EuropePMCFetcher
-from hal_fetcher import HALFetcher
-from nasa_ads_fetcher import NASAADSFetcher
-from openaire_fetcher import OpenAIREFetcher
-from openalex_fetcher import OpenAlexFetcher
-from plos_fetcher import PLOSFetcher
-from pubmed_fetcher import PubMedFetcher
-from semanticscholar_fetcher import SemanticScholarFetcher
-from zenodo_fetcher import ZenodoFetcher
+from app.services.embeddings import EmbeddingEngine
+from app.storage.database import ArticleDatabase
 
 FETCHERS = {
     'pubmed': PubMedFetcher,
@@ -153,7 +153,7 @@ class LiteratureSearchPipeline:
         cancel_check: optional zero-arg callable returning True if the job
             should stop between sources.
         """
-        from base_fetcher import FetchError, classify_error
+        from app.fetchers.base import FetchError, classify_error
 
         logger.info(f"\n=== Fetching from {len(sources)} sources in parallel ===")
         lock = threading.Lock()
@@ -284,7 +284,7 @@ class LiteratureSearchPipeline:
         """
         import time
 
-        from embeddings import select_device
+        from app.services.embeddings import select_device
 
         logger.info("\n=== Step 2: Creating Embeddings ===")
         t0 = time.perf_counter()
@@ -397,7 +397,7 @@ class LiteratureSearchPipeline:
 
         Returns the number of articles written to the key_points table.
         """
-        from summarize import extract_key_points_batch
+        from app.services.summarize import extract_key_points_batch
 
         pool = articles if articles is not None else self.db.get_all_articles()
         if not pool:
@@ -517,7 +517,7 @@ class LiteratureSearchPipeline:
         extra_exclude: Optional[set] = None,
     ) -> Tuple[List[Tuple[str, str]], np.ndarray, Dict]:
         """Embeddings + metadata after screening / source / cluster / year filters."""
-        from utils import parse_year
+        from app.utils import parse_year
 
         article_ids, article_embeddings = self._load_embeddings_cached()
         empty_meta: Dict = {}
@@ -848,7 +848,7 @@ class LiteratureSearchPipeline:
             groups.setdefault(find(key), []).append(key)
 
         articles = self.db.get_all_articles_with_clusters()
-        from utils import duplicate_quality_key
+        from app.utils import duplicate_quality_key
         losers = []
         n_groups = 0
         for members in groups.values():
@@ -900,7 +900,7 @@ class LiteratureSearchPipeline:
 
     def get_cluster_briefings(self) -> List[Dict]:
         """Rule-based topic overview cards for each cluster."""
-        from utils import build_cluster_briefing
+        from app.utils import build_cluster_briefing
         clusters = self.db.get_all_clusters()
         briefings = []
         for c in clusters:

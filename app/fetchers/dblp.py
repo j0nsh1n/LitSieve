@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional
 
-from base_fetcher import BaseFetcher, FetchError, HttpClient
+from app.fetchers.base import BaseFetcher, FetchError, HttpClient
 
 
 class DBLPFetcher(BaseFetcher):

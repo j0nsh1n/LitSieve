@@ -3,10 +3,10 @@
 import numpy as np
 import pytest
 
-import libraries as lib
-import shares as shares_mod
-from database import ArticleDatabase
-from user_db import UserDatabase
+from app.storage import libraries as lib
+from app.storage import shares as shares_mod
+from app.storage.database import ArticleDatabase
+from app.storage.user_db import UserDatabase
 
 
 @pytest.fixture

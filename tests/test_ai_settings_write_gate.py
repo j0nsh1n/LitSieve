@@ -29,8 +29,8 @@ def app_module(tmp_path, monkeypatch):
 
     import importlib
 
-    main = importlib.import_module("main")
-    from user_db import UserDatabase
+    main = importlib.import_module("app.main")
+    from app.storage.user_db import UserDatabase
 
     test_db = UserDatabase(db_path=str(tmp_path / "users.db"))
     monkeypatch.setattr(main, "user_db", test_db)
@@ -94,7 +94,7 @@ def test_settings_post_forbidden_when_write_disabled(app_module, monkeypatch):
 
 
 def test_settings_post_ok_when_write_enabled(app_module, monkeypatch, tmp_path):
-    import llm_service
+    from app.services import llm as llm_service
 
     monkeypatch.setenv("AI_ALLOW_SETTINGS_WRITE", "true")
     settings_path = tmp_path / "user_data" / "ai_settings.json"

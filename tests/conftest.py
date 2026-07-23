@@ -20,7 +20,7 @@ def _reset_rate_limits():
     """
     yield
     try:
-        from main import limiter
+        from app.main import limiter
         if hasattr(limiter, "reset"):
             limiter.reset()
         elif getattr(limiter, "_storage", None) is not None:

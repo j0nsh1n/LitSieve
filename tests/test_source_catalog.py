@@ -4,10 +4,7 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
-from citations import SOURCE_URL
-from main import app
-from pipeline import FETCHERS
-from source_catalog import (
+from app.content.source_catalog import (
     SOURCE_CATALOG,
     SOURCE_PRIORITY,
     TOPIC_PACKS,
@@ -15,7 +12,10 @@ from source_catalog import (
     public_catalog,
     student_tip,
 )
-from utils import coverage_suggestions
+from app.main import app
+from app.services.citations import SOURCE_URL
+from app.services.pipeline import FETCHERS
+from app.utils import coverage_suggestions
 
 
 def test_catalog_matches_fetchers():

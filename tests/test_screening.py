@@ -15,7 +15,7 @@ import pytest
 
 pytest.importorskip("sklearn")
 
-from database import ArticleDatabase
+from app.storage.database import ArticleDatabase
 
 
 @pytest.fixture
@@ -35,7 +35,7 @@ def _article(aid, source="pubmed", abstract="some abstract text", cluster=None):
 # ---------------------------------------------------------------- labels ----
 
 def test_cluster_labels_are_distinct_across_clusters():
-    from clustering import ClusterLabeler
+    from app.services.clustering import ClusterLabeler
 
     # Both clusters share the dominant words "patients" and "treatment";
     # each has its own theme (cardiology vs oncology).
@@ -62,7 +62,7 @@ def test_cluster_labels_are_distinct_across_clusters():
 
 
 def test_cluster_labels_drop_foreign_and_short_tokens():
-    from clustering import ClusterLabeler
+    from app.services.clustering import ClusterLabeler
 
     labels = ClusterLabeler.generate_tfidf_labels({
         0: [{"title": "κα με να gi pl abr", "abstract": "immune response signaling cascade"}],
@@ -79,7 +79,7 @@ def test_cluster_labels_drop_foreign_and_short_tokens():
 def test_representative_title_is_most_central():
     import numpy as np
 
-    from clustering import ClusterLabeler
+    from app.services.clustering import ClusterLabeler
 
     ids = [("1", "s"), ("2", "s"), ("3", "s")]
     emb = np.array([[1.0, 0.0], [0.9, 0.1], [0.0, 1.0]], dtype=np.float32)
@@ -95,7 +95,7 @@ def test_representative_title_is_most_central():
 def test_auto_select_k_finds_natural_group_count():
     import numpy as np
 
-    from clustering import ArticleClusterer
+    from app.services.clustering import ArticleClusterer
 
     rng = np.random.default_rng(0)
     # Two well-separated blobs -> silhouette should pick k=2.
@@ -112,7 +112,7 @@ def test_auto_select_k_finds_natural_group_count():
 def test_hdbscan_finds_dense_groups():
     import numpy as np
 
-    from clustering import ArticleClusterer
+    from app.services.clustering import ArticleClusterer
 
     rng = np.random.default_rng(1)
     # Three tight, well-separated dense blobs -> HDBSCAN should recover them
@@ -137,9 +137,9 @@ def test_noise_bucket_is_relabelled_in_pipeline(monkeypatch):
 
     import numpy as np
 
-    import clustering
-    from clustering import NOISE_CLUSTER_ID, NOISE_CLUSTER_LABEL
-    from pipeline import LiteratureSearchPipeline
+    from app.services import clustering
+    from app.services.clustering import NOISE_CLUSTER_ID, NOISE_CLUSTER_LABEL
+    from app.services.pipeline import LiteratureSearchPipeline
 
     p = LiteratureSearchPipeline(db_path=os.path.join(tempfile.mkdtemp(), "a.db"))
     p.db.insert_articles([_article(str(i)) for i in range(6)])
@@ -159,7 +159,7 @@ def test_noise_bucket_is_relabelled_in_pipeline(monkeypatch):
 
 
 def test_cluster_labels_empty_and_fallback():
-    from clustering import ClusterLabeler
+    from app.services.clustering import ClusterLabeler
     assert ClusterLabeler.generate_tfidf_labels({}) == {}
     # Stop-word-only text can't produce terms -> falls back to "Cluster N".
     labels = ClusterLabeler.generate_tfidf_labels({
@@ -219,7 +219,7 @@ def test_cluster_article_keys_and_clear_all(db):
 def pipe(tmp_path):
     for _dep in ("requests", "Bio", "tqdm", "dotenv"):
         pytest.importorskip(_dep)
-    from pipeline import LiteratureSearchPipeline
+    from app.services.pipeline import LiteratureSearchPipeline
     p = LiteratureSearchPipeline(db_path=str(tmp_path / "articles.db"))
     yield p
     p.close()

@@ -6,9 +6,9 @@ import time
 
 from fastapi.testclient import TestClient
 
-from database import ArticleDatabase
-from feature_guides import FEATURE_ORDER, get_guide, list_guides
-from main import app
+from app.content.feature_guides import FEATURE_ORDER, get_guide, list_guides
+from app.main import app
+from app.storage.database import ArticleDatabase
 
 
 def test_account_ai_card_collapsed_by_default():

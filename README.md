@@ -54,24 +54,19 @@ Built with **FastAPI**, sentence-transformers, FAISS, and scikit-learn.
 
 ```
 .
-├── main.py                 # FastAPI application (entry point)
-├── pipeline.py             # Orchestrates fetch → embed → cluster → search
-├── libraries.py            # Multi-library workspaces per account
-├── shares.py               # Class share codes → clone library into student account
-├── base_fetcher.py         # Abstract fetcher + shared HttpClient (retry/backoff)
-├── <source>_fetcher.py     # One fetcher per source (pubmed_fetcher.py, …)
-├── database.py             # Per-library article/embedding/cluster/notes SQLite
-├── user_db.py              # User-account database (users.db)
-├── auth.py                 # JWT + bcrypt password hashing
-├── embeddings.py           # EmbeddingEngine + PICOExtractor
-├── summarize.py            # Extractive key points (structured + centroid)
-├── clustering.py           # Clustering (KMeans/HDBSCAN) + TF-IDF labels
-├── utils.py                # Year sort, source priority, coverage, briefings, screening report
-├── citations.py            # RIS + BibTeX export
-├── feature_guides.py       # Landing “learn more” page content
+├── app/                    # application package
+│   ├── main.py             # FastAPI app + startup wiring (entry point)
+│   ├── auth.py             # JWT + bcrypt password hashing
+│   ├── utils.py            # Year sort, source priority, coverage, screening report
+│   ├── fetchers/           # One module per source + base.py (HttpClient, retry/backoff)
+│   ├── services/           # pipeline, embeddings, clustering, summarize, study_type, llm, citations
+│   ├── storage/            # database, user_db, libraries, shares (SQLite)
+│   └── content/            # feature guides, sample corpus, source catalog, UI flags
 ├── templates/              # Jinja2 HTML pages
 ├── static/                 # CSS + page JavaScript
 ├── tests/                  # pytest suite
+├── tools/                  # bench_scale.py (offline latency benchmark)
+├── docs/                   # engineering notes
 ├── run_dev.sh              # Local dev with --reload
 ├── requirements.txt
 ├── Dockerfile              # Container build (HF Spaces / any Docker host)
@@ -106,7 +101,7 @@ cp .env.example .env
 ## Running
 
 ```bash
-uvicorn main:app --host 0.0.0.0 --port 7860
+uvicorn app.main:app --host 0.0.0.0 --port 7860
 ```
 
 Then open <http://localhost:7860>. Public landing and `/learn/…` guides need no

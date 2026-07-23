@@ -1,21 +1,21 @@
 """
-HAL (Hyper Articles en Ligne) — French national open archive.
+PLOS (Public Library of Science) open-access journal fetcher.
 
-Free Solr API: https://api.archives-ouvertes.fr/search/
-No key required. Multidisciplinary open-access / institutional deposit.
+Free Solr API: https://api.plos.org/search
+API key optional for higher rate limits (not required for classroom use).
 """
 
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
-from base_fetcher import BaseFetcher, FetchError, HttpClient
+from app.fetchers.base import BaseFetcher, FetchError, HttpClient
 
 
-class HALFetcher(BaseFetcher):
-    SOURCE_NAME = "hal"
-    BASE_URL = "https://api.archives-ouvertes.fr/search/"
+class PLOSFetcher(BaseFetcher):
+    SOURCE_NAME = "plos"
+    BASE_URL = "https://api.plos.org/search"
 
     def __init__(self, email: str = None):
         self.http = HttpClient(
@@ -28,6 +28,8 @@ class HALFetcher(BaseFetcher):
         start = 0
         page_size = min(100, max_results)
         q = (query or "").strip() or "*:*"
+        # Prefer title/abstract hits for classroom relevance.
+        solr_q = f"title:{q} OR abstract:{q}" if q != "*:*" else q
 
         while len(articles) < max_results:
             rows = min(page_size, max_results - len(articles))
@@ -35,21 +37,18 @@ class HALFetcher(BaseFetcher):
                 r = self.http.get(
                     self.BASE_URL,
                     params={
-                        "q": q,
-                        "wt": "json",
+                        "q": solr_q,
+                        "fl": "id,title,abstract,author,publication_date,journal",
                         "rows": rows,
                         "start": start,
-                        "fl": (
-                            "halId_s,title_s,abstract_s,authFullName_s,"
-                            "producedDateY_i,journalTitle_s,doiId_s"
-                        ),
+                        "wt": "json",
                     },
                 )
                 docs = (r.json().get("response") or {}).get("docs") or []
             except FetchError:
                 raise
             except Exception as e:
-                raise FetchError(f"HAL request failed: {e}", kind="network") from e
+                raise FetchError(f"PLOS request failed: {e}", kind="network") from e
 
             if not docs:
                 break
@@ -62,42 +61,41 @@ class HALFetcher(BaseFetcher):
             start += len(docs)
 
         if not articles:
-            raise FetchError("No HAL records matched your query.", kind="no_results")
+            raise FetchError("No PLOS articles matched your query.", kind="no_results")
         return articles[:max_results]
-
-    @staticmethod
-    def _first(val: Any) -> str:
-        if val is None:
-            return ""
-        if isinstance(val, list):
-            return str(val[0]).strip() if val else ""
-        return str(val).strip()
 
     def _parse(self, doc: Dict) -> Optional[Dict]:
         try:
-            title = self._first(doc.get("title_s"))
-            abstract = self._first(doc.get("abstract_s"))
-            abstract = re.sub(r"<[^>]+>", "", abstract).strip()
+            title = doc.get("title")
+            if isinstance(title, list):
+                title = title[0] if title else ""
+            title = (title or "").strip()
+            abstract = doc.get("abstract")
+            if isinstance(abstract, list):
+                abstract = " ".join(str(a) for a in abstract if a)
+            abstract = re.sub(r"<[^>]+>", "", (abstract or "")).strip()
             if not title or not abstract:
                 return None
-            authors = doc.get("authFullName_s") or []
+            authors = doc.get("author") or []
             if isinstance(authors, str):
                 authors = [authors]
             authors = [str(a).strip() for a in authors if str(a).strip()]
-            year = doc.get("producedDateY_i")
-            year = str(year) if year else ""
-            journal = self._first(doc.get("journalTitle_s")) or "HAL"
-            aid = self._first(doc.get("doiId_s")) or self._first(doc.get("halId_s"))
+            pub = doc.get("publication_date") or ""
+            year = str(pub)[:4] if pub else ""
+            journal = doc.get("journal") or "PLOS"
+            if isinstance(journal, list):
+                journal = journal[0] if journal else "PLOS"
+            aid = (doc.get("id") or "").strip()
             if not aid:
                 return None
             return {
                 "article_id": aid,
-                "source": "hal",
+                "source": "plos",
                 "title": title,
                 "abstract": abstract,
                 "year": year,
                 "authors": authors,
-                "journal": journal,
+                "journal": str(journal),
             }
         except Exception:
             return None

@@ -8,7 +8,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from main import app
+from app.main import app
 
 TEMPLATES = Path(__file__).resolve().parents[1] / "templates"
 CACHE_BUST = "20260717r15"

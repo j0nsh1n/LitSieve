@@ -46,10 +46,10 @@ def app_module(tmp_path, monkeypatch):
 
     import importlib
 
-    import pipeline
-    main = importlib.import_module("main")
+    from app.services import pipeline
+    main = importlib.import_module("app.main")
 
-    from user_db import UserDatabase
+    from app.storage.user_db import UserDatabase
     test_db = UserDatabase(db_path=str(tmp_path / "users.db"))
     monkeypatch.setattr(main, "user_db", test_db)
     main._pipelines.clear()

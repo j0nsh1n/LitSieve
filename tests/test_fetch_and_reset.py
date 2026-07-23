@@ -1,11 +1,11 @@
 """Tests for fetch helpers, insert dedupe, and password-reset flow."""
 
 
-from auth import hash_password, verify_password
-from base_fetcher import FetchError, HttpClient, classify_error
-from database import ArticleDatabase
-from user_db import UserDatabase
-from utils import build_screening_report, format_screening_report_txt
+from app.auth import hash_password, verify_password
+from app.fetchers.base import FetchError, HttpClient, classify_error
+from app.storage.database import ArticleDatabase
+from app.storage.user_db import UserDatabase
+from app.utils import build_screening_report, format_screening_report_txt
 
 
 def test_classify_error_kinds():

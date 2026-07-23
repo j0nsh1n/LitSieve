@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
-from main import app
+from app.main import app
 
 
 def test_no_bulk_ai_library_routes():

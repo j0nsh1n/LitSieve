@@ -7,7 +7,7 @@ Requires API token (free at https://ui.adsabs.harvard.edu/user/settings/token)
 import os
 from typing import Dict, List
 
-from base_fetcher import BaseFetcher, HttpClient
+from app.fetchers.base import BaseFetcher, HttpClient
 
 
 class NASAADSFetcher(BaseFetcher):

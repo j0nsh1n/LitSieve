@@ -7,7 +7,7 @@ Free API, no authentication required
 from typing import Dict, List
 from urllib.parse import quote
 
-from base_fetcher import BaseFetcher, FetchError, HttpClient
+from app.fetchers.base import BaseFetcher, FetchError, HttpClient
 
 
 class DOAJFetcher(BaseFetcher):

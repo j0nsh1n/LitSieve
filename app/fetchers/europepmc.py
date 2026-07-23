@@ -7,7 +7,7 @@ from typing import Dict, List, Optional
 
 from tqdm import tqdm
 
-from base_fetcher import BaseFetcher, HttpClient
+from app.fetchers.base import BaseFetcher, HttpClient
 
 
 class EuropePMCFetcher(BaseFetcher):

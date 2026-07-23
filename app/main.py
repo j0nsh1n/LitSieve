@@ -34,18 +34,23 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
-import shares as shares_mod
-from auth import (
+from app.auth import (
     create_token,
     get_current_user,
     hash_password,
     validate_login_name,
     verify_password,
 )
-from citations import collection_to_apa, collection_to_bibtex, collection_to_ris
-from embeddings import PICOExtractor
-from feature_guides import get_guide, list_guides, neighbors
-from libraries import (
+from app.content.feature_guides import get_guide, list_guides, neighbors
+from app.content.sample_corpus import get_sample_articles
+from app.content.screening_reasons import (
+    normalize_reason,
+)
+from app.services.citations import collection_to_apa, collection_to_bibtex, collection_to_ris
+from app.services.embeddings import PICOExtractor
+from app.services.pipeline import LiteratureSearchPipeline
+from app.storage import shares as shares_mod
+from app.storage.libraries import (
     create_library,
     delete_library,
     ensure_libraries,
@@ -56,13 +61,8 @@ from libraries import (
     rename_library,
     set_active_library,
 )
-from pipeline import LiteratureSearchPipeline
-from sample_corpus import get_sample_articles
-from screening_reasons import (
-    normalize_reason,
-)
-from user_db import UserDatabase
-from utils import (
+from app.storage.user_db import UserDatabase
+from app.utils import (
     build_screening_report,
     coverage_suggestions,
     format_screening_report_txt,
@@ -104,7 +104,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 async def _warm_umap_kernels():
     # UMAP's first fit pays ~8s of numba JIT; absorb it at boot in a daemon
     # thread so the first Generate Clusters click stays ~1s (bench_scale.py).
-    from clustering import warm_density_reducer
+    from app.services.clustering import warm_density_reducer
     threading.Thread(target=warm_density_reducer, daemon=True, name="umap-warmup").start()
 @app.get("/health")
 async def health():
@@ -118,7 +118,7 @@ async def api_ui_flags():
     Public so the app shell can load flags before authenticated API calls.
     Extractive key points are never gated by these flags.
     """
-    from ui_flags import get_ui_flags
+    from app.content.ui_flags import get_ui_flags
     return get_ui_flags()
 
 
@@ -129,7 +129,7 @@ async def api_sources():
     Single source of truth is source_catalog.py so Data Management, coverage,
     and duplicate priority stay aligned.
     """
-    from source_catalog import public_catalog
+    from app.content.source_catalog import public_catalog
     return public_catalog()
 
 
@@ -917,10 +917,10 @@ def _attach_key_points(results: List[dict], p) -> None:
 
 def _attach_study_types(results: List[dict]) -> None:
     """Heuristic study-type tags at search time (cheap; may be wrong)."""
-    from ui_flags import get_ui_flags
+    from app.content.ui_flags import get_ui_flags
     if not get_ui_flags().get("show_study_type_tags", True):
         return
-    from study_type import attach_study_types
+    from app.services.study_type import attach_study_types
     attach_study_types(results)
 
 
@@ -1476,8 +1476,8 @@ async def api_ai_settings_get(request: Request):
     user = current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
-    from llm_service import public_ai_settings
-    from llm_service import status as ai_status
+    from app.services.llm import public_ai_settings
+    from app.services.llm import status as ai_status
     return {"settings": public_ai_settings(), "status": ai_status()}
 
 
@@ -1493,12 +1493,12 @@ async def api_ai_settings_save(req: AISettingsUpdate, request: Request):
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
     if csrf_failed(request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
-    from llm_service import (
+    from app.services.llm import (
         ai_settings_write_allowed,
         public_ai_settings,
         save_ai_settings,
     )
-    from llm_service import status as ai_status
+    from app.services.llm import status as ai_status
     if not ai_settings_write_allowed():
         return JSONResponse(
             status_code=403,
@@ -1540,8 +1540,8 @@ async def api_ai_ollama_start(request: Request):
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
     if csrf_failed(request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
-    from llm_service import ai_settings_write_allowed, start_ollama
-    from llm_service import status as ai_status
+    from app.services.llm import ai_settings_write_allowed, start_ollama
+    from app.services.llm import status as ai_status
     if not ai_settings_write_allowed():
         return JSONResponse(
             status_code=403,
@@ -1567,8 +1567,8 @@ async def api_ai_ollama_stop(request: Request):
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
     if csrf_failed(request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
-    from llm_service import ai_settings_write_allowed, stop_ollama
-    from llm_service import status as ai_status
+    from app.services.llm import ai_settings_write_allowed, stop_ollama
+    from app.services.llm import status as ai_status
     if not ai_settings_write_allowed():
         return JSONResponse(
             status_code=403,
@@ -1615,7 +1615,7 @@ async def api_ai_refine_article(req: AIArticleRequest, request: Request):
     uid = user["user_id"]
     p = get_pipeline(uid)
     try:
-        from llm_service import (
+        from app.services.llm import (
             LLMError,
             LLMUnavailable,
             is_configured,
@@ -1710,7 +1710,7 @@ async def api_ai_ask_article(req: AIAskRequest, request: Request):
     uid = user["user_id"]
     p = get_pipeline(uid)
     try:
-        from llm_service import (
+        from app.services.llm import (
             LLMError,
             LLMUnavailable,
             ask_article,
@@ -2289,7 +2289,7 @@ async def api_delete_account(req: DeleteAccountRequest, request: Request):
         # is confirmed gone, so a failed removal keeps the account (and this
         # endpoint retryable) instead of orphaning data with no owner.
         # Honour USER_DATA_DIR the same way libraries.py does.
-        from libraries import user_dir as lib_user_dir
+        from app.storage.libraries import user_dir as lib_user_dir
         udir = lib_user_dir(uid)
         if udir.is_dir():
             shutil.rmtree(udir)

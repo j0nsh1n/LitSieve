@@ -8,7 +8,7 @@ import re
 from typing import Any, Dict, List, Optional, Tuple
 
 # Source priority + topic recommendations live in source_catalog (Phase R4).
-from source_catalog import (
+from app.content.source_catalog import (
     SOURCE_PRIORITY,
     TOPIC_SOURCE_HINTS,
     coverage_reason,
@@ -171,7 +171,7 @@ def format_screening_report_txt(report: Dict[str, Any]) -> str:
         )
     else:
         years_str = "(none)"
-    from screening_reasons import EXCLUSION_REASONS, reason_label
+    from app.content.screening_reasons import EXCLUSION_REASONS, reason_label
 
     lines = [
         f"SCREENING REPORT - {total} papers collected",

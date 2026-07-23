@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 
-from database import ArticleDatabase
-from user_db import UserDatabase
+from app.storage.database import ArticleDatabase
+from app.storage.user_db import UserDatabase
 
 
 @pytest.fixture

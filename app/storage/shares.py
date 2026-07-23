@@ -16,8 +16,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
-from database import ArticleDatabase
-from libraries import (
+from app.storage.database import ArticleDatabase
+from app.storage.libraries import (
     NAME_MAX,
     create_library,
     delete_library,

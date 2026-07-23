@@ -14,7 +14,7 @@ for _dep in (
 
 from fastapi.testclient import TestClient
 
-from citations import article_to_bibtex, article_to_ris, collection_to_ris
+from app.services.citations import article_to_bibtex, article_to_ris, collection_to_ris
 
 
 def _sample_crossref():
@@ -99,8 +99,8 @@ def app_module(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
 
     import importlib
-    main = importlib.import_module("main")
-    from user_db import UserDatabase
+    main = importlib.import_module("app.main")
+    from app.storage.user_db import UserDatabase
     main.user_db = UserDatabase(db_path=str(tmp_path / "users.db"))
     main._pipelines.clear()
     main._pipeline_refcounts.clear()

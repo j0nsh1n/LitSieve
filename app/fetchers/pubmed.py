@@ -9,7 +9,7 @@ from typing import Dict, List, Optional
 from Bio import Entrez
 from tqdm import tqdm
 
-from base_fetcher import BaseFetcher, polite_sleep
+from app.fetchers.base import BaseFetcher, polite_sleep
 
 # Entrez uses urllib under the hood, which has no default timeout. Without this,
 # a stalled NCBI connection hangs the worker thread indefinitely.

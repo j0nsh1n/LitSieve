@@ -6,7 +6,7 @@ Free API, no key required for basic use (rate limited)
 
 from typing import Dict, List
 
-from base_fetcher import BaseFetcher, FetchError, HttpClient
+from app.fetchers.base import BaseFetcher, FetchError, HttpClient
 
 
 class SemanticScholarFetcher(BaseFetcher):

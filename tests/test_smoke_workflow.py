@@ -37,8 +37,8 @@ def app_module(tmp_path, monkeypatch):
 
     import importlib
 
-    main = importlib.import_module("main")
-    from user_db import UserDatabase
+    main = importlib.import_module("app.main")
+    from app.storage.user_db import UserDatabase
 
     main.user_db = UserDatabase(db_path=str(tmp_path / "users.db"))
     main._pipelines.clear()

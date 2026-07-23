@@ -7,7 +7,7 @@ Free API, no authentication required (mailto improves rate limits)
 import re
 from typing import Dict, List
 
-from base_fetcher import BaseFetcher, HttpClient
+from app.fetchers.base import BaseFetcher, HttpClient
 
 _JATS_TAG = re.compile(r'<[^>]+>')
 

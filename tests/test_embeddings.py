@@ -4,7 +4,7 @@ import pytest
 # embeddings.py imports scikit-learn at module load; skip cleanly if absent.
 pytest.importorskip("sklearn")
 
-from embeddings import EmbeddingEngine, select_device
+from app.services.embeddings import EmbeddingEngine, select_device
 
 
 def test_detect_duplicates_finds_near_identical_pairs():

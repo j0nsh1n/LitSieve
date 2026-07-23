@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-import libraries as lib
+from app.storage import libraries as lib
 
 
 @pytest.fixture
@@ -93,7 +93,7 @@ def test_pipeline_opens_active_library_db(user_id, tmp_path, monkeypatch):
     lib.ensure_libraries(user_id)
     lib.create_library(user_id, "Empty two")
     # active is Empty two
-    from database import ArticleDatabase
+    from app.storage.database import ArticleDatabase
     path = lib.active_db_path(user_id)
     db = ArticleDatabase(db_path=path)
     try:
@@ -163,7 +163,7 @@ def test_migration_failure_keeps_legacy_and_meta_unpublished(user_id, monkeypatc
         raise OSError("disk full")
 
     with monkeypatch.context() as mp:
-        mp.setattr("libraries.shutil.copy2", boom)
+        mp.setattr("app.storage.libraries.shutil.copy2", boom)
         with pytest.raises(OSError):
             lib.ensure_libraries(user_id)
         # Retryable: legacy layout intact, metadata never published.

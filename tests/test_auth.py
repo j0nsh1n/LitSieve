@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 import jwt
 
-import auth
+from app import auth
 
 
 def test_hash_and_verify_roundtrip():

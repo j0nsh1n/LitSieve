@@ -750,7 +750,7 @@ class ArticleDatabase:
         """
         if not keys:
             return 0
-        from screening_reasons import normalize_reason
+        from app.content.screening_reasons import normalize_reason
         reason = normalize_reason(reason, default="manual")
         with self._lock:
             cursor = self.conn.cursor()
@@ -898,7 +898,7 @@ class ArticleDatabase:
 
     def get_year_counts(self) -> Dict[str, int]:
         """Papers per publication year (unknown years under 'unknown')."""
-        from utils import parse_year
+        from app.utils import parse_year
         with self._lock:
             cursor = self.conn.cursor()
             cursor.execute("SELECT year FROM articles")
@@ -934,7 +934,7 @@ class ArticleDatabase:
             cursor.execute("SELECT year FROM articles")
             year_rows = cursor.fetchall()
 
-        from utils import parse_year
+        from app.utils import parse_year
         year_counts: Dict[str, int] = {}
         for (year_raw,) in year_rows:
             y = parse_year(year_raw)
@@ -968,7 +968,7 @@ class ArticleDatabase:
                 "SELECT reason, COUNT(*) FROM screening GROUP BY reason"
             )
             reason_rows = cursor.fetchall()
-            from screening_reasons import EXCLUSION_REASONS, normalize_reason
+            from app.content.screening_reasons import EXCLUSION_REASONS, normalize_reason
             excluded = {code: 0 for code in EXCLUSION_REASONS}
             excluded["total"] = 0
             for reason, count in reason_rows:
@@ -988,7 +988,7 @@ class ArticleDatabase:
             cursor.execute("SELECT year FROM articles")
             year_rows = cursor.fetchall()
 
-        from utils import parse_year
+        from app.utils import parse_year
         by_year: Dict[str, int] = {}
         for (year_raw,) in year_rows:
             y = parse_year(year_raw)

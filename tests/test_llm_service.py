@@ -2,7 +2,7 @@
 
 import pytest
 
-import llm_service
+from app.services import llm as llm_service
 
 
 def _clear_providers(monkeypatch):
@@ -167,7 +167,7 @@ def test_builtin_concurrent_ops_share_one_start(monkeypatch):
         llm_service, "stop_ollama",
         lambda: (state.update(running=False, stops=state["stops"] + 1) or True, "stopped"),
     )
-    import llm_service as ls
+    from app.services import llm as ls
     ls._builtin_hold_count = 0
     ls._builtin_started_by_app = False
 

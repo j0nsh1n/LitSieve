@@ -69,11 +69,11 @@ def app_module(tmp_path, monkeypatch):
 
     import importlib
 
-    import pipeline
-    main = importlib.import_module("main")
+    from app.services import pipeline
+    main = importlib.import_module("app.main")
 
     # Fresh account DB + cleared per-user caches for a clean slate every run.
-    from user_db import UserDatabase
+    from app.storage.user_db import UserDatabase
     main.user_db = UserDatabase(db_path=str(tmp_path / "users.db"))
     main._pipelines.clear()
     main._pipeline_refcounts.clear()

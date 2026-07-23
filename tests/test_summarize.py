@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from summarize import (
+from app.services.summarize import (
     bullets_from_structured,
     extract_key_points,
     extract_key_points_batch,
@@ -172,7 +172,7 @@ def test_batch_mixed_structured_and_fallback():
 
 
 def test_key_points_roundtrip_in_db(tmp_path):
-    from database import ArticleDatabase
+    from app.storage.database import ArticleDatabase
 
     db = ArticleDatabase(db_path=str(tmp_path / "kp.db"))
     try:

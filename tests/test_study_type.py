@@ -1,6 +1,6 @@
 """Tests for multi-discipline study-type heuristics."""
 
-from study_type import attach_study_types, classify_study_type
+from app.services.study_type import attach_study_types, classify_study_type
 
 
 def test_meta_analysis_is_synthesis():

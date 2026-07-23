@@ -48,10 +48,10 @@ def app_module(tmp_path, monkeypatch):
 
     import importlib
 
-    import pipeline
-    main = importlib.import_module("main")
+    from app.services import pipeline
+    main = importlib.import_module("app.main")
 
-    from user_db import UserDatabase
+    from app.storage.user_db import UserDatabase
     test_db = UserDatabase(db_path=str(tmp_path / "users.db"))
     monkeypatch.setattr(main, "user_db", test_db)
     main._pipelines.clear()
@@ -173,7 +173,7 @@ def test_libraries_crud_and_isolation(app_module):
 
 
 def test_max_libraries_enforced(app_module, monkeypatch):
-    import libraries as lib
+    from app.storage import libraries as lib
     monkeypatch.setattr(lib, "MAX_LIBRARIES", 3)
 
     c = TestClient(app_module.app)

@@ -2,8 +2,8 @@
 
 from starlette.requests import Request
 
-import auth
-from main import rate_limit_key
+from app import auth
+from app.main import rate_limit_key
 
 
 def _make_request(cookies: dict | None = None, client_host: str = "203.0.113.10") -> Request:

@@ -1,10 +1,10 @@
 """v3.8: sample corpus, APA export, expanded exclusion reasons."""
 
-from citations import article_to_apa, collection_to_apa
-from database import ArticleDatabase
-from sample_corpus import SAMPLE_SOURCE, get_sample_articles
-from screening_reasons import USER_SELECTABLE_REASONS, normalize_reason, reason_label
-from utils import build_screening_report, format_screening_report_txt
+from app.content.sample_corpus import SAMPLE_SOURCE, get_sample_articles
+from app.content.screening_reasons import USER_SELECTABLE_REASONS, normalize_reason, reason_label
+from app.services.citations import article_to_apa, collection_to_apa
+from app.storage.database import ArticleDatabase
+from app.utils import build_screening_report, format_screening_report_txt
 
 
 def test_sample_corpus_shape():
