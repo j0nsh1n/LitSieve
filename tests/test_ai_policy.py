@@ -6,6 +6,7 @@ decision, not a test edit.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from conftest import route_paths
@@ -66,7 +67,14 @@ def test_account_ai_card_collapsed_by_default():
         encoding="utf-8"
     )
     assert 'id="ai-settings-section"' in html
-    assert 'id="ai-settings-details"' in html
     assert "optional" in html.lower()
     assert "built-in" in html.lower() or "study aid" in html.lower()
-    assert 'ai-settings-details" open' not in html
+
+    # Match the whole opening tag, then look for an `open` attribute anywhere
+    # inside it. A substring check like 'ai-settings-details" open' only catches
+    # one attribute order and would miss <details open id="ai-settings-details">.
+    tag = re.search(r'<details\b(?=[^>]*\bid="ai-settings-details")[^>]*>', html)
+    assert tag, 'no <details id="ai-settings-details"> in account.html'
+    assert re.search(r"\sopen(?=[\s=>])", tag.group(0), re.I) is None, (
+        f"AI panel is forced open: {tag.group(0)}"
+    )
