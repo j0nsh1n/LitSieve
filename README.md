@@ -65,7 +65,7 @@ Built with **FastAPI**, sentence-transformers, FAISS, and scikit-learn.
 ├── auth.py                 # JWT + bcrypt password hashing
 ├── embeddings.py           # EmbeddingEngine + PICOExtractor
 ├── summarize.py            # Extractive key points (structured + centroid)
-├── clustering.py           # Clustering, TF-IDF labels, Plotly visualizations
+├── clustering.py           # Clustering (KMeans/HDBSCAN) + TF-IDF labels
 ├── utils.py                # Year sort, source priority, coverage, briefings, screening report
 ├── citations.py            # RIS + BibTeX export
 ├── feature_guides.py       # Landing “learn more” page content
@@ -147,7 +147,6 @@ pipeline.fetch_articles_parallel(query="machine learning healthcare",
 
 pipeline.create_embeddings()
 pipeline.cluster_articles(n_clusters=8, method="kmeans")
-pipeline.create_visualizations()           # writes Plotly HTML to visualizations/
 
 results = pipeline.search_similar("deep learning to predict patient outcomes", top_k=10)
 duplicates = pipeline.detect_duplicates(threshold=0.95)

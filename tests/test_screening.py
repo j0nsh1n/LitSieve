@@ -130,7 +130,7 @@ def test_hdbscan_finds_dense_groups():
 
 def test_noise_bucket_is_relabelled_in_pipeline(monkeypatch):
     """The HDBSCAN noise bucket gets a fixed, honest label and no headline."""
-    for _dep in ("requests", "Bio", "plotly", "tqdm", "dotenv"):
+    for _dep in ("requests", "Bio", "tqdm", "dotenv"):
         pytest.importorskip(_dep)
     import os
     import tempfile
@@ -217,7 +217,7 @@ def test_cluster_article_keys_and_clear_all(db):
 
 @pytest.fixture
 def pipe(tmp_path):
-    for _dep in ("requests", "Bio", "plotly", "tqdm", "dotenv"):
+    for _dep in ("requests", "Bio", "tqdm", "dotenv"):
         pytest.importorskip(_dep)
     from pipeline import LiteratureSearchPipeline
     p = LiteratureSearchPipeline(db_path=str(tmp_path / "articles.db"))

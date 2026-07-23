@@ -4,7 +4,6 @@ Orchestrates the complete workflow from data fetching to visualization
 """
 
 import logging
-import os
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Optional, Tuple
@@ -21,7 +20,6 @@ from clustering import (
     NOISE_CLUSTER_LABEL,
     ArticleClusterer,
     ClusterLabeler,
-    ClusterVisualizer,
 )
 from core_fetcher import COREFetcher
 from crossref_fetcher import CrossRefFetcher
@@ -485,91 +483,6 @@ class LiteratureSearchPipeline:
             logger.info(f"  Cluster {cluster_id} ({size} articles): {label}")
 
         return labels, cluster_labels, articles_by_cluster, resolved_n
-
-    def create_visualizations(self, output_dir: str = "visualizations"):
-        """Step 4: Create visualizations"""
-        logger.info("\n=== Step 4: Creating Visualizations ===")
-
-        os.makedirs(output_dir, exist_ok=True)
-        article_ids, embeddings = self.db.get_all_embeddings()
-
-        if len(article_ids) == 0:
-            logger.info("No embeddings found. Create embeddings first.")
-            return
-
-        id_to_emb_idx = {aid: i for i, aid in enumerate(article_ids)}
-
-        # Batch-fetch all articles with cluster info in one query (not O(N) queries)
-        articles_all_with_clusters = self.db.get_all_articles_with_clusters()
-        
-        articles_with_clusters = []
-        labels = []
-        cluster_labels = {}
-        emb_indices = []
-
-        for key, article in articles_all_with_clusters.items():
-            if key not in id_to_emb_idx:
-                continue
-            if article['cluster_id'] is not None:
-                cluster_id = article['cluster_id']
-                labels.append(cluster_id)
-                cluster_labels[cluster_id] = article['cluster_label']
-                articles_with_clusters.append(article)
-                emb_indices.append(id_to_emb_idx[key])
-
-        if not labels:
-            logger.info("No clusters found. Cluster articles first.")
-            return
-
-        labels = np.array(labels)
-        matched_embeddings = embeddings[emb_indices]
-
-        articles_by_cluster = {}
-        for article, label in zip(articles_with_clusters, labels):
-            if label not in articles_by_cluster:
-                articles_by_cluster[label] = []
-            articles_by_cluster[label].append(article)
-
-        logger.info("Creating 2D visualization...")
-        embeddings_2d = ClusterVisualizer.reduce_dimensions(matched_embeddings, method='pca', n_components=2)
-
-        fig_2d = ClusterVisualizer.plot_2d_clusters(
-            embeddings_2d,
-            labels,
-            cluster_labels,
-            articles_with_clusters,
-            save_path=os.path.join(output_dir, 'clusters_2d.html')
-        )
-
-        logger.info("Creating cluster summary...")
-        fig_summary = ClusterVisualizer.plot_cluster_summary(
-            articles_by_cluster,
-            cluster_labels,
-            save_path=os.path.join(output_dir, 'cluster_summary.html')
-        )
-
-        logger.info("Creating similarity heatmap...")
-        # The heatmap only ever displays up to `heatmap_n` articles, so compute
-        # the similarity matrix on that bounded subset instead of materialising
-        # the full O(N^2) matrix for the whole corpus.
-        heatmap_n = min(100, len(matched_embeddings))
-        similarity_matrix = self.embedding_engine.calculate_similarity_matrix(
-            matched_embeddings[:heatmap_n]
-        )
-        fig_heatmap = ClusterVisualizer.plot_similarity_heatmap(
-            similarity_matrix,
-            labels[:heatmap_n],
-            max_display=heatmap_n,
-            save_path=os.path.join(output_dir, 'similarity_heatmap.html')
-        )
-
-        logger.info(f"Visualizations saved to {output_dir}")
-
-        return {
-            'clusters_2d': fig_2d,
-            'summary': fig_summary,
-            'heatmap': fig_heatmap
-        }
 
     def _load_embeddings_cached(self) -> Tuple[List[Tuple[str, str]], np.ndarray]:
         """Return (ids, matrix), reusing the last load until cache invalidation."""

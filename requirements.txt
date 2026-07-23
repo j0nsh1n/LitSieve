@@ -17,7 +17,6 @@ faiss-cpu>=1.8.0
 umap-learn>=0.5.6
 
 # Visualization
-plotly>=6.0.0
 
 # Web interface
 fastapi>=0.115.0
