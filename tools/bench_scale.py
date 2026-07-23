@@ -92,7 +92,7 @@ def timed(fn, repeats: int) -> float:
 
 
 def bench_size(n: int, repeats: int) -> dict[str, float]:
-    from pipeline import LiteratureSearchPipeline
+    from app.services.pipeline import LiteratureSearchPipeline
 
     rng = random.Random(42)
     out: dict[str, float] = {}

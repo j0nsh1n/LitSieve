@@ -1,16 +1,16 @@
-"""Phase R2 classroom UI flags and plain-language study types."""
+"""Classroom UI flags and plain-language study types."""
 
 from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
-from main import app
-from study_type import (
+from app.content.ui_flags import get_ui_flags
+from app.main import app
+from app.services.study_type import (
     STUDY_TYPE_LABELS,
     STUDY_TYPE_MEANINGS,
     classify_study_type,
 )
-from ui_flags import get_ui_flags
 
 
 def test_study_type_labels_are_plain_language():
@@ -65,7 +65,7 @@ def test_api_ui_flags_respect_env(monkeypatch):
 
 def test_attach_skipped_when_hidden(monkeypatch):
     monkeypatch.setenv("HIDE_STUDY_TYPE_TAGS", "true")
-    from main import _attach_study_types
+    from app.services.enrich import attach_study_types as _attach_study_types
 
     arts = [
         {
@@ -80,7 +80,7 @@ def test_attach_skipped_when_hidden(monkeypatch):
 def test_attach_runs_when_visible(monkeypatch):
     monkeypatch.delenv("HIDE_STUDY_TYPE_TAGS", raising=False)
     monkeypatch.setenv("HIDE_STUDY_TYPE_TAGS", "false")
-    from main import _attach_study_types
+    from app.services.enrich import attach_study_types as _attach_study_types
 
     arts = [
         {

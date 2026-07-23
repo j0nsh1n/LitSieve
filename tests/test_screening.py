@@ -15,7 +15,7 @@ import pytest
 
 pytest.importorskip("sklearn")
 
-from database import ArticleDatabase
+from app.storage.database import ArticleDatabase
 
 
 @pytest.fixture
@@ -35,7 +35,7 @@ def _article(aid, source="pubmed", abstract="some abstract text", cluster=None):
 # ---------------------------------------------------------------- labels ----
 
 def test_cluster_labels_are_distinct_across_clusters():
-    from clustering import ClusterLabeler
+    from app.services.clustering import ClusterLabeler
 
     # Both clusters share the dominant words "patients" and "treatment";
     # each has its own theme (cardiology vs oncology).
@@ -62,7 +62,7 @@ def test_cluster_labels_are_distinct_across_clusters():
 
 
 def test_cluster_labels_drop_foreign_and_short_tokens():
-    from clustering import ClusterLabeler
+    from app.services.clustering import ClusterLabeler
 
     labels = ClusterLabeler.generate_tfidf_labels({
         0: [{"title": "κα με να gi pl abr", "abstract": "immune response signaling cascade"}],
@@ -79,7 +79,7 @@ def test_cluster_labels_drop_foreign_and_short_tokens():
 def test_representative_title_is_most_central():
     import numpy as np
 
-    from clustering import ClusterLabeler
+    from app.services.clustering import ClusterLabeler
 
     ids = [("1", "s"), ("2", "s"), ("3", "s")]
     emb = np.array([[1.0, 0.0], [0.9, 0.1], [0.0, 1.0]], dtype=np.float32)
@@ -95,7 +95,7 @@ def test_representative_title_is_most_central():
 def test_auto_select_k_finds_natural_group_count():
     import numpy as np
 
-    from clustering import ArticleClusterer
+    from app.services.clustering import ArticleClusterer
 
     rng = np.random.default_rng(0)
     # Two well-separated blobs -> silhouette should pick k=2.
@@ -112,7 +112,7 @@ def test_auto_select_k_finds_natural_group_count():
 def test_hdbscan_finds_dense_groups():
     import numpy as np
 
-    from clustering import ArticleClusterer
+    from app.services.clustering import ArticleClusterer
 
     rng = np.random.default_rng(1)
     # Three tight, well-separated dense blobs -> HDBSCAN should recover them
@@ -130,16 +130,16 @@ def test_hdbscan_finds_dense_groups():
 
 def test_noise_bucket_is_relabelled_in_pipeline(monkeypatch):
     """The HDBSCAN noise bucket gets a fixed, honest label and no headline."""
-    for _dep in ("requests", "Bio", "plotly", "tqdm", "dotenv"):
+    for _dep in ("requests", "Bio", "tqdm", "dotenv"):
         pytest.importorskip(_dep)
     import os
     import tempfile
 
     import numpy as np
 
-    import clustering
-    from clustering import NOISE_CLUSTER_ID, NOISE_CLUSTER_LABEL
-    from pipeline import LiteratureSearchPipeline
+    from app.services import clustering
+    from app.services.clustering import NOISE_CLUSTER_ID, NOISE_CLUSTER_LABEL
+    from app.services.pipeline import LiteratureSearchPipeline
 
     p = LiteratureSearchPipeline(db_path=os.path.join(tempfile.mkdtemp(), "a.db"))
     p.db.insert_articles([_article(str(i)) for i in range(6)])
@@ -159,7 +159,7 @@ def test_noise_bucket_is_relabelled_in_pipeline(monkeypatch):
 
 
 def test_cluster_labels_empty_and_fallback():
-    from clustering import ClusterLabeler
+    from app.services.clustering import ClusterLabeler
     assert ClusterLabeler.generate_tfidf_labels({}) == {}
     # Stop-word-only text can't produce terms -> falls back to "Cluster N".
     labels = ClusterLabeler.generate_tfidf_labels({
@@ -217,9 +217,9 @@ def test_cluster_article_keys_and_clear_all(db):
 
 @pytest.fixture
 def pipe(tmp_path):
-    for _dep in ("requests", "Bio", "plotly", "tqdm", "dotenv"):
+    for _dep in ("requests", "Bio", "tqdm", "dotenv"):
         pytest.importorskip(_dep)
-    from pipeline import LiteratureSearchPipeline
+    from app.services.pipeline import LiteratureSearchPipeline
     p = LiteratureSearchPipeline(db_path=str(tmp_path / "articles.db"))
     yield p
     p.close()
@@ -269,3 +269,47 @@ def test_resolve_duplicates_keeps_longest_abstract(pipe):
 
     # And resolving again is a no-op.
     assert pipe.resolve_duplicates(threshold=0.95) == {"groups": 0, "excluded": 0}
+
+
+def test_normalize_reason_codes():
+    from app.content.screening_reasons import (
+        USER_SELECTABLE_REASONS,
+        normalize_reason,
+        reason_label,
+    )
+
+    assert normalize_reason("off_topic") == "off_topic"
+    assert normalize_reason("OFF-TOPIC") == "off_topic"
+    assert normalize_reason("nope") == "manual"
+    assert normalize_reason(None) == "manual"
+    assert "Off topic" in reason_label("off_topic")
+    assert "off_topic" in USER_SELECTABLE_REASONS
+
+
+def test_exclusion_reason_in_report(tmp_path):
+    from app.storage.database import ArticleDatabase
+    from app.utils import build_screening_report, format_screening_report_txt
+
+    db = ArticleDatabase(db_path=str(tmp_path / "r.db"))
+    try:
+        db.insert_articles([
+            {
+                "article_id": "1", "source": "pubmed", "title": "A",
+                "abstract": "abs", "year": "2020", "authors": [], "journal": "",
+            },
+            {
+                "article_id": "2", "source": "pubmed", "title": "B",
+                "abstract": "abs", "year": "2020", "authors": [], "journal": "",
+            },
+        ], dedupe=False)
+        db.exclude_articles([("1", "pubmed")], reason="off_topic")
+        db.exclude_articles([("2", "pubmed")], reason="wrong_population")
+        report = build_screening_report(db)
+        assert report["excluded"]["off_topic"] == 1
+        assert report["excluded"]["wrong_population"] == 1
+        assert report["excluded"]["total"] == 2
+        txt = format_screening_report_txt(report)
+        assert "Off topic" in txt
+        assert "Wrong population" in txt
+    finally:
+        db.close()

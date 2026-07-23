@@ -3,8 +3,8 @@
 import numpy as np
 import pytest
 
-from database import ArticleDatabase
-from pipeline import LiteratureSearchPipeline
+from app.services.pipeline import LiteratureSearchPipeline
+from app.storage.database import ArticleDatabase
 
 
 def _seed_three(db: ArticleDatabase):

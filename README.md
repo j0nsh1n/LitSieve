@@ -7,7 +7,7 @@ sdk: docker
 app_port: 7860
 ---
 
-# Literature Research Aide 📚 — v4.1.1
+# Literature Research Aide 📚 — v4.2.0
 
 A multi-user web app for **teachers and students** to fetch, screen, and rank
 research papers across many academic databases. Semantic embeddings power
@@ -54,24 +54,19 @@ Built with **FastAPI**, sentence-transformers, FAISS, and scikit-learn.
 
 ```
 .
-├── main.py                 # FastAPI application (entry point)
-├── pipeline.py             # Orchestrates fetch → embed → cluster → search
-├── libraries.py            # Multi-library workspaces per account
-├── shares.py               # Class share codes → clone library into student account
-├── base_fetcher.py         # Abstract fetcher + shared HttpClient (retry/backoff)
-├── <source>_fetcher.py     # One fetcher per source (pubmed_fetcher.py, …)
-├── database.py             # Per-library article/embedding/cluster/notes SQLite
-├── user_db.py              # User-account database (users.db)
-├── auth.py                 # JWT + bcrypt password hashing
-├── embeddings.py           # EmbeddingEngine + PICOExtractor
-├── summarize.py            # Extractive key points (structured + centroid)
-├── clustering.py           # Clustering, TF-IDF labels, Plotly visualizations
-├── utils.py                # Year sort, source priority, coverage, briefings, screening report
-├── citations.py            # RIS + BibTeX export
-├── feature_guides.py       # Landing “learn more” page content
+├── app/                    # application package
+│   ├── main.py             # FastAPI app + startup wiring (entry point)
+│   ├── auth.py             # JWT + bcrypt password hashing
+│   ├── utils.py            # Year sort, source priority, coverage, screening report
+│   ├── fetchers/           # One module per source + base.py (HttpClient, retry/backoff)
+│   ├── services/           # pipeline, embeddings, clustering, summarize, study_type, llm, citations
+│   ├── storage/            # database, user_db, libraries, shares (SQLite)
+│   └── content/            # feature guides, sample corpus, source catalog, UI flags
 ├── templates/              # Jinja2 HTML pages
 ├── static/                 # CSS + page JavaScript
 ├── tests/                  # pytest suite
+├── tools/                  # bench_scale.py (offline latency benchmark)
+├── docs/                   # engineering notes
 ├── run_dev.sh              # Local dev with --reload
 ├── requirements.txt
 ├── Dockerfile              # Container build (HF Spaces / any Docker host)
@@ -106,7 +101,7 @@ cp .env.example .env
 ## Running
 
 ```bash
-uvicorn main:app --host 0.0.0.0 --port 7860
+uvicorn app.main:app --host 0.0.0.0 --port 7860
 ```
 
 Then open <http://localhost:7860>. Public landing and `/learn/…` guides need no
@@ -133,7 +128,7 @@ docker run -p 7860:7860 -e SECRET_KEY="$(python -c 'import secrets;print(secrets
 The web app is the primary interface, but the pipeline can be driven directly:
 
 ```python
-from pipeline import LiteratureSearchPipeline
+from app.services.pipeline import LiteratureSearchPipeline
 
 pipeline = LiteratureSearchPipeline(db_path="articles.db", embedding_model="general")
 
@@ -147,7 +142,6 @@ pipeline.fetch_articles_parallel(query="machine learning healthcare",
 
 pipeline.create_embeddings()
 pipeline.cluster_articles(n_clusters=8, method="kmeans")
-pipeline.create_visualizations()           # writes Plotly HTML to visualizations/
 
 results = pipeline.search_similar("deep learning to predict patient outcomes", top_k=10)
 duplicates = pipeline.detect_duplicates(threshold=0.95)
@@ -191,14 +185,20 @@ Start with `general`; switch to a biomedical model for medical corpora.
 
 ## Database Schema
 
-Each user gets their own `user_data/<user_id>/articles.db` with three tables,
-all keyed by the composite `(article_id, source)`:
+Each **library** is its own SQLite file at
+`user_data/<user_id>/libraries/<library_id>/articles.db`, so collections are
+fully isolated. Which libraries exist (and which is active) is tracked in
+`user_data/<user_id>/libraries.json`. Tables are keyed by the composite
+`(article_id, source)`:
 
 - **articles** — `article_id`, `source`, `title`, `abstract`, `year`, `authors`, `journal`
 - **embeddings** — raw numpy bytes + `dtype` + `shape` + `model_name` (no pickle)
 - **clusters** — `cluster_id`, `cluster_label`
+- **screening** — exclusion state + reason (`manual` / `cluster` / `duplicate`)
+- **notes** — private note text + starred flag
+- **key_points** — extractive bullets generated after embedding
 
-User accounts live in a separate `users.db`.
+User accounts and class share codes live in a separate `users.db`.
 
 ## Testing
 

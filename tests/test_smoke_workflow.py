@@ -1,5 +1,5 @@
 """
-Phase R1 smoke path (no live network):
+End-to-end smoke path (no live network):
 
   register → load sample corpus → (stub embeddings) → cluster → search → export
 
@@ -16,11 +16,13 @@ import shutil
 import numpy as np
 import pytest
 
+from app import core
+
 os.environ.setdefault("SECRET_KEY", "pytest-only-not-a-secret-32b-min!!")
 os.environ["DEBUG"] = "true"
 
 for _dep in (
-    "fastapi", "httpx", "Bio", "sklearn", "plotly", "tqdm",
+    "fastapi", "httpx", "Bio", "sklearn", "tqdm",
     "slowapi", "jwt", "passlib", "multipart", "requests", "dotenv",
 ):
     pytest.importorskip(_dep)
@@ -37,13 +39,13 @@ def app_module(tmp_path, monkeypatch):
 
     import importlib
 
-    main = importlib.import_module("main")
-    from user_db import UserDatabase
+    main = importlib.import_module("app.main")
+    from app.storage.user_db import UserDatabase
 
-    main.user_db = UserDatabase(db_path=str(tmp_path / "users.db"))
-    main._pipelines.clear()
-    main._pipeline_refcounts.clear()
-    main._all_progress.clear()
+    core.user_db = UserDatabase(db_path=str(tmp_path / "users.db"))
+    core._pipelines.clear()
+    core._pipeline_refcounts.clear()
+    core._all_progress.clear()
     return main
 
 
@@ -64,7 +66,7 @@ def _csrf(client: TestClient) -> dict:
 
 def _seed_fake_embeddings(main, user_id: str):
     """Insert unit vectors so cluster + search work without model downloads."""
-    pipe = main.get_pipeline(user_id)
+    pipe = core.get_pipeline(user_id)
     try:
         arts = pipe.db.get_all_articles()
         assert arts, "sample corpus should have inserted papers"
@@ -82,7 +84,7 @@ def _seed_fake_embeddings(main, user_id: str):
 
         pipe.embedding_engine.embed_query = fake_query  # type: ignore[method-assign]
     finally:
-        main.release_pipeline(user_id)
+        core.release_pipeline(user_id)
 
 
 def test_smoke_register_sample_cluster_search_export(app_module):
@@ -96,7 +98,7 @@ def test_smoke_register_sample_cluster_search_export(app_module):
     me = c.get("/api/statistics")
     assert me.status_code == 200, me.text
     # User id is not returned by statistics; pull from users.db.
-    rows = main.user_db.conn.execute("SELECT id FROM users").fetchall()
+    rows = core.user_db.conn.execute("SELECT id FROM users").fetchall()
     assert len(rows) == 1
     user_id = rows[0][0]
 

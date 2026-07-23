@@ -10,8 +10,10 @@ os.environ["DEBUG"] = "true"
 
 import pytest
 
+from app import core
+
 for _dep in (
-    "fastapi", "httpx", "Bio", "sklearn", "plotly", "tqdm",
+    "fastapi", "httpx", "Bio", "sklearn", "tqdm",
     "slowapi", "jwt", "passlib", "multipart", "requests", "dotenv",
 ):
     pytest.importorskip(_dep)
@@ -48,18 +50,18 @@ def app_module(tmp_path, monkeypatch):
 
     import importlib
 
-    import pipeline
-    main = importlib.import_module("main")
+    from app.services import pipeline
+    main = importlib.import_module("app.main")
 
-    from user_db import UserDatabase
+    from app.storage.user_db import UserDatabase
     test_db = UserDatabase(db_path=str(tmp_path / "users.db"))
-    monkeypatch.setattr(main, "user_db", test_db)
-    main._pipelines.clear()
-    main._pipeline_refcounts.clear()
-    main._all_progress.clear()
+    monkeypatch.setattr(core, "user_db", test_db)
+    core._pipelines.clear()
+    core._pipeline_refcounts.clear()
+    core._all_progress.clear()
     # Clear shared in-memory rate-limit counters so suite order cannot 429 register.
     try:
-        main.limiter.reset()
+        core.limiter.reset()
     except Exception:
         pass
     monkeypatch.setitem(pipeline.FETCHERS, "pubmed", _FakeFetcher)
@@ -173,7 +175,7 @@ def test_libraries_crud_and_isolation(app_module):
 
 
 def test_max_libraries_enforced(app_module, monkeypatch):
-    import libraries as lib
+    from app.storage import libraries as lib
     monkeypatch.setattr(lib, "MAX_LIBRARIES", 3)
 
     c = TestClient(app_module.app)
@@ -194,15 +196,15 @@ def test_delete_library_while_in_use_conflicts(app_module):
     """Deleting a library with an active job/request must 409, not close the DB mid-write."""
     c = TestClient(app_module.app)
     _register(c, "libbusy")
-    uid = app_module.user_db.get_by_username("libbusy")["id"]
+    uid = core.user_db.get_by_username("libbusy")["id"]
 
     r = c.post("/api/libraries", json={"name": "Busy lib"}, headers=_csrf(c))
     assert r.status_code == 200, r.text
     lib_id = r.json()["library"]["id"]
 
-    key = app_module.pipeline_cache_key(uid, lib_id)
+    key = core.pipeline_cache_key(uid, lib_id)
     # Simulate an in-flight background job holding the pipeline reference.
-    app_module._pipeline_refcounts[key] = 1
+    core._pipeline_refcounts[key] = 1
     try:
         r = c.delete(f"/api/libraries/{lib_id}", headers=_csrf(c))
         assert r.status_code == 409, r.text
@@ -211,7 +213,7 @@ def test_delete_library_while_in_use_conflicts(app_module):
         ids = [L["id"] for L in c.get("/api/libraries").json()["libraries"]]
         assert lib_id in ids
     finally:
-        app_module._pipeline_refcounts.pop(key, None)
+        core._pipeline_refcounts.pop(key, None)
 
     # Once the reference is gone the delete succeeds.
     r = c.delete(f"/api/libraries/{lib_id}", headers=_csrf(c))
@@ -222,7 +224,7 @@ def test_ai_key_points_saves_displayed_bullets(app_module):
     """/api/ai/key-points stores what the student saw - no model re-run."""
     c = TestClient(app_module.app)
     _register(c, "kpsave")
-    uid = app_module.user_db.get_by_username("kpsave")["id"]
+    uid = core.user_db.get_by_username("kpsave")["id"]
     assert _fetch(c, "sleep").status_code == 200  # inserts fake-sleep/pubmed
 
     r = c.post(
@@ -237,12 +239,12 @@ def test_ai_key_points_saves_displayed_bullets(app_module):
     assert r.status_code == 200, r.text
     assert r.json()["key_points"] == ["First point.", "Second point."]
 
-    p = app_module.get_pipeline(uid)
+    p = core.get_pipeline(uid)
     try:
         stored = p.db.get_key_points_map().get(("fake-sleep", "pubmed"))
         assert stored == ["First point.", "Second point."]
     finally:
-        app_module.release_pipeline(uid)
+        core.release_pipeline(uid)
 
     r = c.post(
         "/api/ai/key-points",

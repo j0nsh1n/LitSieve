@@ -48,7 +48,7 @@ echo "  --reload is on (Python file changes restart the server)"
 echo "  CSS/JS/HTML: just refresh the browser"
 echo ""
 
-exec "$VENV_PY" -m uvicorn main:app \
+exec "$VENV_PY" -m uvicorn app.main:app \
   --host 127.0.0.1 \
   --port "$PORT" \
   --reload \

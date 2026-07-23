@@ -7,14 +7,15 @@ import shutil
 import pytest
 
 for _dep in (
-    "fastapi", "httpx", "Bio", "sklearn", "plotly", "tqdm",
+    "fastapi", "httpx", "Bio", "sklearn", "tqdm",
     "slowapi", "jwt", "passlib", "multipart", "requests", "dotenv",
 ):
     pytest.importorskip(_dep)
 
 from fastapi.testclient import TestClient
 
-from citations import article_to_bibtex, article_to_ris, collection_to_ris
+from app import core
+from app.services.citations import article_to_bibtex, article_to_ris, collection_to_ris
 
 
 def _sample_crossref():
@@ -99,13 +100,13 @@ def app_module(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
 
     import importlib
-    main = importlib.import_module("main")
-    from user_db import UserDatabase
-    main.user_db = UserDatabase(db_path=str(tmp_path / "users.db"))
-    main._pipelines.clear()
-    main._pipeline_refcounts.clear()
-    main._all_progress.clear()
-    main._pending_close.clear()
+    main = importlib.import_module("app.main")
+    from app.storage.user_db import UserDatabase
+    core.user_db = UserDatabase(db_path=str(tmp_path / "users.db"))
+    core._pipelines.clear()
+    core._pipeline_refcounts.clear()
+    core._all_progress.clear()
+    core._pending_close.clear()
     return main
 
 
@@ -125,8 +126,8 @@ def test_export_library_ris_endpoint(app_module):
 
     # Touch pipeline so user_data dir exists, then seed one article.
     assert c.get("/api/statistics").status_code == 200
-    uid = main.user_db.get_by_username("citeuser")["id"]
-    p = main.get_pipeline(uid)
+    uid = core.user_db.get_by_username("citeuser")["id"]
+    p = core.get_pipeline(uid)
     try:
         p.db.insert_articles([{
             "article_id": "999",
@@ -138,7 +139,7 @@ def test_export_library_ris_endpoint(app_module):
             "journal": "J Test",
         }])
     finally:
-        main.release_pipeline(uid)
+        core.release_pipeline(uid)
 
     resp = c.get("/api/export/library?format=ris&scope=all")
     assert resp.status_code == 200
@@ -181,3 +182,24 @@ def test_screening_report_endpoint_empty(app_module):
     assert "SCREENING REPORT - 0 papers collected" in txt.text
     assert "attachment" in txt.headers.get("content-disposition", "").lower()
     assert "screening_report.txt" in txt.headers.get("content-disposition", "")
+
+
+def test_apa_export_basic():
+    from app.services.citations import article_to_apa, collection_to_apa
+
+    art = {
+        "article_id": "10.1234/ex",
+        "source": "crossref",
+        "title": "An example study of widgets",
+        "year": "2020",
+        "authors": ["Rivera M", "Chen L"],
+        "journal": "Demo Journal",
+        "abstract": "x",
+    }
+    line = article_to_apa(art)
+    assert "2020" in line
+    assert "widgets" in line.lower()
+    assert "Demo Journal" in line or "Demo" in line
+    assert "doi.org" in line
+    block = collection_to_apa([art, art])
+    assert block.count("2020") == 2

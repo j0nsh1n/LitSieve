@@ -27,7 +27,6 @@ jobs:
             httpx \
             jinja2 \
             biopython \
-            plotly \
             tqdm \
             slowapi \
             PyJWT \

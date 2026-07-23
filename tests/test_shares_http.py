@@ -8,8 +8,10 @@ os.environ["DEBUG"] = "true"
 
 import pytest
 
+from app import core
+
 for _dep in (
-    "fastapi", "httpx", "Bio", "sklearn", "plotly", "tqdm",
+    "fastapi", "httpx", "Bio", "sklearn", "tqdm",
     "slowapi", "jwt", "passlib", "multipart", "requests", "dotenv",
 ):
     pytest.importorskip(_dep)
@@ -46,17 +48,17 @@ def app_module(tmp_path, monkeypatch):
 
     import importlib
 
-    import pipeline
-    main = importlib.import_module("main")
+    from app.services import pipeline
+    main = importlib.import_module("app.main")
 
-    from user_db import UserDatabase
+    from app.storage.user_db import UserDatabase
     test_db = UserDatabase(db_path=str(tmp_path / "users.db"))
-    monkeypatch.setattr(main, "user_db", test_db)
-    main._pipelines.clear()
-    main._pipeline_refcounts.clear()
-    main._all_progress.clear()
+    monkeypatch.setattr(core, "user_db", test_db)
+    core._pipelines.clear()
+    core._pipeline_refcounts.clear()
+    core._all_progress.clear()
     try:
-        main.limiter.reset()
+        core.limiter.reset()
     except Exception:
         pass
     monkeypatch.setitem(pipeline.FETCHERS, "pubmed", _FakeFetcher)

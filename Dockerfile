@@ -1,6 +1,6 @@
 FROM python:3.11-slim
 
-WORKDIR /app
+WORKDIR /code
 
 # Install git (required by Hugging Face Spaces build infrastructure)
 RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
@@ -21,4 +21,4 @@ COPY . .
 # HF Spaces expects port 7860
 EXPOSE 7860
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7860"]

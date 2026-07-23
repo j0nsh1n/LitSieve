@@ -2,7 +2,7 @@
 
 import pytest
 
-import llm_service
+from app.services import llm as llm_service
 
 
 def _clear_providers(monkeypatch):
@@ -167,7 +167,7 @@ def test_builtin_concurrent_ops_share_one_start(monkeypatch):
         llm_service, "stop_ollama",
         lambda: (state.update(running=False, stops=state["stops"] + 1) or True, "stopped"),
     )
-    import llm_service as ls
+    from app.services import llm as ls
     ls._builtin_hold_count = 0
     ls._builtin_started_by_app = False
 
@@ -284,7 +284,7 @@ def test_refine_rejects_short_abstract(monkeypatch):
 
 
 def test_ollama_down_raises_unavailable(monkeypatch):
-    """R5: Ollama stopped → LLMUnavailable (HTTP 503 path), not a generic 400."""
+    """Ollama stopped → LLMUnavailable (HTTP 503 path), not a generic 400."""
     _clear_providers(monkeypatch)
     monkeypatch.setenv("OLLAMA_MODEL", "llama3.1")
     monkeypatch.setenv("LLM_PROVIDER", "ollama")
@@ -301,7 +301,7 @@ def test_ollama_down_raises_unavailable(monkeypatch):
 
 
 def test_connection_failure_classifier():
-    """R5: transport failures map to LLMUnavailable → clear HTTP 503."""
+    """Transport failures map to LLMUnavailable → clear HTTP 503."""
     assert llm_service._is_connection_failure(ConnectionError("Connection refused"))
     assert llm_service._is_connection_failure(TimeoutError("timed out"))
     assert not llm_service._is_connection_failure(ValueError("bad json"))

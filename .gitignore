@@ -27,8 +27,6 @@ user_data/
 .venv/
 venv/
 .claude/
-# Generated Plotly/heatmap artifacts (written by pipeline.create_visualizations)
-visualizations/
 
 # Local agent/dev primer (not part of the product repo)
 context.md

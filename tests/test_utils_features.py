@@ -2,8 +2,8 @@
 
 import numpy as np
 
-from database import ArticleDatabase
-from utils import (
+from app.storage.database import ArticleDatabase
+from app.utils import (
     build_cluster_briefing,
     build_screening_report,
     coverage_suggestions,

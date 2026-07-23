@@ -25,9 +25,11 @@ os.environ["DEBUG"] = "true"
 
 import pytest
 
+from app import core
+
 # Skip the whole module cleanly if the app's runtime deps aren't installed.
 for _dep in (
-    "fastapi", "httpx", "Bio", "sklearn", "plotly", "tqdm",
+    "fastapi", "httpx", "Bio", "sklearn", "tqdm",
     "slowapi", "jwt", "passlib", "multipart", "requests", "dotenv",
 ):
     pytest.importorskip(_dep)
@@ -69,15 +71,15 @@ def app_module(tmp_path, monkeypatch):
 
     import importlib
 
-    import pipeline
-    main = importlib.import_module("main")
+    from app.services import pipeline
+    main = importlib.import_module("app.main")
 
     # Fresh account DB + cleared per-user caches for a clean slate every run.
-    from user_db import UserDatabase
-    main.user_db = UserDatabase(db_path=str(tmp_path / "users.db"))
-    main._pipelines.clear()
-    main._pipeline_refcounts.clear()
-    main._all_progress.clear()
+    from app.storage.user_db import UserDatabase
+    core.user_db = UserDatabase(db_path=str(tmp_path / "users.db"))
+    core._pipelines.clear()
+    core._pipeline_refcounts.clear()
+    core._all_progress.clear()
 
     # Canned fetcher so /api/fetch-articles-multi does zero network I/O.
     monkeypatch.setitem(pipeline.FETCHERS, "pubmed", _FakeFetcher)
@@ -192,7 +194,7 @@ def test_delete_account_flow(app_module):
     c = TestClient(main.app)
     _register(c, "erin")
 
-    uid = main.user_db.get_by_username("erin")["id"]
+    uid = core.user_db.get_by_username("erin")["id"]
 
     # Touch an authed endpoint so the per-user data directory gets created.
     assert c.get("/api/statistics").status_code == 200
@@ -204,7 +206,7 @@ def test_delete_account_flow(app_module):
     r = c.post("/api/delete-account", json={"password": "WRONG-password"},
                headers={"X-CSRF-Token": csrf})
     assert r.status_code == 400
-    assert main.user_db.get_by_username("erin") is not None
+    assert core.user_db.get_by_username("erin") is not None
 
     # Missing CSRF header must be refused.
     r = c.post("/api/delete-account", json={"password": "tpw-fixture-0001"})
@@ -214,7 +216,7 @@ def test_delete_account_flow(app_module):
     r = c.post("/api/delete-account", json={"password": "tpw-fixture-0001"},
                headers={"X-CSRF-Token": csrf})
     assert r.status_code == 200
-    assert main.user_db.get_by_username("erin") is None
+    assert core.user_db.get_by_username("erin") is None
     assert not os.path.isdir(os.path.join("user_data", uid))
 
     # The credentials no longer work.
@@ -306,11 +308,11 @@ def test_fetch_async_job_and_conflict(app_module):
     c = TestClient(main.app)
     _register(c, "jobuser")
     csrf = c.cookies.get("csrf_token")
-    uid = main.user_db.get_by_username("jobuser")["id"]
+    uid = core.user_db.get_by_username("jobuser")["id"]
 
     # Force an in-flight job so the next start is rejected (deterministic under TestClient).
-    with main._progress_lock:
-        main._ensure_progress(uid)["fetch"].update(
+    with core._progress_lock:
+        core._ensure_progress(uid)["fetch"].update(
             {"active": True, "done": 0, "total": 1, "result": None, "error": None}
         )
 
@@ -328,8 +330,8 @@ def test_fetch_async_job_and_conflict(app_module):
     assert r_conflict.status_code == 409
     assert "already running" in r_conflict.json()["detail"].lower()
 
-    with main._progress_lock:
-        main._ensure_progress(uid)["fetch"]["active"] = False
+    with core._progress_lock:
+        core._ensure_progress(uid)["fetch"]["active"] = False
 
     r = c.post(
         "/api/fetch-articles-multi",
@@ -360,5 +362,5 @@ def test_fetch_async_job_and_conflict(app_module):
     assert result is not None, f"job never completed (error={err!r})"
     assert result.get("total_fetched") == 1
     # Pipeline refcount released after job done callback.
-    assert main._pipeline_refcounts.get(uid, 0) == 0
+    assert core._pipeline_refcounts.get(uid, 0) == 0
 

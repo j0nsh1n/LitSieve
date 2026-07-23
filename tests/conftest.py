@@ -20,10 +20,22 @@ def _reset_rate_limits():
     """
     yield
     try:
-        from main import limiter
+        from app.core import limiter
         if hasattr(limiter, "reset"):
             limiter.reset()
         elif getattr(limiter, "_storage", None) is not None:
             limiter._storage.reset()
     except Exception:
         pass
+
+
+def route_paths(fastapi_app) -> set:
+    """All registered route paths.
+
+    FastAPI stores ``include_router`` results as wrapper objects rather than
+    flattening them into ``app.routes``, so a naive comprehension over
+    ``app.routes`` silently returns almost nothing. The OpenAPI schema is the
+    version-independent source of truth — important here because the callers
+    are guardrail tests that must fail loudly, not vacuously pass.
+    """
+    return set(fastapi_app.openapi().get("paths", {}))

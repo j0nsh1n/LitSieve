@@ -2,12 +2,12 @@
 
 
 
-from biorxiv_fetcher import BioRxivFetcher, MedRxivFetcher, _matches
-from dblp_fetcher import DBLPFetcher
-from hal_fetcher import HALFetcher
-from openaire_fetcher import OpenAIREFetcher, _node_text
-from pipeline import FETCHERS
-from plos_fetcher import PLOSFetcher
+from app.fetchers.biorxiv import BioRxivFetcher, MedRxivFetcher, _matches
+from app.fetchers.dblp import DBLPFetcher
+from app.fetchers.hal import HALFetcher
+from app.fetchers.openaire import OpenAIREFetcher, _node_text
+from app.fetchers.plos import PLOSFetcher
+from app.services.pipeline import FETCHERS
 
 
 def test_all_new_sources_registered():

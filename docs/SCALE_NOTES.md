@@ -1,4 +1,4 @@
-# Scale & engineering hygiene notes (Phase R8)
+# Scale & engineering hygiene notes
 
 Classroom demos are usually hundreds of papers per library, not millions.
 Pagination (page size 50) was added so Search / Clusters / Duplicates stay
@@ -38,7 +38,8 @@ Re-run with:
 SECRET_KEY=x DEBUG=true python tools/bench_scale.py --sizes 200,1000,2000 --repeats 5
 ```
 
-(`tools/bench_corpus_memory.py` remains as a rough RSS-only smoke check.)
+(An older RSS-only smoke script was removed in v4.2 — `bench_scale.py` covers
+memory implicitly and measures the stages that actually matter.)
 
 ## Ruff / CI
 
