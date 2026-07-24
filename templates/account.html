@@ -16,62 +16,51 @@
 
 <section class="card">
  <h2>Your libraries</h2>
- <p class="info-text">Create separate collections for different units or projects. Use <strong>Share</strong>
- to give a class a <strong>clone</strong> (not live access) via a short code — students can then
- screen, search, and export RIS or a screening report for hand-ins.
- Deleting a library permanently removes its papers (export first if you need them).</p>
+ <p class="info-text">Each library is a separate paper dataset (different projects, topics, or
+ assignments). Fetch, prepare, cluster, and search only touch the <strong>active</strong> library —
+ switch from the nav bar. Deleting a library permanently removes its papers (export first if you
+ need them).</p>
  <ul class="library-manage-list" id="library-manage-list">
   <li class="info-text">Loading…</li>
  </ul>
  <div class="library-create-row">
   <div class="form-group">
    <label for="library-new-name">New library name</label>
-   <input type="text" id="library-new-name" maxlength="64" placeholder="e.g. Unit 3 climate">
+   <input type="text" id="library-new-name" maxlength="64" placeholder="e.g. Climate project">
   </div>
   <button type="button" id="library-create-btn" class="btn btn-primary">Create library</button>
  </div>
  <div id="library-manage-status" class="status-indicator"></div>
-</section>
 
-<section class="card" id="share-join-section">
- <h2>Join with a class code</h2>
- <p class="info-text">Your teacher shares a code (for example <code>ABCD-EFGH</code>). You get a
-  <strong>new library</strong> that is a full copy of their papers and screening - not live access to theirs.
-  Your notes and stars stay private.</p>
- <div class="library-create-row">
-  <div class="form-group">
-   <label for="account-join-code">Class code</label>
-   <input type="text" id="account-join-code" maxlength="16" placeholder="e.g. ABCD-EFGH"
-    autocomplete="off" spellcheck="false"
-    style="text-transform:uppercase; letter-spacing:0.06em; font-weight:600;">
+ {# Clone codes are optional — not a teacher console. Keep APIs; hide the pitch. #}
+ <details class="advanced-details" id="library-clone-details" style="margin-top:1rem;">
+  <summary>Optional: copy a library via code</summary>
+  <div class="advanced-body">
+   <p class="info-text">Occasionally useful if someone shares a ready-made collection. Joining creates
+    a <strong>new library that is a full copy</strong> (papers + screening) — not live access. Your
+    notes and stars stay private. Most students just create their own libraries above.</p>
+   <div class="library-create-row" id="share-join-section">
+    <div class="form-group">
+     <label for="account-join-code">Library code</label>
+     <input type="text" id="account-join-code" maxlength="16" placeholder="e.g. ABCD-EFGH"
+      autocomplete="off" spellcheck="false"
+      style="text-transform:uppercase; letter-spacing:0.06em; font-weight:600;">
+    </div>
+    <button type="button" id="account-join-preview-btn" class="btn btn-secondary">Preview</button>
+    <button type="button" id="account-join-btn" class="btn btn-primary" disabled>Add as new library</button>
+   </div>
+   <div id="account-join-preview" class="join-preview-card" hidden></div>
+   <div id="account-join-status" class="status-indicator"></div>
+   <p class="info-text" style="margin-top:0.75rem;">Or open <a href="/join">/join</a>.</p>
+   <h3 class="ai-settings-subhead" style="margin-top:1rem;">Codes you created</h3>
+   <p class="help-text">Each join gets a clone, not live access. Revoke a code if it was posted
+    publicly by mistake — people who already joined keep their copy.</p>
+   <ul class="library-manage-list" id="shares-list">
+    <li class="info-text">Loading…</li>
+   </ul>
+   <div id="shares-status" class="status-indicator"></div>
   </div>
-  <button type="button" id="account-join-preview-btn" class="btn btn-secondary">Preview</button>
-  <button type="button" id="account-join-btn" class="btn btn-primary" disabled>Add as new library</button>
- </div>
- <div id="account-join-preview" class="join-preview-card" hidden></div>
- <div id="account-join-status" class="status-indicator"></div>
- <p class="info-text" style="margin-top:0.75rem;">Or open a join link: <a href="/join">/join</a></p>
-</section>
-
-<section class="card">
- <h2>Your active shares</h2>
- <p class="info-text">Class codes you created. Each student who joins gets a <strong>clone</strong>
-  (their own copy), not live access to yours. Revoke if a code was posted publicly by mistake —
-  students who already joined keep their copy.</p>
- <details class="help-details">
-  <summary>What to tell students after you share</summary>
-  <ol class="export-format-list" style="padding-left:1.2rem;">
-   <li>Share the code (or <code>/join?code=…</code> link) and the library name/unit.</li>
-   <li>Students: Join → open the new library in the nav switcher.</li>
-   <li>Suggested next steps: screen on Clusters → clean duplicates → Search &amp; export RIS;
-    optional screening report on Duplicates for process counts.</li>
-   <li>Remind them: public databases only (starting point), not a full library search.</li>
-  </ol>
  </details>
- <ul class="library-manage-list" id="shares-list">
-  <li class="info-text">Loading…</li>
- </ul>
- <div id="shares-status" class="status-indicator"></div>
 </section>
 
 <section class="card" id="ai-settings-section">
@@ -211,5 +200,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/account.js?v=20260720r1"></script>
+<script src="/static/js/account.js?v=20260721r1"></script>
 {% endblock %}

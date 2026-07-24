@@ -1,16 +1,16 @@
 {% extends "base.html" %}
-{% block title %}Join library - Literature Research Aide{% endblock %}
+{% block title %}Copy library - Literature Research Aide{% endblock %}
 {% block content %}
 <section class="page-header">
- <h1>Join a shared library</h1>
- <p class="subtitle">Enter a class code from your teacher. You get your own copy of their papers
-  (screening included). Notes and stars stay private to you.</p>
+ <h1>Copy a library via code</h1>
+ <p class="subtitle">If someone shared a library code, enter it here. You get your own copy of
+  their papers and screening — not live access. Most people create their own libraries on Account.</p>
 </section>
 
 <section class="card">
  <div class="form-row">
   <div class="form-group" style="flex:1 1 14rem;">
-   <label for="join-code-input">Class code</label>
+   <label for="join-code-input">Library code</label>
    <input type="text" id="join-code-input" maxlength="16" placeholder="e.g. ABCD-EFGH"
     value="{{ join_code or '' }}" autocomplete="off" spellcheck="false"
     style="text-transform:uppercase; letter-spacing:0.06em; font-weight:600;">
@@ -29,5 +29,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/join.js?v=20260717r5"></script>
+<script src="/static/js/join.js?v=20260721r1"></script>
 {% endblock %}

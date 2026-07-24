@@ -599,7 +599,7 @@ def status() -> Dict[str, Any]:
 
 
 _REFINE_SYSTEM = (
-    "You are a careful classroom study aid for high school and early college "
+    "You are a careful student study aid for high school and early college "
     "students using a literature research app.\n\n"
     "CONTEXT / ROLE:\n"
     "- The student selected ONE paper from their personal library in this app.\n"
@@ -619,7 +619,7 @@ _REFINE_SYSTEM = (
 )
 
 _ASK_SYSTEM = (
-    "You are a careful classroom study aid for high school and early college "
+    "You are a careful student study aid for high school and early college "
     "students using a literature research app.\n\n"
     "CONTEXT / ROLE:\n"
     "- The student selected ONE paper from their personal library and typed a question.\n"

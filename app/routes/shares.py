@@ -1,4 +1,4 @@
-"""Class share codes: create, list, revoke, preview, join (clone)."""
+"""Optional library copy codes: create, list, revoke, preview, join (clone)."""
 
 import logging
 from datetime import datetime, timedelta, timezone
@@ -43,7 +43,7 @@ async def api_create_share(req: ShareCreateRequest, request: Request):
         lib_id = (req.library_id or "").strip() or get_active_library_id(uid)
         if not shares_mod.library_exists(uid, lib_id):
             return JSONResponse(status_code=400, content={"detail": "Library not found."})
-        title = shares_mod.library_name(uid, lib_id) or "Shared library"
+        title = shares_mod.library_name(uid, lib_id) or "Library"
         expires_at = None
         if req.expires_days is not None:
             expires_at = (
@@ -69,7 +69,7 @@ async def api_create_share(req: ShareCreateRequest, request: Request):
                 last_err = e
                 continue
         if share is None:
-            raise last_err or ValueError("Could not create share code.")
+            raise last_err or ValueError("Could not create library code.")
         return {
             "status": "success",
             "share": {

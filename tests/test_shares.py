@@ -182,7 +182,7 @@ def test_join_own_share_blocked(user_data):
         title_snapshot="Mine",
         code=code,
     )
-    with pytest.raises(ValueError, match="own share"):
+    with pytest.raises(ValueError, match="own library"):
         shares_mod.join_share(udb, teacher["id"], teacher["username"], code)
 
 

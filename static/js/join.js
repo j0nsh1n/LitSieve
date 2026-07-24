@@ -35,7 +35,7 @@ async function doPreview() {
   const code = normalizeCodeLocal(input && input.value);
   if (input) input.value = code;
   if (!code) {
-    setStatus('join-status', 'Enter a class code first.', 'error');
+    setStatus('join-status', 'Enter a library code first.', 'error');
     return;
   }
   setStatus('join-status', 'Loading preview…', 'info');
@@ -69,8 +69,8 @@ function renderPreview(data) {
     : `${data.use_count || 0} joins so far`;
   card.hidden = false;
   card.innerHTML = `
-    <h3 class="join-preview-title">${escapeHtml(data.title || 'Shared library')}</h3>
-    <p class="info-text" style="margin:0.35rem 0;">From <strong>${escapeHtml(data.owner_username || 'teacher')}</strong>
+    <h3 class="join-preview-title">${escapeHtml(data.title || 'Library')}</h3>
+    <p class="info-text" style="margin:0.35rem 0;">From <strong>${escapeHtml(data.owner_username || 'another account')}</strong>
       · code <code>${escapeHtml(data.code || '')}</code></p>
     <ul class="join-preview-stats">
       <li><strong>${Number(data.article_count) || 0}</strong> papers</li>
@@ -86,7 +86,7 @@ async function doJoin() {
   const btn = document.getElementById('join-confirm-btn');
   const code = normalizeCodeLocal(input && input.value);
   if (!code) {
-    setStatus('join-status', 'Enter a class code first.', 'error');
+    setStatus('join-status', 'Enter a library code first.', 'error');
     return;
   }
   setLoading(btn, true);
@@ -99,7 +99,7 @@ async function doJoin() {
     const name = (data.library && data.library.name) || 'library';
     const n = (data.counts && data.counts.articles) || 0;
     setStatus('join-status', `Added "${name}" (${n} papers). Opening Data Management…`, 'success');
-    showNotification(`Joined: ${name}`, 'success');
+    showNotification(`Added library: ${name}`, 'success');
     window.location.href = '/data-management';
   } catch (e) {
     setStatus('join-status', e.message, 'error');
