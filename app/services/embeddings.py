@@ -164,7 +164,7 @@ class EmbeddingEngine:
         # (<= max_display articles), never for full-corpus duplicate detection.
         return cosine_similarity(embeddings)
 
-    def detect_duplicates(self, article_embeddings: np.ndarray, article_ids: list, threshold: float = 0.95) -> list:
+    def detect_duplicates(self, article_embeddings: np.ndarray, article_ids: list, threshold: float = 0.97) -> list:
         """Find near-duplicate pairs whose cosine similarity >= threshold.
 
         Uses a FAISS range search so we only ever materialise the pairs that

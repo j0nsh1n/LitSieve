@@ -71,18 +71,13 @@ def test_coverage_suggestions_peer_reviewed_only():
     assert missing & {"pubmed", "europepmc", "plos", "openalex", "doaj"}
 
 
-def test_coverage_skips_core_without_api_key(monkeypatch):
-    monkeypatch.delenv("CORE_API_KEY", raising=False)
-    tips = coverage_suggestions({}, ["health"])
-    assert "core" not in {t["source"] for t in tips}
+def test_core_source_removed_from_pipeline():
+    """CORE was dropped (rate limits); must not reappear in FETCHERS/catalog."""
+    from app.content.source_catalog import SOURCE_CATALOG
+    from app.services.pipeline import FETCHERS
 
-
-def test_coverage_can_suggest_core_when_key_set(monkeypatch):
-    monkeypatch.setenv("CORE_API_KEY", "test-core-key")
-    tips = coverage_suggestions({}, ["health"])
-    # CORE is optional; if it ranks in the top suggestions it must be allowed.
-    from app.content.source_catalog import eligible_for_coverage_suggestion
-    assert eligible_for_coverage_suggestion("core") is True
+    assert "core" not in FETCHERS
+    assert "core" not in SOURCE_CATALOG
 
 
 def test_cluster_briefing_year_span():

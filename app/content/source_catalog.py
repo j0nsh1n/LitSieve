@@ -142,17 +142,6 @@ SOURCE_CATALOG: Dict[str, Dict[str, Any]] = {
         "priority": 52,
         "needs_key": False,
     },
-    "core": {
-        "name": "CORE",
-        "desc": "Open-access full text, all disciplines",
-        "good_for": "Open-access full text across subjects (when key is set).",
-        "misses": "Needs a free CORE API key; without it this source skips.",
-        "tip": "OA full text (free API key required). Skips if CORE_API_KEY is unset.",
-        "badges": [],
-        "priority": 50,
-        "needs_key": True,
-        "key_env": "CORE_API_KEY",
-    },
     "hal": {
         "name": "HAL",
         "desc": "French national open archive (multi-discipline)",
@@ -211,55 +200,55 @@ SOURCE_CATALOG: Dict[str, Dict[str, Any]] = {
 TOPIC_SOURCE_HINTS: Dict[str, List[str]] = {
     "health": [
         "pubmed", "europepmc", "clinicaltrials", "medrxiv", "plos",
-        "openalex", "semanticscholar", "doaj", "zenodo", "core",
+        "openalex", "semanticscholar", "doaj", "zenodo",
     ],
     "biology": [
         "pubmed", "europepmc", "biorxiv", "plos", "openalex", "arxiv",
-        "semanticscholar", "crossref", "zenodo", "doaj", "core",
+        "semanticscholar", "crossref", "zenodo", "doaj",
     ],
     "chemistry": [
         "openalex", "arxiv", "semanticscholar", "crossref", "zenodo",
-        "doaj", "core", "openaire",
+        "doaj", "openaire",
     ],
     "physics": [
         "arxiv", "openalex", "semanticscholar", "crossref", "zenodo",
-        "nasa_ads", "core", "openaire",
+        "nasa_ads", "openaire",
     ],
     "math": [
         "arxiv", "openalex", "semanticscholar", "crossref", "zenodo",
-        "core", "openaire",
+        "openaire",
     ],
     "cs": [
         "dblp", "arxiv", "openalex", "semanticscholar", "crossref",
-        "zenodo", "doaj", "core", "openaire",
+        "zenodo", "doaj", "openaire",
     ],
     "earth": [
         "openalex", "semanticscholar", "zenodo", "crossref", "doaj",
-        "nasa_ads", "core", "openaire", "hal",
+        "nasa_ads", "openaire", "hal",
     ],
     "history": [
         "openalex", "semanticscholar", "eric", "crossref", "doaj",
-        "core", "hal", "openaire",
+        "hal", "openaire",
     ],
     "economics": [
         "arxiv", "openalex", "semanticscholar", "eric", "crossref",
-        "doaj", "core", "openaire",
+        "doaj", "openaire",
     ],
     "psychology": [
         "pubmed", "openalex", "semanticscholar", "eric", "crossref",
-        "doaj", "core", "openaire",
+        "doaj", "openaire",
     ],
     "polisci": [
         "openalex", "semanticscholar", "eric", "crossref", "doaj",
-        "core", "hal", "openaire",
+        "hal", "openaire",
     ],
     "literature": [
         "openalex", "semanticscholar", "eric", "crossref", "doaj",
-        "core", "hal", "openaire",
+        "hal", "openaire",
     ],
     "education": [
         "eric", "openalex", "semanticscholar", "crossref", "doaj",
-        "core", "hal", "openaire",
+        "hal", "openaire",
     ],
 }
 
@@ -288,7 +277,7 @@ TOPIC_PACKS: List[Dict[str, Any]] = [
         "topics": ["earth"],
         "sources": [
             "openalex", "semanticscholar", "nasa_ads", "zenodo",
-            "crossref", "doaj", "core", "openaire",
+            "crossref", "doaj", "openaire",
         ],
         "query_hint": "climate change impacts on ecosystems",
     },
@@ -300,7 +289,7 @@ TOPIC_PACKS: List[Dict[str, Any]] = [
         "topics": ["health", "education"],
         "sources": [
             "pubmed", "europepmc", "eric", "openalex",
-            "semanticscholar", "plos", "doaj", "core",
+            "semanticscholar", "plos", "doaj",
         ],
         "query_hint": "school-based health education programs",
     },
@@ -312,7 +301,7 @@ TOPIC_PACKS: List[Dict[str, Any]] = [
         "topics": ["history"],
         "sources": [
             "openalex", "semanticscholar", "eric", "crossref",
-            "doaj", "hal", "core", "openaire",
+            "doaj", "hal", "openaire",
         ],
         "query_hint": "civil rights movement oral history",
     },
@@ -324,7 +313,7 @@ TOPIC_PACKS: List[Dict[str, Any]] = [
         "topics": ["cs"],
         "sources": [
             "dblp", "arxiv", "openalex", "semanticscholar",
-            "crossref", "doaj", "core",
+            "crossref", "doaj",
         ],
         "query_hint": "introductory computer science education",
     },
@@ -383,7 +372,7 @@ def eligible_for_coverage_suggestion(source_id: str) -> bool:
     Student starting-point policy: only peer-reviewed journal-style indexes.
     Exclude preprints, trial registries, mixed deposits, and title-only DBs.
     Also skip sources that need an API key when that key is not configured
-    (otherwise we nag students about CORE/NASA ADS that will silently return 0).
+    (otherwise we nag students about NASA ADS when the token is unset).
     """
     meta = SOURCE_CATALOG.get(source_id or "") or {}
     if not meta:

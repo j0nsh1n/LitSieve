@@ -120,7 +120,7 @@ class ClusterRequest(BaseModel):
 
 
 class DuplicateRequest(BaseModel):
-    threshold: float = 0.95
+    threshold: float = 0.97
 
 
 class ScreeningItem(BaseModel):
@@ -158,7 +158,7 @@ class LibrarySwitchRequest(BaseModel):
 
 
 class ResolveDuplicatesRequest(BaseModel):
-    threshold: float = Field(default=0.95, ge=0.5, le=1.0)
+    threshold: float = Field(default=0.97, ge=0.5, le=1.0)
 
 
 class DeleteAccountRequest(BaseModel):

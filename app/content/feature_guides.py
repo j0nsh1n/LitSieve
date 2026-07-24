@@ -63,7 +63,7 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "student’s corpus is comparable.",
             "Students: start broad, then re-fetch with Add to deepen a sub-topic "
             "without wiping your first batch.",
-            "Some sources need free API keys (CORE, NASA ADS). Without a key they "
+            "Some sources need free API keys (NASA ADS). Without a key they "
             "simply skip - the others still run.",
             "If a fetch is already running, wait for it to finish before starting "
             "another (the app will say so).",
