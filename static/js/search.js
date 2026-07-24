@@ -5,8 +5,16 @@ let lastQueryTokens = [];
 /** Last on-screen result list (export “these results” uses this exact order). */
 let lastResults = [];
 
+/** sessionStorage key: refresh keeps query + filters; re-runs search on load. */
+const SEARCH_SESSION_KEY = 'lra_search_session_v1';
+/** Skip auto-restore while applying form (avoids loops). */
+let _restoringSearch = false;
+
 document.addEventListener('DOMContentLoaded', () => {
- applyAvailableSources();
+ // Sources first (enables checkboxes), then restore last search for this library.
+ applyAvailableSources()
+  .then(() => restoreSearchSession())
+  .catch(() => { /* ignore */ });
  refreshStarredCount();
  loadSearchEmptyState();
 
@@ -49,6 +57,154 @@ document.addEventListener('DOMContentLoaded', () => {
  }
  });
 });
+
+// ---------------------------------------------------------------------------
+// Persist last search across refresh (sessionStorage; re-run API on load)
+// ---------------------------------------------------------------------------
+
+function activeLibraryId() {
+ const sel = document.getElementById('nav-library-select');
+ if (sel && (sel.dataset.activeId || sel.value)) {
+  return sel.dataset.activeId || sel.value;
+ }
+ return '';
+}
+
+async function resolveLibraryId() {
+ let id = activeLibraryId();
+ if (id) return id;
+ try {
+  const data = await apiCall('/api/libraries');
+  return (data && data.active_id) || '';
+ } catch (e) {
+  return '';
+ }
+}
+
+function captureSearchSession(kind) {
+ // kind: 'text' | 'pico' | 'seed' | 'starred'
+ const mode = kind === 'starred'
+  ? 'starred'
+  : (document.querySelector('input[name="input_method"]:checked') || {}).value || 'text';
+ const filters = collectSearchFilters();
+ return {
+  v: 1,
+  library_id: activeLibraryId(),
+  mode,
+  query_text: (document.getElementById('query-text') || {}).value || '',
+  pico_population: (document.getElementById('pico-population') || {}).value || '',
+  pico_intervention: (document.getElementById('pico-intervention') || {}).value || '',
+  pico_comparison: (document.getElementById('pico-comparison') || {}).value || '',
+  pico_outcome: (document.getElementById('pico-outcome') || {}).value || '',
+  seed_query: (document.getElementById('seed-query') || {}).value || '',
+  top_k: filters.top_k,
+  sort_by: filters.sort_by,
+  pico_boost: filters.pico_boost,
+  lexical_boost: filters.lexical_boost,
+  source_filter: filters.source_filter,
+  year_min: filters.year_min,
+  year_max: filters.year_max,
+  saved_at: Date.now(),
+ };
+}
+
+async function saveSearchSession(kind) {
+ if (_restoringSearch) return;
+ try {
+  const state = captureSearchSession(kind);
+  if (!state.library_id) {
+   state.library_id = await resolveLibraryId();
+  }
+  sessionStorage.setItem(SEARCH_SESSION_KEY, JSON.stringify(state));
+ } catch (e) { /* quota / private mode */ }
+}
+
+function readSearchSession() {
+ try {
+  const raw = sessionStorage.getItem(SEARCH_SESSION_KEY);
+  if (!raw) return null;
+  const state = JSON.parse(raw);
+  if (!state || state.v !== 1) return null;
+  return state;
+ } catch (e) {
+  return null;
+ }
+}
+
+function setInputMethod(mode) {
+ const radio = document.querySelector(`input[name="input_method"][value="${mode}"]`);
+ if (!radio) return;
+ radio.checked = true;
+ radio.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+function applySearchSessionToForm(state) {
+ if (!state) return;
+ _restoringSearch = true;
+ try {
+  if (state.mode === 'text' || state.mode === 'pico' || state.mode === 'seed') {
+   setInputMethod(state.mode);
+  }
+  const qt = document.getElementById('query-text');
+  if (qt && state.query_text != null) qt.value = state.query_text;
+  const setVal = (id, v) => {
+   const el = document.getElementById(id);
+   if (el && v != null) el.value = v;
+  };
+  setVal('pico-population', state.pico_population);
+  setVal('pico-intervention', state.pico_intervention);
+  setVal('pico-comparison', state.pico_comparison);
+  setVal('pico-outcome', state.pico_outcome);
+  setVal('seed-query', state.seed_query);
+
+  const topk = document.getElementById('top-k');
+  const topkDisplay = document.getElementById('topk-display');
+  if (topk && state.top_k != null) {
+   topk.value = String(state.top_k);
+   if (topkDisplay) topkDisplay.textContent = String(state.top_k);
+   if (typeof updateRangeFill === 'function') updateRangeFill(topk);
+  }
+  const sortBy = document.getElementById('sort-by');
+  if (sortBy && state.sort_by) sortBy.value = state.sort_by;
+  const picoBoost = document.getElementById('pico-boost');
+  if (picoBoost && typeof state.pico_boost === 'boolean') picoBoost.checked = state.pico_boost;
+  const lexBoost = document.getElementById('lexical-boost');
+  if (lexBoost && typeof state.lexical_boost === 'boolean') lexBoost.checked = state.lexical_boost;
+  setVal('year-min', state.year_min != null ? String(state.year_min) : '');
+  setVal('year-max', state.year_max != null ? String(state.year_max) : '');
+
+  // Source checkboxes: only re-check ones that are available (not disabled).
+  if (Array.isArray(state.source_filter) && state.source_filter.length) {
+   const want = new Set(state.source_filter);
+   document.querySelectorAll('input[name="search-source"]').forEach((cb) => {
+    if (cb.disabled) return;
+    cb.checked = want.has(cb.value);
+   });
+  }
+ } finally {
+  _restoringSearch = false;
+ }
+}
+
+async function restoreSearchSession() {
+ const state = readSearchSession();
+ if (!state) return;
+
+ const libId = await resolveLibraryId();
+ // Don't restore a search from another library after a switch.
+ if (state.library_id && libId && state.library_id !== libId) return;
+
+ applySearchSessionToForm(state);
+
+ if (state.mode === 'starred') {
+  await doStarredSearch({ fromRestore: true });
+  return;
+ }
+ // Only auto-run when there is something to search with.
+ const q = buildQueryText();
+ if (!q) return;
+ await doSearch({ fromRestore: true });
+}
 
 function parseOptionalYear(id) {
  const el = document.getElementById(id);
@@ -184,17 +340,20 @@ function escapeRegExp(s) {
  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-async function doSearch() {
+async function doSearch(opts) {
+ const fromRestore = !!(opts && opts.fromRestore);
  const method = document.querySelector('input[name="input_method"]:checked').value;
  const queryText = buildQueryText();
  if (!queryText) {
- showNotification(method === 'seed' ? 'Enter a seed id or title.' : 'Please enter a search query.', 'error');
+ if (!fromRestore) {
+  showNotification(method === 'seed' ? 'Enter a seed id or title.' : 'Please enter a search query.', 'error');
+ }
  return;
  }
 
  const filters = collectSearchFilters();
  if (filters.source_filter.length === 0) {
- showNotification('Please select at least one source.', 'error');
+ if (!fromRestore) showNotification('Please select at least one source.', 'error');
  return;
  }
  const btn = document.getElementById('search-btn');
@@ -263,17 +422,20 @@ async function doSearch() {
  document.getElementById('results-section').style.display = 'block';
  const exportSec = document.getElementById('export-results-section');
  if (exportSec) exportSec.style.display = results.length ? 'block' : 'none';
+ // Persist query + filters so a browser refresh restores this search.
+ await saveSearchSession(method);
  } catch (e) {
- showNotification(`Search failed: ${e.message}`, 'error');
+ if (!fromRestore) showNotification(`Search failed: ${e.message}`, 'error');
  } finally {
  setLoading(btn, false);
  }
 }
 
-async function doStarredSearch() {
+async function doStarredSearch(opts) {
+ const fromRestore = !!(opts && opts.fromRestore);
  const filters = collectSearchFilters();
  if (filters.source_filter.length === 0) {
- showNotification('Please select at least one source.', 'error');
+ if (!fromRestore) showNotification('Please select at least one source.', 'error');
  return;
  }
  const btn = document.getElementById('starred-search-btn');
@@ -319,8 +481,9 @@ async function doStarredSearch() {
  const exportSec = document.getElementById('export-results-section');
  if (exportSec) exportSec.style.display = results.length ? 'block' : 'none';
  await refreshStarredCount();
+ await saveSearchSession('starred');
  } catch (e) {
- showNotification(`Starred search failed: ${e.message}`, 'error');
+ if (!fromRestore) showNotification(`Starred search failed: ${e.message}`, 'error');
  } finally {
  setLoading(btn, false);
  }
