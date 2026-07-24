@@ -763,7 +763,7 @@ class LiteratureSearchPipeline:
         )
         return {"results": results, "seed_count": len(starred_keys)}
 
-    def detect_duplicates(self, threshold: float = 0.97) -> List[Tuple]:
+    def detect_duplicates(self, threshold: float = 0.98) -> List[Tuple]:
         """
         Detect potential duplicate articles
 
@@ -809,7 +809,7 @@ class LiteratureSearchPipeline:
 
         return duplicates
 
-    def resolve_duplicates(self, threshold: float = 0.97) -> Dict:
+    def resolve_duplicates(self, threshold: float = 0.98) -> Dict:
         """
         Auto-resolve duplicate groups: keep the best copy, exclude the rest.
 

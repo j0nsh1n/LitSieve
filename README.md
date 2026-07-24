@@ -145,7 +145,7 @@ pipeline.create_embeddings()
 pipeline.cluster_articles(n_clusters=8, method="kmeans")
 
 results = pipeline.search_similar("deep learning to predict patient outcomes", top_k=10)
-duplicates = pipeline.detect_duplicates(threshold=0.97)
+duplicates = pipeline.detect_duplicates(threshold=0.98)
 pipeline.close()
 ```
 
