@@ -16,6 +16,7 @@ Do not add campus/paywalled DBs. Propose candidates to the maintainer first.
 
 from __future__ import annotations
 
+import os
 from typing import Any, Dict, List
 
 # id → display + classroom tip fields.
@@ -47,7 +48,7 @@ SOURCE_CATALOG: Dict[str, Dict[str, Any]] = {
         "good_for": "Registered trials (status, design). Useful for “is there a trial?” questions.",
         "misses": "Not peer-reviewed journal articles; results text is uneven.",
         "tip": "Trial registries, not finished papers. Great for health methods context.",
-        "badges": [],
+        "badges": ["registry", "not-peer-reviewed"],
         "priority": 85,
         "needs_key": False,
     },
@@ -168,7 +169,7 @@ SOURCE_CATALOG: Dict[str, Dict[str, Any]] = {
         "good_for": "Open deposits: papers, posters, datasets, software.",
         "misses": "Not all peer-reviewed; mixes papers with data packages.",
         "tip": "Open science deposits (papers + data). Check item type when screening.",
-        "badges": [],
+        "badges": ["mixed", "not-peer-reviewed"],
         "priority": 45,
         "needs_key": False,
     },
@@ -353,6 +354,46 @@ def student_tip(source_id: str) -> str:
     misses = (meta.get("misses") or "").strip()
     parts = [p for p in (good, f"Misses: {misses}" if misses else "") if p]
     return " ".join(parts)
+
+
+# Badges that mean "not a peer-reviewed journal index" for coverage suggestions.
+_COVERAGE_EXCLUDE_BADGES = frozenset({
+    "preprint",
+    "not-peer-reviewed",
+    "registry",
+    "mixed",
+    "title-only",
+})
+
+
+def source_api_key_configured(source_id: str) -> bool:
+    """True if this source needs no key, or its key_env is set in the environment."""
+    meta = SOURCE_CATALOG.get(source_id or "") or {}
+    if not meta.get("needs_key"):
+        return True
+    env_name = (meta.get("key_env") or "").strip()
+    if not env_name:
+        return False
+    return bool(os.getenv(env_name, "").strip())
+
+
+def eligible_for_coverage_suggestion(source_id: str) -> bool:
+    """Whether a source may appear under “Suggested sources you are missing”.
+
+    Student starting-point policy: only peer-reviewed journal-style indexes.
+    Exclude preprints, trial registries, mixed deposits, and title-only DBs.
+    Also skip sources that need an API key when that key is not configured
+    (otherwise we nag students about CORE/NASA ADS that will silently return 0).
+    """
+    meta = SOURCE_CATALOG.get(source_id or "") or {}
+    if not meta:
+        return False
+    badges = set(meta.get("badges") or [])
+    if badges & _COVERAGE_EXCLUDE_BADGES:
+        return False
+    if not source_api_key_configured(source_id):
+        return False
+    return True
 
 
 def list_sources_for_api() -> List[Dict[str, Any]]:

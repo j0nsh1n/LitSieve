@@ -58,6 +58,33 @@ def test_coverage_suggestions_missing_sources():
     assert "openalex" not in missing
 
 
+def test_coverage_suggestions_peer_reviewed_only():
+    """Preprints / registries must never appear as “suggested missing”."""
+    tips = coverage_suggestions({}, ["health", "biology"])
+    missing = {t["source"] for t in tips}
+    assert "medrxiv" not in missing
+    assert "biorxiv" not in missing
+    assert "arxiv" not in missing
+    assert "clinicaltrials" not in missing
+    assert "zenodo" not in missing
+    # Peer-reviewed journal-style indexes still suggested when empty.
+    assert missing & {"pubmed", "europepmc", "plos", "openalex", "doaj"}
+
+
+def test_coverage_skips_core_without_api_key(monkeypatch):
+    monkeypatch.delenv("CORE_API_KEY", raising=False)
+    tips = coverage_suggestions({}, ["health"])
+    assert "core" not in {t["source"] for t in tips}
+
+
+def test_coverage_can_suggest_core_when_key_set(monkeypatch):
+    monkeypatch.setenv("CORE_API_KEY", "test-core-key")
+    tips = coverage_suggestions({}, ["health"])
+    # CORE is optional; if it ranks in the top suggestions it must be allowed.
+    from app.content.source_catalog import eligible_for_coverage_suggestion
+    assert eligible_for_coverage_suggestion("core") is True
+
+
 def test_cluster_briefing_year_span():
     b = build_cluster_briefing(
         0, "Climate, Warming",

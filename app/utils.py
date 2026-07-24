@@ -108,10 +108,16 @@ def coverage_suggestions(
     sources_present: Dict[str, int],
     topic_ids: Optional[List[str]] = None,
 ) -> List[Dict[str, str]]:
-    """Suggest missing sources that usually matter for the selected topics."""
+    """Suggest missing peer-reviewed sources for the selected topics.
+
+    Preprints, trial registries, mixed deposits, and key-gated sources without
+    a configured key are never suggested (see eligible_for_coverage_suggestion).
+    """
+    from app.content.source_catalog import eligible_for_coverage_suggestion
+
     topic_ids = topic_ids or []
     if not topic_ids:
-        # Generic high-value sources if no topics chosen.
+        # Generic high-value peer-reviewed indexes if no topics chosen.
         recommended = ["pubmed", "openalex", "semanticscholar", "crossref", "eric"]
     else:
         recommended = []
@@ -124,17 +130,20 @@ def coverage_suggestions(
 
     suggestions = []
     for src in recommended:
-        if (sources_present.get(src) or 0) == 0:
-            tip = coverage_reason(src)
-            suggestions.append({
-                "source": src,
-                "name": source_display_name(src),
-                "reason": (
-                    f"Usually useful for your selected topic(s), but you have no "
-                    f"articles from it yet. {tip}"
-                ).strip(),
-                "tip": tip,
-            })
+        if (sources_present.get(src) or 0) != 0:
+            continue
+        if not eligible_for_coverage_suggestion(src):
+            continue
+        tip = coverage_reason(src)
+        suggestions.append({
+            "source": src,
+            "name": source_display_name(src),
+            "reason": (
+                f"Usually useful for your selected topic(s), but you have no "
+                f"articles from it yet. {tip}"
+            ).strip(),
+            "tip": tip,
+        })
     return suggestions[:6]
 
 
