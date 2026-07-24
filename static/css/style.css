@@ -1649,6 +1649,15 @@ html[data-reading="on"] .key-points {
     position: relative;
 }
 
+/* Expanded: always show full text even if is-clamped was left on by mistake. */
+.abstract-wrap.is-expanded .article-abstract {
+    display: block;
+    -webkit-line-clamp: unset;
+    line-clamp: unset;
+    overflow: visible;
+    max-height: none;
+}
+
 .abstract-wrap:not(.is-expanded) .article-abstract.is-clamped::after {
     content: "";
     position: absolute;
@@ -1658,6 +1667,10 @@ html[data-reading="on"] .key-points {
     height: 2.4em;
     background: linear-gradient(to bottom, transparent, var(--surface));
     pointer-events: none;
+}
+
+.abstract-wrap.is-expanded .article-abstract::after {
+    display: none;
 }
 
 .abstract-toggle {
@@ -3952,16 +3965,7 @@ html[data-reading="on"] .article-abstract {
     letter-spacing: 0.005em;
 }
 
-html[data-reading="on"] .abstract-wrap:not(.is-expanded) .article-abstract.is-clamped {
-    -webkit-line-clamp: unset;
-    line-clamp: unset;
-    display: block;
-    overflow: visible;
-}
-
-html[data-reading="on"] .abstract-wrap:not(.is-expanded) .article-abstract.is-clamped::after {
-    display: none;
-}
+/* Reading mode still uses is-expanded (JS defaults it on); keep clamp CSS consistent. */
 
 html[data-reading="on"] .stats-cards {
     gap: 1rem;

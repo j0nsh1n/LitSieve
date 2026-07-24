@@ -871,9 +871,10 @@ function enhanceAbstracts(root) {
         toggle.addEventListener('click', function(e) {
             e.preventDefault();
             e.stopPropagation();
-            const expanded = wrap.classList.toggle('is-expanded');
-            toggle.textContent = expanded ? 'Show less' : 'Show full abstract';
-            toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+            wrap.classList.toggle('is-expanded');
+            // Must refresh is-clamped: CSS line-clamp is on .is-clamped alone,
+            // so flipping only is-expanded left the abstract still truncated.
+            _syncAbstractClamp(el);
         });
 
         _syncAbstractClamp(el);
@@ -890,28 +891,22 @@ function _syncAbstractClamp(el) {
     // In reading mode, default to expanded (full abstract always visible).
     if (isReadingMode()) {
         wrap.classList.add('is-expanded');
+    }
+
+    const expanded = wrap.classList.contains('is-expanded');
+    if (expanded) {
         el.classList.remove('is-clamped');
         if (toggle) {
             toggle.textContent = 'Show less';
             toggle.setAttribute('aria-expanded', 'true');
-            // Keep a way to collapse if desired.
             toggle.hidden = false;
         }
-        return;
-    }
-
-    if (!wrap.classList.contains('is-expanded')) {
+    } else {
         el.classList.add('is-clamped');
         if (toggle) {
             toggle.textContent = 'Show full abstract';
             toggle.setAttribute('aria-expanded', 'false');
             toggle.hidden = false;
-        }
-    } else {
-        el.classList.remove('is-clamped');
-        if (toggle) {
-            toggle.textContent = 'Show less';
-            toggle.setAttribute('aria-expanded', 'true');
         }
     }
 }
