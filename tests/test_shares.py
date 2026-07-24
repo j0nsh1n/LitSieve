@@ -244,3 +244,62 @@ def test_preview_share(user_data):
     assert preview["excluded_count"] == 1
     assert preview["owner_username"] == "teacher"
     assert preview["has_embeddings"] is True
+
+
+def test_join_is_clone_not_live_view(user_data):
+    """Joiner mutates their copy; owner library (notes + articles) stays intact."""
+    udb = user_data["udb"]
+    owner = user_data["teacher"]
+    joiner = user_data["student"]
+    o_lib = lib.list_libraries(owner["id"])["active_id"]
+    _seed_library(owner["id"], o_lib)
+
+    code = shares_mod.generate_share_code()
+    udb.create_share(
+        owner_user_id=owner["id"],
+        owner_library_id=o_lib,
+        title_snapshot="Clone me",
+        code=code,
+        include_embeddings=True,
+    )
+    result = shares_mod.join_share(udb, joiner["id"], joiner["username"], code)
+    j_lib = result["library"]["id"]
+
+    # Joiner: papers present, private notes never copied.
+    j_db = ArticleDatabase(str(lib.library_db_path(joiner["id"], j_lib)))
+    try:
+        with j_db._lock:
+            j_articles = j_db.conn.execute("SELECT COUNT(*) FROM articles").fetchone()[0]
+            j_notes = j_db.conn.execute("SELECT COUNT(*) FROM notes").fetchone()[0]
+            j_db.conn.execute("DELETE FROM articles WHERE article_id = 'a1'")
+            j_db.conn.commit()
+            j_after = j_db.conn.execute("SELECT COUNT(*) FROM articles").fetchone()[0]
+        assert j_articles == 2
+        assert j_notes == 0
+        assert j_after == 1
+    finally:
+        j_db.close()
+
+    # Owner: still has both papers + private note (not a live shared DB).
+    o_db = ArticleDatabase(str(lib.library_db_path(owner["id"], o_lib)))
+    try:
+        with o_db._lock:
+            o_articles = o_db.conn.execute("SELECT COUNT(*) FROM articles").fetchone()[0]
+            o_notes = o_db.conn.execute(
+                "SELECT note, starred FROM notes WHERE article_id='a1'"
+            ).fetchone()
+        assert o_articles == 2
+        assert o_notes is not None
+        assert o_notes[0] == "Teacher private note"
+        assert int(o_notes[1]) == 1
+    finally:
+        o_db.close()
+
+
+def test_invalid_library_code_messages(user_data):
+    udb = user_data["udb"]
+    student = user_data["student"]
+    with pytest.raises(ValueError, match="library code"):
+        shares_mod.join_share(udb, student["id"], student["username"], "nope")
+    with pytest.raises(ValueError, match="Library code not found|library code"):
+        shares_mod.join_share(udb, student["id"], student["username"], "ZZZZ-ZZZZ")
