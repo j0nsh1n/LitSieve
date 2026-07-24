@@ -1,5 +1,5 @@
 {# Single source of truth for product-scope / research-use disclaimers.
-   Edit ONLY this file when the classroom starting-point copy changes.
+   Edit ONLY this file when the student starting-point copy changes.
    Import: {% from "macros/disclaimers.html" import scope_banner, scope_footer, scope_auth %}
 #}
 
@@ -27,9 +27,9 @@
 {# App footer (base layout). #}
 {% macro scope_footer(compact=false) -%}
 {%- if compact -%}
-<p class="site-disclaimer-foot">Public research databases only · classroom study aid · not a full literature search</p>
+<p class="site-disclaimer-foot">Public research databases only · student starting point · not a full literature search</p>
 {%- else -%}
-<p class="site-disclaimer-foot">Public research databases only. A starting point for classroom research, not a complete library search or professional advice.</p>
+<p class="site-disclaimer-foot">Public research databases only. A starting point for student research, not a complete library search or professional advice.</p>
 {%- endif -%}
 {%- endmacro %}
 

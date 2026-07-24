@@ -65,7 +65,7 @@ def test_auth_and_footer_share_core_limits():
     assert "Public research databases only" in foot
     assert "starting point" in foot.lower()
     assert "Public research databases only" in compact
-    assert "classroom study aid" in compact
+    assert "student starting point" in compact
 
 
 def test_fetch_and_search_variants_mark_starting_point():

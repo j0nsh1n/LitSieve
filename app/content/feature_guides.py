@@ -1,6 +1,6 @@
 """
 Public “learn more” pages for each landing-page feature card.
-Content is written for teachers and students in plain language.
+Content is written for students in plain language (research starting point).
 """
 
 from __future__ import annotations
@@ -244,7 +244,7 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
         "tagline": "Your papers, embeddings, notes - only your account.",
         "summary": (
             "Every account is private on the server. Within an account you can "
-            "keep several named libraries (for example one per class unit). "
+            "keep several named libraries (for example one per project or topic). "
             "Fetched articles, embeddings, clusters, screening choices, stars, "
             "and notes stay inside the active library and never mix with other "
             "users. Sessions use signed tokens; changing your password signs out "
@@ -261,13 +261,13 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "the active library.",
             "All API actions require your session; state-changing actions also "
             "check a CSRF token. Each signed-in user has their own rate limit "
-            "bucket (classrooms behind one network do not share one budget).",
+            "bucket.",
             "Stars and notes attach to papers inside the active library only.",
             "Account page: manage libraries, change password (revokes other "
             "sessions), or delete your account with password confirmation.",
-            "Teachers can Share a library to create a short class code. Students "
-            "Join with the code and receive their own copy (papers + screening + "
-            "optional embeddings) — not live write access to the teacher.",
+            "Optional: someone can create a short library copy code. Joining "
+            "adds a new library that is a full clone (papers + screening + "
+            "optional embeddings) — not live access to theirs.",
             "Fetch and embedding jobs return immediately and finish in the "
             "background on the library that was active when they started; "
             "the progress bar follows until they complete.",
@@ -275,18 +275,16 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "on this device.",
         ],
         "tips": [
-            "School lab computers: log out when finished; do not reuse simple "
-            "passwords.",
-            "Teachers: keep one library per unit or class so papers do not mix; "
-            "share a finished unit library via class code so everyone starts equal.",
+            "Shared computers: log out when finished; do not reuse simple passwords.",
+            "Keep one library per project or topic so papers do not mix.",
             "For process counts, use Duplicates → Screening report. Search keeps ranking "
             "and library RIS export. Notes/stars stay private process evidence, not grades.",
             "Export a library as RIS (Search) and/or a screening report (Duplicates) "
-            "before deleting it if you need a hand-in archive.",
+            "before deleting it if you need an archive.",
             "If you change your password on a shared machine, other open tabs "
             "for that account will need to log in again.",
         ],
-        "where_in_app": "Register / Log in · Library switcher · Account · /join.",
+        "where_in_app": "Register / Log in · Library switcher · Account.",
         "app_path": "/account",
         "app_label": "Open Account",
     },

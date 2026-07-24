@@ -114,7 +114,7 @@ function renderLibraryManager(data) {
  ${isActive ? '<span class="library-manage-badge">Active</span>' : ''}
  <button type="button" class="btn btn-sm btn-secondary lib-rename">Rename</button>
  <button type="button" class="btn btn-sm btn-secondary lib-switch" ${isActive ? 'disabled' : ''}>Switch to</button>
- <button type="button" class="btn btn-sm btn-primary lib-share">Share</button>
+ <button type="button" class="btn btn-sm btn-secondary lib-share">Copy code</button>
  <button type="button" class="btn btn-sm btn-danger lib-delete" ${libs.length <= 1 ? 'disabled' : ''}>Delete</button>
  `;
  li.querySelector('.lib-rename').addEventListener('click', () => doRenameLibrary(L));
@@ -134,13 +134,11 @@ function normalizeJoinCode(raw) {
 }
 
 async function doShareLibrary(lib) {
- // R6: class share wording + optional expiry / max uses.
+ // Optional clone code (not a live share / teacher console).
  if (!confirm(
-  `Create a class share code for "${lib.name}"?\n\n` +
-  'CLASS SHARE (clone, not live view):\n' +
-  '• Students join with the code and get their own copy of papers + screening.\n' +
-  '• Suggested student steps after join: Clusters → Duplicates → Search (export RIS).\n' +
-  '• Notes/stars are NOT copied (private to each student).\n\n' +
+  `Create a copy code for "${lib.name}"?\n\n` +
+  'Anyone with the code gets their own clone of papers + screening ' +
+  '(not live access to yours). Notes and stars are not copied.\n\n' +
   'Continue to set expiry and options?'
  )) {
   return;
@@ -158,7 +156,7 @@ async function doShareLibrary(lib) {
  }
  let maxUses = null;
  const usesRaw = window.prompt(
-  'Max student joins for this code (e.g. class size). Blank = unlimited.',
+  'Max joins for this code (blank = unlimited).',
   ''
  );
  if (usesRaw === null) return;
@@ -171,10 +169,10 @@ async function doShareLibrary(lib) {
   maxUses = n;
  }
  const emb = confirm(
-  'Include embeddings so students can search immediately without Prepare papers?\n\n' +
+  'Include embeddings so the copy can search immediately without Prepare papers?\n\n' +
   'OK = yes (recommended). Cancel = papers only (no embeddings).'
  );
- setStatus('library-manage-status', 'Creating share code…', 'info');
+ setStatus('library-manage-status', 'Creating copy code…', 'info');
  try {
   const body = {
    library_id: lib.id,
@@ -194,26 +192,26 @@ async function doShareLibrary(lib) {
    : `Expires in ~${expiresDays} days`;
   const useLabel = maxUses != null ? `Max joins: ${maxUses}` : 'Max joins: unlimited';
   const msg = [
-   'CLASS SHARE CODE',
+   'LIBRARY COPY CODE',
    '',
    `Code: ${code}`,
    `Link: ${path}`,
    expLabel,
    useLabel,
    '',
-   'Tell students:',
-   '1) Open Join (or /join) and enter the code while logged in.',
+   'To use the code:',
+   '1) Log in → Account → Optional: copy a library via code (or open /join).',
    '2) Switch to the new library in the nav Library menu.',
-   '3) Clusters → Duplicates → Search; export RIS; optional screening report on Duplicates.',
+   '3) Clusters → Duplicates → Search; export RIS as needed.',
    '',
-   'Starting point only (public databases) — finish important work with the school library.',
+   'Starting point only (public databases) — verify important papers elsewhere.',
   ].join('\n');
   if (navigator.clipboard && code) {
    try { await navigator.clipboard.writeText(code); } catch (_) { /* ignore */ }
   }
   alert(msg);
-  setStatus('library-manage-status', `Share code ${code} created (copied if clipboard allowed).`, 'success');
-  showNotification(`Share code ${code}`, 'success');
+  setStatus('library-manage-status', `Copy code ${code} created (copied if clipboard allowed).`, 'success');
+  showNotification(`Copy code ${code}`, 'success');
   loadSharesList();
  } catch (e) {
   setStatus('library-manage-status', e.message, 'error');
@@ -237,7 +235,7 @@ function renderSharesList(shares) {
  if (!list) return;
  list.innerHTML = '';
  if (!shares.length) {
-  list.innerHTML = '<li class="info-text">No share codes yet. Click Share on a library above.</li>';
+  list.innerHTML = '<li class="info-text">No copy codes yet. Use Copy code on a library above.</li>';
   return;
  }
  shares.forEach(s => {
@@ -262,7 +260,7 @@ function renderSharesList(shares) {
    ${badge}
    <span class="info-text share-usage-line" style="margin:0;">${escapeHtml(uses)} · ${exp}</span>
    <button type="button" class="btn btn-sm btn-secondary share-copy" ${revoked ? 'disabled' : ''}>Copy code</button>
-   <button type="button" class="btn btn-sm btn-secondary share-copy-brief" ${revoked ? 'disabled' : ''}>Copy student brief</button>
+   <button type="button" class="btn btn-sm btn-secondary share-copy-brief" ${revoked ? 'disabled' : ''}>Copy how-to</button>
    <button type="button" class="btn btn-sm btn-danger share-revoke" ${revoked ? 'disabled' : ''}>Revoke</button>
   `;
   const copyBtn = li.querySelector('.share-copy');
@@ -280,22 +278,21 @@ function renderSharesList(shares) {
   if (briefBtn) {
    briefBtn.addEventListener('click', async () => {
     const brief = [
-     `Class code: ${s.code || ''}`,
+     `Library code: ${s.code || ''}`,
      `Library: ${s.title_snapshot || 'shared library'}`,
      '',
      'Steps:',
-     '1. Log in → Join (or open /join) and enter the code.',
+     '1. Log in → Account → Optional: copy a library via code (or open /join).',
      '2. Switch to the new library in the nav Library menu.',
-     '3. Clusters (screen) → Duplicates → Search; export RIS for Zotero.',
-     '4. Optional: Duplicates → screening report for process counts.',
+     '3. Clusters → Duplicates → Search; export RIS if needed.',
      '',
-     'This is a starting point from public databases — finish with your school library when needed.',
+     'Starting point only (public databases) — verify important papers elsewhere.',
     ].join('\n');
     try {
      if (navigator.clipboard) await navigator.clipboard.writeText(brief);
-     showNotification('Student brief copied', 'success');
+     showNotification('How-to copied', 'success');
     } catch (_) {
-     prompt('Copy this brief for students:', brief);
+     prompt('Copy these steps:', brief);
     }
    });
   }
@@ -308,12 +305,12 @@ function renderSharesList(shares) {
 }
 
 async function doRevokeShare(share) {
- if (!confirm(`Revoke code ${share.code}? New students will not be able to join. Existing copies stay.`)) {
+ if (!confirm(`Revoke code ${share.code}? New joins will fail. Existing copies stay.`)) {
   return;
  }
  try {
   await apiCall(`/api/shares/${encodeURIComponent(share.id)}`, { method: 'DELETE' });
-  showNotification('Share revoked.', 'success');
+  showNotification('Code revoked.', 'success');
   loadSharesList();
  } catch (e) {
   showNotification(e.message, 'error');
@@ -329,7 +326,7 @@ function renderAccountJoinPreview(data) {
  card.hidden = false;
  card.innerHTML = `
   <h3 class="join-preview-title">${escapeHtml(data.title || 'Shared library')}</h3>
-  <p class="info-text" style="margin:0.35rem 0;">From <strong>${escapeHtml(data.owner_username || 'teacher')}</strong>
+  <p class="info-text" style="margin:0.35rem 0;">From <strong>${escapeHtml(data.owner_username || 'another account')}</strong>
    · <code>${escapeHtml(data.code || '')}</code>
    · ${Number(data.article_count) || 0} papers · ${escapeHtml(emb)}</p>
  `;
@@ -341,7 +338,7 @@ async function doAccountJoinPreview() {
  const code = normalizeJoinCode(input && input.value);
  if (input) input.value = code;
  if (!code) {
-  setStatus('account-join-status', 'Enter a class code first.', 'error');
+  setStatus('account-join-status', 'Enter a library code first.', 'error');
   return;
  }
  setStatus('account-join-status', 'Loading preview…', 'info');
@@ -368,7 +365,7 @@ async function doAccountJoin() {
  const btn = document.getElementById('account-join-btn');
  const code = normalizeJoinCode(input && input.value);
  if (!code) {
-  setStatus('account-join-status', 'Enter a class code first.', 'error');
+  setStatus('account-join-status', 'Enter a library code first.', 'error');
   return;
  }
  setLoading(btn, true);
@@ -377,7 +374,7 @@ async function doAccountJoin() {
   const data = await apiCall('/api/shares/join', { method: 'POST', body: { code } });
   const name = (data.library && data.library.name) || 'library';
   setStatus('account-join-status', `Added "${name}". Opening Data Management…`, 'success');
-  showNotification(`Joined: ${name}`, 'success');
+  showNotification(`Added library: ${name}`, 'success');
   window.location.href = '/data-management';
  } catch (e) {
   setStatus('account-join-status', e.message, 'error');

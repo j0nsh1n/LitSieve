@@ -9,10 +9,11 @@ app_port: 7860
 
 # Literature Research Aide 📚 — v4.2.0
 
-A multi-user web app for **teachers and students** to fetch, screen, and rank
-research papers across many academic databases. Semantic embeddings power
-clustering, duplicate detection, and hybrid search; each account gets a private
-workspace with background jobs, screening reports, and citation export.
+A multi-user web app for **students** to fetch, screen, and rank research papers
+across public academic databases as a **research starting point**. Semantic
+embeddings power clustering, duplicate detection, and hybrid search; each
+account gets a private workspace with **multiple libraries** (separate paper
+datasets), background jobs, screening reports, and citation export.
 
 Built with **FastAPI**, sentence-transformers, FAISS, and scikit-learn.
 
@@ -46,9 +47,9 @@ Built with **FastAPI**, sentence-transformers, FAISS, and scikit-learn.
   (revokes other sessions via `token_version`), **password reset**
 - 📤 Export ranked hits (CSV/TXT) or full library as **RIS** (Zotero / EndNote / Mendeley)
 - 📖 Public landing + `/learn/…` feature guides; first-run checklist + empty states
-- 🧪 **Sample demo corpus** (no APIs) for classroom dry runs
-- 📚 **Multiple libraries** per account (separate collections; switch in the nav)
-- 🔗 **Share a library** via class code (teacher publishes; students get their own clone)
+- 🧪 **Sample demo corpus** (no APIs) for first-run dry runs
+- 📚 **Multiple libraries** per account (separate paper datasets / projects; switch in the nav)
+- 🔗 Optional **library copy codes** (clone a collection into another account — not a live share or teacher LMS)
 
 ## Project Structure
 
@@ -198,7 +199,7 @@ fully isolated. Which libraries exist (and which is active) is tracked in
 - **notes** — private note text + starred flag
 - **key_points** — extractive bullets generated after embedding
 
-User accounts and class share codes live in a separate `users.db`.
+User accounts and optional library copy codes live in a separate `users.db`.
 
 ## Testing
 

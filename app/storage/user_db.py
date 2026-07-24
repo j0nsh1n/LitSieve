@@ -173,7 +173,7 @@ class UserDatabase:
             self.conn.commit()
             return cur.rowcount > 0
 
-    # --- Library shares (class codes) ---
+    # --- Library copy codes (optional clone) ---
 
     @staticmethod
     def _share_row(row) -> Optional[Dict]:

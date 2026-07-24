@@ -1,5 +1,5 @@
 """
-Share-a-library: class codes that clone a library into a student account.
+Share-a-library: optional copy codes that clone a library into another account.
 
 v1 model is clone-only (not a live view of the teacher's DB). Join copies
 articles + screening + key_points, and embeddings when the share allows it.
