@@ -115,7 +115,7 @@ async def account_page(request: Request):
 
 @router.get("/join")
 async def join_page(request: Request):
-    """Join/copy a shared library by code (auth required)."""
+    """Copy a library by code (auth required). Clone only — not live access."""
     code = (request.query_params.get("code") or "").strip()
     user = current_user(request)
     if not user:

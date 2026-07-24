@@ -1,7 +1,7 @@
 """
-Share-a-library: optional copy codes that clone a library into another account.
+Optional library copy codes: clone a library into another account.
 
-v1 model is clone-only (not a live view of the teacher's DB). Join copies
+v1 model is clone-only (not a live view of the owner's DB). Join copies
 articles + screening + key_points, and embeddings when the share allows it.
 Notes, stars, and clusters are never copied.
 """
@@ -72,13 +72,13 @@ def _parse_iso(ts: Optional[str]) -> Optional[datetime]:
 def is_share_usable(share: Dict) -> Tuple[bool, str]:
     """Return (ok, error_message) for redeem/preview eligibility."""
     if share.get("revoked_at"):
-        return False, "This share code has been revoked."
+        return False, "This library code has been revoked."
     expires = _parse_iso(share.get("expires_at"))
     if expires is not None and datetime.now(timezone.utc) > expires:
-        return False, "This share code has expired."
+        return False, "This library code has expired."
     max_uses = share.get("max_uses")
     if max_uses is not None and int(share.get("use_count") or 0) >= int(max_uses):
-        return False, "This share code has reached its maximum number of uses."
+        return False, "This library code has reached its maximum number of uses."
     return True, ""
 
 
@@ -119,10 +119,10 @@ def count_library_stats(user_id: str, library_id: str) -> Dict[str, int]:
         conn.close()
 
 
-def _join_display_name(title: str, teacher_username: str) -> str:
-    teacher = (teacher_username or "teacher").strip() or "teacher"
-    title = (title or "Shared library").strip() or "Shared library"
-    suffix = f" (from {teacher})"
+def _join_display_name(title: str, owner_username: str) -> str:
+    owner = (owner_username or "another account").strip() or "another account"
+    title = (title or "Library").strip() or "Library"
+    suffix = f" (from {owner})"
     if len(title) + len(suffix) <= NAME_MAX:
         return title + suffix
     keep = max(8, NAME_MAX - len(suffix))
@@ -131,7 +131,7 @@ def _join_display_name(title: str, teacher_username: str) -> str:
 
 def create_library_with_unique_name(user_id: str, preferred: str) -> Dict:
     """create_library, appending (2), (3), … on name collision."""
-    preferred = (preferred or "Shared library").strip() or "Shared library"
+    preferred = (preferred or "Library").strip() or "Library"
     if len(preferred) > NAME_MAX:
         preferred = preferred[:NAME_MAX].rstrip()
     try:
@@ -177,7 +177,7 @@ def clone_library_data(
     # into place. The sqlite backup API yields a consistent snapshot including
     # committed WAL frames (a wal_checkpoint can silently return busy), and
     # sanitize-then-VACUUM before publishing means the student's file never
-    # contains the teacher's private notes/clusters, even transiently.
+    # contains the owner's private notes/clusters, even transiently.
     tmp = dest.with_name(dest.name + ".cloning")
     for path in (tmp, dest, Path(str(dest) + "-wal"), Path(str(dest) + "-shm")):
         if path.exists():
@@ -233,24 +233,24 @@ def join_share(
     code: str,
 ) -> Dict[str, Any]:
     """
-    Validate code, clone into a new student library, record redemption.
+    Validate code, clone into a new library for the joining account, record redemption.
 
     Raises ValueError with a user-facing message on expected failures.
     """
     code = normalize_share_code(code)
     if not code or len(code) < 9:
-        raise ValueError("Enter a valid share code (for example ABCD-EFGH).")
+        raise ValueError("Enter a valid library code (for example ABCD-EFGH).")
 
     share = user_db.get_share_by_code(code)
     if not share:
-        raise ValueError("Share code not found.")
+        raise ValueError("Library code not found.")
 
     ok, err = is_share_usable(share)
     if not ok:
         raise ValueError(err)
 
     if share["owner_user_id"] == student_user_id:
-        raise ValueError("You cannot join your own share. Students use this code.")
+        raise ValueError("You cannot use a code for your own library.")
 
     if user_db.has_redeemed_share(share["id"], student_user_id):
         raise ValueError(
@@ -260,12 +260,12 @@ def join_share(
     owner_id = share["owner_user_id"]
     owner_lib = share["owner_library_id"]
     if not library_exists(owner_id, owner_lib):
-        raise ValueError("The shared library is no longer available.")
+        raise ValueError("That library is no longer available.")
 
     owner = user_db.get_by_id(owner_id)
-    teacher = (owner or {}).get("username") or "teacher"
-    title = share.get("title_snapshot") or library_name(owner_id, owner_lib) or "Shared library"
-    preferred = _join_display_name(title, teacher)
+    owner_name = (owner or {}).get("username") or "another account"
+    title = share.get("title_snapshot") or library_name(owner_id, owner_lib) or "Library"
+    preferred = _join_display_name(title, owner_name)
 
     # Capture the pre-join active library so any rollback can restore it.
     prev_active = get_active_library_id(student_user_id)
@@ -323,22 +323,22 @@ def join_share(
         "counts": counts,
         "share_id": share["id"],
         "code": share["code"],
-        "from_username": teacher,
+        "from_username": owner_name,
     }
 
 
 def preview_share(user_db, student_user_id: str, code: str) -> Dict[str, Any]:
     code = normalize_share_code(code)
     if not code or len(code) < 9:
-        raise ValueError("Enter a valid share code (for example ABCD-EFGH).")
+        raise ValueError("Enter a valid library code (for example ABCD-EFGH).")
 
     share = user_db.get_share_by_code(code)
     if not share:
-        raise ValueError("Share code not found.")
+        raise ValueError("Library code not found.")
 
     ok, err = is_share_usable(share)
     owner = user_db.get_by_id(share["owner_user_id"])
-    owner_name = (owner or {}).get("username") or "teacher"
+    owner_name = (owner or {}).get("username") or "another account"
     stats = {"articles": 0, "screening": 0, "embeddings": 0, "key_points": 0}
     lib_available = library_exists(share["owner_user_id"], share["owner_library_id"])
     if lib_available:
@@ -348,10 +348,10 @@ def preview_share(user_db, student_user_id: str, code: str) -> Dict[str, Any]:
     can_join = ok and lib_available and not already and share["owner_user_id"] != student_user_id
     block_reason = None
     if not lib_available:
-        block_reason = "The shared library is no longer available."
+        block_reason = "That library is no longer available."
         can_join = False
     elif share["owner_user_id"] == student_user_id:
-        block_reason = "This is your own share."
+        block_reason = "This code is for one of your own libraries."
         can_join = False
     elif already:
         block_reason = "You already joined with this code."
@@ -362,7 +362,7 @@ def preview_share(user_db, student_user_id: str, code: str) -> Dict[str, Any]:
 
     return {
         "code": share["code"],
-        "title": share.get("title_snapshot") or "Shared library",
+        "title": share.get("title_snapshot") or "Library",
         "owner_username": owner_name,
         "article_count": stats["articles"],
         "excluded_count": stats["screening"],

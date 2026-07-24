@@ -51,7 +51,7 @@ class UserDatabase:
                 PRIMARY KEY (username, token_hash)
             )
         """)
-        # Class share codes: clone a library into student accounts (not live view).
+        # Optional library copy codes: clone into another account (not live view).
         self.conn.execute("""
             CREATE TABLE IF NOT EXISTS shares (
                 id                 TEXT PRIMARY KEY,
@@ -309,7 +309,7 @@ class UserDatabase:
                 (share_id,),
             ).fetchone()
             if not row:
-                raise ValueError("Share code not found.")
+                raise ValueError("Library code not found.")
             max_uses, use_count, revoked_at, expires_at = (
                 row[0],
                 int(row[1] or 0),
@@ -317,7 +317,7 @@ class UserDatabase:
                 row[3],
             )
             if revoked_at:
-                raise ValueError("This share code has been revoked.")
+                raise ValueError("This library code has been revoked.")
             if expires_at:
                 exp = expires_at
                 if exp.endswith("Z"):
@@ -327,13 +327,13 @@ class UserDatabase:
                     if exp_dt.tzinfo is None:
                         exp_dt = exp_dt.replace(tzinfo=timezone.utc)
                     if datetime.now(timezone.utc) > exp_dt:
-                        raise ValueError("This share code has expired.")
+                        raise ValueError("This library code has expired.")
                 except ValueError as e:
                     if "expired" in str(e).lower():
                         raise
             if max_uses is not None and use_count >= int(max_uses):
                 raise ValueError(
-                    "This share code has reached its maximum number of uses."
+                    "This library code has reached its maximum number of uses."
                 )
             try:
                 self.conn.execute(

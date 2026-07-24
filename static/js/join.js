@@ -69,7 +69,7 @@ function renderPreview(data) {
     : `${data.use_count || 0} joins so far`;
   card.hidden = false;
   card.innerHTML = `
-    <h3 class="join-preview-title">${escapeHtml(data.title || 'Shared library')}</h3>
+    <h3 class="join-preview-title">${escapeHtml(data.title || 'Library')}</h3>
     <p class="info-text" style="margin:0.35rem 0;">From <strong>${escapeHtml(data.owner_username || 'another account')}</strong>
       · code <code>${escapeHtml(data.code || '')}</code></p>
     <ul class="join-preview-stats">
@@ -99,7 +99,7 @@ async function doJoin() {
     const name = (data.library && data.library.name) || 'library';
     const n = (data.counts && data.counts.articles) || 0;
     setStatus('join-status', `Added "${name}" (${n} papers). Opening Data Management…`, 'success');
-    showNotification(`Joined: ${name}`, 'success');
+    showNotification(`Added library: ${name}`, 'success');
     window.location.href = '/data-management';
   } catch (e) {
     setStatus('join-status', e.message, 'error');
