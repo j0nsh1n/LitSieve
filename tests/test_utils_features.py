@@ -58,6 +58,28 @@ def test_coverage_suggestions_missing_sources():
     assert "openalex" not in missing
 
 
+def test_coverage_suggestions_peer_reviewed_only():
+    """Preprints / registries must never appear as “suggested missing”."""
+    tips = coverage_suggestions({}, ["health", "biology"])
+    missing = {t["source"] for t in tips}
+    assert "medrxiv" not in missing
+    assert "biorxiv" not in missing
+    assert "arxiv" not in missing
+    assert "clinicaltrials" not in missing
+    assert "zenodo" not in missing
+    # Peer-reviewed journal-style indexes still suggested when empty.
+    assert missing & {"pubmed", "europepmc", "plos", "openalex", "doaj"}
+
+
+def test_core_source_removed_from_pipeline():
+    """CORE was dropped (rate limits); must not reappear in FETCHERS/catalog."""
+    from app.content.source_catalog import SOURCE_CATALOG
+    from app.services.pipeline import FETCHERS
+
+    assert "core" not in FETCHERS
+    assert "core" not in SOURCE_CATALOG
+
+
 def test_cluster_briefing_year_span():
     b = build_cluster_briefing(
         0, "Climate, Warming",

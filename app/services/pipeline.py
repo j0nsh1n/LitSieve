@@ -15,7 +15,6 @@ logger = logging.getLogger(__name__)
 from app.fetchers.arxiv import ArXivFetcher
 from app.fetchers.biorxiv import BioRxivFetcher, MedRxivFetcher
 from app.fetchers.clinicaltrials import ClinicalTrialsFetcher
-from app.fetchers.core import COREFetcher
 from app.fetchers.crossref import CrossRefFetcher
 from app.fetchers.dblp import DBLPFetcher
 from app.fetchers.doaj import DOAJFetcher
@@ -50,7 +49,6 @@ FETCHERS = {
     'crossref': CrossRefFetcher,
     'doaj': DOAJFetcher,
     'nasa_ads': NASAADSFetcher,
-    'core': COREFetcher,
     'biorxiv': BioRxivFetcher,
     'medrxiv': MedRxivFetcher,
     'dblp': DBLPFetcher,
@@ -765,7 +763,7 @@ class LiteratureSearchPipeline:
         )
         return {"results": results, "seed_count": len(starred_keys)}
 
-    def detect_duplicates(self, threshold: float = 0.95) -> List[Tuple]:
+    def detect_duplicates(self, threshold: float = 0.98) -> List[Tuple]:
         """
         Detect potential duplicate articles
 
@@ -811,7 +809,7 @@ class LiteratureSearchPipeline:
 
         return duplicates
 
-    def resolve_duplicates(self, threshold: float = 0.95) -> Dict:
+    def resolve_duplicates(self, threshold: float = 0.98) -> Dict:
         """
         Auto-resolve duplicate groups: keep the best copy, exclude the rest.
 

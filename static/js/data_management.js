@@ -1,19 +1,19 @@
 // === Topic and source definitions ===
 // Fallbacks used if GET /api/sources fails. Canonical data lives in source_catalog.py.
 let TOPICS = [
- { id: 'health', name: 'Health & Medicine', icon: '🏥', sources: ['pubmed', 'europepmc', 'clinicaltrials', 'medrxiv', 'plos', 'openalex', 'semanticscholar', 'doaj', 'zenodo', 'core'] },
- { id: 'biology', name: 'Biology', icon: '🧬', sources: ['pubmed', 'europepmc', 'biorxiv', 'plos', 'openalex', 'arxiv', 'semanticscholar', 'crossref', 'zenodo', 'doaj', 'core'] },
- { id: 'chemistry', name: 'Chemistry', icon: '⚗️', sources: ['openalex', 'arxiv', 'semanticscholar', 'crossref', 'zenodo', 'doaj', 'core', 'openaire'] },
- { id: 'physics', name: 'Physics', icon: '⚛️', sources: ['arxiv', 'openalex', 'semanticscholar', 'crossref', 'zenodo', 'nasa_ads', 'core', 'openaire'] },
- { id: 'math', name: 'Mathematics', icon: '📐', sources: ['arxiv', 'openalex', 'semanticscholar', 'crossref', 'zenodo', 'core', 'openaire'] },
- { id: 'cs', name: 'Computer Science', icon: '💻', sources: ['dblp', 'arxiv', 'openalex', 'semanticscholar', 'crossref', 'zenodo', 'doaj', 'core', 'openaire'] },
- { id: 'earth', name: 'Earth & Environment', icon: '🌍', sources: ['openalex', 'semanticscholar', 'zenodo', 'crossref', 'doaj', 'nasa_ads', 'core', 'openaire', 'hal'] },
- { id: 'history', name: 'History', icon: '📜', sources: ['openalex', 'semanticscholar', 'eric', 'crossref', 'doaj', 'core', 'hal', 'openaire'] },
- { id: 'economics', name: 'Economics', icon: '📊', sources: ['arxiv', 'openalex', 'semanticscholar', 'eric', 'crossref', 'doaj', 'core', 'openaire'] },
- { id: 'psychology', name: 'Psychology', icon: '🧠', sources: ['pubmed', 'openalex', 'semanticscholar', 'eric', 'crossref', 'doaj', 'core', 'openaire'] },
- { id: 'polisci', name: 'Political Science', icon: '🏛️', sources: ['openalex', 'semanticscholar', 'eric', 'crossref', 'doaj', 'core', 'hal', 'openaire'] },
- { id: 'literature', name: 'Literature & Language',icon: '📖', sources: ['openalex', 'semanticscholar', 'eric', 'crossref', 'doaj', 'core', 'hal', 'openaire'] },
- { id: 'education', name: 'Education', icon: '🎓', sources: ['eric', 'openalex', 'semanticscholar', 'crossref', 'doaj', 'core', 'hal', 'openaire'] },
+ { id: 'health', name: 'Health & Medicine', icon: '🏥', sources: ['pubmed', 'europepmc', 'clinicaltrials', 'medrxiv', 'plos', 'openalex', 'semanticscholar', 'doaj', 'zenodo'] },
+ { id: 'biology', name: 'Biology', icon: '🧬', sources: ['pubmed', 'europepmc', 'biorxiv', 'plos', 'openalex', 'arxiv', 'semanticscholar', 'crossref', 'zenodo', 'doaj'] },
+ { id: 'chemistry', name: 'Chemistry', icon: '⚗️', sources: ['openalex', 'arxiv', 'semanticscholar', 'crossref', 'zenodo', 'doaj', 'openaire'] },
+ { id: 'physics', name: 'Physics', icon: '⚛️', sources: ['arxiv', 'openalex', 'semanticscholar', 'crossref', 'zenodo', 'nasa_ads', 'openaire'] },
+ { id: 'math', name: 'Mathematics', icon: '📐', sources: ['arxiv', 'openalex', 'semanticscholar', 'crossref', 'zenodo', 'openaire'] },
+ { id: 'cs', name: 'Computer Science', icon: '💻', sources: ['dblp', 'arxiv', 'openalex', 'semanticscholar', 'crossref', 'zenodo', 'doaj', 'openaire'] },
+ { id: 'earth', name: 'Earth & Environment', icon: '🌍', sources: ['openalex', 'semanticscholar', 'zenodo', 'crossref', 'doaj', 'nasa_ads', 'openaire', 'hal'] },
+ { id: 'history', name: 'History', icon: '📜', sources: ['openalex', 'semanticscholar', 'eric', 'crossref', 'doaj', 'hal', 'openaire'] },
+ { id: 'economics', name: 'Economics', icon: '📊', sources: ['arxiv', 'openalex', 'semanticscholar', 'eric', 'crossref', 'doaj', 'openaire'] },
+ { id: 'psychology', name: 'Psychology', icon: '🧠', sources: ['pubmed', 'openalex', 'semanticscholar', 'eric', 'crossref', 'doaj', 'openaire'] },
+ { id: 'polisci', name: 'Political Science', icon: '🏛️', sources: ['openalex', 'semanticscholar', 'eric', 'crossref', 'doaj', 'hal', 'openaire'] },
+ { id: 'literature', name: 'Literature & Language',icon: '📖', sources: ['openalex', 'semanticscholar', 'eric', 'crossref', 'doaj', 'hal', 'openaire'] },
+ { id: 'education', name: 'Education', icon: '🎓', sources: ['eric', 'openalex', 'semanticscholar', 'crossref', 'doaj', 'hal', 'openaire'] },
 ];
 
 let TOPIC_PACKS = [
@@ -23,7 +23,7 @@ let TOPIC_PACKS = [
  icon: '🌡️',
  blurb: 'Earth & environment sources for climate projects',
  topics: ['earth'],
- sources: ['openalex', 'semanticscholar', 'nasa_ads', 'zenodo', 'crossref', 'doaj', 'core', 'openaire'],
+ sources: ['openalex', 'semanticscholar', 'nasa_ads', 'zenodo', 'crossref', 'doaj', 'openaire'],
  queryHint: 'climate change impacts on ecosystems',
  },
  {
@@ -32,7 +32,7 @@ let TOPIC_PACKS = [
  icon: '❤️',
  blurb: 'Health + classroom education databases',
  topics: ['health', 'education'],
- sources: ['pubmed', 'europepmc', 'eric', 'openalex', 'semanticscholar', 'plos', 'doaj', 'core'],
+ sources: ['pubmed', 'europepmc', 'eric', 'openalex', 'semanticscholar', 'plos', 'doaj'],
  queryHint: 'school-based health education programs',
  },
  {
@@ -41,7 +41,7 @@ let TOPIC_PACKS = [
  icon: '📜',
  blurb: 'History and social-science open sources',
  topics: ['history'],
- sources: ['openalex', 'semanticscholar', 'eric', 'crossref', 'doaj', 'hal', 'core', 'openaire'],
+ sources: ['openalex', 'semanticscholar', 'eric', 'crossref', 'doaj', 'hal', 'openaire'],
  queryHint: 'civil rights movement oral history',
  },
  {
@@ -50,7 +50,7 @@ let TOPIC_PACKS = [
  icon: '💻',
  blurb: 'CS bibliography + arXiv (many DBLP hits lack abstracts)',
  topics: ['cs'],
- sources: ['dblp', 'arxiv', 'openalex', 'semanticscholar', 'crossref', 'doaj', 'core'],
+ sources: ['dblp', 'arxiv', 'openalex', 'semanticscholar', 'crossref', 'doaj'],
  queryHint: 'introductory computer science education',
  },
 ];
@@ -68,7 +68,6 @@ let ALL_SOURCES = {
  crossref: { name: 'CrossRef', desc: 'Broad academic metadata registry', tip: 'Huge DOI registry; skips no-abstract items.' },
  doaj: { name: 'DOAJ', desc: 'Peer-reviewed open access journals', tip: 'Peer-reviewed open access journals.' },
  nasa_ads: { name: 'NASA ADS', desc: 'Astronomy, astrophysics & geosciences', tip: 'Space & geoscience (token required).', needs_key: true },
- core: { name: 'CORE', desc: 'Open-access full text, all disciplines', tip: 'OA full text (API key required).', needs_key: true },
  biorxiv: { name: 'bioRxiv', desc: 'Biology preprints', tip: 'Not peer-reviewed; recent window only.', badges: ['preprint', 'not-peer-reviewed'] },
  medrxiv: { name: 'medRxiv', desc: 'Health preprints', tip: 'Not peer-reviewed; recent window only.', badges: ['preprint', 'not-peer-reviewed'] },
  dblp: { name: 'DBLP', desc: 'Computer science papers & conferences', tip: 'Title/venue often; many abstracts skipped.', badges: ['title-only'] },

@@ -90,3 +90,15 @@ def test_coverage_includes_student_tip():
     assert "tip" in eric
     assert "education" in eric["tip"].lower() or "ERIC" in eric["reason"] or "education" in eric["reason"].lower()
     assert eric.get("name") == "ERIC"
+
+
+def test_eligible_for_coverage_excludes_preprints_and_unkeyed():
+    from app.content.source_catalog import eligible_for_coverage_suggestion
+
+    assert eligible_for_coverage_suggestion("pubmed") is True
+    assert eligible_for_coverage_suggestion("medrxiv") is False
+    assert eligible_for_coverage_suggestion("biorxiv") is False
+    assert eligible_for_coverage_suggestion("arxiv") is False
+    assert eligible_for_coverage_suggestion("clinicaltrials") is False
+    assert eligible_for_coverage_suggestion("zenodo") is False
+    assert eligible_for_coverage_suggestion("dblp") is False

@@ -28,8 +28,8 @@ Built with **FastAPI**, sentence-transformers, FAISS, and scikit-learn.
 
 ## Features
 
-- 🔍 Fetch from **18 sources** in parallel (PubMed, Europe PMC, ClinicalTrials.gov,
-  OpenAlex, arXiv, Semantic Scholar, ERIC, Zenodo, CrossRef, DOAJ, NASA ADS, CORE,
+- 🔍 Fetch from **17 sources** in parallel (PubMed, Europe PMC, ClinicalTrials.gov,
+  OpenAlex, arXiv, Semantic Scholar, ERIC, Zenodo, CrossRef, DOAJ, NASA ADS,
   bioRxiv, medRxiv, DBLP, OpenAIRE, PLOS, HAL)
   — replace or append; **background jobs** with progress, cancel, retries, and
   per-source error classes
@@ -94,7 +94,7 @@ cp .env.example .env
 #   - Set SECRET_KEY (required), e.g.:
 #       python -c "import secrets; print(secrets.token_urlsafe(48))"
 #   - Or set DEBUG=true to run locally without a SECRET_KEY.
-#   - Optionally set NASA_ADS_TOKEN / CORE_API_KEY to enable those sources.
+#   - Optionally set NASA_ADS_TOKEN to enable NASA ADS.
 ```
 
 > The app refuses to start without `SECRET_KEY` unless `DEBUG=true`.
@@ -145,7 +145,7 @@ pipeline.create_embeddings()
 pipeline.cluster_articles(n_clusters=8, method="kmeans")
 
 results = pipeline.search_similar("deep learning to predict patient outcomes", top_k=10)
-duplicates = pipeline.detect_duplicates(threshold=0.95)
+duplicates = pipeline.detect_duplicates(threshold=0.98)
 pipeline.close()
 ```
 
@@ -231,8 +231,8 @@ plain `http://localhost` the browser drops the `Secure` auth cookie. Set
 **FAISS not installed** — the app falls back to scikit-learn for similarity
 search (slower on large corpora). Install `faiss-cpu` to re-enable it.
 
-**NASA ADS / CORE return nothing** — set `NASA_ADS_TOKEN` / `CORE_API_KEY`; those
-sources are skipped when their token/key is unset.
+**NASA ADS returns nothing** — set `NASA_ADS_TOKEN` (free token from ADS);
+the source is skipped when the token is unset.
 
 **No search results** — make sure you fetched articles *and* created embeddings
 first; check counts on the Duplicates (statistics) page.

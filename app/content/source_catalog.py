@@ -16,6 +16,7 @@ Do not add campus/paywalled DBs. Propose candidates to the maintainer first.
 
 from __future__ import annotations
 
+import os
 from typing import Any, Dict, List
 
 # id → display + classroom tip fields.
@@ -47,7 +48,7 @@ SOURCE_CATALOG: Dict[str, Dict[str, Any]] = {
         "good_for": "Registered trials (status, design). Useful for “is there a trial?” questions.",
         "misses": "Not peer-reviewed journal articles; results text is uneven.",
         "tip": "Trial registries, not finished papers. Great for health methods context.",
-        "badges": [],
+        "badges": ["registry", "not-peer-reviewed"],
         "priority": 85,
         "needs_key": False,
     },
@@ -141,17 +142,6 @@ SOURCE_CATALOG: Dict[str, Dict[str, Any]] = {
         "priority": 52,
         "needs_key": False,
     },
-    "core": {
-        "name": "CORE",
-        "desc": "Open-access full text, all disciplines",
-        "good_for": "Open-access full text across subjects (when key is set).",
-        "misses": "Needs a free CORE API key; without it this source skips.",
-        "tip": "OA full text (free API key required). Skips if CORE_API_KEY is unset.",
-        "badges": [],
-        "priority": 50,
-        "needs_key": True,
-        "key_env": "CORE_API_KEY",
-    },
     "hal": {
         "name": "HAL",
         "desc": "French national open archive (multi-discipline)",
@@ -168,7 +158,7 @@ SOURCE_CATALOG: Dict[str, Dict[str, Any]] = {
         "good_for": "Open deposits: papers, posters, datasets, software.",
         "misses": "Not all peer-reviewed; mixes papers with data packages.",
         "tip": "Open science deposits (papers + data). Check item type when screening.",
-        "badges": [],
+        "badges": ["mixed", "not-peer-reviewed"],
         "priority": 45,
         "needs_key": False,
     },
@@ -210,55 +200,55 @@ SOURCE_CATALOG: Dict[str, Dict[str, Any]] = {
 TOPIC_SOURCE_HINTS: Dict[str, List[str]] = {
     "health": [
         "pubmed", "europepmc", "clinicaltrials", "medrxiv", "plos",
-        "openalex", "semanticscholar", "doaj", "zenodo", "core",
+        "openalex", "semanticscholar", "doaj", "zenodo",
     ],
     "biology": [
         "pubmed", "europepmc", "biorxiv", "plos", "openalex", "arxiv",
-        "semanticscholar", "crossref", "zenodo", "doaj", "core",
+        "semanticscholar", "crossref", "zenodo", "doaj",
     ],
     "chemistry": [
         "openalex", "arxiv", "semanticscholar", "crossref", "zenodo",
-        "doaj", "core", "openaire",
+        "doaj", "openaire",
     ],
     "physics": [
         "arxiv", "openalex", "semanticscholar", "crossref", "zenodo",
-        "nasa_ads", "core", "openaire",
+        "nasa_ads", "openaire",
     ],
     "math": [
         "arxiv", "openalex", "semanticscholar", "crossref", "zenodo",
-        "core", "openaire",
+        "openaire",
     ],
     "cs": [
         "dblp", "arxiv", "openalex", "semanticscholar", "crossref",
-        "zenodo", "doaj", "core", "openaire",
+        "zenodo", "doaj", "openaire",
     ],
     "earth": [
         "openalex", "semanticscholar", "zenodo", "crossref", "doaj",
-        "nasa_ads", "core", "openaire", "hal",
+        "nasa_ads", "openaire", "hal",
     ],
     "history": [
         "openalex", "semanticscholar", "eric", "crossref", "doaj",
-        "core", "hal", "openaire",
+        "hal", "openaire",
     ],
     "economics": [
         "arxiv", "openalex", "semanticscholar", "eric", "crossref",
-        "doaj", "core", "openaire",
+        "doaj", "openaire",
     ],
     "psychology": [
         "pubmed", "openalex", "semanticscholar", "eric", "crossref",
-        "doaj", "core", "openaire",
+        "doaj", "openaire",
     ],
     "polisci": [
         "openalex", "semanticscholar", "eric", "crossref", "doaj",
-        "core", "hal", "openaire",
+        "hal", "openaire",
     ],
     "literature": [
         "openalex", "semanticscholar", "eric", "crossref", "doaj",
-        "core", "hal", "openaire",
+        "hal", "openaire",
     ],
     "education": [
         "eric", "openalex", "semanticscholar", "crossref", "doaj",
-        "core", "hal", "openaire",
+        "hal", "openaire",
     ],
 }
 
@@ -287,7 +277,7 @@ TOPIC_PACKS: List[Dict[str, Any]] = [
         "topics": ["earth"],
         "sources": [
             "openalex", "semanticscholar", "nasa_ads", "zenodo",
-            "crossref", "doaj", "core", "openaire",
+            "crossref", "doaj", "openaire",
         ],
         "query_hint": "climate change impacts on ecosystems",
     },
@@ -299,7 +289,7 @@ TOPIC_PACKS: List[Dict[str, Any]] = [
         "topics": ["health", "education"],
         "sources": [
             "pubmed", "europepmc", "eric", "openalex",
-            "semanticscholar", "plos", "doaj", "core",
+            "semanticscholar", "plos", "doaj",
         ],
         "query_hint": "school-based health education programs",
     },
@@ -311,7 +301,7 @@ TOPIC_PACKS: List[Dict[str, Any]] = [
         "topics": ["history"],
         "sources": [
             "openalex", "semanticscholar", "eric", "crossref",
-            "doaj", "hal", "core", "openaire",
+            "doaj", "hal", "openaire",
         ],
         "query_hint": "civil rights movement oral history",
     },
@@ -323,7 +313,7 @@ TOPIC_PACKS: List[Dict[str, Any]] = [
         "topics": ["cs"],
         "sources": [
             "dblp", "arxiv", "openalex", "semanticscholar",
-            "crossref", "doaj", "core",
+            "crossref", "doaj",
         ],
         "query_hint": "introductory computer science education",
     },
@@ -353,6 +343,46 @@ def student_tip(source_id: str) -> str:
     misses = (meta.get("misses") or "").strip()
     parts = [p for p in (good, f"Misses: {misses}" if misses else "") if p]
     return " ".join(parts)
+
+
+# Badges that mean "not a peer-reviewed journal index" for coverage suggestions.
+_COVERAGE_EXCLUDE_BADGES = frozenset({
+    "preprint",
+    "not-peer-reviewed",
+    "registry",
+    "mixed",
+    "title-only",
+})
+
+
+def source_api_key_configured(source_id: str) -> bool:
+    """True if this source needs no key, or its key_env is set in the environment."""
+    meta = SOURCE_CATALOG.get(source_id or "") or {}
+    if not meta.get("needs_key"):
+        return True
+    env_name = (meta.get("key_env") or "").strip()
+    if not env_name:
+        return False
+    return bool(os.getenv(env_name, "").strip())
+
+
+def eligible_for_coverage_suggestion(source_id: str) -> bool:
+    """Whether a source may appear under “Suggested sources you are missing”.
+
+    Student starting-point policy: only peer-reviewed journal-style indexes.
+    Exclude preprints, trial registries, mixed deposits, and title-only DBs.
+    Also skip sources that need an API key when that key is not configured
+    (otherwise we nag students about NASA ADS when the token is unset).
+    """
+    meta = SOURCE_CATALOG.get(source_id or "") or {}
+    if not meta:
+        return False
+    badges = set(meta.get("badges") or [])
+    if badges & _COVERAGE_EXCLUDE_BADGES:
+        return False
+    if not source_api_key_configured(source_id):
+        return False
+    return True
 
 
 def list_sources_for_api() -> List[Dict[str, Any]]:
