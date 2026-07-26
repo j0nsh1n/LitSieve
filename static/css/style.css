@@ -1323,6 +1323,8 @@ input[type="range"]::-moz-range-thumb:hover {
     color: var(--text);
     line-height: 1.7;
     margin-bottom: 0.5rem;
+    width: 100%;
+    max-width: none;
     transition: max-height var(--dur-slow) var(--ease-out),
                 opacity var(--dur-fast) var(--ease-soft);
 }
@@ -1634,6 +1636,8 @@ html[data-reading="on"] .key-points {
 /* Long abstracts: clamp by line count, expand on demand */
 .abstract-wrap {
     margin-bottom: 0.5rem;
+    width: 100%;
+    max-width: none;
 }
 
 .abstract-wrap .article-abstract {
@@ -3956,13 +3960,20 @@ html[data-reading="on"] .article-meta {
     margin-bottom: 0.4rem;
 }
 
-/* Abstracts become the focus: serif measure, comfortable density */
+/* Abstracts: serif + slightly larger type in reading mode, full card width.
+   (Was max-width: 68ch, which looked like "half the column" on wide Search.) */
 html[data-reading="on"] .article-abstract {
     font-family: var(--font-serif);
     font-size: 1.02rem;
     line-height: 1.72;
-    max-width: 68ch;
+    max-width: none;
+    width: 100%;
     letter-spacing: 0.005em;
+}
+
+html[data-reading="on"] .abstract-wrap {
+    max-width: none;
+    width: 100%;
 }
 
 /* Reading mode still uses is-expanded (JS defaults it on); keep clamp CSS consistent. */
