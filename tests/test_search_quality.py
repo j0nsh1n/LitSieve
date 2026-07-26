@@ -106,11 +106,13 @@ def test_starred_centroid_and_empty(pipe, tmp_path):
         empty_p.search_from_starred(top_k=5)
     empty_p.db.close()
 
-    # Star X and Y; remaining embedded paper is Z.
+    # Star X and Y; Z is the other embedded paper. Starred stay in results.
     pipe.db.upsert_note("x", "pubmed", starred=True)
     pipe.db.upsert_note("y", "pubmed", starred=True)
     out = pipe.search_from_starred(top_k=5)
     assert out["seed_count"] == 2
     ids = [a["article_id"] for a in out["results"]]
-    assert "x" not in ids and "y" not in ids
-    assert ids[0] == "z"
+    assert "x" in ids and "y" in ids
+    assert "z" in ids
+    # Stars sit near the centroid, so they should rank at least as high as Z.
+    assert ids.index("z") >= min(ids.index("x"), ids.index("y"))
