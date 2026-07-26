@@ -43,7 +43,17 @@ jobs:
           persist-credentials: false
 
       - name: Build image
-        run: docker build -t literature-aide:ci .
+        # Retry: GitHub runners occasionally hit Docker Hub i/o timeouts on
+        # "load metadata for python:*-slim" (seen on pull_request only).
+        run: |
+          for attempt in 1 2 3; do
+            if docker build -t literature-aide:ci .; then
+              exit 0
+            fi
+            echo "docker build attempt ${attempt} failed; retrying in 15s..."
+            sleep 15
+          done
+          exit 1
 
       - name: Boot the container and check /health
         run: |
