@@ -92,74 +92,144 @@ def _settings_path() -> Path:
 
 
 # --- API keys at rest -------------------------------------------------------
-# Provider API keys are encrypted in ai_settings.json rather than stored as
-# plaintext. The encryption key is derived from SECRET_KEY, so it lives in the
-# same place the process already keeps a secret — this protects a copied or
-# backed-up settings file, not an attacker who already has the environment.
-# Values are tagged so a pre-existing plaintext file keeps working and is
-# upgraded on the next save.
+# Provider API keys are encrypted in ai_settings.json (not plaintext on disk).
+# Master material comes from SECRET_KEY via HKDF — protects a copied settings
+# file, not an attacker who already has the process environment.
+#
+# Current write format: AES-256-GCM (AEAD) with a fresh 12-byte nonce each time
+#   →  enc:v2:<urlsafe-b64(nonce || ciphertext+tag)>
+# Field name is bound as AAD so ciphertext cannot be swapped across keys.
+# Legacy Fernet (enc:v1:) still decrypts; next save upgrades to v2.
+# Plaintext legacy files still load and upgrade on next save.
 SECRET_FIELD_SUFFIX = "_api_key"
-ENC_PREFIX = "enc:v1:"
+ENC_PREFIX_V1 = "enc:v1:"
+ENC_PREFIX_V2 = "enc:v2:"
+# New writes use v2; tests and callers can treat this as "encrypted".
+ENC_PREFIX = ENC_PREFIX_V2
+
+_HKDF_INFO_V1 = b"literature-research-aide/ai-settings/v1"
+_HKDF_INFO_V2 = b"literature-research-aide/ai-settings/aes-gcm/v2"
+_GCM_NONCE_LEN = 12
 
 
-def _fernet():
-    """Fernet built from SECRET_KEY, or None when no secret is configured."""
+def _hkdf_bytes(info: bytes, length: int = 32) -> Optional[bytes]:
+    """Derive key bytes from SECRET_KEY, or None if unavailable."""
     secret = _env("SECRET_KEY")
     if not secret:
         return None
     try:
-        import base64
-
-        from cryptography.fernet import Fernet
         from cryptography.hazmat.primitives import hashes
         from cryptography.hazmat.primitives.kdf.hkdf import HKDF
-    except ImportError:  # pragma: no cover - cryptography is a hard dependency
+    except ImportError:  # pragma: no cover
         logger.warning("cryptography not installed; AI keys stay in plaintext")
         return None
-    derived = HKDF(
-        algorithm=hashes.SHA256(), length=32, salt=None,
-        info=b"literature-research-aide/ai-settings/v1",
+    return HKDF(
+        algorithm=hashes.SHA256(),
+        length=length,
+        salt=None,
+        info=info,
     ).derive(secret.encode("utf-8"))
-    return Fernet(base64.urlsafe_b64encode(derived))
+
+
+def _fernet():
+    """Legacy Fernet for reading enc:v1: values only."""
+    import base64
+
+    from cryptography.fernet import Fernet
+
+    raw = _hkdf_bytes(_HKDF_INFO_V1, 32)
+    if raw is None:
+        return None
+    return Fernet(base64.urlsafe_b64encode(raw))
+
+
+def _aesgcm():
+    """AES-256-GCM for enc:v2: writes and reads."""
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+    raw = _hkdf_bytes(_HKDF_INFO_V2, 32)
+    if raw is None:
+        return None
+    return AESGCM(raw)
+
+
+def _encrypt_value(field: str, plain: str) -> Optional[str]:
+    """Encrypt one secret; returns enc:v2:… or None if crypto unavailable."""
+    import base64
+
+    aes = _aesgcm()
+    if aes is None:
+        return None
+    nonce = os.urandom(_GCM_NONCE_LEN)
+    aad = field.encode("utf-8")
+    ct = aes.encrypt(nonce, plain.encode("utf-8"), aad)
+    blob = base64.urlsafe_b64encode(nonce + ct).decode("ascii")
+    return ENC_PREFIX_V2 + blob
+
+
+def _decrypt_value(field: str, stored: str) -> Optional[str]:
+    """Decrypt enc:v1: / enc:v2:; None if not a ciphertext token we handle."""
+    import base64
+
+    if stored.startswith(ENC_PREFIX_V2):
+        aes = _aesgcm()
+        if aes is None:
+            return None
+        try:
+            raw = base64.urlsafe_b64decode(stored[len(ENC_PREFIX_V2):].encode("ascii"))
+            if len(raw) <= _GCM_NONCE_LEN:
+                return None
+            nonce, ct = raw[:_GCM_NONCE_LEN], raw[_GCM_NONCE_LEN:]
+            return aes.decrypt(nonce, ct, field.encode("utf-8")).decode("utf-8")
+        except Exception:
+            return None
+
+    if stored.startswith(ENC_PREFIX_V1):
+        f = _fernet()
+        if f is None:
+            return None
+        try:
+            return f.decrypt(stored[len(ENC_PREFIX_V1):].encode("ascii")).decode("utf-8")
+        except Exception:
+            return None
+
+    return None  # plaintext or unknown prefix
+
+
+def _is_ciphertext_token(value: str) -> bool:
+    return value.startswith(ENC_PREFIX_V1) or value.startswith(ENC_PREFIX_V2)
 
 
 def _encrypt_secrets(data: Dict[str, Any]) -> Dict[str, Any]:
-    f = _fernet()
-    if f is None:
-        return dict(data)
     out = dict(data)
     for key, value in data.items():
         if not key.endswith(SECRET_FIELD_SUFFIX) or not isinstance(value, str):
             continue
-        if value.startswith(ENC_PREFIX) or not value:
+        if not value or _is_ciphertext_token(value):
             continue
-        out[key] = ENC_PREFIX + f.encrypt(value.encode("utf-8")).decode("ascii")
+        sealed = _encrypt_value(key, value)
+        if sealed is not None:
+            out[key] = sealed
     return out
 
 
 def _decrypt_secrets(data: Dict[str, Any]) -> Dict[str, Any]:
     out = dict(data)
-    f = None
     for key, value in data.items():
         if not key.endswith(SECRET_FIELD_SUFFIX) or not isinstance(value, str):
             continue
-        if not value.startswith(ENC_PREFIX):
+        if not _is_ciphertext_token(value):
             continue  # legacy plaintext; re-encrypted on next save
-        if f is None:
-            f = _fernet()
-        if f is None:
-            out.pop(key, None)
-            continue
-        try:
-            out[key] = f.decrypt(value[len(ENC_PREFIX):].encode("ascii")).decode("utf-8")
-        except Exception:
-            # Almost always means SECRET_KEY changed. Drop the unusable value
-            # instead of handing a ciphertext blob to a provider as an API key.
+        plain = _decrypt_value(key, value)
+        if plain is None:
             logger.warning(
-                "Could not decrypt %s (SECRET_KEY rotated?). Re-enter it on the "
-                "Account page.", key,
+                "Could not decrypt %s (SECRET_KEY rotated or corrupt?). "
+                "Re-enter it on the Account page.",
+                key,
             )
             out.pop(key, None)
+        else:
+            out[key] = plain
     return out
 
 

@@ -12,7 +12,7 @@ from app import core
 
 for _dep in (
     "fastapi", "httpx", "Bio", "sklearn", "tqdm",
-    "slowapi", "jwt", "passlib", "multipart", "requests", "dotenv",
+    "slowapi", "jwt", "bcrypt", "multipart", "requests", "dotenv",
 ):
     pytest.importorskip(_dep)
 

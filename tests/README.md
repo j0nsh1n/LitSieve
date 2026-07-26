@@ -1,10 +1,16 @@
 # Tests & guardrails
 
-Run from the repo root:
+Run from the repo root (prefer the project venv so deps match CI):
 
 ```bash
-SECRET_KEY=x DEBUG=true python -m pytest -q
+# once: install full deps including optional SQLCipher bindings
+./venv/bin/pip install -r requirements.txt
+
+SECRET_KEY=x DEBUG=true ./venv/bin/python -m pytest -q
 ```
+
+Expect **no skips** when `sqlcipher3-binary` is installed (from `requirements.txt`).
+CI installs it explicitly and fails if encryption tests cannot import it.
 
 ## Policy (every feature change)
 
@@ -17,6 +23,8 @@ Tests must catch **real regressions**, not just smoke. When you **add, fix, or r
 | Multi-library storage + HTTP isolation | `test_libraries.py`, `test_libraries_http.py` |
 | Clone codes (not live view; notes/clusters stripped) | `test_shares.py`, `test_shares_http.py` |
 | AI settings write gate | `test_ai_settings_write_gate.py` |
+| At-rest DB encryption (`DB_ENCRYPTION_KEY`) | `test_db_encryption.py` (needs `sqlcipher3-binary`) |
+| Per-account storage quota | `test_quota.py` |
 | FETCHERS ↔ catalog ↔ citations ↔ URLs | `test_source_catalog.py` |
 
 ## Hard rules
