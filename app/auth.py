@@ -74,16 +74,10 @@ if not _SECRET_KEY:
 ALGORITHM = "HS256"
 TOKEN_EXPIRE_DAYS = 30
 
-# bcrypt is used directly (no passlib). passlib 1.7.4 is unmaintained and its
-# bcrypt backend reads `bcrypt.__about__.__version__`, removed in bcrypt 4.1 —
-# which pinned this project to bcrypt <4.1 and blocked upstream fixes.
-# Hash format is unchanged ($2b$ modular crypt), so every password stored by
-# the passlib era still verifies here.
-BCRYPT_ROUNDS = 12  # passlib's default cost; keep so existing/new hashes match
-
-# bcrypt only reads the first 72 bytes of a password. Routes reject anything
-# longer with a clear message, so silently truncating here would hide a bug.
-BCRYPT_MAX_BYTES = 72
+# bcrypt used directly (passlib dropped: unmaintained; pinned bcrypt <4.1).
+# Hash format stays $2b$ modular crypt — existing passwords still verify.
+BCRYPT_ROUNDS = 12
+BCRYPT_MAX_BYTES = 72  # bcrypt limit; routes reject longer passwords
 
 
 def hash_password(password: str) -> str:

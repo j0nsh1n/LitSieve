@@ -95,15 +95,11 @@ def _run_multi_fetch(p, *, query, sources, max_results, email, clear_first, uid)
         if v.get('error_kind')
     }
     ok = {src: v['count'] for src, v in results.items() if not v['error']}
-    cancelled = is_job_cancelled(uid, 'fetch')
     hit_quota = quota.is_over_quota(uid)
-    # Quota stop is not a user cancel — keep status/flags distinct for the UI.
-    if hit_quota:
-        status = "quota_stopped"
-    elif cancelled:
-        status = "cancelled"
-    else:
-        status = "success"
+    status, cancelled_flag = quota.fetch_finish_status(
+        cancelled=is_job_cancelled(uid, 'fetch'),
+        hit_quota=hit_quota,
+    )
     return {
         "status": status,
         "quota_stopped": hit_quota,
@@ -114,8 +110,7 @@ def _run_multi_fetch(p, *, query, sources, max_results, email, clear_first, uid)
         "errors": errors,
         "error_kinds": error_kinds,
         "cleared_first": clear_first,
-        # True only when the user hit Cancel — never set for quota.
-        "cancelled": cancelled and not hit_quota,
+        "cancelled": cancelled_flag,
     }
 
 

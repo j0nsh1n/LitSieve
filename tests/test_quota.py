@@ -149,22 +149,20 @@ def test_statistics_exposes_storage_usage(app_module):
     assert stats["storage"]["over_limit"] is False
 
 
-def test_mid_fetch_quota_status_is_not_cancelled():
-    """When a running fetch hits the cap, status must be quota_stopped not cancelled."""
-    # Mirror _run_multi_fetch status selection without a full multi-source job.
-    cancelled = False
-    hit_quota = True
-    if hit_quota:
-        status = "quota_stopped"
-    elif cancelled:
-        status = "cancelled"
-    else:
-        status = "success"
-    cancelled_flag = cancelled and not hit_quota
+def test_fetch_finish_status_distinguishes_quota_from_cancel():
+    status, cancelled = quota.fetch_finish_status(cancelled=False, hit_quota=True)
     assert status == "quota_stopped"
-    assert cancelled_flag is False
+    assert cancelled is False
 
-    # User cancel without quota still uses cancelled.
-    cancelled, hit_quota = True, False
-    status = "quota_stopped" if hit_quota else ("cancelled" if cancelled else "success")
+    status, cancelled = quota.fetch_finish_status(cancelled=True, hit_quota=False)
     assert status == "cancelled"
+    assert cancelled is True
+
+    # Quota wins if both somehow fire.
+    status, cancelled = quota.fetch_finish_status(cancelled=True, hit_quota=True)
+    assert status == "quota_stopped"
+    assert cancelled is False
+
+    status, cancelled = quota.fetch_finish_status(cancelled=False, hit_quota=False)
+    assert status == "success"
+    assert cancelled is False
