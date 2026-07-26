@@ -471,7 +471,7 @@ async function doStarredSearch(opts) {
  if (banner && bannerText) {
  banner.style.display = 'block';
  bannerText.textContent =
- `More like your starred papers (${data.seed_count || 0} star${(data.seed_count || 0) === 1 ? '' : 's'}). Starred items are excluded from this list.`;
+ `More like your starred papers (${data.seed_count || 0} star${(data.seed_count || 0) === 1 ? '' : 's'}). Starred papers stay in the list (usually near the top).`;
  }
  let results = data.results || [];
  if (filters.sort_by !== 'similarity') {
