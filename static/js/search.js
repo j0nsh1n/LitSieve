@@ -330,9 +330,12 @@ function tokensFromQuery(text) {
 function highlightText(text, tokens) {
  const raw = text || '';
  if (!tokens.length) return escapeHtml(raw);
-    // Longest first so multi-word-ish tokens win when overlapping.
+ // Longest first; word boundaries so "model" does not paint inside "models".
  const sorted = [...new Set(tokens)].sort((a, b) => b.length - a.length);
- const pattern = new RegExp('(' + sorted.map(escapeRegExp).join('|') + ')', 'gi');
+ const pattern = new RegExp(
+  '\\b(' + sorted.map(escapeRegExp).join('|') + ')\\b',
+  'gi'
+ );
  return escapeHtml(raw).replace(pattern, '<mark class="query-hl">$1</mark>');
 }
 
