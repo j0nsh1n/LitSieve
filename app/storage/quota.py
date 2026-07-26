@@ -102,3 +102,16 @@ def is_over_quota(user_id: str) -> bool:
     except Exception:
         logger.exception("Quota check failed for %s; allowing the operation", user_id)
         return False
+
+
+def fetch_finish_status(*, cancelled: bool, hit_quota: bool) -> tuple[str, bool]:
+    """Map job end conditions to API status + cancelled flag.
+
+    Quota stop is not a user cancel: status becomes ``quota_stopped`` and
+    ``cancelled`` stays False so the UI can show a storage message.
+    """
+    if hit_quota:
+        return "quota_stopped", False
+    if cancelled:
+        return "cancelled", True
+    return "success", False
