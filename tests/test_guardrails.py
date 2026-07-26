@@ -162,3 +162,55 @@ def test_pipeline_fetchers_nonempty_and_catalog_aligned():
     assert len(FETCHERS) >= 15
     # Full 1:1 lock lives in test_source_catalog; this is a cheap fail-closed check.
     assert set(FETCHERS.keys()) == set(SOURCE_CATALOG.keys())
+
+
+def test_corpus_growth_endpoints_are_quota_gated():
+    """Every endpoint that can grow an account's disk usage must check quota.
+
+    Without this, adding a new import path (or dropping a gate during a
+    refactor) silently removes the only ceiling on per-account storage.
+    """
+    import inspect
+
+    from app.routes import corpus
+
+    source = inspect.getsource(corpus)
+    for handler in (
+        "async def api_fetch_multi",
+        "async def api_create_embeddings",
+        "async def api_load_sample_corpus",
+    ):
+        assert handler in source, f"{handler} disappeared from routes/corpus.py"
+
+    # The gate is the raise-path call; is_over_quota alone is the in-job check.
+    assert source.count("quota.check_quota(uid)") >= 3, (
+        "a corpus-growth endpoint lost its quota.check_quota() gate"
+    )
+    # A running fetch must also stop when the account crosses the cap.
+    assert "quota.is_over_quota(uid)" in source
+
+
+def test_passwords_use_bcrypt_directly_not_passlib():
+    """passlib is unmaintained and pinned bcrypt <4.1; do not reintroduce it."""
+    import app.auth as auth_mod
+
+    src = Path(auth_mod.__file__).read_text(encoding="utf-8")
+    assert "CryptContext" not in src, "passlib CryptContext is back in app/auth.py"
+    assert "import bcrypt" in src
+
+    reqs = Path(__file__).resolve().parents[1] / "requirements.txt"
+    text = reqs.read_text(encoding="utf-8")
+    assert "passlib" not in text.replace("passlib dropped", ""), "passlib back in requirements"
+    assert "bcrypt<4.1" not in text and "bcrypt>=4.0.1,<4.1" not in text
+
+
+def test_startup_uses_lifespan_not_deprecated_on_event():
+    import re
+
+    main_src = Path(__file__).resolve().parents[1] / "app" / "main.py"
+    src = main_src.read_text(encoding="utf-8")
+    # Match the decorator in use (start of line), not a mention in a comment.
+    assert not re.search(r"^\s*@app\.on_event", src, re.M), (
+        "on_event is deprecated; use the lifespan handler"
+    )
+    assert "lifespan=lifespan" in src

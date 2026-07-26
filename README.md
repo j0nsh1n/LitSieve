@@ -7,7 +7,7 @@ sdk: docker
 app_port: 7860
 ---
 
-# Literature Research Aide 📚 — v4.2.0
+# Literature Research Aide 📚 — v4.3.0
 
 A multi-user web app for **students** to fetch, screen, and rank research papers
 across public academic databases as a **research starting point**. Semantic
@@ -77,7 +77,7 @@ Built with **FastAPI**, sentence-transformers, FAISS, and scikit-learn.
 ## Installation
 
 ### Prerequisites
-- Python 3.11 recommended
+- Python 3.14 (matches CI, Docker, and Render)
 - pip
 
 ### Setup
@@ -228,11 +228,12 @@ cleanly during tests. Coverage includes:
 - **Sessions** — JWT in an `HttpOnly` + `Secure` + `SameSite=Lax` cookie, with a
   `token_version` claim so changing a password revokes that user's other
   sessions. CSRF uses a double-submit token on every mutating request.
-- **Passwords** — bcrypt via passlib. Never stored or logged in the clear.
+- **Passwords** — bcrypt (used directly; passlib dropped). Never stored or logged in the clear.
 - **Provider API keys** — encrypted at rest in `user_data/ai_settings.json`
-  (key derived from `SECRET_KEY`; file also `chmod 600`). Rotating `SECRET_KEY`
-  makes stored keys unreadable — the app drops them and asks you to re-enter,
-  rather than sending a ciphertext blob to a provider.
+  with **AES-256-GCM** (`enc:v2:`, fresh nonce each save; key via HKDF from
+  `SECRET_KEY`). Older Fernet (`enc:v1:`) blobs still load and upgrade on the
+  next save. File is `chmod 600`. Rotating `SECRET_KEY` drops unreadable keys
+  rather than sending ciphertext to a provider.
 - **Databases at rest (optional)** — set `DB_ENCRYPTION_KEY` to open every
   SQLite file through SQLCipher. Off by default. Convert existing databases
   first, or the app will refuse to open them:

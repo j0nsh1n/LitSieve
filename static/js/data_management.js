@@ -724,7 +724,19 @@ function applyFetchResult(data, sources) {
  .map(([src, count]) => `${getSourceName(src)}: ${count}`)
  .join(' · ');
 
- if (data.cancelled) {
+ if (data.quota_stopped || data.status === 'quota_stopped') {
+ const used = (data.quota && data.quota.used_mb != null) ? data.quota.used_mb : '?';
+ const lim = (data.quota && data.quota.limit_mb != null) ? data.quota.limit_mb : '?';
+ setStatus(
+  'fetch-status',
+  `Storage limit reached after ${data.total_fetched || 0} articles (${used} / ${lim} MB) - ${breakdown}. Delete a library or papers, then try again.`,
+  'warning'
+ );
+ showNotification(
+  `Storage limit reached (${data.total_fetched || 0} papers kept). Free space, then fetch again.`,
+  'warning'
+ );
+ } else if (data.cancelled || data.status === 'cancelled') {
  setStatus('fetch-status', `Fetch cancelled after ${data.total_fetched || 0} articles - ${breakdown}`, 'warning');
  showNotification(`Fetch cancelled (${data.total_fetched || 0} papers kept).`, 'warning');
  } else if (errorCount === 0) {
@@ -796,7 +808,8 @@ async function doFetch() {
  // Embeddings are manual: topics may update the model dropdown, but the
  // student presses "Prepare Papers" when ready (avoids surprise long jobs
  // and wrong-model re-embeds).
- if ((data.total_fetched || 0) > 0 && !data.cancelled) {
+ if ((data.total_fetched || 0) > 0 && !data.cancelled && !data.quota_stopped
+  && data.status !== 'quota_stopped') {
  applyModelRecommendation();
  setStatus(
  'embeddings-status',
@@ -809,6 +822,9 @@ async function doFetch() {
  if (msg.toLowerCase().includes('already running')) {
  setStatus('fetch-status', 'A fetch is already running.', 'warning');
  showNotification('A fetch is already running.', 'warning');
+ } else if (msg.toLowerCase().includes('storage limit') || /507/.test(String(e.status || ''))) {
+ setStatus('fetch-status', msg, 'warning');
+ showNotification(msg, 'warning');
  } else {
  setStatus('fetch-status', `Fetch failed: ${msg}`, 'error');
  showNotification(`Fetch failed: ${msg}`, 'error');
@@ -861,7 +877,10 @@ async function doCreateEmbeddings() {
  loadPageData();
  } catch (e) {
  const msg = e.message || '';
- if (msg.toLowerCase().includes('already running')) {
+ if (msg.toLowerCase().includes('storage limit')) {
+  setStatus('embeddings-status', msg, 'warning');
+  showNotification(msg, 'warning');
+ } else if (msg.toLowerCase().includes('already running')) {
  setStatus('embeddings-status', 'Embedding is already running.', 'warning');
  showNotification('An embedding job is already running.', 'warning');
  } else {

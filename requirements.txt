@@ -29,10 +29,10 @@ cryptography>=43.0.0
 # Optional at-rest database encryption. Only used when DB_ENCRYPTION_KEY is
 # set; harmless (and small) otherwise. See tools/encrypt_databases.py.
 sqlcipher3-binary>=0.5.4
-passlib[bcrypt]>=1.7.4
-# passlib 1.7.4 introspects bcrypt.__about__.__version__, removed in bcrypt 4.1+.
-# Pin below 4.1 to keep the passlib bcrypt backend working.
-bcrypt>=4.0.1,<4.1
+# bcrypt used directly (passlib dropped in v4.3: unmaintained since 2020 and
+# its backend pinned us to bcrypt <4.1). Hash format unchanged, so existing
+# passwords keep working.
+bcrypt>=4.1
 
 # Rate limiting
 slowapi>=0.1.9
