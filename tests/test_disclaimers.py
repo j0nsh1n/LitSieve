@@ -11,7 +11,6 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from app.main import app
 
 TEMPLATES = Path(__file__).resolve().parents[1] / "templates"
-CACHE_BUST = "20260717r15"
 
 # Canonical phrases that must appear in the full banner (single source of truth).
 FULL_PHRASES = (
@@ -20,6 +19,10 @@ FULL_PHRASES = (
     "not a complete library search",
     "medical, legal, or professional advice",
 )
+
+# Public pages (landing/auth/guides) and the app shell (base.html) may bump
+# style.css?v= independently — only require a non-empty cache-bust token.
+_STYLE_CACHE_BUST = re.compile(r"style\.css\?v=[A-Za-z0-9._-]+")
 
 
 def _env() -> Environment:
@@ -87,14 +90,14 @@ def test_public_pages_render_shared_banner():
     plain = _plain(landing.text)
     for phrase in FULL_PHRASES:
         assert phrase.lower() in plain, f"landing missing: {phrase}"
-    assert f"style.css?v={CACHE_BUST}" in landing.text
+    assert _STYLE_CACHE_BUST.search(landing.text), "landing missing style.css?v=…"
 
     guide = client.get("/learn/multi-source-search")
     assert guide.status_code == 200
     gplain = _plain(guide.text)
     for phrase in FULL_PHRASES:
         assert phrase.lower() in gplain, f"guide missing: {phrase}"
-    assert f"style.css?v={CACHE_BUST}" in guide.text
+    assert _STYLE_CACHE_BUST.search(guide.text), "guide missing style.css?v=…"
 
 
 def test_auth_pages_render_shared_auth_disclaimer():
@@ -104,7 +107,16 @@ def test_auth_pages_render_shared_auth_disclaimer():
         assert r.status_code == 200
         assert "Starting point only" in r.text
         assert "Public research databases only" in r.text
-        assert f"style.css?v={CACHE_BUST}" in r.text
+        assert _STYLE_CACHE_BUST.search(r.text), f"{path} missing style.css?v=…"
+
+
+def test_app_shell_stylesheet_cache_bust_matches_base_template():
+    """base.html is the app shell; keep its ?v= token present (CodeRabbit)."""
+    base = (TEMPLATES / "base.html").read_text(encoding="utf-8")
+    m = _STYLE_CACHE_BUST.search(base)
+    assert m, "base.html missing style.css?v= cache-bust"
+    # Token must change when CSS changes — currently 20260726r3 on this branch.
+    assert "style.css?v=" in base
 
 
 def test_no_inline_disclaimer_drift_in_templates():
