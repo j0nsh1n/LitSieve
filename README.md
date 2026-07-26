@@ -219,6 +219,37 @@ cleanly during tests. Coverage includes:
   stubbed (a fake fetcher), so it runs offline; it self-skips if app runtime
   deps aren't installed.
 
+## Security
+
+- **Transport** — TLS is terminated by the host (Render / HF Spaces). The app
+  sends `Strict-Transport-Security` (outside `DEBUG`), plus `X-Content-Type-Options`,
+  `X-Frame-Options: DENY`, `Referrer-Policy` and a CSP that blocks scripts from
+  any external origin (`app/security.py`).
+- **Sessions** — JWT in an `HttpOnly` + `Secure` + `SameSite=Lax` cookie, with a
+  `token_version` claim so changing a password revokes that user's other
+  sessions. CSRF uses a double-submit token on every mutating request.
+- **Passwords** — bcrypt via passlib. Never stored or logged in the clear.
+- **Provider API keys** — encrypted at rest in `user_data/ai_settings.json`
+  (key derived from `SECRET_KEY`; file also `chmod 600`). Rotating `SECRET_KEY`
+  makes stored keys unreadable — the app drops them and asks you to re-enter,
+  rather than sending a ciphertext blob to a provider.
+- **Databases at rest (optional)** — set `DB_ENCRYPTION_KEY` to open every
+  SQLite file through SQLCipher. Off by default. Convert existing databases
+  first, or the app will refuse to open them:
+
+  ```bash
+  python tools/encrypt_databases.py --key "$DB_ENCRYPTION_KEY"          # dry run
+  python tools/encrypt_databases.py --key "$DB_ENCRYPTION_KEY" --apply  # convert
+  python tools/encrypt_databases.py --key "$DB_ENCRYPTION_KEY" --decrypt --apply
+  ```
+
+  This protects a stolen disk or a copied backup. It cannot protect a
+  compromised running server, which necessarily holds the key. **Losing the key
+  means losing the data** — keep it in your host's secret store.
+- **Secrets in the repo** — `.env*` and `user_data/` are gitignored; keep `.env`
+  at `chmod 600`. Production keys should come from the platform's secret
+  manager (`render.yaml` generates `SECRET_KEY` automatically).
+
 ## Troubleshooting
 
 **"SECRET_KEY is not configured"** — set `SECRET_KEY` in `.env`, or `DEBUG=true`

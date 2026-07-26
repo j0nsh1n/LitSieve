@@ -7,11 +7,12 @@ import json
 import logging
 import pickle
 import re
-import sqlite3
 import threading
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
+
+from app.storage import dbconn
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +23,7 @@ class ArticleDatabase:
     def __init__(self, db_path: str = "articles.db"):
         """Initialize database connection"""
         self.db_path = db_path
-        self.conn = sqlite3.connect(db_path, check_same_thread=False)
+        self.conn = dbconn.connect(db_path, check_same_thread=False)
         # WAL reduces "database is locked" under concurrent readers/writers;
         # busy_timeout waits up to 5s before raising instead of failing immediately.
         self.conn.execute("PRAGMA journal_mode=WAL")

@@ -16,8 +16,6 @@ faiss-cpu>=1.8.0
 # PCA reduction that produces far more "outliers". Pulls in numba/llvmlite.
 umap-learn>=0.5.6
 
-# Visualization
-
 # Web interface
 fastapi>=0.115.0
 uvicorn>=0.30.0
@@ -26,6 +24,11 @@ python-multipart>=0.0.18
 
 # Authentication
 PyJWT>=2.9.0
+# Encrypts provider API keys at rest in user_data/ai_settings.json.
+cryptography>=43.0.0
+# Optional at-rest database encryption. Only used when DB_ENCRYPTION_KEY is
+# set; harmless (and small) otherwise. See tools/encrypt_databases.py.
+sqlcipher3-binary>=0.5.4
 passlib[bcrypt]>=1.7.4
 # passlib 1.7.4 introspects bcrypt.__about__.__version__, removed in bcrypt 4.1+.
 # Pin below 4.1 to keep the passlib bcrypt backend working.
