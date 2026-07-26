@@ -13,7 +13,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.14"
 
       - name: Install test dependencies
         run: |
@@ -32,8 +32,7 @@ jobs:
             PyJWT \
             cryptography \
             sqlcipher3-binary \
-            "passlib[bcrypt]" \
-            "bcrypt<4.1" \
+            "bcrypt>=4.1" \
             python-multipart \
             requests \
             python-dotenv
@@ -46,3 +45,37 @@ jobs:
           SECRET_KEY: ci-test-key
           DEBUG: "true"
         run: python -m pytest -q
+
+  docker:
+    # Builds the image and boots it. The test job installs packages directly,
+    # so it cannot catch a broken Dockerfile (wrong base image, bad WORKDIR,
+    # a missing runtime dependency) — that used to surface only at deploy.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t literature-aide:ci .
+
+      - name: Boot the container and check /health
+        run: |
+          docker run -d --name lra-ci -p 7860:7860 \
+            -e SECRET_KEY=ci-smoke-key \
+            literature-aide:ci
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:7860/health || true)
+            if [ "$code" = "200" ]; then echo "healthy after ${i}s"; break; fi
+            sleep 1
+          done
+          test "$code" = "200" || { echo "::error::container did not become healthy"; docker logs lra-ci; exit 1; }
+          curl -sf http://127.0.0.1:7860/health | grep -q '"status":"healthy"'
+          # Public landing must render (catches missing templates/ in the image).
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:7860/)" = "200"
+
+      - name: Container logs on failure
+        if: failure()
+        run: docker logs lra-ci || true
+
+      - name: Clean up
+        if: always()
+        run: docker rm -f lra-ci || true
