@@ -1274,11 +1274,6 @@ input[type="range"]::-moz-range-thumb:hover {
     padding: 0.1rem 0.45rem;
     border: 1px solid currentColor;
     flex-shrink: 0;
-    transition: transform var(--dur-fast) var(--ease-out);
-}
-
-.article-card:hover .sim-badge {
-    transform: scale(1.04);
 }
 
 .sim-high { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 55%, var(--rule)); }
@@ -1733,12 +1728,6 @@ html[data-reading="on"] .key-points {
     padding: 0.12rem 0.45rem;
     border: 1px solid var(--rule);
     color: var(--text-soft);
-    transition: transform var(--dur-fast) var(--ease-out),
-                border-color var(--dur-fast) var(--ease-soft);
-}
-
-.pico-tag:hover {
-    transform: translateY(-1px);
 }
 
 .pico-tag.pop { border-color: var(--text-soft); color: var(--text); }
