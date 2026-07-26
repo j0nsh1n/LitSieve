@@ -15,6 +15,7 @@ Set ``MAX_USER_STORAGE_MB=0`` to disable (useful for a single-user local run).
 from __future__ import annotations
 
 import logging
+import math
 import os
 
 from app.storage.libraries import user_dir
@@ -42,16 +43,24 @@ def mb(num_bytes: int) -> float:
 
 
 def limit_bytes() -> int:
-    """Configured ceiling in bytes; 0 means unlimited."""
+    """Configured ceiling in bytes; 0 means unlimited.
+
+    Only finite, non-negative numbers are accepted. ``inf`` / NaN / negatives
+    fall back to the default (negatives used to become 0 and silently disable
+    the cap). Explicit ``0`` still means unlimited.
+    """
     raw = (os.getenv(ENV_KEY) or "").strip()
     if not raw:
         return DEFAULT_MAX_MB * 1024 * 1024
     try:
-        value = int(float(raw))
-    except ValueError:
+        value = float(raw)
+    except (ValueError, OverflowError):
         logger.warning("%s=%r is not a number; using default %d MB", ENV_KEY, raw, DEFAULT_MAX_MB)
         return DEFAULT_MAX_MB * 1024 * 1024
-    return max(0, value) * 1024 * 1024
+    if not math.isfinite(value) or value < 0:
+        logger.warning("%s=%r is invalid; using default %d MB", ENV_KEY, raw, DEFAULT_MAX_MB)
+        return DEFAULT_MAX_MB * 1024 * 1024
+    return int(value) * 1024 * 1024
 
 
 def usage_bytes(user_id: str) -> int:

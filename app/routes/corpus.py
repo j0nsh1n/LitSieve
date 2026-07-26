@@ -123,10 +123,16 @@ async def api_fetch_multi(req: MultiFetchRequest, request: Request):
     if csrf_failed(request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
     uid = user["user_id"]
-    try:
-        quota.check_quota(uid)
-    except quota.QuotaExceeded as e:
-        return JSONResponse(status_code=507, content={"detail": str(e), "quota": quota.usage_report(uid)})
+    # Replace/clear_first must be allowed while over quota so students can
+    # wipe the library and free disk; mid-fetch still stops if they go over again.
+    if not req.clear_first:
+        try:
+            quota.check_quota(uid)
+        except quota.QuotaExceeded as e:
+            return JSONResponse(
+                status_code=507,
+                content={"detail": str(e), "quota": quota.usage_report(uid)},
+            )
     job_kwargs = dict(
         query=req.query,
         sources=req.sources,
@@ -437,10 +443,14 @@ async def api_load_sample_corpus(req: SampleCorpusRequest, request: Request):
     if csrf_failed(request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
     uid = user["user_id"]
-    try:
-        quota.check_quota(uid)
-    except quota.QuotaExceeded as e:
-        return JSONResponse(status_code=507, content={"detail": str(e), "quota": quota.usage_report(uid)})
+    if not req.clear_first:
+        try:
+            quota.check_quota(uid)
+        except quota.QuotaExceeded as e:
+            return JSONResponse(
+                status_code=507,
+                content={"detail": str(e), "quota": quota.usage_report(uid)},
+            )
     p = get_pipeline(uid)
     try:
         if req.clear_first:
