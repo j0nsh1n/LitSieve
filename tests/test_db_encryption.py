@@ -6,12 +6,21 @@ tests cover both states and the failure modes that could destroy data.
 
 from __future__ import annotations
 
+import os
+
 import pytest
 
 from app.storage import dbconn
 from app.storage.database import ArticleDatabase
 
-sqlcipher = pytest.importorskip("sqlcipher3", reason="sqlcipher3-binary not installed")
+# CI always installs sqlcipher3-binary — fail hard there so encryption coverage
+# cannot silently disappear. Locally, skip only if the optional package is missing.
+if os.environ.get("CI"):
+    import sqlcipher3 as sqlcipher  # noqa: F401
+else:
+    sqlcipher = pytest.importorskip(
+        "sqlcipher3", reason="sqlcipher3-binary not installed (pip install -r requirements.txt)"
+    )
 
 ARTICLE = {
     "article_id": "1", "source": "pubmed", "title": "Confidential study title",
