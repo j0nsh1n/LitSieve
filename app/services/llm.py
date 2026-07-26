@@ -91,6 +91,78 @@ def _settings_path() -> Path:
     return AI_SETTINGS_PATH
 
 
+# --- API keys at rest -------------------------------------------------------
+# Provider API keys are encrypted in ai_settings.json rather than stored as
+# plaintext. The encryption key is derived from SECRET_KEY, so it lives in the
+# same place the process already keeps a secret — this protects a copied or
+# backed-up settings file, not an attacker who already has the environment.
+# Values are tagged so a pre-existing plaintext file keeps working and is
+# upgraded on the next save.
+SECRET_FIELD_SUFFIX = "_api_key"
+ENC_PREFIX = "enc:v1:"
+
+
+def _fernet():
+    """Fernet built from SECRET_KEY, or None when no secret is configured."""
+    secret = _env("SECRET_KEY")
+    if not secret:
+        return None
+    try:
+        import base64
+
+        from cryptography.fernet import Fernet
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+    except ImportError:  # pragma: no cover - cryptography is a hard dependency
+        logger.warning("cryptography not installed; AI keys stay in plaintext")
+        return None
+    derived = HKDF(
+        algorithm=hashes.SHA256(), length=32, salt=None,
+        info=b"literature-research-aide/ai-settings/v1",
+    ).derive(secret.encode("utf-8"))
+    return Fernet(base64.urlsafe_b64encode(derived))
+
+
+def _encrypt_secrets(data: Dict[str, Any]) -> Dict[str, Any]:
+    f = _fernet()
+    if f is None:
+        return dict(data)
+    out = dict(data)
+    for key, value in data.items():
+        if not key.endswith(SECRET_FIELD_SUFFIX) or not isinstance(value, str):
+            continue
+        if value.startswith(ENC_PREFIX) or not value:
+            continue
+        out[key] = ENC_PREFIX + f.encrypt(value.encode("utf-8")).decode("ascii")
+    return out
+
+
+def _decrypt_secrets(data: Dict[str, Any]) -> Dict[str, Any]:
+    out = dict(data)
+    f = None
+    for key, value in data.items():
+        if not key.endswith(SECRET_FIELD_SUFFIX) or not isinstance(value, str):
+            continue
+        if not value.startswith(ENC_PREFIX):
+            continue  # legacy plaintext; re-encrypted on next save
+        if f is None:
+            f = _fernet()
+        if f is None:
+            out.pop(key, None)
+            continue
+        try:
+            out[key] = f.decrypt(value[len(ENC_PREFIX):].encode("ascii")).decode("utf-8")
+        except Exception:
+            # Almost always means SECRET_KEY changed. Drop the unusable value
+            # instead of handing a ciphertext blob to a provider as an API key.
+            logger.warning(
+                "Could not decrypt %s (SECRET_KEY rotated?). Re-enter it on the "
+                "Account page.", key,
+            )
+            out.pop(key, None)
+    return out
+
+
 def load_ai_settings(force: bool = False) -> Dict[str, Any]:
     """Load server AI settings from JSON (empty dict if missing)."""
     global _SETTINGS_CACHE
@@ -106,6 +178,7 @@ def load_ai_settings(force: bool = False) -> Dict[str, Any]:
         except Exception as exc:
             logger.warning("Could not read %s: %s", path, exc)
             data = {}
+    data = _decrypt_secrets(data)
     _SETTINGS_CACHE = data
     return dict(data)
 
@@ -124,7 +197,10 @@ def save_ai_settings(updates: Dict[str, Any]) -> Dict[str, Any]:
             current.pop(key, None)
             continue
         current[key] = value
-    path.write_text(json.dumps(current, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    # On disk: API keys encrypted. In memory/cache: plaintext, so callers and
+    # apply_ai_settings_to_env() keep working unchanged.
+    on_disk = _encrypt_secrets(current)
+    path.write_text(json.dumps(on_disk, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     try:
         os.chmod(path, 0o600)
     except OSError:

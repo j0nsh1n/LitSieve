@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
+from app.storage import dbconn
 from app.storage.database import ArticleDatabase
 from app.storage.libraries import (
     NAME_MAX,
@@ -100,7 +101,7 @@ def count_library_stats(user_id: str, library_id: str) -> Dict[str, int]:
     path = library_db_path(user_id, library_id)
     if not path.is_file():
         return {"articles": 0, "screening": 0, "embeddings": 0, "key_points": 0}
-    conn = sqlite3.connect(str(path))
+    conn = dbconn.connect(str(path))
     try:
         def _count(table: str) -> int:
             try:
@@ -187,9 +188,9 @@ def clone_library_data(
                 pass
 
     try:
-        src_conn = sqlite3.connect(f"file:{src}?mode=ro", uri=True)
+        src_conn = dbconn.connect(f"file:{src}?mode=ro", uri=True)
         try:
-            tmp_conn = sqlite3.connect(str(tmp))
+            tmp_conn = dbconn.connect(str(tmp))
             try:
                 src_conn.backup(tmp_conn)
                 tmp_conn.execute("DELETE FROM notes")
