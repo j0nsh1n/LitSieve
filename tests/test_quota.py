@@ -76,6 +76,11 @@ def test_limit_defaults_and_env_override(monkeypatch):
     monkeypatch.setenv(quota.ENV_KEY, "not-a-number")
     assert quota.limit_bytes() == quota.DEFAULT_MAX_MB * 1024 * 1024
 
+    # inf / NaN / negatives → default (negatives must not disable the cap).
+    for bad in ("inf", "-inf", "nan", "-5"):
+        monkeypatch.setenv(quota.ENV_KEY, bad)
+        assert quota.limit_bytes() == quota.DEFAULT_MAX_MB * 1024 * 1024
+
 
 def test_usage_counts_bytes_across_all_libraries(tmp_path, monkeypatch):
     monkeypatch.setenv("USER_DATA_DIR", str(tmp_path / "ud"))
@@ -102,10 +107,16 @@ def test_check_quota_raises_only_when_over(tmp_path, monkeypatch):
     (root / "small.db").write_bytes(b"x" * 1024)
     quota.check_quota(uid)  # under: no raise
 
-    (root / "big.db").write_bytes(b"x" * (1024 * 1024))
+    # Exactly at the cap (>=) is over — not only "strictly greater".
+    (root / "exact.db").write_bytes(b"x" * (1024 * 1024 - 1024))
+    assert quota.usage_bytes(uid) == 1024 * 1024
     with pytest.raises(quota.QuotaExceeded):
         quota.check_quota(uid)
     assert quota.is_over_quota(uid) is True
+
+    (root / "extra.db").write_bytes(b"x" * 10)
+    with pytest.raises(quota.QuotaExceeded):
+        quota.check_quota(uid)
 
 
 def test_fetch_refused_with_507_when_over_quota(app_module, monkeypatch):
@@ -117,13 +128,64 @@ def test_fetch_refused_with_507_when_over_quota(app_module, monkeypatch):
 
     r = c.post(
         "/api/fetch-articles-multi",
-        json={"sources": ["pubmed"], "query": "x", "max_results": 5, "wait": True},
+        json={
+            "sources": ["pubmed"], "query": "x", "max_results": 5,
+            "wait": True, "clear_first": False,
+        },
         headers=headers,
     )
     assert r.status_code == 507, r.text
     body = r.json()
     assert "storage limit" in body["detail"].lower()
     assert body["quota"]["over_limit"] is True
+
+
+def test_fetch_clear_first_allowed_when_over_quota(app_module, monkeypatch):
+    """Replace-mode fetch must not be blocked so an over-limit account can recover."""
+    from app.routes import corpus as corpus_routes
+
+    c = TestClient(app_module.app)
+    headers = _register(c, "quotaclear")
+    monkeypatch.setattr(quota, "usage_bytes", lambda uid: 10**9)
+    monkeypatch.setenv(quota.ENV_KEY, "1")
+
+    # Append (clear_first=false) still blocked.
+    r = c.post(
+        "/api/fetch-articles-multi",
+        json={
+            "sources": ["pubmed"], "query": "x", "max_results": 1,
+            "wait": True, "clear_first": False,
+        },
+        headers=headers,
+    )
+    assert r.status_code == 507, r.text
+
+    # Stub the job body so we only test preflight (no network).
+    monkeypatch.setattr(
+        corpus_routes,
+        "_run_multi_fetch",
+        lambda *a, **k: {
+            "status": "success",
+            "total_fetched": 0,
+            "by_source": {},
+            "ok_sources": {},
+            "errors": {},
+            "error_kinds": {},
+            "cleared_first": True,
+            "cancelled": False,
+            "quota_stopped": False,
+        },
+    )
+    r = c.post(
+        "/api/fetch-articles-multi",
+        json={
+            "sources": ["pubmed"], "query": "x", "max_results": 1,
+            "wait": True, "clear_first": True,
+        },
+        headers=headers,
+    )
+    assert r.status_code == 200, r.text
+    assert r.json().get("status") == "success"
 
 
 def test_embeddings_and_sample_corpus_also_gated(app_module, monkeypatch):
@@ -135,7 +197,8 @@ def test_embeddings_and_sample_corpus_also_gated(app_module, monkeypatch):
     r = c.post("/api/create-embeddings", json={"wait": True}, headers=headers)
     assert r.status_code == 507, r.text
 
-    r = c.post("/api/load-sample-corpus", json={}, headers=headers)
+    # Append sample without clear — still gated. (clear_first=true is allowed.)
+    r = c.post("/api/load-sample-corpus", json={"clear_first": False}, headers=headers)
     assert r.status_code == 507, r.text
 
 

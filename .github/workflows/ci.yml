@@ -15,27 +15,13 @@ jobs:
         with:
           python-version: "3.14"
 
-      - name: Install test dependencies
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install \
-            pytest \
-            ruff \
-            numpy \
-            scikit-learn \
-            fastapi \
-            httpx \
-            jinja2 \
-            biopython \
-            tqdm \
-            slowapi \
-            PyJWT \
-            cryptography \
-            sqlcipher3-binary \
-            "bcrypt>=4.1" \
-            python-multipart \
-            requests \
-            python-dotenv
+          # Same declared set as Docker/Render (CPU torch first keeps the install smaller).
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements.txt
+          pip install pytest ruff
 
       - name: Ruff (critical + unused imports + import order)
         run: ruff check .
@@ -53,6 +39,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Build image
         run: docker build -t literature-aide:ci .
