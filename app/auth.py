@@ -8,11 +8,11 @@ import re
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+import bcrypt
 import jwt
 from dotenv import load_dotenv
 from fastapi import Request
 from jwt import InvalidTokenError
-from passlib.context import CryptContext
 
 load_dotenv()
 
@@ -74,15 +74,46 @@ if not _SECRET_KEY:
 ALGORITHM = "HS256"
 TOKEN_EXPIRE_DAYS = 30
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# bcrypt is used directly (no passlib). passlib 1.7.4 is unmaintained and its
+# bcrypt backend reads `bcrypt.__about__.__version__`, removed in bcrypt 4.1 —
+# which pinned this project to bcrypt <4.1 and blocked upstream fixes.
+# Hash format is unchanged ($2b$ modular crypt), so every password stored by
+# the passlib era still verifies here.
+BCRYPT_ROUNDS = 12  # passlib's default cost; keep so existing/new hashes match
+
+# bcrypt only reads the first 72 bytes of a password. Routes reject anything
+# longer with a clear message, so silently truncating here would hide a bug.
+BCRYPT_MAX_BYTES = 72
 
 
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    raw = password.encode("utf-8")
+    if len(raw) > BCRYPT_MAX_BYTES:
+        raise ValueError(f"Password exceeds {BCRYPT_MAX_BYTES} bytes.")
+    return bcrypt.hashpw(raw, bcrypt.gensalt(rounds=BCRYPT_ROUNDS)).decode("ascii")
+
+
+def _looks_like_bcrypt_hash(hashed: str) -> bool:
+    """Reject obvious garbage before calling into bcrypt (avoids Rust panics)."""
+    if not isinstance(hashed, str) or len(hashed) < 59:
+        return False
+    # Modular crypt: $2a$ / $2b$ / $2y$ + cost + 22-char salt + 31-char checksum.
+    return hashed.startswith(("$2a$", "$2b$", "$2y$"))
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    """Constant-time check. False (never an exception) on malformed input."""
+    if plain is None or not _looks_like_bcrypt_hash(hashed or ""):
+        return False
+    try:
+        raw = plain.encode("utf-8")
+        if len(raw) > BCRYPT_MAX_BYTES:
+            return False
+        return bool(bcrypt.checkpw(raw, hashed.encode("utf-8")))
+    except BaseException:
+        # ValueError/TypeError from bad salt, and (on some bcrypt builds) a
+        # pyo3 PanicException on corrupt hashes — login must never 500.
+        return False
 
 
 def create_token(user_id: str, username: str, token_version: int = 0) -> str:

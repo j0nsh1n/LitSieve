@@ -34,6 +34,7 @@ from app.schemas import (
     ScreeningRequest,
 )
 from app.services.enrich import attach_key_points
+from app.storage import quota
 from app.utils import (
     coverage_suggestions,
 )
@@ -83,7 +84,7 @@ def _run_multi_fetch(p, *, query, sources, max_results, email, clear_first, uid)
         max_results=max_results,
         email=email or "user@example.com",
         progress_callback=on_source_done,
-        cancel_check=lambda: is_job_cancelled(uid, 'fetch'),
+        cancel_check=lambda: is_job_cancelled(uid, 'fetch') or quota.is_over_quota(uid),
     )
     p.invalidate_corpus_cache()
     total = sum(v['count'] for v in results.values())
@@ -95,15 +96,26 @@ def _run_multi_fetch(p, *, query, sources, max_results, email, clear_first, uid)
     }
     ok = {src: v['count'] for src, v in results.items() if not v['error']}
     cancelled = is_job_cancelled(uid, 'fetch')
+    hit_quota = quota.is_over_quota(uid)
+    # Quota stop is not a user cancel — keep status/flags distinct for the UI.
+    if hit_quota:
+        status = "quota_stopped"
+    elif cancelled:
+        status = "cancelled"
+    else:
+        status = "success"
     return {
-        "status": "cancelled" if cancelled else "success",
+        "status": status,
+        "quota_stopped": hit_quota,
+        "quota": quota.usage_report(uid),
         "total_fetched": total,
         "by_source": {src: v['count'] for src, v in results.items()},
         "ok_sources": ok,
         "errors": errors,
         "error_kinds": error_kinds,
         "cleared_first": clear_first,
-        "cancelled": cancelled,
+        # True only when the user hit Cancel — never set for quota.
+        "cancelled": cancelled and not hit_quota,
     }
 
 
@@ -116,6 +128,10 @@ async def api_fetch_multi(req: MultiFetchRequest, request: Request):
     if csrf_failed(request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
     uid = user["user_id"]
+    try:
+        quota.check_quota(uid)
+    except quota.QuotaExceeded as e:
+        return JSONResponse(status_code=507, content={"detail": str(e), "quota": quota.usage_report(uid)})
     job_kwargs = dict(
         query=req.query,
         sources=req.sources,
@@ -201,6 +217,10 @@ async def api_create_embeddings(req: EmbeddingsRequest, request: Request):
     if csrf_failed(request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
     uid = user["user_id"]
+    try:
+        quota.check_quota(uid)
+    except quota.QuotaExceeded as e:
+        return JSONResponse(status_code=507, content={"detail": str(e), "quota": quota.usage_report(uid)})
     job_kwargs = dict(model=req.model, only_missing=req.only_missing, uid=uid)
     if not req.wait:
         if not start_user_job(uid, 'embed', _run_create_embeddings, **job_kwargs):
@@ -298,7 +318,11 @@ async def api_statistics(request: Request):
     uid = user["user_id"]
     p = get_pipeline(uid)
     try:
-        return p.get_statistics()
+        stats = p.get_statistics()
+        # Storage usage is account-wide (all libraries), so the UI can warn
+        # before a fetch is refused rather than after.
+        stats["storage"] = quota.usage_report(uid)
+        return stats
     except Exception as e:
         return server_error(e)
     finally:
@@ -418,6 +442,10 @@ async def api_load_sample_corpus(req: SampleCorpusRequest, request: Request):
     if csrf_failed(request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
     uid = user["user_id"]
+    try:
+        quota.check_quota(uid)
+    except quota.QuotaExceeded as e:
+        return JSONResponse(status_code=507, content={"detail": str(e), "quota": quota.usage_report(uid)})
     p = get_pipeline(uid)
     try:
         if req.clear_first:
