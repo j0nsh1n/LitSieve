@@ -750,6 +750,8 @@ class LiteratureSearchPipeline:
         if norm > 0:
             centroid = centroid / norm
 
+        # Include starred papers in the ranking (they sit near the centroid).
+        # Seed-paper search still excludes the seed itself; starred mode does not.
         results = self.search_similar(
             query_text="",
             top_k=top_k,
@@ -759,7 +761,6 @@ class LiteratureSearchPipeline:
             year_max=year_max,
             lexical_boost=False,
             query_embedding=centroid,
-            extra_exclude=set(starred_keys),
         )
         return {"results": results, "seed_count": len(starred_keys)}
 
