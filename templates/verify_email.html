@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ <title>Email verification - Literature Research Aide</title>
+ <link rel="stylesheet" href="/static/css/style.css?v=20260729a">
+ <script src="/static/js/theme-init.js?v=20260729a"></script>
+</head>
+<body class="auth-body">
+ <div class="auth-card">
+ <a href="/" class="auth-home-link">← Back to home</a>
+ <div class="auth-logo">{% if ok %}Email confirmed{% else %}Verification problem{% endif %}</div>
+
+ {% if ok %}
+ <div class="auth-subtitle">Account recovery is now set up</div>
+ <p class="auth-hint u-centered-lead-wide">
+  Thanks{% if username %}, {{ username }}{% endif %} — this address is confirmed.
+  If you ever forget your password, we can send a reset code here.
+ </p>
+ <p class="auth-hint u-centered-lead-wide">
+  Your <strong>username</strong> is still what you sign in with; the email is
+  only for recovery.
+ </p>
+ <p class="u-centered-lead-wide">
+  <a class="btn btn-primary" href="/account">Go to Account</a>
+  <a class="btn btn-secondary" href="/login">Sign in</a>
+ </p>
+ {% else %}
+ <div class="status-indicator error">{{ error }}</div>
+ <p class="auth-hint u-centered-lead-wide">
+  Verification links expire after 1 hour and work once. Sign in and use
+  <strong>Resend verification</strong> on the Account page to get a fresh one.
+ </p>
+ <p class="u-centered-lead-wide">
+  <a class="btn btn-primary" href="/account">Go to Account</a>
+  <a class="btn btn-secondary" href="/login">Sign in</a>
+ </p>
+ {% endif %}
+ </div>
+</body>
+</html>

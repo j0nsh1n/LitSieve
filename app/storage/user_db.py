@@ -41,6 +41,36 @@ class UserDatabase:
             self.conn.execute(
                 "ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0"
             )
+        # Optional recovery email. Separate from `username` on purpose: the
+        # login handle is not an email, and an address only counts once its
+        # owner has clicked the verification link (email_verified = 1).
+        if "email" not in cols:
+            self.conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
+        if "email_verified" not in cols:
+            self.conn.execute(
+                "ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0"
+            )
+        # One *verified* address per account, and no two accounts may verify the
+        # same address (unverified duplicates are allowed — anyone can type any
+        # address, only clicking the link proves control).
+        self.conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_verified_email "
+            "ON users(email) WHERE email IS NOT NULL AND email_verified = 1"
+        )
+        # One-time email-verification links (hashed, same shape as reset codes).
+        # `email` is stored on the token so a pending change is only applied to
+        # the address that was actually confirmed.
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS email_verification_tokens (
+                username     TEXT NOT NULL COLLATE NOCASE,
+                email        TEXT NOT NULL COLLATE NOCASE,
+                token_hash   TEXT NOT NULL,
+                expires_at   TEXT NOT NULL,
+                used         INTEGER NOT NULL DEFAULT 0,
+                created_at   TEXT DEFAULT (datetime('now')),
+                PRIMARY KEY (username, token_hash)
+            )
+        """)
         # One-time password-reset codes (hashed). Classroom hosts can surface
         # the plaintext code when DEBUG/RESET_CODES_IN_RESPONSE is set.
         self.conn.execute("""
@@ -114,7 +144,7 @@ class UserDatabase:
     def get_by_username(self, username: str) -> Optional[Dict]:
         with self._lock:
             row = self.conn.execute(
-                "SELECT id, username, hashed_password, token_version "
+                "SELECT id, username, hashed_password, token_version, email, email_verified "
                 "FROM users WHERE username = ? COLLATE NOCASE",
                 (username,),
             ).fetchone()
@@ -124,13 +154,16 @@ class UserDatabase:
                 "username": row[1],
                 "hashed_password": row[2],
                 "token_version": int(row[3] or 0),
+                "email": row[4],
+                "email_verified": bool(row[5]),
             }
         return None
 
     def get_by_id(self, user_id: str) -> Optional[Dict]:
         with self._lock:
             row = self.conn.execute(
-                "SELECT id, username, hashed_password, token_version FROM users WHERE id = ?",
+                "SELECT id, username, hashed_password, token_version, email, email_verified "
+                "FROM users WHERE id = ?",
                 (user_id,),
             ).fetchone()
         if row:
@@ -139,6 +172,8 @@ class UserDatabase:
                 "username": row[1],
                 "hashed_password": row[2],
                 "token_version": int(row[3] or 0),
+                "email": row[4],
+                "email_verified": bool(row[5]),
             }
         return None
 
@@ -427,3 +462,130 @@ class UserDatabase:
             )
             self.conn.commit()
         return True, ""
+
+    # --- Optional recovery email -------------------------------------------
+    # Design: `username` stays the login handle. An address is only usable
+    # (i.e. can receive a password-reset link) once the person clicking the
+    # verification link proves they control it.
+
+    @staticmethod
+    def normalize_email(raw: str) -> str:
+        return (raw or "").strip().lower()
+
+    def start_email_verification(
+        self, username: str, email: str, ttl_minutes: int = 60
+    ) -> Optional[str]:
+        """Store a pending (unverified) address + return a one-time token.
+
+        Returns None if the account does not exist. Raises ValueError when the
+        address is already verified on another account.
+        """
+        user = self.get_by_username(username)
+        if not user:
+            return None
+        email = self.normalize_email(email)
+        uname = user["username"]
+
+        token = secrets.token_urlsafe(24)
+        token_hash = self._hash_reset_token(token)
+        expires = (
+            datetime.now(timezone.utc) + timedelta(minutes=ttl_minutes)
+        ).strftime("%Y-%m-%d %H:%M:%S")
+
+        with self._lock:
+            taken = self.conn.execute(
+                "SELECT 1 FROM users WHERE email = ? COLLATE NOCASE "
+                "AND email_verified = 1 AND username <> ? COLLATE NOCASE",
+                (email, uname),
+            ).fetchone()
+            if taken:
+                raise ValueError("That email is already verified on another account.")
+            # Storing the pending address unverified: harmless (it grants
+            # nothing) and lets the UI show "check your inbox".
+            self.conn.execute(
+                "UPDATE users SET email = ?, email_verified = 0 "
+                "WHERE username = ? COLLATE NOCASE",
+                (email, uname),
+            )
+            self.conn.execute(
+                "UPDATE email_verification_tokens SET used = 1 "
+                "WHERE username = ? COLLATE NOCASE AND used = 0",
+                (uname,),
+            )
+            self.conn.execute(
+                "INSERT INTO email_verification_tokens "
+                "(username, email, token_hash, expires_at, used) VALUES (?, ?, ?, ?, 0)",
+                (uname, email, token_hash, expires),
+            )
+            self.conn.commit()
+        return token
+
+    def confirm_email_verification(self, token: str) -> Tuple[bool, str, Optional[str]]:
+        """Consume a verification token. Returns (ok, error, username)."""
+        if not token:
+            return False, "Verification link is missing its code.", None
+        token_hash = self._hash_reset_token(token.strip())
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        with self._lock:
+            row = self.conn.execute(
+                "SELECT username, email, expires_at, used FROM email_verification_tokens "
+                "WHERE token_hash = ?",
+                (token_hash,),
+            ).fetchone()
+            if not row:
+                return False, "That verification link is not valid.", None
+            uname, email, expires_at, used = row[0], row[1], row[2], int(row[3] or 0)
+            if used:
+                return False, "That verification link was already used.", None
+            if expires_at < now:
+                return False, "That verification link has expired. Send a new one.", None
+            taken = self.conn.execute(
+                "SELECT 1 FROM users WHERE email = ? COLLATE NOCASE "
+                "AND email_verified = 1 AND username <> ? COLLATE NOCASE",
+                (email, uname),
+            ).fetchone()
+            if taken:
+                return False, "That email is already verified on another account.", None
+            # Only verify if the pending address still matches the token: if the
+            # user changed their mind and entered a different address, an old
+            # link must not silently verify the wrong one.
+            cur = self.conn.execute(
+                "UPDATE users SET email_verified = 1 "
+                "WHERE username = ? COLLATE NOCASE AND email = ? COLLATE NOCASE",
+                (uname, email),
+            )
+            if cur.rowcount == 0:
+                return False, "That address is no longer pending on this account.", None
+            self.conn.execute(
+                "UPDATE email_verification_tokens SET used = 1 WHERE token_hash = ?",
+                (token_hash,),
+            )
+            self.conn.commit()
+        return True, "", uname
+
+    def clear_email(self, user_id: str) -> bool:
+        """Remove the address and any pending verification links."""
+        with self._lock:
+            user = self.conn.execute(
+                "SELECT username FROM users WHERE id = ?", (user_id,)
+            ).fetchone()
+            if not user:
+                return False
+            self.conn.execute(
+                "UPDATE users SET email = NULL, email_verified = 0 WHERE id = ?",
+                (user_id,),
+            )
+            self.conn.execute(
+                "UPDATE email_verification_tokens SET used = 1 "
+                "WHERE username = ? COLLATE NOCASE AND used = 0",
+                (user[0],),
+            )
+            self.conn.commit()
+        return True
+
+    def get_verified_email(self, username: str) -> Optional[str]:
+        """Verified address for this login, or None. Used for reset delivery."""
+        user = self.get_by_username(username)
+        if user and user.get("email") and user.get("email_verified"):
+            return user["email"]
+        return None
