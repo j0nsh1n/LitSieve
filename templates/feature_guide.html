@@ -4,17 +4,8 @@
  <meta charset="UTF-8">
  <meta name="viewport" content="width=device-width, initial-scale=1.0">
  <title>{{ guide.title }} - Literature Research Aide</title>
- <link rel="stylesheet" href="/static/css/style.css?v=20260717r15">
- <script>
- (function() {
- const saved = localStorage.getItem('theme');
- if (saved) document.documentElement.setAttribute('data-theme', saved);
- if (localStorage.getItem('readingMode') === 'on') {
- document.documentElement.setAttribute('data-reading', 'on');
- }
- document.documentElement.classList.add('js-ready');
- })();
- </script>
+ <link rel="stylesheet" href="/static/css/style.css?v=20260729a">
+ <script src="/static/js/theme-init.js?v=20260729a"></script>
 </head>
 <body class="guide-body">
  <main class="landing guide-page">
@@ -81,7 +72,7 @@
  <section class="card guide-section">
  <h2>Where to find it</h2>
  <p class="guide-prose">{{ guide.where_in_app }}</p>
- <div class="landing-cta" style="justify-content:flex-start;margin-top:1rem;">
+ <div class="landing-cta u-row-start u-mt-xl">
  {% if user %}
  <a href="{{ guide.app_path }}" class="btn btn-primary">{{ guide.app_label }}</a>
  <a href="/" class="btn btn-secondary">Home</a>

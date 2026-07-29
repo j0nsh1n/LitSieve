@@ -15,16 +15,23 @@ from starlette.middleware.base import BaseHTTPMiddleware
 # One year, and eligible for browser preload lists.
 HSTS_VALUE = "max-age=31536000; includeSubDomains"
 
-# Inline <script> blocks (the pre-paint theme switch in base.html) and 36
-# inline style="" attributes across the templates mean 'unsafe-inline' is
-# required for now. The policy is still worth having: it blocks script from
-# any *external* origin, which is the injection path that actually matters.
-# Tightening this further means moving those inline blocks into files or
-# adding per-request nonces.
+# No 'unsafe-inline': every script lives in a file under /static/js and every
+# former style="" attribute is a utility class in style.css. That means an
+# injected <script> or style attribute will not execute — the whole point of
+# having a CSP.
+#
+# Keeping it that way:
+#   * no inline <script> in templates (theme pre-paint lives in
+#     static/js/theme-init.js and MUST stay a blocking <script src> in <head>,
+#     or dark-mode users get a flash of the light theme);
+#   * no style="" attributes — add a `.u-*` utility class instead.
+# CSP does not restrict styles set from JS (element.style.x = y), so the page
+# scripts that show/hide panels are unaffected.
+# tests/test_security_headers.py enforces both rules.
 CSP_VALUE = "; ".join([
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline'",
-    "style-src 'self' 'unsafe-inline'",
+    "script-src 'self'",
+    "style-src 'self'",
     "img-src 'self' data:",
     "font-src 'self'",
     # Outbound API calls are made server-side, so the browser never needs to
