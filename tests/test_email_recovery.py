@@ -336,3 +336,20 @@ def test_reset_request_ignores_an_unverified_email(app_module, sent):
     r = c.post("/reset-password/request", data={"username": "unconfirmed@x.com"}, follow_redirects=False)
     assert r.status_code == 200
     assert not sent, "an unverified address must not identify an account"
+
+
+def test_account_email_section_is_visible_even_without_smtp(app_module, monkeypatch):
+    """It used to hide itself entirely when SMTP was unset, so there was no way
+    to discover the feature or learn how to switch it on."""
+    monkeypatch.delenv("SMTP_HOST", raising=False)
+    c = TestClient(app_module.app)
+    _register(c, "student10")
+    page = c.get("/account").text
+    assert 'id="email-section"' in page
+    assert "Email for account recovery" in page
+    # The explanation and the controls are both present; JS picks which to show.
+    assert 'id="email-unconfigured"' in page
+    assert 'id="email-controls"' in page
+    # And the section itself must not be hard-hidden in the markup.
+    section_tag = page.split('id="email-section"')[0].rsplit("<section", 1)[-1]
+    assert "hidden" not in section_tag, section_tag

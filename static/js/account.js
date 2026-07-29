@@ -673,10 +673,19 @@ document.addEventListener('DOMContentLoaded', () => {
 function renderEmailState(state) {
     const section = document.getElementById('email-section');
     if (!section) return;
-    // No SMTP on this server -> hide the whole thing rather than offer a
-    // verification that can never arrive.
-    section.hidden = !state.sending_configured;
-    if (!state.sending_configured) return;
+
+    // Without SMTP the server cannot send a verification link, so the controls
+    // are replaced by an explanation. The section stays visible on purpose:
+    // hiding it left no way to discover the feature or how to switch it on.
+    const notice = document.getElementById('email-unconfigured');
+    const controls = document.getElementById('email-controls');
+    if (notice) notice.hidden = !!state.sending_configured;
+    if (controls) controls.hidden = !state.sending_configured;
+    if (!state.sending_configured) {
+        const current = document.getElementById('email-current');
+        if (current) current.textContent = '';
+        return;
+    }
 
     const current = document.getElementById('email-current');
     const resend = document.getElementById('email-resend-btn');
