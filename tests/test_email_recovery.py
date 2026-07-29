@@ -286,3 +286,53 @@ def test_grandfathered_login_is_offered_as_a_claim(app_module, sent):
 
     # And the legacy login itself still passes sign-in validation.
     assert validate_login_name("old@school.edu") is None
+
+
+# --- the form copy must match what the server accepts -------------------------
+
+def test_register_form_does_not_offer_email_as_a_username():
+    """The bug this guards: the form said 'Username or email' and its pattern
+    allowed '@', so the browser accepted an address the server then rejected."""
+    html = (pathlib.Path(__file__).resolve().parents[1] / "templates" / "register.html").read_text()
+    assert "Username or email" not in html
+    assert "you@school.edu" not in html
+    # The client-side pattern must not permit '@' either.
+    pattern_line = [ln for ln in html.splitlines() if "pattern=" in ln]
+    assert pattern_line, "username input lost its pattern attribute"
+    assert "@" not in pattern_line[0], pattern_line[0]
+
+
+def test_login_form_still_mentions_grandfathered_logins():
+    html = (pathlib.Path(__file__).resolve().parents[1] / "templates" / "login.html").read_text()
+    assert "Older accounts" in html or "still sign in" in html
+
+
+def test_reset_request_accepts_a_verified_email(app_module, sent):
+    c = TestClient(app_module.app)
+    headers = _register(c, "student8")
+    c.post(
+        "/api/account/email",
+        json={"email": "finder@x.com", "current_password": PASSWORD},
+        headers=headers,
+    )
+    TestClient(app_module.app).get(f"/verify-email?token={_token_from(sent[0]['body'])}")
+    sent.clear()
+
+    # Typing the address (not the username) must still reach the right account.
+    r = c.post("/reset-password/request", data={"username": "finder@x.com"}, follow_redirects=False)
+    assert r.status_code == 200
+    assert len(sent) == 1 and sent[0]["to"] == "finder@x.com"
+
+
+def test_reset_request_ignores_an_unverified_email(app_module, sent):
+    c = TestClient(app_module.app)
+    headers = _register(c, "student9")
+    c.post(
+        "/api/account/email",
+        json={"email": "unconfirmed@x.com", "current_password": PASSWORD},
+        headers=headers,
+    )
+    sent.clear()
+    r = c.post("/reset-password/request", data={"username": "unconfirmed@x.com"}, follow_redirects=False)
+    assert r.status_code == 200
+    assert not sent, "an unverified address must not identify an account"

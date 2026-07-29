@@ -253,8 +253,11 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "mid-job is less painful."
         ),
         "how_it_works": [
-            "Register with a username or school email-style login and a password "
-            "(stored as a bcrypt hash, not plain text).",
+            "Register with a username (not an email) and a password, stored as "
+            "a bcrypt hash, never plain text.",
+            "Optionally add an email on Account for password recovery. It only "
+            "counts once you click the link we send, and it is used for "
+            "recovery alone.",
             "Log in to reach Data Management, Clusters, Search, and Duplicates.",
             "Use the Library switcher in the nav (or Account) to create and "
             "switch collections. Fetch, prepare, cluster, and search only touch "

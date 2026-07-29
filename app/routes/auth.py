@@ -121,7 +121,14 @@ async def reset_password_page(request: Request):
 @limiter.limit("5/minute")
 async def reset_password_request(request: Request, username: str = Form(...)):
     """Issue a one-time reset code. Always looks successful (no user enum)."""
-    username = (username or "").strip().lower()
+    entered = (username or "").strip().lower()
+    # People type whichever they remember. A *verified* address identifies the
+    # account too; an unverified one must not (anyone can type any address).
+    username = entered
+    if entered and "@" in entered and not core.user_db.get_by_username(entered):
+        by_email = core.user_db.get_by_verified_email(entered)
+        if by_email:
+            username = by_email["username"]
     token = core.user_db.create_password_reset_token(username) if username else None
     if token:
         logger.info("Password reset code issued for %s", username)

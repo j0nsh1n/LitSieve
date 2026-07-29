@@ -583,6 +583,23 @@ class UserDatabase:
             self.conn.commit()
         return True
 
+    def get_by_verified_email(self, email: str) -> Optional[Dict]:
+        """Look up an account by a **verified** address (reset-by-email).
+
+        Unverified addresses are ignored on purpose: anyone can type anyone
+        else's address, so only a confirmed one may identify an account.
+        """
+        email = self.normalize_email(email)
+        if not email:
+            return None
+        with self._lock:
+            row = self.conn.execute(
+                "SELECT username FROM users "
+                "WHERE email = ? COLLATE NOCASE AND email_verified = 1",
+                (email,),
+            ).fetchone()
+        return self.get_by_username(row[0]) if row else None
+
     def get_verified_email(self, username: str) -> Optional[str]:
         """Verified address for this login, or None. Used for reset delivery."""
         user = self.get_by_username(username)
