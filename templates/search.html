@@ -44,7 +44,7 @@
  <textarea id="query-text" placeholder="Enter your study description or research question..." rows="4"></textarea>
  </div>
 
- <div id="pico-input-panel" style="display:none;">
+ <div class="u-hidden" id="pico-input-panel">
  <p class="info-text">Fill in the parts you know.</p>
  <div class="pico-grid">
  <div class="form-group">
@@ -66,7 +66,7 @@
  </div>
  </div>
 
- <div id="seed-input-panel" style="display:none;">
+ <div class="u-hidden" id="seed-input-panel">
  <p class="info-text"><strong>Seed paper:</strong> paste an article id (e.g. PubMed ID or DOI) or part
  of a title from a paper already in your collection - the app ranks the rest by similarity to it.
  Useful when a teacher gives you one starter citation.</p>
@@ -141,24 +141,24 @@
    <label class="radio-label"><input type="checkbox" name="search-source" value="plos" checked> PLOS</label>
    <label class="radio-label"><input type="checkbox" name="search-source" value="hal" checked> HAL</label>
    </div>
-   <div class="help-text" id="source-availability-hint" style="margin-top:0.4rem;"></div>
+   <div class="help-text u-mt-sm" id="source-availability-hint"></div>
    </div>
   </div>
  </details>
 
  <button id="search-btn" class="btn btn-primary btn-block">Search</button>
- <button type="button" id="starred-search-btn" class="btn btn-secondary btn-block" style="margin-top:0.6rem;">
+ <button type="button" id="starred-search-btn" class="btn btn-secondary btn-block u-mt-md">
  More like my starred (<span id="starred-count">0</span>)
  </button>
  <p class="help-text">Finds papers similar to the ones you starred (the starred papers themselves are left out).</p>
 </section>
 
-<section id="seed-banner" class="card" style="display:none;">
+<section id="seed-banner" class="card u-hidden">
  <h2>Seed paper</h2>
  <p class="info-text" id="seed-banner-text"></p>
 </section>
 
-<section id="results-section" style="display:none;">
+<section class="u-hidden" id="results-section">
  <div class="results-header">
  <h2>Results: <span id="result-count">0</span> articles found</h2>
  </div>
@@ -209,7 +209,7 @@
   Zotero window.</p>
  </div>
 
- <details class="advanced-details" style="margin-top:1rem;">
+ <details class="advanced-details u-mt-xl">
   <summary>Export whole library instead (not just this search)</summary>
   <div class="advanced-body">
    <p class="info-text">Use this only if you need every paper in a scope (all / included / screened
@@ -236,5 +236,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/search.js?v=20260726r4"></script>
+<script src="/static/js/search.js?v=20260729a"></script>
 {% endblock %}

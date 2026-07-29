@@ -4,20 +4,15 @@
  <meta charset="UTF-8">
  <meta name="viewport" content="width=device-width, initial-scale=1.0">
  <title>Register - Literature Research Aide</title>
- <link rel="stylesheet" href="/static/css/style.css?v=20260717r15">
- <script>
- (function() {
- const saved = localStorage.getItem('theme');
- if (saved) document.documentElement.setAttribute('data-theme', saved);
- })();
- </script>
+ <link rel="stylesheet" href="/static/css/style.css?v=20260729a">
+ <script src="/static/js/theme-init.js?v=20260729a"></script>
 </head>
 <body class="auth-body">
  <div class="auth-card">
  <a href="/" class="auth-home-link">← Back to home</a>
  <div class="auth-logo">Literature Research Aide</div>
  <div class="auth-subtitle">Create a private account</div>
- <p class="auth-hint" style="margin:0 0 0.65rem;text-align:center;">
+ <p class="auth-hint u-centered-lead">
  Free research starting point: 17 public sources, triage, hybrid search, RIS/BibTeX export.
  Your data stays isolated to this account.
  </p>
@@ -54,39 +49,7 @@
  <button type="submit" class="btn btn-primary auth-btn">Create Account</button>
  </form>
 
- <script>
- document.getElementById('show-pw').addEventListener('change', function () {
- const type = this.checked ? 'text' : 'password';
- document.querySelectorAll('.pw-field').forEach(function (el) { el.type = type; });
- });
-
- // Live password-match feedback as the user types.
- const pw = document.querySelector('input[name="password"]');
- const pwc = document.querySelector('input[name="password_confirm"]');
- const matchEl = document.getElementById('pw-match');
-
- function checkMatch() {
- if (!pwc.value) {
- matchEl.textContent = '';
- matchEl.className = 'pw-match';
- pwc.setCustomValidity('');
- return;
- }
- if (pw.value === pwc.value) {
- matchEl.textContent = '✓ Passwords match';
- matchEl.className = 'pw-match match';
- pwc.setCustomValidity('');
- } else {
- matchEl.textContent = '✗ Passwords do not match';
- matchEl.className = 'pw-match mismatch';
- // Blocks form submission with a native validation bubble.
- pwc.setCustomValidity('Passwords do not match');
- }
- }
-
- pw.addEventListener('input', checkMatch);
- pwc.addEventListener('input', checkMatch);
- </script>
+ <script src="/static/js/pw-toggle.js?v=20260729a"></script>
 
  <p class="auth-switch">Already have an account? <a href="/login">Log in</a></p>
  <p class="auth-switch auth-home-foot"><a href="/">← Back to home</a></p>

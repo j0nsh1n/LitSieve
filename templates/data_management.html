@@ -20,7 +20,7 @@
   <li data-step="query"><span class="gs-check" aria-hidden="true">○</span> Type a research question in Fetch</li>
   <li data-step="fetch"><span class="gs-check" aria-hidden="true">○</span> Press <strong>Fetch Articles</strong>, then <strong>Prepare Papers</strong> when ready</li>
  </ol>
- <p class="info-text" style="margin-top:0.75rem;">
+ <p class="info-text u-mt-lg">
   Prefer a dry run with no APIs?
   <button type="button" id="load-sample-btn" class="btn btn-secondary btn-sm">Load sample papers</button>
   (~20 education-themed demos; replaces an empty collection)
@@ -109,8 +109,8 @@
  <button type="button" id="fetch-cancel-btn" class="btn btn-secondary" hidden>Cancel fetch</button>
  </div>
  <div id="fetch-status" class="status-indicator"></div>
- <div id="fetch-source-report" class="info-text" style="display:none;margin-top:0.5rem;"></div>
- <div id="fetch-progress-wrap" style="display:none;">
+ <div id="fetch-source-report" class="info-text u-hidden u-mt-md"></div>
+ <div class="u-hidden" id="fetch-progress-wrap">
  <div class="progress-bar-track"><div class="progress-bar-fill" id="fetch-progress-fill"></div></div>
  <div class="progress-bar-label" id="fetch-progress-label"></div>
  </div>
@@ -122,7 +122,7 @@
  <p class="info-text">A quick health check after a fetch: papers per source, and which recommended
  sources are still empty.</p>
  <div id="coverage-bars"></div>
- <div id="coverage-suggestions" class="info-text" style="margin-top:0.75rem;"></div>
+ <div id="coverage-suggestions" class="info-text u-mt-lg"></div>
  <button type="button" id="coverage-refresh" class="btn btn-secondary btn-sm">Refresh coverage</button>
 </section>
 
@@ -161,7 +161,7 @@
    <span class="help-text">Picking a model here overrides the automatic choice from your topics.</span>
    </div>
    <div class="form-group">
-   <label class="radio-label" style="margin-top:1.4rem;">
+   <label class="radio-label u-mt-form">
    <input type="checkbox" id="only-missing">
    Only prepare new papers (skip ones already processed)
    </label>
@@ -172,7 +172,7 @@
  </details>
  <button id="embeddings-btn" class="btn btn-primary">Prepare Papers</button>
  <div id="embeddings-status" class="status-indicator"></div>
- <div id="embed-progress-wrap" style="display:none;">
+ <div class="u-hidden" id="embed-progress-wrap">
  <div class="progress-bar-track"><div class="progress-bar-fill" id="embed-progress-fill"></div></div>
  <div class="progress-bar-label" id="embed-progress-label"></div>
  </div>
@@ -180,5 +180,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/data_management.js?v=20260724r5"></script>
+<script src="/static/js/data_management.js?v=20260729a"></script>
 {% endblock %}

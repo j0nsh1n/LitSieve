@@ -4060,3 +4060,36 @@ html[data-reading="on"] .container-wide .compare-table {
     }
 }
 
+
+/* === Utilities (replace inline style="" so the CSP can drop 'unsafe-inline') ===
+   CSP governs literal style attributes in served HTML. JS that sets
+   element.style.* at runtime is unaffected, so the existing show/hide code in
+   the page scripts keeps working. */
+.u-hidden { display: none; }
+.u-mt-sm { margin-top: 0.4rem; }
+.u-mt-md { margin-top: 0.6rem; }
+.u-mt-lg { margin-top: 0.75rem; }
+.u-mt-xl { margin-top: 1rem; }
+.u-mt-form { margin-top: 1.4rem; }
+.u-mb-md { margin-bottom: 0.8rem; }
+.u-mb-xl { margin-bottom: 1.5rem; }
+.u-gap-sm { gap: 0.5rem; }
+.u-row-start { justify-content: flex-start; }
+.u-self-end { align-self: flex-end; }
+.u-flex-grow { flex: 1 1 14rem; }
+.u-select-all { user-select: all; word-break: break-all; }
+.u-label-caps {
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+}
+.u-centered-lead { margin: 0 0 0.65rem; text-align: center; }
+.u-centered-lead-wide { margin: 0 0 1rem; text-align: center; }
+.u-form-heading { margin: 0 0 0.5rem; font-size: 1rem; }
+.u-callout {
+    background: color-mix(in srgb, var(--accent, #2a5f6e) 12%, transparent);
+    padding: 0.65rem 0.8rem;
+    border-radius: 6px;
+    margin-bottom: 0.8rem;
+    color: var(--text);
+}

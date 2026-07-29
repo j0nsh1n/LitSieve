@@ -33,7 +33,7 @@
  <div id="library-manage-status" class="status-indicator"></div>
 
  {# Clone codes are optional — not a teacher console. Keep APIs; hide the pitch. #}
- <details class="advanced-details" id="library-clone-details" style="margin-top:1rem;">
+ <details class="advanced-details u-mt-xl" id="library-clone-details">
   <summary>Optional: copy a library via code</summary>
   <div class="advanced-body">
    <p class="info-text">Occasionally useful if someone shares a ready-made collection. Joining creates
@@ -42,17 +42,17 @@
    <div class="library-create-row" id="share-join-section">
     <div class="form-group">
      <label for="account-join-code">Library code</label>
-     <input type="text" id="account-join-code" maxlength="16" placeholder="e.g. ABCD-EFGH"
+     <input class="u-label-caps" type="text" id="account-join-code" maxlength="16" placeholder="e.g. ABCD-EFGH"
       autocomplete="off" spellcheck="false"
-      style="text-transform:uppercase; letter-spacing:0.06em; font-weight:600;">
+     >
     </div>
     <button type="button" id="account-join-preview-btn" class="btn btn-secondary">Preview</button>
     <button type="button" id="account-join-btn" class="btn btn-primary" disabled>Add as new library</button>
    </div>
    <div id="account-join-preview" class="join-preview-card" hidden></div>
    <div id="account-join-status" class="status-indicator"></div>
-   <p class="info-text" style="margin-top:0.75rem;">Or open <a href="/join">/join</a>.</p>
-   <h3 class="ai-settings-subhead" style="margin-top:1rem;">Codes you created</h3>
+   <p class="info-text u-mt-lg">Or open <a href="/join">/join</a>.</p>
+   <h3 class="ai-settings-subhead u-mt-xl">Codes you created</h3>
    <p class="help-text">Each join gets a clone, not live access. Revoke a code if it was posted
     publicly by mistake — people who already joined keep their copy.</p>
    <ul class="library-manage-list" id="shares-list">
@@ -89,7 +89,7 @@
    <p class="info-text" id="ai-status-detail">Checking AI status…</p>
    <button type="button" id="ai-status-refresh" class="btn btn-secondary btn-sm">Refresh status</button>
 
-   <div id="ai-builtin-panel" class="ai-mode-panel" style="margin-top:0.85rem;">
+   <div id="ai-builtin-panel" class="ai-mode-panel u-mt-lg">
     <p class="help-text">
      No key needed. A teacher or deployer installs the study-aid software on this computer once.
      You only use Refine or Ask on Search — nothing else to start or stop.
@@ -97,7 +97,7 @@
     {# Model/host/models-dir are deployer env (.env / ai_settings.json) only. #}
    </div>
 
-   <div id="ai-apikey-panel" class="ai-mode-panel" hidden style="margin-top:0.85rem;">
+   <div id="ai-apikey-panel" class="ai-mode-panel u-mt-lg" hidden>
     <h3 class="ai-settings-subhead">OpenAI-compatible (OpenAI, OpenRouter, Groq, …)</h3>
     <div class="form-row">
      <div class="form-group">
@@ -137,7 +137,7 @@
     Saving AI settings is turned off on this server. A teacher or deployer must
     change the environment or server config file.
    </p>
-   <button type="button" id="ai-settings-save" class="btn btn-primary" style="margin-top:0.75rem;">
+   <button type="button" id="ai-settings-save" class="btn btn-primary u-mt-lg">
     Save AI settings</button>
    <div id="ai-settings-status" class="status-indicator"></div>
    {# Hidden legacy field so older code paths stay safe if present. #}
@@ -191,7 +191,7 @@
  <label class="show-pass">
  <input type="checkbox" id="show-delete-pw"> Show password
  </label>
- <label class="show-pass" style="margin-top: 0.6rem;">
+ <label class="show-pass u-mt-md">
  <input type="checkbox" id="delete-confirm"> I understand this permanently deletes my account and all my data.
  </label>
  <button id="delete-account-btn" class="btn btn-danger" disabled>Delete My Account</button>
@@ -200,5 +200,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/account.js?v=20260721r1"></script>
+<script src="/static/js/account.js?v=20260729a"></script>
 {% endblock %}

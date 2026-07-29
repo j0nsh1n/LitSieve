@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pathlib
+
 from fastapi.testclient import TestClient
 
 from app import security
@@ -42,3 +44,56 @@ def test_hsts_sent_when_not_debug(monkeypatch):
     r = TestClient(app).get("/")
     assert r.headers["Strict-Transport-Security"].startswith("max-age=31536000")
     assert "includeSubDomains" in r.headers["Strict-Transport-Security"]
+
+
+def test_csp_has_no_unsafe_inline():
+    """An 'unsafe-inline' script-src makes injected <script> executable again."""
+    csp = TestClient(app).get("/").headers["Content-Security-Policy"]
+    assert "unsafe-inline" not in csp, csp
+    assert "unsafe-eval" not in csp, csp
+    assert "script-src 'self'" in csp
+    assert "style-src 'self'" in csp
+
+
+def test_no_inline_scripts_in_templates():
+    """Inline <script> would be blocked by the CSP, so the page would break.
+
+    Any new script must go in static/js and be referenced with src=.
+    """
+    import re
+
+    templates = pathlib.Path(__file__).resolve().parents[1] / "templates"
+    offenders = []
+    for path in sorted(templates.rglob("*.html")):
+        html = path.read_text(encoding="utf-8")
+        for tag in re.findall(r"<script\b[^>]*>", html):
+            if "src=" not in tag:
+                offenders.append(f"{path.name}: {tag}")
+    assert not offenders, "inline <script> blocked by CSP: " + "; ".join(offenders)
+
+
+def test_no_inline_style_attributes_in_templates():
+    """style="" is blocked by style-src 'self'; use a .u-* utility class."""
+    import re
+
+    templates = pathlib.Path(__file__).resolve().parents[1] / "templates"
+    offenders = []
+    for path in sorted(templates.rglob("*.html")):
+        html = path.read_text(encoding="utf-8")
+        if re.search(r"<[^>]*\sstyle=\"", html):
+            offenders.append(path.name)
+    assert not offenders, "inline style attributes blocked by CSP: " + ", ".join(offenders)
+
+
+def test_theme_init_is_render_blocking_in_head():
+    """theme-init must not gain defer/async or dark mode flashes white."""
+    import re
+
+    base = pathlib.Path(__file__).resolve().parents[1] / "templates" / "base.html"
+    html = base.read_text(encoding="utf-8")
+    tag = re.search(r"<script[^>]*theme-init\.js[^>]*>", html)
+    assert tag, "base.html no longer loads theme-init.js"
+    assert "defer" not in tag.group(0), tag.group(0)
+    assert "async" not in tag.group(0), tag.group(0)
+    head = html.split("</head>")[0]
+    assert "theme-init.js" in head, "theme-init.js must be in <head>"
