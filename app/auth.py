@@ -22,14 +22,19 @@ _LOGIN_ALLOWED = re.compile(r"^[a-z0-9._+\-@]+$")
 _LOGIN_HAS_ALNUM = re.compile(r"[a-z0-9]")
 LOGIN_MIN_LEN = 3
 LOGIN_MAX_LEN = 64
+EMAIL_MAX_LEN = 254  # RFC 5321 practical maximum
 
 
 def validate_login_name(raw: str) -> Optional[str]:
-    """Validate a username or email-style login.
+    """Base login-string validation; still tolerates "@".
 
-    Returns an error message, or None if the value is acceptable.
-    Caller should still .strip().lower() before storage (this function does not
-    mutate the input).
+    Sign-in itself does not call this (it just looks the string up), so
+    accounts created before usernames and emails were separated keep working
+    with their email-shaped login. Use :func:`validate_new_username` for **new**
+    registrations — it additionally rejects "@".
+
+    Returns an error message, or None if the value is acceptable. Caller should
+    still .strip().lower() before storage (this does not mutate the input).
     """
     if raw is None:
         return "Login is required."
@@ -55,6 +60,55 @@ def validate_login_name(raw: str) -> Optional[str]:
             return "Email domain should include a dot (e.g. school.edu)."
         if local.startswith(".") or local.endswith(".") or ".." in local:
             return "That doesn’t look like a valid email address."
+    return None
+
+
+def validate_new_username(raw: str) -> Optional[str]:
+    """Validate a username for a **new** registration.
+
+    Usernames and emails are separate concepts: the handle you sign in with is
+    not an address. An optional recovery email is added later from Account and
+    must be verified. Existing email-shaped logins keep working via
+    :func:`validate_login_name`.
+    """
+    error = validate_login_name(raw)
+    if error:
+        return error
+    if "@" in (raw or ""):
+        return (
+            "Usernames cannot contain @. Pick a short handle (letters, numbers, "
+            ". _ -). You can add an email for account recovery later, from Account."
+        )
+    return None
+
+
+def validate_email(raw: str) -> Optional[str]:
+    """Validate an address offered as a recovery email.
+
+    Deliberately permissive about exotic-but-legal addresses: the verification
+    link is what actually proves the address works. This only catches typos and
+    obviously unusable input.
+    """
+    if raw is None or not raw.strip():
+        return "Email is required."
+    if any(ord(c) < 32 for c in raw):
+        return "Email contains invalid characters."
+    value = raw.strip().lower()
+    if len(value) > EMAIL_MAX_LEN:
+        return f"Email must be {EMAIL_MAX_LEN} characters or fewer."
+    if value.count("@") != 1:
+        return "Enter a valid email address (exactly one @)."
+    local, _, domain = value.partition("@")
+    if not local or not domain:
+        return "Enter a valid email address."
+    if " " in value:
+        return "Email cannot contain spaces."
+    if "." not in domain:
+        return "Email domain should include a dot (e.g. school.edu)."
+    if domain.startswith(".") or domain.endswith(".") or ".." in domain:
+        return "Enter a valid email address."
+    if local.startswith(".") or local.endswith(".") or ".." in local:
+        return "Enter a valid email address."
     return None
 
 

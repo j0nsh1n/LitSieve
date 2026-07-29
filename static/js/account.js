@@ -647,3 +647,120 @@ async function saveAiSettings() {
   setLoading(btn, false);
  }
 }
+
+// === Optional recovery email =================================================
+// Username stays the login. This section only appears when the server has SMTP
+// configured — without a way to send the link, "verified" would mean nothing.
+
+document.addEventListener('DOMContentLoaded', () => {
+    const section = document.getElementById('email-section');
+    if (!section) return;
+    loadEmailState();
+
+    document.getElementById('email-save-btn').addEventListener('click', saveEmail);
+    document.getElementById('email-resend-btn').addEventListener('click', resendVerification);
+    document.getElementById('email-remove-btn').addEventListener('click', removeEmail);
+    const claim = document.getElementById('email-claim-btn');
+    if (claim) {
+        claim.addEventListener('click', () => {
+            const suggested = document.getElementById('email-suggested').textContent || '';
+            document.getElementById('account-email').value = suggested;
+            document.getElementById('account-email-password').focus();
+        });
+    }
+});
+
+function renderEmailState(state) {
+    const section = document.getElementById('email-section');
+    if (!section) return;
+    // No SMTP on this server -> hide the whole thing rather than offer a
+    // verification that can never arrive.
+    section.hidden = !state.sending_configured;
+    if (!state.sending_configured) return;
+
+    const current = document.getElementById('email-current');
+    const resend = document.getElementById('email-resend-btn');
+    const remove = document.getElementById('email-remove-btn');
+    const claimBox = document.getElementById('email-claim-suggestion');
+
+    if (state.verified) {
+        current.innerHTML = `Recovery email: <strong>${escapeHtml(state.email)}</strong> — verified ✓`;
+    } else if (state.pending) {
+        current.innerHTML =
+            `Recovery email: <strong>${escapeHtml(state.email)}</strong> — ` +
+            `<em>not verified yet</em>. Check that inbox for the confirmation link.`;
+    } else {
+        current.textContent = 'No recovery email on this account yet.';
+    }
+    resend.hidden = !state.pending;
+    remove.hidden = !state.email;
+
+    if (claimBox) {
+        claimBox.hidden = !(state.login_looks_like_email && !state.email);
+        const suggested = document.getElementById('email-suggested');
+        if (suggested) suggested.textContent = state.suggested_email || '';
+    }
+}
+
+async function loadEmailState() {
+    try {
+        renderEmailState(await apiCall('/api/account/email'));
+    } catch (e) {
+        // Not fatal: leave the section hidden.
+    }
+}
+
+async function saveEmail() {
+    const email = document.getElementById('account-email').value.trim();
+    const password = document.getElementById('account-email-password').value;
+    if (!email) { setStatus('email-status', 'Enter an email address.', 'error'); return; }
+    if (!password) { setStatus('email-status', 'Confirm your password to change this.', 'error'); return; }
+
+    const btn = document.getElementById('email-save-btn');
+    setLoading(btn, true);
+    setStatus('email-status', 'Saving and sending the verification link…', 'info');
+    try {
+        const state = await apiCall('/api/account/email', {
+            method: 'POST',
+            body: { email: email, current_password: password },
+        });
+        document.getElementById('account-email-password').value = '';
+        renderEmailState(state);
+        setStatus('email-status', `Verification link sent to ${email}. Click it to finish.`, 'success');
+        showNotification('Verification email sent.', 'success');
+    } catch (e) {
+        setStatus('email-status', e.message, 'error');
+    } finally {
+        setLoading(btn, false);
+    }
+}
+
+async function resendVerification() {
+    const btn = document.getElementById('email-resend-btn');
+    setLoading(btn, true);
+    try {
+        const state = await apiCall('/api/account/email/resend', { method: 'POST' });
+        renderEmailState(state);
+        setStatus('email-status', 'Sent again — check your inbox (and spam).', 'success');
+    } catch (e) {
+        setStatus('email-status', e.message, 'error');
+    } finally {
+        setLoading(btn, false);
+    }
+}
+
+async function removeEmail() {
+    if (!confirm('Remove the recovery email? You will not be able to reset your password by email.')) return;
+    const btn = document.getElementById('email-remove-btn');
+    setLoading(btn, true);
+    try {
+        const state = await apiCall('/api/account/email', { method: 'DELETE' });
+        document.getElementById('account-email').value = '';
+        renderEmailState(state);
+        setStatus('email-status', 'Recovery email removed.', 'success');
+    } catch (e) {
+        setStatus('email-status', e.message, 'error');
+    } finally {
+        setLoading(btn, false);
+    }
+}
