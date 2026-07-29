@@ -9,18 +9,18 @@
 
 <section class="card">
  <div class="form-row">
-  <div class="form-group" style="flex:1 1 14rem;">
+  <div class="form-group u-flex-grow">
    <label for="join-code-input">Library code</label>
-   <input type="text" id="join-code-input" maxlength="16" placeholder="e.g. ABCD-EFGH"
+   <input class="u-label-caps" type="text" id="join-code-input" maxlength="16" placeholder="e.g. ABCD-EFGH"
     value="{{ join_code or '' }}" autocomplete="off" spellcheck="false"
-    style="text-transform:uppercase; letter-spacing:0.06em; font-weight:600;">
+   >
   </div>
-  <div class="form-group" style="align-self:flex-end;">
+  <div class="form-group u-self-end">
    <button type="button" id="join-preview-btn" class="btn btn-secondary">Preview</button>
   </div>
  </div>
  <div id="join-preview-card" class="join-preview-card" hidden></div>
- <div class="form-row" style="margin-top:0.75rem; gap:0.5rem;">
+ <div class="form-row u-mt-lg u-gap-sm">
   <button type="button" id="join-confirm-btn" class="btn btn-primary" disabled>Add as new library</button>
   <a href="/account" class="btn btn-secondary">Back to Account</a>
  </div>
@@ -29,5 +29,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/join.js?v=20260721r1"></script>
+<script src="/static/js/join.js?v=20260729a"></script>
 {% endblock %}
