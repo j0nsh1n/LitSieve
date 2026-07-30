@@ -35,7 +35,7 @@ sqlcipher3-binary>=0.5.4
 bcrypt>=4.1
 
 # Rate limiting
-slowapi>=0.1.9
+slowapi>=0.1.10
 
 # Utilities
 python-dotenv>=1.0.1
