@@ -11,6 +11,9 @@ and this project aims to follow Semantic Versioning for app version strings
 ### Added
 - Governance files: `agents.md`, `spec.md`, `roadmap.md`, tracked `context.md`,
   and this `CHANGELOG.md`.
+- Live `.github/` from former templates: CodeQL workflow, Dependabot (pip +
+  actions), pyright in CI (report-only until backlog cleared), markdownlint
+  (non-blocking).
 - Optional verified recovery email (username separate from email; SMTP-gated)
   on branch `feat/optional-verified-email` (pending merge to main).
 

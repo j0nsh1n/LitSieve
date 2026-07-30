@@ -4,13 +4,14 @@
 - App version **4.3.1** (`app/main.py`, `GET /health`).
 - Python **3.14** (Dockerfile, CI, Render, ruff `py314`).
 - Lint: `ruff check .` — partial select (E9/F63/F7/F82/F401/F541/E401/I); passes.
-- Types: not configured in live CI (no pyright project config).
+- Types: `pyright app` via `pyrightconfig.json` (basic); CI runs it
+  **continue-on-error** until ~76 app/ errors are cleaned (report-only).
 - Tests: `SECRET_KEY=x DEBUG=true ./venv/bin/python -m pytest -q` — **257 passed**
   (2026-07-30 on `feat/optional-verified-email`); use `./venv` so sqlcipher runs.
-- Governance: `agents.md` / `spec.md` / `roadmap.md` / `CHANGELOG.md` / this file
-  adopted; `context.md` no longer gitignored.
-- Known gaps: no dependency lockfile; no Dependabot in live `.github/`;
-  `Github Templates/` is untracked copy-paste material (not active CI).
+- CI: `.github/workflows/ci.yml` (ruff + pyright report + pytest + docker),
+  `codeql.yml`, `dependabot.yml` (pip + github-actions). Adopted from former
+  `Github Templates/` (folder removed).
+- Known gaps: no dependency lockfile; pyright not yet green / blocking.
 
 ## Repo Landmarks
 | Path | Role |
@@ -63,7 +64,7 @@ ShareCode *---1 Library (owner); redeem → clone Library for joiner
 ## Session Handoff
 - **Date:** 2026-07-30
 - **Branch:** `feat/optional-verified-email`
-- **Done:** Filled `spec.md` / `roadmap.md`; restructured `context.md` (state only);
-  added `CHANGELOG.md`; un-ignored `context.md`; governance files ready to track
-- **Next:** Human review of filled governance docs; commit when ready; push only
-  if explicitly asked; finish recovery-email branch → main when approved
+- **Done:** Adopted `Github Templates/` into live `.github/` (ci + codeql +
+  dependabot); removed template folder; pyrightconfig + non-blocking pyright CI
+- **Next:** Push only if human asks; finish recovery-email → main when approved;
+  optional later: make pyright blocking after backlog cleanup
