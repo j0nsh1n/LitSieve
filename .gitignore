@@ -30,3 +30,9 @@ venv/
 
 # Governance / product state files (agents.md, spec.md, roadmap.md, context.md,
 # CHANGELOG.md) are tracked — do not re-ignore them.
+
+# Local SMTP / provider secret dumps (never commit)
+mailersend-smtp.txt
+mailersend-*.txt
+*smtp*secret*
+*smtp*credentials*
