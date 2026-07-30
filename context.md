@@ -9,8 +9,9 @@
 - Tests: `SECRET_KEY=x DEBUG=true ./venv/bin/python -m pytest -q` — **257 passed**
   (2026-07-30 on `feat/optional-verified-email`); use `./venv` so sqlcipher runs.
 - CI: `.github/workflows/ci.yml` (ruff + pyright report + pytest + docker),
-  `codeql.yml`, `dependabot.yml` (pip + github-actions). Adopted from former
-  `Github Templates/` (folder removed).
+  `codeql.yml`. Dependabot config **removed** (2026-07-30); no auto dep PRs.
+- SMTP (local `.env` only): MailerSend configured and confirmed working;
+  secrets never committed.
 - Known gaps: no dependency lockfile; pyright not yet green / blocking.
 
 ## Repo Landmarks
@@ -63,7 +64,9 @@ ShareCode *---1 Library (owner); redeem → clone Library for joiner
 
 ## Session Handoff
 - **Date:** 2026-07-30
-- **Branch:** `main` @ `9b736c7` (PR #38 merged; CI success)
-- **Done:** Local main synced; feature branch deleted; smoke `/health`+landing OK;
-  full pytest 257 passed; opened PR #49 for `tools/send_test_email.py`
-- **Next:** Merge #49 when green; configure SMTP on host if using recovery email
+- **Branch:** `main` (local: Dependabot yml deleted, not pushed yet)
+- **Done:** MailerSend SMTP in gitignored `.env` (confirmed working); closed
+  Dependabot PRs #39–#48; removed `.github/dependabot.yml` locally.
+- **Next:** Push Dependabot removal to `main` only when human says so.
+  PR #49 still open (SMTP test CLI) — close or keep only with human say-so.
+  agents.md: no push/PR without explicit permission this conversation.
