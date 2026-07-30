@@ -1,5 +1,5 @@
 # Core dependencies
-biopython>=1.84
+biopython>=1.87
 requests>=2.32.0
 pandas>=2.2.0
 numpy>=2.0.0
