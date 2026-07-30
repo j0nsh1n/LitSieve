@@ -64,7 +64,7 @@ ShareCode *---1 Library (owner); redeem → clone Library for joiner
 ## Session Handoff
 - **Date:** 2026-07-30
 - **Branch:** `feat/optional-verified-email`
-- **Done:** Adopted `Github Templates/` into live `.github/` (ci + codeql +
-  dependabot); removed template folder; pyrightconfig + non-blocking pyright CI
-- **Next:** Push only if human asks; finish recovery-email → main when approved;
-  optional later: make pyright blocking after backlog cleanup
+- **PR:** https://github.com/j0nsh1n/ResearchDatabaseSearchTool/pull/38 (OPEN)
+- **Done:** Pushed branch; opened PR #38 (recovery email + governance + .github)
+- **Next:** CI green / review on #38; optional later: make pyright blocking;
+  untracked `tools/send_test_email.py` not in PR
