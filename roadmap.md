@@ -31,10 +31,8 @@ works) and via PR review. One phase may span several small PRs.
 - Status: [ ]
 
 ## Backlog (unscheduled)
-- Full type checker (pyright) + CI wire-up if human wants governance parity
-  with `Github Templates/`
+- Make `pyright app` blocking in CI after clearing the current error backlog
 - Dependency lockfile (pip-tools / uv) if reproducibility becomes a priority
-- Dependabot if human enables it in live `.github/`
 - Optional later ruff ratchet: E501 / UP / E402
 - Scale opts (FAISS defaults, TF-IDF corpus cache) only with new ≥10× evidence
 - Not building: clinical evidence grades, paywalled DBs, live teacher shares / LMS

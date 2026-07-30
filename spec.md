@@ -74,8 +74,8 @@ a substitute for school library databases.
 
 ## Security & Privacy
 - No secrets in source. Credentials via environment / `.env` (gitignored).
-- Dependencies: minimum versions in `requirements.txt` (not fully lockfile-pinned;
-  Dependabot is **not** installed in live `.github/` — do not assume auto PRs).
+- Dependencies: minimum versions in `requirements.txt` (not fully lockfile-pinned).
+  Dependabot is enabled (`.github/dependabot.yml`) for pip + github-actions weekly.
 - JWT HttpOnly cookie + CSRF double-submit; password change bumps `token_version`
 - CSP / security headers (`app/security.py`); HSTS skipped when `DEBUG=true`
 - Per-account storage cap `MAX_USER_STORAGE_MB` (default 500; `0` = off)
@@ -85,14 +85,17 @@ a substitute for school library databases.
 ## Validation & Tooling
 - Lint: `ruff check .` — must pass (partial rule set in `pyproject.toml`:
   E9/F63/F7/F82/F401/F541/E401/I; E501/UP/E402 deferred).
-- Types: **not configured** in live CI (no pyright/mypy project config). Treat
-  as report-only until added with human approval.
+- Types: `pyright app` (`pyrightconfig.json`, basic mode). **Transitional:**
+  CI runs pyright with `continue-on-error: true` until the app/ error backlog
+  is cleared; do not block merges on pyright green yet. Report new errors you
+  introduce when practical.
 - Tests:  
   `SECRET_KEY=x DEBUG=true ./venv/bin/python -m pytest -q`  
   Prefer `./venv`. Install deps: `./venv/bin/pip install -r requirements.txt`
-  (includes `sqlcipher3-binary` for encryption tests). CI sets `CI=1` so
+  (includes `sqlcipher3-binary` for encryption tests). CI sets `CI=true` so
   encryption suite hard-fails if sqlcipher missing.
 - Docker CI job builds image and hits `/health` and `/` (retries on Hub timeouts).
+- Markdownlint runs in CI non-blocking (`continue-on-error`).
 - Quirk: many tests use `TestClient`; patch `app.core` attributes (e.g. `user_db`),
   not stale imports. Enumerate routes via `conftest.route_paths(app)` (OpenAPI).
 
