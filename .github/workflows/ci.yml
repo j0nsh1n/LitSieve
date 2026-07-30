@@ -42,7 +42,7 @@ jobs:
         run: pytest -q
 
       # Markdown: template always runs; never blocks.
-      - uses: DavidAnson/markdownlint-cli2-action@v16
+      - uses: DavidAnson/markdownlint-cli2-action@v24
         with:
           globs: "**/*.md"
         continue-on-error: true
