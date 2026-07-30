@@ -1,0 +1,15 @@
+{
+  "include": ["app"],
+  "exclude": [
+    "**/__pycache__",
+    "venv",
+    ".venv",
+    "user_data",
+    "tests",
+    "tools"
+  ],
+  "pythonVersion": "3.14",
+  "typeCheckingMode": "basic",
+  "reportMissingImports": "warning",
+  "reportMissingTypeStubs": "none"
+}

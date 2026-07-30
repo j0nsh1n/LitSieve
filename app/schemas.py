@@ -185,3 +185,11 @@ class ExportSelectionRequest(BaseModel):
 
 class ShareJoinRequest(BaseModel):
     code: str = Field(..., min_length=4, max_length=32)
+
+
+class SetEmailRequest(BaseModel):
+    """Add/change the optional recovery email. Password-confirmed on purpose:
+    an attacker on a borrowed session must not be able to point recovery at
+    their own address."""
+    email: str = Field(..., min_length=3, max_length=254)
+    current_password: str

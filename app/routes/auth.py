@@ -13,7 +13,8 @@ from app import core
 from app.auth import (
     create_token,
     hash_password,
-    validate_login_name,
+    validate_email,
+    validate_new_username,
     verify_password,
 )
 from app.core import (
@@ -22,13 +23,16 @@ from app.core import (
     csrf_failed,
     current_user,
     limiter,
+    run_in_thread,
     server_error,
     templates,
 )
 from app.schemas import (
     ChangePasswordRequest,
     DeleteAccountRequest,
+    SetEmailRequest,
 )
+from app.services import mailer
 
 logger = logging.getLogger(__name__)
 
@@ -117,7 +121,14 @@ async def reset_password_page(request: Request):
 @limiter.limit("5/minute")
 async def reset_password_request(request: Request, username: str = Form(...)):
     """Issue a one-time reset code. Always looks successful (no user enum)."""
-    username = (username or "").strip().lower()
+    entered = (username or "").strip().lower()
+    # People type whichever they remember. A *verified* address identifies the
+    # account too; an unverified one must not (anyone can type any address).
+    username = entered
+    if entered and "@" in entered and not core.user_db.get_by_username(entered):
+        by_email = core.user_db.get_by_verified_email(entered)
+        if by_email:
+            username = by_email["username"]
     token = core.user_db.create_password_reset_token(username) if username else None
     if token:
         logger.info("Password reset code issued for %s", username)
@@ -126,8 +137,26 @@ async def reset_password_request(request: Request, username: str = Form(...)):
         "Enter it below with a new password."
     )
     reset_code = ""
-    if token and _reset_codes_in_response():
-        # Self-hosted / DEBUG: surface the code so teachers don't need SMTP.
+    # Preferred delivery: email the code to a *verified* address. An unverified
+    # address is ignored — nobody has proved they control it, so mailing a reset
+    # code there would be a takeover vector.
+    verified_email = core.user_db.get_verified_email(username) if token else None
+    emailed = False
+    if token and verified_email and mailer.is_configured():
+        try:
+            await run_in_thread(mailer.send_password_reset, verified_email, username, token)
+            emailed = True
+            info = (
+                "If that login exists and has a verified email, a reset code is "
+                "on its way. Enter it below with a new password."
+            )
+        except Exception:
+            # Do not reveal that the account exists; fall through to the
+            # on-screen path if that is enabled for this host.
+            logger.exception("Reset email failed for %s", username)
+
+    if token and not emailed and _reset_codes_in_response():
+        # Self-hosted / DEBUG: surface the code so hosts without SMTP still work.
         reset_code = token
         info = (
             "Reset code created (shown once below — DEBUG/classroom mode). "
@@ -191,7 +220,10 @@ async def register_submit(
     password_confirm: str = Form(...),
 ):
     username = username.strip().lower()
-    error = validate_login_name(username)
+    # New accounts get a plain handle; an optional recovery email is added
+    # later from Account and must be verified. Older email-shaped logins are
+    # grandfathered by validate_login_name at sign-in.
+    error = validate_new_username(username)
 
     if error is None and len(password) < 8:
         error = "Password must be at least 8 characters."
@@ -311,3 +343,137 @@ async def api_delete_account(req: DeleteAccountRequest, request: Request):
     response.delete_cookie("access_token")
     response.delete_cookie("csrf_token")
     return response
+
+
+# --- Optional recovery email -------------------------------------------------
+# Username is the login. An email is optional, added here, and only usable for
+# password recovery once verified. The whole section is inert when SMTP is not
+# configured — without a way to send the link, "verified" would be meaningless.
+
+
+def _email_state(user_row) -> dict:
+    """Non-secret email state for the Account UI."""
+    email = (user_row or {}).get("email")
+    verified = bool((user_row or {}).get("email_verified"))
+    return {
+        "email": email or "",
+        "verified": verified,
+        "pending": bool(email) and not verified,
+        "sending_configured": mailer.is_configured(),
+    }
+
+
+@router.get("/api/account/email")
+async def api_get_email(request: Request):
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    row = core.user_db.get_by_id(user["user_id"])
+    state = _email_state(row)
+    # Grandfathered accounts: the login itself looks like an address, so offer
+    # to claim it rather than making them retype it.
+    login = (row or {}).get("username") or ""
+    state["login_looks_like_email"] = "@" in login
+    state["suggested_email"] = login if "@" in login else ""
+    return state
+
+
+@router.post("/api/account/email")
+@limiter.limit("6/minute")
+async def api_set_email(req: SetEmailRequest, request: Request):
+    """Set/replace the recovery email and send a verification link."""
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    if not mailer.is_configured():
+        return JSONResponse(
+            status_code=503,
+            content={"detail": "Email is not set up on this server, so an address "
+                               "cannot be verified. Ask the person running it to "
+                               "configure SMTP."},
+        )
+
+    row = core.user_db.get_by_username(user["username"])
+    if not row or not verify_password(req.current_password, row["hashed_password"]):
+        return JSONResponse(status_code=400, content={"detail": "Incorrect password"})
+
+    error = validate_email(req.email)
+    if error:
+        return JSONResponse(status_code=400, content={"detail": error})
+
+    email = core.user_db.normalize_email(req.email)
+    try:
+        token = core.user_db.start_email_verification(row["username"], email)
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"detail": str(e)})
+    if not token:
+        return JSONResponse(status_code=404, content={"detail": "Account not found"})
+
+    try:
+        await run_in_thread(mailer.send_verification, email, row["username"], token)
+    except Exception:
+        logger.exception("Verification email failed for %s", row["username"])
+        return JSONResponse(
+            status_code=502,
+            content={"detail": "Saved, but the verification email could not be sent. "
+                               "Try 'Resend' in a moment."},
+        )
+    return {"status": "sent", **_email_state(core.user_db.get_by_id(user["user_id"]))}
+
+
+@router.post("/api/account/email/resend")
+@limiter.limit("4/minute")
+async def api_resend_verification(request: Request):
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    if not mailer.is_configured():
+        return JSONResponse(status_code=503, content={"detail": "Email is not set up on this server."})
+
+    row = core.user_db.get_by_id(user["user_id"])
+    email = (row or {}).get("email")
+    if not email:
+        return JSONResponse(status_code=400, content={"detail": "No email on this account yet."})
+    if row.get("email_verified"):
+        return {"status": "already_verified", **_email_state(row)}
+
+    token = core.user_db.start_email_verification(row["username"], email)
+    try:
+        await run_in_thread(mailer.send_verification, email, row["username"], token)
+    except Exception:
+        logger.exception("Resend failed for %s", row["username"])
+        return JSONResponse(status_code=502, content={"detail": "Could not send the email just now."})
+    return {"status": "sent", **_email_state(core.user_db.get_by_id(user["user_id"]))}
+
+
+@router.delete("/api/account/email")
+@limiter.limit("6/minute")
+async def api_delete_email(request: Request):
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    core.user_db.clear_email(user["user_id"])
+    return {"status": "removed", **_email_state(core.user_db.get_by_id(user["user_id"]))}
+
+
+@router.get("/verify-email")
+async def verify_email_page(request: Request, token: str = ""):
+    """Confirm an address from the emailed link.
+
+    Public on purpose: the token is the proof, and the person clicking may be
+    reading mail in a browser where they are not signed in.
+    """
+    ok, error, username = core.user_db.confirm_email_verification(token)
+    if ok:
+        logger.info("Email verified for %s", username)
+    return templates.TemplateResponse(
+        request, "verify_email.html",
+        context={"ok": ok, "error": error, "username": username or ""},
+        status_code=200 if ok else 400,
+    )
