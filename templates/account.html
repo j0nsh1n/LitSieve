@@ -146,6 +146,55 @@
  </details>
 </section>
 
+<section class="card" id="email-section">
+ <h2>Email for account recovery <span class="help-text">(optional)</span></h2>
+ <p class="info-text">You sign in with your <strong>username</strong>. Adding an email is optional and
+ does one thing: if you forget your password, we can send a reset code to that address.</p>
+ <details class="help-details">
+  <summary>Why verify, and what we do with it</summary>
+  <p class="info-text">An address only counts once you click the link we send — anyone can type any
+  address, so clicking is what proves it is yours. Until then it does nothing. We use it for password
+  recovery only: no newsletters, no sharing. You can remove it at any time, and removing it just means
+  you would need the person running this server to help if you ever get locked out.</p>
+ </details>
+
+ <div id="email-unconfigured" class="u-callout" hidden>
+  <strong>Email sending is not set up on this server</strong>, so an address cannot be verified and
+  this is switched off. Whoever runs the server can enable it by setting <code>SMTP_HOST</code> and
+  the related settings (see <code>.env.example</code>). Password reset still works — it shows a
+  one-time code on screen instead.
+ </div>
+
+ <div id="email-current" class="info-text"></div>
+
+ <div id="email-controls">
+
+ <div id="email-claim-suggestion" class="u-callout" hidden>
+  Your login looks like an email address. Verify <strong id="email-suggested"></strong> to turn on
+  password recovery — your username does not change.
+  <p class="u-mt-md"><button type="button" id="email-claim-btn" class="btn btn-secondary btn-sm">Use this address</button></p>
+ </div>
+
+ <div class="form-row">
+  <div class="form-group u-flex-grow">
+   <label for="account-email">Email address</label>
+   <input type="email" id="account-email" placeholder="you@school.edu" autocomplete="email">
+  </div>
+  <div class="form-group u-flex-grow">
+   <label for="account-email-password">Confirm your password</label>
+   <input type="password" id="account-email-password" placeholder="Current password" autocomplete="current-password">
+   <span class="help-text">Required so someone on a borrowed session cannot redirect recovery.</span>
+  </div>
+ </div>
+ <div class="form-row fetch-actions">
+  <button type="button" id="email-save-btn" class="btn btn-primary">Save and send verification</button>
+  <button type="button" id="email-resend-btn" class="btn btn-secondary" hidden>Resend verification</button>
+  <button type="button" id="email-remove-btn" class="btn btn-secondary" hidden>Remove email</button>
+ </div>
+ </div>
+ <div id="email-status" class="status-indicator"></div>
+</section>
+
 <section class="card">
  <h2>Change password</h2>
  <p class="info-text">Updates your password and signs out other sessions immediately (this browser stays
