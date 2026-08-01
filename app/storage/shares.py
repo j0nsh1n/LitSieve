@@ -33,6 +33,8 @@ logger = logging.getLogger(__name__)
 
 # Human-typeable alphabet (no I/O/0/1).
 _CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
+# Share create defaults / bounds — also used by ShareCreateRequest in schemas.
 DEFAULT_EXPIRES_DAYS = 14
 MAX_EXPIRES_DAYS = 365
 MAX_MAX_USES = 10_000

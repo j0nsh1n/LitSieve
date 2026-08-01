@@ -1,17 +1,21 @@
 # context.md — Literature Research Aide
 
 ## Current State
-- App version **4.3.1** (`app/main.py`, `GET /health`).
+- App version **4.3.2** (`app/main.py`, `GET /health`).
 - Python **3.14** (Dockerfile, CI, Render, ruff `py314`).
 - Lint: `ruff check .` — partial select (E9/F63/F7/F82/F401/F541/E401/I); passes.
 - Types: `pyright app` via `pyrightconfig.json` (basic); CI runs it
   **continue-on-error** until ~76 app/ errors are cleaned (report-only).
-- Tests: `SECRET_KEY=x DEBUG=true ./venv/bin/python -m pytest -q` — **257 passed**
-  (2026-07-30 on `feat/optional-verified-email`); use `./venv` so sqlcipher runs.
+- Tests: `DEBUG=true ./venv/bin/python -m pytest -q` — **268 passed**
+  (2026-07-30; screening suite expanded); use `./venv` so sqlcipher runs.
 - CI: `.github/workflows/ci.yml` (ruff + pyright report + pytest + docker),
-  `codeql.yml`, `dependabot.yml` (pip + github-actions). Adopted from former
-  `Github Templates/` (folder removed).
-- Known gaps: no dependency lockfile; pyright not yet green / blocking.
+  `codeql.yml`. Dependabot config **removed** locally (2026-07-30); not
+  necessarily on origin until pushed.
+- Recovery email: on main (PR #38); MailerSend SMTP in gitignored `.env`
+  confirmed working by human. Secrets never committed.
+- Deploy: `docs/DEPLOY.md` checklist (SECRET_KEY, SMTP, quota, smoke).
+- Known gaps: no dependency lockfile; pyright not yet green / blocking;
+  public cloud host env still operator-owned after local Phase 3 docs/smoke.
 
 ## Repo Landmarks
 | Path | Role |
@@ -63,7 +67,9 @@ ShareCode *---1 Library (owner); redeem → clone Library for joiner
 
 ## Session Handoff
 - **Date:** 2026-07-30
-- **Branch:** `main` @ `9b736c7` (PR #38 merged; CI success)
-- **Done:** Local main synced; feature branch deleted; smoke `/health`+landing OK;
-  full pytest 257 passed; opened PR #49 for `tools/send_test_email.py`
-- **Next:** Merge #49 when green; configure SMTP on host if using recovery email
+- **Branch:** `main` (local commits unpushed; behind origin until human sync)
+- **Done:** Phase 3 — `docs/DEPLOY.md`, README deploy section, roadmap Phase 3
+  marked done after local production-ish `/health` smoke. Prior: screening
+  tests + dead-code purge (268 tests).
+- **Next:** Backlog when human picks it (pyright, lockfile), or push local
+  commits when asked. No PR/push without explicit ask.

@@ -4,6 +4,12 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
+from app.storage.shares import (
+    DEFAULT_EXPIRES_DAYS,
+    MAX_EXPIRES_DAYS,
+    MAX_MAX_USES,
+)
+
 
 class SearchRequest(BaseModel):
     query_text: str
@@ -167,8 +173,10 @@ class DeleteAccountRequest(BaseModel):
 
 class ShareCreateRequest(BaseModel):
     library_id: Optional[str] = None
-    expires_days: Optional[int] = Field(default=14, ge=1, le=365)
-    max_uses: Optional[int] = Field(default=None, ge=1, le=10000)
+    expires_days: Optional[int] = Field(
+        default=DEFAULT_EXPIRES_DAYS, ge=1, le=MAX_EXPIRES_DAYS
+    )
+    max_uses: Optional[int] = Field(default=None, ge=1, le=MAX_MAX_USES)
     include_embeddings: bool = True
 
 

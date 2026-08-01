@@ -9,7 +9,7 @@ import logging
 import random
 import time
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional
 
 import requests
 
@@ -153,13 +153,6 @@ class HttpClient:
 
     def post(self, url: str, **kwargs) -> requests.Response:
         return self.request("POST", url, **kwargs)
-
-    def get_json(self, url: str, **kwargs) -> Union[dict, list]:
-        resp = self.get(url, **kwargs)
-        try:
-            return resp.json()
-        except ValueError as e:
-            raise FetchError(f"Invalid JSON from {url}", kind="error") from e
 
     @staticmethod
     def _backoff_sleep(attempt: int, retry_after: Optional[str]) -> None:
