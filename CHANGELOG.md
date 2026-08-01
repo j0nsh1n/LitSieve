@@ -16,6 +16,8 @@ and this project aims to follow Semantic Versioning for app version strings
 - Optional verified recovery email (username separate from email; SMTP-gated)
   — merged PR #38; human-confirmed with MailerSend SMTP.
 - `tools/send_test_email.py` SMTP smoke CLI (PR #49).
+- Host deploy checklist: `docs/DEPLOY.md` (SECRET_KEY, DEBUG, SMTP, quota,
+  SQLCipher, smoke commands); README links to it.
 
 ### Changed
 - Search abstracts use full card width (removed reading-mode 68ch cap) — v4.3.1.

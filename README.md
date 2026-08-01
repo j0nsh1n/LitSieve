@@ -67,7 +67,8 @@ Built with **FastAPI**, sentence-transformers, FAISS, and scikit-learn.
 ├── static/                 # CSS + page JavaScript
 ├── tests/                  # pytest suite
 ├── tools/                  # bench_scale.py (offline latency benchmark)
-├── docs/                   # engineering notes
+├── docs/                   # engineering notes + deploy checklist
+│   └── DEPLOY.md           # Host checklist (SECRET_KEY, SMTP, quota, smoke)
 ├── run_dev.sh              # Local dev with --reload
 ├── requirements.txt
 ├── Dockerfile              # Container build (HF Spaces / any Docker host)
@@ -123,6 +124,18 @@ account. Register/login for your private workspace, then:
 docker build -t literature-aide .
 docker run -p 7860:7860 -e SECRET_KEY="$(python -c 'import secrets;print(secrets.token_urlsafe(48))')" literature-aide
 ```
+
+### Production / host deploy
+
+See **[docs/DEPLOY.md](docs/DEPLOY.md)** for the full operator checklist:
+
+- Required `SECRET_KEY` when `DEBUG=false`
+- Optional SMTP, storage quota, SQLCipher, AI keys
+- `PUBLIC_BASE_URL` for recovery-email links
+- Smoke: `GET /health` → `200` (`status: healthy`)
+
+Render: `render.yaml` generates `SECRET_KEY` and health-checks `/health`. Set
+`PUBLIC_BASE_URL` and any SMTP/quota vars in the platform dashboard.
 
 ## Programmatic use (pipeline)
 
@@ -250,6 +263,8 @@ cleanly during tests. Coverage includes:
 - **Secrets in the repo** — `.env*` and `user_data/` are gitignored; keep `.env`
   at `chmod 600`. Production keys should come from the platform's secret
   manager (`render.yaml` generates `SECRET_KEY` automatically).
+- **Deploy checklist** — step-by-step host setup and smoke tests:
+  [docs/DEPLOY.md](docs/DEPLOY.md).
 
 ## Troubleshooting
 

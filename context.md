@@ -13,8 +13,9 @@
   necessarily on origin until pushed.
 - Recovery email: on main (PR #38); MailerSend SMTP in gitignored `.env`
   confirmed working by human. Secrets never committed.
+- Deploy: `docs/DEPLOY.md` checklist (SECRET_KEY, SMTP, quota, smoke).
 - Known gaps: no dependency lockfile; pyright not yet green / blocking;
-  Phase 3 deploy checklist / host stabilize still open.
+  public cloud host env still operator-owned after local Phase 3 docs/smoke.
 
 ## Repo Landmarks
 | Path | Role |
@@ -66,9 +67,9 @@ ShareCode *---1 Library (owner); redeem → clone Library for joiner
 
 ## Session Handoff
 - **Date:** 2026-07-30
-- **Branch:** `main` (local commits unpushed; behind origin #49 until sync)
-- **Done:** Screening tests expanded (268). Purged dead code: pipeline
-  excluded-cache stub, `get_cluster_assignments`, `calculate_similarity_matrix`,
-  `HttpClient.get_json`; share bounds single-sourced into schemas. Suite still
-  268 green after purge.
-- **Next:** Phase 3 host stabilize when human wants it. No push until asked.
+- **Branch:** `main` (local commits unpushed; behind origin until human sync)
+- **Done:** Phase 3 — `docs/DEPLOY.md`, README deploy section, roadmap Phase 3
+  marked done after local production-ish `/health` smoke. Prior: screening
+  tests + dead-code purge (268 tests).
+- **Next:** Backlog when human picks it (pyright, lockfile), or push local
+  commits when asked. No PR/push without explicit ask.
