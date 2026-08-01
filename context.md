@@ -6,13 +6,15 @@
 - Lint: `ruff check .` — partial select (E9/F63/F7/F82/F401/F541/E401/I); passes.
 - Types: `pyright app` via `pyrightconfig.json` (basic); CI runs it
   **continue-on-error** until ~76 app/ errors are cleaned (report-only).
-- Tests: `SECRET_KEY=x DEBUG=true ./venv/bin/python -m pytest -q` — **257 passed**
-  (2026-07-30 on `feat/optional-verified-email`); use `./venv` so sqlcipher runs.
+- Tests: `SECRET_KEY=x DEBUG=true ./venv/bin/python -m pytest -q` — **257+**
+  (email recovery suite on main); use `./venv` so sqlcipher runs.
 - CI: `.github/workflows/ci.yml` (ruff + pyright report + pytest + docker),
-  `codeql.yml`. Dependabot config **removed** (2026-07-30); no auto dep PRs.
-- SMTP (local `.env` only): MailerSend configured and confirmed working;
-  secrets never committed.
-- Known gaps: no dependency lockfile; pyright not yet green / blocking.
+  `codeql.yml`. Dependabot config **removed** locally (2026-07-30); not
+  necessarily on origin until pushed.
+- Recovery email: on main (PR #38); MailerSend SMTP in gitignored `.env`
+  confirmed working by human. Secrets never committed.
+- Known gaps: no dependency lockfile; pyright not yet green / blocking;
+  Phase 3 deploy checklist / host stabilize still open.
 
 ## Repo Landmarks
 | Path | Role |
@@ -64,9 +66,9 @@ ShareCode *---1 Library (owner); redeem → clone Library for joiner
 
 ## Session Handoff
 - **Date:** 2026-07-30
-- **Branch:** `main` (local: Dependabot yml deleted, not pushed yet)
-- **Done:** MailerSend SMTP in gitignored `.env` (confirmed working); closed
-  Dependabot PRs #39–#48; removed `.github/dependabot.yml` locally.
-- **Next:** Push Dependabot removal to `main` only when human says so.
-  PR #49 still open (SMTP test CLI) — close or keep only with human say-so.
-  agents.md: no push/PR without explicit permission this conversation.
+- **Branch:** `main` (local ahead of origin with Dependabot removal + docs;
+  also behind origin which has #49 merge — rebase/merge when human allows)
+- **Done:** Phase 2 recovery email closed out (human-confirmed SMTP); roadmap
+  points at Phase 3 host stabilize. Dependabot PRs closed; yml deleted locally.
+- **Next:** Phase 3 — deploy checklist + clean host `/health`. No push until
+  human says so.
