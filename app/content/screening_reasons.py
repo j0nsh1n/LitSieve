@@ -32,20 +32,22 @@ USER_SELECTABLE_REASONS: List[str] = [
     "other",
 ]
 
-# System-assigned reasons (UI should not offer these as free choices for bulk manual).
+# System-assigned reasons (UI must not offer these as free student choices).
 SYSTEM_REASONS = frozenset({"cluster", "duplicate"})
 
 
 def normalize_reason(reason: Optional[str], default: str = "manual") -> str:
-    """Return a known reason code, or default for unknown/empty values."""
+    """Return a known reason code, or default for unknown/empty values.
+
+    Accepts spaces or hyphens (``Wrong population`` / ``OFF-TOPIC``) and maps
+    them to the stable underscore codes in EXCLUSION_REASONS.
+    """
     if not reason:
         return default
     key = str(reason).strip().lower().replace(" ", "_").replace("-", "_")
-    if key in EXCLUSION_REASONS:
-        return key
-    return default
+    return key if key in EXCLUSION_REASONS else default
 
 
 def reason_label(reason: Optional[str]) -> str:
-    code = normalize_reason(reason)
-    return EXCLUSION_REASONS.get(code, code)
+    """Student-facing label for a reason code (unknown → normalized default)."""
+    return EXCLUSION_REASONS.get(normalize_reason(reason), "Manual")

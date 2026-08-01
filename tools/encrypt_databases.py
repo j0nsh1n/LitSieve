@@ -4,14 +4,19 @@
 Enabling DB_ENCRYPTION_KEY does not convert anything on its own — the app will
 refuse to open plaintext files once a key is set. Run this first.
 
+    # Prefer the environment variable so the key is not on argv / in history:
+    export DB_ENCRYPTION_KEY='…'
+
     # see what would happen (default: nothing is written)
-    python tools/encrypt_databases.py --key "$DB_ENCRYPTION_KEY"
+    python tools/encrypt_databases.py
 
     # actually convert, keeping .plaintext.bak copies
-    python tools/encrypt_databases.py --key "$DB_ENCRYPTION_KEY" --apply
+    python tools/encrypt_databases.py --apply
 
     # go back to plaintext (e.g. you are about to rotate the key)
-    python tools/encrypt_databases.py --key "$DB_ENCRYPTION_KEY" --decrypt --apply
+    python tools/encrypt_databases.py --decrypt --apply
+
+    # --key still works for one-off local use; avoid it on shared hosts.
 
 Stop the server first: converting a database that is being written to can
 lose the in-flight writes.
@@ -89,8 +94,11 @@ def convert(path: Path, key: str, *, decrypt: bool) -> None:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--key", default=os.getenv("DB_ENCRYPTION_KEY", ""),
-                    help="encryption key (defaults to $DB_ENCRYPTION_KEY)")
+    ap.add_argument(
+        "--key",
+        default=os.getenv("DB_ENCRYPTION_KEY", ""),
+        help="encryption key (prefer $DB_ENCRYPTION_KEY; --key exposes argv)",
+    )
     ap.add_argument("--decrypt", action="store_true",
                     help="convert encrypted databases back to plaintext")
     ap.add_argument("--apply", action="store_true",
@@ -98,7 +106,11 @@ def main() -> int:
     args = ap.parse_args()
 
     if not args.key:
-        print("No key given. Pass --key or set DB_ENCRYPTION_KEY.", file=sys.stderr)
+        print(
+            "No key given. Set DB_ENCRYPTION_KEY in the environment "
+            "(preferred) or pass --key for a local one-off.",
+            file=sys.stderr,
+        )
         return 2
 
     databases = find_databases()

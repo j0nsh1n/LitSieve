@@ -19,7 +19,7 @@ router = APIRouter()
 
 @router.get("/health")
 async def health():
-    return {"status": "healthy", "version": "4.3.1"}
+    return {"status": "healthy", "version": "4.3.2"}
 
 
 @router.get("/api/ui-flags")

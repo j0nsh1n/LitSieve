@@ -83,18 +83,19 @@ class LiteratureSearchPipeline:
         # in-flight embedding job (or vice versa), which would otherwise mix
         # vectors from two different models.
         self._engine_lock = threading.Lock()
-        # Search hot-path cache: embeddings matrix + excluded set. Bumped when
-        # the corpus changes (fetch / embed / screening).
+        # Search hot-path: cache the embeddings matrix only. Screening
+        # exclusions are read fresh (cheap; they change often during triage).
+        # Bump the generation after fetch / embed / clear (or any change to
+        # the article/embedding set). Screening may still call invalidate for
+        # simplicity; that only forces a harmless emb reload.
         self._corpus_cache_lock = threading.Lock()
         self._corpus_cache_gen = 0
         self._cached_emb_ids = None
         self._cached_emb_matrix = None
-        self._cached_excluded = None
-        self._cached_excluded_gen = -1
         self._cached_emb_gen = -1
 
     def invalidate_corpus_cache(self) -> None:
-        """Call after mutations that change embeddings, screening, or articles."""
+        """Drop the embeddings matrix cache (call after corpus mutations)."""
         with self._corpus_cache_lock:
             self._corpus_cache_gen += 1
 
@@ -495,17 +496,6 @@ class LiteratureSearchPipeline:
             self._cached_emb_gen = self._corpus_cache_gen
         return ids, matrix
 
-    def _load_excluded_cached(self) -> set:
-        with self._corpus_cache_lock:
-            gen = self._corpus_cache_gen
-            if self._cached_excluded_gen == gen and self._cached_excluded is not None:
-                return set(self._cached_excluded)
-        excluded = set(self.db.get_excluded_keys())
-        with self._corpus_cache_lock:
-            self._cached_excluded = set(excluded)
-            self._cached_excluded_gen = self._corpus_cache_gen
-        return excluded
-
     def _candidate_pool(
         self,
         source_filter: Optional[List[str]] = None,
@@ -522,8 +512,6 @@ class LiteratureSearchPipeline:
         if len(article_ids) == 0:
             return [], article_embeddings, empty_meta
 
-        # Excluded keys are cheap to load and change often during triage —
-        # always read fresh. Embeddings stay cached.
         excluded = set(self.db.get_excluded_keys())
         if extra_exclude:
             excluded |= set(extra_exclude)
