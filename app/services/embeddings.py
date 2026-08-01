@@ -159,11 +159,6 @@ class EmbeddingEngine:
             top_indices = np.argsort(similarities)[::-1][:top_k]
             return [(article_ids[idx], float(similarities[idx])) for idx in top_indices]
 
-    def calculate_similarity_matrix(self, embeddings: np.ndarray) -> np.ndarray:
-        # Dense N×N matrix — only used for the heatmap on a bounded subset
-        # (<= max_display articles), never for full-corpus duplicate detection.
-        return cosine_similarity(embeddings)
-
     def detect_duplicates(self, article_embeddings: np.ndarray, article_ids: list, threshold: float = 0.98) -> list:
         """Find near-duplicate pairs whose cosine similarity >= threshold.
 
