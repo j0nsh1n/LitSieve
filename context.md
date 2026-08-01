@@ -1,7 +1,7 @@
 # context.md — Literature Research Aide
 
 ## Current State
-- App version **4.3.1** (`app/main.py`, `GET /health`).
+- App version **4.3.2** (`app/main.py`, `GET /health`).
 - Python **3.14** (Dockerfile, CI, Render, ruff `py314`).
 - Lint: `ruff check .` — partial select (E9/F63/F7/F82/F401/F541/E401/I); passes.
 - Types: `pyright app` via `pyrightconfig.json` (basic); CI runs it

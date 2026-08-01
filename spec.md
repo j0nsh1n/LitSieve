@@ -39,7 +39,7 @@ a substitute for school library databases.
   Or: `DEBUG=true SECRET_KEY=… ./venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 7860 --reload`
 - Example: log in → Data Management → pick topics/sources → Fetch → Prepare
   Papers → Clusters (screen) → Duplicates → Search → Download RIS
-- Health: `GET /health` → `{"status":"healthy","version":"4.3.1"}` (version as of
+- Health: `GET /health` → `{"status":"healthy","version":"4.3.2"}` (version as of
   this writing; bump when releasing)
 
 ## Architecture
