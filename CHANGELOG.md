@@ -11,11 +11,11 @@ and this project aims to follow Semantic Versioning for app version strings
 ### Added
 - Governance files: `agents.md`, `spec.md`, `roadmap.md`, tracked `context.md`,
   and this `CHANGELOG.md`.
-- Live `.github/` from former templates: CodeQL workflow, Dependabot (pip +
-  actions), pyright in CI (report-only until backlog cleared), markdownlint
-  (non-blocking).
+- Live `.github/` from former templates: CodeQL workflow, pyright in CI
+  (report-only until backlog cleared), markdownlint (non-blocking).
 - Optional verified recovery email (username separate from email; SMTP-gated)
-  on branch `feat/optional-verified-email` (pending merge to main).
+  — merged PR #38; human-confirmed with MailerSend SMTP.
+- `tools/send_test_email.py` SMTP smoke CLI (PR #49).
 
 ### Changed
 - Search abstracts use full card width (removed reading-mode 68ch cap) — v4.3.1.

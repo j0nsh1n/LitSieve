@@ -10,25 +10,27 @@ works) and via PR review. One phase may span several small PRs.
   - Align agent workflow to agents.md (no push/PR without explicit ask)
 - Complete when: all five files tracked on the working branch; CI green;
   agents can resume from context.md handoff without reading gitignored secrets
-- Status: [x] 2026-07-30 (local; push only when human asks)
+- Status: [x] 2026-07-30 (local commits may still need push when human asks)
 
-## Phase 2 — Optional recovery email (in flight)
+## Phase 2 — Optional recovery email
 - Tasks:
   - Username separate from email; optional verified recovery address
   - SMTP-gated; Account UI and password-reset paths
   - Tests in `tests/test_email_recovery.py`
-- Complete when: feature merged to main, tests green, CHANGELOG entry, SMTP
-  documented in `.env.example` / README as needed
-- Status: [~] branch `feat/optional-verified-email` (not yet assumed on main)
+  - SMTP smoke tool (`tools/send_test_email.py`); MailerSend verified locally
+- Complete when: feature on main, human-confirmed send/recovery works, secrets
+  only in gitignored `.env` / secret dumps, `.env.example` documents SMTP
+- Status: [x] 2026-07-30 (PR #38 merged; SMTP confirmed working by human)
 
-## Phase 3 — Stabilize v4.3.x host
+## Phase 3 — Stabilize v4.3.x host (current)
 - Tasks:
   - Keep multi-library + student starting-point positioning
   - Storage quota, AI key AES-GCM, optional SQLCipher as deploy options
+  - Deploy checklist: SECRET_KEY, optional SMTP, quota, tokens; `/health` 200
   - No teacher LMS / live-share expansion unless human reopens scope
-- Complete when: deploy checklist (SECRET_KEY, optional SMTP, quota, tokens)
-  documented and a clean main deploy runs `/health` 200
-- Status: [ ]
+- Complete when: deploy checklist documented and a clean main deploy runs
+  `/health` 200 on the intended host
+- Status: [ ] current focus
 
 ## Backlog (unscheduled)
 - Make `pyright app` blocking in CI after clearing the current error backlog
