@@ -6,8 +6,8 @@
 - Lint: `ruff check .` — partial select (E9/F63/F7/F82/F401/F541/E401/I); passes.
 - Types: `pyright app` via `pyrightconfig.json` (basic); CI runs it
   **continue-on-error** until ~76 app/ errors are cleaned (report-only).
-- Tests: `SECRET_KEY=x DEBUG=true ./venv/bin/python -m pytest -q` — **257+**
-  (email recovery suite on main); use `./venv` so sqlcipher runs.
+- Tests: `DEBUG=true ./venv/bin/python -m pytest -q` — **268 passed**
+  (2026-07-30; screening suite expanded); use `./venv` so sqlcipher runs.
 - CI: `.github/workflows/ci.yml` (ruff + pyright report + pytest + docker),
   `codeql.yml`. Dependabot config **removed** locally (2026-07-30); not
   necessarily on origin until pushed.
@@ -66,9 +66,10 @@ ShareCode *---1 Library (owner); redeem → clone Library for joiner
 
 ## Session Handoff
 - **Date:** 2026-07-30
-- **Branch:** `main` (local ahead of origin with Dependabot removal + docs;
-  also behind origin which has #49 merge — rebase/merge when human allows)
-- **Done:** Phase 2 recovery email closed out (human-confirmed SMTP); roadmap
-  points at Phase 3 host stabilize. Dependabot PRs closed; yml deleted locally.
-- **Next:** Phase 3 — deploy checklist + clean host `/health`. No push until
-  human says so.
+- **Branch:** `main` (local uncommitted screening tests + earlier unpushed
+  Dependabot/docs commits; behind origin on #49 merge until human allows sync)
+- **Done:** Expanded screening tests (DB + pipeline + HTTP); full suite 268
+  green. Dead-code audit findings noted (not deleted): `_load_excluded_cached`,
+  `get_cluster_assignments`, `calculate_similarity_matrix`, share bound consts,
+  `HttpClient.get_json`.
+- **Next:** Phase 3 host stabilize when human wants it. No push until asked.
