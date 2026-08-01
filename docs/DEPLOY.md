@@ -112,11 +112,15 @@ Secrets stay in `.env` only. Local dumps like `mailersend-smtp.txt` are gitignor
 ### Optional SQLCipher — `DB_ENCRYPTION_KEY`
 
 - Unset = plain SQLite (default).
-- Set only **after** converting existing DBs, or the app refuses to open them:
+- Set only **after** converting existing DBs, or the app refuses to open them.
+- Prefer the env var (the tool reads `$DB_ENCRYPTION_KEY`). Avoid putting the
+  key on the command line — it can show up in shell history and process lists.
 
 ```bash
-python tools/encrypt_databases.py --key "$DB_ENCRYPTION_KEY"          # dry run
-python tools/encrypt_databases.py --key "$DB_ENCRYPTION_KEY" --apply
+export DB_ENCRYPTION_KEY='…'   # from your secret store; not in git
+python tools/encrypt_databases.py          # dry run
+python tools/encrypt_databases.py --apply  # convert
+# decrypt: python tools/encrypt_databases.py --decrypt --apply
 ```
 
 Losing the key loses the data. Keep it in the host secret store.

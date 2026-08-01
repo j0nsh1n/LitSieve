@@ -465,8 +465,12 @@ def screening_app(tmp_path, monkeypatch):
         pytest.importorskip(_dep)
 
     import os
-    os.environ.setdefault("SECRET_KEY", "pytest-only-not-a-secret-32b-min!!")
-    os.environ["DEBUG"] = "true"
+
+    monkeypatch.setenv(
+        "SECRET_KEY",
+        os.environ.get("SECRET_KEY") or "pytest-only-not-a-secret-32b-min!!",
+    )
+    monkeypatch.setenv("DEBUG", "true")
 
     from app import core
 

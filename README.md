@@ -252,9 +252,11 @@ cleanly during tests. Coverage includes:
   first, or the app will refuse to open them:
 
   ```bash
-  python tools/encrypt_databases.py --key "$DB_ENCRYPTION_KEY"          # dry run
-  python tools/encrypt_databases.py --key "$DB_ENCRYPTION_KEY" --apply  # convert
-  python tools/encrypt_databases.py --key "$DB_ENCRYPTION_KEY" --decrypt --apply
+  # Key from env only (avoids argv / shell history). Do not pass --key on shared hosts.
+  export DB_ENCRYPTION_KEY='…'
+  python tools/encrypt_databases.py                 # dry run
+  python tools/encrypt_databases.py --apply         # convert
+  python tools/encrypt_databases.py --decrypt --apply
   ```
 
   This protects a stolen disk or a copied backup. It cannot protect a
