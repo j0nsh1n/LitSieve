@@ -22,7 +22,7 @@ works) and via PR review. One phase may span several small PRs.
   only in gitignored `.env` / secret dumps, `.env.example` documents SMTP
 - Status: [x] 2026-07-30 (PR #38 merged; SMTP confirmed working by human)
 
-## Phase 3 — Stabilize v4.3.x host (current)
+## Phase 3 — Stabilize v4.3.x host
 - Tasks:
   - Keep multi-library + student starting-point positioning
   - Storage quota, AI key AES-GCM, optional SQLCipher as deploy options
@@ -30,7 +30,9 @@ works) and via PR review. One phase may span several small PRs.
   - No teacher LMS / live-share expansion unless human reopens scope
 - Complete when: deploy checklist documented and a clean main deploy runs
   `/health` 200 on the intended host
-- Status: [ ] current focus
+- Status: [x] 2026-07-30 — `docs/DEPLOY.md` + README link; production-ish
+  local smoke (`DEBUG=false`, throwaway `SECRET_KEY`, `/health` 200).
+  Public cloud host still operator-owned (set env on Render/HF when you deploy).
 
 ## Backlog (unscheduled)
 - Make `pyright app` blocking in CI after clearing the current error backlog
