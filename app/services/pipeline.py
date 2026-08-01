@@ -83,9 +83,11 @@ class LiteratureSearchPipeline:
         # in-flight embedding job (or vice versa), which would otherwise mix
         # vectors from two different models.
         self._engine_lock = threading.Lock()
-        # Search hot-path: cache embeddings matrix only. Screening exclusions
-        # are read fresh (cheap; change often during triage). Bump the
-        # generation after fetch / embed / screening / clear.
+        # Search hot-path: cache the embeddings matrix only. Screening
+        # exclusions are read fresh (cheap; they change often during triage).
+        # Bump the generation after fetch / embed / clear (or any change to
+        # the article/embedding set). Screening may still call invalidate for
+        # simplicity; that only forces a harmless emb reload.
         self._corpus_cache_lock = threading.Lock()
         self._corpus_cache_gen = 0
         self._cached_emb_ids = None
@@ -93,7 +95,7 @@ class LiteratureSearchPipeline:
         self._cached_emb_gen = -1
 
     def invalidate_corpus_cache(self) -> None:
-        """Call after mutations that change embeddings, screening, or articles."""
+        """Drop the embeddings matrix cache (call after corpus mutations)."""
         with self._corpus_cache_lock:
             self._corpus_cache_gen += 1
 

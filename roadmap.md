@@ -28,11 +28,13 @@ works) and via PR review. One phase may span several small PRs.
   - Storage quota, AI key AES-GCM, optional SQLCipher as deploy options
   - Deploy checklist: SECRET_KEY, optional SMTP, quota, tokens; `/health` 200
   - No teacher LMS / live-share expansion unless human reopens scope
-- Complete when: deploy checklist documented and a clean main deploy runs
-  `/health` 200 on the intended host
-- Status: [x] 2026-07-30 — `docs/DEPLOY.md` + README link; production-ish
-  local smoke (`DEBUG=false`, throwaway `SECRET_KEY`, `/health` 200).
-  Public cloud host still operator-owned (set env on Render/HF when you deploy).
+- Complete when: deploy checklist documented **and** production-ish smoke
+  passes: `DEBUG=false` + real `SECRET_KEY`, `GET /health` → 200
+  (`status: healthy`). Public cloud is operator-owned — run the same smoke
+  against that URL when you deploy (see `docs/DEPLOY.md`).
+- Status: [x] 2026-08-01 — `docs/DEPLOY.md` + README link; local
+  production-ish smoke verified. Operator still sets env on Render/HF for a
+  live public host.
 
 ## Backlog (unscheduled)
 - Make `pyright app` blocking in CI after clearing the current error backlog
