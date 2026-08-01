@@ -217,12 +217,6 @@ class ArticleClusterer:
 
         return self.labels
 
-    def get_cluster_assignments(self) -> np.ndarray:
-        """Get cluster labels"""
-        if self.labels is None:
-            raise ValueError("Must fit model first")
-        return self.labels
-
 
 class ClusterLabeler:
     """Generates human-readable labels for clusters"""

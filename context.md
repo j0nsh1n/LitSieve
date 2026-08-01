@@ -66,10 +66,9 @@ ShareCode *---1 Library (owner); redeem → clone Library for joiner
 
 ## Session Handoff
 - **Date:** 2026-07-30
-- **Branch:** `main` (local uncommitted screening tests + earlier unpushed
-  Dependabot/docs commits; behind origin on #49 merge until human allows sync)
-- **Done:** Expanded screening tests (DB + pipeline + HTTP); full suite 268
-  green. Dead-code audit findings noted (not deleted): `_load_excluded_cached`,
-  `get_cluster_assignments`, `calculate_similarity_matrix`, share bound consts,
-  `HttpClient.get_json`.
+- **Branch:** `main` (local commits unpushed; behind origin #49 until sync)
+- **Done:** Screening tests expanded (268). Purged dead code: pipeline
+  excluded-cache stub, `get_cluster_assignments`, `calculate_similarity_matrix`,
+  `HttpClient.get_json`; share bounds single-sourced into schemas. Suite still
+  268 green after purge.
 - **Next:** Phase 3 host stabilize when human wants it. No push until asked.
