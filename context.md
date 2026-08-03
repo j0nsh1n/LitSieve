@@ -8,13 +8,15 @@
   **continue-on-error** (report-only): **61 errors, 6 warnings** (2026-08-02).
 - Tests: `DEBUG=true ./venv/bin/python -m pytest -q` — **268 passed**
   (2026-07-30; screening suite expanded); use `./venv` so sqlcipher runs.
-- CI: `.github/workflows/ci.yml` (ruff + pyright report + pip-audit report +
-  pytest + docker), `codeql.yml`. Dependabot config **removed** locally
-  (2026-07-30); not necessarily on origin until pushed. spec.md records it as
-  deliberate; `pip-audit` (non-blocking) now covers the CVE half.
-- Dependency audit today: `requirements.txt` resolves clean; the local venv
-  reports `setuptools` 78.1.0 (PYSEC-2025-49, PYSEC-2026-3447 — fixed in
-  78.1.1 / 83.0.0). Not a declared dependency; venv/build package.
+- CI: `.github/workflows/ci.yml` (ruff + pyright report + **pip-audit
+  blocking** + pytest + docker), `codeql.yml`. Dependabot config **removed**
+  locally (2026-07-30); not necessarily on origin until pushed. spec.md records
+  it as deliberate; `pip-audit` now covers the CVE half.
+- Dependency audit (2026-08-02): **clean, exit 0**. Local venv `setuptools`
+  upgraded 78.1.0 → 83.0.0 (clears PYSEC-2025-49 / PYSEC-2026-3447); CI install
+  step now upgrades setuptools too. `torch`/`triton-rocm` are skipped as
+  un-auditable (PyTorch index, not PyPI) — skips don't fail without `--strict`,
+  so torch CVEs stay a manual check.
 - Recovery email: on main (PR #38); MailerSend SMTP in gitignored `.env`
   confirmed working by human. Secrets never committed.
 - Deploy: `docs/DEPLOY.md` checklist (SECRET_KEY, SMTP, quota, smoke).
@@ -74,8 +76,8 @@ ShareCode *---1 Library (owner); redeem → clone Library for joiner
 - **Branch:** `chore/doc-drift-and-hygiene` (off `chore/phase3-deploy-and-hygiene`;
   both unpushed)
 - **Done:** Doc-drift fixes (spec.md Dependabot claim, stale pyright count,
-  unused `pandas`, two emoji `print()` strings). Then added `pip-audit` to CI
-  as a non-blocking dependency audit. Lint clean, 268 tests pass, pyright
-  unchanged at 61/6.
-- **Next:** Decide whether to upgrade venv `setuptools` and whether pip-audit
-  should block; then backlog (pyright green, lockfile). Push when asked.
+  unused `pandas`, two emoji `print()` strings). Added `pip-audit` to CI, then
+  upgraded venv setuptools and made the audit **blocking**. Full re-validation:
+  ruff clean, 268 tests pass, pyright unchanged at 61/6, pip-audit exit 0.
+- **Next:** Backlog only (pyright green/blocking, dependency lockfile, ruff
+  ratchet E501/UP/E402). Push when asked.
