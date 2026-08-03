@@ -75,7 +75,10 @@ a substitute for school library databases.
 ## Security & Privacy
 - No secrets in source. Credentials via environment / `.env` (gitignored).
 - Dependencies: minimum versions in `requirements.txt` (not fully lockfile-pinned).
-  Dependabot is enabled (`.github/dependabot.yml`) for pip + github-actions weekly.
+  **Dependabot is deliberately disabled** (no `.github/dependabot.yml`) — the
+  weekly auto-PRs were noise for a project this size. Consequence: nothing
+  watches dependency CVEs automatically, so upgrades are manual. Revisit with a
+  lockfile (see roadmap backlog) if reproducibility or CVE lag becomes a problem.
 - JWT HttpOnly cookie + CSRF double-submit; password change bumps `token_version`
 - CSP / security headers (`app/security.py`); HSTS skipped when `DEBUG=true`
 - Per-account storage cap `MAX_USER_STORAGE_MB` (default 500; `0` = off)

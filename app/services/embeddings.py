@@ -17,7 +17,7 @@ try:
     FAISS_AVAILABLE = True
 except ImportError:
     FAISS_AVAILABLE = False
-    print("⚠️ FAISS not installed — falling back to scikit-learn (slower for large datasets)")
+    print("WARNING: FAISS not installed - falling back to scikit-learn (slower for large datasets)")
 
 from sklearn.metrics.pairwise import cosine_similarity
 
