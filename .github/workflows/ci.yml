@@ -23,15 +23,36 @@ jobs:
           # CPU torch first (same pattern as Dockerfile / Render).
           pip install torch --index-url https://download.pytorch.org/whl/cpu
           pip install -r requirements.txt
-          pip install pytest ruff pyright
+          pip install pytest ruff pyright pip-audit
 
       - name: Ruff
         run: ruff check .
 
       - name: Pyright
         # Template requires pyright. Full strict pass is still a backlog
-        # (~76 errors under app/); report without blocking green CI until cleaned.
+        # (61 errors / 6 warnings under app/); report without blocking green CI
+        # until cleaned.
         run: pyright app
+        continue-on-error: true
+
+      - name: Dependency audit (pip-audit)
+        # Replaces the CVE-watching half of Dependabot, which was removed
+        # because of its weekly version-bump PR noise. This only speaks up for
+        # *known vulnerabilities* and never opens PRs.
+        #
+        # Audits the installed environment (not just requirements.txt) so
+        # transitive and build-time packages are covered too.
+        #
+        # Non-blocking for now: the environment carries packages we do not
+        # declare (e.g. setuptools from the runner image), so a red build would
+        # often be about something requirements.txt cannot fix. Flip
+        # continue-on-error to false once the reported set is understood and
+        # actionable.
+        #
+        # Note: torch is installed from the PyTorch index and is normally
+        # reported as "not found on PyPI, could not be audited" — expected, not
+        # a failure.
+        run: pip-audit --progress-spinner=off
         continue-on-error: true
 
       - name: Pytest
