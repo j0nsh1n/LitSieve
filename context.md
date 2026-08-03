@@ -5,12 +5,12 @@
 - Python **3.14** (Dockerfile, CI, Render, ruff `py314`).
 - Lint: `ruff check .` — partial select (E9/F63/F7/F82/F401/F541/E401/I); passes.
 - Types: `pyright app` via `pyrightconfig.json` (basic); CI runs it
-  **continue-on-error** until ~76 app/ errors are cleaned (report-only).
+  **continue-on-error** (report-only): **61 errors, 6 warnings** (2026-08-02).
 - Tests: `DEBUG=true ./venv/bin/python -m pytest -q` — **268 passed**
   (2026-07-30; screening suite expanded); use `./venv` so sqlcipher runs.
 - CI: `.github/workflows/ci.yml` (ruff + pyright report + pytest + docker),
   `codeql.yml`. Dependabot config **removed** locally (2026-07-30); not
-  necessarily on origin until pushed.
+  necessarily on origin until pushed. spec.md records it as deliberate.
 - Recovery email: on main (PR #38); MailerSend SMTP in gitignored `.env`
   confirmed working by human. Secrets never committed.
 - Deploy: `docs/DEPLOY.md` checklist (SECRET_KEY, SMTP, quota, smoke).
@@ -66,10 +66,12 @@ ShareCode *---1 Library (owner); redeem → clone Library for joiner
 - Host: Linux `./venv` (ROCm torch possible); entry `app.main:app` port 7860
 
 ## Session Handoff
-- **Date:** 2026-07-30
-- **Branch:** `main` (local commits unpushed; behind origin until human sync)
-- **Done:** Phase 3 — `docs/DEPLOY.md`, README deploy section, roadmap Phase 3
-  marked done after local production-ish `/health` smoke. Prior: screening
-  tests + dead-code purge (268 tests).
-- **Next:** Backlog when human picks it (pyright, lockfile), or push local
-  commits when asked. No PR/push without explicit ask.
+- **Date:** 2026-08-02
+- **Branch:** `chore/doc-drift-and-hygiene` (off `chore/phase3-deploy-and-hygiene`;
+  both unpushed)
+- **Done:** Doc-drift fixes — spec.md Dependabot claim corrected to match the
+  deliberate removal; stale pyright count refreshed; dropped unused `pandas`
+  dependency; replaced two emoji `print()` strings in `app/auth.py` and
+  `app/services/embeddings.py`. Lint clean, 268 tests pass, pyright unchanged.
+- **Next:** Backlog when picked (pyright green, lockfile), or push these
+  branches when asked.

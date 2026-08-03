@@ -8,6 +8,14 @@ and this project aims to follow Semantic Versioning for app version strings
 
 ## [Unreleased]
 
+### Removed
+- Unused `pandas` dependency (declared in `requirements.txt`, imported nowhere).
+  Slightly smaller installs; no behaviour change.
+
+### Changed
+- Startup warnings for missing `SECRET_KEY` (DEBUG) and missing FAISS now print
+  plain `WARNING:` text instead of an emoji prefix.
+
 ## [4.3.2] - 2026-08-01
 
 ### Added
