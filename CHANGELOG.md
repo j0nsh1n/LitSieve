@@ -8,6 +8,10 @@ and this project aims to follow Semantic Versioning for app version strings
 
 ## [Unreleased]
 
+### Added
+- CI dependency audit via `pip-audit` (non-blocking), covering known-CVE
+  reporting after Dependabot's weekly auto-PRs were disabled.
+
 ### Removed
 - Unused `pandas` dependency (declared in `requirements.txt`, imported nowhere).
   Slightly smaller installs; no behaviour change.

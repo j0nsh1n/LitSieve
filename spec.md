@@ -97,6 +97,12 @@ a substitute for school library databases.
   Prefer `./venv`. Install deps: `./venv/bin/pip install -r requirements.txt`
   (includes `sqlcipher3-binary` for encryption tests). CI sets `CI=true` so
   encryption suite hard-fails if sqlcipher missing.
+- Dependency audit: `pip-audit` (CI, **non-blocking** for now). Covers the CVE
+  half of what Dependabot did, without opening version-bump PRs. Audits the
+  installed environment, so it also sees transitive and build-time packages
+  that `requirements.txt` does not declare (and cannot fix) — which is why it
+  does not gate the build yet. `torch` comes from the PyTorch index and is
+  reported as un-auditable; that is expected.
 - Docker CI job builds image and hits `/health` and `/` (retries on Hub timeouts).
 - Markdownlint runs in CI non-blocking (`continue-on-error`).
 - Quirk: many tests use `TestClient`; patch `app.core` attributes (e.g. `user_db`),

@@ -8,9 +8,13 @@
   **continue-on-error** (report-only): **61 errors, 6 warnings** (2026-08-02).
 - Tests: `DEBUG=true ./venv/bin/python -m pytest -q` — **268 passed**
   (2026-07-30; screening suite expanded); use `./venv` so sqlcipher runs.
-- CI: `.github/workflows/ci.yml` (ruff + pyright report + pytest + docker),
-  `codeql.yml`. Dependabot config **removed** locally (2026-07-30); not
-  necessarily on origin until pushed. spec.md records it as deliberate.
+- CI: `.github/workflows/ci.yml` (ruff + pyright report + pip-audit report +
+  pytest + docker), `codeql.yml`. Dependabot config **removed** locally
+  (2026-07-30); not necessarily on origin until pushed. spec.md records it as
+  deliberate; `pip-audit` (non-blocking) now covers the CVE half.
+- Dependency audit today: `requirements.txt` resolves clean; the local venv
+  reports `setuptools` 78.1.0 (PYSEC-2025-49, PYSEC-2026-3447 — fixed in
+  78.1.1 / 83.0.0). Not a declared dependency; venv/build package.
 - Recovery email: on main (PR #38); MailerSend SMTP in gitignored `.env`
   confirmed working by human. Secrets never committed.
 - Deploy: `docs/DEPLOY.md` checklist (SECRET_KEY, SMTP, quota, smoke).
@@ -69,9 +73,9 @@ ShareCode *---1 Library (owner); redeem → clone Library for joiner
 - **Date:** 2026-08-02
 - **Branch:** `chore/doc-drift-and-hygiene` (off `chore/phase3-deploy-and-hygiene`;
   both unpushed)
-- **Done:** Doc-drift fixes — spec.md Dependabot claim corrected to match the
-  deliberate removal; stale pyright count refreshed; dropped unused `pandas`
-  dependency; replaced two emoji `print()` strings in `app/auth.py` and
-  `app/services/embeddings.py`. Lint clean, 268 tests pass, pyright unchanged.
-- **Next:** Backlog when picked (pyright green, lockfile), or push these
-  branches when asked.
+- **Done:** Doc-drift fixes (spec.md Dependabot claim, stale pyright count,
+  unused `pandas`, two emoji `print()` strings). Then added `pip-audit` to CI
+  as a non-blocking dependency audit. Lint clean, 268 tests pass, pyright
+  unchanged at 61/6.
+- **Next:** Decide whether to upgrade venv `setuptools` and whether pip-audit
+  should block; then backlog (pyright green, lockfile). Push when asked.
