@@ -6,8 +6,12 @@
 - Lint: `ruff check .` — partial select (E9/F63/F7/F82/F401/F541/E401/I); passes.
 - Types: `pyright app` via `pyrightconfig.json` (basic); CI runs it
   **continue-on-error** (report-only): **61 errors, 6 warnings** (2026-08-02).
-- Tests: `DEBUG=true ./venv/bin/python -m pytest -q` — **268 passed**
-  (2026-07-30; screening suite expanded); use `./venv` so sqlcipher runs.
+- Tests: `DEBUG=true ./venv/bin/python -m pytest -q` — **274 passed**
+  (2026-08-03; +6 model-registry tests); use `./venv` so sqlcipher runs.
+- RAM (measured CPU, single uvicorn worker): ~175 MB imports, first model load
+  ~1.1–1.4 GB one-time (torch runtime), then **~0 per extra concurrent user**
+  since models are shared process-wide. Before sharing: +46 MB/user (MiniLM),
+  +330 MB/user (PubMedBERT). Bound: `MAX_LOADED_MODELS` (default 3).
 - CI: `.github/workflows/ci.yml` (ruff + pyright report + **pip-audit
   blocking** + pytest + docker), `codeql.yml`. Dependabot config **removed**
   locally (2026-07-30); not necessarily on origin until pushed. spec.md records
@@ -69,6 +73,11 @@ ShareCode *---1 Library (owner); redeem → clone Library for joiner
 - Public pages must not load `common.js` (401 redirect)
 - Patch tests against `app.core.*`, not frozen imports; routes via OpenAPI
   `conftest.route_paths`
+- Embedding models shared via `embeddings.get_shared_model` registry; the
+  `EmbeddingEngine.model` property must NOT cache per-engine (cached pipelines
+  would each pin a copy). Safe to share: inference is read-only.
+- `EmbeddingsRequest.model` is unvalidated free-form (falls through to a HF
+  path) — hence the bounded registry. Validation still open.
 - Host: Linux `./venv` (ROCm torch possible); entry `app.main:app` port 7860
 
 ## Session Handoff
@@ -79,5 +88,8 @@ ShareCode *---1 Library (owner); redeem → clone Library for joiner
   unused `pandas`, two emoji `print()` strings). Added `pip-audit` to CI, then
   upgraded venv setuptools and made the audit **blocking**. Full re-validation:
   ruff clean, 268 tests pass, pyright unchanged at 61/6, pip-audit exit 0.
-- **Next:** Backlog only (pyright green/blocking, dependency lockfile, ruff
-  ratchet E501/UP/E402). Push when asked.
+- **Then:** Shared process-wide embedding model registry (RAM fix for
+  self-hosting on one desktop). 274 tests pass; pyright back to 61/6 baseline.
+- **Next:** Validate `EmbeddingsRequest.model` against `EmbeddingEngine.MODELS`
+  (open); then backlog (pyright green/blocking, lockfile, ruff ratchet).
+  Push when asked.

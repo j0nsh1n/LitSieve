@@ -24,7 +24,9 @@ python-multipart>=0.0.18
 # Authentication
 PyJWT>=2.9.0
 # Encrypts provider API keys at rest in user_data/ai_settings.json.
-cryptography>=43.0.0
+# Floor raised for CVE-2026-69247 (fixed in 50.0.0); also backs AES-256-GCM
+# encryption of AI keys and SQLCipher key derivation.
+cryptography>=50.0.0
 # Optional at-rest database encryption. Only used when DB_ENCRYPTION_KEY is
 # set; harmless (and small) otherwise. See tools/encrypt_databases.py.
 sqlcipher3-binary>=0.5.4
