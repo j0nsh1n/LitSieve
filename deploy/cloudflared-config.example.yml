@@ -8,18 +8,20 @@
 #   cloudflared tunnel run litpilot
 #
 # In Zero Trust → Tunnels → Public Hostname:
-#   hostname: YOUR_DOMAIN
+#   hostname: www.litpilot.org
 #   service:  http://127.0.0.1:7860
 #
-# App .env: DEBUG=false, PUBLIC_BASE_URL=https://YOUR_DOMAIN
+# App .env: DEBUG=false, PUBLIC_BASE_URL=https://www.litpilot.org
 
 tunnel: <TUNNEL_ID>
 credentials-file: /home/YOU/.cloudflared/<TUNNEL_ID>.json
 
 ingress:
-  - hostname: YOUR_DOMAIN
+  - hostname: www.litpilot.org
     service: http://127.0.0.1:7860
     originRequest:
       connectTimeout: 30s
       noHappyEyeballs: true
+  - hostname: litpilot.org
+    service: http://127.0.0.1:7860
   - service: http_status:404
