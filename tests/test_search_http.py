@@ -270,3 +270,74 @@ def test_notes_do_not_leak_between_accounts(app_module):
                                      "source": a["source"]}, headers=h2)
     assert r.status_code == 200, r.text
     assert "owner-private-note" not in r.text
+
+
+# --- Regressions -----------------------------------------------------------
+
+def test_note_for_missing_article_is_404_not_500(app_module):
+    """A stale tab must not produce a server error.
+
+    notes.article_id is a foreign key, so starring a paper that has since left
+    the library raised sqlite3.IntegrityError and surfaced as 500. Reachable
+    normally: a "replace" fetch or a library switch changes every article id
+    under an already-open results page.
+    """
+    c = TestClient(app_module.app)
+    headers = _register(c)
+    _seed(app_module, c, headers)
+
+    r = c.post("/api/notes", json={
+        "article_id": "gone-from-this-library", "source": "pubmed",
+        "note": "still here?", "starred": True,
+    }, headers=headers)
+    assert r.status_code == 404, f"{r.status_code}: {r.text}"
+    assert "detail" in r.json()
+
+
+def test_stale_star_after_corpus_replace_is_404(app_module):
+    """The real-world path: star a paper, replace the corpus, star it again."""
+    c = TestClient(app_module.app)
+    headers = _register(c)
+    arts = _seed(app_module, c, headers)
+    stale = arts[0]
+
+    # Replace the corpus; article ids from the previous page are now gone.
+    uid = _uid()
+    pipe = core.get_pipeline(uid)
+    try:
+        pipe.db.clear_all()
+    finally:
+        core.release_pipeline(uid)
+
+    r = c.post("/api/notes", json={
+        "article_id": stale["article_id"], "source": stale["source"],
+        "starred": True,
+    }, headers=headers)
+    assert r.status_code == 404, f"{r.status_code}: {r.text}"
+
+
+@pytest.mark.parametrize("path, payload", [
+    ("/api/search", {"query_text": "health"}),
+    ("/api/search/seed", {"seed": "anything"}),
+    ("/api/search/starred", {}),
+])
+def test_search_posts_require_csrf(app_module, path, payload):
+    """Every state-changing-shaped POST needs the double-submit token.
+
+    common.js already sends X-CSRF-Token on all non-GET calls, so requiring it
+    costs the frontend nothing and closes the inconsistency with /api/notes.
+    """
+    c = TestClient(app_module.app)
+    _register(c)              # cookies present, header deliberately omitted
+    r = c.post(path, json=payload)
+    assert r.status_code == 403, f"{path}: {r.status_code} {r.text}"
+
+
+def test_search_still_works_with_csrf_header(app_module):
+    """Guard against the check breaking legitimate use."""
+    c = TestClient(app_module.app)
+    headers = _register(c)
+    _seed(app_module, c, headers)
+    r = c.post("/api/search", json={"query_text": "health", "top_k": 3},
+               headers=headers)
+    assert r.status_code == 200, r.text

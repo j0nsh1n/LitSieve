@@ -16,6 +16,17 @@ and this project aims to follow Semantic Versioning for app version strings
 - `.env.example` now documents logging plus `MAX_LOADED_MODELS` and
   `EXTRA_EMBEDDING_MODELS`, which shipped earlier undocumented.
 
+### Fixed
+- Starring or annotating a paper that has left your library now returns a clear
+  404 instead of a 500. Reachable from an ordinary stale tab: a "replace" fetch
+  or a library switch changes every article id under an already-open results
+  page.
+
+### Security
+- `POST /api/search`, `/api/search/seed` and `/api/search/starred` now require
+  the CSRF token, matching `/api/notes`. The frontend already sent it on every
+  non-GET request, so nothing changes for users.
+
 ### Changed
 - All 65 `print()` calls in `app/` are now logger calls with levels. Fetcher
   errors in particular were going to stdout, so they had no level, could not be

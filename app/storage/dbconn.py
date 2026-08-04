@@ -52,6 +52,25 @@ def _driver():
     return sqlcipher3.dbapi2
 
 
+def integrity_errors() -> tuple:
+    """IntegrityError classes for whichever driver is active.
+
+    sqlcipher3 ships its own exception hierarchy, so `except
+    sqlite3.IntegrityError` silently stops matching as soon as
+    DB_ENCRYPTION_KEY is set — a constraint violation would turn into an
+    unhandled 500 only on encrypted deployments. Always catch this tuple
+    instead of naming a driver's class directly.
+    """
+    errors = [sqlite3.IntegrityError]
+    try:
+        driver = _driver()
+        if driver is not sqlite3:
+            errors.append(driver.IntegrityError)
+    except Exception:  # pragma: no cover - optional wheel / missing key
+        pass
+    return tuple(errors)
+
+
 def _quote(key: str) -> str:
     """Single-quote a key for PRAGMA (which takes no bound parameters)."""
     return "'" + key.replace("'", "''") + "'"
