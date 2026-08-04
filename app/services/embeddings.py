@@ -158,6 +158,27 @@ class EmbeddingEngine:
     # Backwards-compatible alias (registry outgrew the biomedical-only name).
     BIOMEDICAL_MODELS = MODELS
 
+    @classmethod
+    def allowed_models(cls) -> Dict[str, str]:
+        """Catalog names plus any the operator allow-listed via env.
+
+        `MODELS.get(name, name)` treats an unknown name as a HuggingFace path,
+        which is a useful escape hatch but must not be driven by request bodies:
+        that would let any logged-in user trigger arbitrary model downloads onto
+        the host's disk. Extra models are therefore an operator decision, set as
+        a comma-separated EXTRA_EMBEDDING_MODELS (either "org/model" or
+        "shortname=org/model").
+        """
+        allowed = dict(cls.MODELS)
+        for item in os.getenv("EXTRA_EMBEDDING_MODELS", "").split(","):
+            item = item.strip()
+            if not item:
+                continue
+            name, _, path = item.partition("=")
+            name, path = name.strip(), path.strip()
+            allowed[name] = path or name
+        return allowed
+
     def __init__(self, model_name: str = 'general'):
         self.model_name = model_name
         self.device = None  # resolved lazily when the model is first loaded
