@@ -19,7 +19,10 @@ try:
     FAISS_AVAILABLE = True
 except ImportError:
     FAISS_AVAILABLE = False
-    print("WARNING: FAISS not installed - falling back to scikit-learn (slower for large datasets)")
+    logger.warning(
+        "FAISS not installed - falling back to scikit-learn "
+        "(slower for large datasets)"
+    )
 
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -77,10 +80,9 @@ def _build_model(model_path: str, device: str) -> Tuple[Any, str]:
     from sentence_transformers import SentenceTransformer
 
     logger.info("Loading embedding model %s on device %s", model_path, device)
-    print(f"Loading model: {model_path} (device={device})")
     try:
         model = SentenceTransformer(model_path, device=device)
-        print("Model loaded successfully")
+        logger.info("Model loaded successfully")
         return model, device
     except Exception as e:
         # An accelerator can fail to initialise (driver mismatch, OOM,
@@ -198,7 +200,7 @@ class EmbeddingEngine:
         return model
 
     def embed_articles(self, articles: List[Dict], batch_size: int = 32, progress_callback=None) -> Dict[Tuple[str, str], np.ndarray]:
-        print(f"Creating embeddings for {len(articles)} articles...")
+        logger.info("Creating embeddings for %s articles...", len(articles))
 
         texts = []
         keys = []
@@ -223,7 +225,7 @@ class EmbeddingEngine:
                 progress_callback(min(i + batch_size, total), total)
 
         embeddings = np.concatenate(all_embeddings, axis=0) if all_embeddings else np.array([])
-        print(f"Created embeddings of shape: {embeddings.shape}")
+        logger.info("Created embeddings of shape: %s", embeddings.shape)
 
         return {key: emb for key, emb in zip(keys, embeddings)}
 
@@ -272,7 +274,7 @@ class EmbeddingEngine:
         memory and blows up on large corpora. Falls back to scikit-learn when
         FAISS is unavailable.
         """
-        print(f"Detecting potential duplicates (threshold: {threshold})...")
+        logger.info("Detecting potential duplicates (threshold: %s)...", threshold)
         n = len(article_ids)
         if n < 2:
             return []
@@ -309,7 +311,7 @@ class EmbeddingEngine:
                         duplicates.append((article_ids[i], article_ids[j], float(similarity)))
 
         duplicates.sort(key=lambda x: x[2], reverse=True)
-        print(f"Found {len(duplicates)} potential duplicate pairs")
+        logger.info("Found %s potential duplicate pairs", len(duplicates))
         return duplicates
 
 

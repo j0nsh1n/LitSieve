@@ -22,6 +22,7 @@ from slowapi import _rate_limit_exceeded_handler  # noqa: E402
 from slowapi.errors import RateLimitExceeded  # noqa: E402
 
 from app import core  # noqa: E402
+from app.logging_setup import configure_logging  # noqa: E402
 from app.routes import (  # noqa: E402
     ai,
     auth,
@@ -34,10 +35,7 @@ from app.routes import (  # noqa: E402
 )
 from app.security import SecurityHeadersMiddleware  # noqa: E402
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s %(name)s %(levelname)s %(message)s',
-)
+configure_logging()
 logger = logging.getLogger(__name__)
 
 @asynccontextmanager

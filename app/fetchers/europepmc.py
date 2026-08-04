@@ -3,11 +3,12 @@ Europe PMC Fetcher
 Fetches articles from Europe PMC REST API
 """
 
+import logging
 from typing import Dict, List, Optional
 
-from tqdm import tqdm
-
 from app.fetchers.base import BaseFetcher, HttpClient
+
+logger = logging.getLogger(__name__)
 
 
 class EuropePMCFetcher(BaseFetcher):
@@ -24,7 +25,7 @@ class EuropePMCFetcher(BaseFetcher):
 
     def search(self, query: str, max_results: int = 1000) -> List[str]:
         """Search Europe PMC, return list of IDs"""
-        print(f"Searching Europe PMC for: '{query}'")
+        logger.info("Searching Europe PMC for: '%s'", query)
         ids = []
         page_size = min(max_results, 1000)
         cursor_mark = "*"
@@ -56,15 +57,15 @@ class EuropePMCFetcher(BaseFetcher):
                 cursor_mark = next_cursor
 
             except Exception as e:
-                print(f"Error searching Europe PMC: {e}")
+                logger.exception("Error searching Europe PMC: %s", e)
                 break
 
-        print(f"Found {len(ids[:max_results])} articles")
+        logger.info("Found %s articles", len(ids[:max_results]))
         return ids[:max_results]
 
     def search_and_fetch(self, query: str, max_results: int = 1000) -> List[Dict]:
         """Optimized: Europe PMC search with resultType=core returns full records"""
-        print(f"Searching Europe PMC for: '{query}'")
+        logger.info("Searching Europe PMC for: '%s'", query)
         articles = []
         page_size = min(max_results, 1000)
         cursor_mark = "*"
@@ -97,17 +98,17 @@ class EuropePMCFetcher(BaseFetcher):
                 cursor_mark = next_cursor
 
             except Exception as e:
-                print(f"Error fetching from Europe PMC: {e}")
+                logger.exception("Error fetching from Europe PMC: %s", e)
                 break
 
-        print(f"Successfully fetched {len(articles[:max_results])} articles")
+        logger.info("Successfully fetched %s articles", len(articles[:max_results]))
         return articles[:max_results]
 
     def fetch_details(self, ids: List[str], batch_size: int = 100) -> List[Dict]:
         """Fetch details for given IDs"""
         articles = []
 
-        for article_id in tqdm(ids, desc="Fetching from Europe PMC"):
+        for article_id in ids:
             try:
                 resp = self.http.get(
                     f"{self.BASE_URL}/search",
@@ -124,9 +125,9 @@ class EuropePMCFetcher(BaseFetcher):
                     if parsed:
                         articles.append(parsed)
             except Exception as e:
-                print(f"Error fetching {article_id}: {e}")
+                logger.exception("Error fetching %s: %s", article_id, e)
 
-        print(f"Successfully fetched {len(articles)} articles")
+        logger.info("Successfully fetched %s articles", len(articles))
         return articles
 
     def _parse_article(self, record: Dict) -> Optional[Dict]:

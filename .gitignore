@@ -37,12 +37,14 @@ mailersend-*.txt
 *smtp*secret*
 *smtp*credentials*
 
-# Local operator secrets (DuckDNS token, etc.)
+# Local operator secrets (Cloudflare Tunnel token, ACME material, etc.)
 secrets/*
 !secrets/README.md
 !secrets/*.example
-.duckdns.env
-duckdns.token
 secrets/letsencrypt/
 *.env.save
 secrets/cloudflared.token
+
+# Runtime logs (see LOG_FILE in .env.example)
+logs/
+*.log
