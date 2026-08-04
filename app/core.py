@@ -12,6 +12,7 @@ rather than binding it at import time.
 
 import asyncio
 import contextvars
+import ipaddress
 import logging
 import os
 import secrets
@@ -44,17 +45,39 @@ MAX_CACHED_USERS = 50
 templates = Jinja2Templates(directory="templates")
 
 
-def rate_limit_key(request: Request) -> str:
-    """Authenticated users get their own bucket; anonymous falls back to IP.
+def client_bucket(request: Request) -> str:
+    """Network-level identity for rate limiting.
 
-    Login/register stay IP-keyed (no cookie yet), which is what we want for
+    IPv4 is keyed on the address. IPv6 is keyed on the **/64 prefix**, because a
+    single ordinary IPv6 client is handed a whole /64 and can rotate through
+    billions of addresses for free -- keying the full address would make the
+    login limiter trivially bypassable. Observed in our own access log: Meta's
+    crawler hit us from 2a03:2880:18ff:1b::, :12ff:5::, :11ff:3:: and more, all
+    one operator that per-address keying counts as separate clients.
+    """
+    addr = get_remote_address(request)
+    try:
+        ip = ipaddress.ip_address(addr)
+    except ValueError:
+        # Unparseable (or missing) -- key on whatever we were given rather than
+        # collapsing every such caller into one shared bucket.
+        return addr
+    if ip.version == 6:
+        return f"{ipaddress.ip_network(f'{addr}/64', strict=False).network_address}/64"
+    return addr
+
+
+def rate_limit_key(request: Request) -> str:
+    """Authenticated users get their own bucket; anonymous falls back to network.
+
+    Login/register stay network-keyed (no cookie yet), which is what we want for
     brute-force protection. Classroom NATs no longer share one budget once
     users are signed in.
     """
     user = get_current_user(request)
     if user and user.get("user_id"):
         return f"user:{user['user_id']}"
-    return get_remote_address(request)
+    return client_bucket(request)
 
 
 limiter = Limiter(key_func=rate_limit_key)

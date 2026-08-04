@@ -26,6 +26,19 @@ and this project aims to follow Semantic Versioning for app version strings
 - Unused `pandas` dependency (declared in `requirements.txt`, imported nowhere).
   Slightly smaller installs; no behaviour change.
 
+### Fixed
+- Site no longer stalls for everyone while someone signs in or registers.
+  Password hashing (~157 ms) ran on the single event loop, so a burst of
+  signups froze all other requests — reported by a user as the site "hanging".
+  Measured: 6 concurrent signups took 942 ms and a bystander's page load went
+  from 1.6 ms to 933 ms; now 172 ms and 1.3 ms. Hash cost is unchanged.
+- `/favicon.ico` and `/robots.txt` are served instead of returning 404.
+
+### Security
+- IPv6 rate limiting keys on the /64 prefix instead of the full address. A
+  client is normally handed an entire /64, so per-address keying let anyone
+  bypass the login limiter by rotating addresses. IPv4 is unchanged.
+
 ### Changed
 - Embedding models are now shared process-wide instead of loaded once per
   cached pipeline. Concurrent users no longer each pay for a copy of the

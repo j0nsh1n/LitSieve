@@ -6,8 +6,9 @@
 - Lint: `ruff check .` — partial select (E9/F63/F7/F82/F401/F541/E401/I); passes.
 - Types: `pyright app` via `pyrightconfig.json` (basic); CI runs it
   **continue-on-error** (report-only): **61 errors, 6 warnings** (2026-08-02).
-- Tests: `DEBUG=true ./venv/bin/python -m pytest -q` — **287 passed**
-  (2026-08-03; +6 model-registry, +13 model-validation); `./venv` for sqlcipher.
+- Tests: `DEBUG=true ./venv/bin/python -m pytest -q` — **302 passed**
+  (2026-08-03; +6 model-registry, +13 model-validation, +15 loop/edges);
+  `./venv` for sqlcipher.
 - RAM (measured CPU, single uvicorn worker): ~175 MB imports, first model load
   ~1.1–1.4 GB one-time (torch runtime), then **~0 per extra concurrent user**
   since models are shared process-wide. Before sharing: +46 MB/user (MiniLM),
@@ -73,6 +74,13 @@ ShareCode *---1 Library (owner); redeem → clone Library for joiner
 - Public pages must not load `common.js` (401 redirect)
 - Patch tests against `app.core.*`, not frozen imports; routes via OpenAPI
   `conftest.route_paths`
+- Password hashing MUST use `hash_password_async` / `verify_password_async` in
+  routes. Sync bcrypt (~157 ms) on the single event loop froze the whole app
+  during signup bursts; a guardrail test greps `routes/auth.py` for regressions.
+- Rate limiting keys IPv6 on the /64 (`core.client_bucket`) — per-address
+  keying is bypassable since one client owns a whole /64.
+- Public templates (landing/login/register/feature_guide/reset_password/
+  verify_email) do NOT extend base.html — head changes must be repeated there.
 - Embedding models shared via `embeddings.get_shared_model` registry; the
   `EmbeddingEngine.model` property must NOT cache per-engine (cached pipelines
   would each pin a copy). Safe to share: inference is read-only.
@@ -95,5 +103,9 @@ ShareCode *---1 Library (owner); redeem → clone Library for joiner
 - **Then:** Validated `EmbeddingsRequest.model` (422 on unknown) + drift guards
   tying the UI dropdown and topic map to the catalog. pip-audit's first real
   run caught CVE-2026-69247 (cryptography -> >=50.0.0).
+- **Then:** Live-traffic fixes from the cloudflared deployment: bcrypt off the
+  event loop (bystander page load 933 ms -> 1.3 ms under 6 concurrent signups),
+  IPv6 /64 rate-limit keys, favicon + robots.txt.
 - **Next:** Backlog only (pyright green/blocking, lockfile, ruff ratchet
-  E501/UP/E402). Push when asked.
+  E501/UP/E402). Consider a total-account cap: registration is open, the app is
+  publicly shared, and quota is per-account only. Push when asked.
