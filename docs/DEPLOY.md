@@ -1,4 +1,4 @@
-# Deploy checklist — LitPilot (v4.4.x)
+# Deploy checklist — LitSieve (v4.4.x)
 
 Operator-facing steps to run a clean host. Product scope stays multi-library +
 student starting point; optional SMTP, quota, and SQLCipher are deploy options.
@@ -24,10 +24,10 @@ hostname. See **[SELFHOST.md](SELFHOST.md)**.
 **Docker**
 
 ```bash
-docker build -t litpilot .
+docker build -t litsieve .
 docker run -p 7860:7860 \
   -e SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')" \
-  litpilot
+  litsieve
 curl -sS http://127.0.0.1:7860/health
 ```
 

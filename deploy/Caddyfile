@@ -1,4 +1,4 @@
-# Example Caddyfile for LitPilot behind a real domain (www.litpilot.org).
+# Example Caddyfile for LitSieve behind a real domain (www.litpilot.org).
 # For T-Mobile / CGNAT public access, prefer Cloudflare Tunnel instead.
 {
 	email admin@litpilot.org

@@ -1,5 +1,5 @@
 """
-Optional LLM helpers for LitPilot (opt-in study aid).
+Optional LLM helpers for LitSieve (opt-in study aid).
 
 Providers (any combination; auto picks the first ready):
   • ollama     — local models (free). Can be started/stopped by the app.
@@ -107,6 +107,12 @@ ENC_PREFIX_V2 = "enc:v2:"
 # New writes use v2; tests and callers can treat this as "encrypted".
 ENC_PREFIX = ENC_PREFIX_V2
 
+# DO NOT RENAME THESE, EVER -- not for a rebrand, not for tidiness.
+# They are HKDF domain-separation labels mixed into the key derived from
+# SECRET_KEY. Change a byte and the derived key changes, so every AI API key
+# already stored under `enc:v1:` / `enc:v2:` becomes permanently undecryptable.
+# They are internal constants: no user ever sees them. The product name they
+# happen to contain is frozen history, not branding.
 _HKDF_INFO_V1 = b"literature-research-aide/ai-settings/v1"
 _HKDF_INFO_V2 = b"literature-research-aide/ai-settings/aes-gcm/v2"
 _GCM_NONCE_LEN = 12
@@ -958,7 +964,7 @@ def _structured_openai(system: str, prompt: str, schema_model: Type[BaseModel]):
     # OpenRouter optional branding headers (harmless elsewhere)
     if "openrouter.ai" in base:
         headers["HTTP-Referer"] = _env("OPENROUTER_SITE_URL", "http://localhost")
-        headers["X-Title"] = _env("OPENROUTER_APP_NAME", "LitPilot")
+        headers["X-Title"] = _env("OPENROUTER_APP_NAME", "LitSieve")
     body: Dict[str, Any] = {
         "model": model,
         "temperature": 0.2,

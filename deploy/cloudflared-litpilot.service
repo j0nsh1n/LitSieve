@@ -1,5 +1,5 @@
 [Unit]
-Description=Cloudflare Tunnel for LitPilot (external access on T-Mobile / CGNAT)
+Description=Cloudflare Tunnel for LitSieve (external access on T-Mobile / CGNAT)
 After=network-online.target
 Wants=network-online.target
 

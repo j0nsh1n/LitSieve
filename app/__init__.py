@@ -1,4 +1,4 @@
-"""LitPilot application package.
+"""LitSieve application package.
 
 Layout:
     app/main.py       FastAPI app + startup wiring

@@ -1,4 +1,4 @@
-# Self-host LitPilot
+# Self-host LitSieve
 
 ## Architecture (do not change)
 
@@ -23,7 +23,7 @@ port-forward).
 
 | Piece | Role |
 |-------|------|
-| LitPilot | `uvicorn` **HTTP** on `127.0.0.1:7860` only |
+| LitSieve | `uvicorn` **HTTP** on `127.0.0.1:7860` only |
 | `cloudflared` | Outbound tunnel; public hostname `www.litpilot.org` → origin |
 | Caddy (optional) | LAN-only reverse proxy — not required for www.litpilot.org |
 | Pi-hole | Admin on high ports (e.g. 8080 / 8444) if still installed |
@@ -63,7 +63,7 @@ Public hostname: **`www.litpilot.org`** (Cloudflare Tunnel → `http://127.0.0.1
    - Service: **HTTP** → `http://127.0.0.1:7860`
    - Optional second rule: apex `litpilot.org` → same service (or redirect to www)
 
-6. Keep LitPilot running:
+6. Keep LitSieve running:
 
    ```bash
    ./venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 7860

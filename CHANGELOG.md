@@ -8,6 +8,13 @@ and this project aims to follow Semantic Versioning for app version strings
 
 ## [Unreleased]
 
+### Changed
+- Product name **LitPilot** → **LitSieve** (UI, page titles, emails, FastAPI
+  title, docs, Docker/Render service names, default log file). The public
+  hostname stays `www.litpilot.org` — that is a registrar/Cloudflare fact, not
+  a product name — as do the `*-litpilot.service` systemd units already
+  installed on the host.
+
 ### Added
 - Logs are written to a rotating file (`logs/litpilot.log`) as well as the
   console, including uvicorn's access log. Configure with `LOG_FILE`,

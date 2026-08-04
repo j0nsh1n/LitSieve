@@ -44,7 +44,7 @@ export SECRET_KEY
 # even if .env has DEBUG=false for the public host / tunnel process.
 export DEBUG=true
 
-echo "Starting LitPilot on http://127.0.0.1:${PORT}"
+echo "Starting LitSieve on http://127.0.0.1:${PORT}"
 echo "  DEBUG=${DEBUG} (forced for run_dev; public host should use DEBUG=false)"
 echo "  --reload is on (Python file changes restart the server)"
 echo "  CSS/JS/HTML: just refresh the browser"

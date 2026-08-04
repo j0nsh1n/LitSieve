@@ -39,7 +39,7 @@ def _restore_logging():
 
 
 def test_writes_to_the_configured_file(tmp_path, monkeypatch):
-    target = tmp_path / "logs" / "litpilot.log"
+    target = tmp_path / "logs" / "litsieve.log"
     monkeypatch.setenv("LOG_FILE", str(target))
     logging_setup.configure_logging(force=True)
 
