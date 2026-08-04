@@ -45,3 +45,4 @@ secrets/*
 duckdns.token
 secrets/letsencrypt/
 *.env.save
+secrets/cloudflared.token

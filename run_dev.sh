@@ -41,7 +41,7 @@ fi
 
 export SECRET_KEY
 # Always DEBUG for local reload server so Secure cookies work on http://localhost,
-# even if .env has DEBUG=false for the public DuckDNS / tunnel process.
+# even if .env has DEBUG=false for the public host / tunnel process.
 export DEBUG=true
 
 echo "Starting LitPilot on http://127.0.0.1:${PORT}"

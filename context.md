@@ -2,8 +2,8 @@
 
 ## Current State
 - App version **4.4.0** (`app/main.py`, `GET /health`). Product name **LitPilot**.
-- Public origin target: `https://litpilot.duckdns.org` (`PUBLIC_BASE_URL` in
-  gitignored `.env`; `DEBUG=false` for HTTPS cookies).
+- Public origin: operator domain via Cloudflare Tunnel (`PUBLIC_BASE_URL` in
+  gitignored `.env`; `DEBUG=false` for HTTPS cookies). DuckDNS removed.
 - Python **3.14** (Dockerfile, CI, Render, ruff `py314`).
 - Lint: `ruff check .` — partial select (E9/F63/F7/F82/F401/F541/E401/I); passes.
 - Types: `pyright app` via `pyrightconfig.json` (basic); CI runs it
@@ -93,13 +93,9 @@ ShareCode *---1 Library (owner); redeem → clone Library for joiner
 - Host: Linux `./venv` (ROCm torch possible); entry `app.main:app` port 7860
 
 ## Session Handoff
-- **Date:** 2026-08-03
-- **Branch:** `chore/doc-drift-and-hygiene` (unpushed work on top of post-#50 main)
-- **Done:** Prior hygiene + RAM share + model validation + auth/event-loop
-  fixes. **Rename to LitPilot** (UI/docs/emails), version **4.4.0**, `.env`
-  `PUBLIC_BASE_URL=https://litpilot.duckdns.org` + `DEBUG=false` (gitignored).
-  DEPLOY notes for DuckDNS / Cloudflare Tunnel / single-box efficiency.
-- **Next:** Paste DuckDNS token into `secrets/duckdns.env` and run
-  `./tools/duckdns_update.sh`. Prefer **Cloudflare Tunnel** for public HTTPS
-  (quick-tunnel smoke already returned /health 4.4.0; Pi-hole holds :80/:443;
-  public IP looks CGNAT so port-forward may never work). Push/PR when asked.
+- **Date:** 2026-08-04
+- **Branch:** `chore/doc-drift-and-hygiene` (PR #51 + follow-ups)
+- **Done:** LitPilot v4.4.0 rebrand; Cloudflare Tunnel for public access;
+  **removed DuckDNS** tooling/docs. Tunnel token service on this host.
+- **Next:** Point purchased domain at tunnel Public Hostname; set
+  `PUBLIC_BASE_URL=https://YOUR_DOMAIN` in `.env`. Rotate exposed tunnel token.

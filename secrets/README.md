@@ -2,16 +2,11 @@
 
 | File | Purpose |
 |------|---------|
-| `duckdns.env` | DuckDNS token + domain for IP updater |
-
-Copy the example, then put your real token from
-https://www.duckdns.org (account page):
+| `cloudflared.token` / `cloudflared.env` | Cloudflare Tunnel token (`TUNNEL_TOKEN=…`) |
+| `letsencrypt/` | Optional local ACME material for Caddy (if used) |
 
 ```bash
-cp secrets/duckdns.env.example secrets/duckdns.env
-# edit secrets/duckdns.env — set DUCKDNS_TOKEN=…
-chmod 600 secrets/duckdns.env
-./tools/duckdns_update.sh
+chmod 600 secrets/cloudflared.env secrets/cloudflared.token 2>/dev/null || true
 ```
 
-Never commit `duckdns.env` or any real token.
+Never commit tokens, private keys, or `.env`.

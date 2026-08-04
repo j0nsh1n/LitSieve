@@ -8,14 +8,18 @@ and this project aims to follow Semantic Versioning for app version strings
 
 ## [Unreleased]
 
+### Removed
+- DuckDNS helpers and docs (updater script, systemd timer/service, examples).
+  Self-host public DNS is operator-owned (Cloudflare Tunnel + purchased domain).
+
 ## [4.4.0] - 2026-08-03
 
 ### Added
 - CI dependency audit via `pip-audit` (**blocking**), covering known-CVE
   reporting after Dependabot's weekly auto-PRs were disabled. CI now also keeps
   `setuptools` current, since undeclared runner packages are audited too.
-- Public hostname target for self-host: `https://litpilot.duckdns.org`
-  (`PUBLIC_BASE_URL`); deploy notes for DuckDNS + optional Cloudflare Tunnel.
+- Self-host deploy notes for Cloudflare Tunnel and optional Caddy
+  (`docs/SELFHOST.md`, `docs/DEPLOY.md`).
 
 ### Changed
 - Product name **Literature Research Aide** → **LitPilot** (UI, emails, docs,
