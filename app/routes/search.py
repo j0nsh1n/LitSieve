@@ -22,6 +22,7 @@ from app.schemas import (
 from app.services.enrich import (
     enrich_search_results,
 )
+from app.storage.dbconn import integrity_errors
 from app.utils import (
     sort_articles,
 )
@@ -31,23 +32,13 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 @router.post("/api/search")
 async def api_search(req: SearchRequest, request: Request):
     user = current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
     uid = user["user_id"]
     p = get_pipeline(uid)
     try:
@@ -77,6 +68,8 @@ async def api_search_seed(req: SeedSearchRequest, request: Request):
     user = current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
     uid = user["user_id"]
     p = get_pipeline(uid)
     try:
@@ -106,6 +99,8 @@ async def api_search_starred(req: StarredSearchRequest, request: Request):
     user = current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
     uid = user["user_id"]
     p = get_pipeline(uid)
     try:
@@ -145,6 +140,17 @@ async def api_upsert_note(req: NoteRequest, request: Request):
     try:
         note = p.db.upsert_note(req.article_id, req.source, note=req.note, starred=req.starred)
         return {"status": "success", "note": note}
+    except integrity_errors():
+        # notes.article_id is a foreign key, so starring a paper that is no
+        # longer in this library raises rather than returning a row. That is
+        # reachable from an ordinary stale tab -- a "replace" fetch or a
+        # library switch changes every article id -- so it is the client's
+        # view being out of date, not a server fault.
+        return JSONResponse(
+            status_code=404,
+            content={"detail": "That paper is no longer in this library. "
+                                "Refresh your results and try again."},
+        )
     except Exception as e:
         return server_error(e)
     finally:
