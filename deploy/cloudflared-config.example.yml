@@ -1,0 +1,26 @@
+# Cloudflare Tunnel — recommended when home IP is CGNAT (no inbound ports).
+#
+# Setup (one-time, interactive login):
+#   cloudflared tunnel login
+#   cloudflared tunnel create litpilot
+#   cloudflared tunnel route dns litpilot litpilot.duckdns.org
+#     (or add a CNAME in DuckDNS/Cloudflare as cloudflared prints)
+#   cp deploy/cloudflared-config.example.yml ~/.cloudflared/config.yml
+#   # edit tunnel credentials file path / tunnel id
+#   cloudflared tunnel run litpilot
+#
+# TLS is terminated at Cloudflare (modern TLS, free). Your PC only speaks
+# plain HTTP to 127.0.0.1:7860 — cheap on CPU, no local Let's Encrypt dance.
+# App .env: DEBUG=false, PUBLIC_BASE_URL=https://litpilot.duckdns.org
+
+tunnel: <TUNNEL_ID>
+credentials-file: /home/jonathans/.cloudflared/<TUNNEL_ID>.json
+
+ingress:
+  - hostname: litpilot.duckdns.org
+    service: http://127.0.0.1:7860
+    originRequest:
+      # Long-running search/fetch
+      connectTimeout: 30s
+      noHappyEyeballs: true
+  - service: http_status:404

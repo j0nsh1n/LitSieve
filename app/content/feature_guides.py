@@ -297,7 +297,7 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
         "icon": "📚",
         "tagline": "This app is a starting point — here is how to finish well.",
         "summary": (
-            "Literature Research Aide only queries free public research APIs. "
+            "LitPilot only queries free public research APIs. "
             "That is great for gathering candidates and practising screening, but it "
             "is not a complete literature search and not a college library. After you "
             "export RIS and a screening report, plan a short path to stronger sources "

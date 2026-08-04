@@ -1,0 +1,48 @@
+# LitPilot reverse proxy — efficient modern TLS (Caddy defaults: TLS 1.2+).
+#
+# This machine already uses Pi-hole on :80 and :443. Options:
+#   A) Listen on 8443 and forward router WAN:443 → LAN:8443
+#   B) Move Pi-hole web UI off 80/443, then use :443 here
+#   C) Prefer Cloudflare Tunnel (deploy/cloudflared-config.example.yml)
+#      if your ISP uses CGNAT (common with 172.58.x public IPs).
+#
+# Install Caddy, then:
+#   caddy run --config deploy/Caddyfile
+#
+# Upstream app must stay on loopback only:
+#   uvicorn app.main:app --host 127.0.0.1 --port 7860
+
+{
+	# Global: slightly smaller OCSP/stapling defaults; email for ACME
+	email admin@litpilot.duckdns.org
+}
+
+litpilot.duckdns.org {
+	# If Pi-hole holds 443, use:
+	# bind 0.0.0.0:8443
+	# And obtain certs with DNS or use tunnel instead of HTTP-01 on 80.
+
+	encode zstd gzip
+
+	# Security headers (app also sends some; duplicate is fine)
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+
+	reverse_proxy 127.0.0.1:7860 {
+		# Timeouts for long fetch/embed jobs
+		transport http {
+			read_timeout 600s
+			write_timeout 600s
+		}
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

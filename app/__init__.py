@@ -1,4 +1,4 @@
-"""Literature Research Aide application package.
+"""LitPilot application package.
 
 Layout:
     app/main.py       FastAPI app + startup wiring

@@ -1,5 +1,5 @@
 """
-FastAPI Application — Literature Research Aide v4.3.2
+FastAPI Application — LitPilot v4.4.0
 Multi-user web interface for literature search and analysis.
 
 This module only wires the app together: configuration, static files, the
@@ -53,8 +53,8 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(
-    title="Literature Research Aide",
-    version="4.3.2",
+    title="LitPilot",
+    version="4.4.0",
     lifespan=lifespan,
 )
 app.state.limiter = core.limiter

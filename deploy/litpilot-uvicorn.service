@@ -1,0 +1,19 @@
+[Unit]
+Description=LitPilot (uvicorn on 127.0.0.1:7860)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/HealthDatabaseAccess
+EnvironmentFile=-%h/HealthDatabaseAccess/.env
+# Force loopback; never expose the app directly
+ExecStart=%h/HealthDatabaseAccess/venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 7860 --proxy-headers --forwarded-allow-ips=127.0.0.1
+Restart=on-failure
+RestartSec=3
+# Light hardening
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target

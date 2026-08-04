@@ -90,7 +90,7 @@ def main() -> int:
     try:
         mailer.send(
             recipient,
-            "Test — Literature Research Aide",
+            "Test — LitPilot",
             "If you can read this, SMTP is working.\n\n"
             "Account recovery emails (verification links and password reset "
             "codes) will send from this address.\n",

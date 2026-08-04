@@ -123,7 +123,7 @@ def test_no_inline_disclaimer_drift_in_templates():
     """Templates should include the macros file, not hard-code banner copy."""
     forbidden_snippets = (
         "This tool searches a set of",
-        "Literature Research Aide works with",
+        "LitPilot works with",
         "Uses publicly accessible research databases",
         "Public research databases for gathering candidates",
     )
