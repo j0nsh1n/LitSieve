@@ -6,7 +6,9 @@ Now uses FAISS for fast similarity search (v2.3.0)
 
 import logging
 import os
-from typing import Dict, List, Tuple
+import threading
+from collections import OrderedDict
+from typing import Any, Dict, List, Tuple
 
 import numpy as np
 
@@ -17,7 +19,7 @@ try:
     FAISS_AVAILABLE = True
 except ImportError:
     FAISS_AVAILABLE = False
-    print("⚠️ FAISS not installed — falling back to scikit-learn (slower for large datasets)")
+    print("WARNING: FAISS not installed - falling back to scikit-learn (slower for large datasets)")
 
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -47,6 +49,97 @@ def select_device() -> str:
     return "cpu"
 
 
+# --- Process-wide model registry -------------------------------------------
+# Every pipeline used to build its own EmbeddingEngine, and every engine loaded
+# its own copy of the weights. Measured on CPU, a second concurrent user cost
+# ~46 MB (MiniLM) or ~330 MB (PubMedBERT) purely to duplicate a model that is
+# read-only during inference. Sharing one instance per (path, device) makes the
+# marginal user cost ~0, so RAM scales with the number of *distinct models in
+# use*, not the number of logged-in users.
+#
+# Safe to share: encode() runs the model in eval mode under no_grad and does not
+# mutate weights, so concurrent calls from job threads only contend for CPU.
+#
+# Bounded on purpose: schemas.EmbeddingsRequest.model is a free-form string and
+# MODELS.get(name, name) falls through to it as a HuggingFace path, so an
+# unbounded dict here would let odd model names grow memory without limit.
+MAX_LOADED_MODELS = max(1, int(os.getenv("MAX_LOADED_MODELS", "3") or 3))
+
+_model_cache: "OrderedDict[Tuple[str, str], Any]" = OrderedDict()
+_model_cache_lock = threading.Lock()
+# Per-key load locks so two threads asking for the same model load it once,
+# while different models can still load in parallel.
+_model_load_locks: "Dict[Tuple[str, str], threading.Lock]" = {}
+
+
+def _build_model(model_path: str, device: str) -> Tuple[Any, str]:
+    """Construct a SentenceTransformer, falling back to CPU if the device fails."""
+    from sentence_transformers import SentenceTransformer
+
+    logger.info("Loading embedding model %s on device %s", model_path, device)
+    print(f"Loading model: {model_path} (device={device})")
+    try:
+        model = SentenceTransformer(model_path, device=device)
+        print("Model loaded successfully")
+        return model, device
+    except Exception as e:
+        # An accelerator can fail to initialise (driver mismatch, OOM,
+        # unsupported op on mps). Fall back to CPU rather than crash the whole
+        # embedding step.
+        logger.warning(
+            "Failed to load model on %s (%s); falling back to CPU", device, e,
+        )
+        return SentenceTransformer(model_path, device="cpu"), "cpu"
+
+
+def get_shared_model(model_path: str, device: str) -> Tuple[Any, str]:
+    """Return the process-wide model for (model_path, device), loading once.
+
+    Returns (model, resolved_device); resolved_device differs from `device`
+    when the accelerator failed and we fell back to CPU.
+    """
+    key = (model_path, device)
+    with _model_cache_lock:
+        hit = _model_cache.get(key)
+        if hit is not None:
+            _model_cache.move_to_end(key)
+            return hit, getattr(hit, "_lra_device", device)
+        load_lock = _model_load_locks.setdefault(key, threading.Lock())
+
+    # Load outside the registry lock: pulling weights off disk takes seconds and
+    # must not stall unrelated lookups.
+    with load_lock:
+        with _model_cache_lock:
+            hit = _model_cache.get(key)
+            if hit is not None:
+                _model_cache.move_to_end(key)
+                return hit, getattr(hit, "_lra_device", device)
+
+        model, resolved = _build_model(model_path, device)
+        try:
+            model._lra_device = resolved  # remember where it actually landed
+        except Exception:
+            pass
+
+        with _model_cache_lock:
+            _model_cache[key] = model
+            _model_cache.move_to_end(key)
+            if resolved != device:
+                # Alias the resolved key so a later CPU request reuses this one.
+                _model_cache[(model_path, resolved)] = model
+            # Evicted models stay alive until their last user drops them; this
+            # only stops the registry itself from pinning them forever.
+            while len(_model_cache) > MAX_LOADED_MODELS:
+                _model_cache.popitem(last=False)
+        return model, resolved
+
+
+def clear_model_cache() -> None:
+    """Drop registry references (tests; frees memory once users release them)."""
+    with _model_cache_lock:
+        _model_cache.clear()
+
+
 class EmbeddingEngine:
     """Handles creation and comparison of semantic embeddings"""
 
@@ -65,33 +158,44 @@ class EmbeddingEngine:
     # Backwards-compatible alias (registry outgrew the biomedical-only name).
     BIOMEDICAL_MODELS = MODELS
 
+    @classmethod
+    def allowed_models(cls) -> Dict[str, str]:
+        """Catalog names plus any the operator allow-listed via env.
+
+        `MODELS.get(name, name)` treats an unknown name as a HuggingFace path,
+        which is a useful escape hatch but must not be driven by request bodies:
+        that would let any logged-in user trigger arbitrary model downloads onto
+        the host's disk. Extra models are therefore an operator decision, set as
+        a comma-separated EXTRA_EMBEDDING_MODELS (either "org/model" or
+        "shortname=org/model").
+        """
+        allowed = dict(cls.MODELS)
+        for item in os.getenv("EXTRA_EMBEDDING_MODELS", "").split(","):
+            item = item.strip()
+            if not item:
+                continue
+            name, _, path = item.partition("=")
+            name, path = name.strip(), path.strip()
+            allowed[name] = path or name
+        return allowed
+
     def __init__(self, model_name: str = 'general'):
         self.model_name = model_name
-        self._model = None
         self.device = None  # resolved lazily when the model is first loaded
 
     @property
-    def model(self):
-        if self._model is None:
-            from sentence_transformers import SentenceTransformer
-            model_path = self.MODELS.get(self.model_name, self.model_name)
-            self.device = select_device()
-            logger.info("Loading embedding model %s on device %s", model_path, self.device)
-            print(f"Loading model: {model_path} (device={self.device})")
-            try:
-                self._model = SentenceTransformer(model_path, device=self.device)
-            except Exception as e:
-                # An accelerator can fail to initialise (driver mismatch, OOM,
-                # unsupported op on mps). Fall back to CPU rather than crash the
-                # whole embedding step.
-                logger.warning(
-                    "Failed to load model on %s (%s); falling back to CPU",
-                    self.device, e,
-                )
-                self.device = "cpu"
-                self._model = SentenceTransformer(model_path, device="cpu")
-            print("Model loaded successfully")
-        return self._model
+    def model(self) -> Any:
+        """The shared model for this engine's name.
+
+        Deliberately does NOT keep a per-engine reference: engines are held by
+        long-lived cached pipelines, so caching here would pin one copy per
+        pipeline and undo the sharing. Callers hit this once per batch/query,
+        so a locked dict lookup is noise next to the encode itself.
+        """
+        model_path = self.MODELS.get(self.model_name, self.model_name)
+        model, resolved = get_shared_model(model_path, select_device())
+        self.device = resolved
+        return model
 
     def embed_articles(self, articles: List[Dict], batch_size: int = 32, progress_callback=None) -> Dict[Tuple[str, str], np.ndarray]:
         print(f"Creating embeddings for {len(articles)} articles...")

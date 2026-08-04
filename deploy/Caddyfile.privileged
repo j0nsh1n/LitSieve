@@ -1,0 +1,34 @@
+# Optional LAN HTTPS (public traffic should use Cloudflare Tunnel).
+# Replace YOUR_DOMAIN with your real hostname and issue certs for it.
+# Needs: sudo setcap 'cap_net_bind_service=+ep' ~/bin/caddy
+{
+	auto_https off
+	admin off
+}
+
+:80 {
+	redir https://{host}{uri} permanent
+}
+
+:443 {
+	# tls /path/to/fullchain.pem /path/to/privkey.pem
+	# Or use Caddy's built-in ACME once DNS for YOUR_DOMAIN points here.
+
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+
+	reverse_proxy 127.0.0.1:7860 {
+		header_up X-Forwarded-Proto https
+		transport http {
+			read_timeout 600s
+			write_timeout 600s
+		}
+	}
+}

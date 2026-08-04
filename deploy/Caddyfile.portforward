@@ -1,0 +1,25 @@
+# Optional: reverse proxy on :8443 if you cannot bind :443.
+# Prefer Cloudflare Tunnel for public access on CGNAT ISPs.
+{
+	auto_https off
+	admin off
+}
+
+:8443 {
+	# tls fullchain.pem privkey.pem   # for YOUR_DOMAIN
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+	reverse_proxy 127.0.0.1:7860 {
+		header_up X-Forwarded-Proto https
+		transport http {
+			read_timeout 600s
+			write_timeout 600s
+		}
+	}
+}

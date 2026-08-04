@@ -1,0 +1,23 @@
+# Example Caddyfile for LitPilot behind a real domain (www.litpilot.org).
+# For T-Mobile / CGNAT public access, prefer Cloudflare Tunnel instead.
+{
+	email admin@litpilot.org
+}
+
+www.litpilot.org {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+	reverse_proxy 127.0.0.1:7860 {
+		header_up X-Forwarded-Proto https
+		transport http {
+			read_timeout 600s
+			write_timeout 600s
+		}
+	}
+}

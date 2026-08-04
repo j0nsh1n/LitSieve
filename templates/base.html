@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Literature Research Aide{% endblock %}</title>
+    <title>{% block title %}LitPilot{% endblock %}</title>
+    <link rel="icon" href="/static/favicon.ico?v=20260803a" sizes="32x32">
+    <link rel="apple-touch-icon" href="/static/favicon.png?v=20260803a">
     <link rel="stylesheet" href="/static/css/style.css?v=20260729a">
     <script src="/static/js/theme-init.js?v=20260729a"></script>
 </head>
@@ -25,7 +27,7 @@
 
     <nav class="navbar" id="site-navbar" role="navigation" aria-label="Main">
         <div class="navbar-top">
-            <div class="nav-brand">Literature Research Aide</div>
+            <div class="nav-brand">LitPilot</div>
             <div class="nav-stats">
                 <button type="button"
                         class="nav-menu-toggle"
@@ -85,7 +87,7 @@
 
     {% from "macros/disclaimers.html" import scope_footer %}
     <footer class="footer">
-        <p>Literature Research Aide - v4.3.2</p>
+        <p>LitPilot - v4.4.0</p>
         {{ scope_footer() }}
     </footer>
 

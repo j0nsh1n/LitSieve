@@ -1,16 +1,29 @@
-# context.md — Literature Research Aide
+# context.md — LitPilot
 
 ## Current State
-- App version **4.3.2** (`app/main.py`, `GET /health`).
+- App version **4.4.0** (`app/main.py`, `GET /health`). Product name **LitPilot**.
+- Public origin: **https://www.litpilot.org** via Cloudflare Tunnel →
+  `http://127.0.0.1:7860` (`PUBLIC_BASE_URL` in gitignored `.env`; `DEBUG=false`).
 - Python **3.14** (Dockerfile, CI, Render, ruff `py314`).
 - Lint: `ruff check .` — partial select (E9/F63/F7/F82/F401/F541/E401/I); passes.
 - Types: `pyright app` via `pyrightconfig.json` (basic); CI runs it
-  **continue-on-error** until ~76 app/ errors are cleaned (report-only).
-- Tests: `DEBUG=true ./venv/bin/python -m pytest -q` — **268 passed**
-  (2026-07-30; screening suite expanded); use `./venv` so sqlcipher runs.
-- CI: `.github/workflows/ci.yml` (ruff + pyright report + pytest + docker),
-  `codeql.yml`. Dependabot config **removed** locally (2026-07-30); not
-  necessarily on origin until pushed.
+  **continue-on-error** (report-only): **61 errors, 6 warnings** (2026-08-02).
+- Tests: `DEBUG=true ./venv/bin/python -m pytest -q` — **302 passed**
+  (2026-08-03; +6 model-registry, +13 model-validation, +15 loop/edges);
+  `./venv` for sqlcipher.
+- RAM (measured CPU, single uvicorn worker): ~175 MB imports, first model load
+  ~1.1–1.4 GB one-time (torch runtime), then **~0 per extra concurrent user**
+  since models are shared process-wide. Before sharing: +46 MB/user (MiniLM),
+  +330 MB/user (PubMedBERT). Bound: `MAX_LOADED_MODELS` (default 3).
+- CI: `.github/workflows/ci.yml` (ruff + pyright report + **pip-audit
+  blocking** + pytest + docker), `codeql.yml`. Dependabot config **removed**
+  locally (2026-07-30); not necessarily on origin until pushed. spec.md records
+  it as deliberate; `pip-audit` now covers the CVE half.
+- Dependency audit (2026-08-02): **clean, exit 0**. Local venv `setuptools`
+  upgraded 78.1.0 → 83.0.0 (clears PYSEC-2025-49 / PYSEC-2026-3447); CI install
+  step now upgrades setuptools too. `torch`/`triton-rocm` are skipped as
+  un-auditable (PyTorch index, not PyPI) — skips don't fail without `--strict`,
+  so torch CVEs stay a manual check.
 - Recovery email: on main (PR #38); MailerSend SMTP in gitignored `.env`
   confirmed working by human. Secrets never committed.
 - Deploy: `docs/DEPLOY.md` checklist (SECRET_KEY, SMTP, quota, smoke).
@@ -63,13 +76,26 @@ ShareCode *---1 Library (owner); redeem → clone Library for joiner
 - Public pages must not load `common.js` (401 redirect)
 - Patch tests against `app.core.*`, not frozen imports; routes via OpenAPI
   `conftest.route_paths`
+- Password hashing MUST use `hash_password_async` / `verify_password_async` in
+  routes. Sync bcrypt (~157 ms) on the single event loop froze the whole app
+  during signup bursts; a guardrail test greps `routes/auth.py` for regressions.
+- Rate limiting keys IPv6 on the /64 (`core.client_bucket`) — per-address
+  keying is bypassable since one client owns a whole /64.
+- Public templates (landing/login/register/feature_guide/reset_password/
+  verify_email) do NOT extend base.html — head changes must be repeated there.
+- Embedding models shared via `embeddings.get_shared_model` registry; the
+  `EmbeddingEngine.model` property must NOT cache per-engine (cached pipelines
+  would each pin a copy). Safe to share: inference is read-only.
+- `EmbeddingsRequest.model` validated against `EmbeddingEngine.allowed_models()`
+  (422 on unknown); operator escape hatch `EXTRA_EMBEDDING_MODELS`
+  (`name=org/model` or bare path). Stored/DB model names are NOT hard-failed, so
+  libraries embedded before the gate keep working.
 - Host: Linux `./venv` (ROCm torch possible); entry `app.main:app` port 7860
 
 ## Session Handoff
-- **Date:** 2026-07-30
-- **Branch:** `main` (local commits unpushed; behind origin until human sync)
-- **Done:** Phase 3 — `docs/DEPLOY.md`, README deploy section, roadmap Phase 3
-  marked done after local production-ish `/health` smoke. Prior: screening
-  tests + dead-code purge (268 tests).
-- **Next:** Backlog when human picks it (pyright, lockfile), or push local
-  commits when asked. No PR/push without explicit ask.
+- **Date:** 2026-08-04
+- **Branch:** `chore/doc-drift-and-hygiene` (PR #51 + follow-ups)
+- **Done:** LitPilot v4.4.0 rebrand; Cloudflare Tunnel for public access;
+  **removed DuckDNS** tooling/docs. Tunnel token service on this host.
+- **Next:** Ensure Cloudflare Public Hostname `www.litpilot.org` →
+  `http://127.0.0.1:7860` and DNS is active; rotate exposed tunnel token.

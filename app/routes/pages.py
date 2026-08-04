@@ -4,7 +4,7 @@ import logging
 from urllib.parse import quote
 
 from fastapi import APIRouter, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse
 
 from app.content.feature_guides import get_guide, list_guides, neighbors
 from app.core import (
@@ -19,7 +19,42 @@ router = APIRouter()
 
 @router.get("/health")
 async def health():
-    return {"status": "healthy", "version": "4.3.2"}
+    return {"status": "healthy", "version": "4.4.0"}
+
+
+# Browsers and crawlers request these at the site root, where the /static mount
+# cannot serve them. Both were logging 404s on real traffic.
+
+@router.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    return FileResponse("static/favicon.ico", media_type="image/x-icon")
+
+
+@router.get("/robots.txt", include_in_schema=False)
+async def robots():
+    """Public pages are indexable; app and auth endpoints are not.
+
+    The app pages already require a login, so this mostly stops crawlers from
+    burning requests on redirects — and keeps password-reset and share-join
+    URLs out of search results.
+    """
+    body = (
+        "User-agent: *\n"
+        "Allow: /$\n"
+        "Allow: /learn/\n"
+        "Disallow: /api/\n"
+        "Disallow: /login\n"
+        "Disallow: /register\n"
+        "Disallow: /reset-password\n"
+        "Disallow: /verify-email\n"
+        "Disallow: /join\n"
+        "Disallow: /data-management\n"
+        "Disallow: /clusters\n"
+        "Disallow: /statistics\n"
+        "Disallow: /search\n"
+        "Disallow: /account\n"
+    )
+    return PlainTextResponse(body, media_type="text/plain")
 
 
 @router.get("/api/ui-flags")

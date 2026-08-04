@@ -1,0 +1,14 @@
+[Unit]
+Description=Cloudflare Tunnel for LitPilot (external access on T-Mobile / CGNAT)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Named tunnel config after: cloudflared tunnel login && tools/setup_cloudflare_tunnel.sh
+ExecStart=/usr/local/bin/cloudflared tunnel --config %h/.cloudflared/config.yml run
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

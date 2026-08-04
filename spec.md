@@ -1,4 +1,4 @@
-# spec.md — Literature Research Aide
+# spec.md — LitPilot
 
 ## Problem
 Students need a **starting point** for literature review without a full academic
@@ -39,7 +39,7 @@ a substitute for school library databases.
   Or: `DEBUG=true SECRET_KEY=… ./venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 7860 --reload`
 - Example: log in → Data Management → pick topics/sources → Fetch → Prepare
   Papers → Clusters (screen) → Duplicates → Search → Download RIS
-- Health: `GET /health` → `{"status":"healthy","version":"4.3.2"}` (version as of
+- Health: `GET /health` → `{"status":"healthy","version":"4.4.0"}` (version as of
   this writing; bump when releasing)
 
 ## Architecture
@@ -75,7 +75,10 @@ a substitute for school library databases.
 ## Security & Privacy
 - No secrets in source. Credentials via environment / `.env` (gitignored).
 - Dependencies: minimum versions in `requirements.txt` (not fully lockfile-pinned).
-  Dependabot is enabled (`.github/dependabot.yml`) for pip + github-actions weekly.
+  **Dependabot is deliberately disabled** (no `.github/dependabot.yml`) — the
+  weekly auto-PRs were noise for a project this size. Consequence: nothing
+  watches dependency CVEs automatically, so upgrades are manual. Revisit with a
+  lockfile (see roadmap backlog) if reproducibility or CVE lag becomes a problem.
 - JWT HttpOnly cookie + CSRF double-submit; password change bumps `token_version`
 - CSP / security headers (`app/security.py`); HSTS skipped when `DEBUG=true`
 - Per-account storage cap `MAX_USER_STORAGE_MB` (default 500; `0` = off)
@@ -94,6 +97,15 @@ a substitute for school library databases.
   Prefer `./venv`. Install deps: `./venv/bin/pip install -r requirements.txt`
   (includes `sqlcipher3-binary` for encryption tests). CI sets `CI=true` so
   encryption suite hard-fails if sqlcipher missing.
+- Dependency audit: `pip-audit` (CI, **blocking**). Covers the CVE half of what
+  Dependabot did, without opening version-bump PRs. Audits the installed
+  environment, so it also sees transitive and build-time packages that
+  `requirements.txt` does not declare. Undeclared packages (setuptools, pip)
+  are kept current in the CI install step so the gate stays actionable. Fix a
+  failure by raising the version, not by re-adding `continue-on-error`.
+  `torch`/`triton` come from the PyTorch index and are reported as
+  un-auditable; skips do not fail the run, so **torch CVEs are not covered by
+  this gate** and remain a manual check.
 - Docker CI job builds image and hits `/health` and `/` (retries on Hub timeouts).
 - Markdownlint runs in CI non-blocking (`continue-on-error`).
 - Quirk: many tests use `TestClient`; patch `app.core` attributes (e.g. `user_db`),
