@@ -17,7 +17,7 @@ hostname. See **[SELFHOST.md](SELFHOST.md)**.
 |------|--------|
 | Python | **3.14** (matches CI, Docker, Render) |
 | Entrypoint | `uvicorn app.main:app --host 0.0.0.0 --port <PORT>` |
-| Default port | `7860` (Docker / HF Spaces); Render uses `$PORT` |
+| Default port | `7860` (local, Docker, tunnel origin); Render uses `$PORT` |
 | Health check | `GET /health` → `200` and JSON `status: healthy` |
 | App version | `GET /health` → `version` (also in OpenAPI) |
 
@@ -93,7 +93,7 @@ the edge path only shuttles bytes.
 
 - Signs JWT session cookies.
 - Generate: `python -c "import secrets; print(secrets.token_urlsafe(48))"`
-- Store in the host secret manager (Render env, HF secret, Docker `-e`, never git).
+- Store in the host secret manager (gitignored `.env`, Render env, Docker `-e`, never git).
 - Rotating it invalidates all sessions and can drop unreadable AI keys at rest
   (keys are derived via HKDF from `SECRET_KEY`).
 
@@ -103,7 +103,7 @@ Without `SECRET_KEY` and with `DEBUG=false`, the process **refuses to start**.
 
 | Value | When |
 |-------|------|
-| `false` (default) | Real HTTPS hosts (Render, HF Spaces, reverse-proxy TLS) |
+| `false` (default) | Anything with real HTTPS in front (Cloudflare Tunnel, a reverse proxy, a PaaS router) |
 | `true` | Local plain `http://localhost` only |
 
 Effects of `DEBUG=true`:
@@ -151,6 +151,36 @@ extra concurrent user**.
 - Note the app runs a **single uvicorn worker** — adding `--workers N`
   multiplies all of the above by N, since each worker is a separate process
   with its own copy.
+
+### Model downloads — Hugging Face Hub
+
+Embedding models are **not** vendored in this repo. Every entry in
+`EmbeddingEngine.MODELS` is a Hugging Face Hub repo id (e.g.
+`sentence-transformers/all-MiniLM-L6-v2`), fetched by `sentence-transformers`
+on first use and cached under `~/.cache/huggingface` — about **3.5 GB** with
+the full catalog warm.
+
+This is a real runtime dependency, distinct from Hugging Face *Spaces* (a
+hosting product this project does not use):
+
+- First use of an uncached model **downloads it inside the user's job**, which
+  looks like the job hanging. Sizes range from ~180 MB to ~1.8 GB on disk.
+- If `huggingface.co` is unreachable, selecting an uncached model fails.
+- The cache lives in the operator's home directory, **outside** the repo and
+  outside `user_data/`, so it is not covered by the per-account storage quota
+  and is not captured by a backup of the app directory.
+
+Warm the whole catalog ahead of time so no student is the one who pays for a
+download:
+
+```bash
+./venv/bin/python - <<'PY'
+from app.services.embeddings import EmbeddingEngine
+for name in EmbeddingEngine.MODELS:
+    EmbeddingEngine(name).embed_query("warm")
+    print("cached", name)
+PY
+```
 
 ### Extra embedding models — `EXTRA_EMBEDDING_MODELS`
 
@@ -268,7 +298,8 @@ stick (Secure cookies). Use HTTPS (tunnel or reverse proxy) for real logins.
 
 ## 5. Security reminders
 
-- TLS terminates at the host (Render / HF / reverse proxy). App sends HSTS when
+- TLS terminates upstream (Cloudflare Tunnel here; a reverse proxy or PaaS
+  router elsewhere) — never in Uvicorn. App sends HSTS when
   not in DEBUG (`app/security.py`).
 - Sessions: HttpOnly + Secure (when not DEBUG) + SameSite=Lax JWT cookie;
   password change bumps `token_version` and signs out other sessions.

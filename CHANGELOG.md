@@ -21,6 +21,21 @@ and this project aims to follow Semantic Versioning for app version strings
   errors in particular were going to stdout, so they had no level, could not be
   filtered, and carried no traceback.
 
+### Documentation
+- Hugging Face **Hub** (where the embedding models come from, ~3.5 GB cached
+  under `~/.cache/huggingface`) is now documented in `docs/DEPLOY.md`, including
+  that an uncached model downloads *inside* a user's job and that the cache sits
+  outside `user_data/` — so it is not covered by the storage quota or by a
+  backup of the app directory.
+- Corrected "TLS is terminated by the host (Render / HF Spaces)" in `README.md`
+  and `app/security.py`: TLS terminates at Cloudflare in the current deployment.
+- Removed Hugging Face **Spaces** hosting references, including the Spaces
+  config frontmatter in `README.md` (no Space exists; the only remote is
+  GitHub). This is the hosting product, unrelated to the model Hub above.
+- `roadmap.md`: Phase 3 recorded as actually shipped (live on
+  https://www.litpilot.org via Cloudflare Tunnel, no PaaS), plus a new Phase 4
+  covering the account cap and backups that going live created.
+
 ### Removed
 - Server-side `tqdm` progress bars in four fetchers. They drew to the server
   console where nobody could see them (users get progress from the jobs API)

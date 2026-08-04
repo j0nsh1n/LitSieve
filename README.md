@@ -1,12 +1,3 @@
----
-title: LitPilot
-emoji: 📚
-colorFrom: blue
-colorTo: green
-sdk: docker
-app_port: 7860
----
-
 # LitPilot 📚 — v4.4.0
 
 A multi-user web app for **students** to fetch, screen, and rank research papers
@@ -71,7 +62,7 @@ Built with **FastAPI**, sentence-transformers, FAISS, and scikit-learn.
 │   └── DEPLOY.md           # Host checklist (SECRET_KEY, SMTP, quota, smoke)
 ├── run_dev.sh              # Local dev with --reload
 ├── requirements.txt
-├── Dockerfile              # Container build (HF Spaces / any Docker host)
+├── Dockerfile              # Container build (any Docker host)
 └── render.yaml             # Render.com deployment config
 ```
 
@@ -234,7 +225,8 @@ cleanly during tests. Coverage includes:
 
 ## Security
 
-- **Transport** — TLS is terminated by the host (Render / HF Spaces). The app
+- **Transport** — TLS is terminated upstream, never by the app: Cloudflare in
+  the current self-hosted deployment, or the platform router on a PaaS. The app
   sends `Strict-Transport-Security` (outside `DEBUG`), plus `X-Content-Type-Options`,
   `X-Frame-Options: DENY`, `Referrer-Policy` and a CSP that blocks scripts from
   any external origin (`app/security.py`).
