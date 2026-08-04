@@ -24,7 +24,7 @@ import logging
 import os
 from logging.handlers import RotatingFileHandler
 
-DEFAULT_LOG_FILE = "logs/litpilot.log"
+DEFAULT_LOG_FILE = "logs/litsieve.log"
 DEFAULT_MAX_BYTES = 5 * 1024 * 1024   # 5 MB per file
 DEFAULT_BACKUP_COUNT = 5              # + 5 rotations ≈ 30 MB ceiling
 

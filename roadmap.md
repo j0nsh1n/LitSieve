@@ -1,4 +1,4 @@
-# roadmap.md — LitPilot
+# roadmap.md — LitSieve
 
 Note: "Complete when" conditions are verified locally (tests pass, feature
 works) and via PR review. One phase may span several small PRs.
@@ -45,7 +45,7 @@ home desktop, and the link has been shared publicly.
     user but nothing bounds the number of users)
   - Back up `users.db` + `user_data/` — currently no backup story, and the
     machine is a single point of failure
-  - Watch `logs/litpilot.log` after incidents (rotating; ~30 MB ceiling)
+  - Watch `logs/litsieve.log` after incidents (rotating; ~30 MB ceiling)
   - Keep the HF model cache warm so no student pays for a first download
 - Complete when: an account cap (or invite gate) is enforced, a restore has been
   tested at least once from a backup, and the operator can answer "what happened

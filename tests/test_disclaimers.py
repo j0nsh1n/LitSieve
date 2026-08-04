@@ -123,7 +123,7 @@ def test_no_inline_disclaimer_drift_in_templates():
     """Templates should include the macros file, not hard-code banner copy."""
     forbidden_snippets = (
         "This tool searches a set of",
-        "LitPilot works with",
+        "LitSieve works with",
         "Uses publicly accessible research databases",
         "Public research databases for gathering candidates",
     )
@@ -135,3 +135,46 @@ def test_no_inline_disclaimer_drift_in_templates():
         text = path.read_text(encoding="utf-8")
         for snip in forbidden_snippets:
             assert snip not in text, f"{rel} still hard-codes disclaimer: {snip!r}"
+
+
+# --- Brand consistency -----------------------------------------------------
+
+def test_no_stale_product_name_in_user_facing_surfaces():
+    """The product is LitSieve. Earlier names must not survive in the UI.
+
+    Excluded, because they are not product names:
+      * the public hostname litpilot.org (a Cloudflare/registrar fact)
+      * `_HKDF_INFO_*` — key-derivation labels baked into stored ciphertext.
+        Renaming those would change the derived key and make every existing
+        encrypted AI key undecryptable, so they are frozen forever.
+    """
+    import pathlib
+    import re
+
+    root = pathlib.Path(__file__).resolve().parent.parent
+    targets = [
+        *(root / "templates").rglob("*.html"),
+        *(root / "static").rglob("*.js"),
+        *(root / "app").rglob("*.py"),
+    ]
+
+    offenders = []
+    for path in targets:
+        for i, line in enumerate(path.read_text().splitlines(), 1):
+            # Strip the domain before looking for the old product name.
+            if "_HKDF_INFO" in line:
+                continue          # frozen crypto constant, see docstring
+            stripped = re.sub(r"litpilot\.(org|duckdns\.org)", "", line, flags=re.I)
+            if re.search(r"litpilot|literature[ _-]research[ _-]aide", stripped, re.I):
+                offenders.append(f"{path.relative_to(root)}:{i}")
+
+    assert not offenders, "stale product name: " + ", ".join(offenders)
+
+
+def test_brand_appears_in_the_nav_and_footer():
+    """Guard the rename actually landed where users see it."""
+    import pathlib
+    base = (pathlib.Path(__file__).resolve().parent.parent
+            / "templates" / "base.html").read_text()
+    assert "LitSieve" in base
+    assert "LitPilot" not in base

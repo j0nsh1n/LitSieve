@@ -1,5 +1,5 @@
 """
-FastAPI Application — LitPilot v4.4.0
+FastAPI Application — LitSieve v4.4.0
 Multi-user web interface for literature search and analysis.
 
 This module only wires the app together: configuration, static files, the
@@ -51,7 +51,7 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(
-    title="LitPilot",
+    title="LitSieve",
     version="4.4.0",
     lifespan=lifespan,
 )

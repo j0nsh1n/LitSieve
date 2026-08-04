@@ -1,5 +1,5 @@
 [Unit]
-Description=Caddy reverse proxy for LitPilot (HTTPS → 127.0.0.1:7860)
+Description=Caddy reverse proxy for LitSieve (HTTPS → 127.0.0.1:7860)
 After=network-online.target
 Wants=network-online.target
 

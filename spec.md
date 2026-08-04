@@ -1,4 +1,4 @@
-# spec.md — LitPilot
+# spec.md — LitSieve
 
 ## Problem
 Students need a **starting point** for literature review without a full academic
