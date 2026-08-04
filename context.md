@@ -1,7 +1,9 @@
-# context.md — Literature Research Aide
+# context.md — LitPilot
 
 ## Current State
-- App version **4.3.2** (`app/main.py`, `GET /health`).
+- App version **4.4.0** (`app/main.py`, `GET /health`). Product name **LitPilot**.
+- Public origin target: `https://litpilot.duckdns.org` (`PUBLIC_BASE_URL` in
+  gitignored `.env`; `DEBUG=false` for HTTPS cookies).
 - Python **3.14** (Dockerfile, CI, Render, ruff `py314`).
 - Lint: `ruff check .` — partial select (E9/F63/F7/F82/F401/F541/E401/I); passes.
 - Types: `pyright app` via `pyrightconfig.json` (basic); CI runs it
@@ -92,20 +94,12 @@ ShareCode *---1 Library (owner); redeem → clone Library for joiner
 
 ## Session Handoff
 - **Date:** 2026-08-03
-- **Branch:** `chore/doc-drift-and-hygiene` (off `chore/phase3-deploy-and-hygiene`;
-  both unpushed)
-- **Done:** Doc-drift fixes (spec.md Dependabot claim, stale pyright count,
-  unused `pandas`, two emoji `print()` strings). Added `pip-audit` to CI, then
-  upgraded venv setuptools and made the audit **blocking**. Full re-validation:
-  ruff clean, 268 tests pass, pyright unchanged at 61/6, pip-audit exit 0.
-- **Then:** Shared process-wide embedding model registry (RAM fix for
-  self-hosting on one desktop). 274 tests pass; pyright back to 61/6 baseline.
-- **Then:** Validated `EmbeddingsRequest.model` (422 on unknown) + drift guards
-  tying the UI dropdown and topic map to the catalog. pip-audit's first real
-  run caught CVE-2026-69247 (cryptography -> >=50.0.0).
-- **Then:** Live-traffic fixes from the cloudflared deployment: bcrypt off the
-  event loop (bystander page load 933 ms -> 1.3 ms under 6 concurrent signups),
-  IPv6 /64 rate-limit keys, favicon + robots.txt.
-- **Next:** Backlog only (pyright green/blocking, lockfile, ruff ratchet
-  E501/UP/E402). Consider a total-account cap: registration is open, the app is
-  publicly shared, and quota is per-account only. Push when asked.
+- **Branch:** `chore/doc-drift-and-hygiene` (unpushed work on top of post-#50 main)
+- **Done:** Prior hygiene + RAM share + model validation + auth/event-loop
+  fixes. **Rename to LitPilot** (UI/docs/emails), version **4.4.0**, `.env`
+  `PUBLIC_BASE_URL=https://litpilot.duckdns.org` + `DEBUG=false` (gitignored).
+  DEPLOY notes for DuckDNS / Cloudflare Tunnel / single-box efficiency.
+- **Next:** Paste DuckDNS token into `secrets/duckdns.env` and run
+  `./tools/duckdns_update.sh`. Prefer **Cloudflare Tunnel** for public HTTPS
+  (quick-tunnel smoke already returned /health 4.4.0; Pi-hole holds :80/:443;
+  public IP looks CGNAT so port-forward may never work). Push/PR when asked.

@@ -1,4 +1,4 @@
-# roadmap.md — Literature Research Aide
+# roadmap.md — LitPilot
 
 Note: "Complete when" conditions are verified locally (tests pass, feature
 works) and via PR review. One phase may span several small PRs.

@@ -1,0 +1,9 @@
+[Unit]
+Description=Update DuckDNS A record for litpilot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/HealthDatabaseAccess
+ExecStart=%h/HealthDatabaseAccess/tools/duckdns_update.sh

@@ -40,10 +40,12 @@ if [[ -z "${SECRET_KEY:-}" ]]; then
 fi
 
 export SECRET_KEY
-export DEBUG="${DEBUG:-true}"
+# Always DEBUG for local reload server so Secure cookies work on http://localhost,
+# even if .env has DEBUG=false for the public DuckDNS / tunnel process.
+export DEBUG=true
 
-echo "Starting Literature Research Aide on http://127.0.0.1:${PORT}"
-echo "  DEBUG=${DEBUG}"
+echo "Starting LitPilot on http://127.0.0.1:${PORT}"
+echo "  DEBUG=${DEBUG} (forced for run_dev; public host should use DEBUG=false)"
 echo "  --reload is on (Python file changes restart the server)"
 echo "  CSS/JS/HTML: just refresh the browser"
 echo ""

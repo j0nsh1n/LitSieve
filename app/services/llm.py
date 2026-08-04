@@ -1,5 +1,5 @@
 """
-Optional LLM helpers for Literature Research Aide (opt-in study aid).
+Optional LLM helpers for LitPilot (opt-in study aid).
 
 Providers (any combination; auto picks the first ready):
   • ollama     — local models (free). Can be started/stopped by the app.
@@ -958,7 +958,7 @@ def _structured_openai(system: str, prompt: str, schema_model: Type[BaseModel]):
     # OpenRouter optional branding headers (harmless elsewhere)
     if "openrouter.ai" in base:
         headers["HTTP-Referer"] = _env("OPENROUTER_SITE_URL", "http://localhost")
-        headers["X-Title"] = _env("OPENROUTER_APP_NAME", "Literature Research Aide")
+        headers["X-Title"] = _env("OPENROUTER_APP_NAME", "LitPilot")
     body: Dict[str, Any] = {
         "model": model,
         "temperature": 0.2,

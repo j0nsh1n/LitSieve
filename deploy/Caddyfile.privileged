@@ -1,0 +1,33 @@
+# LitPilot on 80/443. Pi-hole is on 8080/8444 only.
+{
+	auto_https off
+	admin off
+}
+
+# Keep the same host (IP or name) so LAN IP is not sent out via DuckDNS.
+:80 {
+	redir https://{host}{uri} permanent
+}
+
+:443 {
+	tls /home/jonathans/HealthDatabaseAccess/secrets/letsencrypt/config/live/litpilot.duckdns.org/fullchain.pem /home/jonathans/HealthDatabaseAccess/secrets/letsencrypt/config/live/litpilot.duckdns.org/privkey.pem
+
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+
+	reverse_proxy 127.0.0.1:7860 {
+		header_up X-Forwarded-Proto https
+		header_up X-Forwarded-Host {host}
+		transport http {
+			read_timeout 600s
+			write_timeout 600s
+		}
+	}
+}
