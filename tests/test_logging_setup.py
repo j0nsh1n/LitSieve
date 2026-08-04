@@ -92,6 +92,19 @@ def test_unwritable_path_does_not_crash(tmp_path, monkeypatch):
     logging_setup.configure_logging(force=True)   # must not raise
     logging.getLogger("app.test").info("still alive")
 
+    # Console logging must survive so the operator is not left blind.
+    # Check only handlers *we* installed -- pytest puts its own _FileHandler on
+    # the root logger, which would otherwise look like a false positive.
+    ours = [h for h in logging.getLogger().handlers
+            if getattr(h, "_lra_owned", False)]
+    assert ours, "no handlers left after a failed file handler"
+    assert not any(isinstance(h, logging.FileHandler) for h in ours), (
+        "a broken file handler must not be installed"
+    )
+    assert any(isinstance(h, logging.StreamHandler) for h in ours), (
+        "console logging must still work when the file cannot be opened"
+    )
+
 
 def test_uvicorn_access_log_reaches_the_file(tmp_path, monkeypatch):
     """uvicorn's loggers set propagate=False, so they need the handler directly.

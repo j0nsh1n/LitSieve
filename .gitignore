@@ -48,3 +48,7 @@ secrets/cloudflared.token
 # Runtime logs (see LOG_FILE in .env.example)
 logs/
 *.log
+
+# Coverage measurement artefacts
+.coverage
+htmlcov/

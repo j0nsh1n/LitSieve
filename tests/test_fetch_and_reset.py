@@ -2,6 +2,7 @@
 
 
 from app.auth import hash_password, verify_password
+from app.fetchers import base as base_module
 from app.fetchers.base import FetchError, HttpClient, classify_error
 from app.storage.database import ArticleDatabase
 from app.storage.user_db import UserDatabase
@@ -9,16 +10,73 @@ from app.utils import build_screening_report, format_screening_report_txt
 
 
 def test_classify_error_kinds():
+    """Kinds drive the per-source error badges, so they must be exact.
+
+    (The old version OR'd two conditions where the second could never fail
+    independently, so a wrong-but-rate-ish string would have passed.)
+    """
     assert classify_error(FetchError("x", kind="rate_limited")) == "rate_limited"
     assert classify_error(FetchError("x", kind="network")) == "network"
-    assert "rate" in classify_error(Exception("HTTP 429 too many")).lower() or \
-        classify_error(Exception("HTTP 429 too many")) == "rate_limited"
+    # A bare exception is classified by its text.
+    assert classify_error(Exception("HTTP 429 too many")) == "rate_limited"
+    assert classify_error(Exception("something unexpected")) == "error"
 
 
-def test_http_client_backoff_parses_retry_after():
-    # Unit: _backoff_sleep accepts Retry-After without raising.
-    HttpClient._backoff_sleep(0, retry_after="0")
+def _record_sleeps(monkeypatch):
+    """Capture how long _backoff_sleep would have slept, without sleeping."""
+    slept: list[float] = []
+    monkeypatch.setattr(base_module.time, "sleep", lambda s: slept.append(s))
+    return slept
+
+
+def test_backoff_honours_retry_after(monkeypatch):
+    """A server's Retry-After wins; ignoring it is how you get IP-blocked."""
+    slept = _record_sleeps(monkeypatch)
+    HttpClient._backoff_sleep(0, retry_after="7")
+    assert slept == [7.0]
+
+
+def test_backoff_caps_absurd_retry_after(monkeypatch):
+    """A hostile or broken header must not park a job for hours."""
+    slept = _record_sleeps(monkeypatch)
+    HttpClient._backoff_sleep(0, retry_after="86400")
+    assert slept == [60.0]
+
+
+def test_backoff_falls_back_when_retry_after_is_garbage(monkeypatch):
+    """Unparseable header -> exponential path, not a crash and not zero."""
+    slept = _record_sleeps(monkeypatch)
     HttpClient._backoff_sleep(0, retry_after="not-a-number")
+    assert len(slept) == 1
+    assert 0.5 <= slept[0] <= 0.75, slept
+
+
+def test_backoff_is_exponential_and_capped(monkeypatch):
+    """~0.5, 1, 2, 4 … with jitter, flattening at 30s."""
+    slept = _record_sleeps(monkeypatch)
+    for attempt in range(5):
+        HttpClient._backoff_sleep(attempt, retry_after=None)
+    HttpClient._backoff_sleep(99, retry_after=None)
+
+    for attempt in range(5):
+        expected = 0.5 * (2 ** attempt)
+        assert expected <= slept[attempt] <= expected + 0.25, (attempt, slept)
+    assert slept[:-1] == sorted(slept[:-1]), "backoff must not shrink"
+    assert 30.0 <= slept[-1] <= 30.25, f"cap not applied: {slept[-1]}"
+
+
+def test_backoff_zero_retry_after_does_not_stall(monkeypatch):
+    """Retry-After: 0 means retry now."""
+    slept = _record_sleeps(monkeypatch)
+    HttpClient._backoff_sleep(3, retry_after="0")
+    assert slept == [0.0]
+
+
+def test_backoff_ignores_negative_retry_after(monkeypatch):
+    """Negative is nonsense; fall back rather than compute a negative sleep."""
+    slept = _record_sleeps(monkeypatch)
+    HttpClient._backoff_sleep(0, retry_after="-5")
+    assert len(slept) == 1 and slept[0] >= 0.5, slept
 
 
 def test_insert_articles_dedupes_cross_source_title(tmp_path):
