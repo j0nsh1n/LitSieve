@@ -6,8 +6,8 @@ student starting point; optional SMTP, quota, and SQLCipher are deploy options.
 Copy variables from [`.env.example`](../.env.example). Never commit `.env` or
 provider secret dumps (`mailersend-*.txt`, etc.).
 
-**Current public hostname (self-host):** `https://litpilot.duckdns.org`  
-See also **[SELFHOST.md](SELFHOST.md)** (DuckDNS token, Pi-hole on :80/:443, tunnel vs port-forward, light TLS).
+**Self-host:** point your purchased domain at a **Cloudflare Tunnel** public
+hostname. See **[SELFHOST.md](SELFHOST.md)**.
 
 ---
 
@@ -38,56 +38,34 @@ dashboard (SMTP, `PUBLIC_BASE_URL`, quota, etc.).
 **Local dev** — prefer `./run_dev.sh` (`DEBUG=true`, reload). Do not use that
 profile as a public HTTPS deploy.
 
-### Self-host on this machine (DuckDNS)
-
-Target origin: **`https://litpilot.duckdns.org`**
+### Self-host on this machine (Cloudflare Tunnel)
 
 App env (gitignored `.env`):
 
 ```bash
 DEBUG=false
-PUBLIC_BASE_URL=https://litpilot.duckdns.org
-SECRET_KEY=…          # already required
+PUBLIC_BASE_URL=https://YOUR_DOMAIN
+SECRET_KEY=…          # required
 MAX_LOADED_MODELS=3   # shared embedding weights; keep small on one box
-# SMTP_* optional — trial MailerSend From is fine; links use PUBLIC_BASE_URL
+# SMTP_* optional — recovery links use PUBLIC_BASE_URL
 ```
 
-Run the app **bound to localhost** (not exposed on the LAN) and put a tunnel
-or reverse proxy in front:
+Run the app on loopback; put Cloudflare Tunnel in front:
 
 ```bash
-# Production-ish process (no --reload)
 ./venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 7860
+# cloudflared tunnel (token or config) → public hostname → http://127.0.0.1:7860
 ```
 
-**Cloudflare Tunnel (`cloudflared`)** — recommended for a home box:
+**Cloudflare Tunnel (`cloudflared`)** — required on CGNAT ISPs (e.g. T‑Mobile
+Home Internet) where inbound port-forwarding is unavailable:
 
-- Does **not** require opening router ports.
-- Adds a small amount of latency (typically tens of ms RTT), not seconds.
-  Search/embeddings still run **on this machine**; the tunnel only carries
-  HTTP. That lag is negligible next to model load or a multi-source fetch.
-- TLS is terminated at Cloudflare; set `DEBUG=false` so Secure cookies work.
-- Point the tunnel public hostname at `http://127.0.0.1:7860`.
-- DuckDNS alone only maps a name → IP. With a tunnel you still need DNS that
-  reaches Cloudflare (CNAME to the tunnel, or a Cloudflare-managed zone). If
-  you only update a DuckDNS **A record** to your home IP, you are on the
-  port-forward path instead (below).
+- Outbound-only from the PC; no router port-forward.
+- TLS for visitors at Cloudflare; set `DEBUG=false` so Secure cookies work.
+- Public Hostname service URL: `http://127.0.0.1:7860`.
+- Store tunnel tokens only under `secrets/` (gitignored).
 
-**DuckDNS token** — useful when:
-
-- Your public IP is **dynamic**, and
-- DuckDNS holds an **A record** for `litpilot` that must track that IP
-  (port-forward / direct-to-home path).
-
-Store the token only in a gitignored file or env (e.g. `DUCKDNS_TOKEN=`), never
-in the repo. A cron/`systemd` timer can hit DuckDNS’s update URL periodically.
-The token is **not** required for the LitPilot app process itself and is
-**not** needed if DNS for the public hostname is handled entirely by
-Cloudflare Tunnel config (no A-record chasing).
-
-**Port-forward path** (no tunnel): router :443 → host, Caddy/nginx + Let’s
-Encrypt, DuckDNS A record + token updater. More router work; similar app
-performance; slightly lower RTT than a tunnel for nearby clients.
+Optional LAN reverse proxy: `deploy/Caddyfile*` (not required for tunnel users).
 
 ### Efficiency on one machine (same performance level)
 
@@ -274,10 +252,10 @@ Manual (browser, HTTPS host or local with appropriate `DEBUG`):
 **Production-ish local** (HTTPS via tunnel; Secure cookies):
 
 ```bash
-# With .env already set to DEBUG=false and PUBLIC_BASE_URL=https://litpilot.duckdns.org
+# With .env: DEBUG=false and PUBLIC_BASE_URL=https://YOUR_DOMAIN
 ./venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 7860
 curl -sS http://127.0.0.1:7860/health
-# After tunnel/DNS: curl -sS https://litpilot.duckdns.org/health
+# After tunnel + DNS: curl -sS https://YOUR_DOMAIN/health
 ```
 
 Note: with `DEBUG=false` on plain `http://localhost`, browser login may not
