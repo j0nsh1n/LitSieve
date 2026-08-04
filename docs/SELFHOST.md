@@ -1,29 +1,43 @@
 # Self-host LitPilot
 
-Public access on T‑Mobile Home Internet uses a **Cloudflare Tunnel** (inbound
-port-forwarding is not available / CGNAT). TLS for visitors is terminated at
-Cloudflare; this PC only serves LitPilot on loopback.
+## Architecture (do not change)
+
+```text
+Browser  --HTTPS-->  Cloudflare  --HTTP-->  cloudflared  --HTTP-->  uvicorn
+                     (TLS here)              (this PC)              127.0.0.1:7860
+```
+
+| Edge | Origin |
+|------|--------|
+| **Public URL** | `https://www.litpilot.org` |
+| **Local FastAPI** | `http://127.0.0.1:7860` only (no TLS on Uvicorn) |
+
+Cloudflare Tunnel **terminates HTTPS**. Do **not** give Uvicorn certificates or
+`--ssl-keyfile` / `--ssl-certfile`. Optional Caddy is only for LAN experiments,
+not for the public hostname.
+
+Public access on T‑Mobile Home Internet uses the tunnel (CGNAT; no inbound
+port-forward).
 
 ## Machine layout
 
 | Piece | Role |
 |-------|------|
-| LitPilot | `uvicorn` on `127.0.0.1:7860` only |
-| `cloudflared` | Outbound tunnel to Cloudflare (token or config) |
-| Caddy (optional) | LAN HTTPS on :80/:443 if you want local TLS without the tunnel |
+| LitPilot | `uvicorn` **HTTP** on `127.0.0.1:7860` only |
+| `cloudflared` | Outbound tunnel; public hostname `www.litpilot.org` → origin |
+| Caddy (optional) | LAN-only reverse proxy — not required for www.litpilot.org |
 | Pi-hole | Admin on high ports (e.g. 8080 / 8444) if still installed |
 
 ## Required app env (gitignored `.env`)
 
 ```bash
 DEBUG=false
-PUBLIC_BASE_URL=https://YOUR_DOMAIN
+PUBLIC_BASE_URL=https://www.litpilot.org
 # SECRET_KEY=…  required when DEBUG=false
 # SMTP_* optional — recovery links use PUBLIC_BASE_URL
 ```
 
-`YOUR_DOMAIN` is the hostname you attach in the Cloudflare tunnel **Public
-Hostname** settings (the domain you bought and pointed at Cloudflare).
+Public hostname: **`www.litpilot.org`** (Cloudflare Tunnel → `http://127.0.0.1:7860`).
 
 ## Cloudflare Tunnel
 
@@ -44,8 +58,10 @@ Hostname** settings (the domain you bought and pointed at Cloudflare).
    ```
 
 5. In the dashboard, add a **Public Hostname**:
-   - Hostname: `YOUR_DOMAIN` (or `www` / subdomain)
+   - Subdomain: `www`
+   - Domain: `litpilot.org`
    - Service: **HTTP** → `http://127.0.0.1:7860`
+   - Optional second rule: apex `litpilot.org` → same service (or redirect to www)
 
 6. Keep LitPilot running:
 
@@ -58,16 +74,13 @@ Hostname** settings (the domain you bought and pointed at Cloudflare).
 
 ```bash
 curl -sS http://127.0.0.1:7860/health
-# After DNS for YOUR_DOMAIN points via Cloudflare:
-curl -sS https://YOUR_DOMAIN/health
+curl -sS https://www.litpilot.org/health
 ```
 
 ## Optional: Caddy on the LAN
 
-If you still want HTTPS on the LAN IP/name without going through Cloudflare,
-see `deploy/Caddyfile.privileged` (needs `cap_net_bind_service` for :80/:443).
-Prefer certificates for **YOUR_DOMAIN** (HTTP-01 or DNS-01 via your DNS host),
-not legacy providers.
+If you still want HTTPS on the LAN without going through Cloudflare, see
+`deploy/Caddyfile.privileged` (needs `cap_net_bind_service` for :80/:443).
 
 ## Security (good crypto, light on the CPU)
 

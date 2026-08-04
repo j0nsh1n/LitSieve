@@ -1,10 +1,10 @@
-# Example Caddyfile for LitPilot behind a real domain (YOUR_DOMAIN).
+# Example Caddyfile for LitPilot behind a real domain (www.litpilot.org).
 # For T-Mobile / CGNAT public access, prefer Cloudflare Tunnel instead.
 {
-	email admin@YOUR_DOMAIN
+	email admin@litpilot.org
 }
 
-YOUR_DOMAIN {
+www.litpilot.org {
 	encode zstd gzip
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"

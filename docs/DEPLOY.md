@@ -40,32 +40,35 @@ profile as a public HTTPS deploy.
 
 ### Self-host on this machine (Cloudflare Tunnel)
 
+| | |
+|--|--|
+| Public hostname | `https://www.litpilot.org` |
+| Origin | `http://127.0.0.1:7860` (HTTP only) |
+| TLS | **Cloudflare only** — not Uvicorn |
+
 App env (gitignored `.env`):
 
 ```bash
 DEBUG=false
-PUBLIC_BASE_URL=https://YOUR_DOMAIN
+PUBLIC_BASE_URL=https://www.litpilot.org
 SECRET_KEY=…          # required
-MAX_LOADED_MODELS=3   # shared embedding weights; keep small on one box
+MAX_LOADED_MODELS=3
 # SMTP_* optional — recovery links use PUBLIC_BASE_URL
 ```
 
-Run the app on loopback; put Cloudflare Tunnel in front:
-
 ```bash
+# HTTP origin only — no --ssl-* flags
 ./venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 7860
-# cloudflared tunnel (token or config) → public hostname → http://127.0.0.1:7860
+# cloudflared: Public Hostname www.litpilot.org → http://127.0.0.1:7860
 ```
 
-**Cloudflare Tunnel (`cloudflared`)** — required on CGNAT ISPs (e.g. T‑Mobile
-Home Internet) where inbound port-forwarding is unavailable:
+**Cloudflare Tunnel** — used on CGNAT ISPs (e.g. T‑Mobile Home Internet):
 
-- Outbound-only from the PC; no router port-forward.
-- TLS for visitors at Cloudflare; set `DEBUG=false` so Secure cookies work.
-- Public Hostname service URL: `http://127.0.0.1:7860`.
+- Outbound-only; no router port-forward required for public access.
+- Visitors use HTTPS to Cloudflare; origin stays plain HTTP on loopback.
 - Store tunnel tokens only under `secrets/` (gitignored).
 
-Optional LAN reverse proxy: `deploy/Caddyfile*` (not required for tunnel users).
+Optional LAN Caddy (`deploy/Caddyfile*`) is separate from the public hostname.
 
 ### Efficiency on one machine (same performance level)
 
@@ -252,10 +255,10 @@ Manual (browser, HTTPS host or local with appropriate `DEBUG`):
 **Production-ish local** (HTTPS via tunnel; Secure cookies):
 
 ```bash
-# With .env: DEBUG=false and PUBLIC_BASE_URL=https://YOUR_DOMAIN
+# With .env: DEBUG=false and PUBLIC_BASE_URL=https://www.litpilot.org
 ./venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 7860
 curl -sS http://127.0.0.1:7860/health
-# After tunnel + DNS: curl -sS https://YOUR_DOMAIN/health
+curl -sS https://www.litpilot.org/health
 ```
 
 Note: with `DEBUG=false` on plain `http://localhost`, browser login may not
