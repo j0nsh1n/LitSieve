@@ -12,10 +12,10 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from app import core
 from app.auth import (
     create_token,
-    hash_password,
+    hash_password_async,
     validate_email,
     validate_new_username,
-    verify_password,
+    verify_password_async,
 )
 from app.core import (
     _evict_pipeline,
@@ -75,7 +75,7 @@ async def login_submit(
     next_url = _safe_next_url(next or request.query_params.get("next"))
     username = username.strip().lower()
     user = core.user_db.get_by_username(username)
-    if not user or not verify_password(password, user["hashed_password"]):
+    if not user or not await verify_password_async(password, user["hashed_password"]):
         return templates.TemplateResponse(
             request, "login.html",
             context={
@@ -197,7 +197,7 @@ async def reset_password_confirm(
             status_code=400,
         )
     ok, err = core.user_db.consume_password_reset_token(
-        username, token, hash_password(password),
+        username, token, await hash_password_async(password),
     )
     if not ok:
         return templates.TemplateResponse(
@@ -240,7 +240,7 @@ async def register_submit(
         )
 
     try:
-        user = core.user_db.create_user(username, hash_password(password))
+        user = core.user_db.create_user(username, await hash_password_async(password))
     except ValueError:
         # Lost the race against a concurrent registration of the same login.
         return templates.TemplateResponse(
@@ -273,7 +273,7 @@ async def api_change_password(req: ChangePasswordRequest, request: Request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
 
     record = core.user_db.get_by_id(user["user_id"])
-    if not record or not verify_password(req.current_password, record["hashed_password"]):
+    if not record or not await verify_password_async(req.current_password, record["hashed_password"]):
         return JSONResponse(status_code=400, content={"detail": "Incorrect password"})
 
     new_pw = req.new_password or ""
@@ -295,7 +295,7 @@ async def api_change_password(req: ChangePasswordRequest, request: Request):
             content={"detail": "Passwords do not match"},
         )
 
-    if not core.user_db.update_password(user["user_id"], hash_password(new_pw)):
+    if not core.user_db.update_password(user["user_id"], await hash_password_async(new_pw)):
         return JSONResponse(status_code=400, content={"detail": "Could not update password"})
 
     fresh = core.user_db.get_by_id(user["user_id"])
@@ -318,7 +318,7 @@ async def api_delete_account(req: DeleteAccountRequest, request: Request):
     uid = user["user_id"]
     # Re-verify the password before destroying anything.
     record = core.user_db.get_by_username(user["username"])
-    if not record or not verify_password(req.password, record["hashed_password"]):
+    if not record or not await verify_password_async(req.password, record["hashed_password"]):
         return JSONResponse(status_code=400, content={"detail": "Incorrect password"})
 
     try:
@@ -396,7 +396,7 @@ async def api_set_email(req: SetEmailRequest, request: Request):
         )
 
     row = core.user_db.get_by_username(user["username"])
-    if not row or not verify_password(req.current_password, row["hashed_password"]):
+    if not row or not await verify_password_async(req.current_password, row["hashed_password"]):
         return JSONResponse(status_code=400, content={"detail": "Incorrect password"})
 
     error = validate_email(req.email)
