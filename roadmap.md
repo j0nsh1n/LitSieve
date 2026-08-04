@@ -32,9 +32,25 @@ works) and via PR review. One phase may span several small PRs.
   passes: `DEBUG=false` + real `SECRET_KEY`, `GET /health` → 200
   (`status: healthy`). Public cloud is operator-owned — run the same smoke
   against that URL when you deploy (see `docs/DEPLOY.md`).
-- Status: [x] 2026-08-01 — `docs/DEPLOY.md` + README link; local
-  production-ish smoke verified. Operator still sets env on Render/HF for a
-  live public host.
+- Status: [x] 2026-08-03 — `docs/DEPLOY.md` + README link; production smoke
+  verified. Live publicly at **https://www.litpilot.org**, self-hosted on the
+  operator's desktop behind a Cloudflare Tunnel (TLS at Cloudflare; Uvicorn
+  serves plain HTTP on loopback). No PaaS involved.
+
+## Phase 4 — Operate a live instance
+Shipping changed the risk profile: there are real accounts with real data on a
+home desktop, and the link has been shared publicly.
+- Tasks:
+  - Cap total accounts (registration is open; per-account quota bounds disk per
+    user but nothing bounds the number of users)
+  - Back up `users.db` + `user_data/` — currently no backup story, and the
+    machine is a single point of failure
+  - Watch `logs/litpilot.log` after incidents (rotating; ~30 MB ceiling)
+  - Keep the HF model cache warm so no student pays for a first download
+- Complete when: an account cap (or invite gate) is enforced, a restore has been
+  tested at least once from a backup, and the operator can answer "what happened
+  at 14:05?" from the log file
+- Status: [ ] in progress — logging landed 2026-08-04; cap and backups open
 
 ## Backlog (unscheduled)
 - Make `pyright app` blocking in CI after clearing the current error backlog
