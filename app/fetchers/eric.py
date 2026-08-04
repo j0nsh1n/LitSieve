@@ -5,9 +5,12 @@ Covers: education, psychology, social sciences, history, literature
 Free API, no authentication required
 """
 
+import logging
 from typing import Dict, List
 
 from app.fetchers.base import BaseFetcher, FetchError, HttpClient
+
+logger = logging.getLogger(__name__)
 
 
 class ERICFetcher(BaseFetcher):
@@ -47,10 +50,10 @@ class ERICFetcher(BaseFetcher):
                     break
                 start += len(docs)
             except FetchError as e:
-                print(f"ERIC fetch error: {e}")
+                logger.exception("ERIC fetch error: %s", e)
                 raise
             except Exception as e:
-                print(f"ERIC fetch error: {e}")
+                logger.exception("ERIC fetch error: %s", e)
                 break
 
         return articles[:max_results]
@@ -79,7 +82,7 @@ class ERICFetcher(BaseFetcher):
                 'journal': doc.get('source', '') or '',
             }
         except Exception as e:
-            print(f"ERIC parse error: {e}")
+            logger.exception("ERIC parse error: %s", e)
             return None
 
     def search(self, query: str, max_results: int = 500) -> List[str]:

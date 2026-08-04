@@ -8,7 +8,27 @@ and this project aims to follow Semantic Versioning for app version strings
 
 ## [Unreleased]
 
+### Added
+- Logs are written to a rotating file (`logs/litpilot.log`) as well as the
+  console, including uvicorn's access log. Configure with `LOG_FILE`,
+  `LOG_LEVEL`, `LOG_MAX_BYTES`, `LOG_BACKUP_COUNT`; total size is capped
+  (~30 MB by default) so a home server cannot fill its disk.
+- `.env.example` now documents logging plus `MAX_LOADED_MODELS` and
+  `EXTRA_EMBEDDING_MODELS`, which shipped earlier undocumented.
+
+### Changed
+- All 65 `print()` calls in `app/` are now logger calls with levels. Fetcher
+  errors in particular were going to stdout, so they had no level, could not be
+  filtered, and carried no traceback.
+
 ### Removed
+- Server-side `tqdm` progress bars in four fetchers. They drew to the server
+  console where nobody could see them (users get progress from the jobs API)
+  and their carriage returns would have corrupted the new log file. `tqdm` is
+  no longer a dependency.
+- Superseded deploy tooling: host cert renewal and :80/:443 helpers (TLS is
+  terminated at Cloudflare), and the quick-tunnel script/unit (replaced by the
+  named tunnel for www.litpilot.org).
 - DuckDNS helpers and docs (updater script, systemd timer/service, examples).
   Self-host public DNS is operator-owned (Cloudflare Tunnel + purchased domain).
 

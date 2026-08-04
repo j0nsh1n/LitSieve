@@ -3,11 +3,12 @@ OpenAlex Fetcher
 Fetches scholarly works from OpenAlex API
 """
 
+import logging
 from typing import Dict, List, Optional
 
-from tqdm import tqdm
-
 from app.fetchers.base import BaseFetcher, HttpClient
+
+logger = logging.getLogger(__name__)
 
 
 class OpenAlexFetcher(BaseFetcher):
@@ -25,7 +26,7 @@ class OpenAlexFetcher(BaseFetcher):
 
     def search(self, query: str, max_results: int = 1000) -> List[str]:
         """Search OpenAlex, return work IDs"""
-        print(f"Searching OpenAlex for: '{query}'")
+        logger.info("Searching OpenAlex for: '%s'", query)
         ids = []
         page = 1
         per_page = min(max_results, 200)
@@ -56,15 +57,15 @@ class OpenAlexFetcher(BaseFetcher):
                 page += 1
 
             except Exception as e:
-                print(f"Error searching OpenAlex: {e}")
+                logger.exception("Error searching OpenAlex: %s", e)
                 break
 
-        print(f"Found {len(ids[:max_results])} works")
+        logger.info("Found %s works", len(ids[:max_results]))
         return ids[:max_results]
 
     def search_and_fetch(self, query: str, max_results: int = 1000) -> List[Dict]:
         """Optimized: OpenAlex search returns full records"""
-        print(f"Searching OpenAlex for: '{query}'")
+        logger.info("Searching OpenAlex for: '%s'", query)
         articles = []
         page = 1
         per_page = min(max_results, 200)
@@ -94,17 +95,17 @@ class OpenAlexFetcher(BaseFetcher):
                 page += 1
 
             except Exception as e:
-                print(f"Error fetching from OpenAlex: {e}")
+                logger.exception("Error fetching from OpenAlex: %s", e)
                 break
 
-        print(f"Successfully fetched {len(articles[:max_results])} works")
+        logger.info("Successfully fetched %s works", len(articles[:max_results]))
         return articles[:max_results]
 
     def fetch_details(self, ids: List[str], batch_size: int = 50) -> List[Dict]:
         """Fetch work details by OpenAlex IDs"""
         articles = []
 
-        for i in tqdm(range(0, len(ids), batch_size), desc="Fetching from OpenAlex"):
+        for i in range(0, len(ids), batch_size):
             batch = ids[i:i + batch_size]
             id_filter = "|".join(batch)
 
@@ -122,9 +123,9 @@ class OpenAlexFetcher(BaseFetcher):
                     if parsed:
                         articles.append(parsed)
             except Exception as e:
-                print(f"Error fetching batch: {e}")
+                logger.exception("Error fetching batch: %s", e)
 
-        print(f"Successfully fetched {len(articles)} works")
+        logger.info("Successfully fetched %s works", len(articles))
         return articles
 
     def _parse_work(self, work: Dict) -> Optional[Dict]:

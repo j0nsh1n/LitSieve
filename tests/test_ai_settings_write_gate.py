@@ -11,7 +11,7 @@ import pytest
 from app import core
 
 for _dep in (
-    "fastapi", "httpx", "Bio", "sklearn", "tqdm",
+    "fastapi", "httpx", "Bio", "sklearn",
     "slowapi", "jwt", "bcrypt", "multipart", "requests", "dotenv",
 ):
     pytest.importorskip(_dep)

@@ -4,10 +4,14 @@ Covers physics, mathematics, computer science, quantitative biology, economics
 Free API, no authentication required
 """
 
+import logging
 import xml.etree.ElementTree as ET
 from typing import Dict, List, Optional
 
 from app.fetchers.base import BaseFetcher, HttpClient
+
+logger = logging.getLogger(__name__)
+
 
 ATOM_NS = 'http://www.w3.org/2005/Atom'
 ARXIV_NS = 'http://arxiv.org/schemas/atom'
@@ -49,7 +53,7 @@ class ArXivFetcher(BaseFetcher):
                     break
                 start += len(entries)
             except Exception as e:
-                print(f"arXiv search error: {e}")
+                logger.exception("arXiv search error: %s", e)
                 break
 
         return ids[:max_results]
@@ -72,7 +76,7 @@ class ArXivFetcher(BaseFetcher):
                     if article:
                         articles.append(article)
             except Exception as e:
-                print(f"arXiv fetch_details error: {e}")
+                logger.exception("arXiv fetch_details error: %s", e)
 
         return articles
 
@@ -118,5 +122,5 @@ class ArXivFetcher(BaseFetcher):
                 'journal': journal,
             }
         except Exception as e:
-            print(f"arXiv parse error: {e}")
+            logger.exception("arXiv parse error: %s", e)
             return None

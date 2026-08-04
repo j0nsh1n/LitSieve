@@ -194,7 +194,7 @@ class ArticleClusterer:
         if self.method == 'hdbscan':
             self.labels = self._fit_density(embeddings)
             self.resolved_n_clusters = len(set(self.labels) - {NOISE_CLUSTER_ID})
-            print(f"Cluster distribution: {dict(sorted(Counter(self.labels).items()))}")
+            logger.info("Cluster distribution: %s", dict(sorted(Counter(self.labels).items())))
             return self.labels
 
         if self.n_clusters is None:
@@ -206,14 +206,14 @@ class ArticleClusterer:
 
         k = max(1, k)
         self.resolved_n_clusters = k
-        print(f"Clustering {n_samples} articles into {k} clusters...")
+        logger.info("Clustering %s articles into %s clusters...", n_samples, k)
 
         self.cluster_model = self._build_model(k)
         self.labels = self.cluster_model.fit_predict(embeddings)
 
         # Print cluster distribution
         cluster_counts = Counter(self.labels)
-        print(f"Cluster distribution: {dict(sorted(cluster_counts.items()))}")
+        logger.info("Cluster distribution: %s", dict(sorted(cluster_counts.items())))
 
         return self.labels
 
@@ -294,7 +294,7 @@ class ClusterLabeler:
             tfidf = vectorizer.fit_transform(docs)  # rows = clusters
             feature_names = vectorizer.get_feature_names_out()
         except Exception as e:
-            print(f"Error generating cluster labels: {e}")
+            logger.exception("Error generating cluster labels: %s", e)
             return fallback
 
         scores = tfidf.toarray()

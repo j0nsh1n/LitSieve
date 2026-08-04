@@ -4,10 +4,13 @@ CERN open science platform — publications, preprints, datasets across all fiel
 Free API, no authentication required
 """
 
+import logging
 import re
 from typing import Dict, List
 
 from app.fetchers.base import BaseFetcher, FetchError, HttpClient
+
+logger = logging.getLogger(__name__)
 
 
 class ZenodoFetcher(BaseFetcher):
@@ -51,10 +54,10 @@ class ZenodoFetcher(BaseFetcher):
                     break
                 page += 1
             except FetchError as e:
-                print(f"Zenodo fetch error: {e}")
+                logger.exception("Zenodo fetch error: %s", e)
                 raise
             except Exception as e:
-                print(f"Zenodo fetch error: {e}")
+                logger.exception("Zenodo fetch error: %s", e)
                 break
 
         return articles[:max_results]
@@ -97,7 +100,7 @@ class ZenodoFetcher(BaseFetcher):
                 'journal': journal,
             }
         except Exception as e:
-            print(f"Zenodo parse error: {e}")
+            logger.exception("Zenodo parse error: %s", e)
             return None
 
     def search(self, query: str, max_results: int = 500) -> List[str]:

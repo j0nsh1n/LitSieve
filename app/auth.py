@@ -3,6 +3,7 @@ Authentication helpers
 JWT token creation/verification and bcrypt password hashing.
 """
 
+import logging
 import os
 import re
 from datetime import datetime, timedelta, timezone
@@ -14,6 +15,9 @@ from dotenv import load_dotenv
 from fastapi import Request
 from jwt import InvalidTokenError
 from starlette.concurrency import run_in_threadpool
+
+logger = logging.getLogger(__name__)
+
 
 load_dotenv()
 
@@ -119,7 +123,7 @@ _DEBUG = os.getenv("DEBUG", "").strip().lower() in ("1", "true", "yes")
 if not _SECRET_KEY:
     if _DEBUG:
         # Allow imports/tests in debug mode; tokens cannot be created without a key.
-        print("WARNING: SECRET_KEY is not set (DEBUG mode). Tokens cannot be created.")
+        logger.warning("SECRET_KEY is not set (DEBUG mode). Tokens cannot be created.")
     else:
         raise RuntimeError(
             "SECRET_KEY is not configured. Set SECRET_KEY in the environment "
