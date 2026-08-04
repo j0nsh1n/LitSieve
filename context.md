@@ -6,8 +6,8 @@
 - Lint: `ruff check .` — partial select (E9/F63/F7/F82/F401/F541/E401/I); passes.
 - Types: `pyright app` via `pyrightconfig.json` (basic); CI runs it
   **continue-on-error** (report-only): **61 errors, 6 warnings** (2026-08-02).
-- Tests: `DEBUG=true ./venv/bin/python -m pytest -q` — **274 passed**
-  (2026-08-03; +6 model-registry tests); use `./venv` so sqlcipher runs.
+- Tests: `DEBUG=true ./venv/bin/python -m pytest -q` — **287 passed**
+  (2026-08-03; +6 model-registry, +13 model-validation); `./venv` for sqlcipher.
 - RAM (measured CPU, single uvicorn worker): ~175 MB imports, first model load
   ~1.1–1.4 GB one-time (torch runtime), then **~0 per extra concurrent user**
   since models are shared process-wide. Before sharing: +46 MB/user (MiniLM),
@@ -76,12 +76,14 @@ ShareCode *---1 Library (owner); redeem → clone Library for joiner
 - Embedding models shared via `embeddings.get_shared_model` registry; the
   `EmbeddingEngine.model` property must NOT cache per-engine (cached pipelines
   would each pin a copy). Safe to share: inference is read-only.
-- `EmbeddingsRequest.model` is unvalidated free-form (falls through to a HF
-  path) — hence the bounded registry. Validation still open.
+- `EmbeddingsRequest.model` validated against `EmbeddingEngine.allowed_models()`
+  (422 on unknown); operator escape hatch `EXTRA_EMBEDDING_MODELS`
+  (`name=org/model` or bare path). Stored/DB model names are NOT hard-failed, so
+  libraries embedded before the gate keep working.
 - Host: Linux `./venv` (ROCm torch possible); entry `app.main:app` port 7860
 
 ## Session Handoff
-- **Date:** 2026-08-02
+- **Date:** 2026-08-03
 - **Branch:** `chore/doc-drift-and-hygiene` (off `chore/phase3-deploy-and-hygiene`;
   both unpushed)
 - **Done:** Doc-drift fixes (spec.md Dependabot claim, stale pyright count,
@@ -90,6 +92,8 @@ ShareCode *---1 Library (owner); redeem → clone Library for joiner
   ruff clean, 268 tests pass, pyright unchanged at 61/6, pip-audit exit 0.
 - **Then:** Shared process-wide embedding model registry (RAM fix for
   self-hosting on one desktop). 274 tests pass; pyright back to 61/6 baseline.
-- **Next:** Validate `EmbeddingsRequest.model` against `EmbeddingEngine.MODELS`
-  (open); then backlog (pyright green/blocking, lockfile, ruff ratchet).
-  Push when asked.
+- **Then:** Validated `EmbeddingsRequest.model` (422 on unknown) + drift guards
+  tying the UI dropdown and topic map to the catalog. pip-audit's first real
+  run caught CVE-2026-69247 (cryptography -> >=50.0.0).
+- **Next:** Backlog only (pyright green/blocking, lockfile, ruff ratchet
+  E501/UP/E402). Push when asked.

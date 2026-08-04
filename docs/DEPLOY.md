@@ -87,6 +87,35 @@ mail point at the wrong host.
 - **`0`** = unlimited (fine for single-user local).
 - Over cap: fetch / prepare / sample-corpus return **HTTP 507**.
 
+### Memory — `MAX_LOADED_MODELS`
+
+Embedding models are shared across all users in one process, so RAM scales with
+the number of **distinct models in use**, not the number of people signed in.
+Measured on CPU: ~175 MB for imports, then a one-time ~1.1–1.4 GB on the first
+model load (that is the torch runtime, not the weights), and roughly **0 MB per
+extra concurrent user**.
+
+- Default **3** resident models; raise only if you genuinely offer more.
+- Budget roughly **2 GB** for a single-model instance, plus ~0.3–0.5 GB per
+  additional distinct model students select.
+- Note the app runs a **single uvicorn worker** — adding `--workers N`
+  multiplies all of the above by N, since each worker is a separate process
+  with its own copy.
+
+### Extra embedding models — `EXTRA_EMBEDDING_MODELS`
+
+Request bodies may only name models from the built-in catalog (anything else is
+rejected with HTTP 422), so users cannot make the server download arbitrary
+models. To offer more, allow-list them here — comma-separated, either
+`shortname=org/model` or a bare `org/model`:
+
+```
+EXTRA_EMBEDDING_MODELS=biolink=michiyasunaga/BioLinkBERT-base
+```
+
+They must work with plain cosine similarity (no query/passage prefixes), since
+search, clustering, and dedup all compare vectors directly.
+
 ### Optional outbound email (SMTP)
 
 Leave `SMTP_HOST` empty → recovery-email UI stays off; password reset keeps the

@@ -16,6 +16,11 @@ and this project aims to follow Semantic Versioning for app version strings
 ### Security
 - `cryptography` floor raised to `>=50.0.0` for CVE-2026-69247 (caught by the
   new pip-audit gate on its first real run).
+- Embedding model names in `POST /api/create-embeddings` are now validated
+  against the model catalog (HTTP 422 otherwise). Previously an unknown name
+  was passed through as a HuggingFace path, so any signed-in user could make
+  the server download arbitrary models. Operators can still allow extras via
+  `EXTRA_EMBEDDING_MODELS`.
 
 ### Removed
 - Unused `pandas` dependency (declared in `requirements.txt`, imported nowhere).
