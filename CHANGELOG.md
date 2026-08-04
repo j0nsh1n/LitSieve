@@ -13,11 +13,20 @@ and this project aims to follow Semantic Versioning for app version strings
   reporting after Dependabot's weekly auto-PRs were disabled. CI now also keeps
   `setuptools` current, since undeclared runner packages are audited too.
 
+### Security
+- `cryptography` floor raised to `>=50.0.0` for CVE-2026-69247 (caught by the
+  new pip-audit gate on its first real run).
+
 ### Removed
 - Unused `pandas` dependency (declared in `requirements.txt`, imported nowhere).
   Slightly smaller installs; no behaviour change.
 
 ### Changed
+- Embedding models are now shared process-wide instead of loaded once per
+  cached pipeline. Concurrent users no longer each pay for a copy of the
+  weights: measured on CPU, 10 simultaneous PubMedBERT users dropped from
+  ~4.6 GB to ~1.6 GB. Matters most for small self-hosted boxes. Registry is
+  bounded by `MAX_LOADED_MODELS` (default 3).
 - Startup warnings for missing `SECRET_KEY` (DEBUG) and missing FAISS now print
   plain `WARNING:` text instead of an emoji prefix.
 
