@@ -13,6 +13,7 @@ import jwt
 from dotenv import load_dotenv
 from fastapi import Request
 from jwt import InvalidTokenError
+from starlette.concurrency import run_in_threadpool
 
 load_dotenv()
 
@@ -118,7 +119,7 @@ _DEBUG = os.getenv("DEBUG", "").strip().lower() in ("1", "true", "yes")
 if not _SECRET_KEY:
     if _DEBUG:
         # Allow imports/tests in debug mode; tokens cannot be created without a key.
-        print("⚠️ SECRET_KEY is not set (DEBUG mode). Tokens cannot be created.")
+        print("WARNING: SECRET_KEY is not set (DEBUG mode). Tokens cannot be created.")
     else:
         raise RuntimeError(
             "SECRET_KEY is not configured. Set SECRET_KEY in the environment "
@@ -162,6 +163,29 @@ def verify_password(plain: str, hashed: str) -> bool:
         # ValueError/TypeError from bad salt, and (on some bcrypt builds) a
         # pyo3 PanicException on corrupt hashes — login must never 500.
         return False
+
+
+# --- Async wrappers --------------------------------------------------------
+# bcrypt at cost 12 costs ~157 ms of CPU. Called straight from an `async def`
+# route that is ~150 ms during which the whole app serves nobody: one uvicorn
+# worker means one event loop, so a signup burst stalls every other request,
+# including plain page loads. Measured before this change: 6 concurrent signups
+# took 942 ms (= 6 x 157 ms, fully serialised) and a bystander's GET / went from
+# 1.6 ms to 933 ms.
+#
+# bcrypt releases the GIL while hashing (measured 5.6x speedup across 6 threads),
+# so a threadpool gives real parallelism rather than just moving the queue.
+# Cost stays at 12 rounds -- this is a scheduling fix, not a weaker hash.
+
+
+async def hash_password_async(password: str) -> str:
+    """hash_password off the event loop. Use this from async routes."""
+    return await run_in_threadpool(hash_password, password)
+
+
+async def verify_password_async(plain: str, hashed: str) -> bool:
+    """verify_password off the event loop. Use this from async routes."""
+    return await run_in_threadpool(verify_password, plain, hashed)
 
 
 def create_token(user_id: str, username: str, token_version: int = 0) -> str:

@@ -113,7 +113,7 @@ def send_verification(to: str, username: str, token: str) -> None:
     link = f"{public_base_url()}/verify-email?token={token}"
     send(
         to,
-        "Confirm your email — Literature Research Aide",
+        "Confirm your email — LitPilot",
         (
             f"Hi {username},\n\n"
             "Confirm this address so it can be used to reset your password:\n\n"
@@ -129,7 +129,7 @@ def send_password_reset(to: str, username: str, code: str) -> None:
     link = f"{public_base_url()}/reset-password"
     send(
         to,
-        "Password reset code — Literature Research Aide",
+        "Password reset code — LitPilot",
         (
             f"Hi {username},\n\n"
             f"Your one-time password reset code is:\n\n    {code}\n\n"

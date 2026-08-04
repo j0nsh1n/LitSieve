@@ -19,20 +19,44 @@ jobs:
 
       - name: Install Python deps
         run: |
-          python -m pip install --upgrade pip
+          # setuptools is not a declared dependency (Python >=3.12 venvs don't
+          # ship it) but tooling can still pull it in, and pip-audit below
+          # audits the whole environment. Keep it current so the blocking audit
+          # never fails on something requirements.txt cannot fix.
+          python -m pip install --upgrade pip setuptools
           # CPU torch first (same pattern as Dockerfile / Render).
           pip install torch --index-url https://download.pytorch.org/whl/cpu
           pip install -r requirements.txt
-          pip install pytest ruff pyright
+          pip install pytest ruff pyright pip-audit
 
       - name: Ruff
         run: ruff check .
 
       - name: Pyright
         # Template requires pyright. Full strict pass is still a backlog
-        # (~76 errors under app/); report without blocking green CI until cleaned.
+        # (61 errors / 6 warnings under app/); report without blocking green CI
+        # until cleaned.
         run: pyright app
         continue-on-error: true
+
+      - name: Dependency audit (pip-audit)
+        # Replaces the CVE-watching half of Dependabot, which was removed
+        # because of its weekly version-bump PR noise. This only speaks up for
+        # *known vulnerabilities* and never opens PRs.
+        #
+        # Audits the installed environment (not just requirements.txt) so
+        # transitive and build-time packages are covered too.
+        #
+        # BLOCKING. A failure here means a dependency has a published CVE; fix
+        # it by raising the floor in requirements.txt, or — if the package is
+        # undeclared (setuptools, pip) — by bumping it in the install step
+        # above. Do not silence this by re-adding continue-on-error.
+        #
+        # Note: torch/triton come from the PyTorch index and are reported as
+        # "not found on PyPI, could not be audited". Skips do NOT fail the run
+        # (that would need --strict), so this stays green — but it also means
+        # torch CVEs are not covered here and remain a manual check.
+        run: pip-audit --progress-spinner=off
 
       - name: Pytest
         env:

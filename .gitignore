@@ -36,3 +36,13 @@ mailersend-smtp.txt
 mailersend-*.txt
 *smtp*secret*
 *smtp*credentials*
+
+# Local operator secrets (DuckDNS token, etc.)
+secrets/*
+!secrets/README.md
+!secrets/*.example
+.duckdns.env
+duckdns.token
+secrets/letsencrypt/
+*.env.save
+secrets/cloudflared.token

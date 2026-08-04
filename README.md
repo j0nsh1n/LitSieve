@@ -1,5 +1,5 @@
 ---
-title: Health Database Search
+title: LitPilot
 emoji: 📚
 colorFrom: blue
 colorTo: green
@@ -7,7 +7,7 @@ sdk: docker
 app_port: 7860
 ---
 
-# Literature Research Aide 📚 — v4.3.2
+# LitPilot 📚 — v4.4.0
 
 A multi-user web app for **students** to fetch, screen, and rank research papers
 across public academic databases as a **research starting point**. Semantic
@@ -121,8 +121,8 @@ account. Register/login for your private workspace, then:
 ### Docker
 
 ```bash
-docker build -t literature-aide .
-docker run -p 7860:7860 -e SECRET_KEY="$(python -c 'import secrets;print(secrets.token_urlsafe(48))')" literature-aide
+docker build -t litpilot .
+docker run -p 7860:7860 -e SECRET_KEY="$(python -c 'import secrets;print(secrets.token_urlsafe(48))')" litpilot
 ```
 
 ### Production / host deploy

@@ -1,10 +1,13 @@
-# Deploy checklist — Literature Research Aide (v4.3.x)
+# Deploy checklist — LitPilot (v4.4.x)
 
 Operator-facing steps to run a clean host. Product scope stays multi-library +
 student starting point; optional SMTP, quota, and SQLCipher are deploy options.
 
 Copy variables from [`.env.example`](../.env.example). Never commit `.env` or
 provider secret dumps (`mailersend-*.txt`, etc.).
+
+**Self-host:** point your purchased domain at a **Cloudflare Tunnel** public
+hostname. See **[SELFHOST.md](SELFHOST.md)**.
 
 ---
 
@@ -21,10 +24,10 @@ provider secret dumps (`mailersend-*.txt`, etc.).
 **Docker**
 
 ```bash
-docker build -t literature-aide .
+docker build -t litpilot .
 docker run -p 7860:7860 \
   -e SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')" \
-  literature-aide
+  litpilot
 curl -sS http://127.0.0.1:7860/health
 ```
 
@@ -34,6 +37,53 @@ dashboard (SMTP, `PUBLIC_BASE_URL`, quota, etc.).
 
 **Local dev** — prefer `./run_dev.sh` (`DEBUG=true`, reload). Do not use that
 profile as a public HTTPS deploy.
+
+### Self-host on this machine (Cloudflare Tunnel)
+
+| | |
+|--|--|
+| Public hostname | `https://www.litpilot.org` |
+| Origin | `http://127.0.0.1:7860` (HTTP only) |
+| TLS | **Cloudflare only** — not Uvicorn |
+
+App env (gitignored `.env`):
+
+```bash
+DEBUG=false
+PUBLIC_BASE_URL=https://www.litpilot.org
+SECRET_KEY=…          # required
+MAX_LOADED_MODELS=3
+# SMTP_* optional — recovery links use PUBLIC_BASE_URL
+```
+
+```bash
+# HTTP origin only — no --ssl-* flags
+./venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 7860
+# cloudflared: Public Hostname www.litpilot.org → http://127.0.0.1:7860
+```
+
+**Cloudflare Tunnel** — used on CGNAT ISPs (e.g. T‑Mobile Home Internet):
+
+- Outbound-only; no router port-forward required for public access.
+- Visitors use HTTPS to Cloudflare; origin stays plain HTTP on loopback.
+- Store tunnel tokens only under `secrets/` (gitignored).
+
+Optional LAN Caddy (`deploy/Caddyfile*`) is separate from the public hostname.
+
+### Efficiency on one machine (same performance level)
+
+| Knob | Why |
+|------|-----|
+| **One uvicorn worker** | Extra workers each load torch/models (multiplies RAM). |
+| `MAX_LOADED_MODELS=3` | Caps concurrent embedding models in the shared registry. |
+| Shared model registry | Already in app — concurrent users share weights. |
+| `EMBEDDING_DEVICE` | Leave auto, or set `cuda` if you have a GPU. |
+| `MAX_USER_STORAGE_MB` | Default 500; lower if disk is tight and the site is public. |
+| No `--reload` in prod | Reload doubles process churn. |
+| Bind `127.0.0.1` | Only the tunnel/proxy should face the network. |
+
+Heavy work (fetch, embed, cluster) is CPU/GPU and disk on this host either way;
+the edge path only shuttles bytes.
 
 ---
 
@@ -86,6 +136,35 @@ mail point at the wrong host.
 - Default **500** (MB per account under `user_data/<uid>/`).
 - **`0`** = unlimited (fine for single-user local).
 - Over cap: fetch / prepare / sample-corpus return **HTTP 507**.
+
+### Memory — `MAX_LOADED_MODELS`
+
+Embedding models are shared across all users in one process, so RAM scales with
+the number of **distinct models in use**, not the number of people signed in.
+Measured on CPU: ~175 MB for imports, then a one-time ~1.1–1.4 GB on the first
+model load (that is the torch runtime, not the weights), and roughly **0 MB per
+extra concurrent user**.
+
+- Default **3** resident models; raise only if you genuinely offer more.
+- Budget roughly **2 GB** for a single-model instance, plus ~0.3–0.5 GB per
+  additional distinct model students select.
+- Note the app runs a **single uvicorn worker** — adding `--workers N`
+  multiplies all of the above by N, since each worker is a separate process
+  with its own copy.
+
+### Extra embedding models — `EXTRA_EMBEDDING_MODELS`
+
+Request bodies may only name models from the built-in catalog (anything else is
+rejected with HTTP 422), so users cannot make the server download arbitrary
+models. To offer more, allow-list them here — comma-separated, either
+`shortname=org/model` or a bare `org/model`:
+
+```
+EXTRA_EMBEDDING_MODELS=biolink=michiyasunaga/BioLinkBERT-base
+```
+
+They must work with plain cosine similarity (no query/passage prefixes), since
+search, clustering, and dedup all compare vectors directly.
 
 ### Optional outbound email (SMTP)
 
@@ -154,7 +233,7 @@ Run against the live base URL (examples use `http://127.0.0.1:7860`).
 ```bash
 # 1. Process is up
 curl -sS -o /tmp/health.json -w "%{http_code}\n" http://127.0.0.1:7860/health
-# expect: 200 and {"status":"healthy","version":"4.3.2"}
+# expect: 200 and {"status":"healthy","version":"4.4.0"}
 
 # 2. Landing (no auth)
 curl -sS -o /dev/null -w "%{http_code}\n" http://127.0.0.1:7860/
@@ -173,20 +252,17 @@ Manual (browser, HTTPS host or local with appropriate `DEBUG`):
 4. Optional: Create embeddings → Search one query.
 5. Confirm disk under `user_data/` is writable and not exploding past quota.
 
-**Production-ish local** (HTTPS-like cookie rules, still on loopback):
+**Production-ish local** (HTTPS via tunnel; Secure cookies):
 
 ```bash
-export SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
-export DEBUG=false
-export PUBLIC_BASE_URL=http://127.0.0.1:7860
-# SMTP optional — omit to leave email off
+# With .env: DEBUG=false and PUBLIC_BASE_URL=https://www.litpilot.org
 ./venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 7860
-# other terminal:
 curl -sS http://127.0.0.1:7860/health
+curl -sS https://www.litpilot.org/health
 ```
 
-Note: with `DEBUG=false` on `http://`, browser login may not stick (Secure
-cookies). API health and HTML GET smoke still validate the process.
+Note: with `DEBUG=false` on plain `http://localhost`, browser login may not
+stick (Secure cookies). Use HTTPS (tunnel or reverse proxy) for real logins.
 
 ---
 

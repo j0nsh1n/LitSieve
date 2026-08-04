@@ -1,0 +1,16 @@
+[Unit]
+Description=Cloudflare quick tunnel for LitPilot (works off T-Mobile / CGNAT)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Temporary public URL appears in the journal each start:
+#   journalctl --user -u cloudflared-quick -n 30 | grep trycloudflare
+# Prefer your Cloudflare public hostname for all networks; local Pi-hole DNS is optional.
+ExecStart=/usr/local/bin/cloudflared tunnel --url http://127.0.0.1:7860 --no-autoupdate
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

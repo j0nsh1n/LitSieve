@@ -2,7 +2,7 @@
 
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.storage.shares import (
     DEFAULT_EXPIRES_DAYS,
@@ -60,6 +60,26 @@ class EmbeddingsRequest(BaseModel):
     # Skip articles that already have vectors (unless the model changes).
     only_missing: bool = True
     wait: bool = False
+
+    @field_validator("model")
+    @classmethod
+    def _known_model(cls, v: str) -> str:
+        """Reject model names outside the catalog / operator allow-list.
+
+        Unknown names are otherwise passed straight to sentence-transformers as
+        a HuggingFace repo path, so an unvalidated body could make the server
+        download arbitrary models to its disk. Imported lazily: schemas.py is
+        cheap to import and embeddings.py drags in numpy/sklearn.
+        """
+        from app.services.embeddings import EmbeddingEngine
+
+        allowed = EmbeddingEngine.allowed_models()
+        if v not in allowed:
+            raise ValueError(
+                f"Unknown embedding model '{v}'. Choose one of: "
+                f"{', '.join(sorted(allowed))}."
+            )
+        return v
 
 
 class ChangePasswordRequest(BaseModel):

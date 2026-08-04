@@ -1,0 +1,16 @@
+[Unit]
+Description=Caddy reverse proxy for LitPilot (HTTPS → 127.0.0.1:7860)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Relies on: sudo setcap 'cap_net_bind_service=+ep' %h/bin/caddy
+# Keep this unit minimal — extra sandboxing can drop file capabilities.
+ExecStart=%h/bin/caddy run --config %h/HealthDatabaseAccess/deploy/Caddyfile.privileged
+ExecReload=%h/bin/caddy reload --config %h/HealthDatabaseAccess/deploy/Caddyfile.privileged
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target
