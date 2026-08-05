@@ -806,38 +806,69 @@ function prefersReducedMotion() {
     return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
-// === Reading mode (denser chrome, optimized abstracts) ===
-function isReadingMode() {
-    return document.documentElement.getAttribute('data-reading') === 'on';
+// === Simple / Advanced UI mode (client preference, like theme) ===
+function isSimpleMode() {
+    return document.documentElement.getAttribute('data-mode') === 'simple';
 }
 
-function setReadingMode(on) {
+function updateModeToggleButton() {
+    const btn = document.getElementById('mode-toggle');
+    if (!btn) return;
+    const simple = isSimpleMode();
+    btn.setAttribute('aria-pressed', simple ? 'true' : 'false');
+    btn.classList.toggle('is-active', simple);
+    btn.textContent = simple ? 'Simple' : 'Advanced';
+    btn.title = simple
+        ? 'Switch to Advanced mode — full controls'
+        : 'Switch to Simple mode — fewer options';
+    btn.setAttribute('aria-label', btn.title);
+}
+
+function updateNavStepNumbers() {
+    const simple = isSimpleMode();
+    document.querySelectorAll('.nav-link[data-step-advanced]').forEach((a) => {
+        const num = a.querySelector('.nav-step-num');
+        if (!num) return;
+        const next = simple ? (a.getAttribute('data-step-simple') || '') : (a.getAttribute('data-step-advanced') || '');
+        if (next) num.textContent = next;
+    });
+    const menuStep = document.querySelector('.nav-menu-step');
+    if (menuStep) {
+        const adv = menuStep.getAttribute('data-step-advanced') || '';
+        const sim = menuStep.getAttribute('data-step-simple') || '';
+        const next = simple ? sim : adv;
+        if (next) {
+            menuStep.textContent = next;
+            menuStep.hidden = false;
+        } else if (simple && !sim) {
+            // e.g. Clusters page opened by URL in Simple mode — no step number.
+            menuStep.hidden = true;
+        } else {
+            menuStep.hidden = false;
+            if (adv) menuStep.textContent = adv;
+        }
+    }
+}
+
+function setUiMode(mode) {
+    const m = mode === 'simple' ? 'simple' : 'advanced';
     const root = document.documentElement;
-    if (on) {
-        root.setAttribute('data-reading', 'on');
-        localStorage.setItem('readingMode', 'on');
-    } else {
-        root.removeAttribute('data-reading');
-        localStorage.setItem('readingMode', 'off');
-    }
-    const btn = document.getElementById('reading-toggle');
-    if (btn) {
-        btn.setAttribute('aria-pressed', on ? 'true' : 'false');
-        btn.classList.toggle('is-active', on);
-        btn.title = on
-            ? 'Exit reading mode'
-            : 'Reading mode — denser layout, better abstracts';
-    }
-    // Re-apply abstract clamps so they respect the new mode.
-    enhanceAbstracts(document);
+    root.setAttribute('data-mode', m);
+    try {
+        localStorage.setItem('uiMode', m);
+    } catch (e) { /* private mode */ }
+    updateModeToggleButton();
+    updateNavStepNumbers();
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    const btn = document.getElementById('reading-toggle');
+    const btn = document.getElementById('mode-toggle');
     if (!btn) return;
-    setReadingMode(isReadingMode());
+    // theme-init already set data-mode; sync chrome only.
+    updateModeToggleButton();
+    updateNavStepNumbers();
     btn.addEventListener('click', function() {
-        setReadingMode(!isReadingMode());
+        setUiMode(isSimpleMode() ? 'advanced' : 'simple');
     });
 });
 
@@ -887,11 +918,6 @@ function _syncAbstractClamp(el) {
     const toggle = wrap.querySelector('.abstract-toggle');
     const full = el.dataset.fullText || el.textContent || '';
     if (full.length <= ABSTRACT_CLAMP_CHARS) return;
-
-    // In reading mode, default to expanded (full abstract always visible).
-    if (isReadingMode()) {
-        wrap.classList.add('is-expanded');
-    }
 
     const expanded = wrap.classList.contains('is-expanded');
     if (expanded) {

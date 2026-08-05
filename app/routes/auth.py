@@ -253,6 +253,18 @@ async def register_submit(
     )
     response = RedirectResponse(url="/data-management", status_code=302)
     _set_auth_cookies(response, token)
+    # One-shot seed: theme-init reads this when localStorage.uiMode is unset,
+    # sets Simple mode for brand-new accounts, then clears the cookie.
+    # Existing accounts never get this cookie (login path only sets auth).
+    response.set_cookie(
+        "ui_mode_seed",
+        "simple",
+        httponly=False,
+        secure=core.COOKIE_SECURE,
+        samesite="lax",
+        max_age=600,
+        path="/",
+    )
     return response
 
 
