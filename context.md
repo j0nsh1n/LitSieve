@@ -27,6 +27,15 @@
 - Recovery email: on main (PR #38); MailerSend SMTP in gitignored `.env`
   confirmed working by human. Secrets never committed.
 - Deploy: `docs/DEPLOY.md` checklist (SECRET_KEY, SMTP, quota, smoke).
+- **Runs as a user service**: `litsieve-uvicorn.service` (installed + enabled
+  2026-08-04; `Linger=yes`, so it starts at boot). Was previously a terminal
+  process in a transient scope. Restart after code changes:
+  `systemctl --user restart litsieve-uvicorn.service`. Dev with reload on a
+  different port: `./run_dev.sh 7861`.
+- Cloudflare serves a **managed challenge** on the public hostname
+  (`cf-mitigated: challenge`), so `curl https://www.litpilot.org/health` is 403
+  while local is 200 — verify locally, not through the edge. Possible cause of
+  the observed "reached /register, never POSTed" pattern; unconfirmed.
 - Known gaps: no dependency lockfile; pyright not yet green / blocking;
   public cloud host env still operator-owned after local Phase 3 docs/smoke.
 
