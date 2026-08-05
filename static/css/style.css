@@ -537,7 +537,7 @@ body {
 }
 
 .theme-toggle,
-.reading-toggle {
+.mode-toggle {
     background: transparent;
     border: none;
     color: var(--text);
@@ -552,15 +552,17 @@ body {
                 box-shadow var(--dur-fast) var(--ease-soft);
 }
 
-.reading-toggle {
-    font-family: var(--font-serif);
-    font-weight: 700;
-    font-size: 0.85rem;
-    letter-spacing: -0.02em;
+.mode-toggle {
+    font-family: var(--font-sans, inherit);
+    font-weight: 600;
+    font-size: 0.72rem;
+    letter-spacing: 0.01em;
     border: 1px solid transparent;
-    border-radius: 2px;
+    border-radius: 999px;
     min-width: 1.75rem;
     min-height: 1.75rem;
+    padding: 0.3rem 0.55rem;
+    white-space: nowrap;
 }
 
 .theme-toggle:hover {
@@ -573,12 +575,12 @@ body {
     transform: rotate(28deg) scale(0.95);
 }
 
-.reading-toggle:hover {
+.mode-toggle:hover {
     color: var(--accent);
     background: var(--hover);
 }
 
-.reading-toggle.is-active {
+.mode-toggle.is-active {
     color: var(--accent);
     border-color: var(--accent);
     background: var(--accent-soft);
@@ -1316,7 +1318,11 @@ input[type="range"]::-moz-range-thumb:hover {
 
 .article-abstract {
     color: var(--text);
-    line-height: 1.7;
+    /* Serif + slightly larger type (was reading-mode-only; now default). */
+    font-family: var(--font-serif);
+    font-size: 1.02rem;
+    line-height: 1.72;
+    letter-spacing: 0.005em;
     margin-bottom: 0.5rem;
     width: 100%;
     max-width: none;
@@ -1621,11 +1627,6 @@ body.lra-modal-open {
 }
 .year-timeline-plot {
     margin-top: 0.5rem;
-}
-
-/* Reading mode: key points stay readable */
-html[data-reading="on"] .key-points {
-    font-size: 1.05em;
 }
 
 /* Long abstracts: clamp by line count, expand on demand */
@@ -3379,7 +3380,7 @@ html, body {
     .nav-logout, .nav-username { font-size: 0.74rem; }
     .nav-username { max-width: 4.75rem; }
     .theme-toggle,
-    .reading-toggle {
+    .mode-toggle {
         min-width: 2.4rem;
         min-height: 2.4rem;
         display: inline-flex;
@@ -3889,133 +3890,41 @@ html.js-ready body.page-exit .footer {
 }
 
 /* ============================================================
-   Reading mode — denser chrome, better long-abstract reading
-   Toggle: #reading-toggle (persisted as localStorage.readingMode)
+   Simple mode — hide power-user surfaces (presentation only).
+   Toggle: #mode-toggle (persisted as localStorage.uiMode).
+   Hidden controls stay in the DOM and still submit.
    ============================================================ */
-html[data-reading="on"] .container {
-    max-width: 960px;
-    padding-top: 1.5rem;
-    padding-bottom: 1.5rem;
+
+/* Nav: drop Clusters and the arrow that precedes it. The arrow before
+   Duplicates stays so the flow reads DM → Clean up → Search. */
+html[data-mode="simple"] .nav-step-clusters,
+html[data-mode="simple"] .nav-flow-arrow-before-clusters {
+    display: none !important;
 }
 
-html[data-reading="on"] .container.container-wide {
-    max-width: 1280px;
+/* Data Management */
+html[data-mode="simple"] section.card:has(#source-option-grid),
+html[data-mode="simple"] section.card:has(#coverage-bars),
+html[data-mode="simple"] details.advanced-details:has(#fetch-email),
+html[data-mode="simple"] details.advanced-details:has(#embedding-model) {
+    display: none !important;
 }
 
-html[data-reading="on"] .page-header {
-    margin-bottom: 1.25rem;
-    padding-bottom: 0.85rem;
+/* Duplicates / Clean up */
+html[data-mode="simple"] #source-breakdown-section,
+html[data-mode="simple"] #year-timeline-details,
+html[data-mode="simple"] .form-row:has(#threshold) {
+    display: none !important;
 }
 
-html[data-reading="on"] .page-header h1 {
-    font-size: 1.75rem;
-}
-
-html[data-reading="on"] .card {
-    padding: 1.15rem 0;
-}
-
-html[data-reading="on"] .card h2 {
-    font-size: 1.15rem;
-    margin-bottom: 0.65rem;
-}
-
-html[data-reading="on"] .info-text {
-    font-size: 0.84rem;
-    margin-bottom: 0.6rem;
-    line-height: 1.5;
-}
-
-html[data-reading="on"] .form-row,
-html[data-reading="on"] .param-row {
-    margin-bottom: 0.75rem;
-    gap: 0.9rem;
-}
-
-html[data-reading="on"] .article-card {
-    margin-bottom: 0.4rem;
-}
-
-html[data-reading="on"] .article-card summary {
-    padding: 0.6rem 0.85rem;
-}
-
-html[data-reading="on"] .article-body {
-    padding: 0.85rem 1.1rem 1rem;
-}
-
-html[data-reading="on"] .article-meta {
-    font-size: 0.82rem;
-    margin-bottom: 0.4rem;
-}
-
-/* Abstracts: serif + slightly larger type in reading mode, full card width.
-   (Was max-width: 68ch, which looked like "half the column" on wide Search.) */
-html[data-reading="on"] .article-abstract {
-    font-family: var(--font-serif);
-    font-size: 1.02rem;
-    line-height: 1.72;
-    max-width: none;
-    width: 100%;
-    letter-spacing: 0.005em;
-}
-
-html[data-reading="on"] .abstract-wrap {
-    max-width: none;
-    width: 100%;
-}
-
-/* Reading mode still uses is-expanded (JS defaults it on); keep clamp CSS consistent. */
-
-html[data-reading="on"] .stats-cards {
-    gap: 1rem;
-    margin-bottom: 1.15rem;
-}
-
-html[data-reading="on"] .stat-value {
-    font-size: 2rem;
-}
-
-html[data-reading="on"] .topic-grid,
-html[data-reading="on"] .source-option-grid {
-    gap: 0.4rem;
-}
-
-html[data-reading="on"] .topic-card {
-    padding: 0.65rem 0.4rem;
-}
-
-html[data-reading="on"] .source-option {
-    padding: 0.55rem 0.7rem;
-}
-
-html[data-reading="on"] .cluster-article {
-    padding: 0.45rem 0;
-}
-
-html[data-reading="on"] .compare-table {
-    font-size: 0.8rem;
-}
-
-html[data-reading="on"] .navbar {
-    padding-top: 0.4rem;
-    padding-bottom: 0.3rem;
-}
-html[data-reading="on"] .nav-link {
-    font-size: 0.74rem;
-    padding-top: 0.2rem;
-    padding-bottom: 0.3rem;
-}
-
-html[data-reading="on"] .footer {
-    padding: 0.85rem;
-    margin-top: 1.5rem;
-    font-size: 0.8rem;
-}
-
-/* Wider compare columns when both reading + wide container */
-html[data-reading="on"] .container-wide .compare-table {
-    min-width: 520px;
+/* Search */
+html[data-mode="simple"] details.advanced-details:has(#lexical-boost),
+html[data-mode="simple"] details.advanced-details:has(#lib-export-scope),
+html[data-mode="simple"] .input-method-toggle label:has(input[value="seed"]),
+html[data-mode="simple"] #seed-input-panel,
+html[data-mode="simple"] #seed-banner,
+html[data-mode="simple"] .sim-badge {
+    display: none !important;
 }
 
 /* Respect reduced-motion preferences */
