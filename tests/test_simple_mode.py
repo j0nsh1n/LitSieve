@@ -305,3 +305,15 @@ def test_clean_up_page_and_quick_screen_ui_present():
     assert js.index("quick-preview") < js.index("action: 'exclude'") or (
         "action: 'exclude'" in js and "low_relevance" in js
     )
+
+
+def test_search_not_relevant_button_uses_off_topic():
+    """Per-card Not relevant screens out with off_topic and offers undo."""
+    js = (REPO / "static" / "js" / "search.js").read_text(encoding="utf-8")
+    assert "not-relevant-btn" in js
+    assert "Not relevant" in js
+    assert "off_topic" in js
+    assert "replaceCardWithUndo" in js
+    assert "undo-not-relevant" in js
+    # Uses the shared screening endpoint (not a one-off API).
+    assert "/api/screening" in js

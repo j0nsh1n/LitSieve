@@ -3965,6 +3965,26 @@ html[data-mode="simple"] .sim-badge {
     grid-column: 2;
 }
 
+/* Search: Not relevant action + undo strip */
+.article-actions-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    margin-top: 0.35rem;
+}
+.not-relevant-undo {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.65rem 0.85rem;
+    border: 1px dashed var(--rule);
+    border-radius: 6px;
+    margin-bottom: 0.4rem;
+    background: color-mix(in srgb, var(--surface, var(--bg)) 92%, var(--accent) 8%);
+}
+
 /* Respect reduced-motion preferences */
 @media (prefers-reduced-motion: reduce) {
     html { scroll-behavior: auto; }
