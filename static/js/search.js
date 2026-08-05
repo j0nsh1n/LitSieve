@@ -620,7 +620,11 @@ function buildResultCard(article, idx) {
  ${keyPointsHtml}
  <div class="article-abstract">${abstractHtml}</div>
  ${picoHtml}
+ <div class="article-actions-row">
  <button type="button" class="note-toggle" ${noteVal ? 'hidden' : ''}>✎ Add note</button>
+ <button type="button" class="btn btn-sm btn-secondary not-relevant-btn"
+  title="Screen this paper out as not about your topic">Not relevant</button>
+ </div>
  <div class="note-row" ${noteVal ? '' : 'hidden'}>
  <label class="help-text">Private note</label>
  <textarea class="note-field" rows="2" placeholder="Optional study note (saved to your account)…"></textarea>
@@ -685,7 +689,76 @@ function buildResultCard(article, idx) {
  }
  });
 
+ const notRelBtn = details.querySelector('.not-relevant-btn');
+ if (notRelBtn) {
+ notRelBtn.addEventListener('click', async (e) => {
+ e.preventDefault();
+ e.stopPropagation();
+ notRelBtn.disabled = true;
+ try {
+ await apiCall('/api/screening', {
+ method: 'POST',
+ body: {
+ items: [{ article_id: article.article_id, source: article.source }],
+ action: 'exclude',
+ reason: 'off_topic',
+ },
+ });
+ replaceCardWithUndo(details, article);
+ showNotification('Marked not relevant (screened out).', 'success');
+ lastResults = lastResults.filter(
+ (a) => !(a.article_id === article.article_id && a.source === article.source)
+ );
+ const countEl = document.getElementById('result-count');
+ if (countEl) countEl.textContent = String(lastResults.length);
+ } catch (err) {
+ notRelBtn.disabled = false;
+ showNotification(`Could not screen out: ${err.message}`, 'error');
+ }
+ });
+ }
+
  return details;
+}
+
+/** Swap a result card for a short-lived undo strip after Not relevant. */
+function replaceCardWithUndo(cardEl, article) {
+ const parent = cardEl.parentNode;
+ if (!parent) return;
+ const strip = document.createElement('div');
+ strip.className = 'article-card not-relevant-undo';
+ strip.innerHTML =
+ `<span class="info-text">Screened out: <em>${escapeHtml(article.title || 'paper')}</em></span>`
+ + ` <button type="button" class="btn btn-sm btn-secondary undo-not-relevant">Undo</button>`;
+ parent.replaceChild(strip, cardEl);
+ const undoBtn = strip.querySelector('.undo-not-relevant');
+ undoBtn.addEventListener('click', async (e) => {
+ e.preventDefault();
+ undoBtn.disabled = true;
+ try {
+ await apiCall('/api/screening', {
+ method: 'POST',
+ body: {
+ items: [{ article_id: article.article_id, source: article.source }],
+ action: 'include',
+ },
+ });
+ parent.replaceChild(cardEl, strip);
+ const nr = cardEl.querySelector('.not-relevant-btn');
+ if (nr) nr.disabled = false;
+ showNotification('Restored to included set.', 'success');
+ if (!lastResults.some(
+ (a) => a.article_id === article.article_id && a.source === article.source
+ )) {
+ lastResults.push(article);
+ }
+ const countEl = document.getElementById('result-count');
+ if (countEl) countEl.textContent = String(lastResults.length);
+ } catch (err) {
+ undoBtn.disabled = false;
+ showNotification(`Undo failed: ${err.message}`, 'error');
+ }
+ });
 }
 
 function renderResults(results) {
