@@ -31,7 +31,8 @@
   2026-08-04; `Linger=yes`, so it starts at boot). Was previously a terminal
   process in a transient scope. Restart after code changes:
   `systemctl --user restart litsieve-uvicorn.service`. Dev with reload on a
-  different port: `./run_dev.sh 7861`.
+  different port: `./run_dev.sh 7861` (isolated data: `dev_users.db`,
+  `dev_data/`, `logs/dev.log`). Runbook: **docs/SELFHOST.md → Everyday commands**.
 - Cloudflare serves a **managed challenge** on the public hostname
   (`cf-mitigated: challenge`), so `curl https://www.litpilot.org/health` is 403
   while local is 200 — verify locally, not through the edge. Possible cause of

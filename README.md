@@ -109,6 +109,28 @@ account. Register/login for your private workspace, then:
    notes/stars; export ranked hits (CSV/TXT) or library as **RIS**.
 5. **Account** → change password (other sessions sign out) or delete account.
 
+### Running it for real (self-hosted)
+
+Do not leave `uvicorn` running in a terminal — it dies with the session and does
+not come back after a reboot. Install the systemd user unit instead:
+
+```bash
+cp deploy/litsieve-uvicorn.service ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now litsieve-uvicorn.service
+```
+
+Then the whole day-to-day loop — reboot, deploy a code change, develop against
+throwaway data, read the logs — is in
+**[docs/SELFHOST.md → Everyday commands](docs/SELFHOST.md#everyday-commands)**.
+The short version:
+
+```bash
+systemctl --user restart litsieve-uvicorn.service   # publish a code change
+./run_dev.sh 7861                                   # develop (isolated data)
+journalctl --user -u litsieve-uvicorn -f            # logs
+```
+
 ### Docker
 
 ```bash
