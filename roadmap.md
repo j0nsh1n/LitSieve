@@ -52,6 +52,35 @@ home desktop, and the link has been shared publicly.
   at 14:05?" from the log file
 - Status: [ ] in progress — logging landed 2026-08-04; cap and backups open
 
+## Phase 5 — Simple / Advanced mode
+Full build doc: **[docs/SIMPLE_MODE_PLAN.md](docs/SIMPLE_MODE_PLAN.md)**.
+A per-user toggle that hides power-user surfaces and automates the steps a
+student should not have to think about. No capability is removed from Advanced.
+- Tasks:
+  - Mode toggle (`data-mode="simple"`, localStorage, applied in
+    `theme-init.js` pre-paint) + a CSS-only hiding layer; retire reading mode
+    but keep its serif abstract styling as the default
+  - Auto-chain fetch → prepare in Simple, via `start_user_job` (never inline)
+  - Rename Duplicates → **Clean up**; screening moves there, since the
+    screening report already lives on that page
+  - **Quick screen**: rank against the student's research question, propose the
+    least-related set, apply only on confirm. New `low_relevance` code in
+    `EXCLUSION_REASONS` + `SYSTEM_REASONS` so the PRISMA report distinguishes
+    machine-suggested from student-judged exclusions
+  - **By topic group**: existing cluster triage, auto-run on density, triggered
+    lazily as a background job — never on fetch completion
+  - Per-paper "Not relevant" on Search result cards as the catch-all
+- Complete when: a student can go topics → fetch → clean up → search → export
+  RIS in Simple mode without seeing "embedding", "cluster", "HDBSCAN", or a
+  model name; the screening report is non-empty and distinguishes
+  `low_relevance`; nothing heavy runs inline; `/clusters` still loads by URL
+- Status: [ ] not started — plan only
+- Notes: this makes the spec.md line "Clusters page is the only triage UI"
+  wrong. **Propose** that spec edit for human approval; do not make it
+  unilaterally. Cluster label quality is the load-bearing assumption for the
+  topic-group path — sample real labels first; if they read like "cluster 3",
+  ship Quick screen alone.
+
 ## Backlog (unscheduled)
 - Make `pyright app` blocking in CI after clearing the current error backlog
 - Dependency lockfile (pip-tools / uv) if reproducibility becomes a priority
