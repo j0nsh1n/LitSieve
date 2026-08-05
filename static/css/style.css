@@ -3927,6 +3927,44 @@ html[data-mode="simple"] .sim-badge {
     display: none !important;
 }
 
+/* Quick screen preview (Clean up page) */
+.quick-screen-preview {
+    margin-top: 0.75rem;
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 0.65rem 0.85rem;
+    max-height: 22rem;
+    overflow: auto;
+}
+.quick-screen-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+.quick-screen-row {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-rows: auto auto;
+    column-gap: 0.55rem;
+    row-gap: 0.1rem;
+    align-items: start;
+    padding: 0.35rem 0.15rem;
+    border-bottom: 1px solid color-mix(in srgb, var(--rule) 70%, transparent);
+}
+.quick-screen-row:last-child { border-bottom: none; }
+.quick-screen-row input.qs-item {
+    grid-row: 1 / span 2;
+    margin-top: 0.2rem;
+}
+.quick-screen-row .qs-title {
+    font-weight: 500;
+    color: var(--text);
+    line-height: 1.35;
+}
+.quick-screen-row .qs-meta {
+    grid-column: 2;
+}
+
 /* Respect reduced-motion preferences */
 @media (prefers-reduced-motion: reduce) {
     html { scroll-behavior: auto; }

@@ -161,3 +161,147 @@ def test_simple_mode_auto_chains_fetch_to_prepare():
     # Must still go through the job API (never inline embed work in the page).
     assert "/api/create-embeddings" in dm
     assert "waitForJob" in dm
+
+
+def test_low_relevance_is_system_reason_not_user_selectable():
+    from app.content.screening_reasons import (
+        EXCLUSION_REASONS,
+        SYSTEM_REASONS,
+        USER_SELECTABLE_REASONS,
+        normalize_reason,
+        reason_label,
+    )
+
+    assert "low_relevance" in EXCLUSION_REASONS
+    assert "low_relevance" in SYSTEM_REASONS
+    assert "low_relevance" not in USER_SELECTABLE_REASONS
+    assert normalize_reason("low_relevance") == "low_relevance"
+    assert "Low relevance" in reason_label("low_relevance")
+
+
+def test_screening_report_includes_low_relevance_counts(tmp_path):
+    from app.storage.database import ArticleDatabase
+    from app.utils import build_screening_report, format_screening_report_txt
+
+    db = ArticleDatabase(db_path=str(tmp_path / "lr.db"))
+    try:
+        db.insert_articles(
+            [
+                {
+                    "article_id": "1",
+                    "source": "pubmed",
+                    "title": "A",
+                    "abstract": "abs",
+                    "year": "2020",
+                    "authors": [],
+                    "journal": "",
+                },
+                {
+                    "article_id": "2",
+                    "source": "pubmed",
+                    "title": "B",
+                    "abstract": "abs",
+                    "year": "2020",
+                    "authors": [],
+                    "journal": "",
+                },
+            ],
+            dedupe=False,
+        )
+        db.exclude_articles([("1", "pubmed")], reason="low_relevance")
+        report = build_screening_report(db)
+        assert report["excluded"]["low_relevance"] == 1
+        txt = format_screening_report_txt(report)
+        assert "Low relevance" in txt
+    finally:
+        db.close()
+
+
+def test_quick_screen_preview_does_not_exclude(tmp_path):
+    """Preview ranks only — apply is a separate POST /api/screening call."""
+    import numpy as np
+
+    from app.services.pipeline import LiteratureSearchPipeline
+
+    p = LiteratureSearchPipeline(db_path=str(tmp_path / "qs.db"))
+    try:
+        arts = [
+            {
+                "article_id": str(i),
+                "source": "pubmed",
+                "title": f"Title {i}",
+                "abstract": f"abstract {i}",
+                "year": "2020",
+                "authors": [],
+                "journal": "J",
+            }
+            for i in range(8)
+        ]
+        p.db.insert_articles(arts, dedupe=False)
+        # Orthogonal-ish vectors so ranking is deterministic-ish.
+        emb = {
+            (str(i), "pubmed"): np.eye(8, dtype=np.float32)[i]
+            for i in range(8)
+        }
+        p.db.insert_embeddings(emb, model_name="general")
+        p.embedding_engine.embed_query = (  # type: ignore[method-assign]
+            lambda _t: np.eye(8, dtype=np.float32)[0]
+        )
+        before = set(p.db.get_excluded_keys())
+        result = p.propose_low_relevance("diabetes adolescents", fraction=0.25)
+        after = set(p.db.get_excluded_keys())
+        assert before == after, "preview must never write screening"
+        assert result["total_ranked"] == 8
+        assert result["proposed_count"] >= 1
+        assert result["proposed_count"] < 8
+        assert len(result["candidates"]) == result["proposed_count"]
+        # Least similar to e0 should not include paper 0 (most similar).
+        ids = {c["article_id"] for c in result["candidates"]}
+        assert "0" not in ids
+    finally:
+        p.close()
+
+
+def test_quick_screen_apply_and_reinclude_low_relevance(tmp_path):
+    from app.storage.database import ArticleDatabase
+
+    db = ArticleDatabase(db_path=str(tmp_path / "qs2.db"))
+    try:
+        db.insert_articles(
+            [
+                {
+                    "article_id": "x",
+                    "source": "pubmed",
+                    "title": "X",
+                    "abstract": "a",
+                    "year": "2021",
+                    "authors": [],
+                    "journal": "",
+                }
+            ],
+            dedupe=False,
+        )
+        n = db.exclude_articles([("x", "pubmed")], reason="low_relevance")
+        assert n == 1
+        assert ("x", "pubmed") in set(db.get_excluded_keys())
+        n2 = db.include_articles([("x", "pubmed")])
+        assert n2 == 1
+        assert ("x", "pubmed") not in set(db.get_excluded_keys())
+    finally:
+        db.close()
+
+
+def test_clean_up_page_and_quick_screen_ui_present():
+    html = (REPO / "templates" / "statistics.html").read_text(encoding="utf-8")
+    assert "Clean up" in html
+    assert "quick-screen" in html
+    assert "Preview suggestions" in html
+    js = (REPO / "static" / "js" / "statistics.js").read_text(encoding="utf-8")
+    assert "/api/screening/quick-preview" in js
+    assert "low_relevance" in js
+    assert "doQuickScreenPreview" in js
+    assert "doQuickScreenApply" in js
+    # Apply is a separate call from preview.
+    assert js.index("quick-preview") < js.index("action: 'exclude'") or (
+        "action: 'exclude'" in js and "low_relevance" in js
+    )
