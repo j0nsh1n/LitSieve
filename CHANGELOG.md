@@ -8,14 +8,13 @@ and this project aims to follow Semantic Versioning for app version strings
 
 ## [Unreleased]
 
-### Changed
-- Product name **LitPilot** → **LitSieve** (UI, page titles, emails, FastAPI
-  title, docs, Docker/Render service names, default log file). The public
-  hostname stays `www.litpilot.org` — that is a registrar/Cloudflare fact, not
-  a product name — as do the `*-litpilot.service` systemd units already
-  installed on the host.
-
 ### Added
+- `USERS_DB` env var for the accounts database path, so a dev server can use a
+  throwaway accounts file. `run_dev.sh` now sets `USERS_DB`, `USER_DATA_DIR`
+  and `LOG_FILE` to dev-only values **by default** — previously it opened the
+  live accounts DB and real paper libraries, so a local test could write into a
+  student's library or change a real password.
+
 - Logs are written to a rotating file (`logs/litpilot.log`) as well as the
   console, including uvicorn's access log. Configure with `LOG_FILE`,
   `LOG_LEVEL`, `LOG_MAX_BYTES`, `LOG_BACKUP_COUNT`; total size is capped
@@ -24,20 +23,35 @@ and this project aims to follow Semantic Versioning for app version strings
   `EXTRA_EMBEDDING_MODELS`, which shipped earlier undocumented.
 
 ### Fixed
+- `run_dev.sh` and `tools/setup_cloudflare_tunnel.sh` are executable again;
+  `./run_dev.sh` failed with "Permission denied" (mode 644 in git).
+- Duplicate usernames and share-code collisions stay clean errors under
+  SQLCipher. Three `except sqlite3.IntegrityError` catches stopped matching when
+  `DB_ENCRYPTION_KEY` selects the sqlcipher3 driver, turning "username already
+  taken" into a 500 on encrypted deployments only.
+- `run_dev.sh` no longer passes `--reload-include`, which uvicorn silently
+  ignores without `watchfiles` installed.
+
 - Starring or annotating a paper that has left your library now returns a clear
   404 instead of a 500. Reachable from an ordinary stale tab: a "replace" fetch
   or a library switch changes every article id under an already-open results
   page.
 
+### Changed
+- Product name **LitPilot** → **LitSieve** (UI, page titles, emails, FastAPI
+  title, docs, Docker/Render service names, default log file). The public
+  hostname stays `www.litpilot.org` — that is a registrar/Cloudflare fact, not
+  a product name — as do the `*-litpilot.service` systemd units already
+  installed on the host.
+
+- All 65 `print()` calls in `app/` are now logger calls with levels. Fetcher
+  errors in particular were going to stdout, so they had no level, could not be
+  filtered, and carried no traceback.
+
 ### Security
 - `POST /api/search`, `/api/search/seed` and `/api/search/starred` now require
   the CSRF token, matching `/api/notes`. The frontend already sent it on every
   non-GET request, so nothing changes for users.
-
-### Changed
-- All 65 `print()` calls in `app/` are now logger calls with levels. Fetcher
-  errors in particular were going to stdout, so they had no level, could not be
-  filtered, and carried no traceback.
 
 ### Documentation
 - Hugging Face **Hub** (where the embedding models come from, ~3.5 GB cached
