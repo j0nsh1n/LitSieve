@@ -126,3 +126,46 @@ def test_no_driver_specific_integrity_catches_remain():
     assert not offenders, (
         "use dbconn.integrity_errors() instead: " + ", ".join(offenders)
     )
+
+
+# --- Runbook accuracy ------------------------------------------------------
+
+def test_runbook_documents_the_real_service_name():
+    """A runbook naming a unit that does not exist is worse than none.
+
+    The unit filename and the commands in the docs must agree, or a future
+    rename leaves copy-pasteable commands that fail.
+    """
+    root = pathlib.Path(__file__).resolve().parent.parent
+    unit = root / "deploy" / "litsieve-uvicorn.service"
+    assert unit.exists(), "unit file renamed without updating this test"
+
+    name = unit.stem  # litsieve-uvicorn
+    for doc in (root / "docs" / "SELFHOST.md", root / "README.md"):
+        body = doc.read_text()
+        assert f"systemctl --user restart {name}.service" in body, (
+            f"{doc.name} lacks the restart command for {name}"
+        )
+
+
+def test_runbook_covers_the_four_situations():
+    body = (pathlib.Path(__file__).resolve().parent.parent
+            / "docs" / "SELFHOST.md").read_text()
+    assert "## Everyday commands" in body
+    for heading in ("After a reboot", "After changing code",
+                    "While developing", "When something looks wrong"):
+        assert heading in body, f"runbook missing: {heading}"
+
+
+def test_runbook_warns_against_checking_the_public_url():
+    """Cloudflare's managed challenge makes curl-vs-public a false alarm."""
+    body = (pathlib.Path(__file__).resolve().parent.parent
+            / "docs" / "SELFHOST.md").read_text()
+    assert "cf-mitigated" in body or "managed challenge" in body, (
+        "runbook should explain why the public URL 403s to curl"
+    )
+
+
+def test_readme_links_to_the_runbook():
+    body = (pathlib.Path(__file__).resolve().parent.parent / "README.md").read_text()
+    assert "docs/SELFHOST.md#everyday-commands" in body

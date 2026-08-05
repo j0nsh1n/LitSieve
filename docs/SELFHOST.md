@@ -98,14 +98,7 @@ systemctl --user start litsieve-uvicorn.service
 curl -sS http://127.0.0.1:7860/health
 ```
 
-Day-to-day:
-
-```bash
-systemctl --user restart litsieve-uvicorn.service   # after a code change
-systemctl --user stop    litsieve-uvicorn.service
-journalctl --user -u litsieve-uvicorn -f            # live logs
-tail -f logs/litsieve.log                           # same, rotating file
-```
+See [Everyday commands](#everyday-commands) below for the day-to-day loop.
 
 Notes:
 
@@ -117,6 +110,67 @@ Notes:
   the embedding models (see [DEPLOY.md](DEPLOY.md)).
 - The unit reads the gitignored `.env`; with `DEBUG=false` it will not start
   without `SECRET_KEY`.
+
+## Everyday commands
+
+The four things you actually do. Run them from `~/HealthDatabaseAccess`.
+
+### After a reboot — nothing
+
+The service is `enabled` and the account has `Linger=yes`, so it starts on its
+own. Confirm if you want:
+
+```bash
+systemctl --user status litsieve-uvicorn.service
+curl -sS http://127.0.0.1:7860/health     # {"status":"healthy","version":"…"}
+```
+
+Check the *local* URL, not the public one: Cloudflare serves a managed
+challenge, so `curl https://www.litpilot.org/health` returns 403
+(`cf-mitigated: challenge`) even when the site is perfectly healthy.
+
+### After changing code
+
+The service runs whatever was on disk when it started; it does not notice edits.
+
+```bash
+SECRET_KEY=x DEBUG=true ./venv/bin/python -m pytest -q   # optional, but cheap
+systemctl --user restart litsieve-uvicorn.service
+curl -sS http://127.0.0.1:7860/health
+```
+
+A couple of seconds of downtime. Skipping the tests risks restarting the public
+site into a broken state.
+
+### While developing
+
+```bash
+./run_dev.sh 7861
+```
+
+Auto-reloads on save, on a spare port, against **throwaway data**
+(`dev_users.db`, `dev_data/`, `logs/dev.log`) — the live site on 7860 keeps
+running and its accounts and libraries are untouched. The script prints which
+stores it is using and warns if you override it back onto live data.
+
+Note it forces `DEBUG=true`, so cookies are not `Secure` and reset codes may
+render on screen. Correct for `http://localhost`, but it means the dev server is
+not a faithful test of the production auth path.
+
+### When something looks wrong
+
+```bash
+systemctl --user status  litsieve-uvicorn.service
+journalctl --user -u litsieve-uvicorn -n 50 --no-pager   # recent
+journalctl --user -u litsieve-uvicorn -f                 # live
+tail -f logs/litsieve.log                                # same + access lines
+```
+
+Service will not start? Usually one of:
+
+- something else still holds 7860 — `ss -ltnp | grep 7860`
+- `SECRET_KEY` missing from `.env` — with `DEBUG=false` the app refuses to boot
+- crash-looping past the limit — `systemctl --user reset-failed litsieve-uvicorn.service`
 
 ### Smoke
 
