@@ -1,11 +1,12 @@
 """
 User Database
-Stores user accounts in users.db, separate from per-user article data.
+Stores user accounts in users.db (override with USERS_DB), separate from
+per-user article data.
 """
 
 import hashlib
+import os
 import secrets
-import sqlite3
 import threading
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -13,10 +14,26 @@ from typing import Dict, List, Optional, Tuple
 
 from app.storage import dbconn
 
+DEFAULT_USERS_DB = "users.db"
+
+
+def users_db_path() -> str:
+    """Accounts DB location: ``USERS_DB`` env, else ``users.db`` in the cwd.
+
+    Configurable so a dev server can be pointed at a throwaway accounts file.
+    Without this, running the reload server from the repo opens the *live*
+    accounts database — a local experiment could change a real password or
+    delete a real account. Pairs with ``USER_DATA_DIR`` (paper libraries) and
+    ``LOG_FILE``; see run_dev.sh, which sets all three.
+    """
+    return (os.getenv("USERS_DB") or "").strip() or DEFAULT_USERS_DB
+
 
 class UserDatabase:
-    def __init__(self, db_path: str = "users.db"):
+    def __init__(self, db_path: Optional[str] = None):
+        db_path = db_path or users_db_path()
         self.conn = dbconn.connect(db_path, check_same_thread=False)
+        self.db_path = db_path
         # WAL + busy_timeout: same rationale as ArticleDatabase (concurrent access).
         self.conn.execute("PRAGMA journal_mode=WAL")
         self.conn.execute("PRAGMA busy_timeout=5000")
@@ -137,7 +154,10 @@ class UserDatabase:
                     (user_id, username, hashed_password),
                 )
                 self.conn.commit()
-            except sqlite3.IntegrityError as e:
+            except dbconn.integrity_errors() as e:
+                # Driver-agnostic: sqlcipher3 has its own IntegrityError, so
+                # naming sqlite3's would stop catching this the moment
+                # DB_ENCRYPTION_KEY is set, turning a taken username into a 500.
                 raise ValueError(f"Username already taken: {username}") from e
         return {"id": user_id, "username": username, "token_version": 0}
 
@@ -268,7 +288,7 @@ class UserDatabase:
                     ),
                 )
                 self.conn.commit()
-            except sqlite3.IntegrityError as e:
+            except dbconn.integrity_errors() as e:
                 raise ValueError("Could not create share (code collision). Retry.") from e
         return {
             "id": share_id,
@@ -379,7 +399,7 @@ class UserDatabase:
                     "VALUES (?, ?, ?, ?)",
                     (share_id, student_user_id, student_library_id, redeemed_at),
                 )
-            except sqlite3.IntegrityError as e:
+            except dbconn.integrity_errors() as e:
                 # Close the failed write transaction; leaving it open keeps
                 # the database locked until some later commit/rollback.
                 self.conn.rollback()
