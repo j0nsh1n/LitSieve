@@ -15,7 +15,7 @@
     {% set workflow = [
         ("data_management", "Data Management", "/data-management", "Step 1: fetch papers, then prepare them for search", "1"),
         ("clusters", "Clusters", "/clusters", "Step 2: group papers by topic and screen out off-topic ones", ""),
-        ("statistics", "Duplicates", "/statistics", "Step 3: remove duplicate copies + screening report for hand-ins", "2"),
+        ("statistics", "Clean up", "/statistics", "Step 3: remove duplicates, quick-screen off-topic papers, screening report", "2"),
         ("search", "Search", "/search", "Step 4: rank the papers you kept and export your list", "3"),
     ] %}
     {% set ns = namespace(current_label="Steps", current_num="", simple_num="") %}

@@ -705,6 +705,77 @@ class LiteratureSearchPipeline:
 
         return similar_articles
 
+    def propose_low_relevance(
+        self,
+        query_text: str,
+        fraction: float = 0.25,
+    ) -> Dict:
+        """Rank non-excluded prepared papers and propose the least related set.
+
+        Preview only — does not write screening. Callers must apply exclusions
+        via exclude_articles with reason ``low_relevance``.
+        """
+        from sklearn.metrics.pairwise import cosine_similarity
+
+        fraction = max(0.05, min(0.50, float(fraction)))
+        query_text = (query_text or "").strip()
+        if not query_text:
+            raise ValueError("Enter a research question to rank papers against.")
+
+        article_ids, article_embeddings, articles_all = self._candidate_pool()
+        total = len(article_ids)
+        if total == 0:
+            return {
+                "candidates": [],
+                "total_ranked": 0,
+                "proposed_count": 0,
+                "fraction": fraction,
+                "query": query_text,
+            }
+
+        stored_model = self.db.get_embedding_model()
+        with self._engine_lock:
+            if stored_model and stored_model != self.embedding_model_name:
+                self.embedding_engine = EmbeddingEngine(model_name=stored_model)
+                self.embedding_model_name = stored_model
+            query_embedding = self.embedding_engine.embed_query(query_text)
+
+        if query_embedding.shape[-1] != article_embeddings.shape[1]:
+            raise ValueError(
+                "Embedding dimension mismatch between the query and stored "
+                "articles. Re-create embeddings on the Data Management page."
+            )
+
+        q = query_embedding.reshape(1, -1)
+        scores = cosine_similarity(q, article_embeddings)[0]
+        # Least similar first.
+        order = np.argsort(scores)
+        # Never propose the whole library; leave at least one paper.
+        n_propose = int(round(total * fraction))
+        n_propose = max(1, n_propose) if total > 1 else 0
+        n_propose = min(n_propose, max(0, total - 1))
+
+        candidates: List[Dict] = []
+        for idx in order[:n_propose]:
+            key = article_ids[idx]
+            meta = articles_all.get(key) or {}
+            candidates.append({
+                "article_id": key[0],
+                "source": key[1],
+                "title": meta.get("title") or "",
+                "year": meta.get("year") or "",
+                "journal": meta.get("journal") or "",
+                "similarity_score": float(scores[idx]),
+            })
+
+        return {
+            "candidates": candidates,
+            "total_ranked": total,
+            "proposed_count": len(candidates),
+            "fraction": fraction,
+            "query": query_text,
+        }
+
     def search_from_starred(
         self,
         top_k: int = 10,

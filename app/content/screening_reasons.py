@@ -19,6 +19,8 @@ EXCLUSION_REASONS: Dict[str, str] = {
     "language": "Language",
     "insufficient_info": "Insufficient abstract / info",
     "other": "Other",
+    # System-suggested (Quick screen): least similar to the research question.
+    "low_relevance": "Low relevance (suggested)",
 }
 
 # Reasons students may pick in the UI (not auto-set by the system).
@@ -33,7 +35,7 @@ USER_SELECTABLE_REASONS: List[str] = [
 ]
 
 # System-assigned reasons (UI must not offer these as free student choices).
-SYSTEM_REASONS = frozenset({"cluster", "duplicate"})
+SYSTEM_REASONS = frozenset({"cluster", "duplicate", "low_relevance"})
 
 
 def normalize_reason(reason: Optional[str], default: str = "manual") -> str:
