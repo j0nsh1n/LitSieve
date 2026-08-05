@@ -9,6 +9,10 @@ and this project aims to follow Semantic Versioning for app version strings
 ## [Unreleased]
 
 ### Added
+- Health watchdog (`tools/watchdog.py` + `deploy/litsieve-watchdog.timer`,
+  every 5 min). Checks that the app answers locally **and** that the Cloudflare
+  tunnel currently holds registered connections, then emails on state changes
+  using the existing SMTP settings. Set `WATCHDOG_EMAIL_TO` to receive alerts.
 - `USERS_DB` env var for the accounts database path, so a dev server can use a
   throwaway accounts file. `run_dev.sh` now sets `USERS_DB`, `USER_DATA_DIR`
   and `LOG_FILE` to dev-only values **by default** — previously it opened the

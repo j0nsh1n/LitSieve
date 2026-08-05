@@ -33,6 +33,14 @@
   `systemctl --user restart litsieve-uvicorn.service`. Dev with reload on a
   different port: `./run_dev.sh 7861` (isolated data: `dev_users.db`,
   `dev_data/`, `logs/dev.log`). Runbook: **docs/SELFHOST.md → Everyday commands**.
+- **Outage 2026-08-05, 4h47m** (05:05–09:52): Cloudflare tunnel token had been
+  revoked ~Aug 4; cloudflared never re-auths an established connection, so it
+  only surfaced at the unattended ~05:01 reboot. Fixed by pasting a fresh token
+  into `secrets/cloudflared.env`. The machine reboots itself daily around 05:01
+  (firmware RTC, not systemd), so latent failures surface while nobody is awake.
+- **Watchdog** installed: `litsieve-watchdog.timer` (5 min) runs
+  `tools/watchdog.py` — app `/health` + tunnel registered-connections, emails on
+  state change. Needs `WATCHDOG_EMAIL_TO` in `.env` or it stays silent.
 - Cloudflare serves a **managed challenge** on the public hostname
   (`cf-mitigated: challenge`), so `curl https://www.litpilot.org/health` is 403
   while local is 200 — verify locally, not through the edge. Possible cause of

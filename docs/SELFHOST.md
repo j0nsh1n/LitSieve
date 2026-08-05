@@ -172,6 +172,54 @@ Service will not start? Usually one of:
 - `SECRET_KEY` missing from `.env` — with `DEBUG=false` the app refuses to boot
 - crash-looping past the limit — `systemctl --user reset-failed litsieve-uvicorn.service`
 
+## Watchdog (know when it breaks)
+
+On 2026-08-05 the site was down for **4h47m** and nothing said so. The tunnel
+token had been revoked the day before, but cloudflared never re-authenticates an
+*already established* connection — so the site kept serving until the machine's
+unattended ~05:01 reboot forced a fresh registration, which failed. Every signal
+looked healthy: the tunnel unit was `active`, the app answered `/health` 200,
+and `curl` against the public hostname returns 403 either way.
+
+`tools/watchdog.py` checks the two things that actually distinguish up from
+down — the app answers locally, and the tunnel currently holds registered
+connections — and emails on state changes (not every poll).
+
+Install:
+
+```bash
+cp deploy/litsieve-watchdog.{service,timer} ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now litsieve-watchdog.timer
+```
+
+**Add the recipient to `.env`, or alerts are silently skipped:**
+
+```bash
+WATCHDOG_EMAIL_TO=you@example.com
+```
+
+It reuses the app's existing `SMTP_*` settings, so there is nothing else to
+configure. Check and tune:
+
+```bash
+systemctl --user list-timers litsieve-watchdog.timer     # next run
+./venv/bin/python tools/watchdog.py --no-email           # run by hand
+journalctl --user -u litsieve-watchdog -n 20 --no-pager
+cat logs/watchdog_state.json                             # last known state
+```
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `WATCHDOG_EMAIL_TO` | *(unset)* | Alert recipient. Unset = no email. |
+| `WATCHDOG_REMIND_HOURS` | `12` | Re-send while still down. `0` = once only. |
+| `WATCHDOG_HEALTH_URL` | `http://127.0.0.1:7860/health` | App check |
+| `WATCHDOG_TUNNEL_UNIT` | `cloudflared-litpilot-token` | Tunnel unit to inspect |
+
+Exit codes: `0` healthy, `1` down (already emailed), `2` the check itself could
+not run. The unit treats `1` as success so a genuine outage does not also show
+up as a failed unit.
+
 ### Smoke
 
 ```bash
