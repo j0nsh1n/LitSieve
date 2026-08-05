@@ -1,0 +1,48 @@
+[Unit]
+Description=LitSieve (uvicorn on 127.0.0.1:7860)
+Documentation=file://%h/HealthDatabaseAccess/docs/SELFHOST.md
+After=network-online.target
+Wants=network-online.target
+# Stop thrashing if it is genuinely broken, so a bad deploy stays visible
+# instead of restart-looping forever. (These belong in [Unit], not [Service].)
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+WorkingDirectory=%h/HealthDatabaseAccess
+
+# Secrets live in the gitignored .env (SECRET_KEY, SMTP_*, PUBLIC_BASE_URL).
+# The leading "-" means "do not fail if the file is absent", but with
+# DEBUG=false the app refuses to start without SECRET_KEY, so in practice it
+# must exist. The app also calls load_dotenv() itself; this makes the same
+# values visible to systemd.
+EnvironmentFile=-%h/HealthDatabaseAccess/.env
+
+# HTTP only on loopback. Public HTTPS is terminated by Cloudflare Tunnel.
+# Never pass --ssl-keyfile / --ssl-certfile to Uvicorn.
+#
+# One worker on purpose: each extra worker is a separate process with its own
+# copy of torch and the embedding models, which multiplies RAM (docs/DEPLOY.md).
+# No --reload in production either.
+ExecStart=%h/HealthDatabaseAccess/venv/bin/python -m uvicorn app.main:app \
+    --host 127.0.0.1 --port 7860 \
+    --proxy-headers --forwarded-allow-ips=127.0.0.1
+
+# A public site should come back from a clean exit too, not just a crash.
+Restart=always
+RestartSec=3
+# Model loading is lazy so startup is quick; SIGINT lets uvicorn drain rather
+# than dropping in-flight requests, but do not hang on a stuck fetch job.
+KillSignal=SIGINT
+TimeoutStopSec=30
+
+Environment=PYTHONUNBUFFERED=1
+SyslogIdentifier=litsieve
+
+# Light hardening
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target

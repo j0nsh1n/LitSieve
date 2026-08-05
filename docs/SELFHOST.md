@@ -63,12 +63,60 @@ Public hostname: **`www.litpilot.org`** (Cloudflare Tunnel → `http://127.0.0.1
    - Service: **HTTP** → `http://127.0.0.1:7860`
    - Optional second rule: apex `litpilot.org` → same service (or redirect to www)
 
-6. Keep LitSieve running:
+6. Keep LitSieve running (see **Run it as a service** below — do not leave it
+   running in a terminal, it dies with the session).
 
-   ```bash
-   ./venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 7860
-   # or: systemctl --user enable --now litpilot-uvicorn.service
-   ```
+## Run it as a service (starts at boot)
+
+Running `uvicorn` in a terminal means the site dies when that session ends, does
+not restart if it crashes, and does not come back after a reboot. Install the
+unit instead — the same way `cloudflared` already runs.
+
+```bash
+mkdir -p ~/.config/systemd/user
+cp deploy/litsieve-uvicorn.service ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now litsieve-uvicorn.service
+systemctl --user status litsieve-uvicorn.service
+```
+
+**Linger** is what makes user services survive logout and start at boot. It is
+already enabled on this host (cloudflared needs it too), but on a fresh machine:
+
+```bash
+loginctl show-user "$USER" --property=Linger   # want Linger=yes
+sudo loginctl enable-linger "$USER"
+```
+
+Switching over from a manually started server: stop the old process first, or
+the service will fail with "address already in use".
+
+```bash
+# find whatever is holding 7860, then stop it
+ss -ltnp | grep 7860
+systemctl --user start litsieve-uvicorn.service
+curl -sS http://127.0.0.1:7860/health
+```
+
+Day-to-day:
+
+```bash
+systemctl --user restart litsieve-uvicorn.service   # after a code change
+systemctl --user stop    litsieve-uvicorn.service
+journalctl --user -u litsieve-uvicorn -f            # live logs
+tail -f logs/litsieve.log                           # same, rotating file
+```
+
+Notes:
+
+- `Restart=always` brings it back from crashes *and* clean exits, with a
+  5-restarts-in-5-minutes limit so a genuinely broken deploy stays visible
+  rather than looping. Clear that state with
+  `systemctl --user reset-failed litsieve-uvicorn.service`.
+- One worker, deliberately: extra workers each load their own copy of torch and
+  the embedding models (see [DEPLOY.md](DEPLOY.md)).
+- The unit reads the gitignored `.env`; with `DEBUG=false` it will not start
+  without `SECRET_KEY`.
 
 ### Smoke
 
