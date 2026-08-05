@@ -145,3 +145,19 @@ def test_clusters_route_still_exists():
     """Simple mode removes Clusters from the nav only — URL must still work."""
     paths = route_paths(app)
     assert "/clusters" in paths
+
+
+def test_simple_mode_auto_chains_fetch_to_prepare():
+    """After a successful fetch in Simple mode, prepare starts without a second click.
+
+    Zero papers / cancelled / quota must not start prepare. Advanced stays manual.
+    """
+    dm = (REPO / "static" / "js" / "data_management.js").read_text(encoding="utf-8")
+    assert "isSimpleMode" in dm
+    assert "fromAutoChain" in dm
+    assert "Getting your papers ready" in dm
+    # Guard: do not auto-start on empty fetch.
+    assert "total_fetched" in dm
+    # Must still go through the job API (never inline embed work in the page).
+    assert "/api/create-embeddings" in dm
+    assert "waitForJob" in dm

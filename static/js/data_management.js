@@ -805,17 +805,37 @@ async function doFetch() {
  );
  }
  applyFetchResult(data, sources);
- // Embeddings are manual: topics may update the model dropdown, but the
- // student presses "Prepare Papers" when ready (avoids surprise long jobs
- // and wrong-model re-embeds).
- if ((data.total_fetched || 0) > 0 && !data.cancelled && !data.quota_stopped
-  && data.status !== 'quota_stopped') {
+ // Advanced: student presses "Prepare Papers" when ready (avoids surprise
+ // long jobs). Simple: auto-chain prepare so the student sees one continuous
+ // "getting papers ready" flow. Never start prepare on zero papers / cancel /
+ // quota stop. Never auto-cluster here.
+ const fetchedOk = (data.total_fetched || 0) > 0
+  && !data.cancelled && !data.quota_stopped
+  && data.status !== 'quota_stopped'
+  && data.status !== 'cancelled';
+ if (fetchedOk) {
  applyModelRecommendation();
+ const simple = typeof isSimpleMode === 'function' && isSimpleMode();
+ if (simple) {
+ setStatus(
+ 'fetch-status',
+ `Fetched ${data.total_fetched} paper(s). Getting them ready for search…`,
+ 'info'
+ );
+ setStatus('embeddings-status', 'Getting your papers ready…', 'info');
+ // Keep fetch button loading through prepare so it reads as one job.
+ try {
+ await doCreateEmbeddings({ fromAutoChain: true });
+ } catch (chainErr) {
+ // doCreateEmbeddings already surfaces errors; do not rethrow into fetch.
+ }
+ } else {
  setStatus(
  'embeddings-status',
  'Fetch finished. Check the analysis model above, then press Prepare Papers when you are ready.',
  'info'
  );
+ }
  }
  } catch (e) {
  const msg = e.message || '';
@@ -838,7 +858,10 @@ async function doFetch() {
  }
 }
 
-async function doCreateEmbeddings() {
+async function doCreateEmbeddings(opts) {
+ const options = opts || {};
+ const fromAutoChain = !!options.fromAutoChain;
+ const simple = typeof isSimpleMode === 'function' && isSimpleMode();
  const model = document.getElementById('embedding-model').value;
  const onlyMissing = document.getElementById('only-missing')?.checked || false;
  const btn = document.getElementById('embeddings-btn');
@@ -846,7 +869,9 @@ async function doCreateEmbeddings() {
  setLoading(btn, true);
  setStatus(
  'embeddings-status',
- 'Preparing papers for search (embeddings)… this may take a few minutes on large collections.',
+ (simple || fromAutoChain)
+  ? 'Getting your papers ready… this may take a few minutes on large collections.'
+  : 'Preparing papers for search (embeddings)… this may take a few minutes on large collections.',
  'info'
  );
 
@@ -859,13 +884,30 @@ async function doCreateEmbeddings() {
  if (started && started.status === 'started') {
  data = await waitForJob(
  'embed', 'embed-progress-fill', 'embed-progress-label', 'embed-progress-wrap',
- (done, total, pct) => total > 0 ? `${done} / ${total} articles (${pct}%)` : 'Loading model…'
+ (done, total, pct) => {
+ if (simple || fromAutoChain) {
+ return total > 0
+  ? `Getting papers ready… ${done} / ${total} (${pct}%)`
+  : 'Getting your papers ready…';
+ }
+ return total > 0 ? `${done} / ${total} articles (${pct}%)` : 'Loading model…';
+ }
  );
  }
  const secs = data.seconds != null ? `${data.seconds}s` : '?';
  const device = data.device || 'cpu';
  const created = data.embeddings_created ?? data.articles_processed;
  const skipped = data.skipped_existing || 0;
+ if (simple || fromAutoChain) {
+ setStatus(
+ 'embeddings-status',
+ `Ready: ${created} paper(s) prepared`
+  + (skipped ? `, ${skipped} already ready` : '')
+  + `. Total ready for search: ${data.articles_processed}.`,
+ 'success'
+ );
+ showNotification('Your papers are ready — next: Clean up, then Search.', 'success');
+ } else {
  setStatus(
  'embeddings-status',
  `Done: ${created} prepared, ${skipped} skipped (already prepared). ` +
@@ -874,19 +916,25 @@ async function doCreateEmbeddings() {
  'success'
  );
  showNotification('Papers prepared for search!', 'success');
+ }
  loadPageData();
+ return data;
  } catch (e) {
  const msg = e.message || '';
  if (msg.toLowerCase().includes('storage limit')) {
   setStatus('embeddings-status', msg, 'warning');
   showNotification(msg, 'warning');
  } else if (msg.toLowerCase().includes('already running')) {
- setStatus('embeddings-status', 'Embedding is already running.', 'warning');
- showNotification('An embedding job is already running.', 'warning');
+ setStatus('embeddings-status', 'Preparing is already running.', 'warning');
+ showNotification('A prepare job is already running.', 'warning');
  } else {
  setStatus('embeddings-status', `Error: ${msg}`, 'error');
- showNotification(`Embeddings failed: ${msg}`, 'error');
+ showNotification(
+  (simple || fromAutoChain) ? `Could not prepare papers: ${msg}` : `Embeddings failed: ${msg}`,
+  'error'
+ );
  }
+ throw e;
  } finally {
  setLoading(btn, false);
  }
