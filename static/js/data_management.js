@@ -495,19 +495,37 @@ let _autoChainActive = false;
  * Simple mode: prepare is optional and only appears once the library has papers.
  * Advanced: always visible (step 4). forceShow / auto-chain keep it open mid-job.
  */
+/** Show the "Next: Clean up" shortcut once papers are actually ready.
+ *
+ * Only in Simple mode: Advanced users have the numbered steps and the nav.
+ * Hidden again whenever a new fetch starts, so it never advertises a next step
+ * for work that is still running.
+ */
+function setNextStepVisible(visible) {
+ const el = document.getElementById('fetch-next-step');
+ if (!el) return;
+ const simple = typeof isSimpleMode === 'function' && isSimpleMode();
+ el.hidden = !(visible && simple);
+ el.classList.toggle('u-hidden', !(visible && simple));
+}
+
 function updatePrepareSectionVisibility(totalArticles, opts) {
  const sec = document.getElementById('prepare-section');
  if (!sec) return;
  if (typeof totalArticles === 'number' && !Number.isNaN(totalArticles)) {
   _lastTotalArticles = totalArticles;
  }
- const forceShow = !!(opts && opts.forceShow) || _autoChainActive;
+ // Deliberately NOT force-shown while the auto-chain runs. Prepare progress is
+ // mirrored onto the fetch bar during a chain (see doCreateEmbeddings), so the
+ // card has nothing to display yet -- revealing it mid-embed just pops a
+ // "Re-prepare" control into view for work that is still in progress.
+ const forceShow = !!(opts && opts.forceShow);
  const simple = typeof isSimpleMode === 'function' && isSimpleMode();
  if (!simple) {
   sec.hidden = false;
   return;
  }
- sec.hidden = !forceShow && !(_lastTotalArticles > 0);
+ sec.hidden = _autoChainActive || (!forceShow && !(_lastTotalArticles > 0));
 }
 
 async function loadPageData() {
@@ -828,6 +846,7 @@ async function doFetch() {
  const mode = (document.querySelector('input[name="fetch-mode"]:checked') || {}).value || 'replace';
  const clearFirst = mode === 'replace';
 
+ setNextStepVisible(false);
  if (!query) { showNotification('Please enter a search query.', 'error'); return; }
  if (sources.length === 0) { showNotification('Please select at least one source.', 'error'); return; }
 
@@ -884,7 +903,9 @@ async function doFetch() {
  applyModelRecommendation();
  _autoChainActive = true;
  _lastTotalArticles = Math.max(_lastTotalArticles, totalFetched);
- updatePrepareSectionVisibility(_lastTotalArticles, { forceShow: true });
+ // Keeps the card hidden until the chain finishes (see above).
+ updatePrepareSectionVisibility(_lastTotalArticles);
+ setNextStepVisible(false);
  setStatus(
  'fetch-status',
  `Fetched ${totalFetched} paper(s). Getting them ready for search…`,
@@ -997,6 +1018,7 @@ async function doCreateEmbeddings(opts) {
  'success'
  );
  showNotification('Your papers are ready — next: Clean up, then Search.', 'success');
+ setNextStepVisible(true);
  } else {
  setStatus(
  'embeddings-status',

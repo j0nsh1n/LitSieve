@@ -596,3 +596,55 @@ def test_ai_saved_key_points_survive_append_not_replace(tmp_path):
         assert db.get_ai_key_points_keys() == set()
     finally:
         db.close()
+
+
+# --- Fetch → prepare handoff (added after live review) ----------------------
+
+def _dm_js() -> str:
+    import pathlib
+    return (pathlib.Path(__file__).resolve().parent.parent
+            / "static" / "js" / "data_management.js").read_text()
+
+
+def test_prepare_card_stays_hidden_while_auto_chain_runs():
+    """Re-prepare must not appear while the first prepare is still running.
+
+    During an auto-chain the embed progress is mirrored onto the fetch bar, so
+    the prepare card has nothing to show — revealing it mid-embed just pops a
+    "Re-prepare" control into view for work already in progress.
+    """
+    src = _dm_js()
+    assert "sec.hidden = _autoChainActive ||" in src, (
+        "prepare card must be forced hidden while _autoChainActive"
+    )
+    assert "|| _autoChainActive;" not in src, (
+        "auto-chain must not feed forceShow — that is what revealed it early"
+    )
+    assert "updatePrepareSectionVisibility(_lastTotalArticles, { forceShow: true })" not in src, (
+        "the auto-chain start must not force the card open"
+    )
+
+
+def test_next_step_shortcut_exists_and_starts_hidden():
+    """Simple users should not have to scroll back to the nav after a fetch."""
+    import pathlib
+    import re
+    html = (pathlib.Path(__file__).resolve().parent.parent
+            / "templates" / "data_management.html").read_text()
+    tag = re.search(r'<div[^>]*id="fetch-next-step"[^>]*>', html)
+    assert tag, "fetch-next-step shortcut missing"
+    assert "u-hidden" in tag.group(0), "shortcut must start hidden"
+    assert 'href="/statistics"' in html, "shortcut must link to Clean up"
+
+
+def test_next_step_shortcut_is_simple_mode_only_and_resets():
+    src = _dm_js()
+    assert "function setNextStepVisible" in src
+    # Gated on Simple mode
+    block = src.split("function setNextStepVisible", 1)[1].split("}\n", 1)[0]
+    assert "isSimpleMode" in block, "shortcut must be Simple-mode only"
+    # Hidden again when a new fetch starts, so it never points forward mid-job
+    assert src.count("setNextStepVisible(false)") >= 2, (
+        "shortcut must reset on a new fetch and when the chain starts"
+    )
+    assert "setNextStepVisible(true)" in src, "shortcut must appear on success"

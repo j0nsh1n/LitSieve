@@ -120,6 +120,16 @@
  <div class="progress-bar-track"><div class="progress-bar-fill" id="fetch-progress-fill"></div></div>
  <div class="progress-bar-label" id="fetch-progress-label"></div>
  </div>
+ {# Next-step shortcut. Papers are ready and the next action lives on another
+    page, so offer the link right here rather than making them scroll back up
+    to the nav. Shown by JS only after prepare finishes (Simple mode). #}
+ <div class="u-hidden u-mt-md" id="fetch-next-step">
+ <a href="/statistics" class="btn btn-primary" id="fetch-next-step-link">
+ Next: Clean up your papers →
+ </a>
+ <p class="info-text u-mt-sm">Remove duplicates and papers that aren’t about your topic,
+ then search what’s left.</p>
+ </div>
 </section>
 
 <!-- Coverage map (health check after a fetch) -->
