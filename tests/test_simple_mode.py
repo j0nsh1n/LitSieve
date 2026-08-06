@@ -183,6 +183,9 @@ def test_fetch_auto_chains_to_prepare():
     dm = (REPO / "static" / "js" / "data_management.js").read_text(encoding="utf-8")
     assert "fromAutoChain" in dm
     assert "Getting your papers ready" in dm
+    assert "_autoChainActive" in dm
+    # waitForJob must not resolve on a pre-start idle slot (empty result race).
+    assert "sawActive" in dm
     # Auto-chain is not gated on Simple mode only.
     chain_block = dm[dm.find("fetchedOk") : dm.find("async function doCreateEmbeddings")]
     assert "fromAutoChain" in chain_block
