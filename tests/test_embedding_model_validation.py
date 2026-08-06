@@ -8,8 +8,9 @@ user make the server download arbitrary models onto its disk.
 
 from __future__ import annotations
 
-from conftest import TEST_PASSWORD
 import os
+
+from conftest import TEST_PASSWORD
 
 os.environ.setdefault("SECRET_KEY", "pytest-only-not-a-secret-32b-min!!")
 os.environ["DEBUG"] = "true"

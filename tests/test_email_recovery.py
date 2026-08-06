@@ -23,12 +23,12 @@ from app.auth import validate_email, validate_login_name, validate_new_username
 for _dep in ("fastapi", "httpx", "sklearn", "jwt", "bcrypt", "multipart", "dotenv"):
     pytest.importorskip(_dep)
 
+from conftest import TEST_PASSWORD as PASSWORD
 from fastapi.testclient import TestClient
 
 from app.services import mailer
 from app.storage.user_db import UserDatabase
 
-from conftest import TEST_PASSWORD as PASSWORD
 
 @pytest.fixture
 def app_module(tmp_path, monkeypatch):

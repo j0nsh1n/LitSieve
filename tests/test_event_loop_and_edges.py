@@ -12,11 +12,12 @@
 
 from __future__ import annotations
 
-from conftest import TEST_PASSWORD
 import asyncio
 import os
 import pathlib
 import re
+
+from conftest import TEST_PASSWORD
 
 os.environ.setdefault("SECRET_KEY", "pytest-only-not-a-secret-32b-min!!")
 os.environ["DEBUG"] = "true"

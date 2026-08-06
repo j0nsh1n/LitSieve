@@ -12,9 +12,10 @@ The app is run against an isolated working directory so users.db and the
 per-user ``user_data/<uid>/`` trees are created under tmp_path, never the repo.
 """
 
-from conftest import TEST_PASSWORD, TEST_PASSWORD_ALT
 import os
 import pathlib
+
+from conftest import TEST_PASSWORD, TEST_PASSWORD_ALT
 
 # Must be set BEFORE the app is imported:
 #   SECRET_KEY  -> lets auth.py mint/verify tokens

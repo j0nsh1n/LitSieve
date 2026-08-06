@@ -1,6 +1,6 @@
-from conftest import TEST_PASSWORD, TEST_PASSWORD_ALT
 """Tests for fetch helpers, insert dedupe, and password-reset flow."""
 
+from conftest import TEST_PASSWORD_ALT
 
 from app.auth import hash_password, verify_password
 from app.fetchers import base as base_module
