@@ -170,7 +170,16 @@ document.addEventListener('DOMContentLoaded', () => {
  }
  // Start hidden until stats load (avoids a flash of prepare on empty libs).
  updatePrepareSectionVisibility(0);
- document.getElementById('fetch-btn').addEventListener('click', doFetch);
+ // Form submit (button click or Enter in any field) starts fetch.
+ const fetchForm = document.getElementById('fetch-form');
+ if (fetchForm) {
+  fetchForm.addEventListener('submit', (e) => {
+   e.preventDefault();
+   doFetch();
+  });
+ } else {
+  document.getElementById('fetch-btn').addEventListener('click', doFetch);
+ }
  const cancelBtn = document.getElementById('fetch-cancel-btn');
  if (cancelBtn) cancelBtn.addEventListener('click', cancelFetch);
  document.getElementById('embeddings-btn').addEventListener('click', doCreateEmbeddings);

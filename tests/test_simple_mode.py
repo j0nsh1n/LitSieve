@@ -256,6 +256,18 @@ def test_prepare_section_is_optional_and_gated_both_modes():
     assert "_lastReadyArticles" in fn
 
 
+def test_fetch_form_submits_on_enter():
+    """Enter in the query field must start fetch (native form submit → doFetch)."""
+    html = _read("templates", "data_management.html")
+    assert 'id="fetch-form"' in html
+    assert 'type="submit"' in html and 'id="fetch-btn"' in html
+    dm = _read("static", "js", "data_management.js")
+    assert "fetch-form" in dm
+    assert "preventDefault" in dm
+    # Submit handler must call doFetch (not only a click listener on the button).
+    assert re.search(r"fetch-form[\s\S]{0,200}doFetch|submit[\s\S]{0,80}doFetch", dm)
+
+
 def test_fetch_auto_chains_to_prepare_both_modes():
     """After a successful fetch, prepare starts without a second click (all modes)."""
     dm = _read("static", "js", "data_management.js")
