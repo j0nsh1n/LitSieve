@@ -11,12 +11,16 @@ const SEARCH_SESSION_KEY = 'lra_search_session_v1';
 let _restoringSearch = false;
 
 document.addEventListener('DOMContentLoaded', () => {
- // Sources first (enables checkboxes), then restore last search for this library.
- applyAvailableSources()
-  .then(() => restoreSearchSession())
+ // Empty state + hide search UI until papers are prepared; only then restore.
+ loadSearchEmptyState()
+  .then((stats) => {
+   const ready = !!(stats && (stats.articles_with_embeddings || 0) > 0);
+   return applyAvailableSources().then(() => {
+    if (ready) return restoreSearchSession();
+   });
+  })
   .catch(() => { /* ignore */ });
  refreshStarredCount();
- loadSearchEmptyState();
 
  document.querySelectorAll('input[name="input_method"]').forEach(radio => {
  radio.addEventListener('change', () => {
@@ -233,13 +237,43 @@ function collectSearchFilters() {
  };
 }
 
+function updateSearchWorkVisibility(stats) {
+ // Hide query/controls/export until papers are prepared (same gate as empty-state).
+ const emb = (stats && stats.articles_with_embeddings) || 0;
+ const ready = emb > 0;
+ document.querySelectorAll('.search-work').forEach((el) => {
+  // results + seed-banner stay hidden until a search runs (u-hidden / style).
+  if (el.id === 'results-section' || el.id === 'seed-banner') {
+   if (!ready) {
+    el.classList.add('u-hidden');
+    el.style.display = 'none';
+   }
+   return;
+  }
+  if (el.id === 'export-results-section') {
+   // Only show export after there are on-screen results; never before ready.
+   if (!ready) {
+    el.hidden = true;
+    el.style.display = 'none';
+   }
+   return;
+  }
+  el.hidden = !ready;
+ });
+}
+
 async function loadSearchEmptyState() {
  try {
  const stats = await apiCall('/api/statistics');
  if (typeof applyEmptyState === 'function') {
  applyEmptyState('search-empty-state', stats, 'embeddings', 'search-empty-msg');
  }
- } catch (e) { /* ignore */ }
+ updateSearchWorkVisibility(stats);
+ return stats;
+ } catch (e) {
+ updateSearchWorkVisibility({ articles_with_embeddings: 0 });
+ return null;
+ }
 }
 
 async function refreshStarredCount() {
@@ -422,9 +456,16 @@ async function doSearch(opts) {
  lastResults = results;
  renderResults(results);
  document.getElementById('result-count').textContent = results.length;
- document.getElementById('results-section').style.display = 'block';
+ const resultsSec = document.getElementById('results-section');
+ if (resultsSec) {
+  resultsSec.classList.remove('u-hidden');
+  resultsSec.style.display = 'block';
+ }
  const exportSec = document.getElementById('export-results-section');
- if (exportSec) exportSec.style.display = results.length ? 'block' : 'none';
+ if (exportSec) {
+  exportSec.hidden = !results.length;
+  exportSec.style.display = results.length ? 'block' : 'none';
+ }
  // Persist query + filters so a browser refresh restores this search.
  await saveSearchSession(method);
  } catch (e) {
@@ -480,9 +521,16 @@ async function doStarredSearch(opts) {
  lastResults = results;
  renderResults(results);
  document.getElementById('result-count').textContent = results.length;
- document.getElementById('results-section').style.display = 'block';
+ const resultsSec = document.getElementById('results-section');
+ if (resultsSec) {
+  resultsSec.classList.remove('u-hidden');
+  resultsSec.style.display = 'block';
+ }
  const exportSec = document.getElementById('export-results-section');
- if (exportSec) exportSec.style.display = results.length ? 'block' : 'none';
+ if (exportSec) {
+  exportSec.hidden = !results.length;
+  exportSec.style.display = results.length ? 'block' : 'none';
+ }
  await refreshStarredCount();
  await saveSearchSession('starred');
  } catch (e) {
