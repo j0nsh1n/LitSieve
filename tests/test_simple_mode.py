@@ -15,7 +15,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from conftest import route_paths
+from conftest import TEST_PASSWORD, route_paths
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -84,8 +84,8 @@ def test_register_seeds_simple_mode_cookie(tmp_path, monkeypatch):
         "/register",
         data={
             "username": "newstudent1",
-            "password": "tpw-fixture-0001",
-            "password_confirm": "tpw-fixture-0001",
+            "password": TEST_PASSWORD,
+            "password_confirm": TEST_PASSWORD,
         },
         follow_redirects=False,
     )
@@ -96,7 +96,7 @@ def test_register_seeds_simple_mode_cookie(tmp_path, monkeypatch):
     client.cookies.clear()
     r2 = client.post(
         "/login",
-        data={"username": "newstudent1", "password": "tpw-fixture-0001"},
+        data={"username": "newstudent1", "password": TEST_PASSWORD},
         follow_redirects=False,
     )
     assert r2.status_code in (302, 303)

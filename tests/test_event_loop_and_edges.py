@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+from conftest import TEST_PASSWORD
 import asyncio
 import os
 import pathlib
@@ -33,8 +34,8 @@ from app.auth import hash_password_async, verify_password_async
 
 def test_async_wrappers_match_sync_behaviour():
     async def go():
-        h = await hash_password_async("tpw-fixture-0001")
-        assert await verify_password_async("tpw-fixture-0001", h) is True
+        h = await hash_password_async(TEST_PASSWORD)
+        assert await verify_password_async(TEST_PASSWORD, h) is True
         assert await verify_password_async("wrong-password", h) is False
         # Malformed hashes must still return False rather than raise.
         assert await verify_password_async("x", "not-a-hash") is False
@@ -60,7 +61,7 @@ def test_hashing_does_not_block_the_event_loop():
         t = asyncio.create_task(ticker())
         await asyncio.sleep(0.02)          # let the ticker spin up
         ticks = 0                          # measure only during the hash
-        await hash_password_async("tpw-fixture-0001")
+        await hash_password_async(TEST_PASSWORD)
         stop.set()
         await t
         return ticks

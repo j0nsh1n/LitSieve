@@ -28,8 +28,7 @@ from fastapi.testclient import TestClient
 from app.services import mailer
 from app.storage.user_db import UserDatabase
 
-PASSWORD = "tpw-fixture-0001"
-
+from conftest import TEST_PASSWORD as PASSWORD
 
 @pytest.fixture
 def app_module(tmp_path, monkeypatch):

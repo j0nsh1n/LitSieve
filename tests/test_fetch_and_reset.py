@@ -1,3 +1,4 @@
+from conftest import TEST_PASSWORD, TEST_PASSWORD_ALT
 """Tests for fetch helpers, insert dedupe, and password-reset flow."""
 
 
@@ -172,13 +173,13 @@ def test_password_reset_flow(tmp_path):
         token = udb.create_password_reset_token("alice")
         assert token
         # Wrong token fails
-        ok, err = udb.consume_password_reset_token("alice", "not-the-token", hash_password("tpw-fixture-0002"))
+        ok, err = udb.consume_password_reset_token("alice", "not-the-token", hash_password(TEST_PASSWORD_ALT))
         assert not ok
         # Good token works
-        ok, err = udb.consume_password_reset_token("alice", token, hash_password("tpw-fixture-0002"))
+        ok, err = udb.consume_password_reset_token("alice", token, hash_password(TEST_PASSWORD_ALT))
         assert ok, err
         row = udb.get_by_username("alice")
-        assert verify_password("tpw-fixture-0002", row["hashed_password"])
+        assert verify_password(TEST_PASSWORD_ALT, row["hashed_password"])
         assert int(row["token_version"]) == 1
         # Reuse fails
         ok, err = udb.consume_password_reset_token("alice", token, hash_password("anotherpass1"))

@@ -1,5 +1,6 @@
 """HTTP tests for AI_ALLOW_SETTINGS_WRITE gate on settings / ollama control."""
 
+from conftest import TEST_PASSWORD
 import os
 import pathlib
 
@@ -47,7 +48,7 @@ def app_module(tmp_path, monkeypatch):
     test_db.conn.close()
 
 
-def _register(client, username="writegate_user", password="tpw-fixture-0001"):
+def _register(client, username="writegate_user", password=TEST_PASSWORD):
     resp = client.post(
         "/register",
         data={"username": username, "password": password, "password_confirm": password},

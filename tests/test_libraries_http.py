@@ -2,6 +2,7 @@
 HTTP integration tests for multi-library APIs (auth + CSRF + isolation).
 """
 
+from conftest import TEST_PASSWORD
 import os
 import pathlib
 
@@ -69,7 +70,7 @@ def app_module(tmp_path, monkeypatch):
     test_db.conn.close()
 
 
-def _register(client, username, password="tpw-fixture-0001"):
+def _register(client, username, password=TEST_PASSWORD):
     resp = client.post(
         "/register",
         data={"username": username, "password": password, "password_confirm": password},

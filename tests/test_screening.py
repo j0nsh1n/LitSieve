@@ -10,6 +10,7 @@ Tests for the screening/triage layer and distinct cluster labels:
     the rest, and detection stops reporting resolved groups.
 """
 
+from conftest import TEST_PASSWORD
 import numpy as np
 import pytest
 
@@ -505,8 +506,8 @@ def _register_client(main, username="screenuser"):
         "/register",
         data={
             "username": username,
-            "password": "tpw-fixture-0001",
-            "password_confirm": "tpw-fixture-0001",
+            "password": TEST_PASSWORD,
+            "password_confirm": TEST_PASSWORD,
         },
         follow_redirects=False,
     )

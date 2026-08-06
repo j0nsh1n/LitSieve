@@ -6,6 +6,7 @@ truncate a corpus, and must stay disable-able for single-user local runs.
 
 from __future__ import annotations
 
+from conftest import TEST_PASSWORD
 import os
 
 os.environ.setdefault("SECRET_KEY", "pytest-only-not-a-secret-32b-min!!")
@@ -53,7 +54,7 @@ def app_module(tmp_path, monkeypatch):
 def _register(client, username="quotauser"):
     r = client.post(
         "/register",
-        data={"username": username, "password": "tpw-fixture-0001", "password_confirm": "tpw-fixture-0001"},
+        data={"username": username, "password": TEST_PASSWORD, "password_confirm": TEST_PASSWORD},
         follow_redirects=False,
     )
     assert r.status_code == 302, r.text

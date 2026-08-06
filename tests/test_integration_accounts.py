@@ -12,6 +12,7 @@ The app is run against an isolated working directory so users.db and the
 per-user ``user_data/<uid>/`` trees are created under tmp_path, never the repo.
 """
 
+from conftest import TEST_PASSWORD, TEST_PASSWORD_ALT
 import os
 import pathlib
 
@@ -87,7 +88,7 @@ def app_module(tmp_path, monkeypatch):
     return main
 
 
-def _register(client, username, password="tpw-fixture-0001"):
+def _register(client, username, password=TEST_PASSWORD):
     resp = client.post(
         "/register",
         data={"username": username, "password": password, "password_confirm": password},
@@ -180,7 +181,7 @@ def test_login_after_register(app_module):
     c.cookies.clear()
     resp = c.post(
         "/login",
-        data={"username": "carol", "password": "tpw-fixture-0001"},
+        data={"username": "carol", "password": TEST_PASSWORD},
         follow_redirects=False,
     )
     assert resp.status_code == 302
@@ -209,11 +210,11 @@ def test_delete_account_flow(app_module):
     assert core.user_db.get_by_username("erin") is not None
 
     # Missing CSRF header must be refused.
-    r = c.post("/api/delete-account", json={"password": "tpw-fixture-0001"})
+    r = c.post("/api/delete-account", json={"password": TEST_PASSWORD})
     assert r.status_code == 403
 
     # Correct password deletes the account, its data dir, and clears the session.
-    r = c.post("/api/delete-account", json={"password": "tpw-fixture-0001"},
+    r = c.post("/api/delete-account", json={"password": TEST_PASSWORD},
                headers={"X-CSRF-Token": csrf})
     assert r.status_code == 200
     assert core.user_db.get_by_username("erin") is None
@@ -221,7 +222,7 @@ def test_delete_account_flow(app_module):
 
     # The credentials no longer work.
     c.cookies.clear()
-    r = c.post("/login", data={"username": "erin", "password": "tpw-fixture-0001"},
+    r = c.post("/login", data={"username": "erin", "password": TEST_PASSWORD},
                follow_redirects=False)
     assert r.status_code == 400
 
@@ -250,7 +251,7 @@ def test_change_password_revokes_other_sessions(app_module):
     # Second client logs in with the same credentials (separate session cookies).
     r = second.post(
         "/login",
-        data={"username": "pwchanger", "password": "tpw-fixture-0001"},
+        data={"username": "pwchanger", "password": TEST_PASSWORD},
         follow_redirects=False,
     )
     assert r.status_code == 302
@@ -261,9 +262,9 @@ def test_change_password_revokes_other_sessions(app_module):
     r = first.post(
         "/api/change-password",
         json={
-            "current_password": "tpw-fixture-0001",
-            "new_password": "tpw-fixture-0002",
-            "new_password_confirm": "tpw-fixture-0002",
+            "current_password": TEST_PASSWORD,
+            "new_password": TEST_PASSWORD_ALT,
+            "new_password_confirm": TEST_PASSWORD_ALT,
         },
         headers={"X-CSRF-Token": csrf},
     )
@@ -277,12 +278,12 @@ def test_change_password_revokes_other_sessions(app_module):
     second.cookies.clear()
     assert second.post(
         "/login",
-        data={"username": "pwchanger", "password": "tpw-fixture-0001"},
+        data={"username": "pwchanger", "password": TEST_PASSWORD},
         follow_redirects=False,
     ).status_code == 400
     assert second.post(
         "/login",
-        data={"username": "pwchanger", "password": "tpw-fixture-0002"},
+        data={"username": "pwchanger", "password": TEST_PASSWORD_ALT},
         follow_redirects=False,
     ).status_code == 302
 
@@ -291,7 +292,7 @@ def test_change_password_revokes_other_sessions(app_module):
     r = first.post(
         "/api/change-password",
         json={
-            "current_password": "tpw-fixture-0002",
+            "current_password": TEST_PASSWORD_ALT,
             "new_password": "x" * 100,
             "new_password_confirm": "x" * 100,
         },

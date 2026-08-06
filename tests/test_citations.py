@@ -1,5 +1,6 @@
 """Unit + endpoint tests for RIS / BibTeX citation export."""
 
+from conftest import TEST_PASSWORD
 import os
 import pathlib
 import shutil
@@ -113,7 +114,7 @@ def app_module(tmp_path, monkeypatch):
 def _register(client, username="citeuser"):
     r = client.post(
         "/register",
-        data={"username": username, "password": "tpw-fixture-0001", "password_confirm": "tpw-fixture-0001"},
+        data={"username": username, "password": TEST_PASSWORD, "password_confirm": TEST_PASSWORD},
         follow_redirects=False,
     )
     assert r.status_code == 302, r.text

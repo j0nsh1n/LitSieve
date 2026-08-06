@@ -6,7 +6,13 @@ import sys
 import pytest
 
 # Provide a deterministic key so auth.py imports cleanly and tokens can be created.
+# Not a production secret — process-local only for the test suite.
 os.environ.setdefault("SECRET_KEY", "pytest-only-not-a-secret-32b-min!!")
+
+# Fixture credentials for HTTP / auth tests. Meet min length; not real secrets.
+# Import these instead of scattering password-looking string literals in tests.
+TEST_PASSWORD = "tpw-fixture-0001"
+TEST_PASSWORD_ALT = "tpw-fixture-0002"
 
 # Make the application modules importable (tests/ lives one level below repo root).
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))

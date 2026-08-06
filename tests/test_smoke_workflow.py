@@ -10,6 +10,7 @@ loads are stubbed so CI stays offline and fast.
 
 from __future__ import annotations
 
+from conftest import TEST_PASSWORD
 import os
 import pathlib
 import shutil
@@ -50,7 +51,7 @@ def app_module(tmp_path, monkeypatch):
     return main
 
 
-def _register(client: TestClient, username: str = "smoke_user", password: str = "tpw-fixture-0001"):
+def _register(client: TestClient, username: str = "smoke_user", password: str = TEST_PASSWORD):
     resp = client.post(
         "/register",
         data={"username": username, "password": password, "password_confirm": password},
