@@ -4051,11 +4051,26 @@ html.js-ready body.page-exit .footer {
    Hidden controls stay in the DOM and still submit.
    ============================================================ */
 
-/* Nav: drop Clusters and the arrow that precedes it. The arrow before
-   Duplicates stays so the flow reads DM → Clean up → Search. */
+/* Phase 6 Simple nav: Get papers → Search only (Clusters + Clean up stay
+   reachable by URL and remain in Advanced). */
 html[data-mode="simple"] .nav-step-clusters,
-html[data-mode="simple"] .nav-flow-arrow-before-clusters {
+html[data-mode="simple"] .nav-flow-arrow-before-clusters,
+html[data-mode="simple"] .nav-step-statistics,
+html[data-mode="simple"] .nav-flow-arrow-before-statistics {
     display: none !important;
+}
+/* Dual nav labels: Advanced names by default; Simple swaps in. */
+.nav-label-simple {
+    display: none !important;
+}
+html[data-mode="simple"] .nav-label-advanced {
+    display: none !important;
+}
+html[data-mode="simple"] .nav-label-simple {
+    display: inline !important;
+}
+html[data-mode="simple"] .nav-menu-current.nav-label-simple {
+    display: inline !important;
 }
 
 /* Data Management */
@@ -4108,6 +4123,50 @@ html[data-mode="simple"] .form-row:has(#threshold) {
     display: none !important;
 }
 
+/* Phase 6: screening card is Simple-only (Advanced keeps Clean up). */
+html:not([data-mode="simple"]) #simple-screening-card {
+    display: none !important;
+}
+
+/* Guest demo: hide multi-source fetch form (server also 403s the API).
+   Keep the fetch *section* for status/progress after sample prepare. */
+body[data-guest="1"] #fetch-form {
+    display: none !important;
+}
+body[data-guest="1"] .guest-fetch-note {
+    display: block !important;
+}
+.guest-fetch-note {
+    display: none;
+    margin: 0.75rem 0 1rem;
+    padding: 0.75rem 0.9rem;
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    line-height: 1.5;
+}
+.guest-fetch-note .btn {
+    margin: 0.45rem 0.35rem 0 0;
+}
+.guest-banner {
+    background: color-mix(in srgb, var(--accent, #2a5f6e) 14%, var(--surface, #fff));
+    border-bottom: 1px solid var(--rule);
+    padding: 0.55rem 1rem;
+    font-size: 0.9rem;
+}
+.guest-banner-text {
+    margin: 0;
+    max-width: 70rem;
+    margin-inline: auto;
+    line-height: 1.45;
+}
+.guest-banner a {
+    font-weight: 600;
+}
+.guest-banner-logout {
+    margin-left: 0.35rem;
+    white-space: nowrap;
+}
+
 /* Search */
 html[data-mode="simple"] details.advanced-details:has(#lexical-boost),
 html[data-mode="simple"] details.advanced-details:has(#lib-export-scope),
@@ -4116,6 +4175,198 @@ html[data-mode="simple"] #seed-input-panel,
 html[data-mode="simple"] #seed-banner,
 html[data-mode="simple"] .sim-badge {
     display: none !important;
+}
+
+/* Phase 6: Simple sticky export/report panel — Advanced never sees it. */
+html:not([data-mode="simple"]) .search-simple-panel,
+html:not([data-mode="simple"]) #search-simple-panel {
+    display: none !important;
+}
+/* Desktop Simple: results + sticky side panel. */
+html[data-mode="simple"] .search-results-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(14rem, 17rem);
+    gap: 1.25rem 1.5rem;
+    align-items: start;
+}
+html[data-mode="simple"] .search-simple-panel:not([hidden]) {
+    display: block;
+    position: sticky;
+    top: 5.5rem;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 1rem 1rem 1.1rem;
+    background: var(--surface);
+    box-sizing: border-box;
+}
+.search-simple-panel-title {
+    font-family: var(--font-serif);
+    font-size: 1.15rem;
+    margin: 0 0 0.4rem;
+}
+.search-simple-panel-lead {
+    margin: 0 0 0.85rem;
+}
+.search-simple-panel .btn-block {
+    margin-bottom: 0.5rem;
+}
+.search-simple-panel .btn-block:last-of-type {
+    margin-bottom: 0.35rem;
+}
+
+/* --- Phase 6 small screens: screening card + search panel --- */
+@media (max-width: 900px) {
+    /* Sticky side panel becomes a bottom bar so it can scroll with the phone. */
+    html[data-mode="simple"] .search-results-layout {
+        display: block;
+    }
+    html[data-mode="simple"] .search-simple-panel:not([hidden]) {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        top: auto;
+        z-index: 40;
+        border-radius: 12px 12px 0 0;
+        border: 1px solid var(--rule);
+        border-bottom: none;
+        padding: 0.75rem 0.85rem calc(0.75rem + env(safe-area-inset-bottom, 0px));
+        box-shadow: 0 -6px 24px color-mix(in srgb, var(--text) 12%, transparent);
+        max-height: 40vh;
+        overflow: auto;
+    }
+    /* Keep the last result card clear of the bottom bar. */
+    html[data-mode="simple"] #results-section.has-simple-panel {
+        padding-bottom: 9.5rem;
+    }
+    html[data-mode="simple"] .search-simple-panel-title {
+        font-size: 1.05rem;
+    }
+    html[data-mode="simple"] .search-simple-panel .btn-block {
+        min-height: 2.75rem;
+    }
+}
+
+@media (max-width: 640px) {
+    .simple-screen-levels {
+        gap: 0.55rem;
+    }
+    .simple-screen-level {
+        min-height: 2.75rem; /* ≥44px tap target */
+        padding: 0.65rem 0.7rem;
+    }
+    .simple-screen-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .simple-screen-actions .btn {
+        width: 100%;
+        min-height: 2.75rem;
+    }
+    .simple-screen-preview {
+        max-height: 12rem;
+    }
+    html[data-mode="simple"] #results-section.has-simple-panel {
+        padding-bottom: 11rem;
+    }
+}
+
+@media (max-width: 380px) {
+    .simple-screening-card {
+        padding-left: 0.85rem;
+        padding-right: 0.35rem;
+    }
+    html[data-mode="simple"] .search-simple-panel:not([hidden]) {
+        padding-left: 0.65rem;
+        padding-right: 0.65rem;
+    }
+    html[data-mode="simple"] #results-section.has-simple-panel {
+        padding-bottom: 12rem;
+    }
+}
+
+@media (hover: none) {
+    .simple-screen-level,
+    .simple-screen-actions .btn,
+    .search-simple-panel .btn {
+        min-height: 2.75rem;
+    }
+}
+
+/* === Phase 6 Simple screening card (Data Management) === */
+.simple-screening-card {
+    border-left: 4px solid var(--accent, #2a5f6e);
+    padding-left: 1.15rem;
+    padding-right: 0.5rem;
+}
+.simple-screen-levels {
+    border: none;
+    margin: 0.75rem 0 1rem;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+.simple-screen-legend {
+    font-weight: 600;
+    font-size: 0.95rem;
+    margin-bottom: 0.45rem;
+    padding: 0;
+}
+.simple-screen-level {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.55rem;
+    min-height: 2.75rem;
+    padding: 0.45rem 0.5rem;
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    margin: 0;
+    cursor: pointer;
+}
+.simple-screen-level:has(input:checked) {
+    border-color: var(--accent, #2a5f6e);
+    background: color-mix(in srgb, var(--accent, #2a5f6e) 8%, transparent);
+}
+.simple-screen-level input {
+    margin-top: 0.2rem;
+    flex: 0 0 auto;
+}
+.simple-screen-level-text {
+    line-height: 1.4;
+    flex: 1 1 auto;
+}
+.simple-screen-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+.simple-screen-preview {
+    margin-top: 0.65rem;
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 0.65rem 0.85rem;
+    max-height: 14rem;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+}
+.simple-screen-preview .quick-screen-list,
+.simple-screen-preview .simple-screen-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+.simple-screen-outcome {
+    margin-top: 0.65rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.65rem;
+}
+.simple-screen-outcome .info-text {
+    margin: 0;
 }
 
 /* Quick screen preview (Clean up page) */

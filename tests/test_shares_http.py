@@ -1,8 +1,9 @@
 """HTTP integration tests for share create / preview / join / revoke."""
 
-from conftest import TEST_PASSWORD
 import os
 import pathlib
+
+from conftest import TEST_PASSWORD
 
 os.environ.setdefault("SECRET_KEY", "pytest-only-not-a-secret-32b-min!!")
 os.environ["DEBUG"] = "true"

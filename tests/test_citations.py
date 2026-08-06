@@ -1,11 +1,11 @@
 """Unit + endpoint tests for RIS / BibTeX citation export."""
 
-from conftest import TEST_PASSWORD
 import os
 import pathlib
 import shutil
 
 import pytest
+from conftest import TEST_PASSWORD
 
 for _dep in (
     "fastapi", "httpx", "Bio", "sklearn",

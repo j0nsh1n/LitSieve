@@ -79,6 +79,7 @@
   that is normal; check the per-source list. Your last query, sources, and email are remembered
   in this browser.</p>
  </details>
+ {% include "partials/guest_fetch_note.html" %}
  <form id="fetch-form" action="#" method="post">
  <div class="form-row">
  <div class="form-group flex-2">
@@ -122,17 +123,10 @@
  <div class="progress-bar-track"><div class="progress-bar-fill" id="fetch-progress-fill"></div></div>
  <div class="progress-bar-label" id="fetch-progress-label"></div>
  </div>
- {# Next-step shortcut. Papers are ready and the next action lives on another
-    page, so offer the link right here rather than making them scroll back up
-    to the nav. Shown by JS only after prepare finishes (Simple mode). #}
- <div class="u-hidden u-mt-md" id="fetch-next-step">
- <a href="/statistics" class="btn btn-primary" id="fetch-next-step-link">
- Next: Clean up your papers →
- </a>
- <p class="info-text u-mt-sm">Remove duplicates and papers that aren’t about your topic,
- then search what’s left.</p>
- </div>
+ {% include "partials/simple_go_to_search.html" %}
 </section>
+
+{% include "partials/simple_screening_card.html" %}
 
 <!-- Coverage map (health check after a fetch) -->
 <section class="card">
@@ -203,5 +197,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/data_management.js?v=20260805n"></script>
+<script src="/static/js/data_management.js?v=20260806a"></script>
 {% endblock %}

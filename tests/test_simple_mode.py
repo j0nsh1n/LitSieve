@@ -104,50 +104,58 @@ def test_register_seeds_simple_mode_cookie(tmp_path, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# Nav: Simple contiguous 1–3; Advanced keeps four steps including Clusters
+# Nav: Phase 6 Simple is Get papers → Search (1, 2); Advanced keeps four steps
 # ---------------------------------------------------------------------------
 
 
 def test_simple_nav_steps_are_contiguous():
-    """Simple mode hides Clusters; remaining steps must be 1, 2, 3 with no gap."""
+    """Phase 6: Simple hides Clusters + Clean up; remaining steps are 1, 2."""
     base = _read("templates", "base.html")
+    # (key, advanced_label, simple_label, href, tip, simple_step)
     rows = re.findall(
-        r'\(\s*"(\w+)"\s*,\s*"[^"]*"\s*,\s*"[^"]*"\s*,\s*"[^"]*"\s*,\s*"(\d*)"\s*\)',
+        r'\(\s*"(\w+)"\s*,\s*"[^"]*"\s*,\s*"[^"]*"\s*,\s*"[^"]*"\s*,\s*"[^"]*"\s*,\s*"(\d*)"\s*\)',
         base,
     )
-    assert rows, "base.html workflow must include simple_step as 5th tuple field"
+    assert rows, "base.html workflow must include simple_step as 6th tuple field"
     by_key = dict(rows)
     assert "clusters" in by_key, by_key
     assert by_key["clusters"] == "", "Clusters has no Simple step number (hidden)"
-    visible = [by_key[k] for k in ("data_management", "statistics", "search")]
-    assert visible == ["1", "2", "3"], f"Simple steps must be contiguous 1-3, got {visible}"
+    assert by_key["statistics"] == "", "Clean up has no Simple step number (hidden)"
+    visible = [by_key[k] for k in ("data_management", "search")]
+    assert visible == ["1", "2"], f"Simple steps must be contiguous 1-2, got {visible}"
     # Advanced step indices still 1–4 on the same workflow loop.
     assert "data-step-advanced" in base
     assert 'data-step-simple="{{ simple_step }}"' in base or 'data-step-simple="' in base
 
     css = _read("static", "css", "style.css")
     assert 'html[data-mode="simple"] .nav-step-clusters' in css
+    assert 'html[data-mode="simple"] .nav-step-statistics' in css
     assert "nav-flow-arrow-before-clusters" in css
+    assert "nav-flow-arrow-before-statistics" in css
 
-    # Nav label is Clean up (not Duplicates).
+    # Advanced still labels Clean up (not Duplicates); Simple uses Get papers.
     assert "Clean up" in base
     assert re.search(r'"statistics"\s*,\s*"Clean up"', base)
+    assert "Get papers" in base
 
 
 def test_advanced_nav_keeps_clusters_and_four_steps():
-    """Advanced must still list Clusters; CSS only hides it under data-mode=simple."""
+    """Advanced must still list Clusters and Clean up; CSS only hides under simple."""
     base = _read("templates", "base.html")
     assert "nav-step-clusters" in base or "nav-step-{{ key }}" in base
     assert "/clusters" in base
     assert "Clusters" in base
+    assert "/statistics" in base
+    assert "Clean up" in base
     css = _read("static", "css", "style.css")
-    # Advanced is the default when not simple — clusters rule is simple-only.
+    # Advanced is the default when not simple — hide rules are simple-only.
     assert 'html[data-mode="simple"] .nav-step-clusters' in css
+    assert 'html[data-mode="simple"] .nav-step-statistics' in css
     assert "html:not([data-mode=\"simple\"]) .nav-step-clusters" not in css
 
 
 def test_clusters_route_still_exists():
-    """Simple mode removes Clusters from the nav only — URL must still work."""
+    """Simple mode removes Clusters/Clean up from the nav only — URLs still work."""
     paths = route_paths(app)
     assert "/clusters" in paths
     assert "/statistics" in paths
@@ -285,6 +293,31 @@ def test_fetch_auto_chains_to_prepare_both_modes():
     # Progress for auto-chain uses the fetch bar so Simple always sees it.
     assert "fetch-progress-fill" in dm
     assert "fetch-progress-wrap" in dm
+
+
+def test_silent_dedup_after_auto_prepare_simple_only():
+    """Phase 6: Simple runs resolve-duplicates after prepare; failures never throw.
+
+    Advanced must not auto-resolve here — Clean up remains the Advanced path.
+    """
+    dm = _read("static", "js", "data_management.js")
+    assert "silentResolveDuplicatesAfterPrepare" in dm
+    assert "/api/resolve-duplicates" in dm
+    assert "threshold: 0.98" in dm or "threshold:0.98" in dm
+    # Failure path continues (warn + null), never rethrows into the fetch chain.
+    fn = dm[
+        dm.find("async function silentResolveDuplicatesAfterPrepare") : dm.find(
+            "async function doCreateEmbeddings"
+        )
+    ]
+    assert "console.warn" in fn
+    assert "return null" in fn
+    # Called only on Simple auto-chain success, not for Advanced.
+    assert "fromAutoChain && simple" in dm
+    # Advanced Clean up still owns interactive resolve (unchanged page).
+    stats_js = _read("static", "js", "statistics.js")
+    assert "/api/resolve-duplicates" in stats_js
+    assert "doResolveAll" in stats_js
 
 
 def test_no_auto_cluster_on_fetch():
@@ -665,25 +698,224 @@ def test_prepare_card_stays_hidden_while_auto_chain_runs():
 
 
 def test_next_step_shortcut_exists_and_starts_hidden():
-    """Simple users should not have to scroll back to the nav after a fetch."""
-    import pathlib
+    """Phase 6: Go to Search (not Clean up), starts hidden until screen/skip."""
     import re
-    html = (pathlib.Path(__file__).resolve().parent.parent
-            / "templates" / "data_management.html").read_text()
+    # Markup lives in a labeled partial (included from data_management.html).
+    dm = _read("templates", "data_management.html")
+    assert 'include "partials/simple_go_to_search.html"' in dm
+    html = _read("templates", "partials", "simple_go_to_search.html")
     tag = re.search(r'<div[^>]*id="fetch-next-step"[^>]*>', html)
     assert tag, "fetch-next-step shortcut missing"
-    assert "u-hidden" in tag.group(0), "shortcut must start hidden"
-    assert 'href="/statistics"' in html, "shortcut must link to Clean up"
+    assert "u-hidden" in tag.group(0) or "hidden" in tag.group(0), "shortcut must start hidden"
+    assert "Go to Search" in html
+    assert 'id="fetch-next-step-link"' in html
+    link = re.search(
+        r'id="fetch-next-step-link"[^>]*href="([^"]+)"|href="([^"]+)"[^>]*id="fetch-next-step-link"',
+        html,
+    )
+    assert link, "fetch-next-step-link missing"
+    href = link.group(1) or link.group(2)
+    assert href == "/search", href
 
 
 def test_next_step_shortcut_is_simple_mode_only_and_resets():
     src = _dm_js()
     assert "function setNextStepVisible" in src
-    # Gated on Simple mode
-    block = src.split("function setNextStepVisible", 1)[1].split("}\n", 1)[0]
+    block = src.split("function setNextStepVisible", 1)[1].split("function ", 1)[0]
     assert "isSimpleMode" in block, "shortcut must be Simple-mode only"
-    # Hidden again when a new fetch starts, so it never points forward mid-job
-    assert src.count("setNextStepVisible(false)") >= 2, (
-        "shortcut must reset on a new fetch and when the chain starts"
+    # Hidden when a new fetch starts
+    assert "setNextStepVisible(false)" in src
+    # Shown after screen apply/skip via setSimpleScreenGotoVisible
+    assert "setSimpleScreenGotoVisible" in src
+    assert "setNextStepVisible(visible)" in src or "setNextStepVisible(show)" in src
+
+
+# --- Phase 6: two-page Simple (screening card + silent dedup already above) ---
+
+SIMPLE_SCREEN_FRACTIONS = {"low": 0.10, "medium": 0.25, "high": 0.50}
+
+
+def test_simple_screen_levels_map_to_documented_fractions():
+    """Low/Medium/High must match 0.10 / 0.25 / 0.50 and stay in API bounds."""
+    dm = _read("static", "js", "data_management.js")
+    assert "SIMPLE_SCREEN_LEVELS" in dm
+    for level, frac in SIMPLE_SCREEN_FRACTIONS.items():
+        assert f"{level}: {frac}" in dm or f"{level}:{frac}" in dm, level
+        assert 0.05 <= frac <= 0.50
+    # HTML has the three radios (in the Simple-only partial)
+    page = _read("templates", "data_management.html")
+    assert 'include "partials/simple_screening_card.html"' in page
+    html = _read("templates", "partials", "simple_screening_card.html")
+    assert 'name="simple-screen-level"' in html
+    assert 'value="low"' in html
+    assert 'value="medium"' in html
+    assert 'value="high"' in html
+    assert 'id="simple-screening-card"' in html
+
+
+def test_simple_screen_preview_does_not_exclude():
+    """Preview must only call quick-preview — never /api/screening exclude."""
+    dm = _read("static", "js", "data_management.js")
+    fn = dm[dm.find("async function doSimpleScreenPreview") : dm.find("async function doSimpleScreenApply")]
+    assert "/api/screening/quick-preview" in fn
+    assert 'action: \'exclude\'' not in fn and 'action: "exclude"' not in fn
+    assert "low_relevance" not in fn
+
+
+def test_simple_screen_apply_and_undo_use_low_relevance():
+    dm = _read("static", "js", "data_management.js")
+    apply_fn = dm[dm.find("async function doSimpleScreenApply") : dm.find("function doSimpleScreenSkip")]
+    assert 'action: "exclude"' in apply_fn or "action: 'exclude'" in apply_fn
+    assert "low_relevance" in apply_fn
+    undo_fn = dm[dm.find("async function doSimpleScreenUndo") : dm.find("async function silentResolveDuplicatesAfterPrepare")]
+    if "async function doSimpleScreenUndo" not in dm:
+        undo_fn = dm[dm.find("async function doSimpleScreenUndo") :]
+    assert 'action: "include"' in undo_fn or "action: 'include'" in undo_fn
+
+
+def test_simple_screen_skip_leaves_no_exclusion_call():
+    dm = _read("static", "js", "data_management.js")
+    fn = dm[dm.find("function doSimpleScreenSkip") : dm.find("async function doSimpleScreenUndo")]
+    assert "/api/screening" not in fn, "skip must not exclude anything"
+    # Records the choice through the helper, which also persists it per library
+    # so the card does not reappear on reload.
+    assert "setSimpleScreenSkipped(true)" in fn
+
+
+def test_simple_screen_pending_from_corpus_not_js_flag():
+    """Pending uses statistics + screening-report (low_relevance), not a job flag."""
+    dm = _read("static", "js", "data_management.js")
+    fn = dm[dm.find("async function refreshSimpleScreeningCard") : dm.find("async function loadSimpleScreenCounts")]
+    assert "/api/statistics" in fn
+    assert "/api/screening-report" in fn
+    assert "low_relevance" in fn
+    assert "articles_with_embeddings" in fn
+    # Must not gate only on a session flag for showing the card initially
+    assert "ready <= 0" in fn or "ready > 0" in fn or "ready <= 0" in fn
+
+
+def test_simple_screen_counts_fetched_once_not_per_radio():
+    """All three fractions load together; radio change does not re-call the API."""
+    dm = _read("static", "js", "data_management.js")
+    assert "loadSimpleScreenCounts" in dm
+    # Parallel fetch of all levels
+    assert "Object.keys(SIMPLE_SCREEN_LEVELS)" in dm or "SIMPLE_SCREEN_LEVELS" in dm
+    wire = dm[dm.find("function wireSimpleScreeningCard") : dm.find("async function doSimpleScreenPreview")]
+    # Radios: no change listener that calls loadSimpleScreenCounts
+    assert 'name="simple-screen-level"' not in wire or "addEventListener('change'" not in wire
+
+
+def test_simple_screening_card_hidden_in_advanced_css():
+    css = _read("static", "css", "style.css")
+    assert 'html:not([data-mode="simple"]) #simple-screening-card' in css
+    assert "display: none" in css.split('simple-screening-card')[1][:200]
+
+
+def test_go_to_search_not_clean_up_in_simple_next_step():
+    page = _read("templates", "data_management.html")
+    assert 'include "partials/simple_go_to_search.html"' in page
+    html = _read("templates", "partials", "simple_go_to_search.html")
+    # Phase 6 replaces Clean up shortcut with Search
+    assert 'href="/search"' in html
+    assert "Go to Search" in html
+    assert "/statistics" not in html
+
+
+def test_simple_search_side_panel_exists_and_hidden_in_advanced():
+    page = _read("templates", "search.html")
+    assert 'include "partials/simple_search_panel.html"' in page
+    html = _read("templates", "partials", "simple_search_panel.html")
+    assert 'id="search-simple-panel"' in html
+    assert 'id="simple-export-results-btn"' in html
+    assert 'id="simple-screening-report-btn"' in html
+    assert 'screening-report?format=txt' in html
+    css = _read("static", "css", "style.css")
+    assert 'html:not([data-mode="simple"]) #search-simple-panel' in css or \
+           'html:not([data-mode="simple"]) .search-simple-panel' in css
+    js = _read("static", "js", "search.js")
+    assert "updateSimpleSearchPanel" in js
+    assert "simple-export-results-btn" in js
+
+
+def test_simple_small_screen_css_for_panel_and_card():
+    css = _read("static", "css", "style.css")
+    assert "position: fixed" in css
+    assert "has-simple-panel" in css or "padding-bottom" in css
+    assert "simple-screen-level" in css
+    assert "min-height: 2.75rem" in css
+    # Narrowest breakpoint acknowledged
+    assert "max-width: 380px" in css
+
+
+# --- Skip persistence (issue 2 follow-up) -----------------------------------
+
+def test_skip_is_remembered_per_library_not_per_page_view():
+    """Skipping must survive a reload, and must be scoped to one library.
+
+    Pending/complete is derived from the corpus, which is correct — but
+    skipping leaves no trace in the corpus by definition. With a session-only
+    flag the card reappeared on refresh and took the "Go to Search" button with
+    it, so a student who chose to keep everything lost their way forward.
+    """
+    src = _dm_js()
+    assert "SKIP_KEY" in src, "skip must be persisted, not session-only"
+    assert "localStorage.setItem(SKIP_KEY" in src
+    # Scoped per library: skipping one collection says nothing about the next.
+    assert "_activeLibraryId()" in src
+    assert "function setSimpleScreenSkipped" in src
+    assert "function isSimpleScreenSkipped" in src
+
+
+def test_skip_state_is_read_through_the_helper():
+    """A raw read of the session flag would ignore the persisted value."""
+    import re
+    src = _dm_js()
+    # The only places the bare flag may appear are its declaration and the two
+    # helpers; anything else means a code path that bypasses persistence.
+    lines = [
+        i for i, ln in enumerate(src.splitlines(), 1)
+        if re.search(r"_simpleScreenSkippedSession", ln)
+    ]
+    assert len(lines) <= 3, (
+        f"bare uses of _simpleScreenSkippedSession outside the helpers: {lines}"
     )
-    assert "setNextStepVisible(true)" in src, "shortcut must appear on success"
+    assert "if (isSimpleScreenSkipped())" in src
+
+
+def test_active_library_is_resolved_before_the_skip_check():
+    """The nav select populates asynchronously; reading it early races.
+
+    Without an authoritative resolve, the first card refresh sees an empty
+    library id, misses the persisted skip, and shows the card again.
+    """
+    src = _dm_js()
+    assert "async function ensureActiveLibraryId" in src
+    assert "ensureActiveLibraryId()," in src, (
+        "the card refresh must await the library id before deciding"
+    )
+
+
+def test_new_fetch_clears_a_previous_skip():
+    """A fresh corpus has not been screened, so the choice must not carry over."""
+    src = _dm_js()
+    assert "setSimpleScreenSkipped(false)" in src
+
+
+def test_simple_mode_markup_lives_in_labeled_partials():
+    """Phase 6 Simple blocks are separately labeled files, included from the page.
+
+    Avoids forking whole pages (server cannot know uiMode) while making ownership
+    obvious for reviewers — Claude's recommended middle ground for Advanced drift.
+    """
+    dm = _read("templates", "data_management.html")
+    search = _read("templates", "search.html")
+    assert 'include "partials/simple_screening_card.html"' in dm
+    assert 'include "partials/simple_go_to_search.html"' in dm
+    assert 'include "partials/guest_fetch_note.html"' in dm
+    assert 'include "partials/simple_search_panel.html"' in search
+    # Markup itself lives in the partial, not duplicated on the page.
+    assert 'id="simple-screening-card"' not in dm
+    assert 'id="simple-screening-card"' in _read("templates", "partials", "simple_screening_card.html")
+    assert 'id="search-simple-panel"' not in search
+    assert 'id="search-simple-panel"' in _read("templates", "partials", "simple_search_panel.html")
+    assert "Narrow it down" in _read("templates", "partials", "simple_screening_card.html")

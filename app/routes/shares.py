@@ -37,6 +37,8 @@ async def api_create_share(req: ShareCreateRequest, request: Request):
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
     if csrf_failed(request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    if core.is_guest_user(user):
+        return core.guest_forbidden_response()
     uid = user["user_id"]
     try:
         ensure_libraries(uid)

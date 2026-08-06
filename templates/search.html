@@ -171,6 +171,7 @@
  <p class="info-text" id="seed-banner-text"></p>
 </section>
 
+<div class="search-results-layout" id="search-results-layout">
 <section class="search-work u-hidden" id="results-section">
  <div class="results-header">
  <h2>Results: <span id="result-count">0</span> articles found</h2>
@@ -186,6 +187,9 @@
  </details>
  <div id="results-list"></div>
 </section>
+
+{% include "partials/simple_search_panel.html" %}
+</div>
 
 <section class="card search-work" id="export-results-section" hidden>
  <h2>Export these search results</h2>
@@ -249,5 +253,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/search.js?v=20260805n"></script>
+<script src="/static/js/search.js?v=20260805p"></script>
 {% endblock %}

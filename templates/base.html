@@ -6,22 +6,33 @@
     <title>{% block title %}LitSieve{% endblock %}</title>
     <link rel="icon" href="/static/favicon.ico?v=20260803a" sizes="32x32">
     <link rel="apple-touch-icon" href="/static/favicon.png?v=20260803a">
-    <link rel="stylesheet" href="/static/css/style.css?v=20260805e">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260805j">
     <script src="/static/js/theme-init.js?v=20260805a"></script>
 </head>
-<body>
-    {# Recommended order: Fetch/Embed → Cluster/Triage → Dedup → Search.
-       simple_step: nav number when Clusters is hidden (Simple mode). #}
+<body{% if user and user.is_guest %} data-guest="1"{% endif %}>
+    {% if user and user.is_guest %}
+    <div class="guest-banner" role="status">
+     <p class="guest-banner-text">
+      <strong>Demo mode</strong> (ends after 30 minutes). Sample papers only — no real database fetch.
+      <a href="/register">Create a free account</a> to keep your work and search public sources.
+      <a href="/logout" class="guest-banner-logout">End demo</a>
+     </p>
+    </div>
+    {% endif %}
+    {# Recommended order (Advanced): Fetch/Embed → Cluster → Clean up → Search.
+       Simple (Phase 6): Get papers → Search only. simple_step / simple_label
+       empty when the step is hidden in Simple. Routes stay reachable by URL. #}
     {% set workflow = [
-        ("data_management", "Data Management", "/data-management", "Step 1: fetch papers, then prepare them for search", "1"),
-        ("clusters", "Clusters", "/clusters", "Step 2: group papers by topic and screen out off-topic ones", ""),
-        ("statistics", "Clean up", "/statistics", "Step 3: remove duplicates, quick-screen off-topic papers, screening report", "2"),
-        ("search", "Search", "/search", "Step 4: rank the papers you kept and export your list", "3"),
+        ("data_management", "Data Management", "Get papers", "/data-management", "Step 1: fetch papers, then prepare them for search", "1"),
+        ("clusters", "Clusters", "", "/clusters", "Step 2: group papers by topic and screen out off-topic ones", ""),
+        ("statistics", "Clean up", "", "/statistics", "Step 3: remove duplicates, quick-screen off-topic papers, screening report", ""),
+        ("search", "Search", "Search", "/search", "Step 4: rank the papers you kept and export your list", "2"),
     ] %}
-    {% set ns = namespace(current_label="Steps", current_num="", simple_num="") %}
-    {% for key, label, href, tip, simple_step in workflow %}
+    {% set ns = namespace(current_label="Steps", current_label_simple="Steps", current_num="", simple_num="") %}
+    {% for key, label, simple_label, href, tip, simple_step in workflow %}
         {% if key == active_page %}
             {% set ns.current_label = label %}
+            {% set ns.current_label_simple = simple_label or label %}
             {% set ns.current_num = loop.index|string %}
             {% set ns.simple_num = simple_step %}
         {% endif %}
@@ -43,7 +54,8 @@
                           data-step-advanced="{{ ns.current_num }}"
                           data-step-simple="{{ ns.simple_num }}">{{ ns.current_num }}</span>
                     {% endif %}
-                    <span class="nav-menu-current">{{ ns.current_label }}</span>
+                    <span class="nav-menu-current nav-label-advanced">{{ ns.current_label }}</span>
+                    <span class="nav-menu-current nav-label-simple">{{ ns.current_label_simple }}</span>
                 </span>
                 <span class="nav-menu-caret" aria-hidden="true">▾</span>
             </button>
@@ -69,7 +81,7 @@
         </div>
 
         <div class="nav-links" id="nav-links-panel" aria-label="Workflow steps in order">
-            {% for key, label, href, tip, simple_step in workflow %}
+            {% for key, label, simple_label, href, tip, simple_step in workflow %}
             {% if not loop.first %}
             <span class="nav-flow-arrow nav-flow-arrow-before-{{ key }}" aria-hidden="true">→</span>
             {% endif %}
@@ -80,7 +92,10 @@
                data-step-simple="{{ simple_step }}"
                {% if active_page == key %}aria-current="page"{% endif %}>
                 <span class="nav-step-num">{{ loop.index }}</span>
-                <span class="nav-step-label">{{ label }}</span>
+                <span class="nav-step-label nav-label-advanced">{{ label }}</span>
+                {% if simple_label %}
+                <span class="nav-step-label nav-label-simple">{{ simple_label }}</span>
+                {% endif %}
             </a>
             {% endfor %}
         </div>
@@ -97,7 +112,7 @@
         {{ scope_footer() }}
     </footer>
 
-    <script src="/static/js/common.js?v=20260805n"></script>
+    <script src="/static/js/common.js?v=20260805o"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

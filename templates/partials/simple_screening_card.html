@@ -1,0 +1,43 @@
+{# Phase 6 Simple only: inline screening after fetch→prepare.
+   Hidden in Advanced via CSS (html:not([data-mode=simple])) + JS.
+   Pending state is derived from the corpus (prepared papers, no
+   low_relevance exclusions) — survives reload without a job flag. #}
+<section class="card simple-screening-card" id="simple-screening-card" hidden>
+ <h2>Narrow it down</h2>
+ <p class="info-text">Set aside papers that are least related to your question before you search.</p>
+ <div class="form-group">
+  <label for="simple-screen-query">Your question</label>
+  <input type="text" id="simple-screen-query" name="simple-screen-query"
+   placeholder="e.g., climate change effects on ecosystems" autocomplete="off">
+ </div>
+ <fieldset class="simple-screen-levels" id="simple-screen-levels">
+  <legend class="simple-screen-legend">How much should we set aside?</legend>
+  <label class="simple-screen-level radio-label">
+   <input type="radio" name="simple-screen-level" value="low">
+   <span class="simple-screen-level-text">Low — sets aside about <strong id="simple-screen-count-low">…</strong></span>
+  </label>
+  <label class="simple-screen-level radio-label">
+   <input type="radio" name="simple-screen-level" value="medium" checked>
+   <span class="simple-screen-level-text">Medium — sets aside about <strong id="simple-screen-count-medium">…</strong></span>
+  </label>
+  <label class="simple-screen-level radio-label">
+   <input type="radio" name="simple-screen-level" value="high">
+   <span class="simple-screen-level-text">High — sets aside about <strong id="simple-screen-count-high">…</strong></span>
+  </label>
+ </fieldset>
+ <p class="info-text simple-screen-total" id="simple-screen-total" hidden></p>
+ <div class="form-row simple-screen-actions" id="simple-screen-actions">
+  <button type="button" class="btn btn-secondary" id="simple-screen-preview-btn">Show me what would go</button>
+  <button type="button" class="btn btn-primary" id="simple-screen-apply-btn">Set them aside</button>
+  <button type="button" class="btn btn-secondary" id="simple-screen-skip-btn">Skip this</button>
+ </div>
+ <div id="simple-screen-preview" class="simple-screen-preview u-hidden" hidden></div>
+ <div id="simple-screen-outcome" class="simple-screen-outcome u-hidden" hidden>
+  <p class="info-text" id="simple-screen-outcome-msg"></p>
+  <button type="button" class="btn btn-secondary btn-sm" id="simple-screen-undo-btn" hidden>Undo</button>
+ </div>
+ <div id="simple-screen-status" class="status-indicator"></div>
+ <div class="u-mt-md" id="simple-screen-goto" hidden>
+  <a href="/search" class="btn btn-primary" id="simple-screen-goto-link">Go to Search →</a>
+ </div>
+</section>

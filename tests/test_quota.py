@@ -6,8 +6,9 @@ truncate a corpus, and must stay disable-able for single-user local runs.
 
 from __future__ import annotations
 
-from conftest import TEST_PASSWORD
 import os
+
+from conftest import TEST_PASSWORD
 
 os.environ.setdefault("SECRET_KEY", "pytest-only-not-a-secret-32b-min!!")
 os.environ["DEBUG"] = "true"

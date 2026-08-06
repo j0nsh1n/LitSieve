@@ -8,12 +8,20 @@ build/
 .env
 .env.*
 !.env.example
+.env.local
 .secret_key
 *.secret_key
 *.pem
 *.key
 *.pfx
+*.p12
+*.crt
 secrets.*
+# Explicit operator dumps (also covered by secrets/*)
+secrets/cloudflared.env
+secrets/cloudflared.token
+**/ai_settings.json
+user_data/**/ai_settings.json
 
 # --- Databases / user data (accounts, password hashes, fetched corpora) ---
 *.db
@@ -21,12 +29,20 @@ secrets.*
 *.db-shm
 *.sqlite
 *.sqlite3
+users.db
+users.db-*
 .pytest_cache/
 .ruff_cache/
 user_data/
 .venv/
 venv/
 .claude/
+
+# Verified backup archives (tools/backup.py) — live data + may include .env
+backups/
+*.tar.gz
+*.tar.zst
+litsieve-backup-*.tar*
 
 # Governance / product state files (agents.md, spec.md, roadmap.md, context.md,
 # CHANGELOG.md) are tracked — do not re-ignore them.
@@ -43,7 +59,6 @@ secrets/*
 !secrets/*.example
 secrets/letsencrypt/
 *.env.save
-secrets/cloudflared.token
 
 # Runtime logs (see LOG_FILE in .env.example)
 logs/

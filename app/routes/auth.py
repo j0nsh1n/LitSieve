@@ -1,7 +1,8 @@
-"""Registration, login, logout, password reset/change, account deletion."""
+"""Registration, login, logout, password reset/change, account deletion, guest demo."""
 
 import logging
 import os
+import secrets
 import shutil
 from typing import Optional
 from urllib.parse import unquote
@@ -22,7 +23,9 @@ from app.core import (
     _set_auth_cookies,
     csrf_failed,
     current_user,
+    get_pipeline,
     limiter,
+    release_pipeline,
     run_in_thread,
     server_error,
     templates,
@@ -266,6 +269,86 @@ async def register_submit(
         path="/",
     )
     return response
+
+
+async def _start_guest_session(request: Request) -> RedirectResponse:
+    """Create a throwaway guest account, load sample papers, log them in.
+
+    Guests cannot fetch from real databases (server-enforced). Sample corpus
+    only — enough to try prepare → screen → search → export.
+    Accounts and their libraries are deleted after core.GUEST_MAX_AGE_MINUTES.
+    """
+    # Sweep expired demos whenever someone starts a new one.
+    try:
+        core.purge_expired_guests()
+    except Exception:
+        logger.exception("purge_expired_guests before guest start failed")
+
+    # Already signed in: just go to the app (do not replace a real account).
+    # Expired guests already returned None from current_user above path.
+    if current_user(request):
+        return RedirectResponse(url="/data-management", status_code=302)
+
+    from app.content.sample_corpus import get_sample_articles
+
+    username = f"guest_{secrets.token_hex(4)}"
+    # Unusable password (never shown); guests sign in only via /guest.
+    hashed = await hash_password_async(secrets.token_urlsafe(32))
+    try:
+        user = core.user_db.create_user(username, hashed, is_guest=True)
+    except ValueError:
+        # Extremely unlikely collision on token_hex; one retry.
+        username = f"guest_{secrets.token_hex(5)}"
+        user = core.user_db.create_user(username, hashed, is_guest=True)
+
+    uid = user["id"]
+    # Load demo papers into their private library (no external APIs).
+    p = get_pipeline(uid)
+    try:
+        articles = get_sample_articles()
+        p.db.clear_all()
+        p.db.insert_articles(articles, dedupe=False)
+        p.invalidate_corpus_cache()
+    except Exception:
+        logger.exception("Guest sample load failed for %s", uid)
+        # Still let them in; they can use "Load sample papers" on DM.
+    finally:
+        release_pipeline(uid)
+
+    token = create_token(
+        user["id"], user["username"], user.get("token_version", 0),
+    )
+    response = RedirectResponse(url="/data-management", status_code=302)
+    # Cookies expire with the demo window so browsers drop the session too.
+    _set_auth_cookies(
+        response, token, max_age=core.GUEST_MAX_AGE_MINUTES * 60,
+    )
+    # Guests start in Simple mode (same seed as new registrations).
+    response.set_cookie(
+        "ui_mode_seed",
+        "simple",
+        httponly=False,
+        secure=core.COOKIE_SECURE,
+        samesite="lax",
+        max_age=600,
+        path="/",
+    )
+    return response
+
+
+@router.get("/guest")
+@limiter.limit("12/minute")
+async def guest_start_get(request: Request):
+    """Link-friendly entry: Try the demo without creating an account."""
+    return await _start_guest_session(request)
+
+
+@router.post("/guest")
+@limiter.limit("12/minute")
+async def guest_start_post(request: Request):
+    """Form POST entry (same as GET /guest)."""
+    return await _start_guest_session(request)
+
 
 
 @router.get("/logout")

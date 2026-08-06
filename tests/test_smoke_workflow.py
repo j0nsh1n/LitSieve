@@ -10,13 +10,13 @@ loads are stubbed so CI stays offline and fast.
 
 from __future__ import annotations
 
-from conftest import TEST_PASSWORD
 import os
 import pathlib
 import shutil
 
 import numpy as np
 import pytest
+from conftest import TEST_PASSWORD
 
 from app import core
 

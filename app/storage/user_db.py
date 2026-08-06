@@ -67,6 +67,11 @@ class UserDatabase:
             self.conn.execute(
                 "ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0"
             )
+        # Guest demo accounts: sample corpus only; no real multi-source fetch.
+        if "is_guest" not in cols:
+            self.conn.execute(
+                "ALTER TABLE users ADD COLUMN is_guest INTEGER NOT NULL DEFAULT 0"
+            )
         # One *verified* address per account, and no two accounts may verify the
         # same address (unverified duplicates are allowed — anyone can type any
         # address, only clicking the link proves control).
@@ -138,7 +143,9 @@ class UserDatabase:
         )
         self.conn.commit()
 
-    def create_user(self, username: str, hashed_password: str) -> Dict:
+    def create_user(
+        self, username: str, hashed_password: str, *, is_guest: bool = False
+    ) -> Dict:
         """Create a user. Raises ValueError if the username is already taken.
 
         The UNIQUE constraint is the source of truth: relying on a prior
@@ -146,12 +153,13 @@ class UserDatabase:
         concurrent registrations both pass the check and one hits IntegrityError.
         """
         user_id = str(uuid.uuid4())
+        guest = 1 if is_guest else 0
         with self._lock:
             try:
                 self.conn.execute(
-                    "INSERT INTO users (id, username, hashed_password, token_version) "
-                    "VALUES (?, ?, ?, 0)",
-                    (user_id, username, hashed_password),
+                    "INSERT INTO users (id, username, hashed_password, token_version, is_guest) "
+                    "VALUES (?, ?, ?, 0, ?)",
+                    (user_id, username, hashed_password, guest),
                 )
                 self.conn.commit()
             except dbconn.integrity_errors() as e:
@@ -159,12 +167,18 @@ class UserDatabase:
                 # naming sqlite3's would stop catching this the moment
                 # DB_ENCRYPTION_KEY is set, turning a taken username into a 500.
                 raise ValueError(f"Username already taken: {username}") from e
-        return {"id": user_id, "username": username, "token_version": 0}
+        return {
+            "id": user_id,
+            "username": username,
+            "token_version": 0,
+            "is_guest": bool(guest),
+        }
 
     def get_by_username(self, username: str) -> Optional[Dict]:
         with self._lock:
             row = self.conn.execute(
-                "SELECT id, username, hashed_password, token_version, email, email_verified "
+                "SELECT id, username, hashed_password, token_version, email, email_verified, "
+                "COALESCE(is_guest, 0), created_at "
                 "FROM users WHERE username = ? COLLATE NOCASE",
                 (username,),
             ).fetchone()
@@ -176,13 +190,16 @@ class UserDatabase:
                 "token_version": int(row[3] or 0),
                 "email": row[4],
                 "email_verified": bool(row[5]),
+                "is_guest": bool(row[6]),
+                "created_at": row[7],
             }
         return None
 
     def get_by_id(self, user_id: str) -> Optional[Dict]:
         with self._lock:
             row = self.conn.execute(
-                "SELECT id, username, hashed_password, token_version, email, email_verified "
+                "SELECT id, username, hashed_password, token_version, email, email_verified, "
+                "COALESCE(is_guest, 0), created_at "
                 "FROM users WHERE id = ?",
                 (user_id,),
             ).fetchone()
@@ -194,8 +211,34 @@ class UserDatabase:
                 "token_version": int(row[3] or 0),
                 "email": row[4],
                 "email_verified": bool(row[5]),
+                "is_guest": bool(row[6]),
+                "created_at": row[7],
             }
         return None
+
+    def list_expired_guest_ids(self, max_age_minutes: int = 30) -> list:
+        """Guest account ids older than max_age_minutes (SQLite UTC datetime)."""
+        minutes = max(1, int(max_age_minutes))
+        with self._lock:
+            rows = self.conn.execute(
+                "SELECT id FROM users "
+                "WHERE COALESCE(is_guest, 0) = 1 "
+                "AND created_at < datetime('now', ?)",
+                (f"-{minutes} minutes",),
+            ).fetchall()
+        return [row[0] for row in rows if row and row[0]]
+
+    def guest_is_expired(self, user_id: str, max_age_minutes: int = 30) -> bool:
+        """True if this guest account is past max_age_minutes (non-guests → False)."""
+        minutes = max(1, int(max_age_minutes))
+        with self._lock:
+            row = self.conn.execute(
+                "SELECT 1 FROM users "
+                "WHERE id = ? AND COALESCE(is_guest, 0) = 1 "
+                "AND created_at < datetime('now', ?)",
+                (user_id, f"-{minutes} minutes"),
+            ).fetchone()
+        return row is not None
 
     def update_password(self, user_id: str, hashed_password: str) -> bool:
         """Set password hash and bump token_version so other sessions die."""

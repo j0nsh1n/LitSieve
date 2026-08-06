@@ -290,6 +290,10 @@ def start_user_job(uid: str, task: str, fn, /, **kwargs) -> bool:
     return True
 
 
+# Ephemeral demo sessions: delete guest accounts and their libraries after this.
+GUEST_MAX_AGE_MINUTES = 30
+
+
 def current_user(request: Request) -> Optional[dict]:
     """JWT + live account check (token_version) so password change revokes old sessions."""
     payload = get_current_user(request)
@@ -300,23 +304,86 @@ def current_user(request: Request) -> Optional[dict]:
         return None
     if int(payload.get("tv", 0) or 0) != int(record.get("token_version") or 0):
         return None
+    # Guest demos expire after GUEST_MAX_AGE_MINUTES — drop the account and treat as logged out.
+    if record.get("is_guest") and user_db.guest_is_expired(
+        record["id"], GUEST_MAX_AGE_MINUTES
+    ):
+        try:
+            destroy_guest_account(record["id"])
+        except Exception:
+            logger.exception("Failed to expire guest %s", record["id"])
+        return None
     return {
         "user_id": record["id"],
         "username": record["username"],
         "token_version": int(record.get("token_version") or 0),
+        "is_guest": bool(record.get("is_guest")),
+        "created_at": record.get("created_at"),
     }
 
 
-def _set_auth_cookies(response, token: str):
+def is_guest_user(user: Optional[dict]) -> bool:
+    """True when the session is a demo guest (sample corpus only)."""
+    return bool(user and user.get("is_guest"))
+
+
+def guest_forbidden_response():
+    """403 body when a guest hits a real-library action (fetch, shares, …)."""
+    from fastapi.responses import JSONResponse
+
+    return JSONResponse(
+        status_code=403,
+        content={
+            "detail": (
+                "Demo mode only uses the built-in sample papers. "
+                "Create a free account to fetch from research databases and keep your work."
+            ),
+            "guest": True,
+        },
+    )
+
+
+def destroy_guest_account(user_id: str) -> None:
+    """Evict pipelines, remove private data dir, delete the users row."""
+    import shutil
+
+    from app.storage.libraries import user_dir as lib_user_dir
+
+    _evict_pipeline(user_id)
+    udir = lib_user_dir(user_id)
+    if udir.is_dir():
+        shutil.rmtree(udir, ignore_errors=True)
+    user_db.delete_user(user_id)
+
+
+def purge_expired_guests(max_age_minutes: Optional[int] = None) -> int:
+    """Delete guest accounts older than max_age_minutes. Returns how many were removed."""
+    age = GUEST_MAX_AGE_MINUTES if max_age_minutes is None else int(max_age_minutes)
+    ids = user_db.list_expired_guest_ids(age)
+    n = 0
+    for uid in ids:
+        try:
+            destroy_guest_account(uid)
+            n += 1
+        except Exception:
+            logger.exception("purge_expired_guests: failed for %s", uid)
+    if n:
+        logger.info("Purged %s expired guest demo account(s)", n)
+    return n
+
+
+def _set_auth_cookies(response, token: str, max_age: Optional[int] = None):
     """Set the JWT (httponly) and a CSRF token (readable) as cookies."""
+    # Default 30 days for real accounts; guests pass a short max_age.
+    age = 30 * 24 * 3600 if max_age is None else int(max_age)
     csrf_token = secrets.token_urlsafe(32)
     response.set_cookie(
         "access_token", token, httponly=True, secure=COOKIE_SECURE,
-        samesite="lax", max_age=30 * 24 * 3600,
+        samesite="lax", max_age=age,
     )
     response.set_cookie(
         "csrf_token", csrf_token, httponly=False, secure=COOKIE_SECURE,
-        samesite="lax", max_age=30 * 24 * 3600,
+        samesite="lax", max_age=age,
     )
 
 

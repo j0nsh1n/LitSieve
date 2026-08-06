@@ -10,9 +10,9 @@ Tests for the screening/triage layer and distinct cluster labels:
     the rest, and detection stops reporting resolved groups.
 """
 
-from conftest import TEST_PASSWORD
 import numpy as np
 import pytest
+from conftest import TEST_PASSWORD
 
 pytest.importorskip("sklearn")
 
