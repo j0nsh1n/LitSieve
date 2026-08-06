@@ -270,7 +270,11 @@ class ArticleDatabase:
             logger.info("Schema migration complete.")
 
     def clear_all(self):
-        """Delete all articles, embeddings, clusters, screening, notes, key points."""
+        """Wipe the library (replace-fetch / sample reset).
+
+        This is the only path that drops student-saved AI key points. Append
+        fetch and re-prepare leave origin=ai rows intact.
+        """
         with self._lock:
             cursor = self.conn.cursor()
             cursor.execute("DELETE FROM key_points")

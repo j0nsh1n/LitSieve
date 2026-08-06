@@ -514,19 +514,25 @@ def test_dual_mode_labels_never_cross_bleed_in_css():
         ), f"missing advanced-hide for {simple}"
 
 
-def test_ai_saved_key_points_survive_extractive_regen(tmp_path):
-    """Student-saved AI key points persist across re-search and re-prepare."""
+def test_ai_saved_key_points_survive_append_not_replace(tmp_path):
+    """AI key points survive append-fetch + re-prepare; only replace clears them.
+
+    Contract: keep until replace-collection (clear_all). Add-to-collection and
+    re-search/re-prepare must not wipe student-approved AI rewrites.
+    """
+    from app.services.enrich import attach_key_points
     from app.services.pipeline import LiteratureSearchPipeline
     from app.storage.database import ArticleDatabase
 
-    db = ArticleDatabase(db_path=str(tmp_path / "kp.db"))
+    path = str(tmp_path / "kp.db")
+    db = ArticleDatabase(db_path=path)
     try:
         db.insert_articles(
             [
                 {
                     "article_id": "a1",
                     "source": "pubmed",
-                    "title": "T",
+                    "title": "Paper A",
                     "abstract": "Abstract with enough text for key points extraction path.",
                     "year": "2020",
                     "authors": [],
@@ -540,19 +546,53 @@ def test_ai_saved_key_points_survive_extractive_regen(tmp_path):
             origin="ai",
         )
         assert db.get_key_points_origin_map()[("a1", "pubmed")] == "ai"
-        assert ("a1", "pubmed") in db.get_ai_key_points_keys()
 
-        # Extractive regen must not overwrite AI origin.
-        p = LiteratureSearchPipeline(db_path=str(tmp_path / "kp.db"))
+        # Simulate append-fetch: add another paper, upsert existing metadata.
+        db.insert_articles(
+            [
+                {
+                    "article_id": "a1",
+                    "source": "pubmed",
+                    "title": "Paper A updated title",
+                    "abstract": "Abstract with enough text for key points extraction path.",
+                    "year": "2020",
+                    "authors": [],
+                    "journal": "",
+                },
+                {
+                    "article_id": "a2",
+                    "source": "pubmed",
+                    "title": "Paper B",
+                    "abstract": "Another abstract for a newly appended paper in the library.",
+                    "year": "2021",
+                    "authors": [],
+                    "journal": "",
+                },
+            ],
+            dedupe=False,
+        )
+        # Append prepare: only_missing=True and force full extractive both leave AI alone.
+        p = LiteratureSearchPipeline(db_path=path)
         try:
-            n = p._generate_key_points(only_missing=False)
-            assert n == 0  # protected
+            assert p._generate_key_points(only_missing=True) >= 0
+            assert p._generate_key_points(only_missing=False) >= 0
             assert db.get_key_points_map()[("a1", "pubmed")] == [
                 "AI bullet one.",
                 "AI bullet two.",
             ]
             assert db.get_key_points_origin_map()[("a1", "pubmed")] == "ai"
+
+            # Re-search style enrich still surfaces AI origin + bullets.
+            arts = [{"article_id": "a1", "source": "pubmed"}]
+            attach_key_points(arts, p)
+            assert arts[0]["key_points"] == ["AI bullet one.", "AI bullet two."]
+            assert arts[0]["key_points_origin"] == "ai"
         finally:
             p.close()
+
+        # Replace-fetch wipes the library including AI key points.
+        db.clear_all()
+        assert db.get_key_points_map() == {}
+        assert db.get_ai_key_points_keys() == set()
     finally:
         db.close()
