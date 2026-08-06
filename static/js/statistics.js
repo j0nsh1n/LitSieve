@@ -230,6 +230,15 @@ async function loadScreeningReport() {
  }
 }
 
+function updateCleanupWorkVisibility(stats) {
+ // Hide dup / quick-screen / report until papers are prepared — empty CTA only.
+ const emb = (stats && stats.articles_with_embeddings) || 0;
+ const ready = emb > 0;
+ document.querySelectorAll('.cleanup-work').forEach((el) => {
+  el.hidden = !ready;
+ });
+}
+
 async function loadStatistics() {
  try {
  const stats = await apiCall('/api/statistics');
@@ -241,6 +250,7 @@ async function loadStatistics() {
  if (typeof applyEmptyState === 'function') {
  applyEmptyState('dup-empty-state', stats, 'embeddings', 'dup-empty-msg');
  }
+ updateCleanupWorkVisibility(stats);
 
  const sources = stats.sources || {};
  const sourceKeys = Object.keys(sources);
