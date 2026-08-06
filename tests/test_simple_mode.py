@@ -147,15 +147,18 @@ def test_clusters_route_still_exists():
     assert "/clusters" in paths
 
 
-def test_simple_mode_auto_chains_fetch_to_prepare():
-    """After a successful fetch in Simple mode, prepare starts without a second click.
+def test_fetch_auto_chains_to_prepare():
+    """After a successful fetch, prepare starts without a second click (all modes).
 
-    Zero papers / cancelled / quota must not start prepare. Advanced stays manual.
+    Zero papers / cancelled / quota must not start prepare.
     """
     dm = (REPO / "static" / "js" / "data_management.js").read_text(encoding="utf-8")
-    assert "isSimpleMode" in dm
     assert "fromAutoChain" in dm
     assert "Getting your papers ready" in dm
+    # Auto-chain is not gated on Simple mode only.
+    chain_block = dm[dm.find("fetchedOk") : dm.find("async function doCreateEmbeddings")]
+    assert "fromAutoChain" in chain_block
+    assert "isSimpleMode" not in chain_block
     # Guard: do not auto-start on empty fetch.
     assert "total_fetched" in dm
     # Must still go through the job API (never inline embed work in the page).

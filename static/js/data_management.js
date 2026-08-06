@@ -805,18 +805,16 @@ async function doFetch() {
  );
  }
  applyFetchResult(data, sources);
- // Advanced: student presses "Prepare Papers" when ready (avoids surprise
- // long jobs). Simple: auto-chain prepare so the student sees one continuous
- // "getting papers ready" flow. Never start prepare on zero papers / cancel /
- // quota stop. Never auto-cluster here.
+ // Auto-chain prepare after every successful fetch (Simple and Advanced).
+ // Present as one continuous "getting papers ready" flow. Never start
+ // prepare on zero papers / cancel / quota stop. Never auto-cluster here.
+ // The Prepare Papers button remains for re-run after a model change.
  const fetchedOk = (data.total_fetched || 0) > 0
   && !data.cancelled && !data.quota_stopped
   && data.status !== 'quota_stopped'
   && data.status !== 'cancelled';
  if (fetchedOk) {
  applyModelRecommendation();
- const simple = typeof isSimpleMode === 'function' && isSimpleMode();
- if (simple) {
  setStatus(
  'fetch-status',
  `Fetched ${data.total_fetched} paper(s). Getting them ready for search…`,
@@ -828,13 +826,6 @@ async function doFetch() {
  await doCreateEmbeddings({ fromAutoChain: true });
  } catch (chainErr) {
  // doCreateEmbeddings already surfaces errors; do not rethrow into fetch.
- }
- } else {
- setStatus(
- 'embeddings-status',
- 'Fetch finished. Check the analysis model above, then press Prepare Papers when you are ready.',
- 'info'
- );
  }
  }
  } catch (e) {
