@@ -1589,6 +1589,25 @@ body.lra-modal-open {
 .empty-state-card {
     border-left: 4px solid var(--accent, #2a5f6e);
 }
+/* Room between title, message, and CTA — plain <p> wrappers were collapsing. */
+.empty-state-card h2 {
+    margin: 0 0 0.75rem;
+}
+.empty-state-card > .info-text {
+    margin: 0 0 1.15rem;
+    max-width: 40rem;
+    line-height: 1.55;
+}
+.empty-state-card > p:not(.info-text) {
+    margin: 0;
+}
+.empty-state-card .empty-state-actions {
+    margin: 0.25rem 0 0;
+}
+.empty-state-card .btn {
+    display: inline-flex;
+    margin-top: 0.15rem;
+}
 .getting-started-header {
     display: flex;
     align-items: center;

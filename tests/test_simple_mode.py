@@ -327,15 +327,20 @@ def test_clean_up_page_and_quick_screen_ui_present():
     assert "Clean up" in html
     assert "quick-screen" in html
     assert "Preview suggestions" in html
+    assert "cleanup-work" in html
+    assert "empty-state-actions" in html
     js = (REPO / "static" / "js" / "statistics.js").read_text(encoding="utf-8")
     assert "/api/screening/quick-preview" in js
     assert "low_relevance" in js
     assert "doQuickScreenPreview" in js
     assert "doQuickScreenApply" in js
+    assert "updateCleanupWorkVisibility" in js
     # Apply is a separate call from preview.
     assert js.index("quick-preview") < js.index("action: 'exclude'") or (
         "action: 'exclude'" in js and "low_relevance" in js
     )
+    css = (REPO / "static" / "css" / "style.css").read_text(encoding="utf-8")
+    assert ".empty-state-card > .info-text" in css
 
 
 def test_search_not_relevant_button_uses_off_topic():

@@ -26,10 +26,12 @@
 <section class="card empty-state-card" id="dup-empty-state" hidden>
  <h2>No papers to check yet</h2>
  <p class="info-text" id="dup-empty-msg">Fetch papers on Data Management, then prepare them for search so duplicates can be detected.</p>
- <p><a class="btn btn-primary btn-sm" href="/data-management">Go to Data Management</a></p>
+ <p class="empty-state-actions">
+  <a class="btn btn-primary btn-sm" href="/data-management">Go to Data Management</a>
+ </p>
 </section>
 
-<section class="card">
+<section class="card cleanup-work" id="dup-work-section">
  <h2>1. Remove duplicates</h2>
  <p class="info-text">Finds near-identical papers across your sources so you can keep one copy of each.
  Removed copies are screened out, never deleted.</p>
@@ -56,7 +58,7 @@
  <div id="duplicates-list"></div>
 </section>
 
-<section class="card" id="quick-screen-section">
+<section class="card cleanup-work" id="quick-screen-section">
  <h2>2. Quick screen</h2>
  <p class="info-text">The app ranks your papers against your research question and suggests the
  <strong>least related</strong> ones. You always review the titles before anything is screened out.
@@ -94,7 +96,7 @@
  </p>
 </section>
 
-<section class="card">
+<section class="card cleanup-work" id="screening-report-section">
  <div class="screening-report-header">
  <div>
  <h2 class="screening-report-title">3. Screening report</h2>
@@ -134,5 +136,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/statistics.js?v=20260805a"></script>
+<script src="/static/js/statistics.js?v=20260805e"></script>
 {% endblock %}

@@ -674,3 +674,86 @@ def test_api_screening_normalizes_reason_on_wire(screening_app):
     assert r.json()["reason"] == "wrong_study_type"
     report = c.get("/api/screening-report?format=json").json()
     assert report["excluded"]["wrong_study_type"] == 1
+
+
+def test_api_quick_screen_preview_apply_undo(screening_app, monkeypatch):
+    """End-to-end Quick screen: preview (read-only) → apply low_relevance → re-include."""
+    import numpy as np
+
+    from app import core
+    from app.core import get_pipeline, release_pipeline
+
+    c = _register_client(screening_app, "quickscreen1")
+    _seed_user_library(screening_app, c, n=8, with_clusters=False)
+
+    rows = core.user_db.conn.execute("SELECT id FROM users").fetchall()
+    uid = rows[0][0]
+    p = get_pipeline(uid)
+    try:
+        emb = {
+            (str(i + 1), "pubmed"): np.eye(8, dtype=np.float32)[i]
+            for i in range(8)
+        }
+        p.db.insert_embeddings(emb, model_name="general")
+        # Deterministic query vector = first basis vector.
+        p.embedding_engine.embed_query = (  # type: ignore[method-assign]
+            lambda _t: np.eye(8, dtype=np.float32)[0]
+        )
+        p.invalidate_corpus_cache()
+    finally:
+        release_pipeline(uid)
+
+    # Unauthenticated preview rejected.
+    bare = __import__("fastapi.testclient", fromlist=["TestClient"]).TestClient(
+        screening_app.app
+    )
+    assert bare.post(
+        "/api/screening/quick-preview",
+        json={"query": "sleep adolescents", "fraction": 0.25},
+    ).status_code == 401
+
+    # Preview — does not write exclusions.
+    r = c.post(
+        "/api/screening/quick-preview",
+        json={"query": "sleep adolescents", "fraction": 0.25},
+        headers=_csrf(c),
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["total_ranked"] == 8
+    assert body["proposed_count"] >= 1
+    assert body["proposed_count"] < 8
+    assert len(body["candidates"]) == body["proposed_count"]
+    for cand in body["candidates"]:
+        assert cand["article_id"]
+        assert cand["source"]
+        assert "title" in cand
+    report = c.get("/api/screening-report?format=json").json()
+    assert report["excluded"]["total"] == 0, "preview must not exclude"
+
+    items = [
+        {"article_id": cand["article_id"], "source": cand["source"]}
+        for cand in body["candidates"]
+    ]
+    # Apply via existing screening endpoint (separate call).
+    r = c.post(
+        "/api/screening",
+        json={"items": items, "action": "exclude", "reason": "low_relevance"},
+        headers=_csrf(c),
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["count"] == len(items)
+    assert r.json()["reason"] == "low_relevance"
+    report = c.get("/api/screening-report?format=json").json()
+    assert report["excluded"]["low_relevance"] == len(items)
+    assert report["excluded"]["total"] == len(items)
+
+    # Undo
+    r = c.post(
+        "/api/screening",
+        json={"items": items, "action": "include"},
+        headers=_csrf(c),
+    )
+    assert r.status_code == 200, r.text
+    report = c.get("/api/screening-report?format=json").json()
+    assert report["excluded"]["total"] == 0
