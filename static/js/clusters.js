@@ -263,6 +263,7 @@ function buildClusterArticleItem(article) {
  ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" class="article-link">${idText}</a>`
  : idText;
  const authors = (article.authors || []).join('; ');
+ const abstractHtml = escapeHtml(article.abstract || '');
  const keyPointsHtml = typeof renderKeyPointsHtml === 'function'
  ? renderKeyPointsHtml(article.key_points, {
  articleId: article.article_id,
@@ -287,6 +288,7 @@ function buildClusterArticleItem(article) {
  <div class="article-meta meta-authors">
  <span><strong>Authors:</strong> ${escapeHtml(authors)}</span>
  </div>
+ ${abstractHtml ? `<div class="article-abstract">${abstractHtml}</div>` : ''}
  ${keyPointsHtml}
  `;
 
