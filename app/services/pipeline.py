@@ -401,7 +401,8 @@ class LiteratureSearchPipeline:
         pool = articles if articles is not None else self.db.get_all_articles()
         if not pool:
             return 0
-        # Never overwrite student-saved AI rewrites (until clear_all on replace-fetch).
+        # Never overwrite student-saved AI rewrites. They survive append-fetch
+        # and re-prepare; only clear_all (replace collection) drops them.
         protected = self.db.get_ai_key_points_keys()
         if only_missing:
             existing = self.db.get_key_points_keys()
