@@ -305,6 +305,14 @@ body {
     .nav-menu-toggle {
         display: none !important;
     }
+    /* Brand left, trailing controls right (menu toggle is display:none). */
+    .navbar-top {
+        display: flex;
+        justify-content: space-between;
+    }
+    .nav-stats {
+        margin-left: auto;
+    }
     .nav-links,
     #nav-links-panel,
     .navbar.nav-open .nav-links,
