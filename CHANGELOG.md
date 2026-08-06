@@ -8,80 +8,36 @@ and this project aims to follow Semantic Versioning for app version strings
 
 ## [Unreleased]
 
+## [4.5.0] - 2026-08-05
+
 ### Added
-- Health watchdog (`tools/watchdog.py` + `deploy/litsieve-watchdog.timer`,
-  every 5 min). Checks that the app answers locally **and** that the Cloudflare
-  tunnel currently holds registered connections, then emails on state changes
-  using the existing SMTP settings. Set `WATCHDOG_EMAIL_TO` to receive alerts.
-- `USERS_DB` env var for the accounts database path, so a dev server can use a
-  throwaway accounts file. `run_dev.sh` now sets `USERS_DB`, `USER_DATA_DIR`
-  and `LOG_FILE` to dev-only values **by default** — previously it opened the
-  live accounts DB and real paper libraries, so a local test could write into a
-  student's library or change a real password.
-
-- Logs are written to a rotating file (`logs/litpilot.log`) as well as the
-  console, including uvicorn's access log. Configure with `LOG_FILE`,
-  `LOG_LEVEL`, `LOG_MAX_BYTES`, `LOG_BACKUP_COUNT`; total size is capped
-  (~30 MB by default) so a home server cannot fill its disk.
-- `.env.example` now documents logging plus `MAX_LOADED_MODELS` and
-  `EXTRA_EMBEDDING_MODELS`, which shipped earlier undocumented.
-
-### Fixed
-- `run_dev.sh` and `tools/setup_cloudflare_tunnel.sh` are executable again;
-  `./run_dev.sh` failed with "Permission denied" (mode 644 in git).
-- Duplicate usernames and share-code collisions stay clean errors under
-  SQLCipher. Three `except sqlite3.IntegrityError` catches stopped matching when
-  `DB_ENCRYPTION_KEY` selects the sqlcipher3 driver, turning "username already
-  taken" into a 500 on encrypted deployments only.
-- `run_dev.sh` no longer passes `--reload-include`, which uvicorn silently
-  ignores without `watchfiles` installed.
-
-- Starring or annotating a paper that has left your library now returns a clear
-  404 instead of a 500. Reachable from an ordinary stale tab: a "replace" fetch
-  or a library switch changes every article id under an already-open results
-  page.
+- **Simple / Advanced UI mode** (client preference in `localStorage.uiMode`,
+  applied pre-paint via `theme-init.js` as `data-mode`). New accounts seed
+  Simple; existing accounts stay Advanced until they toggle.
+- **Clean up** page (was Duplicates): duplicates, **Quick screen** (rank against
+  a research question and screen out least-related papers with undo), and the
+  screening report in one place.
+- Per-result **Not relevant** on Search (`off_topic` exclusion).
+- Auto **prepare-for-search** after a successful multi-source fetch (both modes).
+- AI Refine “Save these as key points” stores `origin=ai` so rewrites survive
+  re-search and append-fetch until a replace-fetch clears the library.
+- Landing and `/learn/*` guides updated for the new workflow.
+- Health watchdog (`tools/watchdog.py` + timer) for local app + Cloudflare
+  tunnel connectivity alerts.
+- Dev isolation defaults in `run_dev.sh` (`USERS_DB`, `USER_DATA_DIR`, `LOG_FILE`)
+  so local work cannot touch live accounts.
 
 ### Changed
-- Product name **LitPilot** → **LitSieve** (UI, page titles, emails, FastAPI
-  title, docs, Docker/Render service names, default log file). The public
-  hostname stays `www.litpilot.org` — that is a registrar/Cloudflare fact, not
-  a product name — as do the `*-litpilot.service` systemd units already
-  installed on the host.
+- Reading mode retired; Simple/Advanced occupies that nav control.
+- Nav in Simple mode: Data Management → Clean up → Search (Clusters remains
+  available by URL / Advanced).
+- Mobile nav layout rebuilt so brand, steps menu, and controls fit on small
+  screens.
 
-- All 65 `print()` calls in `app/` are now logger calls with levels. Fetcher
-  errors in particular were going to stdout, so they had no level, could not be
-  filtered, and carried no traceback.
-
-### Security
-- `POST /api/search`, `/api/search/seed` and `/api/search/starred` now require
-  the CSRF token, matching `/api/notes`. The frontend already sent it on every
-  non-GET request, so nothing changes for users.
-
-### Documentation
-- Hugging Face **Hub** (where the embedding models come from, ~3.5 GB cached
-  under `~/.cache/huggingface`) is now documented in `docs/DEPLOY.md`, including
-  that an uncached model downloads *inside* a user's job and that the cache sits
-  outside `user_data/` — so it is not covered by the storage quota or by a
-  backup of the app directory.
-- Corrected "TLS is terminated by the host (Render / HF Spaces)" in `README.md`
-  and `app/security.py`: TLS terminates at Cloudflare in the current deployment.
-- Removed Hugging Face **Spaces** hosting references, including the Spaces
-  config frontmatter in `README.md` (no Space exists; the only remote is
-  GitHub). This is the hosting product, unrelated to the model Hub above.
-- `roadmap.md`: Phase 3 recorded as actually shipped (live on
-  https://www.litpilot.org via Cloudflare Tunnel, no PaaS), plus a new Phase 4
-  covering the account cap and backups that going live created.
-
-### Removed
-- Server-side `tqdm` progress bars in four fetchers. They drew to the server
-  console where nobody could see them (users get progress from the jobs API)
-  and their carriage returns would have corrupted the new log file. `tqdm` is
-  no longer a dependency.
-- Superseded deploy tooling: host cert renewal and :80/:443 helpers (TLS is
-  terminated at Cloudflare), and the quick-tunnel script/unit (replaced by the
-  named tunnel for www.litpilot.org).
-- DuckDNS helpers and docs (updater script, systemd timer/service, examples).
-  Self-host public DNS is operator-owned (Cloudflare Tunnel + purchased domain).
+### Fixed
+- Fetch→prepare auto-chain reliability (`waitForJob` no longer resolves on a
+  pre-start idle slot).
+- Deploy note: new API routes (e.g. Quick screen) require a uvicorn restart.
 
 ## [4.4.0] - 2026-08-03
 
