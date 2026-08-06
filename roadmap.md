@@ -81,6 +81,31 @@ student should not have to think about. No capability is removed from Advanced.
   topic-group path — sample real labels first; if they read like "cluster 3",
   ship Quick screen alone.
 
+## Phase 6 — Simple mode on two pages
+Full build doc: **[docs/SIMPLE_TWO_PAGE_PLAN.md](docs/SIMPLE_TWO_PAGE_PLAN.md)**.
+Simple collapses to `Get papers` → `Search`. **Advanced is unchanged.**
+- Tasks:
+  - Duplicates resolved **silently** after auto-prepare, reported in one line
+    (`/api/resolve-duplicates`, existing preferred-source rule)
+  - Inline **screening card** on Data Management — Low / Medium / High mapping
+    to `fraction` 0.10 / 0.25 / 0.50, each showing the real paper count before
+    it is applied; preview and apply stay separate; undo and skip both
+    first-class. Inline, not a surprise modal after a minutes-long fetch
+  - **Go to Search** action once screening is applied or skipped
+  - Search gains a sticky **export / screening report** panel, collapsing to a
+    bottom bar under ~900px
+  - Clean up and Clusters leave the Simple nav; both routes keep working and
+    stay in Advanced
+  - **No auto-clustering anywhere** — the screening card ranks against the
+    research question, which needs embeddings, not clusters
+- Complete when: a Simple student goes topics → fetch → screen → search →
+  export across two pages without seeing "embedding", "cluster", "threshold",
+  or a model name; Advanced behaviour is unchanged; nothing is excluded without
+  an explicit apply; and the flow works at 380px with no horizontal scroll
+- Status: [ ] not started — plan only
+- Notes: small screens are a first-class requirement, not a retrofit — real
+  traffic is overwhelmingly mobile. Existing breakpoints: 900 / 640 / 380px.
+
 ## Backlog (unscheduled)
 - Make `pyright app` blocking in CI after clearing the current error backlog
 - Dependency lockfile (pip-tools / uv) if reproducibility becomes a priority
