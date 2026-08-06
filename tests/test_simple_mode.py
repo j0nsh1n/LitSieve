@@ -215,7 +215,8 @@ def test_simple_mode_renumbers_fetch_not_advanced():
     assert "3. Fetch Articles" in html
     assert "dm-sub-simple" in html
     assert "dm-sub-advanced" in html
-    assert "Step 1 of 4" in html  # Advanced page lead
+    assert "Steps 1–3." in html  # Advanced page lead (prepare is optional after auto-embed)
+    assert "Steps 1–2." in html  # Simple page lead
     css = _read("static", "css", "style.css")
     # Simple labels default-hidden; advanced labels hide only under data-mode=simple.
     assert ".dm-step-simple" in css
