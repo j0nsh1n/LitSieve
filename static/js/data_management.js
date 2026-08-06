@@ -686,7 +686,7 @@ async function refreshCoverage() {
  track.setAttribute('role', 'presentation');
  const inner = document.createElement('div');
  inner.className = 'source-bar-inner';
- // CSP blocks style="" from innerHTML; set width via CSS variable (CSSOM).
+ // CSP blocks inline style attributes from innerHTML; set width via CSS variable (CSSOM).
  inner.style.setProperty('--bar-pct', `${widthPct}%`);
  track.appendChild(inner);
  fill.appendChild(track);

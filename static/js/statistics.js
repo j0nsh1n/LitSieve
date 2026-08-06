@@ -411,7 +411,7 @@ function renderCountBars(container, rows, opts) {
   track.setAttribute('role', 'presentation');
   const inner = document.createElement('div');
   inner.className = 'source-bar-inner';
-  // CSP style-src 'self' blocks style="" from innerHTML; CSSOM variables are allowed.
+  // CSP style-src self blocks inline style attributes from innerHTML; CSSOM is allowed.
   inner.style.setProperty('--bar-pct', `${widthPct}%`);
   track.appendChild(inner);
   fill.appendChild(track);
