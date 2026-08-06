@@ -951,13 +951,7 @@ function _syncAbstractClamp(el) {
     const full = el.dataset.fullText || el.textContent || '';
     if (full.length <= ABSTRACT_CLAMP_CHARS) return;
 
-    // Full abstract is the primary reading surface; start expanded so key
-    // points never look like they replaced it.
-    if (!wrap.dataset.defaultExpanded) {
-        wrap.dataset.defaultExpanded = '1';
-        wrap.classList.add('is-expanded');
-    }
-
+    // Start collapsed — "Show full abstract" to read more.
     const expanded = wrap.classList.contains('is-expanded');
     if (expanded) {
         el.classList.remove('is-clamped');
