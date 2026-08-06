@@ -267,6 +267,7 @@ function buildClusterArticleItem(article) {
  ? renderKeyPointsHtml(article.key_points, {
  articleId: article.article_id,
  source: article.source,
+ origin: article.key_points_origin || 'extractive',
  })
  : '';
 
