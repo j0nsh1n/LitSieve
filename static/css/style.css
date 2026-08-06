@@ -1680,9 +1680,6 @@ body.lra-modal-open {
     gap: 0.5rem;
     align-items: center;
 }
-.year-timeline-plot {
-    margin-top: 0.5rem;
-}
 
 /* Long abstracts: clamp by line count, expand on demand */
 .abstract-wrap {
@@ -2007,7 +2004,8 @@ body.lra-modal-open {
 }
 
 #source-breakdown,
-#coverage-bars {
+#coverage-bars,
+#year-timeline {
     display: grid;
     grid-template-columns: max-content minmax(0, 1fr) max-content;
     width: 100%;
@@ -2017,6 +2015,10 @@ body.lra-modal-open {
     border-radius: 2px;
     box-sizing: border-box;
     background: var(--surface);
+}
+/* Year plot sits under a disclosure; keep a little space above the frame. */
+#year-timeline.year-timeline-plot {
+    margin-top: 0.5rem;
 }
 
 .source-bar {
@@ -2084,7 +2086,8 @@ body.lra-modal-open {
 /* Fallback when subgrid is unavailable */
 @supports not (grid-template-columns: subgrid) {
     #source-breakdown,
-    #coverage-bars {
+    #coverage-bars,
+    #year-timeline {
         display: block;
     }
     .source-bar {
@@ -2098,6 +2101,7 @@ body.lra-modal-open {
     }
     .source-bar-fill {
         flex: 1 1 auto;
+        min-width: 0;
     }
     .source-count {
         flex: 0 0 auto;
@@ -3760,16 +3764,18 @@ html, body {
         font-size: 0.76rem;
     }
 
-    /* Source bars: already table; allow horizontal squeeze */
+    /* Source / year bars: already table; allow horizontal squeeze */
     #source-breakdown,
-    #coverage-bars {
+    #coverage-bars,
+    #year-timeline {
         display: block;
         width: 100%;
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
     }
     #source-breakdown .source-bar,
-    #coverage-bars .source-bar {
+    #coverage-bars .source-bar,
+    #year-timeline .source-bar {
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto;
         grid-template-areas:
@@ -3780,11 +3786,13 @@ html, body {
         border-bottom: 1px solid var(--rule);
     }
     #source-breakdown .source-bar:last-child,
-    #coverage-bars .source-bar:last-child {
+    #coverage-bars .source-bar:last-child,
+    #year-timeline .source-bar:last-child {
         border-bottom: none;
     }
     #source-breakdown .source-name,
-    #coverage-bars .source-name {
+    #coverage-bars .source-name,
+    #year-timeline .source-name {
         grid-area: name;
         display: block;
         width: auto;
@@ -3792,7 +3800,8 @@ html, body {
         border: none;
     }
     #source-breakdown .source-count,
-    #coverage-bars .source-count {
+    #coverage-bars .source-count,
+    #year-timeline .source-count {
         grid-area: count;
         display: block;
         width: auto;
@@ -3801,7 +3810,8 @@ html, body {
         text-align: right;
     }
     #source-breakdown .source-bar-fill,
-    #coverage-bars .source-bar-fill {
+    #coverage-bars .source-bar-fill,
+    #year-timeline .source-bar-fill {
         grid-area: bar;
         display: block;
         width: 100%;
@@ -3814,7 +3824,10 @@ html, body {
     #source-breakdown .source-bar + .source-bar .source-count,
     #coverage-bars .source-bar + .source-bar .source-name,
     #coverage-bars .source-bar + .source-bar .source-bar-fill,
-    #coverage-bars .source-bar + .source-bar .source-count {
+    #coverage-bars .source-bar + .source-bar .source-count,
+    #year-timeline .source-bar + .source-bar .source-name,
+    #year-timeline .source-bar + .source-bar .source-bar-fill,
+    #year-timeline .source-bar + .source-bar .source-count {
         border-top: none;
     }
 

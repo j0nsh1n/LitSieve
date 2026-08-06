@@ -661,17 +661,23 @@ async function refreshCoverage() {
  if (!keys.length) {
  bars.innerHTML = '<p class="info-text">No articles yet - run a fetch to fill the map.</p>';
  } else {
- const maxCount = Math.max(...Object.values(sources), 1);
- keys.sort((a, b) => sources[b] - sources[a]).forEach(src => {
- const count = sources[src];
- const pct = (count / maxCount) * 100;
+ // Scale each bar to the largest source count in this map (not a fixed global max).
+ const counts = keys.map((src) => Math.max(0, Number(sources[src]) || 0));
+ const maxCount = Math.max(...counts, 0);
+ keys
+  .map((src, i) => ({ src, count: counts[i] }))
+  .sort((a, b) => b.count - a.count || a.src.localeCompare(b.src))
+  .forEach(({ src, count }) => {
+ const pct = maxCount > 0 ? (count / maxCount) * 100 : 0;
+ const widthPct = count > 0 ? Math.max(pct, 1.5) : 0;
  const div = document.createElement('div');
  div.className = 'source-bar';
+ div.setAttribute('title', `${getSourceName(src)}: ${count}` + (maxCount ? ` (max ${maxCount})` : ''));
  div.innerHTML = `
  <span class="source-name">${escapeHtml(getSourceName(src))}</span>
  <div class="source-bar-fill">
- <div class="source-track">
- <div class="source-bar-inner" style="width: ${pct}%"></div>
+ <div class="source-track" role="presentation">
+ <div class="source-bar-inner" style="width: ${widthPct}%"></div>
  </div>
  </div>
  <span class="source-count">${count}</span>

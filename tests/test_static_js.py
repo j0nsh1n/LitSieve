@@ -90,3 +90,21 @@ def test_shared_assets_use_one_cache_bust_version():
             f"{asset} requested at multiple versions: "
             + "; ".join(f"{v} in {sorted(set(f))}" for v, f in versions.items())
         )
+
+
+def test_count_bars_scale_to_series_max():
+    """Articles-by-source and papers-by-year bars use the chart's own max.
+
+    The longest bar is 100% of the track; shorter counts are count/max.
+    A fixed global scale (or always-full bars) makes small years/sources
+    look as large as the largest.
+    """
+    src = (JS_DIR / "statistics.js").read_text(encoding="utf-8")
+    assert "function renderCountBars" in src
+    assert "maxCount" in src
+    # Width is relative to this series max, not a hard-coded total.
+    assert "(row.count / maxCount) * 100" in src or "(count / maxCount) * 100" in src
+    assert "renderYearTimeline" in src
+    # Year chart reuses the same helper (one scale definition).
+    year_fn = src[src.find("function renderYearTimeline") :]
+    assert "renderCountBars" in year_fn[:800]

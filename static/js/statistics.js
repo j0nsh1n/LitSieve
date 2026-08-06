@@ -343,33 +343,73 @@ async function loadStatistics() {
 
  const sources = stats.sources || {};
  const sourceKeys = Object.keys(sources);
- if (sourceKeys.length > 0) {
- const maxCount = Math.max(...Object.values(sources), 1);
- const container = document.getElementById('source-breakdown');
- container.innerHTML = '';
- sourceKeys.forEach(source => {
- const count = sources[source];
- const pct = (count / maxCount) * 100;
- const div = document.createElement('div');
- div.className = 'source-bar';
- div.innerHTML = `
- <span class="source-name">${escapeHtml(getSourceName(source))}</span>
- <div class="source-bar-fill">
- <div class="source-track">
- <div class="source-bar-inner" style="width: ${pct}%"></div>
- </div>
- </div>
- <span class="source-count">${count}</span>
- `;
- container.appendChild(div);
- });
- document.getElementById('source-breakdown-section').style.display = 'block';
+ const sourceContainer = document.getElementById('source-breakdown');
+ const sourceSection = document.getElementById('source-breakdown-section');
+ if (sourceKeys.length > 0 && sourceContainer) {
+  renderCountBars(sourceContainer, sourceKeys.map((source) => ({
+   key: source,
+   label: getSourceName(source),
+   count: sources[source],
+  })), { sort: 'count-desc' });
+  if (sourceSection) sourceSection.style.display = 'block';
+ } else if (sourceContainer) {
+  sourceContainer.innerHTML = '';
+  if (sourceSection) sourceSection.style.display = 'none';
  }
 
  renderYearTimeline(stats.year_counts || {});
  } catch (e) {
  showNotification('Failed to load statistics.', 'error');
  }
+}
+
+/**
+ * Horizontal count bars scaled to the largest value in this chart only.
+ * Max row is always 100% of the track; others are count/max so relative size
+ * is obvious (50 of 100 → half bar, not a fixed global scale).
+ */
+function renderCountBars(container, rows, opts) {
+ if (!container) return;
+ const options = opts || {};
+ const items = (rows || []).map((r) => ({
+  key: r.key,
+  label: r.label != null ? String(r.label) : String(r.key),
+  count: Math.max(0, Number(r.count) || 0),
+  className: r.className || '',
+ })).filter((r) => r.key != null);
+
+ if (!items.length) {
+  container.innerHTML = '';
+  return;
+ }
+
+ if (options.sort === 'count-desc') {
+  items.sort((a, b) => b.count - a.count || String(a.label).localeCompare(String(b.label)));
+ } else if (typeof options.sort === 'function') {
+  items.sort(options.sort);
+ }
+
+ const maxCount = Math.max(...items.map((r) => r.count), 0);
+ container.innerHTML = '';
+ items.forEach((row) => {
+  // Empty chart / all zeros → zero-width bars (not a fake full bar).
+  const pct = maxCount > 0 ? (row.count / maxCount) * 100 : 0;
+  // Tiny non-zero counts stay visible without inflating the scale.
+  const widthPct = row.count > 0 ? Math.max(pct, 1.5) : 0;
+  const div = document.createElement('div');
+  div.className = ('source-bar' + (row.className ? ` ${row.className}` : '')).trim();
+  div.setAttribute('title', `${row.label}: ${row.count}` + (maxCount ? ` (max ${maxCount})` : ''));
+  div.innerHTML = `
+ <span class="source-name">${escapeHtml(row.label)}</span>
+ <div class="source-bar-fill">
+ <div class="source-track" role="presentation">
+ <div class="source-bar-inner" style="width: ${widthPct}%"></div>
+ </div>
+ </div>
+ <span class="source-count">${row.count}</span>
+ `;
+  container.appendChild(div);
+ });
 }
 
 function renderYearTimeline(yearCounts) {
@@ -386,28 +426,18 @@ function renderYearTimeline(yearCounts) {
  }
 
  // Sort years ascending; "unknown" last.
- keys.sort((a, b) => {
- if (a === 'unknown') return 1;
- if (b === 'unknown') return -1;
- return parseInt(a, 10) - parseInt(b, 10);
- });
- const maxCount = Math.max(...keys.map(k => yearCounts[k]), 1);
- container.innerHTML = '';
- keys.forEach(year => {
- const count = yearCounts[year];
- const pct = Math.max(4, (count / maxCount) * 100);
- const div = document.createElement('div');
- div.className = 'source-bar year-bar';
- div.innerHTML = `
- <span class="source-name">${escapeHtml(year)}</span>
- <div class="source-bar-fill">
- <div class="source-track">
- <div class="source-bar-inner" style="width: ${pct}%"></div>
- </div>
- </div>
- <span class="source-count">${count}</span>
- `;
- container.appendChild(div);
+ const rows = keys.map((year) => ({
+  key: year,
+  label: year,
+  count: yearCounts[year],
+  className: 'year-bar',
+ }));
+ renderCountBars(container, rows, {
+  sort: (a, b) => {
+   if (a.key === 'unknown') return 1;
+   if (b.key === 'unknown') return -1;
+   return parseInt(a.key, 10) - parseInt(b.key, 10);
+  },
  });
  details.hidden = false;
 }
