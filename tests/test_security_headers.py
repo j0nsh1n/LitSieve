@@ -86,7 +86,10 @@ def test_no_inline_style_attributes_in_templates():
 
 
 def test_theme_init_is_render_blocking_in_head():
-    """theme-init must not gain defer/async or dark mode flashes white."""
+    """theme-init must not gain defer/async or dark mode flashes white.
+
+    Also applies uiMode → data-mode pre-paint (Simple/Advanced).
+    """
     import re
 
     base = pathlib.Path(__file__).resolve().parents[1] / "templates" / "base.html"
@@ -97,3 +100,9 @@ def test_theme_init_is_render_blocking_in_head():
     assert "async" not in tag.group(0), tag.group(0)
     head = html.split("</head>")[0]
     assert "theme-init.js" in head, "theme-init.js must be in <head>"
+
+    init = (
+        pathlib.Path(__file__).resolve().parents[1] / "static" / "js" / "theme-init.js"
+    ).read_text(encoding="utf-8")
+    assert "uiMode" in init
+    assert "data-mode" in init
