@@ -353,3 +353,18 @@ def test_search_not_relevant_button_uses_off_topic():
     assert "undo-not-relevant" in js
     # Uses the shared screening endpoint (not a one-off API).
     assert "/api/screening" in js
+
+
+def test_search_simple_subtitle_and_work_gate():
+    """Simple mode drops Step 4 of 4; search UI stays hidden until papers are ready."""
+    html = (REPO / "templates" / "search.html").read_text(encoding="utf-8")
+    assert "search-sub-simple" in html
+    assert "search-sub-advanced" in html
+    assert "Step 4 of 4" in html  # Advanced only
+    assert "search-work" in html
+    css = (REPO / "static" / "css" / "style.css").read_text(encoding="utf-8")
+    assert 'html[data-mode="simple"] .search-sub-advanced' in css
+    assert 'html:not([data-mode="simple"]) .search-sub-simple' in css
+    js = (REPO / "static" / "js" / "search.js").read_text(encoding="utf-8")
+    assert "updateSearchWorkVisibility" in js
+    assert "articles_with_embeddings" in js

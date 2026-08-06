@@ -3960,6 +3960,16 @@ html:not([data-mode="simple"]) .dm-sub-simple {
     display: none !important;
 }
 
+/* Search page: Simple drops “Step 4 of 4” and the long title. */
+html[data-mode="simple"] .search-sub-advanced,
+html[data-mode="simple"] .search-title-advanced {
+    display: none !important;
+}
+html:not([data-mode="simple"]) .search-sub-simple,
+html:not([data-mode="simple"]) .search-title-simple {
+    display: none !important;
+}
+
 /* Prepare section: Simple uses the optional, un-numbered heading; Advanced keeps step 4. */
 html[data-mode="simple"] .prepare-heading-advanced,
 html[data-mode="simple"] .prepare-lead-advanced {

@@ -3,9 +3,12 @@
 {% block container_mod %}container-wide{% endblock %}
 {% block content %}
 <section class="page-header">
- <h1>Search for Similar Articles</h1>
- <p class="subtitle"><strong>Step 4 of 4 (last).</strong> Rank the papers you kept by how well they
+ <h1 class="search-title-advanced">Search for Similar Articles</h1>
+ <h1 class="search-title-simple">Search</h1>
+ <p class="subtitle search-sub-advanced"><strong>Step 4 of 4 (last).</strong> Rank the papers you kept by how well they
  match your question, then export your list.</p>
+ <p class="subtitle search-sub-simple">Rank the papers you kept by how well they match your question,
+ then export your list for Zotero.</p>
  {% from "macros/disclaimers.html" import scope_search %}
  {{ scope_search() }}
 </section>
@@ -18,7 +21,7 @@
  </p>
 </section>
 
-<section class="card">
+<section class="card search-work" id="search-query-section">
  <p class="info-text">Searches <strong>your collection only</strong> (not the whole internet). Plain
  language works - the app compares meaning, not just keywords.</p>
  <details class="help-details">
@@ -79,7 +82,7 @@
  </div>
 </section>
 
-<section class="card">
+<section class="card search-work" id="search-controls-section">
  <div class="param-row">
  <div class="param-group">
  <label>Results: <strong id="topk-display">10</strong></label>
@@ -155,12 +158,12 @@
  <p class="help-text">Finds papers similar to the ones you starred (the starred papers themselves are left out).</p>
 </section>
 
-<section id="seed-banner" class="card u-hidden">
+<section id="seed-banner" class="card search-work u-hidden">
  <h2>Seed paper</h2>
  <p class="info-text" id="seed-banner-text"></p>
 </section>
 
-<section class="u-hidden" id="results-section">
+<section class="search-work u-hidden" id="results-section">
  <div class="results-header">
  <h2>Results: <span id="result-count">0</span> articles found</h2>
  </div>
@@ -176,7 +179,7 @@
  <div id="results-list"></div>
 </section>
 
-<section class="card" id="export-results-section">
+<section class="card search-work" id="export-results-section" hidden>
  <h2>Export these search results</h2>
  <p class="info-text">Download the papers <strong>currently shown above</strong> as one RIS file
  for free <a href="https://www.zotero.org/download/" target="_blank" rel="noopener">Zotero</a>
@@ -238,5 +241,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/search.js?v=20260805f"></script>
+<script src="/static/js/search.js?v=20260805g"></script>
 {% endblock %}
