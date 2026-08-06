@@ -202,7 +202,7 @@ async function doShareLibrary(lib) {
    'To use the code:',
    '1) Log in → Account → Optional: copy a library via code (or open /join).',
    '2) Switch to the new library in the nav Library menu.',
-   '3) Clusters → Duplicates → Search; export RIS as needed.',
+   '3) Clean up → Search; export RIS as needed. (Advanced: Clusters optional.)',
    '',
    'Starting point only (public databases) — verify important papers elsewhere.',
   ].join('\n');
@@ -284,7 +284,7 @@ function renderSharesList(shares) {
      'Steps:',
      '1. Log in → Account → Optional: copy a library via code (or open /join).',
      '2. Switch to the new library in the nav Library menu.',
-     '3. Clusters → Duplicates → Search; export RIS if needed.',
+     '3. Clean up → Search; export RIS if needed. (Advanced: Clusters optional.)',
      '',
      'Starting point only (public databases) — verify important papers elsewhere.',
     ].join('\n');

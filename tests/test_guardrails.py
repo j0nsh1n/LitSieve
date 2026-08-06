@@ -52,6 +52,8 @@ REQUIRED_ROUTES = {
     "/api/create-embeddings",
     "/api/export/selection",
     "/api/export/library",
+    "/api/screening",
+    "/api/screening/quick-preview",
     "/api/screening-report",
     "/api/search",
     "/api/ai/settings",
@@ -63,6 +65,10 @@ REQUIRED_ROUTES = {
     "/api/shares/join",
     "/join",
     "/account",
+    "/data-management",
+    "/statistics",
+    "/search",
+    "/clusters",
 }
 
 
