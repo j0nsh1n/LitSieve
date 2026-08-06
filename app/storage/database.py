@@ -116,12 +116,15 @@ class ArticleDatabase:
             )
         """)
 
-        # Extractive key points (bullets JSON) derived from the abstract.
+        # Key points (bullets JSON): extractive from abstract, or AI rewrite
+        # saved explicitly by the student (origin='ai' survives re-search and
+        # re-prepare until the library is cleared on replace-fetch).
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS key_points (
                 article_id TEXT NOT NULL,
                 source TEXT NOT NULL DEFAULT 'pubmed',
                 bullets TEXT NOT NULL DEFAULT '[]',
+                origin TEXT NOT NULL DEFAULT 'extractive',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (article_id, source),
                 FOREIGN KEY (article_id, source) REFERENCES articles (article_id, source)
@@ -150,6 +153,15 @@ class ArticleDatabase:
         cluster_columns = [col[1] for col in cursor.fetchall()]
         if cluster_columns and 'representative_title' not in cluster_columns:
             cursor.execute("ALTER TABLE clusters ADD COLUMN representative_title TEXT")
+
+        # AI-saved key points need an origin flag so extractive re-runs do not
+        # overwrite student-approved rewrites on re-search / re-prepare.
+        cursor.execute("PRAGMA table_info(key_points)")
+        kp_columns = [col[1] for col in cursor.fetchall()]
+        if kp_columns and "origin" not in kp_columns:
+            cursor.execute(
+                "ALTER TABLE key_points ADD COLUMN origin TEXT NOT NULL DEFAULT 'extractive'"
+            )
 
         self.conn.commit()
 
@@ -689,29 +701,37 @@ class ArticleDatabase:
             )
             return [(r[0], r[1]) for r in cursor.fetchall()]
 
-    def insert_key_points(self, points: Dict[Tuple[str, str], List[str]]) -> int:
-        """Store extractive key-point bullets for (article_id, source) keys.
+    def insert_key_points(
+        self,
+        points: Dict[Tuple[str, str], List[str]],
+        *,
+        origin: str = "extractive",
+    ) -> int:
+        """Store key-point bullets for (article_id, source) keys.
 
         Empty bullet lists are still stored so we do not re-process short
-        abstracts on every embed pass.
+        abstracts on every embed pass. origin is ``extractive`` (default) or
+        ``ai`` (student-approved Refine rewrite — protected from overwrite).
         """
         if not points:
             return 0
+        origin = "ai" if origin == "ai" else "extractive"
         with self._lock:
             cursor = self.conn.cursor()
             for (article_id, source), bullets in points.items():
                 cursor.execute(
                     """
-                    INSERT INTO key_points (article_id, source, bullets, created_at)
-                    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                    INSERT INTO key_points (article_id, source, bullets, origin, created_at)
+                    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
                     ON CONFLICT(article_id, source) DO UPDATE SET
                         bullets = excluded.bullets,
+                        origin = excluded.origin,
                         created_at = CURRENT_TIMESTAMP
                     """,
-                    (article_id, source, json.dumps(list(bullets or []))),
+                    (article_id, source, json.dumps(list(bullets or [])), origin),
                 )
             self.conn.commit()
-        logger.info("Stored key points for %d articles", len(points))
+        logger.info("Stored key points for %d articles (origin=%s)", len(points), origin)
         return len(points)
 
     def get_key_points_map(self) -> Dict[Tuple[str, str], List[str]]:
@@ -731,11 +751,40 @@ class ArticleDatabase:
             out[(article_id, source)] = [str(b) for b in bullets if b]
         return out
 
+    def get_key_points_origin_map(self) -> Dict[Tuple[str, str], str]:
+        """Map (article_id, source) -> 'extractive' | 'ai'."""
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("PRAGMA table_info(key_points)")
+            cols = {row[1] for row in cursor.fetchall()}
+            if "origin" not in cols:
+                cursor.execute("SELECT article_id, source FROM key_points")
+                return {(row[0], row[1]): "extractive" for row in cursor.fetchall()}
+            cursor.execute("SELECT article_id, source, origin FROM key_points")
+            rows = cursor.fetchall()
+        out: Dict[Tuple[str, str], str] = {}
+        for article_id, source, origin in rows:
+            out[(article_id, source)] = "ai" if origin == "ai" else "extractive"
+        return out
+
     def get_key_points_keys(self) -> set:
         """Set of (article_id, source) that already have a key_points row."""
         with self._lock:
             cursor = self.conn.cursor()
             cursor.execute("SELECT article_id, source FROM key_points")
+            return {(row[0], row[1]) for row in cursor.fetchall()}
+
+    def get_ai_key_points_keys(self) -> set:
+        """Keys whose key points were explicitly saved from an AI refine."""
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("PRAGMA table_info(key_points)")
+            cols = {row[1] for row in cursor.fetchall()}
+            if "origin" not in cols:
+                return set()
+            cursor.execute(
+                "SELECT article_id, source FROM key_points WHERE origin = 'ai'"
+            )
             return {(row[0], row[1]) for row in cursor.fetchall()}
 
     def exclude_articles(self, keys: List[Tuple[str, str]], reason: str = 'manual') -> int:

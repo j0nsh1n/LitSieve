@@ -199,9 +199,10 @@ async def api_ai_refine_article(req: AIArticleRequest, request: Request):
 
         result = await run_in_thread(_work)
         if req.save_key_points and result.get("key_points"):
-            p.db.insert_key_points({
-                (req.article_id, req.source): result["key_points"],
-            })
+            p.db.insert_key_points(
+                {(req.article_id, req.source): result["key_points"]},
+                origin="ai",
+            )
             result["saved"] = True
         else:
             result["saved"] = False
@@ -242,8 +243,16 @@ async def api_ai_save_key_points(req: AISaveKeyPointsRequest, request: Request):
         article = p.db.get_article_by_id(req.article_id, req.source)
         if not article:
             return JSONResponse(status_code=404, content={"detail": "Article not found"})
-        p.db.insert_key_points({(req.article_id, req.source): points})
-        return {"status": "success", "saved": True, "key_points": points}
+        p.db.insert_key_points(
+            {(req.article_id, req.source): points},
+            origin="ai",
+        )
+        return {
+            "status": "success",
+            "saved": True,
+            "key_points": points,
+            "origin": "ai",
+        }
     except Exception as e:
         return server_error(e)
     finally:

@@ -307,14 +307,15 @@ function renderPaginatedList(container, items, renderItem, opts) {
     appendBatch();
 }
 
-/** HTML for extractive key points (honest "from the abstract" label). */
+/** HTML for key points (extractive or student-saved AI rewrite). */
 function renderKeyPointsHtml(bullets, options) {
     options = options || {};
     if (!bullets || !bullets.length) {
         // Still allow AI actions when there are no extractive bullets yet.
         if (!options.articleId) return '';
     }
-    const label = options.aiLabel
+    const isAi = !!(options.aiLabel || options.origin === 'ai');
+    const label = isAi
         ? 'Key points (AI rewrite — from the abstract only)'
         : 'Key points (from the abstract)';
     const items = (bullets || [])
@@ -333,7 +334,7 @@ function renderKeyPointsHtml(bullets, options) {
            </div>
            <div class="ai-panel" hidden></div>`
         : '';
-    return `<div class="key-points">
+    return `<div class="key-points" data-kp-origin="${isAi ? 'ai' : 'extractive'}">
       <div class="key-points-label">${escapeHtml(label)}</div>
       ${list}
       ${actions}

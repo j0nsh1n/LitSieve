@@ -60,9 +60,9 @@
 
 <section class="card cleanup-work" id="quick-screen-section">
  <h2>2. Quick screen</h2>
- <p class="info-text">The app ranks your papers against your research question and suggests the
- <strong>least related</strong> ones. You always review the titles before anything is screened out.
- You can undo.</p>
+ <p class="info-text">Ranks papers against your research question and
+ <strong>screens out the least related</strong> set right away. You can undo, or
+ preview first if you want to review titles before applying.</p>
  <div class="form-row">
   <div class="form-group flex-2">
    <label for="quick-screen-query">Research question</label>
@@ -75,7 +75,7 @@
  </div>
  <div class="form-row">
   <div class="param-group">
-   <label for="quick-screen-fraction">How many to suggest</label>
+   <label for="quick-screen-fraction">How many to screen out</label>
    <select id="quick-screen-fraction">
     <option value="0.10">Remove fewer (~10% least related)</option>
     <option value="0.25" selected>Balanced (~25% least related)</option>
@@ -84,9 +84,10 @@
   </div>
  </div>
  <div class="form-row fetch-actions">
-  <button type="button" id="quick-screen-preview-btn" class="btn btn-primary">Preview suggestions</button>
-  <button type="button" id="quick-screen-apply-btn" class="btn btn-secondary" hidden>Screen out selected</button>
+  <button type="button" id="quick-screen-apply-now-btn" class="btn btn-primary">Screen out least related</button>
   <button type="button" id="quick-screen-undo-btn" class="btn btn-secondary" hidden>Undo last Quick screen</button>
+  <button type="button" id="quick-screen-preview-btn" class="btn btn-secondary">Preview first</button>
+  <button type="button" id="quick-screen-apply-btn" class="btn btn-secondary" hidden>Screen out selected</button>
  </div>
  <div id="quick-screen-status" class="status-indicator"></div>
  <div id="quick-screen-preview" class="quick-screen-preview u-hidden"></div>
@@ -136,5 +137,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/statistics.js?v=20260805e"></script>
+<script src="/static/js/statistics.js?v=20260805j"></script>
 {% endblock %}

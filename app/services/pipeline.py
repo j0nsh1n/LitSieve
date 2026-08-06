@@ -401,18 +401,23 @@ class LiteratureSearchPipeline:
         pool = articles if articles is not None else self.db.get_all_articles()
         if not pool:
             return 0
+        # Never overwrite student-saved AI rewrites (until clear_all on replace-fetch).
+        protected = self.db.get_ai_key_points_keys()
         if only_missing:
             existing = self.db.get_key_points_keys()
-            pool = [
-                a for a in pool
-                if (a["article_id"], a["source"]) not in existing
-            ]
+            skip = existing | protected
+        else:
+            skip = protected
+        pool = [
+            a for a in pool
+            if (a["article_id"], a["source"]) not in skip
+        ]
         if not pool:
             return 0
 
         logger.info("Generating key points for %d articles…", len(pool))
         points = extract_key_points_batch(pool, encode_fn=self._encode_texts)
-        return self.db.insert_key_points(points)
+        return self.db.insert_key_points(points, origin="extractive")
 
     def generate_key_points(self, only_missing: bool = True) -> Dict:
         """Public backfill: generate key points for stragglers (or all)."""
