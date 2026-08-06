@@ -126,3 +126,54 @@ def test_fresh_guest_not_expired(tmp_path, monkeypatch):
     assert db.guest_is_expired(user["id"], 30) is False
     assert core.purge_expired_guests(30) == 0
     assert db.get_by_id(user["id"]) is not None
+
+
+def test_guest_start_never_replaces_a_signed_in_session(tmp_path, monkeypatch):
+    """POST /guest must not hijack a real account's session.
+
+    /guest deliberately takes no CSRF token — a logged-out visitor has no
+    csrf cookie yet, so requiring one would make the demo unreachable. That
+    leaves a cross-site POST able to reach it, so the protection has to be the
+    "already signed in" short-circuit in _start_guest_session: an existing
+    session is redirected to the app instead of being swapped for a guest one.
+    Without it, any page on the internet could quietly sign a student out of
+    their own account and out of their saved libraries.
+    """
+    from app import core
+    from app.storage.user_db import UserDatabase
+
+    db = UserDatabase(str(tmp_path / "users.db"))
+    monkeypatch.setattr(core, "user_db", db)
+    monkeypatch.setenv("USER_DATA_DIR", str(tmp_path / "user_data"))
+
+    client = TestClient(app)
+    reg = client.post(
+        "/register",
+        data={
+            "username": "realstudent",
+            "password": "tpw-fixture-0001",
+            "password_confirm": "tpw-fixture-0001",
+        },
+        follow_redirects=False,
+    )
+    assert reg.status_code == 302, reg.text
+    token_before = client.cookies.get("access_token")
+    assert token_before
+
+    for call in (
+        lambda: client.post("/guest", follow_redirects=False),
+        lambda: client.get("/guest", follow_redirects=False),
+    ):
+        resp = call()
+        assert resp.status_code in (302, 303), resp.text
+        assert resp.headers.get("location") == "/data-management"
+        # Session untouched: same token, and still the real account.
+        assert client.cookies.get("access_token") == token_before
+        who = client.get("/api/statistics")
+        assert who.status_code == 200
+
+    # No guest account was created as a side effect.
+    rows = db.conn.execute(
+        "SELECT username FROM users WHERE username LIKE 'guest_%'"
+    ).fetchall()
+    assert rows == [], f"signed-in request created a guest account: {rows}"
