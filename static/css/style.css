@@ -3915,6 +3915,20 @@ html[data-mode="simple"] details.advanced-details:has(#embedding-model) {
     display: none !important;
 }
 
+/* Prepare section: Simple uses the optional, un-numbered heading; Advanced keeps step 4. */
+html[data-mode="simple"] .prepare-heading-advanced,
+html[data-mode="simple"] .prepare-lead-advanced {
+    display: none !important;
+}
+html:not([data-mode="simple"]) .prepare-heading-simple,
+html:not([data-mode="simple"]) .prepare-lead-simple {
+    display: none !important;
+}
+/* When Simple and empty library, JS sets [hidden]; keep progress usable when shown. */
+html[data-mode="simple"] #prepare-section[hidden] {
+    display: none !important;
+}
+
 /* Duplicates / Clean up */
 html[data-mode="simple"] #source-breakdown-section,
 html[data-mode="simple"] #year-timeline-details,
