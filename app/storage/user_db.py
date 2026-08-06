@@ -178,7 +178,7 @@ class UserDatabase:
         with self._lock:
             row = self.conn.execute(
                 "SELECT id, username, hashed_password, token_version, email, email_verified, "
-                "COALESCE(is_guest, 0) "
+                "COALESCE(is_guest, 0), created_at "
                 "FROM users WHERE username = ? COLLATE NOCASE",
                 (username,),
             ).fetchone()
@@ -191,6 +191,7 @@ class UserDatabase:
                 "email": row[4],
                 "email_verified": bool(row[5]),
                 "is_guest": bool(row[6]),
+                "created_at": row[7],
             }
         return None
 
@@ -198,7 +199,7 @@ class UserDatabase:
         with self._lock:
             row = self.conn.execute(
                 "SELECT id, username, hashed_password, token_version, email, email_verified, "
-                "COALESCE(is_guest, 0) "
+                "COALESCE(is_guest, 0), created_at "
                 "FROM users WHERE id = ?",
                 (user_id,),
             ).fetchone()
@@ -211,8 +212,33 @@ class UserDatabase:
                 "email": row[4],
                 "email_verified": bool(row[5]),
                 "is_guest": bool(row[6]),
+                "created_at": row[7],
             }
         return None
+
+    def list_expired_guest_ids(self, max_age_minutes: int = 30) -> list:
+        """Guest account ids older than max_age_minutes (SQLite UTC datetime)."""
+        minutes = max(1, int(max_age_minutes))
+        with self._lock:
+            rows = self.conn.execute(
+                "SELECT id FROM users "
+                "WHERE COALESCE(is_guest, 0) = 1 "
+                "AND created_at < datetime('now', ?)",
+                (f"-{minutes} minutes",),
+            ).fetchall()
+        return [row[0] for row in rows if row and row[0]]
+
+    def guest_is_expired(self, user_id: str, max_age_minutes: int = 30) -> bool:
+        """True if this guest account is past max_age_minutes (non-guests → False)."""
+        minutes = max(1, int(max_age_minutes))
+        with self._lock:
+            row = self.conn.execute(
+                "SELECT 1 FROM users "
+                "WHERE id = ? AND COALESCE(is_guest, 0) = 1 "
+                "AND created_at < datetime('now', ?)",
+                (user_id, f"-{minutes} minutes"),
+            ).fetchone()
+        return row is not None
 
     def update_password(self, user_id: str, hashed_password: str) -> bool:
         """Set password hash and bump token_version so other sessions die."""

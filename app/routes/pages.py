@@ -19,6 +19,13 @@ router = APIRouter()
 
 @router.get("/health")
 async def health():
+    # Opportunistic cleanup: drop guest demos past their 30-minute window even
+    # when no one is starting a new /guest session (watchdog hits /health).
+    try:
+        from app import core as _core
+        _core.purge_expired_guests()
+    except Exception:
+        logger.exception("purge_expired_guests from /health failed")
     return {"status": "healthy", "version": "4.5.0"}
 
 

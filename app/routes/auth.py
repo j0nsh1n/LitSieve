@@ -276,8 +276,16 @@ async def _start_guest_session(request: Request) -> RedirectResponse:
 
     Guests cannot fetch from real databases (server-enforced). Sample corpus
     only — enough to try prepare → screen → search → export.
+    Accounts and their libraries are deleted after core.GUEST_MAX_AGE_MINUTES.
     """
+    # Sweep expired demos whenever someone starts a new one.
+    try:
+        core.purge_expired_guests()
+    except Exception:
+        logger.exception("purge_expired_guests before guest start failed")
+
     # Already signed in: just go to the app (do not replace a real account).
+    # Expired guests already returned None from current_user above path.
     if current_user(request):
         return RedirectResponse(url="/data-management", status_code=302)
 
@@ -311,7 +319,10 @@ async def _start_guest_session(request: Request) -> RedirectResponse:
         user["id"], user["username"], user.get("token_version", 0),
     )
     response = RedirectResponse(url="/data-management", status_code=302)
-    _set_auth_cookies(response, token)
+    # Cookies expire with the demo window so browsers drop the session too.
+    _set_auth_cookies(
+        response, token, max_age=core.GUEST_MAX_AGE_MINUTES * 60,
+    )
     # Guests start in Simple mode (same seed as new registrations).
     response.set_cookie(
         "ui_mode_seed",

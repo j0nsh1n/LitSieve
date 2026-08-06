@@ -84,3 +84,45 @@ def test_guest_cta_on_public_pages():
     assert 'href="/guest"' in landing
     assert 'href="/guest"' in login
     assert "Try the demo" in landing or "demo" in landing.lower()
+
+
+def test_expired_guests_are_purged(tmp_path, monkeypatch):
+    """Guests older than GUEST_MAX_AGE_MINUTES lose their account and library data."""
+    from app import core
+    from app.storage.libraries import user_dir
+    from app.storage.user_db import UserDatabase
+
+    db = UserDatabase(str(tmp_path / "users.db"))
+    monkeypatch.setattr(core, "user_db", db)
+    monkeypatch.setenv("USER_DATA_DIR", str(tmp_path / "user_data"))
+
+    user = db.create_user("guest_oldone", "hash", is_guest=True)
+    uid = user["id"]
+    # Backdate created_at past the demo window.
+    with db._lock:
+        db.conn.execute(
+            "UPDATE users SET created_at = datetime('now', '-45 minutes') WHERE id = ?",
+            (uid,),
+        )
+        db.conn.commit()
+    udir = user_dir(uid)
+    udir.mkdir(parents=True, exist_ok=True)
+    (udir / "marker.txt").write_text("demo", encoding="utf-8")
+
+    assert db.guest_is_expired(uid, 30) is True
+    n = core.purge_expired_guests(30)
+    assert n == 1
+    assert db.get_by_id(uid) is None
+    assert not udir.exists()
+
+
+def test_fresh_guest_not_expired(tmp_path, monkeypatch):
+    from app import core
+    from app.storage.user_db import UserDatabase
+
+    db = UserDatabase(str(tmp_path / "users.db"))
+    monkeypatch.setattr(core, "user_db", db)
+    user = db.create_user("guest_fresh", "hash", is_guest=True)
+    assert db.guest_is_expired(user["id"], 30) is False
+    assert core.purge_expired_guests(30) == 0
+    assert db.get_by_id(user["id"]) is not None
