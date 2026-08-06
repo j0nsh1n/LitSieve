@@ -1610,32 +1610,37 @@ body.lra-modal-open {
     }
 }
 
-/* Getting-started checklist + empty states */
-.getting-started-card,
-.empty-state-card {
+/* Getting-started checklist + empty states.
+   Use .card.<name> so mobile/tablet rules like `.card { padding: 1.15rem 0 }`
+   (same single-class specificity, later in the file) cannot wipe the left inset
+   from the accent bar — that was the mobile “text flush against the blue line” bug. */
+.card.getting-started-card,
+.card.empty-state-card {
     border-left: 4px solid var(--accent, #2a5f6e);
     /* Cards normally have no horizontal padding; leave room from the accent bar. */
     padding-left: 1.15rem;
     padding-right: 0.5rem;
 }
-/* Room between title, message, and CTA — plain <p> wrappers were collapsing. */
-.empty-state-card h2 {
+/* Room between title, message, and CTA — plain <p> wrappers were collapsing.
+   .card h2 / .info-text also need the extra class so mobile margin resets lose. */
+.card.empty-state-card h2 {
     margin: 0 0 0.85rem;
 }
-.empty-state-card > .info-text,
-.empty-state-card .info-text#dup-empty-msg,
-.empty-state-card .info-text#search-empty-msg {
+.card.empty-state-card > .info-text,
+.card.empty-state-card .info-text#dup-empty-msg,
+.card.empty-state-card .info-text#search-empty-msg,
+.card.empty-state-card .info-text#clusters-empty-msg {
     margin: 0 0 1.25rem;
     max-width: 40rem;
     line-height: 1.55;
 }
-.empty-state-card > p:not(.info-text) {
+.card.empty-state-card > p:not(.info-text) {
     margin: 0;
 }
-.empty-state-card .empty-state-actions {
+.card.empty-state-card .empty-state-actions {
     margin: 0.35rem 0 0;
 }
-.empty-state-card .btn {
+.card.empty-state-card .btn {
     display: inline-flex;
     margin-top: 0.15rem;
 }
@@ -3412,6 +3417,10 @@ html, body {
 
     .page-header h1 { font-size: 1.85rem; }
     .card { padding: 1.4rem 0; }
+    .card.getting-started-card,
+    .card.empty-state-card {
+        padding: 1.4rem 0.5rem 1.4rem 1.15rem;
+    }
     .card h2 { font-size: 1.2rem; }
 
     .source-option-grid {
@@ -3528,14 +3537,28 @@ html, body {
     .card {
         padding: 1.15rem 0;
     }
+    /* Keep accent-bar inset when the generic .card padding shorthand resets axes. */
+    .card.getting-started-card,
+    .card.empty-state-card {
+        padding: 1.15rem 0.5rem 1.15rem 1.15rem;
+    }
     .card h2 {
         font-size: 1.12rem;
         margin-bottom: 0.7rem;
+    }
+    .card.empty-state-card h2 {
+        margin: 0 0 0.85rem;
     }
     .card h3 { font-size: 1rem; }
     .info-text {
         font-size: 0.88rem;
         margin-bottom: 0.7rem;
+    }
+    .card.empty-state-card > .info-text,
+    .card.empty-state-card .info-text#dup-empty-msg,
+    .card.empty-state-card .info-text#search-empty-msg,
+    .card.empty-state-card .info-text#clusters-empty-msg {
+        margin: 0 0 1.25rem;
     }
     .footer {
         padding: 1rem 0.85rem;
