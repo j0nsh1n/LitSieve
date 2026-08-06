@@ -639,8 +639,6 @@ function buildResultCard(article, idx) {
  articleId: article.article_id,
  source: article.source,
  origin: article.key_points_origin || 'extractive',
- // Full abstract is on the card — do not restate it as extractive bullets.
- abstractShown: true,
  })
  : '';
  const studyTypeHtml = renderStudyTypeBadge(article);
@@ -668,8 +666,8 @@ function buildResultCard(article, idx) {
  <div class="article-meta meta-authors">
  <span><strong>Authors:</strong> ${escapeHtml(authors)}</span>
  </div>
- <div class="article-abstract">${abstractHtml}</div>
  ${keyPointsHtml}
+ <div class="article-abstract">${abstractHtml}</div>
  ${picoHtml}
  <div class="article-actions-row">
  <button type="button" class="note-toggle" ${noteVal ? 'hidden' : ''}>✎ Add note</button>

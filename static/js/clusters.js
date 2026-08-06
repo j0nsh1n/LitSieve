@@ -269,7 +269,6 @@ function buildClusterArticleItem(article) {
  articleId: article.article_id,
  source: article.source,
  origin: article.key_points_origin || 'extractive',
- abstractShown: !!(article.abstract),
  })
  : '';
 
@@ -289,8 +288,8 @@ function buildClusterArticleItem(article) {
  <div class="article-meta meta-authors">
  <span><strong>Authors:</strong> ${escapeHtml(authors)}</span>
  </div>
- ${abstractHtml ? `<div class="article-abstract">${abstractHtml}</div>` : ''}
  ${keyPointsHtml}
+ ${abstractHtml ? `<div class="article-abstract">${abstractHtml}</div>` : ''}
  `;
 
  if (typeof bindAiArticleActions === 'function') {
