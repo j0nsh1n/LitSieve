@@ -399,15 +399,30 @@ function renderCountBars(container, rows, opts) {
   const div = document.createElement('div');
   div.className = ('source-bar' + (row.className ? ` ${row.className}` : '')).trim();
   div.setAttribute('title', `${row.label}: ${row.count}` + (maxCount ? ` (max ${maxCount})` : ''));
-  div.innerHTML = `
- <span class="source-name">${escapeHtml(row.label)}</span>
- <div class="source-bar-fill">
- <div class="source-track" role="presentation">
- <div class="source-bar-inner" style="width: ${widthPct}%"></div>
- </div>
- </div>
- <span class="source-count">${row.count}</span>
- `;
+
+  const name = document.createElement('span');
+  name.className = 'source-name';
+  name.textContent = row.label;
+
+  const fill = document.createElement('div');
+  fill.className = 'source-bar-fill';
+  const track = document.createElement('div');
+  track.className = 'source-track';
+  track.setAttribute('role', 'presentation');
+  const inner = document.createElement('div');
+  inner.className = 'source-bar-inner';
+  // CSP style-src 'self' blocks style="" from innerHTML; CSSOM variables are allowed.
+  inner.style.setProperty('--bar-pct', `${widthPct}%`);
+  track.appendChild(inner);
+  fill.appendChild(track);
+
+  const countEl = document.createElement('span');
+  countEl.className = 'source-count';
+  countEl.textContent = String(row.count);
+
+  div.appendChild(name);
+  div.appendChild(fill);
+  div.appendChild(countEl);
   container.appendChild(div);
  });
 }

@@ -108,3 +108,23 @@ def test_count_bars_scale_to_series_max():
     # Year chart reuses the same helper (one scale definition).
     year_fn = src[src.find("function renderYearTimeline") :]
     assert "renderCountBars" in year_fn[:800]
+
+
+def test_count_bars_do_not_use_inline_style_attributes():
+    """CSP is style-src 'self' with no unsafe-inline — style="" is ignored.
+
+    Bar widths must be applied via CSS variables / CSSOM (setProperty), not
+    style=\"width:…\" in innerHTML, or every bar renders full-width.
+    """
+    stats = (JS_DIR / "statistics.js").read_text(encoding="utf-8")
+    dm = (JS_DIR / "data_management.js").read_text(encoding="utf-8")
+    bars_fn = stats[stats.find("function renderCountBars") : stats.find("function renderYearTimeline")]
+    # Forbid HTML style attributes; allow element.style.setProperty (CSSOM).
+    assert 'style="' not in bars_fn and "style='" not in bars_fn
+    assert "setProperty" in bars_fn and "--bar-pct" in bars_fn
+    assert "source-bar-inner" in bars_fn
+    # Coverage map on Data Management uses the same CSP-safe pattern.
+    assert "--bar-pct" in dm
+    assert 'style="width:' not in dm and "style='width:" not in dm
+    css = (JS_DIR.parent / "css" / "style.css").read_text(encoding="utf-8")
+    assert "var(--bar-pct" in css

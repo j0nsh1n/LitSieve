@@ -670,18 +670,34 @@ async function refreshCoverage() {
   .forEach(({ src, count }) => {
  const pct = maxCount > 0 ? (count / maxCount) * 100 : 0;
  const widthPct = count > 0 ? Math.max(pct, 1.5) : 0;
+ const label = getSourceName(src);
  const div = document.createElement('div');
  div.className = 'source-bar';
- div.setAttribute('title', `${getSourceName(src)}: ${count}` + (maxCount ? ` (max ${maxCount})` : ''));
- div.innerHTML = `
- <span class="source-name">${escapeHtml(getSourceName(src))}</span>
- <div class="source-bar-fill">
- <div class="source-track" role="presentation">
- <div class="source-bar-inner" style="width: ${widthPct}%"></div>
- </div>
- </div>
- <span class="source-count">${count}</span>
- `;
+ div.setAttribute('title', `${label}: ${count}` + (maxCount ? ` (max ${maxCount})` : ''));
+
+ const name = document.createElement('span');
+ name.className = 'source-name';
+ name.textContent = label;
+
+ const fill = document.createElement('div');
+ fill.className = 'source-bar-fill';
+ const track = document.createElement('div');
+ track.className = 'source-track';
+ track.setAttribute('role', 'presentation');
+ const inner = document.createElement('div');
+ inner.className = 'source-bar-inner';
+ // CSP blocks style="" from innerHTML; set width via CSS variable (CSSOM).
+ inner.style.setProperty('--bar-pct', `${widthPct}%`);
+ track.appendChild(inner);
+ fill.appendChild(track);
+
+ const countEl = document.createElement('span');
+ countEl.className = 'source-count';
+ countEl.textContent = String(count);
+
+ div.appendChild(name);
+ div.appendChild(fill);
+ div.appendChild(countEl);
  bars.appendChild(div);
  });
  }
