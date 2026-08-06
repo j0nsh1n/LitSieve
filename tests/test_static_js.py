@@ -128,3 +128,26 @@ def test_count_bars_do_not_use_inline_style_attributes():
     assert 'style="width:' not in dm and "style='width:" not in dm
     css = (JS_DIR.parent / "css" / "style.css").read_text(encoding="utf-8")
     assert "var(--bar-pct" in css
+
+
+def test_account_uses_site_modals_not_browser_dialogs():
+    """Account destructive/input flows use in-app modals, not window.confirm/prompt/alert."""
+    account = (JS_DIR / "account.js").read_text(encoding="utf-8")
+    common = (JS_DIR / "common.js").read_text(encoding="utf-8")
+    assert "function openSiteConfirm" in common
+    assert "function openSitePrompt" in common
+    assert "function openSiteAlert" in common
+    assert "function openSiteModal" in common
+    # No browser dialogs left on Account.
+    for bad in ("window.confirm", "window.prompt", "window.alert", "confirm(", "prompt(", "alert("):
+        # allow openSiteConfirm / openSitePrompt names and variable names like password_confirm
+        if bad in ("confirm(", "prompt(", "alert("):
+            # strip function defs and openSite* calls
+            stripped = account
+            for keep in ("openSiteConfirm", "openSitePrompt", "openSiteAlert", "password_confirm", "new_password_confirm", "delete-confirm", "confirmCb", "confirmLabel"):
+                stripped = stripped.replace(keep, "")
+            assert bad not in stripped, f"account.js still uses browser {bad}"
+        else:
+            assert bad not in account
+    assert "openSiteConfirm" in account
+    assert "openSitePrompt" in account
