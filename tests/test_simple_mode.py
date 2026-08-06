@@ -817,3 +817,13 @@ def test_simple_search_side_panel_exists_and_hidden_in_advanced():
     js = _read("static", "js", "search.js")
     assert "updateSimpleSearchPanel" in js
     assert "simple-export-results-btn" in js
+
+
+def test_simple_small_screen_css_for_panel_and_card():
+    css = _read("static", "css", "style.css")
+    assert "position: fixed" in css
+    assert "has-simple-panel" in css or "padding-bottom" in css
+    assert "simple-screen-level" in css
+    assert "min-height: 2.75rem" in css
+    # Narrowest breakpoint acknowledged
+    assert "max-width: 380px" in css

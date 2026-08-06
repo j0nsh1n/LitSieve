@@ -845,9 +845,12 @@ function renderResults(results) {
 /** Phase 6 Simple: show sticky export/report panel once results exist. */
 function updateSimpleSearchPanel(hasResults) {
  const panel = document.getElementById('search-simple-panel');
+ const resultsSec = document.getElementById('results-section');
  if (!panel) return;
  const simple = typeof isSimpleMode === 'function' && isSimpleMode();
- panel.hidden = !(simple && hasResults);
+ const show = !!(simple && hasResults);
+ panel.hidden = !show;
+ if (resultsSec) resultsSec.classList.toggle('has-simple-panel', show);
 }
 
 async function doExportResults(format) {
