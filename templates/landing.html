@@ -14,9 +14,10 @@
  <header class="landing-header">
  <h1 class="landing-title"><span class="accent">Lit</span>Pilot</h1>
  <p class="landing-tagline">
- Gather papers from 17 public research databases at once, sort them into
- topics, remove duplicates, and find the most relevant ones for your
- project - then export citations and a screening report for hand-ins.
+ Gather papers from 17 public research databases at once, prepare them for
+ search automatically, clean up duplicates and off-topic papers, then rank
+ what you kept and export citations plus a screening report for hand-ins.
+ Simple mode keeps the path short for class; Advanced keeps every control.
  </p>
  <div class="landing-cta">
  {% if user %}
@@ -45,37 +46,37 @@
  <a href="/learn/semantic-embeddings" class="feature-card">
  <span class="feature-icon" aria-hidden="true">&#129504;</span>
  <h3>Semantic embeddings</h3>
- <p>Every article becomes a meaning-based vector (GPU when available). Runs
- as a background job so large batches can finish while you keep working.</p>
+ <p>Every article becomes a meaning-based vector after you fetch (runs
+ automatically as a background job). Search, Clean up, and clusters all use
+ those fingerprints.</p>
  <span class="feature-more">Learn more →</span>
  </a>
  <a href="/learn/clustering-triage" class="feature-card">
  <span class="feature-icon" aria-hidden="true">&#129513;</span>
- <h3>Clustering &amp; triage</h3>
- <p>Group papers into themed clusters with distinct labels, then exclude
- off-topic groups here - Search only ranks what you kept.</p>
+ <h3>Screening &amp; triage</h3>
+ <p>Quick screen least-related papers on Clean up (Simple path), or group by
+ topic on Clusters (Advanced). Search only ranks what you kept.</p>
  <span class="feature-more">Learn more →</span>
  </a>
  <a href="/learn/duplicate-resolution" class="feature-card">
  <span class="feature-icon" aria-hidden="true">&#128260;</span>
- <h3>Duplicate resolution</h3>
- <p>Find near-identical papers across sources, keep the best copy, and
- download a screening report that shows what you collected and excluded.</p>
+ <h3>Clean up</h3>
+ <p>Remove near-duplicates across sources, optional Quick screen, and a
+ screening report that shows what you collected and excluded for hand-ins.</p>
  <span class="feature-more">Learn more →</span>
  </a>
  <a href="/learn/similarity-search" class="feature-card">
  <span class="feature-icon" aria-hidden="true">&#127919;</span>
  <h3>Similarity search</h3>
- <p>Rank by meaning plus exact words, filter by year, start from a seed
- paper, or find more like your starred set. Export RIS for Zotero or similar.</p>
+ <p>Rank by meaning plus exact words, mark Not relevant, export RIS for
+ Zotero. Advanced adds seed paper and ranking options.</p>
  <span class="feature-more">Learn more →</span>
  </a>
  <a href="/learn/private-workspace" class="feature-card">
  <span class="feature-icon" aria-hidden="true">&#128274;</span>
  <h3>Private workspace</h3>
- <p>Each account is private, with several named libraries for different projects
- or topics. Change password (signs out other sessions), background jobs,
- and private notes/stars.</p>
+ <p>Private accounts, named libraries, Simple/Advanced layout toggle,
+ background jobs, and private notes/stars.</p>
  <span class="feature-more">Learn more →</span>
  </a>
  <a href="/learn/finish-your-research" class="feature-card">
@@ -96,8 +97,8 @@
  </section>
 
  <p class="landing-steps">
- Fetch papers &rarr; Group by topic &amp; screen &rarr; Remove duplicates &rarr;
- Search &amp; export - all private to your account.
+ Fetch &amp; prepare &rarr; Clean up (duplicates / Quick screen) &rarr;
+ Search &amp; export - Simple by default; Advanced keeps Clusters and every control.
  </p>
 
  <footer class="landing-footer">
