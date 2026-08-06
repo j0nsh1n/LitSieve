@@ -639,6 +639,8 @@ function buildResultCard(article, idx) {
  articleId: article.article_id,
  source: article.source,
  origin: article.key_points_origin || 'extractive',
+ // Full abstract is on the card — do not restate it as extractive bullets.
+ abstractShown: true,
  })
  : '';
  const studyTypeHtml = renderStudyTypeBadge(article);

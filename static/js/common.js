@@ -307,24 +307,31 @@ function renderPaginatedList(container, items, renderItem, opts) {
     appendBatch();
 }
 
-/** HTML for key points (extractive or student-saved AI rewrite). */
+/** HTML for key points (extractive or student-saved AI rewrite).
+ *
+ * When the full abstract is already on the card (options.abstractShown), skip
+ * listing extractive bullets — they restate the abstract and look like a
+ * duplicate. AI-saved rewrites still show their bullet list once.
+ */
 function renderKeyPointsHtml(bullets, options) {
     options = options || {};
-    if (!bullets || !bullets.length) {
-        // Still allow AI actions when there are no extractive bullets yet.
-        if (!options.articleId) return '';
-    }
     const isAi = !!(options.aiLabel || options.origin === 'ai');
+    const hasBullets = !!(bullets && bullets.length);
+    // Abstract already visible: only surface AI-saved bullets or the AI action row.
+    const hideExtractiveList = !!options.abstractShown && !isAi;
+    if (!hasBullets && !options.articleId) return '';
+    if (hideExtractiveList && !options.articleId) return '';
+
     const label = isAi
         ? 'Key points (AI rewrite — from the abstract only)'
         : 'Key points (from the abstract)';
-    const items = (bullets || [])
-        .map(b => `<li>${escapeHtml(String(b))}</li>`)
-        .join('');
+    const showList = hasBullets && !hideExtractiveList;
+    const items = showList
+        ? (bullets || []).map(b => `<li>${escapeHtml(String(b))}</li>`).join('')
+        : '';
     const list = items ? `<ul class="key-points-list">${items}</ul>` : '';
     const aid = options.articleId ? escapeHtml(String(options.articleId)) : '';
     const src = options.source ? escapeHtml(String(options.source)) : '';
-    // Extractive key points always show; AI buttons are optional (classroom toggle).
     const showAi = typeof uiFlag === 'function' ? uiFlag('show_ai_buttons', true) : true;
     const actions = (aid && src && showAi)
         ? `<div class="ai-actions" data-article-id="${aid}" data-source="${src}">
@@ -334,6 +341,14 @@ function renderKeyPointsHtml(bullets, options) {
            </div>
            <div class="ai-panel" hidden></div>`
         : '';
+    // Nothing to show (no list, no AI chrome).
+    if (!list && !actions) return '';
+    // Extractive + abstract shown: only AI chrome (no empty "Key points" header).
+    if (hideExtractiveList && actions) {
+        return `<div class="key-points key-points-actions-only" data-kp-origin="extractive">
+      ${actions}
+    </div>`;
+    }
     return `<div class="key-points" data-kp-origin="${isAi ? 'ai' : 'extractive'}">
       <div class="key-points-label">${escapeHtml(label)}</div>
       ${list}
@@ -522,19 +537,35 @@ function bindAiArticleActions(rootEl, article) {
                             });
                             const savedPoints = (savedResp && savedResp.key_points) || data.key_points || [];
                             showNotification('Key points updated (AI rewrite saved).', 'success');
-                            const lab = rootEl.querySelector('.key-points-label');
-                            if (lab) lab.textContent = 'Key points (AI rewrite — from the abstract only)';
-                            if (savedPoints.length) {
+                            // Promote the main card block to a single AI list;
+                            // hide the refine panel so bullets are not shown twice.
+                            const kpRoot = rootEl.querySelector('.key-points');
+                            if (kpRoot && savedPoints.length) {
+                                kpRoot.dataset.kpOrigin = 'ai';
+                                kpRoot.classList.remove('key-points-actions-only');
+                                let lab = kpRoot.querySelector('.key-points-label');
+                                if (!lab) {
+                                    lab = document.createElement('div');
+                                    lab.className = 'key-points-label';
+                                    kpRoot.insertBefore(lab, kpRoot.firstChild);
+                                }
+                                lab.textContent = 'Key points (AI rewrite — from the abstract only)';
                                 const savedHtml = savedPoints
                                     .map(b => `<li>${escapeHtml(String(b))}</li>`)
                                     .join('');
-                                // Update every rendered copy (result card +
-                                // AI panel preview) to match what was stored.
-                                rootEl.querySelectorAll('.key-points-list').forEach(ul => {
-                                    ul.innerHTML = savedHtml;
-                                });
+                                let ul = kpRoot.querySelector(':scope > .key-points-list');
+                                if (!ul) {
+                                    ul = document.createElement('ul');
+                                    ul.className = 'key-points-list';
+                                    const acts = kpRoot.querySelector('.ai-actions');
+                                    kpRoot.insertBefore(ul, acts || null);
+                                }
+                                ul.innerHTML = savedHtml;
                             }
-                            saveBtn.textContent = 'Saved';
+                            if (panel) {
+                                panel.hidden = true;
+                                panel.innerHTML = '';
+                            }
                         } catch (err) {
                             showNotification(`Could not save: ${err.message}`, 'error');
                             saveBtn.disabled = false;
