@@ -6,7 +6,7 @@
     <title>{% block title %}LitSieve{% endblock %}</title>
     <link rel="icon" href="/static/favicon.ico?v=20260803a" sizes="32x32">
     <link rel="apple-touch-icon" href="/static/favicon.png?v=20260803a">
-    <link rel="stylesheet" href="/static/css/style.css?v=20260805k">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260805p">
     <script src="/static/js/theme-init.js?v=20260805a"></script>
 </head>
 <body>
@@ -30,24 +30,24 @@
     <nav class="navbar" id="site-navbar" role="navigation" aria-label="Main">
         <div class="navbar-top">
             <div class="nav-brand">LitSieve</div>
+            <button type="button"
+                    class="nav-menu-toggle"
+                    id="nav-menu-toggle"
+                    aria-expanded="false"
+                    aria-controls="nav-links-panel"
+                    title="Open steps menu">
+                <span class="nav-menu-toggle-icon" aria-hidden="true">☰</span>
+                <span class="nav-menu-toggle-text">
+                    {% if ns.current_num %}
+                    <span class="nav-step-num nav-menu-step"
+                          data-step-advanced="{{ ns.current_num }}"
+                          data-step-simple="{{ ns.simple_num }}">{{ ns.current_num }}</span>
+                    {% endif %}
+                    <span class="nav-menu-current">{{ ns.current_label }}</span>
+                </span>
+                <span class="nav-menu-caret" aria-hidden="true">▾</span>
+            </button>
             <div class="nav-stats">
-                <button type="button"
-                        class="nav-menu-toggle"
-                        id="nav-menu-toggle"
-                        aria-expanded="false"
-                        aria-controls="nav-links-panel"
-                        title="Open steps menu">
-                    <span class="nav-menu-toggle-icon" aria-hidden="true">☰</span>
-                    <span class="nav-menu-toggle-text">
-                        {% if ns.current_num %}
-                        <span class="nav-step-num nav-menu-step"
-                              data-step-advanced="{{ ns.current_num }}"
-                              data-step-simple="{{ ns.simple_num }}">{{ ns.current_num }}</span>
-                        {% endif %}
-                        <span class="nav-menu-current">{{ ns.current_label }}</span>
-                    </span>
-                    <span class="nav-menu-caret" aria-hidden="true">▾</span>
-                </button>
                 {% if user %}
                 <label class="nav-library-wrap" title="Switch library (separate paper collections)">
                     <span class="nav-library-label">Library</span>
