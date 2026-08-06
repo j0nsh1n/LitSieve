@@ -1,7 +1,7 @@
 # context.md — LitSieve
 
 ## Current State
-- App version **4.4.0** (`app/main.py`, `GET /health`). Product name **LitSieve**.
+- App version **4.5.0** (`app/main.py`, `GET /health`). Product name **LitSieve**.
 - Public origin: **https://www.litpilot.org** via Cloudflare Tunnel →
   `http://127.0.0.1:7860` (`PUBLIC_BASE_URL` in gitignored `.env`; `DEBUG=false`).
 - Python **3.14** (Dockerfile, CI, Render, ruff `py314`).
@@ -113,7 +113,7 @@ ShareCode *---1 Library (owner); redeem → clone Library for joiner
 ## Session Handoff
 - **Date:** 2026-08-04
 - **Branch:** `chore/doc-drift-and-hygiene` (PR #51 + follow-ups)
-- **Done:** LitSieve v4.4.0 rebrand; Cloudflare Tunnel for public access;
+- **Done:** LitSieve v4.5.0 Simple/Advanced mode; v4.4.0 rebrand; Cloudflare Tunnel for public access;
   **removed DuckDNS** tooling/docs. Tunnel token service on this host.
 - **Next:** Ensure Cloudflare Public Hostname `www.litpilot.org` →
   `http://127.0.0.1:7860` and DNS is active; rotate exposed tunnel token.
