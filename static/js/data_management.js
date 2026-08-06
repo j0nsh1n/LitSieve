@@ -157,7 +157,9 @@ document.addEventListener('DOMContentLoaded', () => {
  renderTopicPacks();
  renderSourceGrid();
  restoreFetchPrefs();
- loadPageData();
+ loadPageData().finally(() => {
+  refreshSimpleScreeningCard();
+ });
  refreshCoverage();
  });
  // Simple: hide optional prepare card until the library has papers.
