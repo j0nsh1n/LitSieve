@@ -3,7 +3,9 @@
 {% block content %}
 <section class="page-header">
  <h1>Data Management</h1>
- <p class="subtitle"><strong>Step 1 of 4.</strong> Pick topics, choose sources, and fetch papers.
+ <p class="subtitle dm-sub-advanced"><strong>Step 1 of 4.</strong> Pick topics, choose sources, and fetch papers.
+ Preparing for search starts automatically after a successful fetch.</p>
+ <p class="subtitle dm-sub-simple"><strong>Steps 1–2.</strong> Pick topics and fetch papers.
  Preparing for search starts automatically after a successful fetch.</p>
  {% from "macros/disclaimers.html" import scope_fetch %}
  {{ scope_fetch() }}
@@ -60,9 +62,10 @@
  <div class="source-option-grid" id="source-option-grid"></div>
 </section>
 
-<!-- Step 3: Fetch -->
+<!-- Fetch: Advanced step 3 (sources is 2); Simple step 2 (sources hidden). -->
 <section class="card">
- <h2>3. Fetch Articles</h2>
+ <h2 class="dm-step-heading dm-step-advanced">3. Fetch Articles</h2>
+ <h2 class="dm-step-heading dm-step-simple">2. Fetch Articles</h2>
  <p class="info-text">Searches every selected source at once, saves the papers to your private
  collection, then <strong>automatically prepares them for search</strong> (you can leave this page
  open while progress runs).</p>
@@ -187,5 +190,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/data_management.js?v=20260805c"></script>
+<script src="/static/js/data_management.js?v=20260805d"></script>
 {% endblock %}
