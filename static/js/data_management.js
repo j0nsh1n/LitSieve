@@ -1002,6 +1002,29 @@ async function doFetch() {
  }
 }
 
+/**
+ * Phase 6 Simple: after auto-prepare, resolve near-duplicates without a UI.
+ * Preferred-source rule lives on the server (threshold 0.98 default).
+ * Failures are logged only — never block the fetch → screen → search flow.
+ * @returns {Promise<string|null>} one-line outcome, or null if nothing/error
+ */
+async function silentResolveDuplicatesAfterPrepare() {
+ try {
+  const data = await apiCall('/api/resolve-duplicates', {
+   method: 'POST',
+   body: { threshold: 0.98 },
+  });
+  const n = Number(data && data.excluded) || 0;
+  if (n <= 0) return null;
+  return n === 1
+   ? 'Removed 1 duplicate copy.'
+   : `Removed ${n} duplicate copies.`;
+ } catch (err) {
+  console.warn('Silent duplicate resolve failed (continuing):', err);
+  return null;
+ }
+}
+
 async function doCreateEmbeddings(opts) {
  // Button click passes a DOM Event; only treat real option bags as auto-chain.
  const fromAutoChain = !!(opts && opts.fromAutoChain === true);
@@ -1059,6 +1082,7 @@ async function doCreateEmbeddings(opts) {
  const device = data.device || 'cpu';
  const created = data.embeddings_created ?? data.articles_processed;
  const skipped = data.skipped_existing || 0;
+ const preparedCount = data.articles_processed != null ? data.articles_processed : created;
  if (simple || fromAutoChain) {
  setStatus(
  'embeddings-status',
@@ -1067,12 +1091,21 @@ async function doCreateEmbeddings(opts) {
   + `. Total ready for search: ${data.articles_processed}.`,
  'success'
  );
- setStatus(
- 'fetch-status',
- `Fetched and prepared ${data.articles_processed != null ? data.articles_processed : created} paper(s) for search.`,
- 'success'
+ let fetchLine =
+  `Fetched and prepared ${preparedCount} paper(s) for search.`;
+ // Phase 6: Simple auto-flow removes duplicates silently after prepare.
+ // Advanced is unchanged — students still use Clean up for dedup.
+ if (fromAutoChain && simple) {
+  const dedupLine = await silentResolveDuplicatesAfterPrepare();
+  if (dedupLine) fetchLine = `${fetchLine} ${dedupLine}`;
+ }
+ setStatus('fetch-status', fetchLine, 'success');
+ showNotification(
+  simple
+   ? 'Your papers are ready — next: screen, then Search.'
+   : 'Your papers are ready — next: Clean up, then Search.',
+  'success'
  );
- showNotification('Your papers are ready — next: Clean up, then Search.', 'success');
  setNextStepVisible(true);
  } else {
  setStatus(

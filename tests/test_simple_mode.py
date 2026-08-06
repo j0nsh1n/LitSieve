@@ -287,6 +287,31 @@ def test_fetch_auto_chains_to_prepare_both_modes():
     assert "fetch-progress-wrap" in dm
 
 
+def test_silent_dedup_after_auto_prepare_simple_only():
+    """Phase 6: Simple runs resolve-duplicates after prepare; failures never throw.
+
+    Advanced must not auto-resolve here — Clean up remains the Advanced path.
+    """
+    dm = _read("static", "js", "data_management.js")
+    assert "silentResolveDuplicatesAfterPrepare" in dm
+    assert "/api/resolve-duplicates" in dm
+    assert "threshold: 0.98" in dm or "threshold:0.98" in dm
+    # Failure path continues (warn + null), never rethrows into the fetch chain.
+    fn = dm[
+        dm.find("async function silentResolveDuplicatesAfterPrepare") : dm.find(
+            "async function doCreateEmbeddings"
+        )
+    ]
+    assert "console.warn" in fn
+    assert "return null" in fn
+    # Called only on Simple auto-chain success, not for Advanced.
+    assert "fromAutoChain && simple" in dm
+    # Advanced Clean up still owns interactive resolve (unchanged page).
+    stats_js = _read("static", "js", "statistics.js")
+    assert "/api/resolve-duplicates" in stats_js
+    assert "doResolveAll" in stats_js
+
+
 def test_no_auto_cluster_on_fetch():
     """Clustering must never start from the fetch completion path."""
     dm = _read("static", "js", "data_management.js")
