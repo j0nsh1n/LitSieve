@@ -666,8 +666,8 @@ function buildResultCard(article, idx) {
  <div class="article-meta meta-authors">
  <span><strong>Authors:</strong> ${escapeHtml(authors)}</span>
  </div>
- ${keyPointsHtml}
  <div class="article-abstract">${abstractHtml}</div>
+ ${keyPointsHtml}
  ${picoHtml}
  <div class="article-actions-row">
  <button type="button" class="note-toggle" ${noteVal ? 'hidden' : ''}>✎ Add note</button>
