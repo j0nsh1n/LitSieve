@@ -217,16 +217,22 @@ def test_simple_mode_renumbers_fetch_not_advanced():
     assert "dm-sub-advanced" in html
     assert "Step 1 of 4" in html  # Advanced page lead
     css = _read("static", "css", "style.css")
+    # Simple labels default-hidden; advanced labels hide only under data-mode=simple.
+    assert ".dm-step-simple" in css
     assert 'html[data-mode="simple"] .dm-step-advanced' in css
-    assert 'html:not([data-mode="simple"]) .dm-step-simple' in css
+    assert 'html[data-mode="simple"] .dm-step-simple' in css
     assert 'html[data-mode="simple"] .dm-sub-advanced' in css
-    assert 'html:not([data-mode="simple"]) .dm-sub-simple' in css
+    assert 'html[data-mode="simple"] .dm-sub-simple' in css
 
 
 def test_simple_prepare_section_is_optional_and_gated():
     """Simple: un-numbered optional prepare; Advanced keeps step 4 heading."""
     html = _read("templates", "data_management.html")
     assert 'id="prepare-section"' in html
+    # Pre-JS default: hidden so the card never flashes on empty libraries.
+    assert re.search(r'id="prepare-section"[^>]*\bhidden\b', html) or re.search(
+        r'\bhidden\b[^>]*id="prepare-section"', html
+    ), "prepare-section must start with the hidden attribute"
     assert "Optional: re-prepare for search" in html
     assert "prepare-heading-simple" in html
     assert "prepare-heading-advanced" in html
@@ -234,11 +240,13 @@ def test_simple_prepare_section_is_optional_and_gated():
     assert "<strong>Optional.</strong>" in html or "Optional." in html
     css = _read("static", "css", "style.css")
     assert 'html[data-mode="simple"] .prepare-heading-advanced' in css
-    assert 'html:not([data-mode="simple"]) .prepare-heading-simple' in css
+    assert ".prepare-heading-simple" in css
     dm = _read("static", "js", "data_management.js")
     assert "updatePrepareSectionVisibility" in dm
     assert "forceShow" in dm
-    assert "_autoChainActive" in dm
+    assert "_pipelineBusy" in dm
+    assert "_lastReadyArticles" in dm
+    assert "readyArticles" in dm
 
 
 def test_fetch_auto_chains_to_prepare_both_modes():
@@ -246,7 +254,7 @@ def test_fetch_auto_chains_to_prepare_both_modes():
     dm = _read("static", "js", "data_management.js")
     assert "fromAutoChain" in dm
     assert "Getting your papers ready" in dm
-    assert "_autoChainActive" in dm
+    assert "_pipelineBusy" in dm
     assert "sawActive" in dm
     chain_block = dm[dm.find("fetchedOk") : dm.find("async function doCreateEmbeddings")]
     assert "fromAutoChain" in chain_block
@@ -456,7 +464,8 @@ def test_search_simple_subtitle_and_work_gate():
     assert "Clean up" in html or "/statistics" in html
     css = _read("static", "css", "style.css")
     assert 'html[data-mode="simple"] .search-sub-advanced' in css
-    assert 'html:not([data-mode="simple"]) .search-sub-simple' in css
+    assert ".search-sub-simple" in css  # default-hidden; shown under data-mode=simple
+    assert 'html[data-mode="simple"] .search-sub-simple' in css
     assert 'html[data-mode="simple"] .search-title-advanced' in css
     assert "search-help-simple" in css
     js = _read("static", "js", "search.js")
@@ -493,7 +502,11 @@ def test_search_advanced_keeps_seed_and_ranking_in_dom():
 
 
 def test_dual_mode_labels_never_cross_bleed_in_css():
-    """Every simple-only heading has a matching advanced counterpart hide rule."""
+    """Simple labels default-hidden; advanced counterparts hide under data-mode=simple.
+
+    Default-hide (not html:not) is intentional: if data-mode is missing or CSS is
+    partially applied, only Advanced text shows — never both stacked.
+    """
     css = _read("static", "css", "style.css")
     pairs = [
         ("dm-step-advanced", "dm-step-simple"),
@@ -505,13 +518,15 @@ def test_dual_mode_labels_never_cross_bleed_in_css():
         ("search-help-advanced", "search-help-simple"),
     ]
     for advanced, simple in pairs:
-        assert f'html[data-mode="simple"] .{advanced}' in css or (
-            f'html[data-mode="simple"] .{advanced},' in css
+        assert (
+            f'html[data-mode="simple"] .{advanced}' in css
             or f".{advanced}" in css
-        ), f"missing simple-hide for {advanced}"
-        assert f'html:not([data-mode="simple"]) .{simple}' in css or (
-            f".{simple}" in css
-        ), f"missing advanced-hide for {simple}"
+        ), f"missing simple-mode hide for {advanced}"
+        # Simple variant must be hidden by default (not only under :not simple).
+        assert f".{simple}" in css, f"missing default-hide for {simple}"
+        assert (
+            f'html[data-mode="simple"] .{simple}' in css
+        ), f"missing simple-mode show for {simple}"
 
 
 def test_ai_saved_key_points_survive_append_not_replace(tmp_path):
@@ -607,22 +622,24 @@ def _dm_js() -> str:
 
 
 def test_prepare_card_stays_hidden_while_auto_chain_runs():
-    """Re-prepare must not appear while the first prepare is still running.
+    """Re-prepare must not appear while fetch or the first prepare is running.
 
     During an auto-chain the embed progress is mirrored onto the fetch bar, so
     the prepare card has nothing to show — revealing it mid-embed just pops a
-    "Re-prepare" control into view for work already in progress.
+    "Re-prepare" control into view for work already in progress. Gate is
+    _pipelineBusy (covers fetch + auto-chain) and readyArticles > 0.
     """
     src = _dm_js()
-    assert "sec.hidden = _autoChainActive ||" in src, (
-        "prepare card must be forced hidden while _autoChainActive"
-    )
-    assert "|| _autoChainActive;" not in src, (
-        "auto-chain must not feed forceShow — that is what revealed it early"
-    )
-    assert "updatePrepareSectionVisibility(_lastTotalArticles, { forceShow: true })" not in src, (
-        "the auto-chain start must not force the card open"
-    )
+    assert "_pipelineBusy" in src
+    assert "_lastReadyArticles" in src
+    assert "if (_pipelineBusy)" in src or "if (_pipelineBusy) {" in src
+    assert "readyArticles" in src
+    # Auto-chain start must not force the card open mid-run.
+    assert "fromAutoChain: true" in src
+    # forceShow is only for failed auto-prepare recovery, not the happy path start.
+    assert "autoChainFailed" in src
+    # Must not use the old total-articles-only gate (showed mid-fetch with 0 ready).
+    assert "sec.hidden = _autoChainActive ||" not in src
 
 
 def test_next_step_shortcut_exists_and_starts_hidden():

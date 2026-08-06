@@ -143,8 +143,9 @@
 </section>
 
 <!-- Prepare papers (embeddings) — auto-runs after a successful fetch.
-     In Simple mode: un-numbered, marked optional, only shown once the library has papers. -->
-<section class="card" id="prepare-section">
+     In Simple mode: un-numbered, optional, only shown once papers are ready for search
+     (hidden attribute is the pre-JS default so it never flashes mid-fetch). -->
+<section class="card" id="prepare-section" hidden>
  <h2 class="prepare-heading prepare-heading-advanced">4. Prepare Papers for Search</h2>
  <h2 class="prepare-heading prepare-heading-simple">Optional: re-prepare for search</h2>
  <p class="info-text prepare-lead prepare-lead-advanced">Runs automatically after a successful fetch. Use the button below only if you
@@ -200,5 +201,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/data_management.js?v=20260805i"></script>
+<script src="/static/js/data_management.js?v=20260805j"></script>
 {% endblock %}
