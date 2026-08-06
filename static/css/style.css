@@ -4051,11 +4051,26 @@ html.js-ready body.page-exit .footer {
    Hidden controls stay in the DOM and still submit.
    ============================================================ */
 
-/* Nav: drop Clusters and the arrow that precedes it. The arrow before
-   Duplicates stays so the flow reads DM → Clean up → Search. */
+/* Phase 6 Simple nav: Get papers → Search only (Clusters + Clean up stay
+   reachable by URL and remain in Advanced). */
 html[data-mode="simple"] .nav-step-clusters,
-html[data-mode="simple"] .nav-flow-arrow-before-clusters {
+html[data-mode="simple"] .nav-flow-arrow-before-clusters,
+html[data-mode="simple"] .nav-step-statistics,
+html[data-mode="simple"] .nav-flow-arrow-before-statistics {
     display: none !important;
+}
+/* Dual nav labels: Advanced names by default; Simple swaps in. */
+.nav-label-simple {
+    display: none !important;
+}
+html[data-mode="simple"] .nav-label-advanced {
+    display: none !important;
+}
+html[data-mode="simple"] .nav-label-simple {
+    display: inline !important;
+}
+html[data-mode="simple"] .nav-menu-current.nav-label-simple {
+    display: inline !important;
 }
 
 /* Data Management */

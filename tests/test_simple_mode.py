@@ -104,50 +104,58 @@ def test_register_seeds_simple_mode_cookie(tmp_path, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# Nav: Simple contiguous 1–3; Advanced keeps four steps including Clusters
+# Nav: Phase 6 Simple is Get papers → Search (1, 2); Advanced keeps four steps
 # ---------------------------------------------------------------------------
 
 
 def test_simple_nav_steps_are_contiguous():
-    """Simple mode hides Clusters; remaining steps must be 1, 2, 3 with no gap."""
+    """Phase 6: Simple hides Clusters + Clean up; remaining steps are 1, 2."""
     base = _read("templates", "base.html")
+    # (key, advanced_label, simple_label, href, tip, simple_step)
     rows = re.findall(
-        r'\(\s*"(\w+)"\s*,\s*"[^"]*"\s*,\s*"[^"]*"\s*,\s*"[^"]*"\s*,\s*"(\d*)"\s*\)',
+        r'\(\s*"(\w+)"\s*,\s*"[^"]*"\s*,\s*"[^"]*"\s*,\s*"[^"]*"\s*,\s*"[^"]*"\s*,\s*"(\d*)"\s*\)',
         base,
     )
-    assert rows, "base.html workflow must include simple_step as 5th tuple field"
+    assert rows, "base.html workflow must include simple_step as 6th tuple field"
     by_key = dict(rows)
     assert "clusters" in by_key, by_key
     assert by_key["clusters"] == "", "Clusters has no Simple step number (hidden)"
-    visible = [by_key[k] for k in ("data_management", "statistics", "search")]
-    assert visible == ["1", "2", "3"], f"Simple steps must be contiguous 1-3, got {visible}"
+    assert by_key["statistics"] == "", "Clean up has no Simple step number (hidden)"
+    visible = [by_key[k] for k in ("data_management", "search")]
+    assert visible == ["1", "2"], f"Simple steps must be contiguous 1-2, got {visible}"
     # Advanced step indices still 1–4 on the same workflow loop.
     assert "data-step-advanced" in base
     assert 'data-step-simple="{{ simple_step }}"' in base or 'data-step-simple="' in base
 
     css = _read("static", "css", "style.css")
     assert 'html[data-mode="simple"] .nav-step-clusters' in css
+    assert 'html[data-mode="simple"] .nav-step-statistics' in css
     assert "nav-flow-arrow-before-clusters" in css
+    assert "nav-flow-arrow-before-statistics" in css
 
-    # Nav label is Clean up (not Duplicates).
+    # Advanced still labels Clean up (not Duplicates); Simple uses Get papers.
     assert "Clean up" in base
     assert re.search(r'"statistics"\s*,\s*"Clean up"', base)
+    assert "Get papers" in base
 
 
 def test_advanced_nav_keeps_clusters_and_four_steps():
-    """Advanced must still list Clusters; CSS only hides it under data-mode=simple."""
+    """Advanced must still list Clusters and Clean up; CSS only hides under simple."""
     base = _read("templates", "base.html")
     assert "nav-step-clusters" in base or "nav-step-{{ key }}" in base
     assert "/clusters" in base
     assert "Clusters" in base
+    assert "/statistics" in base
+    assert "Clean up" in base
     css = _read("static", "css", "style.css")
-    # Advanced is the default when not simple — clusters rule is simple-only.
+    # Advanced is the default when not simple — hide rules are simple-only.
     assert 'html[data-mode="simple"] .nav-step-clusters' in css
+    assert 'html[data-mode="simple"] .nav-step-statistics' in css
     assert "html:not([data-mode=\"simple\"]) .nav-step-clusters" not in css
 
 
 def test_clusters_route_still_exists():
-    """Simple mode removes Clusters from the nav only — URL must still work."""
+    """Simple mode removes Clusters/Clean up from the nav only — URLs still work."""
     paths = route_paths(app)
     assert "/clusters" in paths
     assert "/statistics" in paths

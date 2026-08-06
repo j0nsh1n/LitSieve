@@ -862,7 +862,17 @@ function updateNavStepNumbers() {
         const num = a.querySelector('.nav-step-num');
         if (!num) return;
         const next = simple ? (a.getAttribute('data-step-simple') || '') : (a.getAttribute('data-step-advanced') || '');
-        if (next) num.textContent = next;
+        if (next) {
+            num.textContent = next;
+            num.hidden = false;
+        } else if (simple) {
+            // Hidden Simple steps (Clusters, Clean up) — no number when opened by URL.
+            num.hidden = true;
+        } else {
+            num.hidden = false;
+            const adv = a.getAttribute('data-step-advanced') || '';
+            if (adv) num.textContent = adv;
+        }
     });
     const menuStep = document.querySelector('.nav-menu-step');
     if (menuStep) {
@@ -873,7 +883,7 @@ function updateNavStepNumbers() {
             menuStep.textContent = next;
             menuStep.hidden = false;
         } else if (simple && !sim) {
-            // e.g. Clusters page opened by URL in Simple mode — no step number.
+            // e.g. Clusters / Clean up opened by URL in Simple mode — no step number.
             menuStep.hidden = true;
         } else {
             menuStep.hidden = false;

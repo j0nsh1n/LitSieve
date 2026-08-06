@@ -102,7 +102,7 @@ Simple collapses to `Get papers` → `Search`. **Advanced is unchanged.**
   export across two pages without seeing "embedding", "cluster", "threshold",
   or a model name; Advanced behaviour is unchanged; nothing is excluded without
   an explicit apply; and the flow works at 380px with no horizontal scroll
-- Status: [ ] not started — plan only
+- Status: [x] implemented on main (local commits; not pushed)
 - Notes: small screens are a first-class requirement, not a retrofit — real
   traffic is overwhelmingly mobile. Existing breakpoints: 900 / 640 / 380px.
 
