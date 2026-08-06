@@ -1332,11 +1332,7 @@ input[type="range"]::-moz-range-thumb:hover {
 
 .article-abstract {
     color: var(--text);
-    /* Serif + slightly larger type (was reading-mode-only; now default). */
-    font-family: var(--font-serif);
-    font-size: 1.02rem;
-    line-height: 1.72;
-    letter-spacing: 0.005em;
+    line-height: 1.7;
     margin-bottom: 0.5rem;
     width: 100%;
     max-width: none;
