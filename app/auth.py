@@ -79,6 +79,10 @@ def validate_new_username(raw: str) -> Optional[str]:
     error = validate_login_name(raw)
     if error:
         return error
+    u = (raw or "").strip().lower()
+    # Reserved for ephemeral demo sessions (POST /guest).
+    if u.startswith("guest_"):
+        return "That login is reserved. Choose a different username."
     if "@" in (raw or ""):
         return (
             "Usernames cannot contain @. Pick a short handle (letters, numbers, "

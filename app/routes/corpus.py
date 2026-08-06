@@ -123,6 +123,8 @@ async def api_fetch_multi(req: MultiFetchRequest, request: Request):
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
     if csrf_failed(request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    if core.is_guest_user(user):
+        return core.guest_forbidden_response()
     uid = user["user_id"]
     # Replace/clear_first must be allowed while over quota so students can
     # wipe the library and free disk; mid-fetch still stops if they go over again.

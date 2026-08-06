@@ -50,6 +50,8 @@ async def api_create_library(req: LibraryCreateRequest, request: Request):
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
     if csrf_failed(request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    if core.is_guest_user(user):
+        return core.guest_forbidden_response()
     try:
         result = create_library(user["user_id"], req.name)
         return {"status": "success", **result}

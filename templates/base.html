@@ -6,10 +6,19 @@
     <title>{% block title %}LitSieve{% endblock %}</title>
     <link rel="icon" href="/static/favicon.ico?v=20260803a" sizes="32x32">
     <link rel="apple-touch-icon" href="/static/favicon.png?v=20260803a">
-    <link rel="stylesheet" href="/static/css/style.css?v=20260805i">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260805j">
     <script src="/static/js/theme-init.js?v=20260805a"></script>
 </head>
-<body>
+<body{% if user and user.is_guest %} data-guest="1"{% endif %}>
+    {% if user and user.is_guest %}
+    <div class="guest-banner" role="status">
+     <p class="guest-banner-text">
+      <strong>Demo mode.</strong> You’re exploring with sample papers only — no real database fetch.
+      <a href="/register">Create a free account</a> to keep your work and search public sources.
+      <a href="/logout" class="guest-banner-logout">End demo</a>
+     </p>
+    </div>
+    {% endif %}
     {# Recommended order (Advanced): Fetch/Embed → Cluster → Clean up → Search.
        Simple (Phase 6): Get papers → Search only. simple_step / simple_label
        empty when the step is hidden in Simple. Routes stay reachable by URL. #}

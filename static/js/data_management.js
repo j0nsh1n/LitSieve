@@ -197,6 +197,8 @@ document.addEventListener('DOMContentLoaded', () => {
  });
  const sampleBtn = document.getElementById('load-sample-btn');
  if (sampleBtn) sampleBtn.addEventListener('click', () => loadSampleCorpus(true));
+ const guestSampleBtn = document.getElementById('load-sample-btn-guest');
+ if (guestSampleBtn) guestSampleBtn.addEventListener('click', () => loadSampleCorpus(true));
  // Live checklist ticks as the student fills the form.
  ['fetch-query'].forEach(id => {
  const el = document.getElementById(id);

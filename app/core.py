@@ -304,7 +304,29 @@ def current_user(request: Request) -> Optional[dict]:
         "user_id": record["id"],
         "username": record["username"],
         "token_version": int(record.get("token_version") or 0),
+        "is_guest": bool(record.get("is_guest")),
     }
+
+
+def is_guest_user(user: Optional[dict]) -> bool:
+    """True when the session is a demo guest (sample corpus only)."""
+    return bool(user and user.get("is_guest"))
+
+
+def guest_forbidden_response():
+    """403 body when a guest hits a real-library action (fetch, shares, …)."""
+    from fastapi.responses import JSONResponse
+
+    return JSONResponse(
+        status_code=403,
+        content={
+            "detail": (
+                "Demo mode only uses the built-in sample papers. "
+                "Create a free account to fetch from research databases and keep your work."
+            ),
+            "guest": True,
+        },
+    )
 
 
 def _set_auth_cookies(response, token: str):
