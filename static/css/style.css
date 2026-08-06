@@ -541,11 +541,16 @@ body {
     background: transparent;
     border: none;
     color: var(--text);
-    font-size: 1rem;
+    font-size: 1.15rem;
     cursor: pointer;
     line-height: 1;
-    padding: 0.35rem;
+    padding: 0.4rem;
     border-radius: 50%;
+    min-width: 2.15rem;
+    min-height: 2.15rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     transition: color var(--dur-fast) var(--ease-soft),
                 background var(--dur-fast) var(--ease-soft),
                 transform var(--dur-med) var(--ease-out),
@@ -555,13 +560,13 @@ body {
 .mode-toggle {
     font-family: var(--font-sans, inherit);
     font-weight: 600;
-    font-size: 0.72rem;
+    font-size: 0.88rem;
     letter-spacing: 0.01em;
     border: 1px solid transparent;
     border-radius: 999px;
-    min-width: 1.75rem;
-    min-height: 1.75rem;
-    padding: 0.3rem 0.55rem;
+    min-width: 4.5rem;
+    min-height: 2.15rem;
+    padding: 0.4rem 0.75rem;
     white-space: nowrap;
 }
 
@@ -1588,13 +1593,18 @@ body.lra-modal-open {
 .getting-started-card,
 .empty-state-card {
     border-left: 4px solid var(--accent, #2a5f6e);
+    /* Cards normally have no horizontal padding; leave room from the accent bar. */
+    padding-left: 1.15rem;
+    padding-right: 0.5rem;
 }
 /* Room between title, message, and CTA — plain <p> wrappers were collapsing. */
 .empty-state-card h2 {
-    margin: 0 0 0.75rem;
+    margin: 0 0 0.85rem;
 }
-.empty-state-card > .info-text {
-    margin: 0 0 1.15rem;
+.empty-state-card > .info-text,
+.empty-state-card .info-text#dup-empty-msg,
+.empty-state-card .info-text#search-empty-msg {
+    margin: 0 0 1.25rem;
     max-width: 40rem;
     line-height: 1.55;
 }
@@ -1602,7 +1612,7 @@ body.lra-modal-open {
     margin: 0;
 }
 .empty-state-card .empty-state-actions {
-    margin: 0.25rem 0 0;
+    margin: 0.35rem 0 0;
 }
 .empty-state-card .btn {
     display: inline-flex;
@@ -3410,6 +3420,11 @@ html, body {
         display: inline-flex;
         align-items: center;
         justify-content: center;
+    }
+    .mode-toggle {
+        min-width: 4.75rem;
+        font-size: 0.85rem;
+        padding: 0.4rem 0.7rem;
     }
     /* Keep dropdown closed/open rules from the 900px block; only tweak density */
     .nav-link {
