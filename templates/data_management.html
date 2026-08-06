@@ -143,13 +143,13 @@
 </section>
 
 <!-- Prepare papers (embeddings) — auto-runs after a successful fetch.
-     In Simple mode: un-numbered, optional, only shown once papers are ready for search
-     (hidden attribute is the pre-JS default so it never flashes mid-fetch). -->
+     Both modes: optional re-prepare card, only shown once papers are ready for
+     search (hidden attribute is the pre-JS default so it never flashes mid-fetch). -->
 <section class="card" id="prepare-section" hidden>
- <h2 class="prepare-heading prepare-heading-advanced">4. Prepare Papers for Search</h2>
+ <h2 class="prepare-heading prepare-heading-advanced">4. Optional: re-prepare for search</h2>
  <h2 class="prepare-heading prepare-heading-simple">Optional: re-prepare for search</h2>
- <p class="info-text prepare-lead prepare-lead-advanced">Runs automatically after a successful fetch. Use the button below only if you
- need to re-prepare (for example after changing the analysis model under Advanced).</p>
+ <p class="info-text prepare-lead prepare-lead-advanced"><strong>Optional.</strong> Papers are prepared automatically after you fetch.
+ Use this only if prepare failed, you changed the analysis model, or you need to run it again.</p>
  <p class="info-text prepare-lead prepare-lead-simple"><strong>Optional.</strong> Papers are prepared automatically after you fetch.
  Use this only if prepare failed, or you need to run it again.</p>
  <details class="help-details">
@@ -201,5 +201,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/data_management.js?v=20260805j"></script>
+<script src="/static/js/data_management.js?v=20260805k"></script>
 {% endblock %}

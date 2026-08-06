@@ -225,8 +225,8 @@ def test_simple_mode_renumbers_fetch_not_advanced():
     assert 'html[data-mode="simple"] .dm-sub-simple' in css
 
 
-def test_simple_prepare_section_is_optional_and_gated():
-    """Simple: un-numbered optional prepare; Advanced keeps step 4 heading."""
+def test_prepare_section_is_optional_and_gated_both_modes():
+    """Both modes: optional prepare card, hidden until papers are ready (or forceShow)."""
     html = _read("templates", "data_management.html")
     assert 'id="prepare-section"' in html
     # Pre-JS default: hidden so the card never flashes on empty libraries.
@@ -236,7 +236,8 @@ def test_simple_prepare_section_is_optional_and_gated():
     assert "Optional: re-prepare for search" in html
     assert "prepare-heading-simple" in html
     assert "prepare-heading-advanced" in html
-    assert "4. Prepare Papers for Search" in html
+    # Advanced keeps step number but marks optional; Simple is un-numbered.
+    assert "4. Optional: re-prepare for search" in html
     assert "<strong>Optional.</strong>" in html or "Optional." in html
     css = _read("static", "css", "style.css")
     assert 'html[data-mode="simple"] .prepare-heading-advanced' in css
@@ -247,6 +248,11 @@ def test_simple_prepare_section_is_optional_and_gated():
     assert "_pipelineBusy" in dm
     assert "_lastReadyArticles" in dm
     assert "readyArticles" in dm
+    # Same gate for both modes — no early unhide for Advanced only.
+    fn = dm[dm.find("function updatePrepareSectionVisibility") : dm.find("async function loadPageData")]
+    assert "if (!simple)" not in fn
+    assert "_pipelineBusy" in fn
+    assert "_lastReadyArticles" in fn
 
 
 def test_fetch_auto_chains_to_prepare_both_modes():
@@ -627,7 +633,7 @@ def test_prepare_card_stays_hidden_while_auto_chain_runs():
     During an auto-chain the embed progress is mirrored onto the fetch bar, so
     the prepare card has nothing to show — revealing it mid-embed just pops a
     "Re-prepare" control into view for work already in progress. Gate is
-    _pipelineBusy (covers fetch + auto-chain) and readyArticles > 0.
+    _pipelineBusy (covers fetch + auto-chain) and readyArticles > 0, for both modes.
     """
     src = _dm_js()
     assert "_pipelineBusy" in src
@@ -640,6 +646,9 @@ def test_prepare_card_stays_hidden_while_auto_chain_runs():
     assert "autoChainFailed" in src
     # Must not use the old total-articles-only gate (showed mid-fetch with 0 ready).
     assert "sec.hidden = _autoChainActive ||" not in src
+    # Advanced must not always force the card open.
+    fn = src[src.find("function updatePrepareSectionVisibility") : src.find("async function loadPageData")]
+    assert "isSimpleMode" not in fn or "if (!simple)" not in fn
 
 
 def test_next_step_shortcut_exists_and_starts_hidden():

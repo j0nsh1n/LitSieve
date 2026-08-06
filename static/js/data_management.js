@@ -168,7 +168,7 @@ document.addEventListener('DOMContentLoaded', () => {
    queueAnimationFrame(() => updatePrepareSectionVisibility(_lastTotalArticles));
   });
  }
- // Start hidden in Simple until stats load (avoids a flash of step 4 on empty libs).
+ // Start hidden until stats load (avoids a flash of prepare on empty libs).
  updatePrepareSectionVisibility(0);
  document.getElementById('fetch-btn').addEventListener('click', doFetch);
  const cancelBtn = document.getElementById('fetch-cancel-btn');
@@ -486,21 +486,20 @@ function restoreFetchPrefs() {
  updateModelHint();
 }
 
-/** Last known article count (for Simple-mode prepare section + mode toggles). */
+/** Last known article count (for prepare section + mode toggles). */
 let _lastTotalArticles = 0;
-/** Papers with embeddings (ready for search). Simple prepare card gates on this. */
+/** Papers with embeddings (ready for search). Optional prepare card gates on this. */
 let _lastReadyArticles = 0;
 /**
  * True while a fetch is running or the post-fetch auto-prepare is in flight.
- * Simple mode keeps the optional prepare card fully hidden for this whole
+ * Both modes keep the optional prepare card fully hidden for this whole
  * window — progress lives on the fetch bar, not on a second "Re-prepare" card.
  */
 let _pipelineBusy = false;
 
 /**
- * Simple mode: prepare is optional and only appears once papers are ready for
+ * Prepare is optional in both modes and only appears once papers are ready for
  * search (embeddings exist). Never mid-fetch / mid-auto-chain.
- * Advanced: always visible (step 4).
  * forceShow: reveal after a failed auto-prepare so Re-prepare is reachable.
  */
 /** Show the "Next: Clean up" shortcut once papers are actually ready.
@@ -527,12 +526,7 @@ function updatePrepareSectionVisibility(totalArticles, opts) {
   _lastReadyArticles = opts.readyArticles;
  }
  const forceShow = !!(opts && opts.forceShow);
- const simple = typeof isSimpleMode === 'function' && isSimpleMode();
- if (!simple) {
-  sec.hidden = false;
-  return;
- }
- // Busy (fetch or auto-chain): never show the re-prepare card.
+ // Busy (fetch or auto-chain): never show the re-prepare card (Simple or Advanced).
  if (_pipelineBusy) {
   sec.hidden = true;
   return;
@@ -611,16 +605,18 @@ async function loadSampleCorpus(clearFirst) {
  body: { clear_first: !!clearFirst },
  });
  showNotification(
- `Loaded ${data.inserted || data.loaded || 0} sample papers. Press Prepare Papers when you are ready.`,
+ `Loaded ${data.inserted || data.loaded || 0} sample papers. Use Re-prepare Papers when you are ready.`,
  'success'
  );
  await loadPageData();
+ // Samples have no embeddings yet; reveal the optional prepare card so Re-prepare is available.
+ updatePrepareSectionVisibility(_lastTotalArticles, { forceShow: true });
  refreshCoverage();
  updateNavStats();
  applyModelRecommendation();
  setStatus(
  'embeddings-status',
- 'Sample papers loaded. Choose a model if needed, then press Prepare Papers.',
+ 'Sample papers loaded. Choose a model if needed, then press Re-prepare Papers.',
  'info'
  );
  } catch (e) {
