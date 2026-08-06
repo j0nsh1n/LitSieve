@@ -3915,6 +3915,17 @@ html[data-mode="simple"] details.advanced-details:has(#embedding-model) {
     display: none !important;
 }
 
+/* Data Management step labels: Simple renumbers around the hidden sources grid
+   (1 Topics → 2 Fetch; prepare is optional/un-numbered). Advanced keeps 1–4. */
+html[data-mode="simple"] .dm-step-advanced,
+html[data-mode="simple"] .dm-sub-advanced {
+    display: none !important;
+}
+html:not([data-mode="simple"]) .dm-step-simple,
+html:not([data-mode="simple"]) .dm-sub-simple {
+    display: none !important;
+}
+
 /* Prepare section: Simple uses the optional, un-numbered heading; Advanced keeps step 4. */
 html[data-mode="simple"] .prepare-heading-advanced,
 html[data-mode="simple"] .prepare-lead-advanced {

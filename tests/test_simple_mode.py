@@ -162,6 +162,19 @@ def test_simple_prepare_section_is_optional_and_gated():
     assert "forceShow" in dm
 
 
+def test_simple_mode_renumbers_fetch_not_advanced():
+    """Simple: Fetch is step 2 (sources hidden). Advanced keeps Fetch as step 3."""
+    html = (REPO / "templates" / "data_management.html").read_text(encoding="utf-8")
+    assert "dm-step-simple" in html
+    assert "dm-step-advanced" in html
+    assert "2. Fetch Articles" in html
+    assert "3. Fetch Articles" in html
+    css = (REPO / "static" / "css" / "style.css").read_text(encoding="utf-8")
+    # Simple hides advanced labels; Advanced hides simple labels — no cross-bleed.
+    assert 'html[data-mode="simple"] .dm-step-advanced' in css
+    assert 'html:not([data-mode="simple"]) .dm-step-simple' in css
+
+
 def test_fetch_auto_chains_to_prepare():
     """After a successful fetch, prepare starts without a second click (all modes).
 
