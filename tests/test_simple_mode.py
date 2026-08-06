@@ -803,3 +803,17 @@ def test_go_to_search_not_clean_up_in_simple_next_step():
     assert "Go to Search" in html
     next_step = html[html.find("fetch-next-step") : html.find("simple-screening-card")]
     assert "/statistics" not in next_step
+
+
+def test_simple_search_side_panel_exists_and_hidden_in_advanced():
+    html = _read("templates", "search.html")
+    assert 'id="search-simple-panel"' in html
+    assert 'id="simple-export-results-btn"' in html
+    assert 'id="simple-screening-report-btn"' in html
+    assert 'screening-report?format=txt' in html
+    css = _read("static", "css", "style.css")
+    assert 'html:not([data-mode="simple"]) #search-simple-panel' in css or \
+           'html:not([data-mode="simple"]) .search-simple-panel' in css
+    js = _read("static", "js", "search.js")
+    assert "updateSimpleSearchPanel" in js
+    assert "simple-export-results-btn" in js

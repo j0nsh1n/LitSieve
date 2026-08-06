@@ -4123,6 +4123,43 @@ html[data-mode="simple"] .sim-badge {
     display: none !important;
 }
 
+/* Phase 6: Simple sticky export/report panel — Advanced never sees it. */
+html:not([data-mode="simple"]) .search-simple-panel,
+html:not([data-mode="simple"]) #search-simple-panel {
+    display: none !important;
+}
+/* Desktop Simple: results + sticky side panel. */
+html[data-mode="simple"] .search-results-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(14rem, 17rem);
+    gap: 1.25rem 1.5rem;
+    align-items: start;
+}
+html[data-mode="simple"] .search-simple-panel:not([hidden]) {
+    display: block;
+    position: sticky;
+    top: 5.5rem;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 1rem 1rem 1.1rem;
+    background: var(--surface);
+    box-sizing: border-box;
+}
+.search-simple-panel-title {
+    font-family: var(--font-serif);
+    font-size: 1.15rem;
+    margin: 0 0 0.4rem;
+}
+.search-simple-panel-lead {
+    margin: 0 0 0.85rem;
+}
+.search-simple-panel .btn-block {
+    margin-bottom: 0.5rem;
+}
+.search-simple-panel .btn-block:last-of-type {
+    margin-bottom: 0.35rem;
+}
+
 /* === Phase 6 Simple screening card (Data Management) === */
 .simple-screening-card {
     border-left: 4px solid var(--accent, #2a5f6e);

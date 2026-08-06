@@ -44,6 +44,12 @@ document.addEventListener('DOMContentLoaded', () => {
  const risBtn = document.getElementById('export-results-ris');
  if (risBtn) risBtn.addEventListener('click', () => doExportResults('ris'));
 
+ // Phase 6 Simple side panel (same export path; Advanced never shows the panel).
+ const simpleExportBtn = document.getElementById('simple-export-results-btn');
+ if (simpleExportBtn) {
+  simpleExportBtn.addEventListener('click', () => doExportResults('ris'));
+ }
+
  document.querySelectorAll('[data-lib-export-format]').forEach(btn => {
  btn.addEventListener('click', () => {
  const format = btn.getAttribute('data-lib-export-format') || 'ris';
@@ -466,6 +472,7 @@ async function doSearch(opts) {
   exportSec.hidden = !results.length;
   exportSec.style.display = results.length ? 'block' : 'none';
  }
+ updateSimpleSearchPanel(results.length > 0);
  // Persist query + filters so a browser refresh restores this search.
  await saveSearchSession(method);
  } catch (e) {
@@ -531,6 +538,7 @@ async function doStarredSearch(opts) {
   exportSec.hidden = !results.length;
   exportSec.style.display = results.length ? 'block' : 'none';
  }
+ updateSimpleSearchPanel(results.length > 0);
  await refreshStarredCount();
  await saveSearchSession('starred');
  } catch (e) {
@@ -834,16 +842,26 @@ function renderResults(results) {
  * Download exactly the papers currently on screen (lastResults), in that order.
  * Primary path for RIS → Zotero File → Import.
  */
+/** Phase 6 Simple: show sticky export/report panel once results exist. */
+function updateSimpleSearchPanel(hasResults) {
+ const panel = document.getElementById('search-simple-panel');
+ if (!panel) return;
+ const simple = typeof isSimpleMode === 'function' && isSimpleMode();
+ panel.hidden = !(simple && hasResults);
+}
+
 async function doExportResults(format) {
  if (!lastResults || !lastResults.length) {
   showNotification('Run a search first, then export the results shown on screen.', 'error');
   return;
  }
  const status = document.getElementById('export-results-status');
+ const simpleStatus = document.getElementById('simple-export-status');
  if (status) {
   status.textContent = 'Preparing download…';
   status.className = 'status-indicator loading';
  }
+ if (simpleStatus) simpleStatus.textContent = 'Preparing download…';
  const items = lastResults.map((a) => ({
   article_id: a.article_id,
   source: a.source,
@@ -888,12 +906,16 @@ async function doExportResults(format) {
    status.textContent = `Downloaded ${filename} (${items.length} paper${items.length === 1 ? '' : 's'}). Import with Zotero → File → Import…`;
    status.className = 'status-indicator success';
   }
+  if (simpleStatus) {
+   simpleStatus.textContent = `Downloaded ${filename} (${items.length} paper${items.length === 1 ? '' : 's'}).`;
+  }
   showNotification(`Downloaded ${filename}`, 'success');
  } catch (e) {
   if (status) {
    status.textContent = e.message || 'Export failed';
    status.className = 'status-indicator error';
   }
+  if (simpleStatus) simpleStatus.textContent = e.message || 'Export failed';
   showNotification(`Export failed: ${e.message}`, 'error');
  }
 }
