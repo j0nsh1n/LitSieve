@@ -771,8 +771,10 @@ def test_simple_screen_apply_and_undo_use_low_relevance():
 def test_simple_screen_skip_leaves_no_exclusion_call():
     dm = _read("static", "js", "data_management.js")
     fn = dm[dm.find("function doSimpleScreenSkip") : dm.find("async function doSimpleScreenUndo")]
-    assert "/api/screening" not in fn
-    assert "_simpleScreenSkippedSession = true" in fn
+    assert "/api/screening" not in fn, "skip must not exclude anything"
+    # Records the choice through the helper, which also persists it per library
+    # so the card does not reappear on reload.
+    assert "setSimpleScreenSkipped(true)" in fn
 
 
 def test_simple_screen_pending_from_corpus_not_js_flag():
@@ -835,3 +837,57 @@ def test_simple_small_screen_css_for_panel_and_card():
     assert "min-height: 2.75rem" in css
     # Narrowest breakpoint acknowledged
     assert "max-width: 380px" in css
+
+
+# --- Skip persistence (issue 2 follow-up) -----------------------------------
+
+def test_skip_is_remembered_per_library_not_per_page_view():
+    """Skipping must survive a reload, and must be scoped to one library.
+
+    Pending/complete is derived from the corpus, which is correct — but
+    skipping leaves no trace in the corpus by definition. With a session-only
+    flag the card reappeared on refresh and took the "Go to Search" button with
+    it, so a student who chose to keep everything lost their way forward.
+    """
+    src = _dm_js()
+    assert "SKIP_KEY" in src, "skip must be persisted, not session-only"
+    assert "localStorage.setItem(SKIP_KEY" in src
+    # Scoped per library: skipping one collection says nothing about the next.
+    assert "_activeLibraryId()" in src
+    assert "function setSimpleScreenSkipped" in src
+    assert "function isSimpleScreenSkipped" in src
+
+
+def test_skip_state_is_read_through_the_helper():
+    """A raw read of the session flag would ignore the persisted value."""
+    import re
+    src = _dm_js()
+    # The only places the bare flag may appear are its declaration and the two
+    # helpers; anything else means a code path that bypasses persistence.
+    lines = [
+        i for i, ln in enumerate(src.splitlines(), 1)
+        if re.search(r"_simpleScreenSkippedSession", ln)
+    ]
+    assert len(lines) <= 3, (
+        f"bare uses of _simpleScreenSkippedSession outside the helpers: {lines}"
+    )
+    assert "if (isSimpleScreenSkipped())" in src
+
+
+def test_active_library_is_resolved_before_the_skip_check():
+    """The nav select populates asynchronously; reading it early races.
+
+    Without an authoritative resolve, the first card refresh sees an empty
+    library id, misses the persisted skip, and shows the card again.
+    """
+    src = _dm_js()
+    assert "async function ensureActiveLibraryId" in src
+    assert "ensureActiveLibraryId()," in src, (
+        "the card refresh must await the library id before deciding"
+    )
+
+
+def test_new_fetch_clears_a_previous_skip():
+    """A fresh corpus has not been screened, so the choice must not carry over."""
+    src = _dm_js()
+    assert "setSimpleScreenSkipped(false)" in src

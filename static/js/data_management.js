@@ -546,6 +546,76 @@ let _simpleScreenCandidates = [];
 let _simpleScreenLastItems = null;
 /** Session-only: skip hides the decision UI until reload (pending is corpus-derived). */
 let _simpleScreenSkippedSession = false;
+
+// Skip is remembered per library, not just per page view.
+//
+// "Pending vs complete" is derived from the corpus (prepared papers, and
+// whether any low_relevance exclusions exist), which is correct and survives a
+// reload. Skipping leaves no trace in the corpus by definition, so without
+// this the card reappears on refresh and — worse — the "Go to Search" button
+// they were just offered disappears with it.
+//
+// Per library, because skipping one collection says nothing about the next.
+const SKIP_KEY = 'lra_screen_skipped_v1';
+
+// Resolved once per page and cached. The nav select is populated
+// asynchronously by common.js, so reading it during the first card refresh
+// races and comes back empty — which would silently lose a persisted skip.
+let _activeLibIdCache = '';
+
+function _activeLibraryId() {
+ const sel = document.getElementById('nav-library-select');
+ return (sel && sel.value) || _activeLibIdCache || '';
+}
+
+/** Authoritative active library id; falls back to the API before the nav loads. */
+async function ensureActiveLibraryId() {
+ const fromSelect = (document.getElementById('nav-library-select') || {}).value;
+ if (fromSelect) {
+  _activeLibIdCache = fromSelect;
+  return fromSelect;
+ }
+ if (_activeLibIdCache) return _activeLibIdCache;
+ try {
+  const data = await apiCall('/api/libraries');
+  _activeLibIdCache = (data && data.active_id) || '';
+ } catch (e) {
+  _activeLibIdCache = '';
+ }
+ return _activeLibIdCache;
+}
+
+function _skipStore() {
+ try {
+  return JSON.parse(localStorage.getItem(SKIP_KEY) || '{}') || {};
+ } catch (e) {
+  return {};
+ }
+}
+
+function isSimpleScreenSkipped() {
+ if (_simpleScreenSkippedSession) return true;
+ const lib = _activeLibraryId();
+ if (!lib) return false;
+ return _skipStore()[lib] === true;
+}
+
+function setSimpleScreenSkipped(skipped) {
+ _simpleScreenSkippedSession = skipped;
+ const lib = _activeLibraryId();
+ if (!lib) return;
+ try {
+  const store = _skipStore();
+  if (skipped) {
+   store[lib] = true;
+  } else {
+   delete store[lib];
+  }
+  localStorage.setItem(SKIP_KEY, JSON.stringify(store));
+ } catch (e) {
+  // Private mode / storage disabled: fall back to session-only behaviour.
+ }
+}
 let _simpleScreenWired = false;
 
 function simpleScreenSelectedLevel() {
@@ -601,6 +671,9 @@ async function refreshSimpleScreeningCard() {
   const [stats, report] = await Promise.all([
    apiCall('/api/statistics'),
    apiCall('/api/screening-report?format=json'),
+   // Resolves (and caches) the active library so a persisted skip is not
+   // missed just because the nav select has not populated yet.
+   ensureActiveLibraryId(),
   ]);
   const ready = Number(stats.articles_with_embeddings) || 0;
   const lowRel = Number(
@@ -649,7 +722,7 @@ async function refreshSimpleScreeningCard() {
    return;
   }
 
-  if (_simpleScreenSkippedSession) {
+  if (isSimpleScreenSkipped()) {
    if (decision) decision.hidden = true;
    if (actions) actions.hidden = true;
    if (outcome) {
@@ -909,7 +982,7 @@ async function doSimpleScreenApply() {
 }
 
 function doSimpleScreenSkip() {
- _simpleScreenSkippedSession = true;
+ setSimpleScreenSkipped(true);
  const decision = document.getElementById('simple-screen-levels');
  const actions = document.getElementById('simple-screen-actions');
  const preview = document.getElementById('simple-screen-preview');
@@ -948,7 +1021,7 @@ async function doSimpleScreenUndo() {
   });
   const n = _simpleScreenLastItems.length;
   _simpleScreenLastItems = null;
-  _simpleScreenSkippedSession = false;
+  setSimpleScreenSkipped(false);
   _simpleScreenCounts = { low: null, medium: null, high: null };
   setStatus('simple-screen-status', `Restored ${n} paper(s).`, 'success');
   showNotification(`Restored ${n} paper(s).`, 'success');
@@ -1338,7 +1411,7 @@ async function doFetch() {
  const cancelBtn = document.getElementById('fetch-cancel-btn');
  // Hide Simple re-prepare for the whole fetch (+ auto-chain) window.
  _pipelineBusy = true;
- _simpleScreenSkippedSession = false;
+ setSimpleScreenSkipped(false);
  _simpleScreenLastItems = null;
  _simpleScreenCounts = { low: null, medium: null, high: null };
  updatePrepareSectionVisibility(_lastTotalArticles);
