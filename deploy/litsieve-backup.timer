@@ -1,0 +1,13 @@
+[Unit]
+Description=Daily LitSieve backup
+Documentation=file://%h/HealthDatabaseAccess/docs/SELFHOST.md
+
+[Timer]
+# Before the machine's unattended ~05:01 reboot, while it is still up.
+OnCalendar=*-*-* 03:30:00
+# Catch up after the machine has been off, rather than skipping a day silently.
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

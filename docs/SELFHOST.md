@@ -220,6 +220,60 @@ Exit codes: `0` healthy, `1` down (already emailed), `2` the check itself could
 not run. The unit treats `1` as success so a genuine outage does not also show
 up as a failed unit.
 
+## Backups
+
+Everything is on one desktop: `users.db` (real accounts) and `user_data/`
+(libraries, embeddings, notes, screening decisions). A dead disk loses all of
+it.
+
+`tools/backup.py` runs daily via `litsieve-backup.timer` and writes to
+`~/litsieve-backups/` — deliberately outside the repo, so a bad deploy or
+`git clean` cannot take the backups with it.
+
+```bash
+cp deploy/litsieve-backup.{service,timer} ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now litsieve-backup.timer
+
+tools/backup.py --list                 # what exists
+tools/backup.py                        # run one now
+tools/backup.py --verify <archive>     # integrity-check an archive
+systemctl --user list-timers litsieve-backup.timer
+```
+
+Two things make this more than `cp -r`:
+
+- Databases are copied through the **SQLite online backup API**, not the
+  filesystem. They run in WAL mode with a live server attached, so a plain copy
+  can catch a torn write and restore to a corrupt file.
+- Every copy is **integrity-checked before the archive is written**, and the
+  archive is re-verified afterwards. An unverified backup is a guess.
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `BACKUP_DIR` | `~/litsieve-backups` | Where archives are written |
+| `BACKUP_KEEP` | `14` | Archives retained; older ones pruned |
+
+**The archive contains every user's data and, by default, `.env` — including
+`SECRET_KEY`.** That is deliberate: without it, stored AI keys cannot be
+decrypted, so a restore would be partial. Archives are written `0600`. Use
+`--no-env` to exclude it, and encrypt any copy you move off this machine.
+
+### Restoring
+
+```bash
+tar -xzf ~/litsieve-backups/litsieve-YYYYMMDD-HHMMSS.tar.gz -C /tmp/restore
+systemctl --user stop litsieve-uvicorn.service
+cp /tmp/restore/litsieve/users.db ~/HealthDatabaseAccess/
+cp -r /tmp/restore/litsieve/user_data ~/HealthDatabaseAccess/
+systemctl --user start litsieve-uvicorn.service
+```
+
+Off-machine copies are still the gap: this protects against a bad deploy, an
+accidental delete, or filesystem corruption — not against the disk dying or the
+house burning down. Copying the newest archive somewhere else periodically
+closes that.
+
 ### Smoke
 
 ```bash

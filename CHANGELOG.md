@@ -8,6 +8,26 @@ and this project aims to follow Semantic Versioning for app version strings
 
 ## [Unreleased]
 
+### Added
+- Daily backups of `users.db` and `user_data/` (`tools/backup.py` +
+  `litsieve-backup.timer`). Databases are copied through the SQLite online
+  backup API and integrity-checked before and after archiving; archives land
+  outside the repo, are pruned to `BACKUP_KEEP`, and are written `0600` because
+  they contain user data and `SECRET_KEY`.
+- JavaScript syntax checking in the test suite. There is no npm or build step,
+  so a broken browser script previously shipped with every Python test green.
+
+### Fixed
+- The Re-prepare card no longer appears while the automatic prepare is still
+  running after a fetch. Progress is shown on the fetch bar during the chain,
+  so the card had nothing to display and only advertised a "Re-prepare" action
+  for work already in progress.
+- Simple mode now offers a "Next: Clean up your papers" shortcut once papers
+  are ready, instead of requiring a scroll back to the nav.
+- All templates request the same `?v=` build of `theme-init.js` and
+  `style.css`. Only `base.html` had been bumped, so returning visitors on the
+  public pages (login, register, landing) kept a cached older script.
+
 ## [4.5.0] - 2026-08-05
 
 ### Added

@@ -27,7 +27,9 @@ jobs:
           # CPU torch first (same pattern as Dockerfile / Render).
           pip install torch --index-url https://download.pytorch.org/whl/cpu
           pip install -r requirements.txt
-          pip install pytest ruff pyright pip-audit
+          # esprima: syntax-checks static/js (no npm/build step in this repo,
+          # so nothing else would catch a broken browser script).
+          pip install pytest ruff pyright pip-audit esprima
 
       - name: Ruff
         run: ruff check .
