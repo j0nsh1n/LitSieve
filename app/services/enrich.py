@@ -59,11 +59,14 @@ def attach_notes(results: List[dict], p) -> None:
 
 
 def attach_key_points(results: List[dict], p) -> None:
-    """Attach stored extractive bullets (may be empty list)."""
+    """Attach stored key-point bullets (extractive or student-saved AI)."""
     kp = p.db.get_key_points_map()
+    origins = p.db.get_key_points_origin_map()
     for a in results:
-        bullets = kp.get((a.get("article_id"), a.get("source")))
+        key = (a.get("article_id"), a.get("source"))
+        bullets = kp.get(key)
         a["key_points"] = list(bullets) if bullets else []
+        a["key_points_origin"] = origins.get(key, "extractive")
 
 
 def attach_study_types(results: List[dict]) -> None:

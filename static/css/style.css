@@ -3980,11 +3980,13 @@ html:not([data-mode="simple"]) .dm-sub-simple {
 
 /* Search page: Simple drops “Step 4 of 4” and the long title. */
 html[data-mode="simple"] .search-sub-advanced,
-html[data-mode="simple"] .search-title-advanced {
+html[data-mode="simple"] .search-title-advanced,
+html[data-mode="simple"] .search-help-advanced {
     display: none !important;
 }
 html:not([data-mode="simple"]) .search-sub-simple,
-html:not([data-mode="simple"]) .search-title-simple {
+html:not([data-mode="simple"]) .search-title-simple,
+html:not([data-mode="simple"]) .search-help-simple {
     display: none !important;
 }
 

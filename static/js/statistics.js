@@ -40,22 +40,111 @@ function initQuickScreen() {
  }
  } catch (e) { /* ignore */ }
 
+ const applyNowBtn = document.getElementById('quick-screen-apply-now-btn');
  const previewBtn = document.getElementById('quick-screen-preview-btn');
  const applyBtn = document.getElementById('quick-screen-apply-btn');
  const undoBtn = document.getElementById('quick-screen-undo-btn');
+ if (applyNowBtn) applyNowBtn.addEventListener('click', doQuickScreenApplyNow);
  if (previewBtn) previewBtn.addEventListener('click', doQuickScreenPreview);
  if (applyBtn) applyBtn.addEventListener('click', doQuickScreenApply);
  if (undoBtn) undoBtn.addEventListener('click', doQuickScreenUndo);
 }
 
-async function doQuickScreenPreview() {
+function _quickScreenQueryAndFraction() {
  const queryEl = document.getElementById('quick-screen-query');
  const fracEl = document.getElementById('quick-screen-fraction');
+ const query = (queryEl && queryEl.value || '').trim();
+ const fraction = parseFloat((fracEl && fracEl.value) || '0.25');
+ return { query, fraction };
+}
+
+/** Primary path: rank + screen out immediately (no mandatory preview). */
+async function doQuickScreenApplyNow() {
+ const applyNowBtn = document.getElementById('quick-screen-apply-now-btn');
+ const undoBtn = document.getElementById('quick-screen-undo-btn');
+ const applyBtn = document.getElementById('quick-screen-apply-btn');
+ const panel = document.getElementById('quick-screen-preview');
+ const { query, fraction } = _quickScreenQueryAndFraction();
+
+ if (!query) {
+ showNotification('Enter a research question first.', 'error');
+ return;
+ }
+
+ setLoading(applyNowBtn, true);
+ if (applyBtn) applyBtn.hidden = true;
+ _quickScreenCandidates = [];
+ setStatus('quick-screen-status', 'Ranking papers and screening out the least related…', 'info');
+ if (panel) {
+ panel.classList.add('u-hidden');
+ panel.innerHTML = '';
+ }
+
+ try {
+ const data = await apiCall('/api/screening/quick-preview', {
+ method: 'POST',
+ body: { query, fraction },
+ });
+ const candidates = data.candidates || [];
+ if (!candidates.length) {
+ setStatus(
+ 'quick-screen-status',
+ data.total_ranked
+  ? 'Nothing to screen out — every prepared paper already looks related, or only one paper is left.'
+  : 'No prepared papers to rank yet. Fetch and prepare papers first.',
+ 'info'
+ );
+ return;
+ }
+ const items = candidates.map((c) => ({
+ article_id: c.article_id,
+ source: c.source,
+ }));
+ const applied = await apiCall('/api/screening', {
+ method: 'POST',
+ body: { items, action: 'exclude', reason: 'low_relevance' },
+ });
+ _quickScreenLastItems = items;
+ _quickScreenCandidates = [];
+ setStatus(
+ 'quick-screen-status',
+ `Screened out ${applied.count || items.length} of ${data.total_ranked} paper(s) as low relevance. Undo is available once.`,
+ 'success'
+ );
+ showNotification(`Screened out ${applied.count || items.length} paper(s).`, 'success');
+ if (undoBtn) undoBtn.hidden = false;
+ // Show what was removed (read-only list for transparency).
+ if (panel) {
+ panel.innerHTML = '';
+ const list = document.createElement('div');
+ list.className = 'quick-screen-list';
+ candidates.forEach((c) => {
+ const row = document.createElement('div');
+ row.className = 'quick-screen-row';
+ row.innerHTML =
+ `<span class="qs-title">${escapeHtml(c.title || '(no title)')}</span>`
+ + `<span class="qs-meta help-text">${escapeHtml(String(c.year || ''))}`
+ + ` · ${escapeHtml(getSourceName(c.source))} · screened out</span>`;
+ list.appendChild(row);
+ });
+ panel.appendChild(list);
+ panel.classList.remove('u-hidden');
+ }
+ loadStatistics();
+ } catch (e) {
+ setStatus('quick-screen-status', `Quick screen failed: ${e.message}`, 'error');
+ showNotification(`Quick screen failed: ${e.message}`, 'error');
+ } finally {
+ setLoading(applyNowBtn, false);
+ }
+}
+
+/** Optional: preview titles first, then apply selected. */
+async function doQuickScreenPreview() {
  const previewBtn = document.getElementById('quick-screen-preview-btn');
  const applyBtn = document.getElementById('quick-screen-apply-btn');
  const panel = document.getElementById('quick-screen-preview');
- const query = (queryEl && queryEl.value || '').trim();
- const fraction = parseFloat((fracEl && fracEl.value) || '0.25');
+ const { query, fraction } = _quickScreenQueryAndFraction();
 
  if (!query) {
  showNotification('Enter a research question first.', 'error');
@@ -90,7 +179,7 @@ async function doQuickScreenPreview() {
  }
  setStatus(
  'quick-screen-status',
- `Suggesting ${candidates.length} of ${data.total_ranked} paper(s) as least related. Uncheck any you want to keep, then apply.`,
+ `Preview: ${candidates.length} of ${data.total_ranked} paper(s) least related. Uncheck any to keep, then Screen out selected.`,
  'success'
  );
  renderQuickScreenPreview(candidates);

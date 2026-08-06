@@ -638,6 +638,7 @@ function buildResultCard(article, idx) {
  ? renderKeyPointsHtml(article.key_points, {
  articleId: article.article_id,
  source: article.source,
+ origin: article.key_points_origin || 'extractive',
  })
  : '';
  const studyTypeHtml = renderStudyTypeBadge(article);

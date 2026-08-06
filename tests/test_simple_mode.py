@@ -278,7 +278,8 @@ def test_clean_up_page_and_quick_screen_ui_present():
     html = _read("templates", "statistics.html")
     assert "Clean up" in html
     assert "quick-screen" in html
-    assert "Preview suggestions" in html
+    assert "Screen out least related" in html  # primary action
+    assert "Preview first" in html  # optional, not primary
     assert "cleanup-work" in html
     assert "empty-state-actions" in html
     assert "1. Remove duplicates" in html
@@ -287,11 +288,12 @@ def test_clean_up_page_and_quick_screen_ui_present():
     js = _read("static", "js", "statistics.js")
     assert "/api/screening/quick-preview" in js
     assert "low_relevance" in js
+    assert "doQuickScreenApplyNow" in js
     assert "doQuickScreenPreview" in js
     assert "doQuickScreenApply" in js
     assert "doQuickScreenUndo" in js
     assert "updateCleanupWorkVisibility" in js
-    # Apply is a separate call from preview.
+    # Primary path still uses separate preview + exclude API calls (apply is explicit).
     assert "quick-preview" in js
     assert "action: 'exclude'" in js or 'action: "exclude"' in js
     assert "low_relevance" in js
@@ -442,17 +444,25 @@ def test_search_simple_subtitle_and_work_gate():
     assert "search-sub-advanced" in html
     assert "search-title-simple" in html
     assert "search-title-advanced" in html
+    assert "search-help-simple" in html
+    assert "search-help-advanced" in html
     assert "Step 4 of 4" in html  # Advanced only
     assert "search-work" in html
+    # Simple help must not mention Seed; Advanced help may.
+    simple_help = html[html.find("search-help-simple") : html.find("input-method-toggle")]
+    assert "Seed" not in simple_help
+    assert "Seed" in html  # Advanced block still documents seed mode
     # Screening report link uses Clean up naming.
     assert "Clean up" in html or "/statistics" in html
     css = _read("static", "css", "style.css")
     assert 'html[data-mode="simple"] .search-sub-advanced' in css
     assert 'html:not([data-mode="simple"]) .search-sub-simple' in css
     assert 'html[data-mode="simple"] .search-title-advanced' in css
+    assert "search-help-simple" in css
     js = _read("static", "js", "search.js")
     assert "updateSearchWorkVisibility" in js
     assert "articles_with_embeddings" in js
+    assert "key_points_origin" in js
 
 
 def test_search_not_relevant_button_uses_off_topic():
@@ -492,6 +502,7 @@ def test_dual_mode_labels_never_cross_bleed_in_css():
         ("prepare-lead-advanced", "prepare-lead-simple"),
         ("search-sub-advanced", "search-sub-simple"),
         ("search-title-advanced", "search-title-simple"),
+        ("search-help-advanced", "search-help-simple"),
     ]
     for advanced, simple in pairs:
         assert f'html[data-mode="simple"] .{advanced}' in css or (
@@ -501,3 +512,47 @@ def test_dual_mode_labels_never_cross_bleed_in_css():
         assert f'html:not([data-mode="simple"]) .{simple}' in css or (
             f".{simple}" in css
         ), f"missing advanced-hide for {simple}"
+
+
+def test_ai_saved_key_points_survive_extractive_regen(tmp_path):
+    """Student-saved AI key points persist across re-search and re-prepare."""
+    from app.services.pipeline import LiteratureSearchPipeline
+    from app.storage.database import ArticleDatabase
+
+    db = ArticleDatabase(db_path=str(tmp_path / "kp.db"))
+    try:
+        db.insert_articles(
+            [
+                {
+                    "article_id": "a1",
+                    "source": "pubmed",
+                    "title": "T",
+                    "abstract": "Abstract with enough text for key points extraction path.",
+                    "year": "2020",
+                    "authors": [],
+                    "journal": "",
+                }
+            ],
+            dedupe=False,
+        )
+        db.insert_key_points(
+            {("a1", "pubmed"): ["AI bullet one.", "AI bullet two."]},
+            origin="ai",
+        )
+        assert db.get_key_points_origin_map()[("a1", "pubmed")] == "ai"
+        assert ("a1", "pubmed") in db.get_ai_key_points_keys()
+
+        # Extractive regen must not overwrite AI origin.
+        p = LiteratureSearchPipeline(db_path=str(tmp_path / "kp.db"))
+        try:
+            n = p._generate_key_points(only_missing=False)
+            assert n == 0  # protected
+            assert db.get_key_points_map()[("a1", "pubmed")] == [
+                "AI bullet one.",
+                "AI bullet two.",
+            ]
+            assert db.get_key_points_origin_map()[("a1", "pubmed")] == "ai"
+        finally:
+            p.close()
+    finally:
+        db.close()

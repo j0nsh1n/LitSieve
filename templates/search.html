@@ -24,14 +24,22 @@
 <section class="card search-work" id="search-query-section">
  <p class="info-text">Searches <strong>your collection only</strong> (not the whole internet). Plain
  language works - the app compares meaning, not just keywords.</p>
- <details class="help-details">
+ <details class="help-details search-help-advanced">
   <summary>The three input modes and what gets searched</summary>
   <p class="info-text"><strong>Text</strong> is a free research question; <strong>PICO</strong> is for
   clinical-style questions (Population / Intervention / Comparison / Outcome); <strong>Seed</strong>
   starts from one paper already in your collection. You can also run <strong>More like my
   starred</strong> after bookmarking papers with ★. The app compares meaning, then slightly boosts
-  papers that also share your exact words. Papers you screened out on Clusters (or resolved as
-  duplicates) never appear here.</p>
+  papers that also share your exact words. Papers you screened out (Quick screen, Not relevant,
+  Clusters, or duplicates) never appear here.</p>
+ </details>
+ <details class="help-details search-help-simple">
+  <summary>How search works</summary>
+  <p class="info-text"><strong>Text</strong> is a free research question; <strong>PICO</strong> is for
+  clinical-style questions (Population / Intervention / Comparison / Outcome). You can also run
+  <strong>More like my starred</strong> after bookmarking papers with ★. The app compares meaning,
+  then slightly boosts papers that also share your exact words. Papers you screened out (Quick
+  screen, Not relevant, or duplicates) never appear here.</p>
  </details>
  <div class="input-method-toggle">
  <label class="radio-label">
@@ -241,5 +249,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/search.js?v=20260805g"></script>
+<script src="/static/js/search.js?v=20260805j"></script>
 {% endblock %}
