@@ -122,15 +122,55 @@
  <div class="progress-bar-track"><div class="progress-bar-fill" id="fetch-progress-fill"></div></div>
  <div class="progress-bar-label" id="fetch-progress-label"></div>
  </div>
- {# Next-step shortcut. Papers are ready and the next action lives on another
-    page, so offer the link right here rather than making them scroll back up
-    to the nav. Shown by JS only after prepare finishes (Simple mode). #}
- <div class="u-hidden u-mt-md" id="fetch-next-step">
- <a href="/statistics" class="btn btn-primary" id="fetch-next-step-link">
- Next: Clean up your papers →
+ {# Simple-only next step after screen/skip (Phase 6). Advanced uses the nav. #}
+ <div class="u-hidden u-mt-md" id="fetch-next-step" hidden>
+ <a href="/search" class="btn btn-primary" id="fetch-next-step-link">
+ Go to Search →
  </a>
- <p class="info-text u-mt-sm">Remove duplicates and papers that aren’t about your topic,
- then search what’s left.</p>
+ <p class="info-text u-mt-sm">Rank the papers you kept and export your list.</p>
+ </div>
+</section>
+
+{# Phase 6 Simple: inline screening after fetch→prepare. Hidden in Advanced via
+   CSS + JS. Pending state is derived from the corpus (prepared papers, no
+   low_relevance exclusions) — survives reload without a job flag. #}
+<section class="card simple-screening-card" id="simple-screening-card" hidden>
+ <h2>Narrow it down</h2>
+ <p class="info-text">Set aside papers that are least related to your question before you search.</p>
+ <div class="form-group">
+  <label for="simple-screen-query">Your question</label>
+  <input type="text" id="simple-screen-query" name="simple-screen-query"
+   placeholder="e.g., climate change effects on ecosystems" autocomplete="off">
+ </div>
+ <fieldset class="simple-screen-levels" id="simple-screen-levels">
+  <legend class="simple-screen-legend">How much should we set aside?</legend>
+  <label class="simple-screen-level radio-label">
+   <input type="radio" name="simple-screen-level" value="low">
+   <span class="simple-screen-level-text">Low — sets aside about <strong id="simple-screen-count-low">…</strong></span>
+  </label>
+  <label class="simple-screen-level radio-label">
+   <input type="radio" name="simple-screen-level" value="medium" checked>
+   <span class="simple-screen-level-text">Medium — sets aside about <strong id="simple-screen-count-medium">…</strong></span>
+  </label>
+  <label class="simple-screen-level radio-label">
+   <input type="radio" name="simple-screen-level" value="high">
+   <span class="simple-screen-level-text">High — sets aside about <strong id="simple-screen-count-high">…</strong></span>
+  </label>
+ </fieldset>
+ <p class="info-text simple-screen-total" id="simple-screen-total" hidden></p>
+ <div class="form-row simple-screen-actions" id="simple-screen-actions">
+  <button type="button" class="btn btn-secondary" id="simple-screen-preview-btn">Show me what would go</button>
+  <button type="button" class="btn btn-primary" id="simple-screen-apply-btn">Set them aside</button>
+  <button type="button" class="btn btn-secondary" id="simple-screen-skip-btn">Skip this</button>
+ </div>
+ <div id="simple-screen-preview" class="simple-screen-preview u-hidden" hidden></div>
+ <div id="simple-screen-outcome" class="simple-screen-outcome u-hidden" hidden>
+  <p class="info-text" id="simple-screen-outcome-msg"></p>
+  <button type="button" class="btn btn-secondary btn-sm" id="simple-screen-undo-btn" hidden>Undo</button>
+ </div>
+ <div id="simple-screen-status" class="status-indicator"></div>
+ <div class="u-mt-md" id="simple-screen-goto" hidden>
+  <a href="/search" class="btn btn-primary" id="simple-screen-goto-link">Go to Search →</a>
  </div>
 </section>
 
@@ -203,5 +243,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/data_management.js?v=20260805o"></script>
+<script src="/static/js/data_management.js?v=20260805p"></script>
 {% endblock %}

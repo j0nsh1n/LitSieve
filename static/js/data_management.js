@@ -165,11 +165,16 @@ document.addEventListener('DOMContentLoaded', () => {
  const modeBtn = document.getElementById('mode-toggle');
  if (modeBtn) {
   modeBtn.addEventListener('click', () => {
-   queueAnimationFrame(() => updatePrepareSectionVisibility(_lastTotalArticles));
+   queueAnimationFrame(() => {
+    updatePrepareSectionVisibility(_lastTotalArticles);
+    refreshSimpleScreeningCard();
+   });
   });
  }
  // Start hidden until stats load (avoids a flash of prepare on empty libs).
  updatePrepareSectionVisibility(0);
+ // Phase 6: derive screening card visibility from corpus after stats load.
+ queueAnimationFrame(() => refreshSimpleScreeningCard());
  // Form submit (button click or Enter in any field) starts fetch.
  const fetchForm = document.getElementById('fetch-form');
  if (fetchForm) {
@@ -511,18 +516,446 @@ let _pipelineBusy = false;
  * search (embeddings exist). Never mid-fetch / mid-auto-chain.
  * forceShow: reveal after a failed auto-prepare so Re-prepare is reachable.
  */
-/** Show the "Next: Clean up" shortcut once papers are actually ready.
+/** Show "Go to Search" once screening is applied or skipped (Simple only).
  *
- * Only in Simple mode: Advanced users have the numbered steps and the nav.
- * Hidden again whenever a new fetch starts, so it never advertises a next step
- * for work that is still running.
+ * Hidden again whenever a new fetch starts.
  */
 function setNextStepVisible(visible) {
  const el = document.getElementById('fetch-next-step');
  if (!el) return;
  const simple = typeof isSimpleMode === 'function' && isSimpleMode();
- el.hidden = !(visible && simple);
- el.classList.toggle('u-hidden', !(visible && simple));
+ const show = !!(visible && simple);
+ el.hidden = !show;
+ el.classList.toggle('u-hidden', !show);
+}
+
+// --- Phase 6 Simple screening card ------------------------------------------
+// Levels → quick-preview fraction. Counts fetched once, not on every radio click.
+const SIMPLE_SCREEN_LEVELS = {
+ low: 0.10,
+ medium: 0.25,
+ high: 0.50,
+};
+/** @type {Record<string, {proposed_count:number, total_ranked:number, candidates:array}|null>} */
+let _simpleScreenCounts = { low: null, medium: null, high: null };
+let _simpleScreenCandidates = [];
+let _simpleScreenLastItems = null;
+/** Session-only: skip hides the decision UI until reload (pending is corpus-derived). */
+let _simpleScreenSkippedSession = false;
+let _simpleScreenWired = false;
+
+function simpleScreenSelectedLevel() {
+ const el = document.querySelector('input[name="simple-screen-level"]:checked');
+ return (el && el.value) || 'medium';
+}
+
+function simpleScreenFraction(level) {
+ return SIMPLE_SCREEN_LEVELS[level] != null ? SIMPLE_SCREEN_LEVELS[level] : 0.25;
+}
+
+function simpleScreenQuery() {
+ const el = document.getElementById('simple-screen-query');
+ if (el && el.value.trim()) return el.value.trim();
+ const fetchQ = document.getElementById('fetch-query');
+ return (fetchQ && fetchQ.value.trim()) || '';
+}
+
+function prefillSimpleScreenQuery() {
+ const el = document.getElementById('simple-screen-query');
+ if (!el || el.value.trim()) return;
+ try {
+  const prefs = JSON.parse(localStorage.getItem('lra_fetch_prefs_v1') || 'null');
+  if (prefs && prefs.query) {
+   el.value = prefs.query;
+   return;
+  }
+ } catch (e) { /* ignore */ }
+ const fetchQ = document.getElementById('fetch-query');
+ if (fetchQ && fetchQ.value.trim()) el.value = fetchQ.value.trim();
+}
+
+function setSimpleScreenGotoVisible(visible) {
+ const el = document.getElementById('simple-screen-goto');
+ if (el) el.hidden = !visible;
+ setNextStepVisible(visible);
+}
+
+/**
+ * Pending/complete from corpus, not a job flag:
+ *  - pending: prepared papers exist and no low_relevance exclusions yet
+ *  - complete: low_relevance > 0 (applied at least once)
+ */
+async function refreshSimpleScreeningCard() {
+ const card = document.getElementById('simple-screening-card');
+ if (!card) return;
+ const simple = typeof isSimpleMode === 'function' && isSimpleMode();
+ if (!simple || _pipelineBusy) {
+  card.hidden = true;
+  return;
+ }
+ try {
+  const [stats, report] = await Promise.all([
+   apiCall('/api/statistics'),
+   apiCall('/api/screening-report?format=json'),
+  ]);
+  const ready = Number(stats.articles_with_embeddings) || 0;
+  const lowRel = Number(
+   report && report.excluded && report.excluded.low_relevance
+  ) || 0;
+  const total = Number(stats.total_articles) || 0;
+
+  if (ready <= 0) {
+   card.hidden = true;
+   setSimpleScreenGotoVisible(false);
+   return;
+  }
+
+  card.hidden = false;
+  prefillSimpleScreenQuery();
+  wireSimpleScreeningCard();
+
+  const decision = document.getElementById('simple-screen-levels');
+  const actions = document.getElementById('simple-screen-actions');
+  const outcome = document.getElementById('simple-screen-outcome');
+  const outcomeMsg = document.getElementById('simple-screen-outcome-msg');
+  const undoBtn = document.getElementById('simple-screen-undo-btn');
+  const preview = document.getElementById('simple-screen-preview');
+
+  if (lowRel > 0) {
+   // Complete: already screened this library.
+   if (decision) decision.hidden = true;
+   if (actions) actions.hidden = true;
+   if (preview) {
+    preview.hidden = true;
+    preview.classList.add('u-hidden');
+   }
+   if (outcome) {
+    outcome.hidden = false;
+    outcome.classList.remove('u-hidden');
+   }
+   if (outcomeMsg) {
+    outcomeMsg.textContent =
+     `Set aside ${lowRel} paper${lowRel === 1 ? '' : 's'} as less related to your question.`;
+   }
+   if (undoBtn) {
+    // Undo of prior apply needs the exact items; only enable after this session's apply.
+    undoBtn.hidden = !_simpleScreenLastItems || !_simpleScreenLastItems.length;
+   }
+   setSimpleScreenGotoVisible(true);
+   return;
+  }
+
+  if (_simpleScreenSkippedSession) {
+   if (decision) decision.hidden = true;
+   if (actions) actions.hidden = true;
+   if (outcome) {
+    outcome.hidden = false;
+    outcome.classList.remove('u-hidden');
+   }
+   if (outcomeMsg) {
+    outcomeMsg.textContent = 'Screening skipped — you can still search everything you fetched.';
+   }
+   if (undoBtn) undoBtn.hidden = true;
+   setSimpleScreenGotoVisible(true);
+   return;
+  }
+
+  // Pending: show levels + actions; fetch counts once.
+  if (decision) decision.hidden = false;
+  if (actions) actions.hidden = false;
+  if (outcome) {
+   outcome.hidden = true;
+   outcome.classList.add('u-hidden');
+  }
+  setSimpleScreenGotoVisible(false);
+  const totalEl = document.getElementById('simple-screen-total');
+  if (totalEl) {
+   totalEl.hidden = false;
+   totalEl.textContent = `${ready} paper${ready === 1 ? '' : 's'} ready to rank`
+    + (total > ready ? ` (${total} in collection).` : '.');
+  }
+  await loadSimpleScreenCounts();
+ } catch (e) {
+  console.warn('refreshSimpleScreeningCard failed:', e);
+  card.hidden = true;
+ }
+}
+
+async function loadSimpleScreenCounts() {
+ const query = simpleScreenQuery();
+ const status = document.getElementById('simple-screen-status');
+ if (!query) {
+  ['low', 'medium', 'high'].forEach((level) => {
+   const el = document.getElementById(`simple-screen-count-${level}`);
+   if (el) el.textContent = '…';
+  });
+  if (status) {
+   setStatus('simple-screen-status', 'Enter a research question to see how many papers each level would set aside.', 'info');
+  }
+  return;
+ }
+ if (status) setStatus('simple-screen-status', 'Counting papers for each level…', 'info');
+ // Fetch all three fractions once (parallel). Reuse until query changes.
+ const qKey = query;
+ if (_simpleScreenCounts._query === qKey
+  && _simpleScreenCounts.low && _simpleScreenCounts.medium && _simpleScreenCounts.high) {
+  applySimpleScreenCountLabels();
+  if (status) setStatus('simple-screen-status', '', 'info');
+  return;
+ }
+ try {
+  const entries = await Promise.all(
+   Object.keys(SIMPLE_SCREEN_LEVELS).map(async (level) => {
+    const fraction = SIMPLE_SCREEN_LEVELS[level];
+    const data = await apiCall('/api/screening/quick-preview', {
+     method: 'POST',
+     body: { query, fraction },
+    });
+    return [level, data];
+   })
+  );
+  _simpleScreenCounts = { low: null, medium: null, high: null, _query: qKey };
+  entries.forEach(([level, data]) => {
+   _simpleScreenCounts[level] = data;
+  });
+  applySimpleScreenCountLabels();
+  if (status) setStatus('simple-screen-status', '', 'info');
+ } catch (e) {
+  if (status) setStatus('simple-screen-status', `Could not rank papers: ${e.message}`, 'error');
+  console.warn('loadSimpleScreenCounts failed:', e);
+ }
+}
+
+function applySimpleScreenCountLabels() {
+ const total =
+  (_simpleScreenCounts.medium && _simpleScreenCounts.medium.total_ranked)
+  || (_simpleScreenCounts.low && _simpleScreenCounts.low.total_ranked)
+  || 0;
+ ['low', 'medium', 'high'].forEach((level) => {
+  const el = document.getElementById(`simple-screen-count-${level}`);
+  if (!el) return;
+  const data = _simpleScreenCounts[level];
+  if (!data) {
+   el.textContent = '…';
+   return;
+  }
+  const n = Number(data.proposed_count) || 0;
+  const t = Number(data.total_ranked) || total || 0;
+  el.textContent = t ? `${n} of ${t}` : String(n);
+ });
+}
+
+function wireSimpleScreeningCard() {
+ if (_simpleScreenWired) return;
+ _simpleScreenWired = true;
+ const previewBtn = document.getElementById('simple-screen-preview-btn');
+ const applyBtn = document.getElementById('simple-screen-apply-btn');
+ const skipBtn = document.getElementById('simple-screen-skip-btn');
+ const undoBtn = document.getElementById('simple-screen-undo-btn');
+ const queryEl = document.getElementById('simple-screen-query');
+ if (previewBtn) previewBtn.addEventListener('click', doSimpleScreenPreview);
+ if (applyBtn) applyBtn.addEventListener('click', doSimpleScreenApply);
+ if (skipBtn) skipBtn.addEventListener('click', doSimpleScreenSkip);
+ if (undoBtn) undoBtn.addEventListener('click', doSimpleScreenUndo);
+ if (queryEl) {
+  let t = null;
+  queryEl.addEventListener('change', () => {
+   _simpleScreenCounts = { low: null, medium: null, high: null };
+   loadSimpleScreenCounts();
+  });
+  queryEl.addEventListener('input', () => {
+   clearTimeout(t);
+   t = setTimeout(() => {
+    _simpleScreenCounts = { low: null, medium: null, high: null };
+    loadSimpleScreenCounts();
+   }, 600);
+  });
+ }
+ // Radios only switch labels already loaded — no re-fetch.
+}
+
+async function doSimpleScreenPreview() {
+ const level = simpleScreenSelectedLevel();
+ const fraction = simpleScreenFraction(level);
+ const query = simpleScreenQuery();
+ const btn = document.getElementById('simple-screen-preview-btn');
+ const panel = document.getElementById('simple-screen-preview');
+ if (!query) {
+  showNotification('Enter a research question first.', 'error');
+  return;
+ }
+ setLoading(btn, true);
+ setStatus('simple-screen-status', 'Finding the least related papers…', 'info');
+ try {
+  let data = _simpleScreenCounts[level];
+  if (!data || _simpleScreenCounts._query !== query) {
+   data = await apiCall('/api/screening/quick-preview', {
+    method: 'POST',
+    body: { query, fraction },
+   });
+   _simpleScreenCounts[level] = data;
+   _simpleScreenCounts._query = query;
+   applySimpleScreenCountLabels();
+  }
+  const candidates = data.candidates || [];
+  _simpleScreenCandidates = candidates;
+  if (!panel) return;
+  panel.innerHTML = '';
+  if (!candidates.length) {
+   panel.innerHTML = '<p class="info-text">Nothing to set aside at this level.</p>';
+  } else {
+   const list = document.createElement('div');
+   list.className = 'simple-screen-list';
+   candidates.forEach((c) => {
+    const row = document.createElement('div');
+    row.className = 'quick-screen-row';
+    const title = document.createElement('span');
+    title.className = 'qs-title';
+    title.textContent = c.title || '(no title)';
+    const meta = document.createElement('span');
+    meta.className = 'qs-meta help-text';
+    meta.textContent =
+     `${c.year || ''} · ${typeof getSourceName === 'function' ? getSourceName(c.source) : c.source}`;
+    row.appendChild(title);
+    row.appendChild(meta);
+    list.appendChild(row);
+   });
+   panel.appendChild(list);
+  }
+  panel.hidden = false;
+  panel.classList.remove('u-hidden');
+  setStatus(
+   'simple-screen-status',
+   `Showing ${candidates.length} paper(s) that would be set aside. Nothing is excluded yet.`,
+   'info'
+  );
+ } catch (e) {
+  setStatus('simple-screen-status', `Preview failed: ${e.message}`, 'error');
+  showNotification(`Preview failed: ${e.message}`, 'error');
+ } finally {
+  setLoading(btn, false);
+ }
+}
+
+async function doSimpleScreenApply() {
+ const level = simpleScreenSelectedLevel();
+ const fraction = simpleScreenFraction(level);
+ const query = simpleScreenQuery();
+ const btn = document.getElementById('simple-screen-apply-btn');
+ if (!query) {
+  showNotification('Enter a research question first.', 'error');
+  return;
+ }
+ setLoading(btn, true);
+ setStatus('simple-screen-status', 'Setting aside the least related papers…', 'info');
+ try {
+  let data = _simpleScreenCounts[level];
+  if (!data || _simpleScreenCounts._query !== query) {
+   data = await apiCall('/api/screening/quick-preview', {
+    method: 'POST',
+    body: { query, fraction },
+   });
+  }
+  const candidates = data.candidates || [];
+  if (!candidates.length) {
+   setStatus('simple-screen-status', 'Nothing to set aside at this level.', 'info');
+   return;
+  }
+  const items = candidates.map((c) => ({
+   article_id: c.article_id,
+   source: c.source,
+  }));
+  const applied = await apiCall('/api/screening', {
+   method: 'POST',
+   body: { items, action: 'exclude', reason: 'low_relevance' },
+  });
+  _simpleScreenLastItems = items;
+  _simpleScreenCandidates = [];
+  const n = applied.count || items.length;
+  const decision = document.getElementById('simple-screen-levels');
+  const actions = document.getElementById('simple-screen-actions');
+  if (decision) decision.hidden = true;
+  if (actions) actions.hidden = true;
+  const outcome = document.getElementById('simple-screen-outcome');
+  const outcomeMsg = document.getElementById('simple-screen-outcome-msg');
+  const undoBtn = document.getElementById('simple-screen-undo-btn');
+  if (outcome) {
+   outcome.hidden = false;
+   outcome.classList.remove('u-hidden');
+  }
+  if (outcomeMsg) {
+   outcomeMsg.textContent = `Set aside ${n} paper${n === 1 ? '' : 's'}.`;
+  }
+  if (undoBtn) undoBtn.hidden = false;
+  const preview = document.getElementById('simple-screen-preview');
+  if (preview) {
+   preview.hidden = true;
+   preview.classList.add('u-hidden');
+  }
+  setStatus('simple-screen-status', `Set aside ${n} paper(s). You can undo once.`, 'success');
+  showNotification(`Set aside ${n} paper(s).`, 'success');
+  setSimpleScreenGotoVisible(true);
+  updateNavStats();
+ } catch (e) {
+  setStatus('simple-screen-status', `Could not set papers aside: ${e.message}`, 'error');
+  showNotification(`Could not set papers aside: ${e.message}`, 'error');
+ } finally {
+  setLoading(btn, false);
+ }
+}
+
+function doSimpleScreenSkip() {
+ _simpleScreenSkippedSession = true;
+ const decision = document.getElementById('simple-screen-levels');
+ const actions = document.getElementById('simple-screen-actions');
+ const preview = document.getElementById('simple-screen-preview');
+ if (decision) decision.hidden = true;
+ if (actions) actions.hidden = true;
+ if (preview) {
+  preview.hidden = true;
+  preview.classList.add('u-hidden');
+ }
+ const outcome = document.getElementById('simple-screen-outcome');
+ const outcomeMsg = document.getElementById('simple-screen-outcome-msg');
+ const undoBtn = document.getElementById('simple-screen-undo-btn');
+ if (outcome) {
+  outcome.hidden = false;
+  outcome.classList.remove('u-hidden');
+ }
+ if (outcomeMsg) {
+  outcomeMsg.textContent = 'Screening skipped — you can still search everything you fetched.';
+ }
+ if (undoBtn) undoBtn.hidden = true;
+ setStatus('simple-screen-status', '', 'info');
+ setSimpleScreenGotoVisible(true);
+}
+
+async function doSimpleScreenUndo() {
+ const btn = document.getElementById('simple-screen-undo-btn');
+ if (!_simpleScreenLastItems || !_simpleScreenLastItems.length) {
+  showNotification('Nothing to undo from this session.', 'info');
+  return;
+ }
+ setLoading(btn, true);
+ try {
+  await apiCall('/api/screening', {
+   method: 'POST',
+   body: { items: _simpleScreenLastItems, action: 'include' },
+  });
+  const n = _simpleScreenLastItems.length;
+  _simpleScreenLastItems = null;
+  _simpleScreenSkippedSession = false;
+  _simpleScreenCounts = { low: null, medium: null, high: null };
+  setStatus('simple-screen-status', `Restored ${n} paper(s).`, 'success');
+  showNotification(`Restored ${n} paper(s).`, 'success');
+  await refreshSimpleScreeningCard();
+  updateNavStats();
+ } catch (e) {
+  setStatus('simple-screen-status', `Undo failed: ${e.message}`, 'error');
+  showNotification(`Undo failed: ${e.message}`, 'error');
+ } finally {
+  setLoading(btn, false);
+ }
 }
 
 function updatePrepareSectionVisibility(totalArticles, opts) {
@@ -901,7 +1334,12 @@ async function doFetch() {
  const cancelBtn = document.getElementById('fetch-cancel-btn');
  // Hide Simple re-prepare for the whole fetch (+ auto-chain) window.
  _pipelineBusy = true;
+ _simpleScreenSkippedSession = false;
+ _simpleScreenLastItems = null;
+ _simpleScreenCounts = { low: null, medium: null, high: null };
  updatePrepareSectionVisibility(_lastTotalArticles);
+ setNextStepVisible(false);
+ refreshSimpleScreeningCard(); // hides while busy
  setLoading(btn, true);
  if (cancelBtn) {
  cancelBtn.hidden = false;
@@ -994,6 +1432,8 @@ async function doFetch() {
  } else {
   updatePrepareSectionVisibility(_lastTotalArticles);
  }
+ // Simple screening card becomes available once papers are prepared.
+ refreshSimpleScreeningCard();
  setLoading(btn, false);
  if (cancelBtn) {
  cancelBtn.hidden = true;
@@ -1102,11 +1542,14 @@ async function doCreateEmbeddings(opts) {
  setStatus('fetch-status', fetchLine, 'success');
  showNotification(
   simple
-   ? 'Your papers are ready — next: screen, then Search.'
+   ? 'Your papers are ready — narrow them down, then Search.'
    : 'Your papers are ready — next: Clean up, then Search.',
   'success'
  );
- setNextStepVisible(true);
+ // Simple: screening card (not Go to Search yet). Advanced: no next-step bar.
+ if (!simple) {
+  setNextStepVisible(false);
+ }
  } else {
  setStatus(
  'embeddings-status',

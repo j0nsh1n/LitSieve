@@ -690,25 +690,116 @@ def test_prepare_card_stays_hidden_while_auto_chain_runs():
 
 
 def test_next_step_shortcut_exists_and_starts_hidden():
-    """Simple users should not have to scroll back to the nav after a fetch."""
+    """Phase 6: Go to Search (not Clean up), starts hidden until screen/skip."""
     import pathlib
     import re
     html = (pathlib.Path(__file__).resolve().parent.parent
             / "templates" / "data_management.html").read_text()
     tag = re.search(r'<div[^>]*id="fetch-next-step"[^>]*>', html)
     assert tag, "fetch-next-step shortcut missing"
-    assert "u-hidden" in tag.group(0), "shortcut must start hidden"
-    assert 'href="/statistics"' in html, "shortcut must link to Clean up"
+    assert "u-hidden" in tag.group(0) or "hidden" in tag.group(0), "shortcut must start hidden"
+    assert "Go to Search" in html
+    assert 'id="fetch-next-step-link"' in html
+    # Link target is Search, not Clean up
+    link = re.search(r'id="fetch-next-step-link"[^>]*href="([^"]+)"|href="([^"]+)"[^>]*id="fetch-next-step-link"', html)
+    assert link, "fetch-next-step-link missing"
+    href = link.group(1) or link.group(2)
+    assert href == "/search", href
 
 
 def test_next_step_shortcut_is_simple_mode_only_and_resets():
     src = _dm_js()
     assert "function setNextStepVisible" in src
-    # Gated on Simple mode
-    block = src.split("function setNextStepVisible", 1)[1].split("}\n", 1)[0]
+    block = src.split("function setNextStepVisible", 1)[1].split("function ", 1)[0]
     assert "isSimpleMode" in block, "shortcut must be Simple-mode only"
-    # Hidden again when a new fetch starts, so it never points forward mid-job
-    assert src.count("setNextStepVisible(false)") >= 2, (
-        "shortcut must reset on a new fetch and when the chain starts"
-    )
-    assert "setNextStepVisible(true)" in src, "shortcut must appear on success"
+    # Hidden when a new fetch starts
+    assert "setNextStepVisible(false)" in src
+    # Shown after screen apply/skip via setSimpleScreenGotoVisible
+    assert "setSimpleScreenGotoVisible" in src
+    assert "setNextStepVisible(visible)" in src or "setNextStepVisible(show)" in src
+
+
+# --- Phase 6: two-page Simple (screening card + silent dedup already above) ---
+
+SIMPLE_SCREEN_FRACTIONS = {"low": 0.10, "medium": 0.25, "high": 0.50}
+
+
+def test_simple_screen_levels_map_to_documented_fractions():
+    """Low/Medium/High must match 0.10 / 0.25 / 0.50 and stay in API bounds."""
+    dm = _read("static", "js", "data_management.js")
+    assert "SIMPLE_SCREEN_LEVELS" in dm
+    for level, frac in SIMPLE_SCREEN_FRACTIONS.items():
+        assert f"{level}: {frac}" in dm or f"{level}:{frac}" in dm, level
+        assert 0.05 <= frac <= 0.50
+    # HTML has the three radios
+    html = _read("templates", "data_management.html")
+    assert 'name="simple-screen-level"' in html
+    assert 'value="low"' in html
+    assert 'value="medium"' in html
+    assert 'value="high"' in html
+    assert 'id="simple-screening-card"' in html
+
+
+def test_simple_screen_preview_does_not_exclude():
+    """Preview must only call quick-preview — never /api/screening exclude."""
+    dm = _read("static", "js", "data_management.js")
+    fn = dm[dm.find("async function doSimpleScreenPreview") : dm.find("async function doSimpleScreenApply")]
+    assert "/api/screening/quick-preview" in fn
+    assert 'action: \'exclude\'' not in fn and 'action: "exclude"' not in fn
+    assert "low_relevance" not in fn
+
+
+def test_simple_screen_apply_and_undo_use_low_relevance():
+    dm = _read("static", "js", "data_management.js")
+    apply_fn = dm[dm.find("async function doSimpleScreenApply") : dm.find("function doSimpleScreenSkip")]
+    assert 'action: "exclude"' in apply_fn or "action: 'exclude'" in apply_fn
+    assert "low_relevance" in apply_fn
+    undo_fn = dm[dm.find("async function doSimpleScreenUndo") : dm.find("async function silentResolveDuplicatesAfterPrepare")]
+    if "async function doSimpleScreenUndo" not in dm:
+        undo_fn = dm[dm.find("async function doSimpleScreenUndo") :]
+    assert 'action: "include"' in undo_fn or "action: 'include'" in undo_fn
+
+
+def test_simple_screen_skip_leaves_no_exclusion_call():
+    dm = _read("static", "js", "data_management.js")
+    fn = dm[dm.find("function doSimpleScreenSkip") : dm.find("async function doSimpleScreenUndo")]
+    assert "/api/screening" not in fn
+    assert "_simpleScreenSkippedSession = true" in fn
+
+
+def test_simple_screen_pending_from_corpus_not_js_flag():
+    """Pending uses statistics + screening-report (low_relevance), not a job flag."""
+    dm = _read("static", "js", "data_management.js")
+    fn = dm[dm.find("async function refreshSimpleScreeningCard") : dm.find("async function loadSimpleScreenCounts")]
+    assert "/api/statistics" in fn
+    assert "/api/screening-report" in fn
+    assert "low_relevance" in fn
+    assert "articles_with_embeddings" in fn
+    # Must not gate only on a session flag for showing the card initially
+    assert "ready <= 0" in fn or "ready > 0" in fn or "ready <= 0" in fn
+
+
+def test_simple_screen_counts_fetched_once_not_per_radio():
+    """All three fractions load together; radio change does not re-call the API."""
+    dm = _read("static", "js", "data_management.js")
+    assert "loadSimpleScreenCounts" in dm
+    # Parallel fetch of all levels
+    assert "Object.keys(SIMPLE_SCREEN_LEVELS)" in dm or "SIMPLE_SCREEN_LEVELS" in dm
+    wire = dm[dm.find("function wireSimpleScreeningCard") : dm.find("async function doSimpleScreenPreview")]
+    # Radios: no change listener that calls loadSimpleScreenCounts
+    assert 'name="simple-screen-level"' not in wire or "addEventListener('change'" not in wire
+
+
+def test_simple_screening_card_hidden_in_advanced_css():
+    css = _read("static", "css", "style.css")
+    assert 'html:not([data-mode="simple"]) #simple-screening-card' in css
+    assert "display: none" in css.split('simple-screening-card')[1][:200]
+
+
+def test_go_to_search_not_clean_up_in_simple_next_step():
+    html = _read("templates", "data_management.html")
+    # Phase 6 replaces Clean up shortcut with Search
+    assert 'href="/search"' in html
+    assert "Go to Search" in html
+    next_step = html[html.find("fetch-next-step") : html.find("simple-screening-card")]
+    assert "/statistics" not in next_step

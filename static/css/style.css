@@ -4108,6 +4108,11 @@ html[data-mode="simple"] .form-row:has(#threshold) {
     display: none !important;
 }
 
+/* Phase 6: screening card is Simple-only (Advanced keeps Clean up). */
+html:not([data-mode="simple"]) #simple-screening-card {
+    display: none !important;
+}
+
 /* Search */
 html[data-mode="simple"] details.advanced-details:has(#lexical-boost),
 html[data-mode="simple"] details.advanced-details:has(#lib-export-scope),
@@ -4116,6 +4121,82 @@ html[data-mode="simple"] #seed-input-panel,
 html[data-mode="simple"] #seed-banner,
 html[data-mode="simple"] .sim-badge {
     display: none !important;
+}
+
+/* === Phase 6 Simple screening card (Data Management) === */
+.simple-screening-card {
+    border-left: 4px solid var(--accent, #2a5f6e);
+    padding-left: 1.15rem;
+    padding-right: 0.5rem;
+}
+.simple-screen-levels {
+    border: none;
+    margin: 0.75rem 0 1rem;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+.simple-screen-legend {
+    font-weight: 600;
+    font-size: 0.95rem;
+    margin-bottom: 0.45rem;
+    padding: 0;
+}
+.simple-screen-level {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.55rem;
+    min-height: 2.75rem;
+    padding: 0.45rem 0.5rem;
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    margin: 0;
+    cursor: pointer;
+}
+.simple-screen-level:has(input:checked) {
+    border-color: var(--accent, #2a5f6e);
+    background: color-mix(in srgb, var(--accent, #2a5f6e) 8%, transparent);
+}
+.simple-screen-level input {
+    margin-top: 0.2rem;
+    flex: 0 0 auto;
+}
+.simple-screen-level-text {
+    line-height: 1.4;
+    flex: 1 1 auto;
+}
+.simple-screen-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+.simple-screen-preview {
+    margin-top: 0.65rem;
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 0.65rem 0.85rem;
+    max-height: 14rem;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+}
+.simple-screen-preview .quick-screen-list,
+.simple-screen-preview .simple-screen-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+.simple-screen-outcome {
+    margin-top: 0.65rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.65rem;
+}
+.simple-screen-outcome .info-text {
+    margin: 0;
 }
 
 /* Quick screen preview (Clean up page) */
