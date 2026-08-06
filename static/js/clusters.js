@@ -269,6 +269,7 @@ function buildClusterArticleItem(article) {
  articleId: article.article_id,
  source: article.source,
  origin: article.key_points_origin || 'extractive',
+ abstractShown: !!(article.abstract),
  })
  : '';
 
