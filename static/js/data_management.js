@@ -160,6 +160,16 @@ document.addEventListener('DOMContentLoaded', () => {
  loadPageData();
  refreshCoverage();
  });
+ // Simple: hide optional prepare card until the library has papers.
+ // Re-evaluate when the mode toggle flips (common.js sets data-mode first).
+ const modeBtn = document.getElementById('mode-toggle');
+ if (modeBtn) {
+  modeBtn.addEventListener('click', () => {
+   queueAnimationFrame(() => updatePrepareSectionVisibility(_lastTotalArticles));
+  });
+ }
+ // Start hidden in Simple until stats load (avoids a flash of step 4 on empty libs).
+ updatePrepareSectionVisibility(0);
  document.getElementById('fetch-btn').addEventListener('click', doFetch);
  const cancelBtn = document.getElementById('fetch-cancel-btn');
  if (cancelBtn) cancelBtn.addEventListener('click', cancelFetch);
@@ -476,13 +486,36 @@ function restoreFetchPrefs() {
  updateModelHint();
 }
 
+/** Last known article count (for Simple-mode prepare section + mode toggles). */
+let _lastTotalArticles = 0;
+
+/**
+ * Simple mode: prepare is optional and only appears once the library has papers.
+ * Advanced: always visible (step 4). forceShow is used while an auto-chain prepare runs.
+ */
+function updatePrepareSectionVisibility(totalArticles, opts) {
+ const sec = document.getElementById('prepare-section');
+ if (!sec) return;
+ if (typeof totalArticles === 'number' && !Number.isNaN(totalArticles)) {
+  _lastTotalArticles = totalArticles;
+ }
+ const forceShow = !!(opts && opts.forceShow);
+ const simple = typeof isSimpleMode === 'function' && isSimpleMode();
+ if (!simple) {
+  sec.hidden = false;
+  return;
+ }
+ sec.hidden = !forceShow && !(_lastTotalArticles > 0);
+}
+
 async function loadPageData() {
  try {
  const stats = await apiCall('/api/statistics');
  const model = stats.embedding_model || ' - ';
- const missing = stats.missing_embeddings ?? Math.max(0, (stats.total_articles || 0) - (stats.articles_with_embeddings || 0));
+ const total = stats.total_articles || 0;
+ const missing = stats.missing_embeddings ?? Math.max(0, total - (stats.articles_with_embeddings || 0));
  document.getElementById('embedding-info').textContent =
- `${stats.articles_with_embeddings} of ${stats.total_articles} papers are ready for search` +
+ `${stats.articles_with_embeddings} of ${total} papers are ready for search` +
  (stats.articles_with_embeddings ? ` (model: ${model})` : '') +
  (missing ? ` · ${missing} still need preparing` : '') + '.';
  // Topic recommendation drives the dropdown (unless the user overrode it).
@@ -490,10 +523,12 @@ async function loadPageData() {
  // pubmedbert "stick" after a biomedical prep even when topics say specter.
  window._corpusEmbeddingModel = stats.embedding_model || null;
  applyModelRecommendation();
- updateGettingStartedCard(stats.total_articles || 0);
+ updateGettingStartedCard(total);
+ updatePrepareSectionVisibility(total);
  } catch (e) {
  document.getElementById('embedding-info').textContent = 'Unable to load article info.';
  updateGettingStartedCard(0);
+ updatePrepareSectionVisibility(0);
  }
 }
 
@@ -815,6 +850,9 @@ async function doFetch() {
   && data.status !== 'cancelled';
  if (fetchedOk) {
  applyModelRecommendation();
+ // Simple: surface the optional prepare card so progress is visible mid-chain.
+ _lastTotalArticles = Math.max(_lastTotalArticles, data.total_fetched || 0);
+ updatePrepareSectionVisibility(_lastTotalArticles, { forceShow: true });
  setStatus(
  'fetch-status',
  `Fetched ${data.total_fetched} paper(s). Getting them ready for search…`,

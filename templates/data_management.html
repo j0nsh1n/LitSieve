@@ -129,11 +129,15 @@
  <button type="button" id="coverage-refresh" class="btn btn-secondary btn-sm">Refresh coverage</button>
 </section>
 
-<!-- Step 4: Prepare papers (embeddings) — also auto-runs after a successful fetch -->
-<section class="card">
- <h2>4. Prepare Papers for Search</h2>
- <p class="info-text">Runs automatically after a successful fetch. Use the button below only if you
+<!-- Prepare papers (embeddings) — auto-runs after a successful fetch.
+     In Simple mode: un-numbered, marked optional, only shown once the library has papers. -->
+<section class="card" id="prepare-section">
+ <h2 class="prepare-heading prepare-heading-advanced">4. Prepare Papers for Search</h2>
+ <h2 class="prepare-heading prepare-heading-simple">Optional: re-prepare for search</h2>
+ <p class="info-text prepare-lead prepare-lead-advanced">Runs automatically after a successful fetch. Use the button below only if you
  need to re-prepare (for example after changing the analysis model under Advanced).</p>
+ <p class="info-text prepare-lead prepare-lead-simple"><strong>Optional.</strong> Papers are prepared automatically after you fetch.
+ Use this only if prepare failed, or you need to run it again.</p>
  <details class="help-details">
   <summary>What preparing does (embeddings)</summary>
   <p class="info-text">Preparing creates <strong>embeddings</strong>: each abstract becomes a numerical
@@ -183,5 +187,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/data_management.js?v=20260729a"></script>
+<script src="/static/js/data_management.js?v=20260805c"></script>
 {% endblock %}

@@ -147,6 +147,21 @@ def test_clusters_route_still_exists():
     assert "/clusters" in paths
 
 
+def test_simple_prepare_section_is_optional_and_gated():
+    """Simple mode: prepare is un-numbered, optional, and only shown with papers."""
+    html = (REPO / "templates" / "data_management.html").read_text(encoding="utf-8")
+    assert 'id="prepare-section"' in html
+    assert "Optional: re-prepare for search" in html
+    assert "prepare-heading-simple" in html
+    assert "<strong>Optional.</strong>" in html or "Optional." in html
+    css = (REPO / "static" / "css" / "style.css").read_text(encoding="utf-8")
+    assert "prepare-heading-advanced" in css
+    assert "prepare-heading-simple" in css
+    dm = (REPO / "static" / "js" / "data_management.js").read_text(encoding="utf-8")
+    assert "updatePrepareSectionVisibility" in dm
+    assert "forceShow" in dm
+
+
 def test_fetch_auto_chains_to_prepare():
     """After a successful fetch, prepare starts without a second click (all modes).
 
