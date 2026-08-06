@@ -488,12 +488,20 @@ function restoreFetchPrefs() {
 
 /** Last known article count (for Simple-mode prepare section + mode toggles). */
 let _lastTotalArticles = 0;
-/** True while fetch→prepare auto-chain is running (keeps prepare card visible). */
-let _autoChainActive = false;
+/** Papers with embeddings (ready for search). Simple prepare card gates on this. */
+let _lastReadyArticles = 0;
+/**
+ * True while a fetch is running or the post-fetch auto-prepare is in flight.
+ * Simple mode keeps the optional prepare card fully hidden for this whole
+ * window — progress lives on the fetch bar, not on a second "Re-prepare" card.
+ */
+let _pipelineBusy = false;
 
 /**
- * Simple mode: prepare is optional and only appears once the library has papers.
- * Advanced: always visible (step 4). forceShow / auto-chain keep it open mid-job.
+ * Simple mode: prepare is optional and only appears once papers are ready for
+ * search (embeddings exist). Never mid-fetch / mid-auto-chain.
+ * Advanced: always visible (step 4).
+ * forceShow: reveal after a failed auto-prepare so Re-prepare is reachable.
  */
 /** Show the "Next: Clean up" shortcut once papers are actually ready.
  *
@@ -515,17 +523,26 @@ function updatePrepareSectionVisibility(totalArticles, opts) {
  if (typeof totalArticles === 'number' && !Number.isNaN(totalArticles)) {
   _lastTotalArticles = totalArticles;
  }
- // Deliberately NOT force-shown while the auto-chain runs. Prepare progress is
- // mirrored onto the fetch bar during a chain (see doCreateEmbeddings), so the
- // card has nothing to display yet -- revealing it mid-embed just pops a
- // "Re-prepare" control into view for work that is still in progress.
+ if (opts && typeof opts.readyArticles === 'number' && !Number.isNaN(opts.readyArticles)) {
+  _lastReadyArticles = opts.readyArticles;
+ }
  const forceShow = !!(opts && opts.forceShow);
  const simple = typeof isSimpleMode === 'function' && isSimpleMode();
  if (!simple) {
   sec.hidden = false;
   return;
  }
- sec.hidden = _autoChainActive || (!forceShow && !(_lastTotalArticles > 0));
+ // Busy (fetch or auto-chain): never show the re-prepare card.
+ if (_pipelineBusy) {
+  sec.hidden = true;
+  return;
+ }
+ if (forceShow) {
+  sec.hidden = false;
+  return;
+ }
+ // Optional re-prepare only once something is actually ready for search.
+ sec.hidden = !(_lastReadyArticles > 0);
 }
 
 async function loadPageData() {
@@ -533,10 +550,11 @@ async function loadPageData() {
  const stats = await apiCall('/api/statistics');
  const model = stats.embedding_model || ' - ';
  const total = stats.total_articles || 0;
- const missing = stats.missing_embeddings ?? Math.max(0, total - (stats.articles_with_embeddings || 0));
+ const ready = stats.articles_with_embeddings || 0;
+ const missing = stats.missing_embeddings ?? Math.max(0, total - ready);
  document.getElementById('embedding-info').textContent =
- `${stats.articles_with_embeddings} of ${total} papers are ready for search` +
- (stats.articles_with_embeddings ? ` (model: ${model})` : '') +
+ `${ready} of ${total} papers are ready for search` +
+ (ready ? ` (model: ${model})` : '') +
  (missing ? ` · ${missing} still need preparing` : '') + '.';
  // Topic recommendation drives the dropdown (unless the user overrode it).
  // Do NOT force the corpus's stored model into the select — that made
@@ -544,11 +562,11 @@ async function loadPageData() {
  window._corpusEmbeddingModel = stats.embedding_model || null;
  applyModelRecommendation();
  updateGettingStartedCard(total);
- updatePrepareSectionVisibility(total);
+ updatePrepareSectionVisibility(total, { readyArticles: ready });
  } catch (e) {
  document.getElementById('embedding-info').textContent = 'Unable to load article info.';
  updateGettingStartedCard(0);
- updatePrepareSectionVisibility(0);
+ updatePrepareSectionVisibility(0, { readyArticles: 0 });
  }
 }
 
@@ -854,6 +872,9 @@ async function doFetch() {
 
  const btn = document.getElementById('fetch-btn');
  const cancelBtn = document.getElementById('fetch-cancel-btn');
+ // Hide Simple re-prepare for the whole fetch (+ auto-chain) window.
+ _pipelineBusy = true;
+ updatePrepareSectionVisibility(_lastTotalArticles);
  setLoading(btn, true);
  if (cancelBtn) {
  cancelBtn.hidden = false;
@@ -868,6 +889,7 @@ async function doFetch() {
  'info'
  );
 
+ let autoChainFailed = false;
  try {
  const started = await apiCall('/api/fetch-articles-multi', {
  method: 'POST',
@@ -901,9 +923,8 @@ async function doFetch() {
   && data.status !== 'cancelled';
  if (fetchedOk) {
  applyModelRecommendation();
- _autoChainActive = true;
  _lastTotalArticles = Math.max(_lastTotalArticles, totalFetched);
- // Keeps the card hidden until the chain finishes (see above).
+ // Still busy: keep prepare hidden; progress stays on the fetch bar.
  updatePrepareSectionVisibility(_lastTotalArticles);
  setNextStepVisible(false);
  setStatus(
@@ -916,6 +937,7 @@ async function doFetch() {
  await doCreateEmbeddings({ fromAutoChain: true });
  } catch (chainErr) {
  // doCreateEmbeddings already surfaces errors; do not rethrow into fetch.
+ autoChainFailed = true;
  console.warn('Auto-prepare after fetch failed:', chainErr);
  setStatus(
  'fetch-status',
@@ -937,8 +959,14 @@ async function doFetch() {
  showNotification(`Fetch failed: ${msg}`, 'error');
  }
  } finally {
- _autoChainActive = false;
- updatePrepareSectionVisibility(_lastTotalArticles);
+ _pipelineBusy = false;
+ // After a failed auto-prepare with papers in hand, force the re-prepare card open
+ // so the student has a control (ready count may still be 0).
+ if (autoChainFailed && _lastTotalArticles > 0) {
+  updatePrepareSectionVisibility(_lastTotalArticles, { forceShow: true });
+ } else {
+  updatePrepareSectionVisibility(_lastTotalArticles);
+ }
  setLoading(btn, false);
  if (cancelBtn) {
  cancelBtn.hidden = true;

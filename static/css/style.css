@@ -4027,41 +4027,39 @@ html[data-mode="simple"] details.advanced-details:has(#embedding-model) {
     display: none !important;
 }
 
-/* Data Management step labels: Simple renumbers around the hidden sources grid
-   (1 Topics → 2 Fetch; prepare is optional/un-numbered). Advanced keeps 1–4. */
+/* Dual-mode labels (DM, prepare, search).
+   Default = Advanced only. Simple variants stay display:none unless data-mode is
+   simple. That way a missing attribute, partial CSS load, or stale cache never
+   double-renders both headings (the glitch that stacked “2. Fetch” + “3. Fetch”). */
+.dm-step-simple,
+.dm-sub-simple,
+.prepare-heading-simple,
+.prepare-lead-simple,
+.search-sub-simple,
+.search-title-simple,
+.search-help-simple {
+    display: none !important;
+}
 html[data-mode="simple"] .dm-step-advanced,
-html[data-mode="simple"] .dm-sub-advanced {
-    display: none !important;
-}
-html:not([data-mode="simple"]) .dm-step-simple,
-html:not([data-mode="simple"]) .dm-sub-simple {
-    display: none !important;
-}
-
-/* Search page: Simple drops “Step 4 of 4” and the long title. */
+html[data-mode="simple"] .dm-sub-advanced,
+html[data-mode="simple"] .prepare-heading-advanced,
+html[data-mode="simple"] .prepare-lead-advanced,
 html[data-mode="simple"] .search-sub-advanced,
 html[data-mode="simple"] .search-title-advanced,
 html[data-mode="simple"] .search-help-advanced {
     display: none !important;
 }
-html:not([data-mode="simple"]) .search-sub-simple,
-html:not([data-mode="simple"]) .search-title-simple,
-html:not([data-mode="simple"]) .search-help-simple {
-    display: none !important;
+html[data-mode="simple"] .dm-step-simple,
+html[data-mode="simple"] .dm-sub-simple,
+html[data-mode="simple"] .prepare-heading-simple,
+html[data-mode="simple"] .prepare-lead-simple,
+html[data-mode="simple"] .search-sub-simple,
+html[data-mode="simple"] .search-title-simple {
+    display: block !important;
 }
-
-/* Prepare section: Simple uses the optional, un-numbered heading; Advanced keeps step 4. */
-html[data-mode="simple"] .prepare-heading-advanced,
-html[data-mode="simple"] .prepare-lead-advanced {
-    display: none !important;
-}
-html:not([data-mode="simple"]) .prepare-heading-simple,
-html:not([data-mode="simple"]) .prepare-lead-simple {
-    display: none !important;
-}
-/* When Simple and empty library, JS sets [hidden]; keep progress usable when shown. */
-html[data-mode="simple"] #prepare-section[hidden] {
-    display: none !important;
+/* <details> is not a block paragraph — restore native display. */
+html[data-mode="simple"] .search-help-simple {
+    display: block !important;
 }
 
 /* Duplicates / Clean up */
@@ -4186,6 +4184,11 @@ html[data-mode="simple"] .sim-badge {
    CSP governs literal style attributes in served HTML. JS that sets
    element.style.* at runtime is unaffected, so the existing show/hide code in
    the page scripts keeps working. */
+
+/* Author styles (e.g. .card animation fill) must not resurrect [hidden] nodes.
+   UA [hidden]{display:none} loses to any more-specific display rule. */
+[hidden] { display: none !important; }
+
 .u-hidden { display: none; }
 .u-mt-sm { margin-top: 0.4rem; }
 .u-mt-md { margin-top: 0.6rem; }
