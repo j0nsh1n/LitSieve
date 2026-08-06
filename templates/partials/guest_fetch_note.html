@@ -1,0 +1,9 @@
+{# Guest demo only: multi-source fetch is server-blocked; point them at sample papers. #}
+{% if user and user.is_guest %}
+ <div class="guest-fetch-note info-text" id="guest-fetch-note">
+  <strong>Demo mode:</strong> multi-source fetch is turned off. You’re using the built-in sample
+  papers (~20 education demos). Prepare them for search, narrow them down, then go to Search.
+  <button type="button" id="load-sample-btn-guest" class="btn btn-secondary btn-sm">Reload sample papers</button>
+  <a href="/register" class="btn btn-primary btn-sm">Create account to fetch real papers</a>
+ </div>
+{% endif %}

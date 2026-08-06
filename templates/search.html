@@ -188,21 +188,7 @@
  <div id="results-list"></div>
 </section>
 
-{# Phase 6 Simple: sticky export / report panel (Advanced: CSS-hidden). #}
-<aside class="search-simple-panel" id="search-simple-panel" hidden>
- <h2 class="search-simple-panel-title">Save your work</h2>
- <p class="help-text search-simple-panel-lead">Export the results on this page, or download the
-  screening counts for a hand-in.</p>
- <button type="button" class="btn btn-primary btn-block" id="simple-export-results-btn">
-  Export these results
- </button>
- <a class="btn btn-secondary btn-block" id="simple-screening-report-btn"
-  href="/api/screening-report?format=txt"
-  download="screening_report.txt">
-  Download screening report
- </a>
- <p class="help-text" id="simple-export-status" aria-live="polite"></p>
-</aside>
+{% include "partials/simple_search_panel.html" %}
 </div>
 
 <section class="card search-work" id="export-results-section" hidden>

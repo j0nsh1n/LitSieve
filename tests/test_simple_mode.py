@@ -699,17 +699,20 @@ def test_prepare_card_stays_hidden_while_auto_chain_runs():
 
 def test_next_step_shortcut_exists_and_starts_hidden():
     """Phase 6: Go to Search (not Clean up), starts hidden until screen/skip."""
-    import pathlib
     import re
-    html = (pathlib.Path(__file__).resolve().parent.parent
-            / "templates" / "data_management.html").read_text()
+    # Markup lives in a labeled partial (included from data_management.html).
+    dm = _read("templates", "data_management.html")
+    assert 'include "partials/simple_go_to_search.html"' in dm
+    html = _read("templates", "partials", "simple_go_to_search.html")
     tag = re.search(r'<div[^>]*id="fetch-next-step"[^>]*>', html)
     assert tag, "fetch-next-step shortcut missing"
     assert "u-hidden" in tag.group(0) or "hidden" in tag.group(0), "shortcut must start hidden"
     assert "Go to Search" in html
     assert 'id="fetch-next-step-link"' in html
-    # Link target is Search, not Clean up
-    link = re.search(r'id="fetch-next-step-link"[^>]*href="([^"]+)"|href="([^"]+)"[^>]*id="fetch-next-step-link"', html)
+    link = re.search(
+        r'id="fetch-next-step-link"[^>]*href="([^"]+)"|href="([^"]+)"[^>]*id="fetch-next-step-link"',
+        html,
+    )
     assert link, "fetch-next-step-link missing"
     href = link.group(1) or link.group(2)
     assert href == "/search", href
@@ -739,8 +742,10 @@ def test_simple_screen_levels_map_to_documented_fractions():
     for level, frac in SIMPLE_SCREEN_FRACTIONS.items():
         assert f"{level}: {frac}" in dm or f"{level}:{frac}" in dm, level
         assert 0.05 <= frac <= 0.50
-    # HTML has the three radios
-    html = _read("templates", "data_management.html")
+    # HTML has the three radios (in the Simple-only partial)
+    page = _read("templates", "data_management.html")
+    assert 'include "partials/simple_screening_card.html"' in page
+    html = _read("templates", "partials", "simple_screening_card.html")
     assert 'name="simple-screen-level"' in html
     assert 'value="low"' in html
     assert 'value="medium"' in html
@@ -807,16 +812,19 @@ def test_simple_screening_card_hidden_in_advanced_css():
 
 
 def test_go_to_search_not_clean_up_in_simple_next_step():
-    html = _read("templates", "data_management.html")
+    page = _read("templates", "data_management.html")
+    assert 'include "partials/simple_go_to_search.html"' in page
+    html = _read("templates", "partials", "simple_go_to_search.html")
     # Phase 6 replaces Clean up shortcut with Search
     assert 'href="/search"' in html
     assert "Go to Search" in html
-    next_step = html[html.find("fetch-next-step") : html.find("simple-screening-card")]
-    assert "/statistics" not in next_step
+    assert "/statistics" not in html
 
 
 def test_simple_search_side_panel_exists_and_hidden_in_advanced():
-    html = _read("templates", "search.html")
+    page = _read("templates", "search.html")
+    assert 'include "partials/simple_search_panel.html"' in page
+    html = _read("templates", "partials", "simple_search_panel.html")
     assert 'id="search-simple-panel"' in html
     assert 'id="simple-export-results-btn"' in html
     assert 'id="simple-screening-report-btn"' in html
@@ -891,3 +899,23 @@ def test_new_fetch_clears_a_previous_skip():
     """A fresh corpus has not been screened, so the choice must not carry over."""
     src = _dm_js()
     assert "setSimpleScreenSkipped(false)" in src
+
+
+def test_simple_mode_markup_lives_in_labeled_partials():
+    """Phase 6 Simple blocks are separately labeled files, included from the page.
+
+    Avoids forking whole pages (server cannot know uiMode) while making ownership
+    obvious for reviewers — Claude's recommended middle ground for Advanced drift.
+    """
+    dm = _read("templates", "data_management.html")
+    search = _read("templates", "search.html")
+    assert 'include "partials/simple_screening_card.html"' in dm
+    assert 'include "partials/simple_go_to_search.html"' in dm
+    assert 'include "partials/guest_fetch_note.html"' in dm
+    assert 'include "partials/simple_search_panel.html"' in search
+    # Markup itself lives in the partial, not duplicated on the page.
+    assert 'id="simple-screening-card"' not in dm
+    assert 'id="simple-screening-card"' in _read("templates", "partials", "simple_screening_card.html")
+    assert 'id="search-simple-panel"' not in search
+    assert 'id="search-simple-panel"' in _read("templates", "partials", "simple_search_panel.html")
+    assert "Narrow it down" in _read("templates", "partials", "simple_screening_card.html")
