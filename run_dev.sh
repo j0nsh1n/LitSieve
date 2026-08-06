@@ -44,17 +44,35 @@ export SECRET_KEY
 # even if .env has DEBUG=false for the public host / tunnel process.
 export DEBUG=true
 
-echo "Starting LitPilot on http://127.0.0.1:${PORT}"
+# Isolate dev data from the live site by DEFAULT.
+#
+# This script runs from the repo, which is also the service's WorkingDirectory,
+# so without these it opens the *production* accounts DB and paper libraries:
+# a test fetch would write into a real student's library, and a stray click
+# could change a real password. Two processes sharing one rotating log file
+# also lose lines when it rolls over.
+#
+# Export any of these yourself to override (e.g. to reproduce a bug against
+# real data on a copy).
+export USERS_DB="${USERS_DB:-dev_users.db}"
+export USER_DATA_DIR="${USER_DATA_DIR:-dev_data}"
+export LOG_FILE="${LOG_FILE:-logs/dev.log}"
+
+echo "Starting LitSieve on http://127.0.0.1:${PORT}"
 echo "  DEBUG=${DEBUG} (forced for run_dev; public host should use DEBUG=false)"
 echo "  --reload is on (Python file changes restart the server)"
 echo "  CSS/JS/HTML: just refresh the browser"
+echo "  data: USERS_DB=${USERS_DB}  USER_DATA_DIR=${USER_DATA_DIR}"
+if [[ "$USERS_DB" == "users.db" || "$USER_DATA_DIR" == "user_data" ]]; then
+  echo "  !! WARNING: pointed at LIVE data. Ctrl-C now unless that is deliberate."
+fi
 echo ""
 
+# No --reload-include: those flags are silently ignored unless `watchfiles` is
+# installed, and they are not needed anyway. Jinja reloads templates per render
+# and static files are read from disk per request, so HTML/CSS/JS changes show
+# up on a browser refresh with no server restart.
 exec "$VENV_PY" -m uvicorn app.main:app \
   --host 127.0.0.1 \
   --port "$PORT" \
-  --reload \
-  --reload-include "*.py" \
-  --reload-include "*.html" \
-  --reload-include "*.css" \
-  --reload-include "*.js"
+  --reload

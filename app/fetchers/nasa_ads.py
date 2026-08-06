@@ -4,10 +4,13 @@ NASA Astrophysics Data System — astronomy, astrophysics, physics, geosciences
 Requires API token (free at https://ui.adsabs.harvard.edu/user/settings/token)
 """
 
+import logging
 import os
 from typing import Dict, List
 
 from app.fetchers.base import BaseFetcher, HttpClient
+
+logger = logging.getLogger(__name__)
 
 
 class NASAADSFetcher(BaseFetcher):
@@ -25,7 +28,7 @@ class NASAADSFetcher(BaseFetcher):
 
     def search_and_fetch(self, query: str, max_results: int = 500) -> List[Dict]:
         if not self.token:
-            print("NASA ADS: NASA_ADS_TOKEN env var not set; skipping source")
+            logger.warning("NASA ADS: NASA_ADS_TOKEN env var not set; skipping source")
             return []
         articles = []
         start = 0
@@ -57,7 +60,7 @@ class NASAADSFetcher(BaseFetcher):
                     break
                 start += len(docs)
             except Exception as e:
-                print(f"NASA ADS fetch error: {e}")
+                logger.exception("NASA ADS fetch error: %s", e)
                 break
 
         return articles[:max_results]
@@ -85,7 +88,7 @@ class NASAADSFetcher(BaseFetcher):
                 'journal': journal,
             }
         except Exception as e:
-            print(f"NASA ADS parse error: {e}")
+            logger.exception("NASA ADS parse error: %s", e)
             return None
 
     def search(self, query: str, max_results: int = 500) -> List[str]:

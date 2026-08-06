@@ -1,0 +1,12 @@
+[Unit]
+Description=LitSieve backup (accounts + user libraries)
+Documentation=file://%h/HealthDatabaseAccess/docs/SELFHOST.md
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/HealthDatabaseAccess
+# BACKUP_DIR / BACKUP_KEEP can be overridden in .env.
+EnvironmentFile=-%h/HealthDatabaseAccess/.env
+ExecStart=%h/HealthDatabaseAccess/venv/bin/python tools/backup.py
+SyslogIdentifier=litsieve-backup
+NoNewPrivileges=true

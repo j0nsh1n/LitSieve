@@ -1,22 +1,296 @@
-// === Statistics page logic ===
+// === Statistics / Clean up page logic ===
+
+// Last Quick-screen exclusion set (for one-click undo).
+let _quickScreenLastItems = null;
+// Current preview candidates (titles student can uncheck before apply).
+let _quickScreenCandidates = [];
 
 document.addEventListener('DOMContentLoaded', () => {
  loadStatistics();
+ initQuickScreen();
 
  const slider = document.getElementById('threshold');
  const display = document.getElementById('threshold-display');
+ if (slider && display) {
  slider.addEventListener('input', () => {
  display.textContent = parseFloat(slider.value).toFixed(2);
  });
+ }
 
- document.getElementById('detect-btn').addEventListener('click', doDetectDuplicates);
- document.getElementById('resolve-btn').addEventListener('click', doResolveAll);
+ const detectBtn = document.getElementById('detect-btn');
+ const resolveBtn = document.getElementById('resolve-btn');
+ if (detectBtn) detectBtn.addEventListener('click', doDetectDuplicates);
+ if (resolveBtn) resolveBtn.addEventListener('click', doResolveAll);
 
  const reportBtn = document.getElementById('screening-report-btn');
  if (reportBtn) {
  reportBtn.addEventListener('click', loadScreeningReport);
  }
 });
+
+function initQuickScreen() {
+ const queryEl = document.getElementById('quick-screen-query');
+ if (!queryEl) return;
+
+ // Prefill from last fetch query (browser-local prefs).
+ try {
+ const prefs = JSON.parse(localStorage.getItem('lra_fetch_prefs_v1') || 'null');
+ if (prefs && prefs.query && !queryEl.value) {
+ queryEl.value = prefs.query;
+ }
+ } catch (e) { /* ignore */ }
+
+ const applyNowBtn = document.getElementById('quick-screen-apply-now-btn');
+ const previewBtn = document.getElementById('quick-screen-preview-btn');
+ const applyBtn = document.getElementById('quick-screen-apply-btn');
+ const undoBtn = document.getElementById('quick-screen-undo-btn');
+ if (applyNowBtn) applyNowBtn.addEventListener('click', doQuickScreenApplyNow);
+ if (previewBtn) previewBtn.addEventListener('click', doQuickScreenPreview);
+ if (applyBtn) applyBtn.addEventListener('click', doQuickScreenApply);
+ if (undoBtn) undoBtn.addEventListener('click', doQuickScreenUndo);
+}
+
+function _quickScreenQueryAndFraction() {
+ const queryEl = document.getElementById('quick-screen-query');
+ const fracEl = document.getElementById('quick-screen-fraction');
+ const query = (queryEl && queryEl.value || '').trim();
+ const fraction = parseFloat((fracEl && fracEl.value) || '0.25');
+ return { query, fraction };
+}
+
+/** Primary path: rank + screen out immediately (no mandatory preview). */
+async function doQuickScreenApplyNow() {
+ const applyNowBtn = document.getElementById('quick-screen-apply-now-btn');
+ const undoBtn = document.getElementById('quick-screen-undo-btn');
+ const applyBtn = document.getElementById('quick-screen-apply-btn');
+ const panel = document.getElementById('quick-screen-preview');
+ const { query, fraction } = _quickScreenQueryAndFraction();
+
+ if (!query) {
+ showNotification('Enter a research question first.', 'error');
+ return;
+ }
+
+ setLoading(applyNowBtn, true);
+ if (applyBtn) applyBtn.hidden = true;
+ _quickScreenCandidates = [];
+ setStatus('quick-screen-status', 'Ranking papers and screening out the least related…', 'info');
+ if (panel) {
+ panel.classList.add('u-hidden');
+ panel.innerHTML = '';
+ }
+
+ try {
+ const data = await apiCall('/api/screening/quick-preview', {
+ method: 'POST',
+ body: { query, fraction },
+ });
+ const candidates = data.candidates || [];
+ if (!candidates.length) {
+ setStatus(
+ 'quick-screen-status',
+ data.total_ranked
+  ? 'Nothing to screen out — every prepared paper already looks related, or only one paper is left.'
+  : 'No prepared papers to rank yet. Fetch and prepare papers first.',
+ 'info'
+ );
+ return;
+ }
+ const items = candidates.map((c) => ({
+ article_id: c.article_id,
+ source: c.source,
+ }));
+ const applied = await apiCall('/api/screening', {
+ method: 'POST',
+ body: { items, action: 'exclude', reason: 'low_relevance' },
+ });
+ _quickScreenLastItems = items;
+ _quickScreenCandidates = [];
+ setStatus(
+ 'quick-screen-status',
+ `Screened out ${applied.count || items.length} of ${data.total_ranked} paper(s) as low relevance. Undo is available once.`,
+ 'success'
+ );
+ showNotification(`Screened out ${applied.count || items.length} paper(s).`, 'success');
+ if (undoBtn) undoBtn.hidden = false;
+ // Show what was removed (read-only list for transparency).
+ if (panel) {
+ panel.innerHTML = '';
+ const list = document.createElement('div');
+ list.className = 'quick-screen-list';
+ candidates.forEach((c) => {
+ const row = document.createElement('div');
+ row.className = 'quick-screen-row';
+ row.innerHTML =
+ `<span class="qs-title">${escapeHtml(c.title || '(no title)')}</span>`
+ + `<span class="qs-meta help-text">${escapeHtml(String(c.year || ''))}`
+ + ` · ${escapeHtml(getSourceName(c.source))} · screened out</span>`;
+ list.appendChild(row);
+ });
+ panel.appendChild(list);
+ panel.classList.remove('u-hidden');
+ }
+ loadStatistics();
+ } catch (e) {
+ setStatus('quick-screen-status', `Quick screen failed: ${e.message}`, 'error');
+ showNotification(`Quick screen failed: ${e.message}`, 'error');
+ } finally {
+ setLoading(applyNowBtn, false);
+ }
+}
+
+/** Optional: preview titles first, then apply selected. */
+async function doQuickScreenPreview() {
+ const previewBtn = document.getElementById('quick-screen-preview-btn');
+ const applyBtn = document.getElementById('quick-screen-apply-btn');
+ const panel = document.getElementById('quick-screen-preview');
+ const { query, fraction } = _quickScreenQueryAndFraction();
+
+ if (!query) {
+ showNotification('Enter a research question first.', 'error');
+ return;
+ }
+
+ setLoading(previewBtn, true);
+ if (applyBtn) applyBtn.hidden = true;
+ _quickScreenCandidates = [];
+ setStatus('quick-screen-status', 'Ranking papers against your question…', 'info');
+ if (panel) {
+ panel.classList.add('u-hidden');
+ panel.innerHTML = '';
+ }
+
+ try {
+ const data = await apiCall('/api/screening/quick-preview', {
+ method: 'POST',
+ body: { query, fraction },
+ });
+ const candidates = data.candidates || [];
+ _quickScreenCandidates = candidates;
+ if (!candidates.length) {
+ setStatus(
+ 'quick-screen-status',
+ data.total_ranked
+  ? 'No suggestions — every prepared paper already looks related, or only one paper is left.'
+  : 'No prepared papers to rank yet. Fetch and prepare papers first.',
+ 'info'
+ );
+ return;
+ }
+ setStatus(
+ 'quick-screen-status',
+ `Preview: ${candidates.length} of ${data.total_ranked} paper(s) least related. Uncheck any to keep, then Screen out selected.`,
+ 'success'
+ );
+ renderQuickScreenPreview(candidates);
+ if (applyBtn) applyBtn.hidden = false;
+ } catch (e) {
+ setStatus('quick-screen-status', `Preview failed: ${e.message}`, 'error');
+ showNotification(`Quick screen preview failed: ${e.message}`, 'error');
+ } finally {
+ setLoading(previewBtn, false);
+ }
+}
+
+function renderQuickScreenPreview(candidates) {
+ const panel = document.getElementById('quick-screen-preview');
+ if (!panel) return;
+ panel.innerHTML = '';
+ const list = document.createElement('div');
+ list.className = 'quick-screen-list';
+ candidates.forEach((c, i) => {
+ const row = document.createElement('label');
+ row.className = 'quick-screen-row radio-label';
+ const checked = 'checked';
+ row.innerHTML =
+ `<input type="checkbox" class="qs-item" data-idx="${i}" ${checked}>`
+ + `<span class="qs-title">${escapeHtml(c.title || '(no title)')}</span>`
+ + `<span class="qs-meta help-text">${escapeHtml(String(c.year || ''))}`
+ + ` · ${escapeHtml(getSourceName(c.source))}</span>`;
+ list.appendChild(row);
+ });
+ panel.appendChild(list);
+ panel.classList.remove('u-hidden');
+}
+
+function selectedQuickScreenItems() {
+ const panel = document.getElementById('quick-screen-preview');
+ if (!panel) return [];
+ const items = [];
+ panel.querySelectorAll('.qs-item:checked').forEach((cb) => {
+ const idx = parseInt(cb.getAttribute('data-idx'), 10);
+ const c = _quickScreenCandidates[idx];
+ if (c) items.push({ article_id: c.article_id, source: c.source });
+ });
+ return items;
+}
+
+async function doQuickScreenApply() {
+ const items = selectedQuickScreenItems();
+ const applyBtn = document.getElementById('quick-screen-apply-btn');
+ const undoBtn = document.getElementById('quick-screen-undo-btn');
+ if (!items.length) {
+ showNotification('Select at least one paper to screen out, or cancel.', 'error');
+ return;
+ }
+ setLoading(applyBtn, true);
+ try {
+ const data = await apiCall('/api/screening', {
+ method: 'POST',
+ body: { items, action: 'exclude', reason: 'low_relevance' },
+ });
+ _quickScreenLastItems = items;
+ setStatus(
+ 'quick-screen-status',
+ `Screened out ${data.count || items.length} paper(s) as low relevance. Undo is available once.`,
+ 'success'
+ );
+ showNotification(`Screened out ${data.count || items.length} paper(s).`, 'success');
+ if (undoBtn) undoBtn.hidden = false;
+ if (applyBtn) applyBtn.hidden = true;
+ const panel = document.getElementById('quick-screen-preview');
+ if (panel) {
+ panel.classList.add('u-hidden');
+ panel.innerHTML = '';
+ }
+ _quickScreenCandidates = [];
+ loadStatistics();
+ } catch (e) {
+ setStatus('quick-screen-status', `Apply failed: ${e.message}`, 'error');
+ showNotification(`Could not screen out papers: ${e.message}`, 'error');
+ } finally {
+ setLoading(applyBtn, false);
+ }
+}
+
+async function doQuickScreenUndo() {
+ const undoBtn = document.getElementById('quick-screen-undo-btn');
+ if (!_quickScreenLastItems || !_quickScreenLastItems.length) {
+ showNotification('Nothing to undo.', 'info');
+ return;
+ }
+ setLoading(undoBtn, true);
+ try {
+ const data = await apiCall('/api/screening', {
+ method: 'POST',
+ body: { items: _quickScreenLastItems, action: 'include' },
+ });
+ setStatus(
+ 'quick-screen-status',
+ `Restored ${data.count || _quickScreenLastItems.length} paper(s).`,
+ 'success'
+ );
+ showNotification('Quick screen undone.', 'success');
+ _quickScreenLastItems = null;
+ if (undoBtn) undoBtn.hidden = true;
+ loadStatistics();
+ } catch (e) {
+ setStatus('quick-screen-status', `Undo failed: ${e.message}`, 'error');
+ showNotification(`Undo failed: ${e.message}`, 'error');
+ } finally {
+ setLoading(undoBtn, false);
+ }
+}
 
 async function loadScreeningReport() {
  const btn = document.getElementById('screening-report-btn');
@@ -45,6 +319,15 @@ async function loadScreeningReport() {
  }
 }
 
+function updateCleanupWorkVisibility(stats) {
+ // Hide dup / quick-screen / report until papers are prepared — empty CTA only.
+ const emb = (stats && stats.articles_with_embeddings) || 0;
+ const ready = emb > 0;
+ document.querySelectorAll('.cleanup-work').forEach((el) => {
+  el.hidden = !ready;
+ });
+}
+
 async function loadStatistics() {
  try {
  const stats = await apiCall('/api/statistics');
@@ -56,6 +339,7 @@ async function loadStatistics() {
  if (typeof applyEmptyState === 'function') {
  applyEmptyState('dup-empty-state', stats, 'embeddings', 'dup-empty-msg');
  }
+ updateCleanupWorkVisibility(stats);
 
  const sources = stats.sources || {};
  const sourceKeys = Object.keys(sources);

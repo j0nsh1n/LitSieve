@@ -2,7 +2,7 @@
 
 Registration is open and a single fetch can pull thousands of abstracts, each
 of which later grows a 384-float embedding. Without a ceiling, one enthusiastic
-account (or a bot) can fill the disk for everyone on a small Render / HF box.
+account (or a bot) can fill the disk for everyone on a small self-hosted box.
 
 The cap is measured in **bytes actually on disk** under ``user_data/<uid>/``
 rather than an article count, because that is the resource that runs out and it

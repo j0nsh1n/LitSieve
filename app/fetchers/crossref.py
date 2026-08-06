@@ -4,10 +4,14 @@ Broad academic metadata registry — covers all academic disciplines
 Free API, no authentication required (mailto improves rate limits)
 """
 
+import logging
 import re
 from typing import Dict, List
 
 from app.fetchers.base import BaseFetcher, HttpClient
+
+logger = logging.getLogger(__name__)
+
 
 _JATS_TAG = re.compile(r'<[^>]+>')
 
@@ -56,7 +60,7 @@ class CrossRefFetcher(BaseFetcher):
                     break
                 offset += n
             except Exception as e:
-                print(f"CrossRef fetch error: {e}")
+                logger.exception("CrossRef fetch error: %s", e)
                 break
 
         return articles[:max_results]
@@ -101,7 +105,7 @@ class CrossRefFetcher(BaseFetcher):
                 'journal': journal,
             }
         except Exception as e:
-            print(f"CrossRef parse error: {e}")
+            logger.exception("CrossRef parse error: %s", e)
             return None
 
     def search(self, query: str, max_results: int = 500) -> List[str]:

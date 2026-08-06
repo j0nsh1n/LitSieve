@@ -307,23 +307,31 @@ function renderPaginatedList(container, items, renderItem, opts) {
     appendBatch();
 }
 
-/** HTML for extractive key points (honest "from the abstract" label). */
+/** HTML for key points (extractive or student-saved AI rewrite).
+ *
+ * When the full abstract is already on the card (options.abstractShown), skip
+ * listing extractive bullets — they restate the abstract and look like a
+ * duplicate. AI-saved rewrites still show their bullet list once.
+ */
 function renderKeyPointsHtml(bullets, options) {
     options = options || {};
-    if (!bullets || !bullets.length) {
-        // Still allow AI actions when there are no extractive bullets yet.
-        if (!options.articleId) return '';
-    }
-    const label = options.aiLabel
+    const isAi = !!(options.aiLabel || options.origin === 'ai');
+    const hasBullets = !!(bullets && bullets.length);
+    // Abstract already visible: only surface AI-saved bullets or the AI action row.
+    const hideExtractiveList = !!options.abstractShown && !isAi;
+    if (!hasBullets && !options.articleId) return '';
+    if (hideExtractiveList && !options.articleId) return '';
+
+    const label = isAi
         ? 'Key points (AI rewrite — from the abstract only)'
         : 'Key points (from the abstract)';
-    const items = (bullets || [])
-        .map(b => `<li>${escapeHtml(String(b))}</li>`)
-        .join('');
+    const showList = hasBullets && !hideExtractiveList;
+    const items = showList
+        ? (bullets || []).map(b => `<li>${escapeHtml(String(b))}</li>`).join('')
+        : '';
     const list = items ? `<ul class="key-points-list">${items}</ul>` : '';
     const aid = options.articleId ? escapeHtml(String(options.articleId)) : '';
     const src = options.source ? escapeHtml(String(options.source)) : '';
-    // Extractive key points always show; AI buttons are optional (classroom toggle).
     const showAi = typeof uiFlag === 'function' ? uiFlag('show_ai_buttons', true) : true;
     const actions = (aid && src && showAi)
         ? `<div class="ai-actions" data-article-id="${aid}" data-source="${src}">
@@ -333,7 +341,15 @@ function renderKeyPointsHtml(bullets, options) {
            </div>
            <div class="ai-panel" hidden></div>`
         : '';
-    return `<div class="key-points">
+    // Nothing to show (no list, no AI chrome).
+    if (!list && !actions) return '';
+    // Extractive + abstract shown: only AI chrome (no empty "Key points" header).
+    if (hideExtractiveList && actions) {
+        return `<div class="key-points key-points-actions-only" data-kp-origin="extractive">
+      ${actions}
+    </div>`;
+    }
+    return `<div class="key-points" data-kp-origin="${isAi ? 'ai' : 'extractive'}">
       <div class="key-points-label">${escapeHtml(label)}</div>
       ${list}
       ${actions}
@@ -521,19 +537,35 @@ function bindAiArticleActions(rootEl, article) {
                             });
                             const savedPoints = (savedResp && savedResp.key_points) || data.key_points || [];
                             showNotification('Key points updated (AI rewrite saved).', 'success');
-                            const lab = rootEl.querySelector('.key-points-label');
-                            if (lab) lab.textContent = 'Key points (AI rewrite — from the abstract only)';
-                            if (savedPoints.length) {
+                            // Promote the main card block to a single AI list;
+                            // hide the refine panel so bullets are not shown twice.
+                            const kpRoot = rootEl.querySelector('.key-points');
+                            if (kpRoot && savedPoints.length) {
+                                kpRoot.dataset.kpOrigin = 'ai';
+                                kpRoot.classList.remove('key-points-actions-only');
+                                let lab = kpRoot.querySelector('.key-points-label');
+                                if (!lab) {
+                                    lab = document.createElement('div');
+                                    lab.className = 'key-points-label';
+                                    kpRoot.insertBefore(lab, kpRoot.firstChild);
+                                }
+                                lab.textContent = 'Key points (AI rewrite — from the abstract only)';
                                 const savedHtml = savedPoints
                                     .map(b => `<li>${escapeHtml(String(b))}</li>`)
                                     .join('');
-                                // Update every rendered copy (result card +
-                                // AI panel preview) to match what was stored.
-                                rootEl.querySelectorAll('.key-points-list').forEach(ul => {
-                                    ul.innerHTML = savedHtml;
-                                });
+                                let ul = kpRoot.querySelector(':scope > .key-points-list');
+                                if (!ul) {
+                                    ul = document.createElement('ul');
+                                    ul.className = 'key-points-list';
+                                    const acts = kpRoot.querySelector('.ai-actions');
+                                    kpRoot.insertBefore(ul, acts || null);
+                                }
+                                ul.innerHTML = savedHtml;
                             }
-                            saveBtn.textContent = 'Saved';
+                            if (panel) {
+                                panel.hidden = true;
+                                panel.innerHTML = '';
+                            }
                         } catch (err) {
                             showNotification(`Could not save: ${err.message}`, 'error');
                             saveBtn.disabled = false;
@@ -806,38 +838,69 @@ function prefersReducedMotion() {
     return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
-// === Reading mode (denser chrome, optimized abstracts) ===
-function isReadingMode() {
-    return document.documentElement.getAttribute('data-reading') === 'on';
+// === Simple / Advanced UI mode (client preference, like theme) ===
+function isSimpleMode() {
+    return document.documentElement.getAttribute('data-mode') === 'simple';
 }
 
-function setReadingMode(on) {
+function updateModeToggleButton() {
+    const btn = document.getElementById('mode-toggle');
+    if (!btn) return;
+    const simple = isSimpleMode();
+    btn.setAttribute('aria-pressed', simple ? 'true' : 'false');
+    btn.classList.toggle('is-active', simple);
+    btn.textContent = simple ? 'Simple' : 'Advanced';
+    btn.title = simple
+        ? 'Switch to Advanced mode — full controls'
+        : 'Switch to Simple mode — fewer options';
+    btn.setAttribute('aria-label', btn.title);
+}
+
+function updateNavStepNumbers() {
+    const simple = isSimpleMode();
+    document.querySelectorAll('.nav-link[data-step-advanced]').forEach((a) => {
+        const num = a.querySelector('.nav-step-num');
+        if (!num) return;
+        const next = simple ? (a.getAttribute('data-step-simple') || '') : (a.getAttribute('data-step-advanced') || '');
+        if (next) num.textContent = next;
+    });
+    const menuStep = document.querySelector('.nav-menu-step');
+    if (menuStep) {
+        const adv = menuStep.getAttribute('data-step-advanced') || '';
+        const sim = menuStep.getAttribute('data-step-simple') || '';
+        const next = simple ? sim : adv;
+        if (next) {
+            menuStep.textContent = next;
+            menuStep.hidden = false;
+        } else if (simple && !sim) {
+            // e.g. Clusters page opened by URL in Simple mode — no step number.
+            menuStep.hidden = true;
+        } else {
+            menuStep.hidden = false;
+            if (adv) menuStep.textContent = adv;
+        }
+    }
+}
+
+function setUiMode(mode) {
+    const m = mode === 'simple' ? 'simple' : 'advanced';
     const root = document.documentElement;
-    if (on) {
-        root.setAttribute('data-reading', 'on');
-        localStorage.setItem('readingMode', 'on');
-    } else {
-        root.removeAttribute('data-reading');
-        localStorage.setItem('readingMode', 'off');
-    }
-    const btn = document.getElementById('reading-toggle');
-    if (btn) {
-        btn.setAttribute('aria-pressed', on ? 'true' : 'false');
-        btn.classList.toggle('is-active', on);
-        btn.title = on
-            ? 'Exit reading mode'
-            : 'Reading mode — denser layout, better abstracts';
-    }
-    // Re-apply abstract clamps so they respect the new mode.
-    enhanceAbstracts(document);
+    root.setAttribute('data-mode', m);
+    try {
+        localStorage.setItem('uiMode', m);
+    } catch (e) { /* private mode */ }
+    updateModeToggleButton();
+    updateNavStepNumbers();
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    const btn = document.getElementById('reading-toggle');
+    const btn = document.getElementById('mode-toggle');
     if (!btn) return;
-    setReadingMode(isReadingMode());
+    // theme-init already set data-mode; sync chrome only.
+    updateModeToggleButton();
+    updateNavStepNumbers();
     btn.addEventListener('click', function() {
-        setReadingMode(!isReadingMode());
+        setUiMode(isSimpleMode() ? 'advanced' : 'simple');
     });
 });
 
@@ -888,11 +951,7 @@ function _syncAbstractClamp(el) {
     const full = el.dataset.fullText || el.textContent || '';
     if (full.length <= ABSTRACT_CLAMP_CHARS) return;
 
-    // In reading mode, default to expanded (full abstract always visible).
-    if (isReadingMode()) {
-        wrap.classList.add('is-expanded');
-    }
-
+    // Start collapsed — "Show full abstract" to read more.
     const expanded = wrap.classList.contains('is-expanded');
     if (expanded) {
         el.classList.remove('is-clamped');

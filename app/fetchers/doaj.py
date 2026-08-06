@@ -4,10 +4,13 @@ Directory of Open Access Journals — peer-reviewed open access across all field
 Free API, no authentication required
 """
 
+import logging
 from typing import Dict, List
 from urllib.parse import quote
 
 from app.fetchers.base import BaseFetcher, FetchError, HttpClient
+
+logger = logging.getLogger(__name__)
 
 
 class DOAJFetcher(BaseFetcher):
@@ -44,10 +47,10 @@ class DOAJFetcher(BaseFetcher):
                     break
                 page += 1
             except FetchError as e:
-                print(f"DOAJ fetch error: {e}")
+                logger.exception("DOAJ fetch error: %s", e)
                 raise
             except Exception as e:
-                print(f"DOAJ fetch error: {e}")
+                logger.exception("DOAJ fetch error: %s", e)
                 break
 
         return articles[:max_results]
@@ -83,7 +86,7 @@ class DOAJFetcher(BaseFetcher):
                 'journal': journal,
             }
         except Exception as e:
-            print(f"DOAJ parse error: {e}")
+            logger.exception("DOAJ parse error: %s", e)
             return None
 
     def search(self, query: str, max_results: int = 500) -> List[str]:

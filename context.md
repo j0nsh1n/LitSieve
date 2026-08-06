@@ -1,7 +1,7 @@
-# context.md — LitPilot
+# context.md — LitSieve
 
 ## Current State
-- App version **4.4.0** (`app/main.py`, `GET /health`). Product name **LitPilot**.
+- App version **4.5.0** (`app/main.py`, `GET /health`). Product name **LitSieve**.
 - Public origin: **https://www.litpilot.org** via Cloudflare Tunnel →
   `http://127.0.0.1:7860` (`PUBLIC_BASE_URL` in gitignored `.env`; `DEBUG=false`).
 - Python **3.14** (Dockerfile, CI, Render, ruff `py314`).
@@ -27,6 +27,24 @@
 - Recovery email: on main (PR #38); MailerSend SMTP in gitignored `.env`
   confirmed working by human. Secrets never committed.
 - Deploy: `docs/DEPLOY.md` checklist (SECRET_KEY, SMTP, quota, smoke).
+- **Runs as a user service**: `litsieve-uvicorn.service` (installed + enabled
+  2026-08-04; `Linger=yes`, so it starts at boot). Was previously a terminal
+  process in a transient scope. Restart after code changes:
+  `systemctl --user restart litsieve-uvicorn.service`. Dev with reload on a
+  different port: `./run_dev.sh 7861` (isolated data: `dev_users.db`,
+  `dev_data/`, `logs/dev.log`). Runbook: **docs/SELFHOST.md → Everyday commands**.
+- **Outage 2026-08-05, 4h47m** (05:05–09:52): Cloudflare tunnel token had been
+  revoked ~Aug 4; cloudflared never re-auths an established connection, so it
+  only surfaced at the unattended ~05:01 reboot. Fixed by pasting a fresh token
+  into `secrets/cloudflared.env`. The machine reboots itself daily around 05:01
+  (firmware RTC, not systemd), so latent failures surface while nobody is awake.
+- **Watchdog** installed: `litsieve-watchdog.timer` (5 min) runs
+  `tools/watchdog.py` — app `/health` + tunnel registered-connections, emails on
+  state change. Needs `WATCHDOG_EMAIL_TO` in `.env` or it stays silent.
+- Cloudflare serves a **managed challenge** on the public hostname
+  (`cf-mitigated: challenge`), so `curl https://www.litpilot.org/health` is 403
+  while local is 200 — verify locally, not through the edge. Possible cause of
+  the observed "reached /register, never POSTed" pattern; unconfirmed.
 - Known gaps: no dependency lockfile; pyright not yet green / blocking;
   public cloud host env still operator-owned after local Phase 3 docs/smoke.
 
@@ -95,7 +113,7 @@ ShareCode *---1 Library (owner); redeem → clone Library for joiner
 ## Session Handoff
 - **Date:** 2026-08-04
 - **Branch:** `chore/doc-drift-and-hygiene` (PR #51 + follow-ups)
-- **Done:** LitPilot v4.4.0 rebrand; Cloudflare Tunnel for public access;
+- **Done:** LitSieve v4.5.0 Simple/Advanced mode; v4.4.0 rebrand; Cloudflare Tunnel for public access;
   **removed DuckDNS** tooling/docs. Tunnel token service on this host.
 - **Next:** Ensure Cloudflare Public Hostname `www.litpilot.org` →
   `http://127.0.0.1:7860` and DNS is active; rotate exposed tunnel token.

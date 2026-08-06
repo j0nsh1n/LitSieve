@@ -1,10 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Data Management - LitPilot{% endblock %}
+{% block title %}Data Management - LitSieve{% endblock %}
 {% block content %}
 <section class="page-header">
  <h1>Data Management</h1>
- <p class="subtitle"><strong>Step 1 of 4.</strong> Pick topics, choose sources, and fetch papers.
- Then prepare them for search when you are ready (step 4).</p>
+ <p class="subtitle dm-sub-advanced"><strong>Step 1 of 4.</strong> Pick topics, choose sources, and fetch papers.
+ Preparing for search starts automatically after a successful fetch.</p>
+ <p class="subtitle dm-sub-simple"><strong>Steps 1–2.</strong> Pick topics and fetch papers.
+ Preparing for search starts automatically after a successful fetch.</p>
  {% from "macros/disclaimers.html" import scope_fetch %}
  {{ scope_fetch() }}
 </section>
@@ -18,7 +20,7 @@
  <ol class="getting-started-list">
   <li data-step="topics"><span class="gs-check" aria-hidden="true">○</span> Pick one or more topics below</li>
   <li data-step="query"><span class="gs-check" aria-hidden="true">○</span> Type a research question in Fetch</li>
-  <li data-step="fetch"><span class="gs-check" aria-hidden="true">○</span> Press <strong>Fetch Articles</strong>, then <strong>Prepare Papers</strong> when ready</li>
+  <li data-step="fetch"><span class="gs-check" aria-hidden="true">○</span> Press <strong>Fetch Articles</strong> (prepare for search runs next automatically)</li>
  </ol>
  <p class="info-text u-mt-lg">
   Prefer a dry run with no APIs?
@@ -60,18 +62,22 @@
  <div class="source-option-grid" id="source-option-grid"></div>
 </section>
 
-<!-- Step 3: Fetch -->
+<!-- Fetch: Advanced step 3 (sources is 2); Simple step 2 (sources hidden). -->
 <section class="card">
- <h2>3. Fetch Articles</h2>
- <p class="info-text">Searches every selected source at once and saves the papers to your private
- collection. Preparing for search is a separate step (button below) so you control the model and timing.</p>
+ <h2 class="dm-step-heading dm-step-advanced">3. Fetch Articles</h2>
+ <h2 class="dm-step-heading dm-step-simple">2. Fetch Articles</h2>
+ <p class="info-text">Searches every selected source at once, saves the papers to your private
+ collection, then <strong>automatically prepares them for search</strong> (you can leave this page
+ open while progress runs).</p>
  <details class="help-details">
   <summary>How fetching works</summary>
   <p class="info-text">The query runs against every selected source <strong>in parallel</strong> as a
   background job (progress bar; Cancel stops after the current source). Saves title, abstract,
   authors, year, and journal. Records without an abstract are skipped (later steps need text).
-  Some sources may fail (rate limits, API rules) while others succeed — that is normal; check the
-  per-source list. Your last query, sources, and email are remembered in this browser.</p>
+  When at least one paper is saved, prepare-for-search starts next as another background job
+  (same progress area). Some sources may fail (rate limits, API rules) while others succeed —
+  that is normal; check the per-source list. Your last query, sources, and email are remembered
+  in this browser.</p>
  </details>
  <div class="form-row">
  <div class="form-group flex-2">
@@ -114,6 +120,16 @@
  <div class="progress-bar-track"><div class="progress-bar-fill" id="fetch-progress-fill"></div></div>
  <div class="progress-bar-label" id="fetch-progress-label"></div>
  </div>
+ {# Next-step shortcut. Papers are ready and the next action lives on another
+    page, so offer the link right here rather than making them scroll back up
+    to the nav. Shown by JS only after prepare finishes (Simple mode). #}
+ <div class="u-hidden u-mt-md" id="fetch-next-step">
+ <a href="/statistics" class="btn btn-primary" id="fetch-next-step-link">
+ Next: Clean up your papers →
+ </a>
+ <p class="info-text u-mt-sm">Remove duplicates and papers that aren’t about your topic,
+ then search what’s left.</p>
+ </div>
 </section>
 
 <!-- Coverage map (health check after a fetch) -->
@@ -126,11 +142,16 @@
  <button type="button" id="coverage-refresh" class="btn btn-secondary btn-sm">Refresh coverage</button>
 </section>
 
-<!-- Step 4: Prepare papers (embeddings) -->
-<section class="card">
- <h2>4. Prepare Papers for Search</h2>
- <p class="info-text">Run this after a fetch when you are ready. The analysis model follows your
- selected topics (or your Advanced override). Nothing here starts until you press the button.</p>
+<!-- Prepare papers (embeddings) — auto-runs after a successful fetch.
+     In Simple mode: un-numbered, optional, only shown once papers are ready for search
+     (hidden attribute is the pre-JS default so it never flashes mid-fetch). -->
+<section class="card" id="prepare-section" hidden>
+ <h2 class="prepare-heading prepare-heading-advanced">4. Prepare Papers for Search</h2>
+ <h2 class="prepare-heading prepare-heading-simple">Optional: re-prepare for search</h2>
+ <p class="info-text prepare-lead prepare-lead-advanced">Runs automatically after a successful fetch. Use the button below only if you
+ need to re-prepare (for example after changing the analysis model under Advanced).</p>
+ <p class="info-text prepare-lead prepare-lead-simple"><strong>Optional.</strong> Papers are prepared automatically after you fetch.
+ Use this only if prepare failed, or you need to run it again.</p>
  <details class="help-details">
   <summary>What preparing does (embeddings)</summary>
   <p class="info-text">Preparing creates <strong>embeddings</strong>: each abstract becomes a numerical
@@ -170,7 +191,7 @@
    </div>
   </div>
  </details>
- <button id="embeddings-btn" class="btn btn-primary">Prepare Papers</button>
+ <button id="embeddings-btn" class="btn btn-secondary">Re-prepare Papers</button>
  <div id="embeddings-status" class="status-indicator"></div>
  <div class="u-hidden" id="embed-progress-wrap">
  <div class="progress-bar-track"><div class="progress-bar-fill" id="embed-progress-fill"></div></div>
@@ -180,5 +201,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/data_management.js?v=20260729a"></script>
+<script src="/static/js/data_management.js?v=20260805j"></script>
 {% endblock %}

@@ -160,6 +160,16 @@ document.addEventListener('DOMContentLoaded', () => {
  loadPageData();
  refreshCoverage();
  });
+ // Simple: hide optional prepare card until the library has papers.
+ // Re-evaluate when the mode toggle flips (common.js sets data-mode first).
+ const modeBtn = document.getElementById('mode-toggle');
+ if (modeBtn) {
+  modeBtn.addEventListener('click', () => {
+   queueAnimationFrame(() => updatePrepareSectionVisibility(_lastTotalArticles));
+  });
+ }
+ // Start hidden in Simple until stats load (avoids a flash of step 4 on empty libs).
+ updatePrepareSectionVisibility(0);
  document.getElementById('fetch-btn').addEventListener('click', doFetch);
  const cancelBtn = document.getElementById('fetch-cancel-btn');
  if (cancelBtn) cancelBtn.addEventListener('click', cancelFetch);
@@ -476,24 +486,87 @@ function restoreFetchPrefs() {
  updateModelHint();
 }
 
+/** Last known article count (for Simple-mode prepare section + mode toggles). */
+let _lastTotalArticles = 0;
+/** Papers with embeddings (ready for search). Simple prepare card gates on this. */
+let _lastReadyArticles = 0;
+/**
+ * True while a fetch is running or the post-fetch auto-prepare is in flight.
+ * Simple mode keeps the optional prepare card fully hidden for this whole
+ * window — progress lives on the fetch bar, not on a second "Re-prepare" card.
+ */
+let _pipelineBusy = false;
+
+/**
+ * Simple mode: prepare is optional and only appears once papers are ready for
+ * search (embeddings exist). Never mid-fetch / mid-auto-chain.
+ * Advanced: always visible (step 4).
+ * forceShow: reveal after a failed auto-prepare so Re-prepare is reachable.
+ */
+/** Show the "Next: Clean up" shortcut once papers are actually ready.
+ *
+ * Only in Simple mode: Advanced users have the numbered steps and the nav.
+ * Hidden again whenever a new fetch starts, so it never advertises a next step
+ * for work that is still running.
+ */
+function setNextStepVisible(visible) {
+ const el = document.getElementById('fetch-next-step');
+ if (!el) return;
+ const simple = typeof isSimpleMode === 'function' && isSimpleMode();
+ el.hidden = !(visible && simple);
+ el.classList.toggle('u-hidden', !(visible && simple));
+}
+
+function updatePrepareSectionVisibility(totalArticles, opts) {
+ const sec = document.getElementById('prepare-section');
+ if (!sec) return;
+ if (typeof totalArticles === 'number' && !Number.isNaN(totalArticles)) {
+  _lastTotalArticles = totalArticles;
+ }
+ if (opts && typeof opts.readyArticles === 'number' && !Number.isNaN(opts.readyArticles)) {
+  _lastReadyArticles = opts.readyArticles;
+ }
+ const forceShow = !!(opts && opts.forceShow);
+ const simple = typeof isSimpleMode === 'function' && isSimpleMode();
+ if (!simple) {
+  sec.hidden = false;
+  return;
+ }
+ // Busy (fetch or auto-chain): never show the re-prepare card.
+ if (_pipelineBusy) {
+  sec.hidden = true;
+  return;
+ }
+ if (forceShow) {
+  sec.hidden = false;
+  return;
+ }
+ // Optional re-prepare only once something is actually ready for search.
+ sec.hidden = !(_lastReadyArticles > 0);
+}
+
 async function loadPageData() {
  try {
  const stats = await apiCall('/api/statistics');
  const model = stats.embedding_model || ' - ';
- const missing = stats.missing_embeddings ?? Math.max(0, (stats.total_articles || 0) - (stats.articles_with_embeddings || 0));
+ const total = stats.total_articles || 0;
+ const ready = stats.articles_with_embeddings || 0;
+ const missing = stats.missing_embeddings ?? Math.max(0, total - ready);
  document.getElementById('embedding-info').textContent =
- `${stats.articles_with_embeddings} of ${stats.total_articles} papers are ready for search` +
- (stats.articles_with_embeddings ? ` (model: ${model})` : '') +
+ `${ready} of ${total} papers are ready for search` +
+ (ready ? ` (model: ${model})` : '') +
  (missing ? ` · ${missing} still need preparing` : '') + '.';
  // Topic recommendation drives the dropdown (unless the user overrode it).
  // Do NOT force the corpus's stored model into the select — that made
  // pubmedbert "stick" after a biomedical prep even when topics say specter.
  window._corpusEmbeddingModel = stats.embedding_model || null;
  applyModelRecommendation();
- updateGettingStartedCard(stats.total_articles || 0);
+ updateGettingStartedCard(total);
+ updatePrepareSectionVisibility(total, { readyArticles: ready });
  } catch (e) {
  document.getElementById('embedding-info').textContent = 'Unable to load article info.';
  updateGettingStartedCard(0);
+ updatePrepareSectionVisibility(0, { readyArticles: 0 });
  }
 }
 
@@ -627,47 +700,77 @@ async function refreshCoverage() {
 }
 
 // === Progress polling (jobs return 202; UI waits on /api/progress) ===
+// Must see active=true at least once before accepting a finished result — otherwise
+// a poll that lands before the job flips active (or sees a stale idle slot) resolves
+// with {} and the auto-chain never starts prepare.
 function waitForJob(task, fillId, labelId, wrapId, formatLabel, timeoutMs = 600000) {
  return new Promise((resolve, reject) => {
  const fill = document.getElementById(fillId);
  const label = document.getElementById(labelId);
  const wrap = document.getElementById(wrapId);
- wrap.style.display = 'block';
- fill.style.width = '0%';
+ if (wrap) wrap.style.display = 'block';
+ if (fill) fill.style.width = '0%';
  const started = Date.now();
+ let sawActive = false;
+ let settled = false;
 
- const interval = setInterval(async () => {
- try {
- if (Date.now() - started > timeoutMs) {
- clearInterval(interval);
- reject(new Error('Timed out waiting for the job to finish'));
- return;
- }
- const data = await apiCall('/api/progress');
- const p = data[task];
- if (!p) return;
- if (p.active) {
- const pct = p.total > 0 ? Math.round((p.done / p.total) * 100) : 0;
- fill.style.width = pct + '%';
- // Prefer server message (includes paper counts) when present.
- label.textContent = p.message
- ? p.message
- : formatLabel(p.done, p.total, pct, p);
- return;
- }
- clearInterval(interval);
- fill.style.width = '100%';
- setTimeout(() => { wrap.style.display = 'none'; fill.style.width = '0%'; }, 800);
- if (p.error) {
- reject(new Error(p.error));
- } else {
- resolve(p.result || {});
- }
- } catch (e) {
- clearInterval(interval);
- reject(e);
- }
- }, 500);
+ const finish = (err, result) => {
+  if (settled) return;
+  settled = true;
+  clearInterval(interval);
+  if (fill) fill.style.width = err ? '0%' : '100%';
+  if (wrap) {
+   setTimeout(() => {
+    wrap.style.display = 'none';
+    if (fill) fill.style.width = '0%';
+   }, 800);
+  }
+  if (err) reject(err);
+  else resolve(result || {});
+ };
+
+ const tick = async () => {
+  try {
+   if (Date.now() - started > timeoutMs) {
+    finish(new Error('Timed out waiting for the job to finish'));
+    return;
+   }
+   const data = await apiCall('/api/progress');
+   const p = data[task];
+   if (!p) return;
+   if (p.active) {
+    sawActive = true;
+    const pct = p.total > 0 ? Math.round((p.done / p.total) * 100) : 0;
+    if (fill) fill.style.width = pct + '%';
+    if (label) {
+     label.textContent = p.message
+      ? p.message
+      : (typeof formatLabel === 'function' ? formatLabel(p.done, p.total, pct, p) : '');
+    }
+    return;
+   }
+   // Idle: only finish after we observed this job running, or after a short
+   // grace if the job completed between 202 and the first poll.
+   if (p.error) {
+    finish(new Error(p.error));
+    return;
+   }
+   if (sawActive) {
+    finish(null, p.result || {});
+    return;
+   }
+   // Not yet active and never was — keep waiting (job may still be starting).
+   if (Date.now() - started > 8000 && p.result) {
+    // Job finished so fast we never saw active=true; accept result.
+    finish(null, p.result);
+   }
+  } catch (e) {
+   finish(e);
+  }
+ };
+
+ const interval = setInterval(tick, 400);
+ tick(); // poll immediately, do not wait for first interval
  });
 }
 
@@ -761,6 +864,7 @@ async function doFetch() {
  const mode = (document.querySelector('input[name="fetch-mode"]:checked') || {}).value || 'replace';
  const clearFirst = mode === 'replace';
 
+ setNextStepVisible(false);
  if (!query) { showNotification('Please enter a search query.', 'error'); return; }
  if (sources.length === 0) { showNotification('Please select at least one source.', 'error'); return; }
 
@@ -768,6 +872,9 @@ async function doFetch() {
 
  const btn = document.getElementById('fetch-btn');
  const cancelBtn = document.getElementById('fetch-cancel-btn');
+ // Hide Simple re-prepare for the whole fetch (+ auto-chain) window.
+ _pipelineBusy = true;
+ updatePrepareSectionVisibility(_lastTotalArticles);
  setLoading(btn, true);
  if (cancelBtn) {
  cancelBtn.hidden = false;
@@ -782,6 +889,7 @@ async function doFetch() {
  'info'
  );
 
+ let autoChainFailed = false;
  try {
  const started = await apiCall('/api/fetch-articles-multi', {
  method: 'POST',
@@ -805,17 +913,38 @@ async function doFetch() {
  );
  }
  applyFetchResult(data, sources);
- // Embeddings are manual: topics may update the model dropdown, but the
- // student presses "Prepare Papers" when ready (avoids surprise long jobs
- // and wrong-model re-embeds).
- if ((data.total_fetched || 0) > 0 && !data.cancelled && !data.quota_stopped
-  && data.status !== 'quota_stopped') {
+ // Auto-chain prepare after every successful fetch (Simple and Advanced).
+ // Never start prepare on zero papers / cancel / quota stop. Never auto-cluster.
+ const totalFetched = Number(data.total_fetched) || 0
+  || Object.values(data.by_source || {}).reduce((s, n) => s + (Number(n) || 0), 0);
+ const fetchedOk = totalFetched > 0
+  && !data.cancelled && !data.quota_stopped
+  && data.status !== 'quota_stopped'
+  && data.status !== 'cancelled';
+ if (fetchedOk) {
  applyModelRecommendation();
+ _lastTotalArticles = Math.max(_lastTotalArticles, totalFetched);
+ // Still busy: keep prepare hidden; progress stays on the fetch bar.
+ updatePrepareSectionVisibility(_lastTotalArticles);
+ setNextStepVisible(false);
  setStatus(
- 'embeddings-status',
- 'Fetch finished. Check the analysis model above, then press Prepare Papers when you are ready.',
+ 'fetch-status',
+ `Fetched ${totalFetched} paper(s). Getting them ready for search…`,
  'info'
  );
+ setStatus('embeddings-status', 'Getting your papers ready…', 'info');
+ try {
+ await doCreateEmbeddings({ fromAutoChain: true });
+ } catch (chainErr) {
+ // doCreateEmbeddings already surfaces errors; do not rethrow into fetch.
+ autoChainFailed = true;
+ console.warn('Auto-prepare after fetch failed:', chainErr);
+ setStatus(
+ 'fetch-status',
+ `Fetched ${totalFetched} paper(s), but prepare did not finish. Use Re-prepare if needed.`,
+ 'warning'
+ );
+ }
  }
  } catch (e) {
  const msg = e.message || '';
@@ -830,6 +959,14 @@ async function doFetch() {
  showNotification(`Fetch failed: ${msg}`, 'error');
  }
  } finally {
+ _pipelineBusy = false;
+ // After a failed auto-prepare with papers in hand, force the re-prepare card open
+ // so the student has a control (ready count may still be 0).
+ if (autoChainFailed && _lastTotalArticles > 0) {
+  updatePrepareSectionVisibility(_lastTotalArticles, { forceShow: true });
+ } else {
+  updatePrepareSectionVisibility(_lastTotalArticles);
+ }
  setLoading(btn, false);
  if (cancelBtn) {
  cancelBtn.hidden = true;
@@ -838,15 +975,33 @@ async function doFetch() {
  }
 }
 
-async function doCreateEmbeddings() {
- const model = document.getElementById('embedding-model').value;
+async function doCreateEmbeddings(opts) {
+ // Button click passes a DOM Event; only treat real option bags as auto-chain.
+ const fromAutoChain = !!(opts && opts.fromAutoChain === true);
+ const simple = typeof isSimpleMode === 'function' && isSimpleMode();
+ const modelEl = document.getElementById('embedding-model');
+ const model = (modelEl && modelEl.value) || 'general';
  const onlyMissing = document.getElementById('only-missing')?.checked || false;
  const btn = document.getElementById('embeddings-btn');
  saveFetchPrefs();
  setLoading(btn, true);
+ // Auto-chain: show progress on the fetch bar so Simple mode (prepare card
+ // may still be opening) always has a visible progress track.
+ const progressFill = fromAutoChain ? 'fetch-progress-fill' : 'embed-progress-fill';
+ const progressLabel = fromAutoChain ? 'fetch-progress-label' : 'embed-progress-label';
+ const progressWrap = fromAutoChain ? 'fetch-progress-wrap' : 'embed-progress-wrap';
+ setStatus(
+ fromAutoChain ? 'fetch-status' : 'embeddings-status',
+ (simple || fromAutoChain)
+  ? 'Getting your papers ready… this may take a few minutes on large collections.'
+  : 'Preparing papers for search (embeddings)… this may take a few minutes on large collections.',
+ 'info'
+ );
  setStatus(
  'embeddings-status',
- 'Preparing papers for search (embeddings)… this may take a few minutes on large collections.',
+ (simple || fromAutoChain)
+  ? 'Getting your papers ready…'
+  : 'Preparing papers for search (embeddings)…',
  'info'
  );
 
@@ -858,14 +1013,41 @@ async function doCreateEmbeddings() {
  let data = started;
  if (started && started.status === 'started') {
  data = await waitForJob(
- 'embed', 'embed-progress-fill', 'embed-progress-label', 'embed-progress-wrap',
- (done, total, pct) => total > 0 ? `${done} / ${total} articles (${pct}%)` : 'Loading model…'
+ 'embed', progressFill, progressLabel, progressWrap,
+ (done, total, pct) => {
+ if (simple || fromAutoChain) {
+ return total > 0
+  ? `Getting papers ready… ${done} / ${total} (${pct}%)`
+  : 'Getting your papers ready…';
+ }
+ return total > 0 ? `${done} / ${total} articles (${pct}%)` : 'Loading model…';
+ }
  );
+ }
+ // If the 202 body already had a final payload (wait=true legacy), use it.
+ if (data && data.status === 'started' && !data.articles_processed) {
+  throw new Error('Prepare job did not return a result. Try Re-prepare Papers.');
  }
  const secs = data.seconds != null ? `${data.seconds}s` : '?';
  const device = data.device || 'cpu';
  const created = data.embeddings_created ?? data.articles_processed;
  const skipped = data.skipped_existing || 0;
+ if (simple || fromAutoChain) {
+ setStatus(
+ 'embeddings-status',
+ `Ready: ${created} paper(s) prepared`
+  + (skipped ? `, ${skipped} already ready` : '')
+  + `. Total ready for search: ${data.articles_processed}.`,
+ 'success'
+ );
+ setStatus(
+ 'fetch-status',
+ `Fetched and prepared ${data.articles_processed != null ? data.articles_processed : created} paper(s) for search.`,
+ 'success'
+ );
+ showNotification('Your papers are ready — next: Clean up, then Search.', 'success');
+ setNextStepVisible(true);
+ } else {
  setStatus(
  'embeddings-status',
  `Done: ${created} prepared, ${skipped} skipped (already prepared). ` +
@@ -874,19 +1056,25 @@ async function doCreateEmbeddings() {
  'success'
  );
  showNotification('Papers prepared for search!', 'success');
- loadPageData();
+ }
+ await loadPageData();
+ return data;
  } catch (e) {
  const msg = e.message || '';
  if (msg.toLowerCase().includes('storage limit')) {
   setStatus('embeddings-status', msg, 'warning');
   showNotification(msg, 'warning');
  } else if (msg.toLowerCase().includes('already running')) {
- setStatus('embeddings-status', 'Embedding is already running.', 'warning');
- showNotification('An embedding job is already running.', 'warning');
+ setStatus('embeddings-status', 'Preparing is already running.', 'warning');
+ showNotification('A prepare job is already running.', 'warning');
  } else {
  setStatus('embeddings-status', `Error: ${msg}`, 'error');
- showNotification(`Embeddings failed: ${msg}`, 'error');
+ showNotification(
+  (simple || fromAutoChain) ? `Could not prepare papers: ${msg}` : `Embeddings failed: ${msg}`,
+  'error'
+ );
  }
+ throw e;
  } finally {
  setLoading(btn, false);
  }

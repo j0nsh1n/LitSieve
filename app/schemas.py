@@ -161,10 +161,16 @@ class ScreeningRequest(BaseModel):
     reason: Optional[str] = "manual"
 
 
+class QuickScreenPreviewRequest(BaseModel):
+    """Preview least-relevant papers for Quick screen (does not exclude)."""
+    query: str = Field(..., min_length=1, max_length=2000)
+    # Fraction of the prepared, non-excluded library to propose (bottom of rank).
+    fraction: float = Field(default=0.25, ge=0.05, le=0.50)
+
+
 class ClusterScreeningRequest(BaseModel):
     action: str = Field(default="exclude", pattern="^(exclude|include)$")
     reason: Optional[str] = "cluster"
-
 
 class SampleCorpusRequest(BaseModel):
     # True = wipe collection first (demo reset). False = append samples.

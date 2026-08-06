@@ -3,47 +3,51 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}LitPilot{% endblock %}</title>
+    <title>{% block title %}LitSieve{% endblock %}</title>
     <link rel="icon" href="/static/favicon.ico?v=20260803a" sizes="32x32">
     <link rel="apple-touch-icon" href="/static/favicon.png?v=20260803a">
-    <link rel="stylesheet" href="/static/css/style.css?v=20260729a">
-    <script src="/static/js/theme-init.js?v=20260729a"></script>
+    <link rel="stylesheet" href="/static/css/style.css?v=20260805b">
+    <script src="/static/js/theme-init.js?v=20260805a"></script>
 </head>
 <body>
-    {# Recommended order: Fetch/Embed → Cluster/Triage → Dedup → Search #}
+    {# Recommended order: Fetch/Embed → Cluster/Triage → Dedup → Search.
+       simple_step: nav number when Clusters is hidden (Simple mode). #}
     {% set workflow = [
-        ("data_management", "Data Management", "/data-management", "Step 1: fetch papers, then prepare them for search"),
-        ("clusters", "Clusters", "/clusters", "Step 2: group papers by topic and screen out off-topic ones"),
-        ("statistics", "Duplicates", "/statistics", "Step 3: remove duplicate copies + screening report for hand-ins"),
-        ("search", "Search", "/search", "Step 4: rank the papers you kept and export your list"),
+        ("data_management", "Data Management", "/data-management", "Step 1: fetch papers, then prepare them for search", "1"),
+        ("clusters", "Clusters", "/clusters", "Step 2: group papers by topic and screen out off-topic ones", ""),
+        ("statistics", "Clean up", "/statistics", "Step 3: remove duplicates, quick-screen off-topic papers, screening report", "2"),
+        ("search", "Search", "/search", "Step 4: rank the papers you kept and export your list", "3"),
     ] %}
-    {% set ns = namespace(current_label="Steps", current_num="") %}
-    {% for key, label, href, tip in workflow %}
+    {% set ns = namespace(current_label="Steps", current_num="", simple_num="") %}
+    {% for key, label, href, tip, simple_step in workflow %}
         {% if key == active_page %}
             {% set ns.current_label = label %}
             {% set ns.current_num = loop.index|string %}
+            {% set ns.simple_num = simple_step %}
         {% endif %}
     {% endfor %}
 
     <nav class="navbar" id="site-navbar" role="navigation" aria-label="Main">
         <div class="navbar-top">
-            <div class="nav-brand">LitPilot</div>
+            <div class="nav-brand">LitSieve</div>
+            <button type="button"
+                    class="nav-menu-toggle"
+                    id="nav-menu-toggle"
+                    aria-expanded="false"
+                    aria-controls="nav-links-panel"
+                    title="Open steps menu">
+                <span class="nav-menu-toggle-icon" aria-hidden="true">☰</span>
+                <span class="nav-menu-toggle-text">
+                    {% if ns.current_num %}
+                    <span class="nav-step-num nav-menu-step"
+                          data-step-advanced="{{ ns.current_num }}"
+                          data-step-simple="{{ ns.simple_num }}">{{ ns.current_num }}</span>
+                    {% endif %}
+                    <span class="nav-menu-current">{{ ns.current_label }}</span>
+                </span>
+                <span class="nav-menu-caret" aria-hidden="true">▾</span>
+            </button>
             <div class="nav-stats">
-                <button type="button"
-                        class="nav-menu-toggle"
-                        id="nav-menu-toggle"
-                        aria-expanded="false"
-                        aria-controls="nav-links-panel"
-                        title="Open steps menu">
-                    <span class="nav-menu-toggle-icon" aria-hidden="true">☰</span>
-                    <span class="nav-menu-toggle-text">
-                        {% if ns.current_num %}
-                        <span class="nav-step-num nav-menu-step">{{ ns.current_num }}</span>
-                        {% endif %}
-                        <span class="nav-menu-current">{{ ns.current_label }}</span>
-                    </span>
-                    <span class="nav-menu-caret" aria-hidden="true">▾</span>
-                </button>
                 {% if user %}
                 <label class="nav-library-wrap" title="Switch library (separate paper collections)">
                     <span class="nav-library-label">Library</span>
@@ -52,9 +56,9 @@
                     </select>
                 </label>
                 {% endif %}
-                <button type="button" class="reading-toggle" id="reading-toggle"
-                    title="Reading mode - denser layout, better abstracts"
-                    aria-label="Toggle reading mode" aria-pressed="false">Aa</button>
+                <button type="button" class="mode-toggle" id="mode-toggle"
+                    title="Switch to Simple mode"
+                    aria-label="Switch to Simple mode" aria-pressed="false">Advanced</button>
                 <button type="button" class="theme-toggle" id="theme-toggle" title="Toggle theme" aria-label="Toggle theme">🌙</button>
                 {% if user %}
                 <a href="/account" class="nav-username {% if active_page == 'account' %}active{% endif %}" title="Account settings">{{ user.username }}</a>
@@ -65,13 +69,15 @@
         </div>
 
         <div class="nav-links" id="nav-links-panel" aria-label="Workflow steps in order">
-            {% for key, label, href, tip in workflow %}
+            {% for key, label, href, tip, simple_step in workflow %}
             {% if not loop.first %}
-            <span class="nav-flow-arrow" aria-hidden="true">→</span>
+            <span class="nav-flow-arrow nav-flow-arrow-before-{{ key }}" aria-hidden="true">→</span>
             {% endif %}
             <a href="{{ href }}"
-               class="nav-link {% if active_page == key %}active{% endif %}"
+               class="nav-link nav-step-{{ key }} {% if active_page == key %}active{% endif %}"
                title="{{ tip }}"
+               data-step-advanced="{{ loop.index }}"
+               data-step-simple="{{ simple_step }}"
                {% if active_page == key %}aria-current="page"{% endif %}>
                 <span class="nav-step-num">{{ loop.index }}</span>
                 <span class="nav-step-label">{{ label }}</span>
@@ -87,11 +93,11 @@
 
     {% from "macros/disclaimers.html" import scope_footer %}
     <footer class="footer">
-        <p>LitPilot - v4.4.0</p>
+        <p>LitSieve - v4.5.0</p>
         {{ scope_footer() }}
     </footer>
 
-    <script src="/static/js/common.js?v=20260729a"></script>
+    <script src="/static/js/common.js?v=20260805n"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

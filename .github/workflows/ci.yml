@@ -27,7 +27,9 @@ jobs:
           # CPU torch first (same pattern as Dockerfile / Render).
           pip install torch --index-url https://download.pytorch.org/whl/cpu
           pip install -r requirements.txt
-          pip install pytest ruff pyright pip-audit
+          # esprima: syntax-checks static/js (no npm/build step in this repo,
+          # so nothing else would catch a broken browser script).
+          pip install pytest ruff pyright pip-audit esprima
 
       - name: Ruff
         run: ruff check .
@@ -83,7 +85,7 @@ jobs:
       - name: Build image
         run: |
           for attempt in 1 2 3; do
-            if docker build -t literature-aide:ci .; then
+            if docker build -t litsieve:ci .; then
               exit 0
             fi
             echo "docker build attempt ${attempt} failed; retrying in 15s..."
@@ -93,22 +95,22 @@ jobs:
 
       - name: Boot the container and check /health
         run: |
-          docker run -d --name lra-ci -p 7860:7860 \
+          docker run -d --name litsieve-ci -p 7860:7860 \
             -e SECRET_KEY=ci-smoke-key \
-            literature-aide:ci
+            litsieve:ci
           for i in $(seq 1 60); do
             code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:7860/health || true)
             if [ "$code" = "200" ]; then echo "healthy after ${i}s"; break; fi
             sleep 1
           done
-          test "$code" = "200" || { echo "::error::container did not become healthy"; docker logs lra-ci; exit 1; }
+          test "$code" = "200" || { echo "::error::container did not become healthy"; docker logs litsieve-ci; exit 1; }
           curl -sf http://127.0.0.1:7860/health | grep -q '"status":"healthy"'
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:7860/)" = "200"
 
       - name: Container logs on failure
         if: failure()
-        run: docker logs lra-ci || true
+        run: docker logs litsieve-ci || true
 
       - name: Clean up
         if: always()
-        run: docker rm -f lra-ci || true
+        run: docker rm -f litsieve-ci || true

@@ -1,13 +1,4 @@
----
-title: LitPilot
-emoji: 📚
-colorFrom: blue
-colorTo: green
-sdk: docker
-app_port: 7860
----
-
-# LitPilot 📚 — v4.4.0
+# LitSieve 📚 — v4.5.0
 
 A multi-user web app for **students** to fetch, screen, and rank research papers
 across public academic databases as a **research starting point**. Semantic
@@ -71,7 +62,7 @@ Built with **FastAPI**, sentence-transformers, FAISS, and scikit-learn.
 │   └── DEPLOY.md           # Host checklist (SECRET_KEY, SMTP, quota, smoke)
 ├── run_dev.sh              # Local dev with --reload
 ├── requirements.txt
-├── Dockerfile              # Container build (HF Spaces / any Docker host)
+├── Dockerfile              # Container build (any Docker host)
 └── render.yaml             # Render.com deployment config
 ```
 
@@ -118,11 +109,33 @@ account. Register/login for your private workspace, then:
    notes/stars; export ranked hits (CSV/TXT) or library as **RIS**.
 5. **Account** → change password (other sessions sign out) or delete account.
 
+### Running it for real (self-hosted)
+
+Do not leave `uvicorn` running in a terminal — it dies with the session and does
+not come back after a reboot. Install the systemd user unit instead:
+
+```bash
+cp deploy/litsieve-uvicorn.service ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now litsieve-uvicorn.service
+```
+
+Then the whole day-to-day loop — reboot, deploy a code change, develop against
+throwaway data, read the logs — is in
+**[docs/SELFHOST.md → Everyday commands](docs/SELFHOST.md#everyday-commands)**.
+The short version:
+
+```bash
+systemctl --user restart litsieve-uvicorn.service   # publish a code change
+./run_dev.sh 7861                                   # develop (isolated data)
+journalctl --user -u litsieve-uvicorn -f            # logs
+```
+
 ### Docker
 
 ```bash
-docker build -t litpilot .
-docker run -p 7860:7860 -e SECRET_KEY="$(python -c 'import secrets;print(secrets.token_urlsafe(48))')" litpilot
+docker build -t litsieve .
+docker run -p 7860:7860 -e SECRET_KEY="$(python -c 'import secrets;print(secrets.token_urlsafe(48))')" litsieve
 ```
 
 ### Production / host deploy
@@ -234,7 +247,8 @@ cleanly during tests. Coverage includes:
 
 ## Security
 
-- **Transport** — TLS is terminated by the host (Render / HF Spaces). The app
+- **Transport** — TLS is terminated upstream, never by the app: Cloudflare in
+  the current self-hosted deployment, or the platform router on a PaaS. The app
   sends `Strict-Transport-Security` (outside `DEBUG`), plus `X-Content-Type-Options`,
   `X-Frame-Options: DENY`, `Referrer-Policy` and a CSP that blocks scripts from
   any external origin (`app/security.py`).

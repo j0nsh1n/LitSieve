@@ -45,14 +45,17 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
         "how_it_works": [
             "On Data Management, choose academic topics (e.g. Education, Health). "
             "Recommended databases light up based on those topics.",
+            "In Simple mode the source grid is hidden but still auto-checks "
+            "recommended databases; Advanced lets you tick sources by hand.",
             "Type a normal research query (the kind you would type into a library site).",
             "Set max results per source and choose Replace (start fresh) or Add "
             "(keep what you already have).",
-            "Fetch runs sources in parallel in the background so you can leave the "
-            "tab open; you get a ✓/✗ report per database when it finishes.",
-            "Papers without an abstract are skipped - later steps (search, clusters) "
-            "need text to work with.",
-            "The coverage map shows how many papers you have per source and which "
+            "Fetch runs sources in parallel in the background; when papers arrive, "
+            "prepare-for-search (embeddings) starts automatically so you do not "
+            "need a second click.",
+            "You get a ✓/✗ report per database when the fetch finishes. Papers "
+            "without an abstract are skipped - later steps need text to work with.",
+            "In Advanced, the coverage map shows papers per source and which "
             "recommended sources are still empty.",
         ],
         "tips": [
@@ -62,13 +65,14 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "Teachers: assign a topic pack (e.g. “use ERIC + OpenAlex”) so every "
             "student’s corpus is comparable.",
             "Students: start broad, then re-fetch with Add to deepen a sub-topic "
-            "without wiping your first batch.",
+            "without wiping your first batch (saved AI key points on old papers stay).",
             "Some sources need free API keys (NASA ADS). Without a key they "
             "simply skip - the others still run.",
             "If a fetch is already running, wait for it to finish before starting "
             "another (the app will say so).",
         ],
-        "where_in_app": "Data Management → steps 1-3 (Topics, Sources, Fetch).",
+        "where_in_app": "Data Management → topics, sources (Advanced), fetch "
+        "(prepare runs after fetch).",
         "app_path": "/data-management",
         "app_label": "Open Data Management",
     },
@@ -84,28 +88,30 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "detection all depend on these fingerprints."
         ),
         "how_it_works": [
-            "After you fetch papers, open Create Embeddings on Data Management.",
-            "Pick a model: general (fast, mixed topics), pubmedbert / biosentbert "
-            "(medical), or specter (scientific papers).",
-            "By default only new papers are embedded - already-processed ones are "
-            "skipped so re-runs stay fast. (Replace mode turns that off so a full "
-            "re-embed is easy to request.)",
-            "If you switch models, everything is re-embedded so all vectors stay "
-            "compatible with each other.",
+            "After a successful fetch, prepare-for-search starts automatically "
+            "(same progress flow as “getting your papers ready”).",
+            "The model is chosen from your topics (biomedical → pubmedbert, hard "
+            "science → specter, otherwise general). Advanced can override under "
+            "preparation options.",
+            "Add-to-collection prefers only new papers; Replace re-prepares the "
+            "whole set so dimensions stay consistent.",
+            "If you switch models in Advanced, everything is re-embedded so all "
+            "vectors stay compatible with each other.",
             "Embedding runs in the background with a progress bar - safe to leave "
             "the page open while a large batch finishes.",
             "When available, work runs on your GPU (including ROCm on supported "
             "Linux setups); otherwise it uses the CPU.",
-            "You see how many papers still need vectors, which model was used, "
-            "device, and how long the run took.",
+            "Optional Re-prepare on Data Management is only needed if prepare "
+            "failed or you changed the model by hand.",
         ],
         "tips": [
-            "Always embed after a fetch before using Search, Clusters, or Duplicates.",
+            "Wait for prepare to finish before Search or Clean up (nav shows ready "
+            "counts).",
             "Stick to one model for a project so results stay consistent.",
-            "Large collections take longer the first time; “only new papers” makes "
-            "later fetches cheap.",
+            "Large collections take longer the first time; “only new papers” on "
+            "Add makes later fetches cheap.",
         ],
-        "where_in_app": "Data Management → step 4 (Create Embeddings).",
+        "where_in_app": "Data Management — auto after fetch; optional Re-prepare.",
         "app_path": "/data-management",
         "app_label": "Open Data Management",
     },
@@ -113,79 +119,82 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
         "slug": "clustering-triage",
         "title": "Clustering & triage",
         "icon": "🧩",
-        "tagline": "Group papers by theme, then screen out the noise.",
+        "tagline": "Group papers by theme (Advanced), or Quick screen on Clean up.",
         "summary": (
-            "Clustering sorts your collection into topic piles using the embeddings. "
-            "Each pile gets a distinctive keyword label and a real paper title as a "
-            "headline, plus a short topic overview. This is the only place for topic "
-            "triage: exclude whole off-topic groups (or single papers) so Search, "
-            "hybrid ranking, and more-like-starred only see what you kept."
+            "You can screen papers two ways. Simple mode leans on Clean up → Quick "
+            "screen (rank against your research question and drop least-related "
+            "papers, with undo). Advanced keeps the Clusters page: group papers by "
+            "theme with embeddings, then exclude off-topic piles. Search only ranks "
+            "what you kept. Cluster labels are best when they read like real topics; "
+            "if they look weak, prefer Quick screen."
         ),
         "how_it_works": [
-            "Open Clusters after embeddings exist (create them on Data Management; "
-            "that job can finish in the background).",
+            "Simple path: after prepare, open Clean up → Quick screen. Enter your "
+            "research question, pick how many least-related papers to drop, and "
+            "Screen out least related (or Preview first). Undo once if needed.",
+            "Advanced path: open Clusters after embeddings exist (prepare runs after "
+            "fetch on Data Management).",
             "Density mode (recommended) finds natural topic groups and puts odd "
             "papers in an “outliers” bucket. K-Means and Hierarchical need a count "
             "(or Auto).",
-            "Open a cluster to read its topic overview (year span + example titles) "
-            "and the paper list.",
-            "Exclude cluster screens out every paper in that group from Search. "
-            "Each paper also has its own Exclude / Restore toggle.",
-            "Nothing is permanently deleted - Restore brings papers back anytime.",
-            "Labels are built so the same keyword is not repeated across every "
-            "cluster (they stay distinctive).",
-            "Exclusion reasons show up later on the Duplicates screening report "
-            "(cluster vs duplicate vs manual counts for hand-ins).",
+            "Open a cluster to read its topic overview and paper list. Exclude "
+            "cluster screens out every paper in that group from Search.",
+            "Each paper also has Exclude / Restore; nothing is permanently deleted.",
+            "Search also has per-paper Not relevant (off-topic) for catch-all "
+            "exclusions.",
+            "Exclusion reasons (low relevance, cluster, duplicate, off topic, …) "
+            "show on the Clean up screening report for hand-ins.",
         ],
         "tips": [
-            "Students: exclude clearly off-topic piles before similarity search so "
-            "rankings stay on assignment.",
-            "Teachers: ask for a short note on which clusters were excluded and why, "
-            "plus the screening report text from Duplicates.",
+            "Students in Simple: Quick screen first, then Search; use Not relevant "
+            "on stragglers.",
+            "Teachers: ask for the Clean up screening report plus a short note on "
+            "what was excluded and why.",
+            "Clusters stays in Advanced nav; Simple hides it but /clusters still "
+            "works if bookmarked.",
             "Re-clustering refreshes groups but keeps your exclusion list.",
         ],
-        "where_in_app": "Clusters page (only place for topic/paper triage).",
-        "app_path": "/clusters",
-        "app_label": "Open Clusters",
+        "where_in_app": "Clean up → Quick screen (Simple default) · Clusters "
+        "(Advanced group triage) · Search → Not relevant.",
+        "app_path": "/statistics",
+        "app_label": "Open Clean up",
     },
     "duplicate-resolution": {
         "slug": "duplicate-resolution",
-        "title": "Duplicate resolution",
+        "title": "Clean up (duplicates & report)",
         "icon": "🔄",
-        "tagline": "Same paper, many databases - keep the best copy.",
+        "tagline": "Duplicates, Quick screen, and the hand-in report.",
         "summary": (
-            "The same study often appears in PubMed, Europe PMC, OpenAlex, and more "
-            "under different ids. Near-duplicate detection finds those pairs by "
-            "embedding similarity. You can compare them side by side, keep one by "
-            "hand, or auto-resolve groups. The same page can also build a "
-            "screening report (collected / excluded / included counts) for hand-ins."
+            "The Clean up page (nav label: Clean up) is where you finish the "
+            "collection before Search: remove near-duplicate copies across databases, "
+            "optionally Quick-screen least-related papers, and download a screening "
+            "report (collected / excluded / included counts) for hand-ins."
         ),
         "how_it_works": [
-            "Open the Duplicates page (nav label: Duplicates).",
-            "Set a similarity threshold (higher = only near-identical pairs).",
-            "Detect Duplicates lists pairs; expand a group to compare fields "
-            "(title, abstract, year, etc.).",
-            "Auto-Resolve All keeps the most complete abstract; if lengths are "
-            "similar it prefers trusted sources (PubMed first, then Europe PMC, "
-            "ClinicalTrials, CrossRef, OpenAlex, and so on).",
-            "Losers are screened out (hidden from Search), not deleted. You can "
-            "restore them from Clusters if needed.",
-            "Use per-group “Keep this” when you want to choose the winner yourself.",
-            "Screening report shows how many papers you collected, removed as "
-            "duplicates, excluded by cluster triage, excluded manually, and kept "
-            "in the final set - downloadable as plain text.",
+            "Open Clean up after papers are prepared (auto after fetch).",
+            "Remove duplicates: set match strictness (Advanced; Simple hides the "
+            "slider and uses the default). Detect Duplicates, then Auto-Resolve or "
+            "Keep this per group.",
+            "Auto-Resolve keeps the most complete abstract; if lengths are similar "
+            "it prefers trusted sources (PubMed first, then Europe PMC, and so on).",
+            "Losers are screened out (hidden from Search), not deleted.",
+            "Quick screen: rank against your research question and screen out the "
+            "least related set (primary button), or Preview first; Undo once.",
+            "Screening report shows collected, duplicates removed, exclusions by "
+            "reason (including low relevance and cluster triage), and included set "
+            "— downloadable as plain text.",
         ],
         "tips": [
-            "Run duplicates after a multi-source fetch and before writing - cuts "
+            "Run Clean up after a multi-source fetch and before writing - cuts "
             "double-counting in bibliographies.",
-            "If Auto-Resolve feels aggressive, raise the threshold or resolve "
-            "groups manually.",
+            "If Auto-Resolve feels aggressive, raise the threshold (Advanced) or "
+            "resolve groups manually.",
             "Teachers: ask students to attach the screening report text with a "
             "short reflection on what they excluded.",
         ],
-        "where_in_app": "Duplicates page (statistics + detection + screening report).",
+        "where_in_app": "Clean up page (duplicates + Quick screen + screening report).",
         "app_path": "/statistics",
-        "app_label": "Open Duplicates",
+        "app_label": "Open Clean up",
     },
     "similarity-search": {
         "slug": "similarity-search",
@@ -195,27 +204,27 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
         "summary": (
             "Describe your study in plain language or PICO fields. The app embeds "
             "your description, ranks closest papers by meaning, and (by default) "
-            "slightly boosts papers that also share your exact words. You can "
-            "filter by year, start from a seed paper, or find more papers like "
-            "everything you have starred. This searches only your fetched library, "
-            "not the whole web."
+            "slightly boosts papers that also share your exact words. Advanced can "
+            "filter by source, start from a seed paper, or use more ranking options. "
+            "This searches only your fetched library, not the whole web."
         ),
         "how_it_works": [
-            "Choose Text, PICO (Population / Intervention / Comparison / Outcome), "
-            "or Seed paper. Or click More like my starred after bookmarking papers.",
-            "Optional filters: sources, from/to year (unknown years hide when a "
-            "range is set), Prefer PICO matches, Prefer exact words (hybrid ranking).",
+            "Simple: Text or PICO, then Search. Use More like my starred after "
+            "bookmarking papers. Seed paper and advanced ranking options stay in "
+            "Advanced mode.",
+            "Optional (Advanced): source filter, Prefer PICO matches, Prefer exact "
+            "words (hybrid), seed paper mode.",
             "Hybrid ranking blends embedding similarity with TF-IDF word overlap "
             "so rare terms in your query still surface.",
-            "Results show a similarity score (0-1), highlighted query words in "
-            "abstracts, and PICO snippets when detected.",
-            "Star papers and add private notes for your study log.",
-            "Export this ranked list as CSV (spreadsheet) or Text (reading list), or "
-            "export the whole library as RIS or BibTeX (scope: all / included / "
-            "screened out / starred). Format APA or MLA in Zotero or an online "
-            "converter linked from Search — not in this app.",
-            "Process counts for hand-ins live on Duplicates as the screening report "
-            "(plain-text collected / excluded / included numbers) — not on Search.",
+            "Results show key points, a collapsible abstract, and PICO snippets "
+            "when detected. Use Not relevant to screen out one paper as off-topic.",
+            "Star papers and add private notes for your study log. Saved AI key "
+            "points (Refine → Save) stay on that paper until you replace the "
+            "library.",
+            "Export the ranked list as RIS for Zotero. Advanced can also export a "
+            "whole-library scope (all / included / screened out / starred).",
+            "Process counts for hand-ins live on Clean up as the screening report "
+            "— not on Search.",
         ],
         "tips": [
             "Search only ranks papers already in your collection (from public "
@@ -224,16 +233,16 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "Each result may show a study Type tag (plain-language guess from title "
             "and abstract - often wrong when confidence is low). It is not an evidence "
             "grade.",
-            "Screen off-topic clusters first so the ranking pool is clean.",
-            "Seed mode is great when a teacher gives one starter paper: find more "
-            "like it from what you already fetched.",
+            "Screen with Clean up (Quick screen / duplicates) first so the ranking "
+            "pool is clean.",
+            "Advanced: Seed mode is great when a teacher gives one starter paper.",
             "Star a handful of must-read papers, then use More like my starred to "
             "expand the set without rewriting the query.",
             "Need a real bibliography? Export RIS of the search results from Search, then "
             "Zotero → File → Import… (not drag-and-drop) → Create Bibliography. "
-            "Need process counts? Duplicates → Screening report (.txt).",
+            "Need process counts? Clean up → Screening report (.txt).",
         ],
-        "where_in_app": "Search page.",
+        "where_in_app": "Search page (Simple or Advanced).",
         "app_path": "/search",
         "app_label": "Open Search",
     },
@@ -241,7 +250,7 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
         "slug": "private-workspace",
         "title": "Private workspace",
         "icon": "🔒",
-        "tagline": "Your papers, embeddings, notes - only your account.",
+        "tagline": "Your papers, notes, and Simple/Advanced layout - only your account.",
         "summary": (
             "Every account is private on the server. Within an account you can "
             "keep several named libraries (for example one per project or topic). "
@@ -249,19 +258,23 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "and notes stay inside the active library and never mix with other "
             "users. Sessions use signed tokens; changing your password signs out "
             "other devices while keeping this one signed in. Long fetches and "
-            "embedding runs continue in the background so closing a laptop "
+            "prepare jobs continue in the background so closing a laptop "
             "mid-job is less painful."
         ),
         "how_it_works": [
             "Register with a username (not an email) and a password, stored as "
-            "a bcrypt hash, never plain text.",
+            "a bcrypt hash, never plain text. New accounts open in Simple mode "
+            "(fewer controls); existing accounts keep Advanced until you toggle.",
             "Optionally add an email on Account for password recovery. It only "
             "counts once you click the link we send, and it is used for "
             "recovery alone.",
-            "Log in to reach Data Management, Clusters, Search, and Duplicates.",
+            "Log in to reach Data Management, Clean up, and Search. Advanced also "
+            "shows Clusters in the nav (Simple can still open /clusters by URL).",
             "Use the Library switcher in the nav (or Account) to create and "
-            "switch collections. Fetch, prepare, cluster, and search only touch "
+            "switch collections. Fetch, prepare, and search only touch "
             "the active library.",
+            "Simple / Advanced is a browser preference (like light/dark theme) "
+            "on this device — it does not delete data.",
             "All API actions require your session; state-changing actions also "
             "check a CSRF token. Each signed-in user has their own rate limit "
             "bucket.",
@@ -271,23 +284,23 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "Optional: someone can create a short library copy code. Joining "
             "adds a new library that is a full clone (papers + screening + "
             "optional embeddings) — not live access to theirs.",
-            "Fetch and embedding jobs return immediately and finish in the "
+            "Fetch and prepare jobs return immediately and finish in the "
             "background on the library that was active when they started; "
             "the progress bar follows until they complete.",
-            "Theme (light/dark) and reading mode preferences stay in your browser "
+            "Theme (light/dark) and Simple/Advanced stay in your browser "
             "on this device.",
         ],
         "tips": [
             "Shared computers: log out when finished; do not reuse simple passwords.",
             "Keep one library per project or topic so papers do not mix.",
-            "For process counts, use Duplicates → Screening report. Search keeps ranking "
+            "For process counts, use Clean up → Screening report. Search keeps ranking "
             "and library RIS export. Notes/stars stay private process evidence, not grades.",
-            "Export a library as RIS (Search) and/or a screening report (Duplicates) "
+            "Export a library as RIS (Search) and/or a screening report (Clean up) "
             "before deleting it if you need an archive.",
             "If you change your password on a shared machine, other open tabs "
             "for that account will need to log in again.",
         ],
-        "where_in_app": "Register / Log in · Library switcher · Account.",
+        "where_in_app": "Register / Log in · Simple/Advanced toggle · Library switcher · Account.",
         "app_path": "/account",
         "app_label": "Open Account",
     },
@@ -297,15 +310,16 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
         "icon": "📚",
         "tagline": "This app is a starting point — here is how to finish well.",
         "summary": (
-            "LitPilot only queries free public research APIs. "
+            "LitSieve only queries free public research APIs. "
             "That is great for gathering candidates and practising screening, but it "
             "is not a complete literature search and not a college library. After you "
             "export RIS and a screening report, plan a short path to stronger sources "
             "with people and tools that do have broader access."
         ),
         "how_it_works": [
-            "Use this app to collect candidates, screen off-topic groups, remove "
-            "duplicates, rank what remains, and export RIS plus a screening report.",
+            "Use this app to collect candidates (fetch + auto-prepare), screen on "
+            "Clean up (duplicates and/or Quick screen), rank on Search, and export "
+            "RIS plus a screening report.",
             "Write down what you still need (for example: a peer-reviewed review, "
             "a local newspaper archive, or a book chapter your teacher assigned).",
             "Search your school library catalogue and any databases your school "
@@ -381,9 +395,10 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "Out of scope for this product: campus proxy full-text, Web of Science, "
             "JSTOR/EBSCO packages, SSO into university systems.",
         ],
-        "where_in_app": "Landing /learn/citation-quality · use while screening on Clusters.",
-        "app_path": "/clusters",
-        "app_label": "Open Clusters",
+        "where_in_app": "Landing /learn/citation-quality · use while screening on Clean up "
+        "or Clusters (Advanced).",
+        "app_path": "/statistics",
+        "app_label": "Open Clean up",
         "checklists": [
             {
                 "title": "Citation quality (manual)",

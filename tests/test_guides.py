@@ -51,3 +51,48 @@ def test_list_guides_includes_scope_guides():
     slugs = [g["slug"] for g in list_guides()]
     assert "finish-your-research" in slugs
     assert "citation-quality" in slugs
+
+
+def test_guides_reflect_simple_advanced_and_clean_up():
+    """Landing learn pages should match Simple/Advanced + Clean up workflow."""
+    emb = get_guide("semantic-embeddings")
+    assert emb
+    emb_body = emb["summary"] + " ".join(emb["how_it_works"]) + " ".join(emb["tips"])
+    assert "automatic" in emb_body.lower() or "auto" in emb_body.lower()
+
+    triage = get_guide("clustering-triage")
+    assert triage
+    triage_body = (
+        triage["summary"] + " ".join(triage["how_it_works"]) + triage["where_in_app"]
+    ).lower()
+    assert "quick screen" in triage_body
+    assert "clean up" in triage_body
+    # No longer claim Clusters is the only triage UI.
+    assert "only place for topic" not in triage_body
+
+    dup = get_guide("duplicate-resolution")
+    assert dup
+    assert "Clean up" in dup["title"] or "clean up" in dup["where_in_app"].lower()
+    assert dup["app_path"] == "/statistics"
+    assert "Duplicates" not in dup.get("app_label", "")
+
+    priv = get_guide("private-workspace")
+    assert priv
+    priv_body = " ".join(priv["how_it_works"]).lower()
+    assert "simple" in priv_body and "advanced" in priv_body
+
+    client = TestClient(app)
+    landing = client.get("/")
+    assert landing.status_code == 200
+    assert "Clean up" in landing.text
+    assert "Simple" in landing.text or "simple" in landing.text
+    for slug in (
+        "multi-source-search",
+        "semantic-embeddings",
+        "clustering-triage",
+        "duplicate-resolution",
+        "similarity-search",
+        "private-workspace",
+    ):
+        r = client.get(f"/learn/{slug}")
+        assert r.status_code == 200, slug

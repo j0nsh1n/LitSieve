@@ -4,9 +4,12 @@ Covers all academic disciplines — broad cross-domain coverage
 Free API, no key required for basic use (rate limited)
 """
 
+import logging
 from typing import Dict, List
 
 from app.fetchers.base import BaseFetcher, FetchError, HttpClient
+
+logger = logging.getLogger(__name__)
 
 
 class SemanticScholarFetcher(BaseFetcher):
@@ -40,10 +43,10 @@ class SemanticScholarFetcher(BaseFetcher):
                     break
                 offset += n
             except FetchError as e:
-                print(f"Semantic Scholar search error: {e}")
+                logger.exception("Semantic Scholar search error: %s", e)
                 raise
             except Exception as e:
-                print(f"Semantic Scholar search error: {e}")
+                logger.exception("Semantic Scholar search error: %s", e)
                 break
 
         return ids[:max_results]
@@ -65,10 +68,10 @@ class SemanticScholarFetcher(BaseFetcher):
                     if article:
                         articles.append(article)
             except FetchError as e:
-                print(f"Semantic Scholar fetch error: {e}")
+                logger.exception("Semantic Scholar fetch error: %s", e)
                 raise
             except Exception as e:
-                print(f"Semantic Scholar fetch error: {e}")
+                logger.exception("Semantic Scholar fetch error: %s", e)
 
         return articles
 
@@ -89,5 +92,5 @@ class SemanticScholarFetcher(BaseFetcher):
                 'journal': paper.get('venue') or '',
             }
         except Exception as e:
-            print(f"Semantic Scholar parse error: {e}")
+            logger.exception("Semantic Scholar parse error: %s", e)
             return None

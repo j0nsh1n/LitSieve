@@ -1,0 +1,15 @@
+[Unit]
+Description=Daily LitSieve backup
+Documentation=file://%h/HealthDatabaseAccess/docs/SELFHOST.md
+
+[Timer]
+# Midday: the machine is most reliably on then. Safe to run against a live
+# site — copies go through the SQLite online backup API, which tolerates
+# concurrent readers and writers.
+OnCalendar=*-*-* 12:00:00
+# Catch up after the machine has been off, rather than skipping a day silently.
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

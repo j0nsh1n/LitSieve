@@ -19,7 +19,7 @@ router = APIRouter()
 
 @router.get("/health")
 async def health():
-    return {"status": "healthy", "version": "4.4.0"}
+    return {"status": "healthy", "version": "4.5.0"}
 
 
 # Browsers and crawlers request these at the site root, where the /static mount

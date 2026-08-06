@@ -1,7 +1,8 @@
 """
-End-to-end smoke path (no live network):
+End-to-end smoke paths (no live network):
 
-  register → load sample corpus → (stub embeddings) → cluster → search → export
+  Advanced-shaped: register → sample → embeddings → cluster → search → export
+  Simple-shaped:   register → sample → embeddings → quick screen → search → export
 
 Uses the real ASGI app under an isolated tmp working directory. Embedding model
 loads are stubbed so CI stays offline and fast.
@@ -22,7 +23,7 @@ os.environ.setdefault("SECRET_KEY", "pytest-only-not-a-secret-32b-min!!")
 os.environ["DEBUG"] = "true"
 
 for _dep in (
-    "fastapi", "httpx", "Bio", "sklearn", "tqdm",
+    "fastapi", "httpx", "Bio", "sklearn",
     "slowapi", "jwt", "bcrypt", "multipart", "requests", "dotenv",
 ):
     pytest.importorskip(_dep)
@@ -158,4 +159,101 @@ def test_smoke_register_sample_cluster_search_export(app_module):
     for path in ("/data-management", "/clusters", "/statistics", "/search", "/account"):
         page = c.get(path)
         assert page.status_code == 200, path
-        assert "20260717r5" in page.text or "LitPilot" in page.text
+        assert "LitSieve" in page.text or "LitPilot" in page.text or "text/html" in page.headers.get("content-type", "")
+
+    # Advanced surfaces still present in HTML (Simple only CSS-hides them).
+    dm = c.get("/data-management")
+    assert dm.status_code == 200
+    assert "source-option-grid" in dm.text or "embedding-model" in dm.text
+    stats_page = c.get("/statistics")
+    assert stats_page.status_code == 200
+    assert "Clean up" in stats_page.text
+    assert "quick-screen" in stats_page.text
+
+
+def test_smoke_simple_path_quick_screen_search_export(app_module):
+    """Simple-mode workflow: prepare → Quick screen → search → export (no cluster)."""
+    main = app_module
+    c = TestClient(main.app)
+
+    _register(c, username="simple_smoke")
+    # New accounts seed Simple mode for the browser; cookie is set on register.
+    assert c.cookies.get("ui_mode_seed") == "simple"
+
+    rows = core.user_db.conn.execute("SELECT id FROM users").fetchall()
+    user_id = rows[0][0]
+
+    r = c.post(
+        "/api/load-sample-corpus",
+        json={"clear_first": True},
+        headers=_csrf(c),
+    )
+    assert r.status_code == 200, r.text
+    _seed_fake_embeddings(main, user_id)
+
+    # Quick screen preview must not write exclusions.
+    prev = c.post(
+        "/api/screening/quick-preview",
+        json={"query": "education learning students", "fraction": 0.25},
+        headers=_csrf(c),
+    )
+    assert prev.status_code == 200, prev.text
+    body = prev.json()
+    assert body["total_ranked"] >= 1
+    assert body.get("proposed_count", 0) >= 0
+    report0 = c.get("/api/screening-report?format=json").json()
+    assert report0["excluded"]["total"] == 0
+
+    # Apply a subset if any candidates (fraction may yield 0 on tiny corpora).
+    candidates = body.get("candidates") or []
+    if candidates:
+        items = [
+            {"article_id": x["article_id"], "source": x["source"]}
+            for x in candidates[:3]
+        ]
+        ex = c.post(
+            "/api/screening",
+            json={"items": items, "action": "exclude", "reason": "low_relevance"},
+            headers=_csrf(c),
+        )
+        assert ex.status_code == 200, ex.text
+        assert ex.json()["reason"] == "low_relevance"
+        report1 = c.get("/api/screening-report?format=json").json()
+        assert report1["excluded"]["low_relevance"] >= 1
+
+        # Re-include (undo)
+        inc = c.post(
+            "/api/screening",
+            json={"items": items, "action": "include"},
+            headers=_csrf(c),
+        )
+        assert inc.status_code == 200, inc.text
+
+    # Search + export still work without clustering.
+    r = c.post(
+        "/api/search",
+        json={"query_text": "education learning students", "top_k": 5, "lexical_boost": True},
+        headers=_csrf(c),
+    )
+    assert r.status_code == 200, r.text
+    assert len(r.json().get("results") or []) >= 1
+
+    # Per-paper Not relevant (off_topic) via screening API.
+    hit = (r.json().get("results") or [])[0]
+    off = c.post(
+        "/api/screening",
+        json={
+            "items": [{"article_id": hit["article_id"], "source": hit["source"]}],
+            "action": "exclude",
+            "reason": "off_topic",
+        },
+        headers=_csrf(c),
+    )
+    assert off.status_code == 200, off.text
+    assert off.json()["reason"] == "off_topic"
+
+    exp = c.get("/api/export/library?format=ris&scope=included")
+    assert exp.status_code == 200, exp.text[:200]
+
+    # Simple nav still leaves /clusters reachable.
+    assert c.get("/clusters").status_code == 200

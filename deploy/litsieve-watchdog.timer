@@ -1,0 +1,15 @@
+[Unit]
+Description=Run the LitSieve health watchdog every 5 minutes
+Documentation=file://%h/HealthDatabaseAccess/docs/SELFHOST.md
+
+[Timer]
+# First run shortly after boot: the machine reboots unattended around 05:01,
+# which is exactly when a stale Cloudflare token surfaces.
+OnBootSec=3min
+OnUnitActiveSec=5min
+# Do not fire every timer at the same instant.
+RandomizedDelaySec=30
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,16 @@
+[Unit]
+Description=LitSieve health watchdog (app + Cloudflare tunnel)
+Documentation=file://%h/HealthDatabaseAccess/docs/SELFHOST.md
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/HealthDatabaseAccess
+# Reuses the app's SMTP settings for alerts; add WATCHDOG_EMAIL_TO there.
+EnvironmentFile=-%h/HealthDatabaseAccess/.env
+ExecStart=%h/HealthDatabaseAccess/venv/bin/python tools/watchdog.py --quiet
+# A failing check is the normal "site is down" path, not a broken unit: the
+# script has already emailed. Letting systemd mark the unit failed would just
+# add noise to `systemctl --user --failed`.
+SuccessExitStatus=0 1
+SyslogIdentifier=litsieve-watchdog
+NoNewPrivileges=true

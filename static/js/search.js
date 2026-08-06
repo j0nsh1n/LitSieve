@@ -11,12 +11,16 @@ const SEARCH_SESSION_KEY = 'lra_search_session_v1';
 let _restoringSearch = false;
 
 document.addEventListener('DOMContentLoaded', () => {
- // Sources first (enables checkboxes), then restore last search for this library.
- applyAvailableSources()
-  .then(() => restoreSearchSession())
+ // Empty state + hide search UI until papers are prepared; only then restore.
+ loadSearchEmptyState()
+  .then((stats) => {
+   const ready = !!(stats && (stats.articles_with_embeddings || 0) > 0);
+   return applyAvailableSources().then(() => {
+    if (ready) return restoreSearchSession();
+   });
+  })
   .catch(() => { /* ignore */ });
  refreshStarredCount();
- loadSearchEmptyState();
 
  document.querySelectorAll('input[name="input_method"]').forEach(radio => {
  radio.addEventListener('change', () => {
@@ -233,13 +237,43 @@ function collectSearchFilters() {
  };
 }
 
+function updateSearchWorkVisibility(stats) {
+ // Hide query/controls/export until papers are prepared (same gate as empty-state).
+ const emb = (stats && stats.articles_with_embeddings) || 0;
+ const ready = emb > 0;
+ document.querySelectorAll('.search-work').forEach((el) => {
+  // results + seed-banner stay hidden until a search runs (u-hidden / style).
+  if (el.id === 'results-section' || el.id === 'seed-banner') {
+   if (!ready) {
+    el.classList.add('u-hidden');
+    el.style.display = 'none';
+   }
+   return;
+  }
+  if (el.id === 'export-results-section') {
+   // Only show export after there are on-screen results; never before ready.
+   if (!ready) {
+    el.hidden = true;
+    el.style.display = 'none';
+   }
+   return;
+  }
+  el.hidden = !ready;
+ });
+}
+
 async function loadSearchEmptyState() {
  try {
  const stats = await apiCall('/api/statistics');
  if (typeof applyEmptyState === 'function') {
  applyEmptyState('search-empty-state', stats, 'embeddings', 'search-empty-msg');
  }
- } catch (e) { /* ignore */ }
+ updateSearchWorkVisibility(stats);
+ return stats;
+ } catch (e) {
+ updateSearchWorkVisibility({ articles_with_embeddings: 0 });
+ return null;
+ }
 }
 
 async function refreshStarredCount() {
@@ -422,9 +456,16 @@ async function doSearch(opts) {
  lastResults = results;
  renderResults(results);
  document.getElementById('result-count').textContent = results.length;
- document.getElementById('results-section').style.display = 'block';
+ const resultsSec = document.getElementById('results-section');
+ if (resultsSec) {
+  resultsSec.classList.remove('u-hidden');
+  resultsSec.style.display = 'block';
+ }
  const exportSec = document.getElementById('export-results-section');
- if (exportSec) exportSec.style.display = results.length ? 'block' : 'none';
+ if (exportSec) {
+  exportSec.hidden = !results.length;
+  exportSec.style.display = results.length ? 'block' : 'none';
+ }
  // Persist query + filters so a browser refresh restores this search.
  await saveSearchSession(method);
  } catch (e) {
@@ -480,9 +521,16 @@ async function doStarredSearch(opts) {
  lastResults = results;
  renderResults(results);
  document.getElementById('result-count').textContent = results.length;
- document.getElementById('results-section').style.display = 'block';
+ const resultsSec = document.getElementById('results-section');
+ if (resultsSec) {
+  resultsSec.classList.remove('u-hidden');
+  resultsSec.style.display = 'block';
+ }
  const exportSec = document.getElementById('export-results-section');
- if (exportSec) exportSec.style.display = results.length ? 'block' : 'none';
+ if (exportSec) {
+  exportSec.hidden = !results.length;
+  exportSec.style.display = results.length ? 'block' : 'none';
+ }
  await refreshStarredCount();
  await saveSearchSession('starred');
  } catch (e) {
@@ -590,6 +638,7 @@ function buildResultCard(article, idx) {
  ? renderKeyPointsHtml(article.key_points, {
  articleId: article.article_id,
  source: article.source,
+ origin: article.key_points_origin || 'extractive',
  })
  : '';
  const studyTypeHtml = renderStudyTypeBadge(article);
@@ -620,7 +669,11 @@ function buildResultCard(article, idx) {
  ${keyPointsHtml}
  <div class="article-abstract">${abstractHtml}</div>
  ${picoHtml}
+ <div class="article-actions-row">
  <button type="button" class="note-toggle" ${noteVal ? 'hidden' : ''}>✎ Add note</button>
+ <button type="button" class="btn btn-sm btn-secondary not-relevant-btn"
+  title="Screen this paper out as not about your topic">Not relevant</button>
+ </div>
  <div class="note-row" ${noteVal ? '' : 'hidden'}>
  <label class="help-text">Private note</label>
  <textarea class="note-field" rows="2" placeholder="Optional study note (saved to your account)…"></textarea>
@@ -685,7 +738,76 @@ function buildResultCard(article, idx) {
  }
  });
 
+ const notRelBtn = details.querySelector('.not-relevant-btn');
+ if (notRelBtn) {
+ notRelBtn.addEventListener('click', async (e) => {
+ e.preventDefault();
+ e.stopPropagation();
+ notRelBtn.disabled = true;
+ try {
+ await apiCall('/api/screening', {
+ method: 'POST',
+ body: {
+ items: [{ article_id: article.article_id, source: article.source }],
+ action: 'exclude',
+ reason: 'off_topic',
+ },
+ });
+ replaceCardWithUndo(details, article);
+ showNotification('Marked not relevant (screened out).', 'success');
+ lastResults = lastResults.filter(
+ (a) => !(a.article_id === article.article_id && a.source === article.source)
+ );
+ const countEl = document.getElementById('result-count');
+ if (countEl) countEl.textContent = String(lastResults.length);
+ } catch (err) {
+ notRelBtn.disabled = false;
+ showNotification(`Could not screen out: ${err.message}`, 'error');
+ }
+ });
+ }
+
  return details;
+}
+
+/** Swap a result card for a short-lived undo strip after Not relevant. */
+function replaceCardWithUndo(cardEl, article) {
+ const parent = cardEl.parentNode;
+ if (!parent) return;
+ const strip = document.createElement('div');
+ strip.className = 'article-card not-relevant-undo';
+ strip.innerHTML =
+ `<span class="info-text">Screened out: <em>${escapeHtml(article.title || 'paper')}</em></span>`
+ + ` <button type="button" class="btn btn-sm btn-secondary undo-not-relevant">Undo</button>`;
+ parent.replaceChild(strip, cardEl);
+ const undoBtn = strip.querySelector('.undo-not-relevant');
+ undoBtn.addEventListener('click', async (e) => {
+ e.preventDefault();
+ undoBtn.disabled = true;
+ try {
+ await apiCall('/api/screening', {
+ method: 'POST',
+ body: {
+ items: [{ article_id: article.article_id, source: article.source }],
+ action: 'include',
+ },
+ });
+ parent.replaceChild(cardEl, strip);
+ const nr = cardEl.querySelector('.not-relevant-btn');
+ if (nr) nr.disabled = false;
+ showNotification('Restored to included set.', 'success');
+ if (!lastResults.some(
+ (a) => a.article_id === article.article_id && a.source === article.source
+ )) {
+ lastResults.push(article);
+ }
+ const countEl = document.getElementById('result-count');
+ if (countEl) countEl.textContent = String(lastResults.length);
+ } catch (err) {
+ undoBtn.disabled = false;
+ showNotification(`Undo failed: ${err.message}`, 'error');
+ }
+ });
 }
 
 function renderResults(results) {

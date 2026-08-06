@@ -267,6 +267,8 @@ body {
     justify-content: space-between;
     gap: 0.75rem;
     min-height: 2rem;
+    min-width: 0;
+    width: 100%;
 }
 
 .nav-brand {
@@ -276,6 +278,7 @@ body {
     letter-spacing: -0.01em;
     white-space: nowrap;
     min-width: 0;
+    flex: 0 1 auto;
     overflow: hidden;
     text-overflow: ellipsis;
     transition: color var(--dur-fast) var(--ease-soft),
@@ -301,6 +304,14 @@ body {
 @media (min-width: 901px) {
     .nav-menu-toggle {
         display: none !important;
+    }
+    /* Brand left, trailing controls right (menu toggle is display:none). */
+    .navbar-top {
+        display: flex;
+        justify-content: space-between;
+    }
+    .nav-stats {
+        margin-left: auto;
     }
     .nav-links,
     #nav-links-panel,
@@ -496,15 +507,21 @@ body {
 .nav-stats {
     display: flex;
     align-items: center;
-    gap: 0.65rem;
-    flex-shrink: 0;
+    gap: 0.75rem;
+    flex: 0 1 auto;
+    min-width: 0;
+    justify-content: flex-end;
+    flex-wrap: nowrap;
 }
 
 .nav-username {
-    font-size: 0.8rem;
+    font-size: 0.9rem;
     color: var(--text-soft);
     white-space: nowrap;
-    max-width: 10rem;
+    max-width: 11rem;
+    min-height: 2.15rem;
+    display: inline-flex;
+    align-items: center;
     overflow: hidden;
     text-overflow: ellipsis;
     text-decoration: none;
@@ -517,50 +534,63 @@ body {
 .nav-username.active { color: var(--text); border-bottom-color: var(--accent); }
 
 .nav-logout {
-    font-size: 0.8rem;
+    font-size: 0.9rem;
     color: var(--text-soft);
     text-decoration: none;
     white-space: nowrap;
+    min-height: 2.15rem;
+    display: inline-flex;
+    align-items: center;
     transition: color var(--dur-fast) var(--ease-soft);
 }
 
 .nav-logout:hover { color: var(--accent); }
 
 .stat-badge {
-    font-size: 0.75rem;
+    font-size: 0.88rem;
     font-style: italic;
     font-family: var(--font-serif);
     color: var(--text-soft);
     white-space: nowrap;
+    min-height: 2.15rem;
+    display: inline-flex;
+    align-items: center;
     transition: color var(--dur-fast) var(--ease-soft),
                 opacity var(--dur-med) var(--ease-soft);
 }
 
 .theme-toggle,
-.reading-toggle {
+.mode-toggle {
     background: transparent;
     border: none;
     color: var(--text);
-    font-size: 1rem;
+    font-size: 1.15rem;
     cursor: pointer;
     line-height: 1;
-    padding: 0.35rem;
+    padding: 0.4rem;
     border-radius: 50%;
+    min-width: 2.15rem;
+    min-height: 2.15rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     transition: color var(--dur-fast) var(--ease-soft),
                 background var(--dur-fast) var(--ease-soft),
                 transform var(--dur-med) var(--ease-out),
                 box-shadow var(--dur-fast) var(--ease-soft);
 }
 
-.reading-toggle {
-    font-family: var(--font-serif);
-    font-weight: 700;
-    font-size: 0.85rem;
-    letter-spacing: -0.02em;
+.mode-toggle {
+    font-family: var(--font-sans, inherit);
+    font-weight: 600;
+    font-size: 0.88rem;
+    letter-spacing: 0.01em;
     border: 1px solid transparent;
-    border-radius: 2px;
-    min-width: 1.75rem;
-    min-height: 1.75rem;
+    border-radius: 999px;
+    min-width: 4.5rem;
+    min-height: 2.15rem;
+    padding: 0.4rem 0.75rem;
+    white-space: nowrap;
 }
 
 .theme-toggle:hover {
@@ -573,12 +603,12 @@ body {
     transform: rotate(28deg) scale(0.95);
 }
 
-.reading-toggle:hover {
+.mode-toggle:hover {
     color: var(--accent);
     background: var(--hover);
 }
 
-.reading-toggle.is-active {
+.mode-toggle.is-active {
     color: var(--accent);
     border-color: var(--accent);
     background: var(--accent-soft);
@@ -1484,26 +1514,28 @@ body.lra-modal-open {
     text-align: center;
 }
 
-/* Library switcher in the nav */
+/* Library switcher in the nav — match mode/theme control height */
 .nav-library-wrap {
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
+    gap: 0.4rem;
     margin: 0 0.25rem;
-    max-width: 14rem;
+    max-width: 16rem;
+    min-height: 2.15rem;
 }
 .nav-library-label {
-    font-size: 0.72rem;
+    font-size: 0.8rem;
     text-transform: uppercase;
     letter-spacing: 0.04em;
     color: var(--text-soft, #a39e93);
     white-space: nowrap;
 }
 .nav-library-select {
-    max-width: 11rem;
-    min-width: 6rem;
-    font-size: 0.85rem;
-    padding: 0.25rem 0.4rem;
+    max-width: 12rem;
+    min-width: 6.5rem;
+    min-height: 2.15rem;
+    font-size: 0.9rem;
+    padding: 0.35rem 0.55rem;
     border-radius: 6px;
     border: 1px solid var(--border, #3a3a3a);
     background: var(--surface, #1e1e1e);
@@ -1566,15 +1598,15 @@ body.lra-modal-open {
     margin: 0.15rem 0;
 }
 
+/* Library stays inline on tablet; phones compact it further below. */
 @media (max-width: 900px) {
     .nav-library-wrap {
-        max-width: 100%;
-        width: 100%;
-        order: 5;
+        max-width: 11rem;
+        min-width: 0;
     }
     .nav-library-select {
-        max-width: none;
-        flex: 1;
+        max-width: 8.5rem;
+        min-width: 0;
     }
 }
 
@@ -1582,6 +1614,30 @@ body.lra-modal-open {
 .getting-started-card,
 .empty-state-card {
     border-left: 4px solid var(--accent, #2a5f6e);
+    /* Cards normally have no horizontal padding; leave room from the accent bar. */
+    padding-left: 1.15rem;
+    padding-right: 0.5rem;
+}
+/* Room between title, message, and CTA — plain <p> wrappers were collapsing. */
+.empty-state-card h2 {
+    margin: 0 0 0.85rem;
+}
+.empty-state-card > .info-text,
+.empty-state-card .info-text#dup-empty-msg,
+.empty-state-card .info-text#search-empty-msg {
+    margin: 0 0 1.25rem;
+    max-width: 40rem;
+    line-height: 1.55;
+}
+.empty-state-card > p:not(.info-text) {
+    margin: 0;
+}
+.empty-state-card .empty-state-actions {
+    margin: 0.35rem 0 0;
+}
+.empty-state-card .btn {
+    display: inline-flex;
+    margin-top: 0.15rem;
 }
 .getting-started-header {
     display: flex;
@@ -1621,11 +1677,6 @@ body.lra-modal-open {
 }
 .year-timeline-plot {
     margin-top: 0.5rem;
-}
-
-/* Reading mode: key points stay readable */
-html[data-reading="on"] .key-points {
-    font-size: 1.05em;
 }
 
 /* Long abstracts: clamp by line count, expand on demand */
@@ -2447,10 +2498,13 @@ html[data-reading="on"] .key-points {
 /* === Progressive disclosure (help + advanced) ===
    Cards keep one plain lead sentence; the full explanation lives in a
    collapsed .help-details. .advanced-details wraps optional controls whose
-   defaults already suit most users. */
+   defaults already suit most users.
+
+   Summaries are intentionally small and quiet — optional expanders, not
+   primary actions. Same look in Simple and Advanced. */
 .help-details,
 .advanced-details {
-    margin: 0 0 0.85rem;
+    margin: 0 0 0.55rem;
 }
 
 .help-details > summary,
@@ -2459,29 +2513,28 @@ html[data-reading="on"] .key-points {
     list-style: none;
     display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
-    font-size: 0.95rem;
-    font-weight: 600;
-    line-height: 1.35;
-    padding: 0.45rem 0.7rem;
-    margin: 0.15rem 0;
-    border-radius: 6px;
-    border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--rule));
-    background: color-mix(in srgb, var(--accent) 8%, var(--surface));
-    color: var(--text);
+    gap: 0.3rem;
+    font-size: 0.78rem;
+    font-weight: 500;
+    line-height: 1.3;
+    letter-spacing: 0.01em;
+    padding: 0.2rem 0.45rem;
+    margin: 0.05rem 0;
+    border-radius: 4px;
+    border: 1px solid color-mix(in srgb, var(--rule) 85%, var(--text-soft));
+    background: transparent;
+    color: var(--text-soft);
     transition:
         color var(--dur-fast) var(--ease-soft),
         border-color var(--dur-fast) var(--ease-soft),
-        background var(--dur-fast) var(--ease-soft),
-        box-shadow var(--dur-fast) var(--ease-soft);
+        background var(--dur-fast) var(--ease-soft);
 }
 
 .help-details > summary:hover,
 .advanced-details > summary:hover {
-    color: var(--accent);
-    border-color: color-mix(in srgb, var(--accent) 55%, var(--rule));
-    background: color-mix(in srgb, var(--accent) 14%, var(--surface));
-    box-shadow: var(--elev-1);
+    color: var(--text-body);
+    border-color: color-mix(in srgb, var(--accent) 28%, var(--rule));
+    background: color-mix(in srgb, var(--text) 3%, transparent);
 }
 
 .help-details > summary::-webkit-details-marker,
@@ -2490,42 +2543,45 @@ html[data-reading="on"] .key-points {
 .help-details > summary::before,
 .advanced-details > summary::before {
     content: "+";
-    font-family: var(--font-serif);
-    font-size: 1.15rem;
-    font-weight: 700;
+    font-family: var(--font-sans);
+    font-size: 0.85rem;
+    font-weight: 600;
     line-height: 1;
-    width: 1.1em;
+    width: 0.85em;
     text-align: center;
     flex-shrink: 0;
-    color: var(--accent);
-    transition: transform var(--dur-med) var(--ease-out);
+    color: var(--text-soft);
+    opacity: 0.85;
+    transition: transform var(--dur-med) var(--ease-out), color var(--dur-fast) var(--ease-soft);
 }
 
 .help-details[open] > summary::before,
 .advanced-details[open] > summary::before {
     content: "\2212";
-    color: var(--accent);
-    transform: rotate(180deg);
+    color: var(--text-body);
+    opacity: 1;
+    transform: none;
 }
 
 .help-details[open] > summary,
 .advanced-details[open] > summary {
-    color: var(--accent);
-    border-color: color-mix(in srgb, var(--accent) 50%, var(--rule));
-    background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+    color: var(--text-body);
+    border-color: color-mix(in srgb, var(--accent) 22%, var(--rule));
+    background: color-mix(in srgb, var(--text) 2.5%, transparent);
 }
 
 .help-details .info-text,
 .advanced-details .info-text {
-    margin-top: 0.6rem;
-    padding-left: 0.9rem;
-    border-left: 2px solid color-mix(in srgb, var(--accent) 30%, var(--rule));
+    margin-top: 0.45rem;
+    padding-left: 0.65rem;
+    border-left: 2px solid color-mix(in srgb, var(--rule) 80%, var(--accent));
+    font-size: 0.88rem;
 }
 
 .advanced-details .advanced-body {
-    margin-top: 0.8rem;
-    padding: 0.9rem;
-    border: 1px dashed var(--rule);
+    margin-top: 0.55rem;
+    padding: 0.7rem 0.8rem;
+    border: 1px dashed color-mix(in srgb, var(--rule) 90%, transparent);
 }
 
 /* === Progress bar (pill track, compact height, full width) === */
@@ -3237,23 +3293,48 @@ html, body {
     max-width: 100%;
 }
 
-/* Tablet and below: steps collapse into a dropdown button (no drag strip) */
+/* Tablet and below: steps collapse into a centered dropdown button */
 @media (max-width: 900px) {
     .navbar {
         padding: 0.45rem 1rem 0.4rem;
         gap: 0;
         position: sticky;
+        overflow: visible;
     }
     .navbar-top {
+        /* brand | steps menu (center) | trailing controls */
+        display: grid;
+        grid-template-columns: minmax(0, auto) minmax(0, 1fr) minmax(0, auto);
+        align-items: center;
+        gap: 0.4rem 0.5rem;
         min-height: 2.5rem;
+        min-width: 0;
+        width: 100%;
     }
-    .stat-badge { display: none; }
-    .nav-stats { gap: 0.45rem; flex-wrap: wrap; justify-content: flex-end; }
-    .nav-username { max-width: 6.5rem; }
-
+    .nav-brand {
+        grid-column: 1;
+        max-width: 7.5rem;
+        font-size: 1rem;
+        justify-self: start;
+    }
     .nav-menu-toggle {
         display: inline-flex !important;
+        grid-column: 2;
+        justify-self: center;
+        max-width: min(100%, 14rem);
+        width: auto;
+        min-width: 0;
     }
+    .nav-stats {
+        grid-column: 3;
+        gap: 0.35rem;
+        flex-wrap: nowrap;
+        justify-content: flex-end;
+        min-width: 0;
+        max-width: 100%;
+    }
+    .stat-badge { display: none; }
+    .nav-username { max-width: 5.5rem; }
 
     /*
      * Closed by default. Open when either the navbar or body has the open flag
@@ -3354,7 +3435,7 @@ html, body {
     #notification-area { top: 4.25rem; }
 }
 
-/* Phones */
+/* Phones — keep brand + centered steps menu + compact trailing controls visible */
 @media (max-width: 640px) {
     body {
         font-size: 15.5px;
@@ -3363,30 +3444,62 @@ html, body {
 
     /* --- Nav --- */
     .navbar {
-        padding: 0.4rem 0.75rem 0.35rem;
+        padding: 0.4rem 0.65rem 0.35rem;
     }
-    .navbar-top { gap: 0.35rem; min-height: 2.35rem; }
+    .navbar-top {
+        gap: 0.3rem 0.35rem;
+        min-height: 2.35rem;
+        grid-template-columns: minmax(0, 5.75rem) minmax(0, 1fr) minmax(0, auto);
+    }
     .nav-brand {
-        font-size: 0.9rem;
-        max-width: min(36vw, 8.5rem);
+        font-size: 0.92rem;
+        max-width: 5.75rem;
     }
     .nav-menu-toggle {
-        max-width: min(46vw, 11.5rem);
-        min-height: 2.5rem;
-        padding: 0.35rem 0.5rem;
+        max-width: 100%;
+        min-height: 2.25rem;
+        padding: 0.3rem 0.4rem;
+        gap: 0.25rem;
     }
-    .nav-menu-current { font-size: 0.68rem; }
-    .nav-logout, .nav-username { font-size: 0.74rem; }
-    .nav-username { max-width: 4.75rem; }
+    .nav-menu-current { font-size: 0.65rem; }
+    .nav-menu-toggle-icon { font-size: 0.9rem; }
+    .nav-stats {
+        gap: 0.25rem;
+    }
+    /* Drop lower-priority chrome so brand + steps stay on screen */
+    .nav-library-label { display: none; }
+    .nav-library-wrap {
+        max-width: 5.25rem;
+    }
+    .nav-library-select {
+        max-width: 5.25rem;
+        min-width: 0;
+        min-height: 2rem;
+        font-size: 0.72rem;
+        padding: 0.2rem 0.25rem;
+    }
+    .nav-username { display: none; } /* account still via longer sessions / desktop */
+    .nav-logout {
+        font-size: 0.72rem;
+        min-height: 2rem;
+        padding: 0 0.1rem;
+    }
     .theme-toggle,
-    .reading-toggle {
-        min-width: 2.4rem;
-        min-height: 2.4rem;
+    .mode-toggle {
+        min-width: 2rem;
+        min-height: 2rem;
         display: inline-flex;
         align-items: center;
         justify-content: center;
+        padding: 0.25rem;
+        font-size: 0.95rem;
     }
-    /* Keep dropdown closed/open rules from the 900px block; only tweak density */
+    .mode-toggle {
+        min-width: 0;
+        font-size: 0.68rem;
+        padding: 0.25rem 0.4rem;
+        letter-spacing: 0;
+    }
     .nav-link {
         font-size: 0.8rem;
         padding: 0.8rem 0.55rem;
@@ -3795,11 +3908,16 @@ html, body {
     }
 }
 
-/* Very small phones */
+/* Very small phones — tighter still; library optional chrome */
 @media (max-width: 380px) {
-    .nav-brand { max-width: 30vw; }
-    .nav-menu-toggle { max-width: min(50vw, 10.5rem); }
-    .nav-username { display: none; } /* account still reachable if needed via… kept logout */
+    .navbar-top {
+        grid-template-columns: minmax(0, 4.75rem) minmax(0, 1fr) minmax(0, auto);
+    }
+    .nav-brand { max-width: 4.75rem; font-size: 0.85rem; }
+    .nav-menu-toggle { max-width: 100%; padding: 0.25rem 0.3rem; }
+    .nav-library-wrap { display: none; } /* switch libraries on tablet/desktop */
+    .mode-toggle { font-size: 0.62rem; padding: 0.2rem 0.3rem; }
+    .nav-logout { font-size: 0.68rem; }
     .stats-cards {
         grid-template-columns: 1fr;
     }
@@ -3889,133 +4007,134 @@ html.js-ready body.page-exit .footer {
 }
 
 /* ============================================================
-   Reading mode — denser chrome, better long-abstract reading
-   Toggle: #reading-toggle (persisted as localStorage.readingMode)
+   Simple mode — hide power-user surfaces (presentation only).
+   Toggle: #mode-toggle (persisted as localStorage.uiMode).
+   Hidden controls stay in the DOM and still submit.
    ============================================================ */
-html[data-reading="on"] .container {
-    max-width: 960px;
-    padding-top: 1.5rem;
-    padding-bottom: 1.5rem;
+
+/* Nav: drop Clusters and the arrow that precedes it. The arrow before
+   Duplicates stays so the flow reads DM → Clean up → Search. */
+html[data-mode="simple"] .nav-step-clusters,
+html[data-mode="simple"] .nav-flow-arrow-before-clusters {
+    display: none !important;
 }
 
-html[data-reading="on"] .container.container-wide {
-    max-width: 1280px;
+/* Data Management */
+html[data-mode="simple"] section.card:has(#source-option-grid),
+html[data-mode="simple"] section.card:has(#coverage-bars),
+html[data-mode="simple"] details.advanced-details:has(#fetch-email),
+html[data-mode="simple"] details.advanced-details:has(#embedding-model) {
+    display: none !important;
 }
 
-html[data-reading="on"] .page-header {
-    margin-bottom: 1.25rem;
-    padding-bottom: 0.85rem;
+/* Dual-mode labels (DM, prepare, search).
+   Default = Advanced only. Simple variants stay display:none unless data-mode is
+   simple. That way a missing attribute, partial CSS load, or stale cache never
+   double-renders both headings (the glitch that stacked “2. Fetch” + “3. Fetch”). */
+.dm-step-simple,
+.dm-sub-simple,
+.prepare-heading-simple,
+.prepare-lead-simple,
+.search-sub-simple,
+.search-title-simple,
+.search-help-simple {
+    display: none !important;
+}
+html[data-mode="simple"] .dm-step-advanced,
+html[data-mode="simple"] .dm-sub-advanced,
+html[data-mode="simple"] .prepare-heading-advanced,
+html[data-mode="simple"] .prepare-lead-advanced,
+html[data-mode="simple"] .search-sub-advanced,
+html[data-mode="simple"] .search-title-advanced,
+html[data-mode="simple"] .search-help-advanced {
+    display: none !important;
+}
+html[data-mode="simple"] .dm-step-simple,
+html[data-mode="simple"] .dm-sub-simple,
+html[data-mode="simple"] .prepare-heading-simple,
+html[data-mode="simple"] .prepare-lead-simple,
+html[data-mode="simple"] .search-sub-simple,
+html[data-mode="simple"] .search-title-simple {
+    display: block !important;
+}
+/* <details> is not a block paragraph — restore native display. */
+html[data-mode="simple"] .search-help-simple {
+    display: block !important;
 }
 
-html[data-reading="on"] .page-header h1 {
-    font-size: 1.75rem;
+/* Duplicates / Clean up */
+html[data-mode="simple"] #source-breakdown-section,
+html[data-mode="simple"] #year-timeline-details,
+html[data-mode="simple"] .form-row:has(#threshold) {
+    display: none !important;
 }
 
-html[data-reading="on"] .card {
-    padding: 1.15rem 0;
+/* Search */
+html[data-mode="simple"] details.advanced-details:has(#lexical-boost),
+html[data-mode="simple"] details.advanced-details:has(#lib-export-scope),
+html[data-mode="simple"] .input-method-toggle label:has(input[value="seed"]),
+html[data-mode="simple"] #seed-input-panel,
+html[data-mode="simple"] #seed-banner,
+html[data-mode="simple"] .sim-badge {
+    display: none !important;
 }
 
-html[data-reading="on"] .card h2 {
-    font-size: 1.15rem;
-    margin-bottom: 0.65rem;
+/* Quick screen preview (Clean up page) */
+.quick-screen-preview {
+    margin-top: 0.75rem;
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 0.65rem 0.85rem;
+    max-height: 22rem;
+    overflow: auto;
+}
+.quick-screen-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+.quick-screen-row {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-rows: auto auto;
+    column-gap: 0.55rem;
+    row-gap: 0.1rem;
+    align-items: start;
+    padding: 0.35rem 0.15rem;
+    border-bottom: 1px solid color-mix(in srgb, var(--rule) 70%, transparent);
+}
+.quick-screen-row:last-child { border-bottom: none; }
+.quick-screen-row input.qs-item {
+    grid-row: 1 / span 2;
+    margin-top: 0.2rem;
+}
+.quick-screen-row .qs-title {
+    font-weight: 500;
+    color: var(--text);
+    line-height: 1.35;
+}
+.quick-screen-row .qs-meta {
+    grid-column: 2;
 }
 
-html[data-reading="on"] .info-text {
-    font-size: 0.84rem;
-    margin-bottom: 0.6rem;
-    line-height: 1.5;
+/* Search: Not relevant action + undo strip */
+.article-actions-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    margin-top: 0.35rem;
 }
-
-html[data-reading="on"] .form-row,
-html[data-reading="on"] .param-row {
-    margin-bottom: 0.75rem;
-    gap: 0.9rem;
-}
-
-html[data-reading="on"] .article-card {
+.not-relevant-undo {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.65rem 0.85rem;
+    border: 1px dashed var(--rule);
+    border-radius: 6px;
     margin-bottom: 0.4rem;
-}
-
-html[data-reading="on"] .article-card summary {
-    padding: 0.6rem 0.85rem;
-}
-
-html[data-reading="on"] .article-body {
-    padding: 0.85rem 1.1rem 1rem;
-}
-
-html[data-reading="on"] .article-meta {
-    font-size: 0.82rem;
-    margin-bottom: 0.4rem;
-}
-
-/* Abstracts: serif + slightly larger type in reading mode, full card width.
-   (Was max-width: 68ch, which looked like "half the column" on wide Search.) */
-html[data-reading="on"] .article-abstract {
-    font-family: var(--font-serif);
-    font-size: 1.02rem;
-    line-height: 1.72;
-    max-width: none;
-    width: 100%;
-    letter-spacing: 0.005em;
-}
-
-html[data-reading="on"] .abstract-wrap {
-    max-width: none;
-    width: 100%;
-}
-
-/* Reading mode still uses is-expanded (JS defaults it on); keep clamp CSS consistent. */
-
-html[data-reading="on"] .stats-cards {
-    gap: 1rem;
-    margin-bottom: 1.15rem;
-}
-
-html[data-reading="on"] .stat-value {
-    font-size: 2rem;
-}
-
-html[data-reading="on"] .topic-grid,
-html[data-reading="on"] .source-option-grid {
-    gap: 0.4rem;
-}
-
-html[data-reading="on"] .topic-card {
-    padding: 0.65rem 0.4rem;
-}
-
-html[data-reading="on"] .source-option {
-    padding: 0.55rem 0.7rem;
-}
-
-html[data-reading="on"] .cluster-article {
-    padding: 0.45rem 0;
-}
-
-html[data-reading="on"] .compare-table {
-    font-size: 0.8rem;
-}
-
-html[data-reading="on"] .navbar {
-    padding-top: 0.4rem;
-    padding-bottom: 0.3rem;
-}
-html[data-reading="on"] .nav-link {
-    font-size: 0.74rem;
-    padding-top: 0.2rem;
-    padding-bottom: 0.3rem;
-}
-
-html[data-reading="on"] .footer {
-    padding: 0.85rem;
-    margin-top: 1.5rem;
-    font-size: 0.8rem;
-}
-
-/* Wider compare columns when both reading + wide container */
-html[data-reading="on"] .container-wide .compare-table {
-    min-width: 520px;
+    background: color-mix(in srgb, var(--surface, var(--bg)) 92%, var(--accent) 8%);
 }
 
 /* Respect reduced-motion preferences */
@@ -4065,6 +4184,11 @@ html[data-reading="on"] .container-wide .compare-table {
    CSP governs literal style attributes in served HTML. JS that sets
    element.style.* at runtime is unaffected, so the existing show/hide code in
    the page scripts keeps working. */
+
+/* Author styles (e.g. .card animation fill) must not resurrect [hidden] nodes.
+   UA [hidden]{display:none} loses to any more-specific display rule. */
+[hidden] { display: none !important; }
+
 .u-hidden { display: none; }
 .u-mt-sm { margin-top: 0.4rem; }
 .u-mt-md { margin-top: 0.6rem; }

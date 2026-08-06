@@ -1,11 +1,14 @@
 {% extends "base.html" %}
-{% block title %}Search - LitPilot{% endblock %}
+{% block title %}Search - LitSieve{% endblock %}
 {% block container_mod %}container-wide{% endblock %}
 {% block content %}
 <section class="page-header">
- <h1>Search for Similar Articles</h1>
- <p class="subtitle"><strong>Step 4 of 4 (last).</strong> Rank the papers you kept by how well they
+ <h1 class="search-title-advanced">Search for Similar Articles</h1>
+ <h1 class="search-title-simple">Search</h1>
+ <p class="subtitle search-sub-advanced"><strong>Step 4 of 4 (last).</strong> Rank the papers you kept by how well they
  match your question, then export your list.</p>
+ <p class="subtitle search-sub-simple">Rank the papers you kept by how well they match your question,
+ then export your list for Zotero.</p>
  {% from "macros/disclaimers.html" import scope_search %}
  {{ scope_search() }}
 </section>
@@ -13,20 +16,30 @@
 <section class="card empty-state-card" id="search-empty-state" hidden>
  <h2>Nothing to search yet</h2>
  <p class="info-text" id="search-empty-msg">Fetch papers and prepare them for search on Data Management first.</p>
- <p><a class="btn btn-primary btn-sm" href="/data-management">Go to Data Management</a></p>
+ <p class="empty-state-actions">
+  <a class="btn btn-primary btn-sm" href="/data-management">Go to Data Management</a>
+ </p>
 </section>
 
-<section class="card">
+<section class="card search-work" id="search-query-section">
  <p class="info-text">Searches <strong>your collection only</strong> (not the whole internet). Plain
  language works - the app compares meaning, not just keywords.</p>
- <details class="help-details">
+ <details class="help-details search-help-advanced">
   <summary>The three input modes and what gets searched</summary>
   <p class="info-text"><strong>Text</strong> is a free research question; <strong>PICO</strong> is for
   clinical-style questions (Population / Intervention / Comparison / Outcome); <strong>Seed</strong>
   starts from one paper already in your collection. You can also run <strong>More like my
   starred</strong> after bookmarking papers with ★. The app compares meaning, then slightly boosts
-  papers that also share your exact words. Papers you screened out on Clusters (or resolved as
-  duplicates) never appear here.</p>
+  papers that also share your exact words. Papers you screened out (Quick screen, Not relevant,
+  Clusters, or duplicates) never appear here.</p>
+ </details>
+ <details class="help-details search-help-simple">
+  <summary>How search works</summary>
+  <p class="info-text"><strong>Text</strong> is a free research question; <strong>PICO</strong> is for
+  clinical-style questions (Population / Intervention / Comparison / Outcome). You can also run
+  <strong>More like my starred</strong> after bookmarking papers with ★. The app compares meaning,
+  then slightly boosts papers that also share your exact words. Papers you screened out (Quick
+  screen, Not relevant, or duplicates) never appear here.</p>
  </details>
  <div class="input-method-toggle">
  <label class="radio-label">
@@ -77,7 +90,7 @@
  </div>
 </section>
 
-<section class="card">
+<section class="card search-work" id="search-controls-section">
  <div class="param-row">
  <div class="param-group">
  <label>Results: <strong id="topk-display">10</strong></label>
@@ -153,12 +166,12 @@
  <p class="help-text">Finds papers similar to the ones you starred (the starred papers themselves are left out).</p>
 </section>
 
-<section id="seed-banner" class="card u-hidden">
+<section id="seed-banner" class="card search-work u-hidden">
  <h2>Seed paper</h2>
  <p class="info-text" id="seed-banner-text"></p>
 </section>
 
-<section class="u-hidden" id="results-section">
+<section class="search-work u-hidden" id="results-section">
  <div class="results-header">
  <h2>Results: <span id="result-count">0</span> articles found</h2>
  </div>
@@ -174,7 +187,7 @@
  <div id="results-list"></div>
 </section>
 
-<section class="card" id="export-results-section">
+<section class="card search-work" id="export-results-section" hidden>
  <h2>Export these search results</h2>
  <p class="info-text">Download the papers <strong>currently shown above</strong> as one RIS file
  for free <a href="https://www.zotero.org/download/" target="_blank" rel="noopener">Zotero</a>
@@ -229,12 +242,12 @@
      title="Whole-library RIS for Zotero File → Import">Download library RIS</button>
    </div>
    <p class="help-text">Process counts (how many collected / excluded / kept) are on
-   <a href="/statistics">Duplicates → Screening report</a>.</p>
+   <a href="/statistics">Clean up → Screening report</a>.</p>
   </div>
  </details>
 </section>
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/search.js?v=20260729a"></script>
+<script src="/static/js/search.js?v=20260805n"></script>
 {% endblock %}

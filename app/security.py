@@ -1,9 +1,12 @@
 """HTTP security headers.
 
-The app already sets HttpOnly/Secure/SameSite auth cookies and relies on the
-host (Render / HF Spaces) for TLS. These headers close the remaining gaps:
-they stop a browser from silently downgrading to plain HTTP, from guessing
-content types, and from letting a hostile page frame the app.
+The app already sets HttpOnly/Secure/SameSite auth cookies and never terminates
+TLS itself — something upstream always does. In the current deployment that is
+Cloudflare, in front of a tunnel to Uvicorn on 127.0.0.1; on a PaaS it would be
+the platform's router. Either way Uvicorn speaks plain HTTP locally, which is
+why these headers matter: they stop a browser from silently downgrading to
+plain HTTP, from guessing content types, and from letting a hostile page frame
+the app.
 """
 
 from __future__ import annotations

@@ -2,7 +2,8 @@ FROM python:3.14-slim
 
 WORKDIR /code
 
-# Install git (required by Hugging Face Spaces build infrastructure)
+# git: some pip installs resolve VCS refs during the build.
+# Verify the build still succeeds before removing this.
 RUN apt-get update && apt-get install -y --no-install-recommends git \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --create-home --uid 1000 --shell /usr/sbin/nologin appuser
@@ -25,7 +26,7 @@ RUN mkdir -p /code/user_data && chown -R appuser:appuser /code
 
 USER appuser
 
-# HF Spaces expects port 7860
+# 7860 matches run_dev.sh and the Cloudflare Tunnel origin.
 EXPOSE 7860
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7860"]

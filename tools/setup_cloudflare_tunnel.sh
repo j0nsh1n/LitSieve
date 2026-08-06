@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-time setup helper for a named Cloudflare Tunnel (LitPilot on loopback).
+# One-time setup helper for a named Cloudflare Tunnel (LitSieve on loopback).
 # T-Mobile Home Internet / CGNAT: use a tunnel instead of port-forwarding.
 #
 # Prefer the dashboard "Install with token" flow. This script is for
@@ -15,19 +15,19 @@ command -v "$CF" >/dev/null || { echo "Install cloudflared first"; exit 1; }
 echo "=== 1) Login (browser will open) ==="
 "$CF" tunnel login
 
-echo "=== 2) Create named tunnel 'litpilot' (ok if exists) ==="
-"$CF" tunnel create litpilot 2>/dev/null || "$CF" tunnel list
+echo "=== 2) Create named tunnel 'litsieve' (ok if exists) ==="
+"$CF" tunnel create litsieve 2>/dev/null || "$CF" tunnel list
 
 TUNNEL_ID="$("$CF" tunnel list -o json 2>/dev/null | python3 -c '
 import json,sys
 data=json.load(sys.stdin)
 for t in data:
-    if t.get("name")=="litpilot":
+    if t.get("name")=="litsieve":
         print(t["id"]); break
 ' 2>/dev/null || true)"
 
 if [[ -z "${TUNNEL_ID}" ]]; then
-  TUNNEL_ID="$("$CF" tunnel list | awk '/litpilot/{print $1; exit}')"
+  TUNNEL_ID="$("$CF" tunnel list | awk '/litsieve/{print $1; exit}')"
 fi
 echo "tunnel_id=${TUNNEL_ID}"
 

@@ -1,5 +1,5 @@
 """
-FastAPI Application — LitPilot v4.4.0
+FastAPI Application — LitSieve v4.5.0
 Multi-user web interface for literature search and analysis.
 
 This module only wires the app together: configuration, static files, the
@@ -22,6 +22,7 @@ from slowapi import _rate_limit_exceeded_handler  # noqa: E402
 from slowapi.errors import RateLimitExceeded  # noqa: E402
 
 from app import core  # noqa: E402
+from app.logging_setup import configure_logging  # noqa: E402
 from app.routes import (  # noqa: E402
     ai,
     auth,
@@ -34,10 +35,7 @@ from app.routes import (  # noqa: E402
 )
 from app.security import SecurityHeadersMiddleware  # noqa: E402
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s %(name)s %(levelname)s %(message)s',
-)
+configure_logging()
 logger = logging.getLogger(__name__)
 
 @asynccontextmanager
@@ -53,8 +51,8 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(
-    title="LitPilot",
-    version="4.4.0",
+    title="LitSieve",
+    version="4.5.0",
     lifespan=lifespan,
 )
 app.state.limiter = core.limiter

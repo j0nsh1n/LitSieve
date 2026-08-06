@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Clusters - LitPilot{% endblock %}
+{% block title %}Clusters - LitSieve{% endblock %}
 {% block container_mod %}container-wide{% endblock %}
 {% block content %}
 <section class="page-header">
@@ -11,7 +11,7 @@
 <section class="card empty-state-card" id="clusters-empty-state" hidden>
  <h2>Nothing to cluster yet</h2>
  <p class="info-text" id="clusters-empty-msg">Fetch and prepare papers on Data Management first.</p>
- <p>
+ <p class="empty-state-actions">
   <a class="btn btn-primary btn-sm" href="/data-management">Go to Data Management</a>
   <button type="button" class="btn btn-secondary btn-sm load-sample-btn">Load sample papers</button>
  </p>
@@ -20,7 +20,7 @@
 <section class="card" id="exclusion-reason-card">
  <h2>Exclusion reason</h2>
  <p class="info-text">When you screen out a paper (or a whole cluster), pick why. Counts show up on
- the Duplicates screening report.</p>
+ the Clean up screening report.</p>
  <div class="form-group">
   <label for="exclusion-reason">Default reason for Exclude buttons</label>
   <select id="exclusion-reason">
@@ -94,7 +94,7 @@
   (no shared keyword spam). Opening a cluster shows a short <strong>topic overview</strong>
   (year span + example titles) so you can decide if the group is on-topic. Excluded papers are
   screened out of Search and hybrid ranking entirely; counts by exclusion reason appear on the
-  Duplicates page's <strong>screening report</strong> for hand-ins.</p>
+  Clean up page's <strong>screening report</strong> for hand-ins.</p>
  </details>
  <div id="clusters-list">
  <p class="info-text">No clusters yet. Generate them above to see them here.</p>
@@ -103,5 +103,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/clusters.js?v=20260729a"></script>
+<script src="/static/js/clusters.js?v=20260805n"></script>
 {% endblock %}

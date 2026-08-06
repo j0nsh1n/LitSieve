@@ -29,6 +29,7 @@ from app.schemas import (
     DuplicateRequest,
     EmbeddingsRequest,
     MultiFetchRequest,
+    QuickScreenPreviewRequest,
     ResolveDuplicatesRequest,
     SampleCorpusRequest,
     ScreeningRequest,
@@ -393,6 +394,34 @@ async def api_screening(req: ScreeningRequest, request: Request):
             "count": count,
             "reason": reason,
         }
+    except Exception as e:
+        return server_error(e)
+    finally:
+        release_pipeline(uid)
+
+
+@router.post("/api/screening/quick-preview")
+async def api_screening_quick_preview(req: QuickScreenPreviewRequest, request: Request):
+    """Rank papers against a research question; return least-related for review.
+
+    Read-only: never writes screening. Apply via POST /api/screening with
+    reason=low_relevance after the student confirms the title list.
+    """
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    uid = user["user_id"]
+    p = get_pipeline(uid)
+    try:
+        # Embedding a query can be heavy — keep it off the event loop.
+        result = await run_in_thread(
+            p.propose_low_relevance, req.query, req.fraction,
+        )
+        return result
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"detail": str(e)})
     except Exception as e:
         return server_error(e)
     finally:
