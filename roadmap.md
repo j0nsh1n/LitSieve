@@ -79,10 +79,10 @@ student should not have to think about. No capability is removed from Advanced.
 - Status: [x] 2026-08-05 — shipped in **v4.5.0** (PR #52 lineage). Quick screen
   + Clean up rename + auto-prepare + Simple/Advanced toggle. Phase 6 further
   collapses Simple to two pages (below).
-- Notes: this makes the spec.md line "Clusters page is the only triage UI"
-  wrong. **Propose** that spec edit for human approval; do not make it
-  unilaterally. Cluster label quality remains a concern for topic-group triage;
-  Phase 6 deliberately avoids auto-clustering.
+- Notes: `spec.md` triage/workflow text updated 2026-08-06 (human-approved) for
+  Clean up, Quick screen, Simple screening card, and guest. Cluster label
+  quality remains a concern for topic-group triage; Phase 6 deliberately avoids
+  auto-clustering.
 
 ## Phase 6 — Simple mode on two pages
 Full build doc: **[docs/SIMPLE_TWO_PAGE_PLAN.md](docs/SIMPLE_TWO_PAGE_PLAN.md)**.

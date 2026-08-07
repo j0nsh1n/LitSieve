@@ -22,8 +22,7 @@
 - Ops: daily backup timer + watchdog timer; runbook `docs/SELFHOST.md`.
 - Cloudflare edge may challenge public curl (local `/health` is the check).
 - Known gaps: no dependency lockfile; pyright not green/blocking; account cap
-  still open (Phase 4 partial); **spec.md** workflow text lags Simple/guest
-  (flag only — human approval required to edit).
+  still open (Phase 4 partial).
 
 ## Repo Landmarks
 | Path | Role |
@@ -82,10 +81,7 @@ Guest User (is_guest) → sample corpus only; purged by age
 
 ## Session Handoff
 - **Date:** 2026-08-06
-- **Branch:** `feat/phase6-guest-demo` (ahead of origin by uncommitted/local work;
-  do not push without explicit ask)
-- **Done:** Diagnosed live `POST /data-management` 405 → fixed undefined
-  `queueAnimationFrame`; Account site modals; audit: tests + CHANGELOG/context/
-  roadmap/README/plan status; guest + Phase 6 already on branch/main lineage.
-- **Next:** Commit when ready; human restart uvicorn after deploy; optional
-  human-approved `spec.md` refresh (Simple/guest/Clean up triage paths).
+- **Branch:** `feat/phase6-guest-demo` (local commits; do not push without ask)
+- **Done:** Fetch form 405 fix; test/docs audit; human-approved **spec.md**
+  refresh (Simple/Advanced, guest, Clean up / screening triage, example flows).
+- **Next:** Push/PR only if human asks; restart uvicorn after deploy for live.
