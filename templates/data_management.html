@@ -80,7 +80,7 @@
   in this browser.</p>
  </details>
  {% include "partials/guest_fetch_note.html" %}
- <form id="fetch-form" action="#" method="post">
+ <form id="fetch-form" action="/data-management" method="get">
  <div class="form-row">
  <div class="form-group flex-2">
  <label for="fetch-query">Search Query</label>
@@ -197,5 +197,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/data_management.js?v=20260806a"></script>
+<script src="/static/js/data_management.js?v=20260806b"></script>
 {% endblock %}
