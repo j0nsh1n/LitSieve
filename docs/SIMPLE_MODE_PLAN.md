@@ -1,5 +1,9 @@
 # Plan — Simple / Advanced mode
 
+**Status (2026-08-06):** Shipped in **v4.5.0**. Contracts live in
+`tests/test_simple_mode.py`. Follow-on: Phase 6 (`docs/SIMPLE_TWO_PAGE_PLAN.md`)
+collapsed Simple to two pages. This file remains the Phase 5 design record.
+
 Build doc for the Simple-mode work. Written to be executed by someone (or
 something) that has not seen the rest of this conversation.
 

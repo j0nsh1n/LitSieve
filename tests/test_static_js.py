@@ -151,3 +151,16 @@ def test_account_uses_site_modals_not_browser_dialogs():
             assert bad not in account
     assert "openSiteConfirm" in account
     assert "openSitePrompt" in account
+
+
+def test_no_queueAnimationFrame_typo():
+    """queueAnimationFrame is not a browser API; it throws and aborts page setup.
+
+    Caught in production when Data Management never bound the fetch form
+    submit handler and POST /data-management returned 405.
+    """
+    offenders = []
+    for path in _js_files():
+        if "queueAnimationFrame" in path.read_text(encoding="utf-8"):
+            offenders.append(path.name)
+    assert not offenders, f"undefined queueAnimationFrame in: {offenders}"

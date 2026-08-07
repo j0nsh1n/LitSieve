@@ -64,6 +64,7 @@ REQUIRED_ROUTES = {
     "/api/shares/preview",
     "/api/shares/join",
     "/join",
+    "/guest",
     "/account",
     "/data-management",
     "/statistics",

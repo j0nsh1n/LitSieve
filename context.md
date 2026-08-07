@@ -1,72 +1,50 @@
 # context.md — LitSieve
 
 ## Current State
-- App version **4.5.0** (`app/main.py`, `GET /health`). Product name **LitSieve**.
+- App version **4.5.0** (`app/main.py`, `GET /health`). Product name **LitSieve**
+  (public host still **www.litpilot.org**).
 - Public origin: **https://www.litpilot.org** via Cloudflare Tunnel →
   `http://127.0.0.1:7860` (`PUBLIC_BASE_URL` in gitignored `.env`; `DEBUG=false`).
 - Python **3.14** (Dockerfile, CI, Render, ruff `py314`).
-- Lint: `ruff check .` — partial select (E9/F63/F7/F82/F401/F541/E401/I); passes.
-- Types: `pyright app` via `pyrightconfig.json` (basic); CI runs it
-  **continue-on-error** (report-only): **61 errors, 6 warnings** (2026-08-02).
-- Tests: `DEBUG=true ./venv/bin/python -m pytest -q` — **302 passed**
-  (2026-08-03; +6 model-registry, +13 model-validation, +15 loop/edges);
-  `./venv` for sqlcipher.
-- RAM (measured CPU, single uvicorn worker): ~175 MB imports, first model load
-  ~1.1–1.4 GB one-time (torch runtime), then **~0 per extra concurrent user**
-  since models are shared process-wide. Before sharing: +46 MB/user (MiniLM),
-  +330 MB/user (PubMedBERT). Bound: `MAX_LOADED_MODELS` (default 3).
-- CI: `.github/workflows/ci.yml` (ruff + pyright report + **pip-audit
-  blocking** + pytest + docker), `codeql.yml`. Dependabot config **removed**
-  locally (2026-07-30); not necessarily on origin until pushed. spec.md records
-  it as deliberate; `pip-audit` now covers the CVE half.
-- Dependency audit (2026-08-02): **clean, exit 0**. Local venv `setuptools`
-  upgraded 78.1.0 → 83.0.0 (clears PYSEC-2025-49 / PYSEC-2026-3447); CI install
-  step now upgrades setuptools too. `torch`/`triton-rocm` are skipped as
-  un-auditable (PyTorch index, not PyPI) — skips don't fail without `--strict`,
-  so torch CVEs stay a manual check.
-- Recovery email: on main (PR #38); MailerSend SMTP in gitignored `.env`
-  confirmed working by human. Secrets never committed.
-- Deploy: `docs/DEPLOY.md` checklist (SECRET_KEY, SMTP, quota, smoke).
-- **Runs as a user service**: `litsieve-uvicorn.service` (installed + enabled
-  2026-08-04; `Linger=yes`, so it starts at boot). Was previously a terminal
-  process in a transient scope. Restart after code changes:
-  `systemctl --user restart litsieve-uvicorn.service`. Dev with reload on a
-  different port: `./run_dev.sh 7861` (isolated data: `dev_users.db`,
-  `dev_data/`, `logs/dev.log`). Runbook: **docs/SELFHOST.md → Everyday commands**.
-- **Outage 2026-08-05, 4h47m** (05:05–09:52): Cloudflare tunnel token had been
-  revoked ~Aug 4; cloudflared never re-auths an established connection, so it
-  only surfaced at the unattended ~05:01 reboot. Fixed by pasting a fresh token
-  into `secrets/cloudflared.env`. The machine reboots itself daily around 05:01
-  (firmware RTC, not systemd), so latent failures surface while nobody is awake.
-- **Watchdog** installed: `litsieve-watchdog.timer` (5 min) runs
-  `tools/watchdog.py` — app `/health` + tunnel registered-connections, emails on
-  state change. Needs `WATCHDOG_EMAIL_TO` in `.env` or it stays silent.
-- Cloudflare serves a **managed challenge** on the public hostname
-  (`cf-mitigated: challenge`), so `curl https://www.litpilot.org/health` is 403
-  while local is 200 — verify locally, not through the edge. Possible cause of
-  the observed "reached /register, never POSTed" pattern; unconfirmed.
-- Known gaps: no dependency lockfile; pyright not yet green / blocking;
-  public cloud host env still operator-owned after local Phase 3 docs/smoke.
+- Lint: `ruff check .` — partial select (E9/F63/F7/F82/F401/F541/E401/I).
+- Types: `pyright app` via `pyrightconfig.json` (basic); CI **continue-on-error**
+  (report-only). Last recorded baseline: **61 errors, 6 warnings** (2026-08-02).
+- Tests: `SECRET_KEY=x DEBUG=true ./venv/bin/python -m pytest -q` — **475 passed**
+  (2026-08-06). Prefer `./venv` for sqlcipher.
+- Branch work (local): guest demo, Phase 6 two-page Simple, Account site modals,
+  fetch-form 405 fix (`requestAnimationFrame`), Jinja partials for Simple markup.
+- UI: Simple/Advanced via `localStorage.uiMode` + `data-mode` (theme-init pre-paint).
+  Simple nav: Get papers → Search. Advanced: full steps including Clean up + Clusters.
+- Guest: `/guest` → sample corpus, fetch APIs 403, purge after 30 minutes.
+- Host: `litsieve-uvicorn.service` (user unit, Linger). Restart after code changes:
+  `systemctl --user restart litsieve-uvicorn.service`. Dev isolation:
+  `./run_dev.sh 7861` → `dev_users.db` / `dev_data/` / `logs/dev.log`.
+- Ops: daily backup timer + watchdog timer; runbook `docs/SELFHOST.md`.
+- Cloudflare edge may challenge public curl (local `/health` is the check).
+- Known gaps: no dependency lockfile; pyright not green/blocking; account cap
+  still open (Phase 4 partial); **spec.md** workflow text lags Simple/guest
+  (flag only — human approval required to edit).
 
 ## Repo Landmarks
 | Path | Role |
 |------|------|
 | `app/main.py` | FastAPI app, lifespan UMAP warm-up, static mount |
-| `app/core.py` | Process state: user_db, pipeline cache, jobs, limiter |
-| `app/routes/` | pages, auth, libraries, shares, corpus, search, exports, ai |
+| `app/core.py` | Process state: user_db, pipeline cache, jobs, limiter, guest purge |
+| `app/routes/` | pages, auth (incl. guest), libraries, shares, corpus, search, exports, ai |
 | `app/services/` | pipeline, embeddings, clustering, summarize, llm, citations, mailer |
 | `app/storage/` | database, libraries, shares, user_db, quota, dbconn |
 | `app/fetchers/` | 17 public sources + `base.py` |
 | `app/content/` | source_catalog, feature_guides, sample_corpus, ui_flags |
-| `templates/` + `static/` | Jinja + vanilla JS/CSS (no npm) |
-| `tests/` | pytest; see `tests/README.md` |
-| `run_dev.sh` | local server port 7860, `./venv` |
-| `docs/SCALE_NOTES.md` | measured latency; parked scale opts |
+| `templates/` + `partials/` | Jinja shell + Simple/guest partials |
+| `static/` | vanilla JS/CSS (no npm); cache-bust `?v=` |
+| `tests/` | pytest; policy in `tests/README.md` |
+| `docs/` | DEPLOY, SELFHOST, SIMPLE_* plans, SCALE_NOTES |
+| `tools/` | backup, watchdog, bench_scale, encrypt_databases |
 
 ## Domain Model
-- **User** (`user_db` / `users.db`): username (not filesystem path), password hash,
-  token_version; optional recovery email fields when feature enabled
-- **Library**: named collection per user; meta in `libraries.json`; SQLite
+- **User** (`users.db`): username, password hash, token_version; optional recovery
+  email; `is_guest` + created_at for demo accounts
+- **Library**: named collection; meta in `libraries.json`; SQLite
   `user_data/<uid>/libraries/<lib_id>/articles.db`
 - **Article** key `(article_id, source)`: title, abstract, year, authors, journal
 - **Embeddings / clusters / screening / notes / key_points**: per library DB
@@ -80,40 +58,34 @@ User 1---* Library 1---* Article
               |            +-- embeddings, screening, notes, key_points
               +-- jobs (fetch/embed) use active library
 ShareCode *---1 Library (owner); redeem → clone Library for joiner
+Guest User (is_guest) → sample corpus only; purged by age
 ```
 
 ## Non-Obvious Decisions
 - Student **starting point** product: 17 free sources; CORE removed (rate limits)
 - Multi-library is the multi-collection story; clone codes are optional/power
 - AI optional; extractive key points default; one-article Refine/Ask only
+- Simple/Advanced is **client-only** (CSS + JS); Advanced must not lose capability
+- Phase 6: no auto-clustering; screening ranks vs research question (embeddings)
+- Guest accounts: reserved `guest_*` usernames; multi-source fetch 403
 - SQLCipher opt-in via `DB_ENCRYPTION_KEY`; plaintext refuses key without migrate
 - AI keys: AES-256-GCM `enc:v2:` (Fernet `enc:v1:` still decrypts)
 - Duplicate default match strictness **0.98**
 - Starred search **includes** starred papers in results (centroid ranking)
-- Reading mode does **not** cap abstract width at 68ch (full card width)
-- Public pages must not load `common.js` (401 redirect)
-- Patch tests against `app.core.*`, not frozen imports; routes via OpenAPI
-  `conftest.route_paths`
-- Password hashing MUST use `hash_password_async` / `verify_password_async` in
-  routes. Sync bcrypt (~157 ms) on the single event loop froze the whole app
-  during signup bursts; a guardrail test greps `routes/auth.py` for regressions.
-- Rate limiting keys IPv6 on the /64 (`core.client_bucket`) — per-address
-  keying is bypassable since one client owns a whole /64.
-- Public templates (landing/login/register/feature_guide/reset_password/
-  verify_email) do NOT extend base.html — head changes must be repeated there.
-- Embedding models shared via `embeddings.get_shared_model` registry; the
-  `EmbeddingEngine.model` property must NOT cache per-engine (cached pipelines
-  would each pin a copy). Safe to share: inference is read-only.
-- `EmbeddingsRequest.model` validated against `EmbeddingEngine.allowed_models()`
-  (422 on unknown); operator escape hatch `EXTRA_EMBEDDING_MODELS`
-  (`name=org/model` or bare path). Stored/DB model names are NOT hard-failed, so
-  libraries embedded before the gate keep working.
-- Host: Linux `./venv` (ROCm torch possible); entry `app.main:app` port 7860
+- Public pages must not load `common.js` (401 redirect); do not extend base.html
+- Patch tests against `app.core.*`; enumerate routes via `conftest.route_paths`
+- Password hashing is async in routes so bcrypt does not block the single worker
+- Rate limiting keys IPv6 on the /64 (`core.client_bucket`)
+- Embedding models shared process-wide (`get_shared_model`); validated names
+  (`EXTRA_EMBEDDING_MODELS` escape hatch); CSP `style-src 'self'` → no style= in HTML
+- Host entry: `app.main:app` port 7860; Linux `./venv`
 
 ## Session Handoff
-- **Date:** 2026-08-04
-- **Branch:** `chore/doc-drift-and-hygiene` (PR #51 + follow-ups)
-- **Done:** LitSieve v4.5.0 Simple/Advanced mode; v4.4.0 rebrand; Cloudflare Tunnel for public access;
-  **removed DuckDNS** tooling/docs. Tunnel token service on this host.
-- **Next:** Ensure Cloudflare Public Hostname `www.litpilot.org` →
-  `http://127.0.0.1:7860` and DNS is active; rotate exposed tunnel token.
+- **Date:** 2026-08-06
+- **Branch:** `feat/phase6-guest-demo` (ahead of origin by uncommitted/local work;
+  do not push without explicit ask)
+- **Done:** Diagnosed live `POST /data-management` 405 → fixed undefined
+  `queueAnimationFrame`; Account site modals; audit: tests + CHANGELOG/context/
+  roadmap/README/plan status; guest + Phase 6 already on branch/main lineage.
+- **Next:** Commit when ready; human restart uvicorn after deploy; optional
+  human-approved `spec.md` refresh (Simple/guest/Clean up triage paths).
