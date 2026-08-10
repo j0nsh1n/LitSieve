@@ -1,8 +1,9 @@
-"""Phase 7 design-system tokens and scale discipline (presentation only).
+"""Phase 7 design-system tokens, scale discipline, and fetch-progress narrative.
 
 Locks the type / spacing / radius scales in style.css so hand-tuned values
-cannot silently multiply again. No behaviour assertions — Simple/guest guards
-remain the proof of presentation-only work.
+cannot silently multiply again. Also covers the live per-source progress
+fields on the server (by_source / source_status) — client string greps alone
+are not enough. Simple/guest guards remain the proof of presentation-only flow.
 """
 
 from __future__ import annotations
@@ -215,3 +216,159 @@ def test_prefers_reduced_motion_covers_shimmer():
     joined = "\n".join(reduce_blocks)
     assert "skeleton" in joined.lower() or "animation: none" in joined
     assert "animation-duration: 0.01ms" in joined or "animation-duration:0.01ms" in joined
+
+
+# --- Server-side progress narrative (Phase 7 waiting states) -----------------
+# These fail if sources/by_source/source_status are dropped from the progress
+# slot. Client-side string greps alone do not prove the server publishes them.
+
+
+def test_fresh_progress_slot_declares_fetch_narrative_fields():
+    """A new progress slot must declare empty sources / by_source / source_status."""
+    from app import core
+
+    uid = "test-progress-fresh-uid"
+    with core._progress_lock:
+        core._all_progress.pop(uid, None)
+    try:
+        with core._progress_lock:
+            fetch = core._ensure_progress(uid)["fetch"]
+            assert "sources" in fetch
+            assert "by_source" in fetch
+            assert "source_status" in fetch
+            assert fetch["sources"] == []
+            assert fetch["by_source"] == {}
+            assert fetch["source_status"] == {}
+    finally:
+        with core._progress_lock:
+            core._all_progress.pop(uid, None)
+
+
+def test_progress_backfills_narrative_fields_without_clobbering():
+    """Pre-Phase-7 in-flight slots get empty narrative keys; done/total stay put."""
+    from app import core
+
+    uid = "test-progress-backfill-uid"
+    with core._progress_lock:
+        core._all_progress.pop(uid, None)
+        # Shape that existed before the live narrative fields were added.
+        core._all_progress[uid] = {
+            "fetch": {"active": True, "done": 1, "total": 3},
+            "embed": {
+                "active": False,
+                "done": 0,
+                "total": 0,
+                "result": None,
+                "error": None,
+                "cancel": False,
+                "articles_so_far": 0,
+                "message": "",
+            },
+        }
+    try:
+        with core._progress_lock:
+            fetch = core._ensure_progress(uid)["fetch"]
+            assert fetch["active"] is True
+            assert fetch["done"] == 1
+            assert fetch["total"] == 3
+            assert fetch["sources"] == []
+            assert fetch["by_source"] == {}
+            assert fetch["source_status"] == {}
+    finally:
+        with core._progress_lock:
+            core._all_progress.pop(uid, None)
+
+
+def test_run_multi_fetch_publishes_per_source_counts_including_failures(monkeypatch):
+    """Progress must record every source, including rate-limited failures (muted UI)."""
+    from app import core
+    from app.routes import corpus as corpus_routes
+
+    uid = "test-progress-live-uid"
+    with core._progress_lock:
+        core._all_progress.pop(uid, None)
+
+    monkeypatch.setattr(corpus_routes.quota, "is_over_quota", lambda _uid: False)
+    monkeypatch.setattr(
+        corpus_routes.quota,
+        "usage_report",
+        lambda _uid: {
+            "used_mb": 0.0,
+            "limit_mb": 0,
+            "percent": 0.0,
+            "over_limit": False,
+        },
+    )
+
+    class _DB:
+        def clear_all(self):
+            return None
+
+    class _Pipe:
+        def __init__(self):
+            self.db = _DB()
+
+        def invalidate_corpus_cache(self):
+            return None
+
+        def fetch_articles_parallel(
+            self,
+            *,
+            query,
+            sources,
+            max_results,
+            email,
+            progress_callback,
+            cancel_check,
+        ):
+            # Match real pipeline callback shape (done, total, **extra).
+            steps = [
+                ("pubmed", 142, None),
+                ("europepmc", 89, None),
+                ("semanticscholar", 0, "rate_limited"),
+            ]
+            arts = 0
+            out = {}
+            for i, (src, count, kind) in enumerate(steps, 1):
+                arts += count
+                progress_callback(
+                    i,
+                    len(sources),
+                    articles_so_far=arts,
+                    source=src,
+                    source_count=count,
+                    error_kind=kind,
+                )
+                out[src] = {
+                    "count": count,
+                    "error": "rate limited" if kind == "rate_limited" else None,
+                    "error_kind": kind,
+                }
+            return out
+
+    try:
+        corpus_routes._run_multi_fetch(
+            _Pipe(),
+            query="climate",
+            sources=["pubmed", "europepmc", "semanticscholar"],
+            max_results=100,
+            email=None,
+            clear_first=False,
+            uid=uid,
+        )
+        with core._progress_lock:
+            fetch = core._all_progress[uid]["fetch"]
+            assert fetch["by_source"] == {
+                "pubmed": 142,
+                "europepmc": 89,
+                "semanticscholar": 0,
+            }
+            assert fetch["source_status"]["semanticscholar"] == "rate_limited"
+            assert fetch["source_status"]["pubmed"] == "ok"
+            assert fetch["source_status"]["europepmc"] == "ok"
+            # Failing source must be present for the muted narrative row.
+            assert "semanticscholar" in fetch["by_source"]
+            assert fetch["sources"] == ["pubmed", "europepmc", "semanticscholar"]
+    finally:
+        with core._progress_lock:
+            core._all_progress.pop(uid, None)
