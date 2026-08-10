@@ -1240,13 +1240,53 @@ async function refreshCoverage() {
 // Must see active=true at least once before accepting a finished result — otherwise
 // a poll that lands before the job flips active (or sees a stale idle slot) resolves
 // with {} and the auto-chain never starts prepare.
+/** Render live per-source fetch rows from progress payload only (no invented counts). */
+function renderFetchLiveSources(p) {
+ const host = document.getElementById('fetch-live-sources');
+ if (!host) return;
+ const sources = Array.isArray(p && p.sources) ? p.sources : [];
+ const by = (p && p.by_source) || {};
+ const status = (p && p.source_status) || {};
+ if (!sources.length) {
+  host.innerHTML = '';
+  return;
+ }
+ const rows = sources.map((src) => {
+  const name = typeof getSourceName === 'function' ? getSourceName(src) : src;
+  const done = Object.prototype.hasOwnProperty.call(by, src);
+  const count = done ? Number(by[src]) || 0 : null;
+  const kind = status[src] || '';
+  let detail;
+  let rowClass = 'fetch-live-row';
+  if (!done) {
+   detail = 'searching…';
+   rowClass += ' is-pending';
+  } else if (kind && kind !== 'ok' && kind !== 'no_results') {
+   // Muted — per-source failure is normal while the job overall succeeds.
+   detail = String(kind).replace(/_/g, ' ');
+   rowClass += ' is-muted';
+  } else if (kind === 'no_results' || count === 0) {
+   detail = '0 papers';
+   rowClass += ' is-muted';
+  } else {
+   detail = `${count} paper${count === 1 ? '' : 's'}`;
+   rowClass += ' is-ok';
+  }
+  return `<div class="${rowClass}"><span class="fetch-live-name">${escapeHtml(name)}</span>`
+   + `<span class="fetch-live-detail">${escapeHtml(detail)}</span></div>`;
+ });
+ host.innerHTML = rows.join('');
+}
+
 function waitForJob(task, fillId, labelId, wrapId, formatLabel, timeoutMs = 600000) {
  return new Promise((resolve, reject) => {
  const fill = document.getElementById(fillId);
  const label = document.getElementById(labelId);
  const wrap = document.getElementById(wrapId);
+ const live = document.getElementById('fetch-live-sources');
  if (wrap) wrap.style.display = 'block';
  if (fill) fill.style.width = '0%';
+ if (task === 'fetch' && live) live.innerHTML = '';
  const started = Date.now();
  let sawActive = false;
  let settled = false;
@@ -1260,6 +1300,7 @@ function waitForJob(task, fillId, labelId, wrapId, formatLabel, timeoutMs = 6000
    setTimeout(() => {
     wrap.style.display = 'none';
     if (fill) fill.style.width = '0%';
+    if (live && task === 'fetch') live.innerHTML = '';
    }, 800);
   }
   if (err) reject(err);
@@ -1284,6 +1325,7 @@ function waitForJob(task, fillId, labelId, wrapId, formatLabel, timeoutMs = 6000
       ? p.message
       : (typeof formatLabel === 'function' ? formatLabel(p.done, p.total, pct, p) : '');
     }
+    if (task === 'fetch') renderFetchLiveSources(p);
     return;
    }
    // Idle: only finish after we observed this job running, or after a short

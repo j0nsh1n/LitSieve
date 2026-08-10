@@ -122,6 +122,8 @@
  <div class="u-hidden" id="fetch-progress-wrap">
  <div class="progress-bar-track"><div class="progress-bar-fill" id="fetch-progress-fill"></div></div>
  <div class="progress-bar-label" id="fetch-progress-label"></div>
+ <!-- Reserved height: live per-source rows (API counts only; no invented progress). -->
+ <div id="fetch-live-sources" class="fetch-live-sources" aria-live="polite"></div>
  </div>
  {% include "partials/simple_go_to_search.html" %}
 </section>
@@ -197,5 +199,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/data_management.js?v=20260806b"></script>
+<script src="/static/js/data_management.js?v=20260807d"></script>
 {% endblock %}

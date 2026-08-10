@@ -2722,6 +2722,73 @@ body.lra-modal-open {
     transform-origin: left center;
 }
 
+/* Live per-source fetch narrative (API counts only). */
+.fetch-live-sources {
+    margin-top: var(--space-3);
+    min-height: 2.5rem; /* reserve space — avoid layout jump when rows appear */
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+}
+.fetch-live-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: var(--space-3);
+    font-family: var(--font-sans);
+    font-size: var(--fs-sm);
+    line-height: var(--lh-snug);
+    padding: var(--space-1) 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--rule) 70%, transparent);
+}
+.fetch-live-row:last-child { border-bottom: none; }
+.fetch-live-name {
+    font-weight: 500;
+    color: var(--text);
+    min-width: 0;
+}
+.fetch-live-detail {
+    font-variant-numeric: tabular-nums;
+    color: var(--text-soft);
+    flex-shrink: 0;
+    text-align: right;
+}
+.fetch-live-row.is-pending .fetch-live-detail {
+    font-style: italic;
+}
+.fetch-live-row.is-muted .fetch-live-detail,
+.fetch-live-row.is-muted .fetch-live-name {
+    color: var(--text-soft);
+    opacity: 0.9;
+}
+/* Failures stay muted — not --err alarm (overall job often still succeeds). */
+
+/* List skeletons — match article-card vertical rhythm */
+.skeleton-card {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    padding: var(--space-3) var(--space-4);
+    margin-bottom: var(--space-2);
+    min-height: 4.5rem;
+}
+.skeleton-line {
+    height: 0.75rem;
+    border-radius: var(--radius-sm);
+    margin-bottom: var(--space-2);
+    background: linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--rule) 55%, var(--surface)) 0%,
+        color-mix(in srgb, var(--rule) 25%, var(--surface)) 50%,
+        color-mix(in srgb, var(--rule) 55%, var(--surface)) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.6s linear infinite;
+}
+.skeleton-line:last-child { margin-bottom: 0; }
+.skeleton-line-title { width: 72%; height: 0.95rem; }
+.skeleton-line-meta { width: 40%; }
+.skeleton-line-body { width: 92%; }
+
 .progress-bar-label {
     font-size: var(--fs-xs);
     font-style: italic;

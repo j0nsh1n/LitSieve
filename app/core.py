@@ -205,6 +205,7 @@ def _ensure_progress(user_id: str) -> dict:
             'fetch': {
                 'active': False, 'done': 0, 'total': 0, 'result': None, 'error': None,
                 'cancel': False, 'articles_so_far': 0, 'message': '',
+                'sources': [], 'by_source': {}, 'source_status': {},
             },
             'embed': {
                 'active': False, 'done': 0, 'total': 0, 'result': None, 'error': None,
@@ -227,6 +228,10 @@ def _ensure_progress(user_id: str) -> dict:
         slot.setdefault('cancel', False)
         slot.setdefault('articles_so_far', 0)
         slot.setdefault('message', '')
+        if task == 'fetch':
+            slot.setdefault('sources', [])
+            slot.setdefault('by_source', {})
+            slot.setdefault('source_status', {})
     return _all_progress[user_id]
 
 

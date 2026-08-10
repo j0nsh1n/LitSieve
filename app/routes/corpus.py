@@ -57,9 +57,13 @@ async def api_progress(request: Request):
 
 def _run_multi_fetch(p, *, query, sources, max_results, email, clear_first, uid):
     """Blocking multi-source fetch for sync wait= or background jobs."""
+    # Live per-source narrative for the UI: only counts the API has produced.
+    live_by_source: dict = {}
+    live_status: dict = {}
     update_progress(
         uid, 'fetch', done=0, total=len(sources),
         articles_so_far=0, message='Starting fetch…', cancel=False,
+        sources=list(sources), by_source={}, source_status={},
     )
     if clear_first:
         p.db.clear_all()
@@ -70,6 +74,10 @@ def _run_multi_fetch(p, *, query, sources, max_results, email, clear_first, uid)
         src = extra.get('source') or ''
         sc = extra.get('source_count', 0)
         kind = extra.get('error_kind')
+        if src:
+            live_by_source[src] = int(sc or 0)
+            # None / no_results / ok — never invent; client mutes failures.
+            live_status[src] = kind or 'ok'
         if kind and kind not in (None, 'no_results'):
             msg = f"{done}/{total} sources · {arts} papers · {src}: {kind}"
         else:
@@ -77,6 +85,9 @@ def _run_multi_fetch(p, *, query, sources, max_results, email, clear_first, uid)
         update_progress(
             uid, 'fetch', done=done, total=total,
             articles_so_far=arts, message=msg,
+            sources=list(sources),
+            by_source=dict(live_by_source),
+            source_status=dict(live_status),
         )
 
     results = p.fetch_articles_parallel(
@@ -153,8 +164,11 @@ async def api_fetch_multi(req: MultiFetchRequest, request: Request):
         return JSONResponse(status_code=202, content={"status": "started"})
 
     p = get_pipeline(uid)
-    update_progress(uid, 'fetch', active=True, done=0, total=len(req.sources),
-                    result=None, error=None, cancel=False, articles_so_far=0)
+    update_progress(
+        uid, 'fetch', active=True, done=0, total=len(req.sources),
+        result=None, error=None, cancel=False, articles_so_far=0,
+        sources=list(req.sources), by_source={}, source_status={},
+    )
     try:
         result = await run_in_thread(_run_multi_fetch, p, **job_kwargs)
         update_progress(uid, 'fetch', active=False, result=result, error=None)

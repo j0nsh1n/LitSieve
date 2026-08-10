@@ -401,6 +401,12 @@ async function doSearch(opts) {
  }
  const btn = document.getElementById('search-btn');
  setLoading(btn, true);
+ const resultsSec = document.getElementById('results-section');
+ if (resultsSec) {
+  resultsSec.classList.remove('u-hidden');
+  resultsSec.style.display = 'block';
+ }
+ showResultSkeletons(6);
 
  lastSearchParams = {
  query_text: queryText,
@@ -491,6 +497,12 @@ async function doStarredSearch(opts) {
  }
  const btn = document.getElementById('starred-search-btn');
  setLoading(btn, true);
+ const resultsSec = document.getElementById('results-section');
+ if (resultsSec) {
+  resultsSec.classList.remove('u-hidden');
+  resultsSec.style.display = 'block';
+ }
+ showResultSkeletons(6);
  lastSearchParams = {
  query_text: '',
  top_k: filters.top_k,
@@ -711,6 +723,9 @@ function buildResultCard(article, idx) {
  e.preventDefault();
  e.stopPropagation();
  const next = !starBtn.classList.contains('is-starred');
+ // Optimistic: flip immediately; roll back on failure.
+ starBtn.classList.toggle('is-starred', next);
+ starBtn.textContent = next ? '★' : '☆';
  try {
  await apiCall('/api/notes', {
  method: 'POST',
@@ -720,10 +735,10 @@ function buildResultCard(article, idx) {
  starred: next,
  },
  });
- starBtn.classList.toggle('is-starred', next);
- starBtn.textContent = next ? '★' : '☆';
  refreshStarredCount();
  } catch (err) {
+ starBtn.classList.toggle('is-starred', !next);
+ starBtn.textContent = next ? '☆' : '★';
  showNotification(`Could not save star: ${err.message}`, 'error');
  }
  });
@@ -731,6 +746,9 @@ function buildResultCard(article, idx) {
  const saveBtn = details.querySelector('.note-save');
  saveBtn.addEventListener('click', async (e) => {
  e.preventDefault();
+ const prev = saveBtn.textContent;
+ saveBtn.disabled = true;
+ saveBtn.textContent = 'Saved';
  try {
  await apiCall('/api/notes', {
  method: 'POST',
@@ -742,7 +760,13 @@ function buildResultCard(article, idx) {
  });
  showNotification('Note saved.', 'success');
  } catch (err) {
+ saveBtn.textContent = prev;
  showNotification(`Could not save note: ${err.message}`, 'error');
+ } finally {
+ saveBtn.disabled = false;
+ if (saveBtn.textContent === 'Saved') {
+  setTimeout(() => { if (saveBtn.textContent === 'Saved') saveBtn.textContent = prev; }, 1200);
+ }
  }
  });
 
@@ -752,6 +776,11 @@ function buildResultCard(article, idx) {
  e.preventDefault();
  e.stopPropagation();
  notRelBtn.disabled = true;
+ // Optimistic remove; restore card if the write fails.
+ const parent = details.parentNode;
+ const nextSibling = details.nextSibling;
+ replaceCardWithUndo(details, article, { pending: true });
+ const strip = parent && parent.querySelector('.not-relevant-undo.is-pending');
  try {
  await apiCall('/api/screening', {
  method: 'POST',
@@ -761,7 +790,7 @@ function buildResultCard(article, idx) {
  reason: 'off_topic',
  },
  });
- replaceCardWithUndo(details, article);
+ if (strip) strip.classList.remove('is-pending');
  showNotification('Marked not relevant (screened out).', 'success');
  lastResults = lastResults.filter(
  (a) => !(a.article_id === article.article_id && a.source === article.source)
@@ -769,6 +798,11 @@ function buildResultCard(article, idx) {
  const countEl = document.getElementById('result-count');
  if (countEl) countEl.textContent = String(lastResults.length);
  } catch (err) {
+ if (strip && parent) {
+  parent.replaceChild(details, strip);
+ } else if (parent) {
+  parent.insertBefore(details, nextSibling);
+ }
  notRelBtn.disabled = false;
  showNotification(`Could not screen out: ${err.message}`, 'error');
  }
@@ -779,11 +813,11 @@ function buildResultCard(article, idx) {
 }
 
 /** Swap a result card for a short-lived undo strip after Not relevant. */
-function replaceCardWithUndo(cardEl, article) {
+function replaceCardWithUndo(cardEl, article, opts) {
  const parent = cardEl.parentNode;
  if (!parent) return;
  const strip = document.createElement('div');
- strip.className = 'article-card not-relevant-undo';
+ strip.className = 'article-card not-relevant-undo' + (opts && opts.pending ? ' is-pending' : '');
  strip.innerHTML =
  `<span class="info-text">Screened out: <em>${escapeHtml(article.title || 'paper')}</em></span>`
  + ` <button type="button" class="btn btn-sm btn-secondary undo-not-relevant">Undo</button>`;
@@ -816,6 +850,24 @@ function replaceCardWithUndo(cardEl, article) {
  showNotification(`Undo failed: ${err.message}`, 'error');
  }
  });
+}
+
+/** Skeleton rows matching .article-card geometry (prevents layout jump). */
+function showResultSkeletons(n) {
+ const container = document.getElementById('results-list');
+ if (!container) return;
+ const count = Math.max(1, Math.min(n || 5, 10));
+ const bits = [];
+ for (let i = 0; i < count; i++) {
+  bits.push(
+   '<div class="skeleton-card" aria-hidden="true">'
+   + '<div class="skeleton-line skeleton-line-title"></div>'
+   + '<div class="skeleton-line skeleton-line-meta"></div>'
+   + '<div class="skeleton-line skeleton-line-body"></div>'
+   + '</div>'
+  );
+ }
+ container.innerHTML = bits.join('');
 }
 
 function renderResults(results) {

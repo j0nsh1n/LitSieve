@@ -166,3 +166,31 @@ def test_padding_uses_spacing_scale_only():
         for v in _decl_values(prop):
             lits = _literal_lengths(v)
             assert not lits, f"{prop}: literal length(s) {lits} in {v!r}"
+
+
+def test_fetch_live_sources_markup_and_renderer():
+    """Waiting state: live per-source list is reserved and rendered from API data."""
+    dm_html = (REPO / "templates" / "data_management.html").read_text(encoding="utf-8")
+    assert 'id="fetch-live-sources"' in dm_html
+    dm_js = (REPO / "static" / "js" / "data_management.js").read_text(encoding="utf-8")
+    assert "function renderFetchLiveSources" in dm_js
+    assert "by_source" in dm_js
+    assert "source_status" in dm_js
+    # Must not invent progress — only fields from the progress payload.
+    assert "searching…" in dm_js or "searching..." in dm_js
+    css = CSS
+    assert ".fetch-live-sources" in css
+    assert ".skeleton-card" in css
+    assert "shimmer" in css
+
+
+def test_search_optimistic_star_and_skeletons():
+    search = (REPO / "static" / "js" / "search.js").read_text(encoding="utf-8")
+    assert "function showResultSkeletons" in search
+    assert "showResultSkeletons" in search
+    # Optimistic star flips UI before await (note-save appears earlier in the file).
+    start = search.find("starBtn.addEventListener")
+    assert start != -1
+    star_block = search[start : start + 600]
+    assert "classList.toggle('is-starred'" in star_block
+    assert star_block.find("classList.toggle") < star_block.find("await apiCall")
