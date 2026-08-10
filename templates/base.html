@@ -6,7 +6,7 @@
     <title>{% block title %}LitSieve{% endblock %}</title>
     <link rel="icon" href="/static/favicon.ico?v=20260803a" sizes="32x32">
     <link rel="apple-touch-icon" href="/static/favicon.png?v=20260803a">
-    <link rel="stylesheet" href="/static/css/style.css?v=20260806a">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260806c">
     <script src="/static/js/theme-init.js?v=20260805a"></script>
 </head>
 <body{% if user and user.is_guest %} data-guest="1"{% endif %}>
@@ -73,7 +73,13 @@
                     aria-label="Switch to Simple mode" aria-pressed="false">Advanced</button>
                 <button type="button" class="theme-toggle" id="theme-toggle" title="Toggle theme" aria-label="Toggle theme">🌙</button>
                 {% if user %}
-                <a href="/account" class="nav-username {% if active_page == 'account' %}active{% endif %}" title="Account settings">{{ user.username }}</a>
+                <a href="/account"
+                   class="nav-username {% if active_page == 'account' %}active{% endif %}"
+                   title="Account settings"
+                   aria-label="Account settings ({{ user.username }})">
+                    <span class="nav-username-full">{{ user.username }}</span>
+                    <span class="nav-username-short">Account</span>
+                </a>
                 <a href="/logout" class="nav-logout">Logout</a>
                 {% endif %}
                 <span class="stat-badge" id="nav-article-count" aria-live="polite">-- articles</span>

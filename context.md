@@ -83,5 +83,6 @@ Guest User (is_guest) → sample corpus only; purged by age
 - **Date:** 2026-08-06
 - **Branch:** `feat/phase6-guest-demo` (local commits; do not push without ask)
 - **Done:** Fetch form 405 fix; test/docs audit; human-approved **spec.md**
-  refresh (Simple/Advanced, guest, Clean up / screening triage, example flows).
-- **Next:** Push/PR only if human asks; restart uvicorn after deploy for live.
+  refresh; mobile nav Account link restored (≤640px no longer hides profile).
+- **Next:** Commit/push mobile Account fix onto PR #54 if still open; restart
+  uvicorn after deploy.

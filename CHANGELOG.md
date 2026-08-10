@@ -35,6 +35,9 @@ and this project aims to follow Semantic Versioning for app version strings
   “Next: Clean up your papers” bar once screening is applied or skipped).
 
 ### Fixed
+- Mobile nav (≤640px) again exposes **Account**: the profile link was
+  `display: none`, so phones could only log out. Shows a compact “Account”
+  control that still opens `/account`.
 - Fetch on Data Management no longer 405s: a `queueAnimationFrame` typo aborted
   page setup before the form submit handler bound, so Enter/click posted the
   HTML form to the GET-only page. Fixed to `requestAnimationFrame`; form no

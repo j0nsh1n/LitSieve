@@ -164,3 +164,28 @@ def test_no_queueAnimationFrame_typo():
         if "queueAnimationFrame" in path.read_text(encoding="utf-8"):
             offenders.append(path.name)
     assert not offenders, f"undefined queueAnimationFrame in: {offenders}"
+
+
+def test_mobile_nav_keeps_account_link_reachable():
+    """Phones must not hide the Account control (≤640px used to display:none it).
+
+    Users could Logout but never open /account from the mobile top bar.
+    """
+    root = pathlib.Path(__file__).resolve().parent.parent
+    base = (root / "templates" / "base.html").read_text(encoding="utf-8")
+    assert 'href="/account"' in base
+    assert "nav-username" in base
+    assert "nav-username-full" in base
+    assert "nav-username-short" in base
+    assert "Account" in base
+
+    css = (root / "static" / "css" / "style.css").read_text(encoding="utf-8")
+    # Extract the phones (≤640px) block so we do not match unrelated rules.
+    phone = css[css.find("@media (max-width: 640px)") : css.find("@media (max-width: 380px)")]
+    assert phone, "missing 640px media block"
+    # Must not hide the account link entirely.
+    assert re.search(r"\.nav-username\s*\{\s*display\s*:\s*none", phone) is None, (
+        "phones hide .nav-username; Account is unreachable"
+    )
+    assert "nav-username-short" in phone
+    assert "display: inline" in phone or "display:inline" in phone

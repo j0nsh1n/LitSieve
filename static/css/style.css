@@ -526,8 +526,18 @@ body {
     text-overflow: ellipsis;
     text-decoration: none;
     border-bottom: 2px solid transparent;
+    flex-shrink: 0;
     transition: color var(--dur-fast) var(--ease-soft),
                 border-color var(--dur-med) var(--ease-out);
+}
+
+/* Desktop/tablet: full username. Phones: compact "Account" (see 640px). */
+.nav-username-short { display: none; }
+.nav-username-full {
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .nav-username:hover { color: var(--text); }
@@ -3527,11 +3537,23 @@ html, body {
         font-size: 0.72rem;
         padding: 0.2rem 0.25rem;
     }
-    .nav-username { display: none; } /* account still via longer sessions / desktop */
+    /* Keep Account reachable on phones (was display:none — profile unusable). */
+    .nav-username {
+        display: inline-flex;
+        max-width: none;
+        min-height: 2rem;
+        min-width: 2.75rem;
+        padding: 0 0.2rem;
+        font-size: 0.72rem;
+        flex-shrink: 0;
+    }
+    .nav-username-full { display: none; }
+    .nav-username-short { display: inline; }
     .nav-logout {
         font-size: 0.72rem;
         min-height: 2rem;
         padding: 0 0.1rem;
+        flex-shrink: 0;
     }
     .theme-toggle,
     .mode-toggle {
