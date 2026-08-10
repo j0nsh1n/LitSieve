@@ -19,6 +19,9 @@ Tests must catch **real regressions**, not just smoke. When you **add, fix, or r
 | Concern | Where it lives |
 |--------|----------------|
 | Product invariants (deleted/required routes, auth, Account structure, clone wording) | `test_guardrails.py` |
+| Simple / Advanced dual-mode contracts (nav, auto-chain, screening card, two-page flow) | `test_simple_mode.py` |
+| Guest demo (`/guest`, sample-only, 30‑min purge, no session hijack) | `test_guest_mode.py` |
+| Browser JS parse + CSP-safe bars + Account site modals + shared `?v=` | `test_static_js.py` |
 | AI opt-in / no bulk rewrite / panel collapsed | `test_ai_policy.py` |
 | Multi-library storage + HTTP isolation | `test_libraries.py`, `test_libraries_http.py` |
 | Clone codes (not live view; notes/clusters stripped) | `test_shares.py`, `test_shares_http.py` |
@@ -26,6 +29,8 @@ Tests must catch **real regressions**, not just smoke. When you **add, fix, or r
 | At-rest DB encryption (`DB_ENCRYPTION_KEY`) | `test_db_encryption.py` (needs `sqlcipher3-binary`) |
 | Per-account storage quota | `test_quota.py` |
 | FETCHERS ↔ catalog ↔ citations ↔ URLs | `test_source_catalog.py` |
+| Daily backup copy + integrity | `test_backup.py` |
+| End-to-end smoke (pages + core API surface) | `test_smoke_workflow.py` |
 
 ## Hard rules
 

@@ -357,47 +357,78 @@ function renderKeyPointsHtml(bullets, options) {
 }
 
 /**
- * Site-styled modal for Ask about this paper (replaces window.prompt).
- * Resolves with trimmed question string, or null if cancelled.
+ * Shared site modal shell (confirm / prompt / alert). Replaces browser popups.
+ * opts: {
+ *   title, message, mode: 'confirm'|'prompt'|'alert',
+ *   defaultValue, placeholder, inputType, multiline, selectAll,
+ *   confirmLabel, cancelLabel, danger, requireNonEmpty
+ * }
+ * confirm → Promise<boolean>
+ * prompt  → Promise<string|null>  (null = cancelled)
+ * alert   → Promise<void>
  */
-function openAiAskModal(paperTitle) {
+function openSiteModal(opts) {
+    const o = opts || {};
+    const mode = o.mode || 'alert';
     return new Promise((resolve) => {
-        const existing = document.getElementById('ai-ask-modal-root');
+        const existing = document.getElementById('site-modal-root');
         if (existing) existing.remove();
 
         const root = document.createElement('div');
-        root.id = 'ai-ask-modal-root';
+        root.id = 'site-modal-root';
         root.className = 'lra-modal-root';
         root.setAttribute('role', 'dialog');
         root.setAttribute('aria-modal', 'true');
-        root.setAttribute('aria-labelledby', 'ai-ask-modal-title');
-        const titleBit = paperTitle
-            ? `<p class="lra-modal-paper info-text">About: <strong>${escapeHtml(String(paperTitle).slice(0, 160))}</strong></p>`
+        root.setAttribute('aria-labelledby', 'site-modal-title');
+
+        const title = o.title || (mode === 'confirm' ? 'Please confirm' : mode === 'prompt' ? 'Input needed' : 'Notice');
+        const confirmLabel = o.confirmLabel || (mode === 'confirm' ? 'Confirm' : 'OK');
+        const cancelLabel = o.cancelLabel || 'Cancel';
+        const confirmClass = o.danger ? 'btn btn-danger' : 'btn btn-primary';
+        const msgHtml = o.message
+            ? `<p class="lra-modal-message info-text">${escapeHtml(String(o.message)).replace(/\n/g, '<br>')}</p>`
             : '';
-        root.innerHTML = `
-          <div class="lra-modal-backdrop" data-ai-ask-dismiss></div>
-          <div class="lra-modal-card card">
-            <h2 id="ai-ask-modal-title" class="lra-modal-title">Ask about this paper</h2>
-            <p class="info-text">Answered only from this paper’s <strong>title and abstract</strong>
-              (not the full text). The study aid starts for this question, then stops.</p>
-            ${titleBit}
+
+        let fieldHtml = '';
+        if (mode === 'prompt') {
+            if (o.multiline) {
+                fieldHtml = `
             <div class="form-group">
-              <label for="ai-ask-modal-input">Your question</label>
-              <textarea id="ai-ask-modal-input" class="lra-modal-textarea" rows="3"
-                placeholder="e.g. Who was studied? What was the main finding?"
-                maxlength="500"></textarea>
-            </div>
+              <label class="u-visually-hidden" for="site-modal-input">${escapeHtml(title)}</label>
+              <textarea id="site-modal-input" class="lra-modal-textarea" rows="6"
+                placeholder="${escapeHtml(o.placeholder || '')}"></textarea>
+            </div>`;
+            } else {
+                fieldHtml = `
+            <div class="form-group">
+              <label class="u-visually-hidden" for="site-modal-input">${escapeHtml(title)}</label>
+              <input id="site-modal-input" class="lra-modal-input" type="${escapeHtml(o.inputType || 'text')}"
+                placeholder="${escapeHtml(o.placeholder || '')}" autocomplete="off">
+            </div>`;
+            }
+        }
+
+        const cancelBtn = mode === 'alert'
+            ? ''
+            : `<button type="button" class="btn btn-secondary" data-site-modal-cancel>${escapeHtml(cancelLabel)}</button>`;
+
+        root.innerHTML = `
+          <div class="lra-modal-backdrop" data-site-modal-cancel></div>
+          <div class="lra-modal-card card">
+            <h2 id="site-modal-title" class="lra-modal-title">${escapeHtml(title)}</h2>
+            ${msgHtml}
+            ${fieldHtml}
             <div class="lra-modal-actions">
-              <button type="button" class="btn btn-secondary" data-ai-ask-dismiss>Cancel</button>
-              <button type="button" class="btn btn-primary" id="ai-ask-modal-submit">Ask</button>
+              ${cancelBtn}
+              <button type="button" class="${confirmClass}" id="site-modal-confirm">${escapeHtml(confirmLabel)}</button>
             </div>
           </div>
         `;
         document.body.appendChild(root);
         document.body.classList.add('lra-modal-open');
 
-        const input = root.querySelector('#ai-ask-modal-input');
-        const submit = root.querySelector('#ai-ask-modal-submit');
+        const input = root.querySelector('#site-modal-input');
+        const confirmBtn = root.querySelector('#site-modal-confirm');
         let settled = false;
 
         const close = (value) => {
@@ -412,42 +443,99 @@ function openAiAskModal(paperTitle) {
         const onKey = (ev) => {
             if (ev.key === 'Escape') {
                 ev.preventDefault();
-                close(null);
+                close(mode === 'confirm' ? false : mode === 'prompt' ? null : undefined);
             }
         };
         document.addEventListener('keydown', onKey);
 
-        root.querySelectorAll('[data-ai-ask-dismiss]').forEach((el) => {
+        root.querySelectorAll('[data-site-modal-cancel]').forEach((el) => {
             el.addEventListener('click', (ev) => {
                 ev.preventDefault();
-                close(null);
+                close(mode === 'confirm' ? false : mode === 'prompt' ? null : undefined);
             });
         });
 
-        const doSubmit = () => {
-            const q = (input && input.value || '').trim();
-            if (!q || q.length < 3) {
-                showNotification('Type a slightly longer question (at least a few words).', 'error');
-                if (input) input.focus();
-                return;
-            }
-            close(q);
-        };
+        if (confirmBtn) {
+            confirmBtn.addEventListener('click', (ev) => {
+                ev.preventDefault();
+                if (mode === 'confirm') {
+                    close(true);
+                    return;
+                }
+                if (mode === 'alert') {
+                    close(undefined);
+                    return;
+                }
+                // prompt
+                const val = input ? input.value : '';
+                const trimmed = String(val).trim();
+                if (o.requireNonEmpty && !trimmed) {
+                    showNotification('Please enter a value.', 'error');
+                    if (input) input.focus();
+                    return;
+                }
+                const minLen = o.minLength != null ? Number(o.minLength) : 0;
+                if (minLen > 0 && trimmed.length < minLen) {
+                    showNotification(
+                        o.minLengthMessage
+                            || `Please enter at least ${minLen} characters.`,
+                        'error'
+                    );
+                    if (input) input.focus();
+                    return;
+                }
+                close(val);
+            });
+        }
 
-        if (submit) submit.addEventListener('click', (ev) => {
-            ev.preventDefault();
-            doSubmit();
-        });
         if (input) {
+            input.value = o.defaultValue != null ? String(o.defaultValue) : '';
             input.addEventListener('keydown', (ev) => {
                 if (ev.key === 'Enter' && !ev.shiftKey) {
                     ev.preventDefault();
-                    doSubmit();
+                    confirmBtn && confirmBtn.click();
                 }
             });
-            setTimeout(() => input.focus(), 30);
+            setTimeout(() => {
+                input.focus();
+                if (o.selectAll && typeof input.select === 'function') input.select();
+            }, 30);
+        } else if (confirmBtn) {
+            setTimeout(() => confirmBtn.focus(), 30);
         }
     });
+}
+
+function openSiteConfirm(opts) {
+    return openSiteModal(Object.assign({}, opts, { mode: 'confirm' }));
+}
+
+function openSitePrompt(opts) {
+    return openSiteModal(Object.assign({}, opts, { mode: 'prompt' }));
+}
+
+function openSiteAlert(opts) {
+    return openSiteModal(Object.assign({}, opts, { mode: 'alert' }));
+}
+
+/**
+ * Site-styled modal for Ask about this paper (replaces window.prompt).
+ * Resolves with trimmed question string, or null if cancelled.
+ */
+function openAiAskModal(paperTitle) {
+    return openSitePrompt({
+        title: 'Ask about this paper',
+        message: paperTitle
+            ? `About: ${String(paperTitle).slice(0, 160)}\n\nAnswered only from this paper’s title and abstract (not the full text).`
+            : 'Answered only from this paper’s title and abstract (not the full text). The study aid starts for this question, then stops.',
+        placeholder: 'e.g. Who was studied? What was the main finding?',
+        confirmLabel: 'Ask',
+        cancelLabel: 'Cancel',
+        multiline: true,
+        requireNonEmpty: true,
+        minLength: 3,
+        minLengthMessage: 'Type a slightly longer question (at least a few words).',
+    }).then((q) => (q == null ? null : String(q).trim()));
 }
 
 /**

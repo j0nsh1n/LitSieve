@@ -265,15 +265,35 @@ def test_prepare_section_is_optional_and_gated_both_modes():
 
 
 def test_fetch_form_submits_on_enter():
-    """Enter in the query field must start fetch (native form submit → doFetch)."""
+    """Enter in the query field must start fetch (native form submit → doFetch).
+
+    Live regression: a `queueAnimationFrame` typo threw during DOMContentLoaded
+    *before* the submit listener was registered, so Enter/click posted the form
+    to the GET-only page route and returned 405 Method Not Allowed.
+    """
     html = _read("templates", "data_management.html")
     assert 'id="fetch-form"' in html
     assert 'type="submit"' in html and 'id="fetch-btn"' in html
+    form = re.search(r'<form[^>]*id="fetch-form"[^>]*>', html)
+    assert form, "fetch-form opening tag missing"
+    form_tag = form.group(0).lower()
+    # Native POST to /data-management is not a real API and returns 405.
+    assert 'method="post"' not in form_tag, form.group(0)
     dm = _read("static", "js", "data_management.js")
     assert "fetch-form" in dm
     assert "preventDefault" in dm
     # Submit handler must call doFetch (not only a click listener on the button).
     assert re.search(r"fetch-form[\s\S]{0,200}doFetch|submit[\s\S]{0,80}doFetch", dm)
+    # The undefined name that broke wire-up; keep the real browser API only.
+    assert "queueAnimationFrame" not in dm
+    assert "requestAnimationFrame" in dm
+    # Listener registration must sit after the rAF call in DOMContentLoaded so
+    # a future typo there still fails loudly in review, but the contract is:
+    # both are present and the handler path is intact.
+    dom = dm[dm.find("DOMContentLoaded") : dm.find("function syncOnlyMissingFromFetchMode")]
+    assert "requestAnimationFrame" in dom
+    assert "fetch-form" in dom
+    assert "doFetch" in dom
 
 
 def test_fetch_auto_chains_to_prepare_both_modes():

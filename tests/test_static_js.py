@@ -128,3 +128,64 @@ def test_count_bars_do_not_use_inline_style_attributes():
     assert 'style="width:' not in dm and "style='width:" not in dm
     css = (JS_DIR.parent / "css" / "style.css").read_text(encoding="utf-8")
     assert "var(--bar-pct" in css
+
+
+def test_account_uses_site_modals_not_browser_dialogs():
+    """Account destructive/input flows use in-app modals, not window.confirm/prompt/alert."""
+    account = (JS_DIR / "account.js").read_text(encoding="utf-8")
+    common = (JS_DIR / "common.js").read_text(encoding="utf-8")
+    assert "function openSiteConfirm" in common
+    assert "function openSitePrompt" in common
+    assert "function openSiteAlert" in common
+    assert "function openSiteModal" in common
+    # No browser dialogs left on Account.
+    for bad in ("window.confirm", "window.prompt", "window.alert", "confirm(", "prompt(", "alert("):
+        # allow openSiteConfirm / openSitePrompt names and variable names like password_confirm
+        if bad in ("confirm(", "prompt(", "alert("):
+            # strip function defs and openSite* calls
+            stripped = account
+            for keep in ("openSiteConfirm", "openSitePrompt", "openSiteAlert", "password_confirm", "new_password_confirm", "delete-confirm", "confirmCb", "confirmLabel"):
+                stripped = stripped.replace(keep, "")
+            assert bad not in stripped, f"account.js still uses browser {bad}"
+        else:
+            assert bad not in account
+    assert "openSiteConfirm" in account
+    assert "openSitePrompt" in account
+
+
+def test_no_queueAnimationFrame_typo():
+    """queueAnimationFrame is not a browser API; it throws and aborts page setup.
+
+    Caught in production when Data Management never bound the fetch form
+    submit handler and POST /data-management returned 405.
+    """
+    offenders = []
+    for path in _js_files():
+        if "queueAnimationFrame" in path.read_text(encoding="utf-8"):
+            offenders.append(path.name)
+    assert not offenders, f"undefined queueAnimationFrame in: {offenders}"
+
+
+def test_mobile_nav_keeps_account_link_reachable():
+    """Phones must not hide the Account control (≤640px used to display:none it).
+
+    Users could Logout but never open /account from the mobile top bar.
+    """
+    root = pathlib.Path(__file__).resolve().parent.parent
+    base = (root / "templates" / "base.html").read_text(encoding="utf-8")
+    assert 'href="/account"' in base
+    assert "nav-username" in base
+    assert "nav-username-full" in base
+    assert "nav-username-short" in base
+    assert "Account" in base
+
+    css = (root / "static" / "css" / "style.css").read_text(encoding="utf-8")
+    # Extract the phones (≤640px) block so we do not match unrelated rules.
+    phone = css[css.find("@media (max-width: 640px)") : css.find("@media (max-width: 380px)")]
+    assert phone, "missing 640px media block"
+    # Must not hide the account link entirely.
+    assert re.search(r"\.nav-username\s*\{\s*display\s*:\s*none", phone) is None, (
+        "phones hide .nav-username; Account is unreachable"
+    )
+    assert "nav-username-short" in phone
+    assert "display: inline" in phone or "display:inline" in phone

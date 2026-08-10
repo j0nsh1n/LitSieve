@@ -43,14 +43,16 @@ home desktop, and the link has been shared publicly.
 - Tasks:
   - Cap total accounts (registration is open; per-account quota bounds disk per
     user but nothing bounds the number of users)
-  - Back up `users.db` + `user_data/` — currently no backup story, and the
-    machine is a single point of failure
+  - Back up `users.db` + `user_data/` — `tools/backup.py` +
+    `litsieve-backup.timer` (daily; integrity-checked archives)
   - Watch `logs/litsieve.log` after incidents (rotating; ~30 MB ceiling)
+  - Health watchdog (`tools/watchdog.py` + timer) for app + tunnel
   - Keep the HF model cache warm so no student pays for a first download
 - Complete when: an account cap (or invite gate) is enforced, a restore has been
   tested at least once from a backup, and the operator can answer "what happened
   at 14:05?" from the log file
-- Status: [ ] in progress — logging landed 2026-08-04; cap and backups open
+- Status: [ ] in progress — logging, backups, and watchdog landed 2026-08-04–06;
+  **account cap still open**; restore drill still open
 
 ## Phase 5 — Simple / Advanced mode
 Full build doc: **[docs/SIMPLE_MODE_PLAN.md](docs/SIMPLE_MODE_PLAN.md)**.
@@ -74,12 +76,13 @@ student should not have to think about. No capability is removed from Advanced.
   RIS in Simple mode without seeing "embedding", "cluster", "HDBSCAN", or a
   model name; the screening report is non-empty and distinguishes
   `low_relevance`; nothing heavy runs inline; `/clusters` still loads by URL
-- Status: [ ] not started — plan only
-- Notes: this makes the spec.md line "Clusters page is the only triage UI"
-  wrong. **Propose** that spec edit for human approval; do not make it
-  unilaterally. Cluster label quality is the load-bearing assumption for the
-  topic-group path — sample real labels first; if they read like "cluster 3",
-  ship Quick screen alone.
+- Status: [x] 2026-08-05 — shipped in **v4.5.0** (PR #52 lineage). Quick screen
+  + Clean up rename + auto-prepare + Simple/Advanced toggle. Phase 6 further
+  collapses Simple to two pages (below).
+- Notes: `spec.md` triage/workflow text updated 2026-08-06 (human-approved) for
+  Clean up, Quick screen, Simple screening card, and guest. Cluster label
+  quality remains a concern for topic-group triage; Phase 6 deliberately avoids
+  auto-clustering.
 
 ## Phase 6 — Simple mode on two pages
 Full build doc: **[docs/SIMPLE_TWO_PAGE_PLAN.md](docs/SIMPLE_TWO_PAGE_PLAN.md)**.
@@ -102,9 +105,12 @@ Simple collapses to `Get papers` → `Search`. **Advanced is unchanged.**
   export across two pages without seeing "embedding", "cluster", "threshold",
   or a model name; Advanced behaviour is unchanged; nothing is excluded without
   an explicit apply; and the flow works at 380px with no horizontal scroll
-- Status: [x] implemented on main (local commits; not pushed)
+- Status: [x] 2026-08-06 — implemented on `main` / `feat/phase6-guest-demo`
+  (guest demo + polish on the same line; live fix for fetch form 405)
 - Notes: small screens are a first-class requirement, not a retrofit — real
   traffic is overwhelmingly mobile. Existing breakpoints: 900 / 640 / 380px.
+  Guest demo (`/guest`, sample-only, 30‑min purge) ships alongside as a low-friction
+  try-without-register path; not a separate roadmap phase.
 
 ## Backlog (unscheduled)
 - Make `pyright app` blocking in CI after clearing the current error backlog

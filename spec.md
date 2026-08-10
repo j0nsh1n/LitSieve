@@ -15,13 +15,29 @@ a substitute for school library databases.
 
 ## Required Behavior
 - Multi-user accounts (register / login / logout); JWT session; CSRF on mutations
+- Optional **guest demo** (`/guest`): temporary sample-corpus session (no multi-source
+  fetch); expires and is purged after a short window; must not replace an already
+  signed-in account session
 - Each account has **multiple named libraries** (separate paper collections);
   nav switcher sets the active library; jobs bind to the library active at start
 - Fetch from **17 public sources** in parallel (background job, cancellable,
   per-source errors); skip abstract-less records
-- Prepare papers (embeddings) as a background job; extractive key points default
-- Clusters page is the only triage UI (exclude/restore with reason codes)
-- Duplicates: detect near-dups, auto-resolve preferred source; screening report
+- Prepare papers (embeddings) as a background job after a successful fetch
+  (auto-chain; optional re-prepare); extractive key points default
+- **Simple / Advanced UI mode** (client preference: `localStorage.uiMode` +
+  `data-mode` on `<html>`, applied pre-paint). Simple does not remove Advanced
+  capability; Advanced keeps every control
+  - **Simple nav:** Get papers (`/data-management`) → Search. After auto-prepare:
+    optional inline **screening card** (preview counts, apply/undo/skip), silent
+    preferred-source duplicate resolve, then Go to Search
+  - **Advanced nav:** Data Management → Clean up → Clusters → Search (plus Account)
+- **Screening / triage** (exclude/restore with reason codes), not only on Clusters:
+  - Clean up (`/statistics`): near-duplicates, preferred-source auto-resolve,
+    **Quick screen** (rank vs research question; apply only on confirm;
+    `low_relevance` is a system reason), screening report
+  - Clusters: density / k-means / hierarchical group triage (exclude/restore);
+    not auto-run after fetch
+  - Search: per-result **Not relevant** (`off_topic`); export / report panel
 - Search: hybrid rank (semantic + optional lexical), year/source filters, seed
   paper, **more like starred** (starred papers **remain** in the result list),
   notes/stars, export on-screen results as RIS
@@ -37,8 +53,12 @@ a substitute for school library databases.
   **No npm / no frontend build.**
 - Local run: `./run_dev.sh` → http://127.0.0.1:7860  
   Or: `DEBUG=true SECRET_KEY=… ./venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 7860 --reload`
-- Example: log in → Data Management → pick topics/sources → Fetch → Prepare
-  Papers → Clusters (screen) → Duplicates → Search → Download RIS
+  Dev isolation (preferred): `./run_dev.sh 7861` uses separate DB/data/log paths.
+- Example (Simple): register or **Try the demo** → Get papers (topics → Fetch →
+  auto-prepare → optional screen) → Search → export RIS
+- Example (Advanced): log in → Data Management (topics/sources → Fetch →
+  auto-prepare) → Clean up (dedup / Quick screen / report) → optional Clusters →
+  Search → Download RIS
 - Health: `GET /health` → `{"status":"healthy","version":"4.5.0"}` (version as of
   this writing; bump when releasing)
 
@@ -65,8 +85,9 @@ a substitute for school library databases.
   - `app/storage/` — database, libraries, shares, user_db, quota, dbconn
   - `app/fetchers/` — one module per public source + base HttpClient
   - `app/content/` — source catalog, feature guides, sample corpus, UI flags
-  - `templates/` + `static/` — UI (repo root)
+  - `templates/` (+ `partials/`) + `static/` — UI (repo root; no frontend build)
   - `tests/` — pytest suite; `tests/README.md` policy
+  - `tools/` — backup, watchdog, bench_scale, encrypt_databases
 - External APIs: 17 free academic sources (PubMed, Europe PMC, OpenAlex, arXiv,
   Semantic Scholar, ERIC, CrossRef, DOAJ, ClinicalTrials.gov, NASA ADS with
   token, bioRxiv, medRxiv, DBLP, OpenAIRE, PLOS, HAL, Zenodo). Optional:
@@ -112,8 +133,11 @@ a substitute for school library databases.
   not stale imports. Enumerate routes via `conftest.route_paths(app)` (OpenAPI).
 
 ## Acceptance Criteria
-- [ ] Student can fetch → prepare → cluster/screen → dedup → search → export RIS
-      on a local or hosted instance with public sources only
+- [ ] Student can complete a literature pass on public sources only:
+      Simple: topics → fetch → auto-prepare → optional screen → search → export RIS;
+      Advanced: same plus Clean up (dedup / Quick screen) and optional Clusters
+- [ ] Guest demo loads sample papers without multi-source fetch and does not
+      hijack an existing signed-in session
 - [ ] Libraries isolate data; clone codes do not grant live write access
 - [ ] With SMTP unset, app runs without requiring email; with SMTP set, recovery
       email verification works as designed on this product path

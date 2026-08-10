@@ -135,16 +135,26 @@ function normalizeJoinCode(raw) {
 
 async function doShareLibrary(lib) {
  // Optional clone code (not a live share / teacher console).
- if (!confirm(
-  `Create a copy code for "${lib.name}"?\n\n` +
-  'Anyone with the code gets their own clone of papers + screening ' +
-  '(not live access to yours). Notes and stars are not copied.\n\n' +
-  'Continue to set expiry and options?'
- )) {
+ if (!(await openSiteConfirm({
+  title: 'Create a copy code?',
+  message:
+   `Create a copy code for “${lib.name}”?\n\n` +
+   'Anyone with the code gets their own clone of papers + screening ' +
+   '(not live access to yours). Notes and stars are not copied.\n\n' +
+   'Continue to set expiry and options?',
+  confirmLabel: 'Continue',
+  cancelLabel: 'Cancel',
+ }))) {
   return;
  }
  let expiresDays = 14;
- const daysRaw = window.prompt('Days until the code expires (1–90). Blank = 14.', '14');
+ const daysRaw = await openSitePrompt({
+  title: 'Code expiry',
+  message: 'Days until the code expires (1–90). Leave blank for 14.',
+  defaultValue: '14',
+  placeholder: '14',
+  confirmLabel: 'Next',
+ });
  if (daysRaw === null) return;
  if (String(daysRaw).trim() !== '') {
   const n = parseInt(daysRaw, 10);
@@ -155,10 +165,13 @@ async function doShareLibrary(lib) {
   expiresDays = n;
  }
  let maxUses = null;
- const usesRaw = window.prompt(
-  'Max joins for this code (blank = unlimited).',
-  ''
- );
+ const usesRaw = await openSitePrompt({
+  title: 'Max joins',
+  message: 'Maximum number of joins for this code. Leave blank for unlimited.',
+  defaultValue: '',
+  placeholder: 'unlimited',
+  confirmLabel: 'Next',
+ });
  if (usesRaw === null) return;
  if (String(usesRaw).trim() !== '') {
   const n = parseInt(usesRaw, 10);
@@ -168,10 +181,14 @@ async function doShareLibrary(lib) {
   }
   maxUses = n;
  }
- const emb = confirm(
-  'Include embeddings so the copy can search immediately without Prepare papers?\n\n' +
-  'OK = yes (recommended). Cancel = papers only (no embeddings).'
- );
+ const emb = await openSiteConfirm({
+  title: 'Include embeddings?',
+  message:
+   'Include embeddings so the copy can search immediately without Prepare papers?\n\n' +
+   'Yes = recommended. No = papers only (no embeddings).',
+  confirmLabel: 'Yes, include',
+  cancelLabel: 'Papers only',
+ });
  setStatus('library-manage-status', 'Creating copy code…', 'info');
  try {
   const body = {
@@ -209,7 +226,11 @@ async function doShareLibrary(lib) {
   if (navigator.clipboard && code) {
    try { await navigator.clipboard.writeText(code); } catch (_) { /* ignore */ }
   }
-  alert(msg);
+  await openSiteAlert({
+   title: 'Copy code created',
+   message: msg,
+   confirmLabel: 'Done',
+  });
   setStatus('library-manage-status', `Copy code ${code} created (copied if clipboard allowed).`, 'success');
   showNotification(`Copy code ${code}`, 'success');
   loadSharesList();
@@ -270,7 +291,14 @@ function renderSharesList(shares) {
      if (navigator.clipboard) await navigator.clipboard.writeText(s.code || '');
      showNotification(`Copied ${s.code}`, 'success');
     } catch (_) {
-     prompt('Copy this code:', s.code || '');
+     await openSitePrompt({
+      title: 'Copy this code',
+      message: 'Select and copy the code below.',
+      defaultValue: s.code || '',
+      selectAll: true,
+      confirmLabel: 'Close',
+      cancelLabel: 'Close',
+     });
     }
    });
   }
@@ -292,7 +320,15 @@ function renderSharesList(shares) {
      if (navigator.clipboard) await navigator.clipboard.writeText(brief);
      showNotification('How-to copied', 'success');
     } catch (_) {
-     prompt('Copy these steps:', brief);
+     await openSitePrompt({
+      title: 'Copy these steps',
+      message: 'Select and copy the text below.',
+      defaultValue: brief,
+      multiline: true,
+      selectAll: true,
+      confirmLabel: 'Close',
+      cancelLabel: 'Close',
+     });
     }
    });
   }
@@ -305,7 +341,13 @@ function renderSharesList(shares) {
 }
 
 async function doRevokeShare(share) {
- if (!confirm(`Revoke code ${share.code}? New joins will fail. Existing copies stay.`)) {
+ if (!(await openSiteConfirm({
+  title: 'Revoke copy code?',
+  message: `Revoke code ${share.code}? New joins will fail. Existing copies stay.`,
+  confirmLabel: 'Revoke',
+  cancelLabel: 'Keep code',
+  danger: true,
+ }))) {
   return;
  }
  try {
@@ -405,7 +447,14 @@ async function doCreateLibrary() {
 }
 
 async function doRenameLibrary(lib) {
- const name = prompt('Rename library:', lib.name || '');
+ const name = await openSitePrompt({
+  title: 'Rename library',
+  message: 'Choose a new name for this library.',
+  defaultValue: lib.name || '',
+  selectAll: true,
+  requireNonEmpty: true,
+  confirmLabel: 'Rename',
+ });
  if (name == null) return;
  const trimmed = name.trim();
  if (!trimmed) {
@@ -442,7 +491,13 @@ async function doDeleteLibrary(lib, count) {
  showNotification('You must keep at least one library.', 'error');
  return;
  }
- if (!confirm(`Delete library "${lib.name}" and all of its papers? This cannot be undone.`)) {
+ if (!(await openSiteConfirm({
+  title: 'Delete library?',
+  message: `Delete library “${lib.name}” and all of its papers? This cannot be undone.`,
+  confirmLabel: 'Delete library',
+  cancelLabel: 'Keep library',
+  danger: true,
+ }))) {
  return;
  }
  try {
@@ -496,7 +551,13 @@ async function doDeleteAccount() {
  showNotification('Enter your password to confirm deletion.', 'error');
  return;
  }
- if (!confirm('Permanently delete your account and all of its data? This cannot be undone.')) {
+ if (!(await openSiteConfirm({
+  title: 'Delete account?',
+  message: 'Permanently delete your account and all of its data? This cannot be undone.',
+  confirmLabel: 'Delete account',
+  cancelLabel: 'Keep account',
+  danger: true,
+ }))) {
  return;
  }
 
@@ -759,7 +820,13 @@ async function resendVerification() {
 }
 
 async function removeEmail() {
-    if (!confirm('Remove the recovery email? You will not be able to reset your password by email.')) return;
+    if (!(await openSiteConfirm({
+        title: 'Remove recovery email?',
+        message: 'Remove the recovery email? You will not be able to reset your password by email.',
+        confirmLabel: 'Remove email',
+        cancelLabel: 'Keep email',
+        danger: true,
+    }))) return;
     const btn = document.getElementById('email-remove-btn');
     setLoading(btn, true);
     try {

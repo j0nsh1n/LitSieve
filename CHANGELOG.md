@@ -9,6 +9,17 @@ and this project aims to follow Semantic Versioning for app version strings
 ## [Unreleased]
 
 ### Added
+- **Guest demo** (`/guest`): temporary sample-corpus account (no multi-source
+  fetch), 30-minute expiry/purge, landing/login CTA. Signed-in sessions are
+  never swapped for a guest account.
+- **Simple mode on two pages** (Phase 6): Get papers → Search. Inline
+  screening card (Low/Medium/High with real counts, apply/undo/skip), silent
+  duplicate resolve after auto-prepare, sticky Search export/report panel
+  (desktop) and bottom bar (small screens). Clean up and Clusters stay in
+  Advanced only.
+- Skipped Simple screening remembered per library across reloads (localStorage).
+- Account page uses **in-app site modals** for confirm / prompt / alert flows
+  (no browser `confirm` / `prompt` / `alert`).
 - Daily backups of `users.db` and `user_data/` (`tools/backup.py` +
   `litsieve-backup.timer`). Databases are copied through the SQLite online
   backup API and integrity-checked before and after archiving; archives land
@@ -17,16 +28,28 @@ and this project aims to follow Semantic Versioning for app version strings
 - JavaScript syntax checking in the test suite. There is no npm or build step,
   so a broken browser script previously shipped with every Python test green.
 
+### Changed
+- Simple nav is **Get papers → Search** only (contiguous steps 1–2). Clean up
+  remains on `/statistics` for Advanced.
+- Simple post-prepare shortcut is **Go to Search** (replaces the Phase 5
+  “Next: Clean up your papers” bar once screening is applied or skipped).
+
 ### Fixed
+- Mobile nav (≤640px) again exposes **Account**: the profile link was
+  `display: none`, so phones could only log out. Shows a compact “Account”
+  control that still opens `/account`.
+- Fetch on Data Management no longer 405s: a `queueAnimationFrame` typo aborted
+  page setup before the form submit handler bound, so Enter/click posted the
+  HTML form to the GET-only page. Fixed to `requestAnimationFrame`; form no
+  longer uses `method="post"` as a fallback.
 - The Re-prepare card no longer appears while the automatic prepare is still
-  running after a fetch. Progress is shown on the fetch bar during the chain,
-  so the card had nothing to display and only advertised a "Re-prepare" action
-  for work already in progress.
-- Simple mode now offers a "Next: Clean up your papers" shortcut once papers
-  are ready, instead of requiring a scroll back to the nav.
+  running after a fetch. Progress is shown on the fetch bar during the chain.
+- Source and year bar charts scale to each series max under CSP (`style-src
+  'self'`) via `--bar-pct` CSS variables instead of ignored inline widths.
 - All templates request the same `?v=` build of `theme-init.js` and
   `style.css`. Only `base.html` had been bumped, so returning visitors on the
   public pages (login, register, landing) kept a cached older script.
+- Enter in the fetch query field starts fetch via a real form submit handler.
 
 ## [4.5.0] - 2026-08-05
 

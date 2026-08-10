@@ -167,7 +167,7 @@ document.addEventListener('DOMContentLoaded', () => {
  const modeBtn = document.getElementById('mode-toggle');
  if (modeBtn) {
   modeBtn.addEventListener('click', () => {
-   queueAnimationFrame(() => {
+   requestAnimationFrame(() => {
     updatePrepareSectionVisibility(_lastTotalArticles);
     refreshSimpleScreeningCard();
    });
@@ -176,7 +176,7 @@ document.addEventListener('DOMContentLoaded', () => {
  // Start hidden until stats load (avoids a flash of prepare on empty libs).
  updatePrepareSectionVisibility(0);
  // Phase 6: derive screening card visibility from corpus after stats load.
- queueAnimationFrame(() => refreshSimpleScreeningCard());
+ requestAnimationFrame(() => refreshSimpleScreeningCard());
  // Form submit (button click or Enter in any field) starts fetch.
  const fetchForm = document.getElementById('fetch-form');
  if (fetchForm) {

@@ -23,22 +23,26 @@ Built with **FastAPI**, sentence-transformers, FAISS, and scikit-learn.
   OpenAlex, arXiv, Semantic Scholar, ERIC, Zenodo, CrossRef, DOAJ, NASA ADS,
   bioRxiv, medRxiv, DBLP, OpenAIRE, PLOS, HAL)
   — replace or append; **background jobs** with progress, cancel, retries, and
-  per-source error classes
+  per-source error classes; **auto prepare-for-search** after a successful fetch
+- 🧭 **Simple / Advanced** UI mode (client preference): Simple is Get papers →
+  Search with an inline screening card; Advanced keeps Clean up, Clusters, and
+  full controls
 - 🧠 Semantic embeddings (only-new or full re-embed; topic-based model pick; GPU when
   available; background job) + **extractive key points** from abstracts
 - 🎯 Hybrid similarity search (meaning + exact words), **year range**, plain text /
   PICO / **seed paper** / **more like my starred**, highlights & private notes;
-  paginated result lists
-- 🧩 Clustering: Density (HDBSCAN), K-Means, Hierarchical — **triage only on Clusters**
-  (paginated article lists)
-- 🔄 Cross-source duplicate detection + preferred-source auto-resolve
-- 📋 **Screening report** (collected / excluded by reason / included / by year) on Duplicates
+  paginated result lists; Simple sticky export / screening-report panel
+- 🧹 **Clean up** (`/statistics`, Advanced nav): near-duplicates, preferred-source
+  auto-resolve, **Quick screen**, screening report
+- 🧩 Clustering (Advanced): Density (HDBSCAN), K-Means, Hierarchical — topic
+  triage on Clusters (paginated lists); not auto-run after fetch
+- 📋 **Screening report** (collected / excluded by reason / included / by year)
 - 📈 Coverage map, papers-by-year timeline, and per-source breakdown
 - 💾 Per-user SQLite, JWT + bcrypt, CSRF, **per-user rate limits**, change password
   (revokes other sessions via `token_version`), **password reset**
 - 📤 Export ranked hits (CSV/TXT) or full library as **RIS** (Zotero / EndNote / Mendeley)
 - 📖 Public landing + `/learn/…` feature guides; first-run checklist + empty states
-- 🧪 **Sample demo corpus** (no APIs) for first-run dry runs
+- 🧪 **Guest demo** (`/guest`) and **sample corpus** (no multi-source APIs) for dry runs
 - 📚 **Multiple libraries** per account (separate paper datasets / projects; switch in the nav)
 - 🔗 Optional **library copy codes** (clone a collection into another account — not a live share or teacher LMS)
 
@@ -57,9 +61,10 @@ Built with **FastAPI**, sentence-transformers, FAISS, and scikit-learn.
 ├── templates/              # Jinja2 HTML pages
 ├── static/                 # CSS + page JavaScript
 ├── tests/                  # pytest suite
-├── tools/                  # bench_scale.py (offline latency benchmark)
-├── docs/                   # engineering notes + deploy checklist
-│   └── DEPLOY.md           # Host checklist (SECRET_KEY, SMTP, quota, smoke)
+├── tools/                  # backup, watchdog, bench_scale, encrypt_databases
+├── docs/                   # deploy / self-host + Simple-mode plans
+│   ├── DEPLOY.md           # Host checklist (SECRET_KEY, SMTP, quota, smoke)
+│   └── SELFHOST.md         # Everyday systemd / tunnel commands
 ├── run_dev.sh              # Local dev with --reload
 ├── requirements.txt
 ├── Dockerfile              # Container build (any Docker host)
@@ -98,15 +103,21 @@ uvicorn app.main:app --host 0.0.0.0 --port 7860
 ```
 
 Then open <http://localhost:7860>. Public landing and `/learn/…` guides need no
-account. Register/login for your private workspace, then:
+account. **Try the demo** (`/guest`) loads sample papers without registering.
+Register/login for a private workspace, then:
 
-1. **Data Management** → topics/sources, **Fetch** (replace or add; background job),
-   then **Create embeddings** (background job).
-2. **Clusters** → Density / K-Means / Hierarchical; **exclude** off-topic groups
-   or single papers (**only** place for topic triage).
-3. **Duplicates** → near-duplicates + auto-resolve; **screening report** for hand-ins.
-4. **Search** → text / PICO / seed / more-like-starred; hybrid rank + year filter;
-   notes/stars; export ranked hits (CSV/TXT) or library as **RIS**.
+**Simple mode (default for new accounts)**
+
+1. **Get papers** (`/data-management`) → topics, **Fetch** (prepare runs next
+   automatically) → optional screening card → **Go to Search**.
+2. **Search** → rank, filter, export RIS / screening report from the side panel.
+
+**Advanced mode** (toggle in the nav)
+
+1. **Data Management** → topics/sources, **Fetch** (auto-prepare; optional re-prepare).
+2. **Clean up** → duplicates + Quick screen + screening report.
+3. **Clusters** → Density / K-Means / Hierarchical; exclude off-topic groups or papers.
+4. **Search** → text / PICO / seed / more-like-starred; notes/stars; export.
 5. **Account** → change password (other sessions sign out) or delete account.
 
 ### Running it for real (self-hosted)

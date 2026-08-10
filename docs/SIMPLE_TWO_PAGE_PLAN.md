@@ -1,5 +1,10 @@
 # Plan — Simple mode on two pages (Phase 6)
 
+**Status (2026-08-06):** Implemented (branch/main lineage). Guardrails in
+`tests/test_simple_mode.py` (screening fractions, preview≠exclude, nav steps,
+partials, Go to Search). Guest demo is separate but co-shipped on the same line
+(`tests/test_guest_mode.py`).
+
 Build doc, written to be executed by someone who has not seen the design
 conversation. Follows Phase 5 (`docs/SIMPLE_MODE_PLAN.md`), which shipped in
 v4.5.0.
