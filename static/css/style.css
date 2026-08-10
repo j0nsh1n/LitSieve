@@ -3666,7 +3666,7 @@ html, body {
     .nav-username {
         display: inline-flex;
         max-width: none;
-        min-height: 2rem;
+        min-height: 2.75rem; /* ≥44px tap target */
         min-width: 2.75rem;
         padding: 0 var(--space-1);
         font-size: var(--fs-xs);
@@ -3676,14 +3676,14 @@ html, body {
     .nav-username-short { display: inline; }
     .nav-logout {
         font-size: var(--fs-xs);
-        min-height: 2rem;
-        padding: 0 0;
+        min-height: 2.75rem;
+        padding: 0 var(--space-1);
         flex-shrink: 0;
     }
     .theme-toggle,
     .mode-toggle {
-        min-width: 2rem;
-        min-height: 2rem;
+        min-width: 2.75rem;
+        min-height: 2.75rem;
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -4127,16 +4127,50 @@ html, body {
     }
 }
 
-/* Very small phones — tighter still; library optional chrome */
+/* Very small phones — different layout (not a squeezed desktop) */
 @media (max-width: 380px) {
+    body {
+        overflow-x: hidden;
+    }
     .navbar-top {
         grid-template-columns: minmax(0, 4.75rem) minmax(0, 1fr) minmax(0, auto);
     }
     .nav-brand { max-width: 4.75rem; font-size: var(--fs-sm); }
-    .nav-menu-toggle { max-width: 100%; padding: var(--space-1) var(--space-1); }
+    .nav-menu-toggle { max-width: 100%; padding: var(--space-1) var(--space-1); min-height: 2.75rem; }
     .nav-library-wrap { display: none; } /* switch libraries on tablet/desktop */
     .mode-toggle { font-size: var(--fs-xs); padding: var(--space-1) var(--space-1); }
     .nav-logout { font-size: var(--fs-xs); }
+    .container {
+        padding: var(--space-3) var(--space-2) var(--space-5);
+    }
+    .card {
+        padding: var(--space-4) 0; /* denser vertical rhythm than desktop */
+    }
+    .card h2 {
+        font-size: var(--fs-lg);
+    }
+    .form-row {
+        flex-direction: column;
+        gap: var(--space-3);
+    }
+    .form-group,
+    .form-group.flex-2 {
+        min-width: 0;
+        width: 100%;
+    }
+    .btn,
+    .btn-primary,
+    .btn-secondary {
+        min-height: 2.75rem;
+    }
+    .fetch-live-row {
+        flex-wrap: wrap;
+        gap: var(--space-1);
+    }
+    .fetch-live-detail {
+        width: 100%;
+        text-align: left;
+    }
     .stats-cards {
         grid-template-columns: 1fr;
     }
@@ -4145,6 +4179,11 @@ html, body {
     .landing-title { font-size: var(--fs-xl); }
     .export-row .btn {
         min-width: 100%;
+    }
+    .topic-grid,
+    .source-option-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: var(--space-2);
     }
 }
 

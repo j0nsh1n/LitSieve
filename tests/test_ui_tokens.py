@@ -194,3 +194,12 @@ def test_search_optimistic_star_and_skeletons():
     star_block = search[start : start + 600]
     assert "classList.toggle('is-starred'" in star_block
     assert star_block.find("classList.toggle") < star_block.find("await apiCall")
+
+
+def test_mobile_380_has_overflow_guard_and_tap_targets():
+    """380px treatment is a real layout: no horizontal scroll intent, 44px taps."""
+    css = CSS
+    block = css[css.find("@media (max-width: 380px)") :]
+    assert "overflow-x: hidden" in block or "overflow-x:hidden" in block
+    assert "min-height: 2.75rem" in CSS  # 44px-class targets used on small screens
+    assert "flex-direction: column" in block  # form-row stacks
