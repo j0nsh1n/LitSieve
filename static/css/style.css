@@ -155,11 +155,16 @@ html.theme-animating *::after {
         box-shadow var(--dur-med) var(--ease-soft) !important;
 }
 
-/* === Keyframes === */
+/* === Keyframes ===
+   Motion vocabulary (Phase 7):
+     enter   — opacity + 4px rise, --dur-fast, --ease-out
+     exit    — opacity only, 120ms, --ease-soft
+     emph.   — transform/colour, --dur-med, --ease-soft
+   Prefer these three patterns; nothing longer than --dur-med except progress. */
 @keyframes fadeUp {
     from {
         opacity: 0;
-        transform: translateY(10px);
+        transform: translateY(4px);
     }
     to {
         opacity: 1;
@@ -175,7 +180,7 @@ html.theme-animating *::after {
 @keyframes slideIn {
     from {
         opacity: 0;
-        transform: translateX(16px);
+        transform: translateX(8px);
     }
     to {
         opacity: 1;
@@ -190,14 +195,14 @@ html.theme-animating *::after {
     }
     to {
         opacity: 0;
-        transform: translateX(12px);
+        transform: translateX(0);
     }
 }
 
 @keyframes listIn {
     from {
         opacity: 0;
-        transform: translateY(6px);
+        transform: translateY(4px);
     }
     to {
         opacity: 1;
@@ -4646,7 +4651,8 @@ html[data-mode="simple"] .search-simple-panel:not([hidden]) {
     background: color-mix(in srgb, var(--surface, var(--bg)) 92%, var(--accent) 8%);
 }
 
-/* Respect reduced-motion preferences */
+/* Respect reduced-motion preferences — neutralises ALL motion, including
+   skeleton shimmer, progress shimmer, and any new enter/exit/emphasis. */
 @media (prefers-reduced-motion: reduce) {
     html { scroll-behavior: auto; }
 
@@ -4662,6 +4668,16 @@ html[data-mode="simple"] .search-simple-panel:not([hidden]) {
     .progress-bar-fill {
         animation: none !important;
         background: var(--accent);
+    }
+
+    .skeleton-line,
+    .skeleton-card .skeleton-line {
+        animation: none !important;
+        background: color-mix(in srgb, var(--rule) 40%, var(--surface));
+    }
+
+    .fetch-live-row.is-pending .fetch-live-detail {
+        font-style: normal;
     }
 
     .loading-text,

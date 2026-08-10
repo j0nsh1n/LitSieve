@@ -134,12 +134,14 @@ Presentation only — no flow, endpoint, or copy changes.
   horizontal scroll or overlapped controls; loading regions show skeletons
   rather than blank space; and the Simple/Advanced guards in
   `tests/test_simple_mode.py` still pass unchanged (proving presentation-only)
-- Status: [ ] not started — plan only
-- Notes: the colour/motion layer is already good and must be preserved. Dark
-  mode is derived via `color-mix`, so it drifts silently — check both themes on
-  every change. Public templates do not extend `base.html`, so nothing
-  propagates to them automatically. `--measure` on Search result cards was
-  tried before and rejected; do not reintroduce it there.
+- Status: [x] 2026-08-10 — implemented on `feat/phase6-guest-demo` (local
+  commits; presentation only). Token scales, value collapse, editorial pass,
+  fetch narrative + skeletons + optimistic writes, mobile 380 layout, motion
+  vocabulary + reduced-motion covering shimmer.
+- Notes: the colour/motion layer was preserved (existing tokens not renamed).
+  Dark mode is derived via `color-mix` — re-check contrast after future colour
+  edits. Public templates do not extend `base.html`. `--measure` stays off
+  Search result cards.
 
 ## Backlog (unscheduled)
 - Make `pyright app` blocking in CI after clearing the current error backlog

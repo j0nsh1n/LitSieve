@@ -203,3 +203,15 @@ def test_mobile_380_has_overflow_guard_and_tap_targets():
     assert "overflow-x: hidden" in block or "overflow-x:hidden" in block
     assert "min-height: 2.75rem" in CSS  # 44px-class targets used on small screens
     assert "flex-direction: column" in block  # form-row stacks
+
+
+def test_prefers_reduced_motion_covers_shimmer():
+    """One reduce block must kill infinite shimmer (progress + skeletons)."""
+    css = CSS
+    assert css.count("@media (prefers-reduced-motion: reduce)") >= 1
+    # Skeleton shimmer is the Phase 7 loading animation.
+    assert "shimmer" in css
+    reduce_blocks = re.split(r"@media \(prefers-reduced-motion: reduce\)", css)[1:]
+    joined = "\n".join(reduce_blocks)
+    assert "skeleton" in joined.lower() or "animation: none" in joined
+    assert "animation-duration: 0.01ms" in joined or "animation-duration:0.01ms" in joined

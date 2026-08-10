@@ -80,9 +80,9 @@ Guest User (is_guest) → sample corpus only; purged by age
 - Host entry: `app.main:app` port 7860; Linux `./venv`
 
 ## Session Handoff
-- **Date:** 2026-08-06
+- **Date:** 2026-08-10
 - **Branch:** `feat/phase6-guest-demo` (local commits; do not push without ask)
-- **Done:** Fetch form 405 fix; test/docs audit; human-approved **spec.md**
-  refresh; mobile nav Account link restored (≤640px no longer hides profile).
-- **Next:** Commit/push mobile Account fix onto PR #54 if still open; restart
-  uvicorn after deploy.
+- **Done:** Phase 7 UI refresh (tokens → collapse → editorial → waiting →
+  mobile → motion) in six local commits; Simple/guest tests unchanged green.
+- **Next:** Human review visual in light+dark at 380px; push/PR only if asked;
+  restart uvicorn after deploy.

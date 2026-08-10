@@ -1,5 +1,8 @@
 # Plan — UI/UX refresh: design system + editorial direction (Phase 7)
 
+**Status (2026-08-10):** Implemented on `feat/phase6-guest-demo` (local).
+Contracts in `tests/test_ui_tokens.py` + existing Simple/guest guards.
+
 Build doc, written to be executed by someone who has not seen the design
 conversation.
 

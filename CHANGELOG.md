@@ -29,6 +29,11 @@ and this project aims to follow Semantic Versioning for app version strings
   so a broken browser script previously shipped with every Python test green.
 
 ### Changed
+- **UI refresh (Phase 7):** design-system type / spacing / radius scales;
+  editorial serif headings and abstracts with hairline card sections; live
+  per-source fetch progress; list skeletons; optimistic star / note / Not
+  relevant; denser 380px mobile layout; motion vocabulary with reduced-motion
+  covering shimmer.
 - Simple nav is **Get papers → Search** only (contiguous steps 1–2). Clean up
   remains on `/statistics` for Advanced.
 - Simple post-prepare shortcut is **Go to Search** (replaces the Phase 5
