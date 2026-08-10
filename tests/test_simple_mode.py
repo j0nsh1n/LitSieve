@@ -66,9 +66,12 @@ def test_mode_toggle_replaces_reading_mode():
     assert "updateNavStepNumbers" in common
     assert "reading-toggle" not in common
     assert "setReadingMode" not in common
+    # Highlight the control when Advanced is active (not Simple).
+    assert "classList.toggle('is-active', !simple)" in common or 'classList.toggle("is-active", !simple)' in common
     css = _read("static", "css", "style.css")
     assert "data-reading" not in css
     assert ".mode-toggle" in css
+    assert ".mode-toggle.is-active" in css
 
 
 def test_register_seeds_simple_mode_cookie(tmp_path, monkeypatch):

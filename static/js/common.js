@@ -935,8 +935,9 @@ function updateModeToggleButton() {
     const btn = document.getElementById('mode-toggle');
     if (!btn) return;
     const simple = isSimpleMode();
-    btn.setAttribute('aria-pressed', simple ? 'true' : 'false');
-    btn.classList.toggle('is-active', simple);
+    // Highlight when Advanced is active (not Simple) — power mode reads as "on".
+    btn.setAttribute('aria-pressed', simple ? 'false' : 'true');
+    btn.classList.toggle('is-active', !simple);
     btn.textContent = simple ? 'Simple' : 'Advanced';
     btn.title = simple
         ? 'Switch to Advanced mode — full controls'
