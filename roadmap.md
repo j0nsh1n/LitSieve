@@ -112,6 +112,35 @@ Simple collapses to `Get papers` → `Search`. **Advanced is unchanged.**
   Guest demo (`/guest`, sample-only, 30‑min purge) ships alongside as a low-friction
   try-without-register path; not a separate roadmap phase.
 
+## Phase 7 — UI/UX refresh (design system + editorial)
+Full build doc: **[docs/UI_REFRESH_PLAN.md](docs/UI_REFRESH_PLAN.md)**.
+Presentation only — no flow, endpoint, or copy changes.
+- Tasks:
+  - **Token layer**: type / line-height / spacing / radius scales in `:root`,
+    alongside the existing colour + motion tokens (which stay). Re-point the
+    `.u-mt-*` utilities rather than deleting them
+  - **Collapse the hand-tuned values**: 38 distinct font sizes → 8, 29 paddings
+    → 6, 6 radii → 3, section by section through the 41 CSS banners
+  - **Editorial pass**: serif headings + abstracts, sans for UI chrome, hairline
+    rules instead of shadows for cards, accent reserved for actions/focus
+  - **Design the waiting** (the UX half): live per-source fetch narrative from
+    data the API already returns, skeletons matched to real card geometry,
+    optimistic star / not-relevant / note-save, and no async layout shift
+  - **Mobile first** at 380 / 640 / 900 — a different layout, not a squeeze
+  - **Motion vocabulary**: one enter, one exit, one emphasis, with a single
+    `prefers-reduced-motion` block that neutralises all of it
+- Complete when: ≤8 font sizes / ≤6 paddings / ≤3 radii remain; both themes hold
+  contrast; every interactive element shows the focus ring; 380px has no
+  horizontal scroll or overlapped controls; loading regions show skeletons
+  rather than blank space; and the Simple/Advanced guards in
+  `tests/test_simple_mode.py` still pass unchanged (proving presentation-only)
+- Status: [ ] not started — plan only
+- Notes: the colour/motion layer is already good and must be preserved. Dark
+  mode is derived via `color-mix`, so it drifts silently — check both themes on
+  every change. Public templates do not extend `base.html`, so nothing
+  propagates to them automatically. `--measure` on Search result cards was
+  tried before and rejected; do not reintroduce it there.
+
 ## Backlog (unscheduled)
 - Make `pyright app` blocking in CI after clearing the current error backlog
 - Dependency lockfile (pip-tools / uv) if reproducibility becomes a priority
