@@ -282,7 +282,7 @@ Condenses Data Management in Simple mode. **Advanced is unchanged.**
   the cases where the choice is meaningless; hidden radios still drive
   `clear_first` and the only-missing hint; the collapsed report shows ≤5 rows;
   and the existing Simple/guest guards pass unchanged
-- Status: [ ] not started — plan only
+- Status: [x] 2026-08-11 — modal shell, dense report, Simple fetch/prepare dialogs (local commits; not pushed)
 - Notes: the research question is **not** an input to prepare
   (`/api/create-embeddings` takes `{model, only_missing}`), so "change your
   question" belongs on the screening card, which already has an editable field —
