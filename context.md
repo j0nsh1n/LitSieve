@@ -1,26 +1,22 @@
 # context.md — LitSieve
 
 ## Current State
-- App version **4.5.0** (`app/main.py`, `GET /health`). Product name **LitSieve**
-  (public host still **www.litpilot.org**).
-- Public origin: **https://www.litpilot.org** via Cloudflare Tunnel →
-  `http://127.0.0.1:7860` (`PUBLIC_BASE_URL` in gitignored `.env`; `DEBUG=false`).
+- App version **4.5.0** (`app/main.py`, `GET /health`). Product name **LitSieve**.
+- Example public deployment pattern: HTTPS at the edge (e.g. Cloudflare Tunnel)
+  → `uvicorn` HTTP on `127.0.0.1:7860` only. Operator sets `PUBLIC_BASE_URL` and
+  `DEBUG=false` with a real `SECRET_KEY` in gitignored `.env`.
 - Python **3.14** (Dockerfile, CI, Render, ruff `py314`).
 - Lint: `ruff check .` — partial select (E9/F63/F7/F82/F401/F541/E401/I).
 - Types: `pyright app` via `pyrightconfig.json` (basic); CI **continue-on-error**
   (report-only). Last recorded baseline: **61 errors, 6 warnings** (2026-08-02).
-- Tests: `SECRET_KEY=x DEBUG=true ./venv/bin/python -m pytest -q` — **475 passed**
-  (2026-08-06). Prefer `./venv` for sqlcipher.
-- Branch work (local): guest demo, Phase 6 two-page Simple, Account site modals,
-  fetch-form 405 fix (`requestAnimationFrame`), Jinja partials for Simple markup.
+- Tests: `SECRET_KEY=x DEBUG=true ./venv/bin/python -m pytest -q` — prefer
+  `./venv` for sqlcipher. Count drifts with the branch; re-run before release.
 - UI: Simple/Advanced via `localStorage.uiMode` + `data-mode` (theme-init pre-paint).
   Simple nav: Get papers → Search. Advanced: full steps including Clean up + Clusters.
-- Guest: `/guest` → sample corpus, fetch APIs 403, purge after 30 minutes.
-- Host: `litsieve-uvicorn.service` (user unit, Linger). Restart after code changes:
-  `systemctl --user restart litsieve-uvicorn.service`. Dev isolation:
-  `./run_dev.sh 7861` → `dev_users.db` / `dev_data/` / `logs/dev.log`.
-- Ops: daily backup timer + watchdog timer; runbook `docs/SELFHOST.md`.
-- Cloudflare edge may challenge public curl (local `/health` is the check).
+- Guest: `/guest` → sample corpus, multi-source fetch 403, purge after 30 minutes.
+- Ops: systemd user unit for uvicorn; optional backup + watchdog timers — see
+  `docs/SELFHOST.md` and `docs/DEPLOY.md` (generic operator runbooks).
+- Dev isolation: `./run_dev.sh 7861` → throwaway DB/data/log paths.
 - Known gaps: no dependency lockfile; pyright not green/blocking; account cap
   still open (Phase 4 partial).
 
@@ -37,7 +33,7 @@
 | `templates/` + `partials/` | Jinja shell + Simple/guest partials |
 | `static/` | vanilla JS/CSS (no npm); cache-bust `?v=` |
 | `tests/` | pytest; policy in `tests/README.md` |
-| `docs/` | DEPLOY, SELFHOST, SIMPLE_* plans, SCALE_NOTES |
+| `docs/` | DEPLOY, SELFHOST, plans, SCALE_NOTES |
 | `tools/` | backup, watchdog, bench_scale, encrypt_databases |
 
 ## Domain Model
@@ -81,8 +77,8 @@ Guest User (is_guest) → sample corpus only; purged by age
 
 ## Session Handoff
 - **Date:** 2026-08-10
-- **Branch:** `feat/phase6-guest-demo` (local commits; do not push without ask)
-- **Done:** Phase 7 UI refresh (tokens → collapse → editorial → waiting →
-  mobile → motion) in six local commits; Simple/guest tests unchanged green.
-- **Next:** Human review visual in light+dark at 380px; push/PR only if asked;
-  restart uvicorn after deploy.
+- **Branch:** `feat/phase6-guest-demo` (do not push without explicit ask)
+- **Done:** Public-safe trim of SELFHOST + context (less host fingerprinting);
+  Phase 7 UI work remains local ahead of origin.
+- **Next:** Open repo only after operator review; restart uvicorn after deploy
+  when shipping code.
