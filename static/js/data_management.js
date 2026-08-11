@@ -1222,7 +1222,7 @@ async function refreshCoverage() {
  }).join('');
  sug.innerHTML = '<strong>Suggested sources you are missing:</strong>'
  + `<ul class="coverage-suggest-list">${items}</ul>`
- + '<p class="help-text" style="margin-top:0.4rem;">Check them under Choose Sources on the next fetch.</p>';
+ + '<p class="help-text u-mt-sm">Check them under Choose Sources on the next fetch.</p>';
  } else if (keys.length) {
  sug.textContent = selectedTopics.size
  ? 'Coverage looks good for your selected topics - recommended sources each have at least one paper.'

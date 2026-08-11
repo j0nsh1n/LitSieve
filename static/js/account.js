@@ -264,7 +264,7 @@ function renderSharesList(shares) {
   const revoked = !!s.revoked_at;
   const active = !!s.active && !revoked;
   const badge = revoked
-   ? '<span class="library-manage-badge" style="color:var(--danger,#c44);">Revoked</span>'
+   ? '<span class="library-manage-badge is-revoked">Revoked</span>'
    : (active
     ? '<span class="library-manage-badge">Active</span>'
     : '<span class="library-manage-badge">Expired / full</span>');
@@ -279,7 +279,7 @@ function renderSharesList(shares) {
    <span class="library-manage-name"><code>${escapeHtml(s.code || '')}</code>
     · ${escapeHtml(s.title_snapshot || 'Library')}</span>
    ${badge}
-   <span class="info-text share-usage-line" style="margin:0;">${escapeHtml(uses)} · ${exp}</span>
+   <span class="info-text share-usage-line u-m-0">${escapeHtml(uses)} · ${exp}</span>
    <button type="button" class="btn btn-sm btn-secondary share-copy" ${revoked ? 'disabled' : ''}>Copy code</button>
    <button type="button" class="btn btn-sm btn-secondary share-copy-brief" ${revoked ? 'disabled' : ''}>Copy how-to</button>
    <button type="button" class="btn btn-sm btn-danger share-revoke" ${revoked ? 'disabled' : ''}>Revoke</button>
@@ -368,7 +368,7 @@ function renderAccountJoinPreview(data) {
  card.hidden = false;
  card.innerHTML = `
   <h3 class="join-preview-title">${escapeHtml(data.title || 'Library')}</h3>
-  <p class="info-text" style="margin:0.35rem 0;">From <strong>${escapeHtml(data.owner_username || 'another account')}</strong>
+  <p class="info-text join-preview-lead">From <strong>${escapeHtml(data.owner_username || 'another account')}</strong>
    · <code>${escapeHtml(data.code || '')}</code>
    · ${Number(data.article_count) || 0} papers · ${escapeHtml(emb)}</p>
  `;

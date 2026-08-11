@@ -1667,6 +1667,7 @@ body.lra-modal-open {
     color: var(--accent, #7eb8c4);
     font-weight: 600;
 }
+.library-manage-badge.is-revoked { color: var(--err); }
 .library-create-row {
     display: flex;
     flex-wrap: wrap;
@@ -1689,6 +1690,7 @@ body.lra-modal-open {
     margin: 0 0 var(--space-1);
     font-size: var(--fs-base);
 }
+.join-preview-lead { margin: var(--space-1) 0; }
 .join-preview-stats {
     margin: var(--space-2) 0 0;
     padding-left: var(--space-4);
@@ -4715,6 +4717,7 @@ html[data-mode="simple"] .search-simple-panel:not([hidden]) {
 [hidden] { display: none !important; }
 
 .u-hidden { display: none; }
+.u-m-0 { margin: 0; }
 /* Spacing utilities re-pointed at the scale (class names stay for templates). */
 .u-mt-sm { margin-top: var(--space-2); }
 .u-mt-md { margin-top: var(--space-3); }
