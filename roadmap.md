@@ -263,6 +263,32 @@ is left is **information architecture and density**.
   asserts a hardcoded relative `user_data`, and setting `CI=true` makes
   `test_db_encryption.py` hard-import sqlcipher3 by design.
 
+## Phase 8 — Simple-mode dialogs + dense source report
+Full build doc: **[docs/SIMPLE_DIALOGS_PLAN.md](docs/SIMPLE_DIALOGS_PLAN.md)**.
+Condenses Data Management in Simple mode. **Advanced is unchanged.**
+- Tasks:
+  - **Modal shell first** (prerequisite): `openSiteModal` lacks a focus trap,
+    focus restore, and body scroll lock. This phase puts dialogs in the main
+    flow on phones, where all three bite
+  - **Dense per-source report**: top 5 successes + one summary line, classroom
+    notes inside a `<details>` expander, failures summarised and muted (a source
+    returning nothing is normal). Must not double up with the Phase 7 live rows
+  - **Fetch mode dialog**: replace/add only *means* something once the library
+    has papers, so skip the dialog entirely on an empty collection and ask —
+    with the real paper count — when it is real
+  - **Re-prepare dialog**: asks the one real choice, only-new vs all
+    (`only_missing`); skipped when nothing is prepared
+- Complete when: Advanced renders exactly as today; Simple skips both dialogs in
+  the cases where the choice is meaningless; hidden radios still drive
+  `clear_first` and the only-missing hint; the collapsed report shows ≤5 rows;
+  and the existing Simple/guest guards pass unchanged
+- Status: [ ] not started — plan only
+- Notes: the research question is **not** an input to prepare
+  (`/api/create-embeddings` takes `{model, only_missing}`), so "change your
+  question" belongs on the screening card, which already has an editable field —
+  not in the prepare dialog. After re-prepare, screening should return to
+  pending via corpus state, never a JS flag.
+
 ## Backlog (unscheduled)
 - Make `pyright app` blocking in CI after clearing the current error backlog
 - Dependency lockfile (pip-tools / uv) if reproducibility becomes a priority
