@@ -6,6 +6,24 @@
  <p class="subtitle">Private workspace settings: libraries, password, or permanently delete this account.</p>
 </section>
 
+<div class="page-help-toolbar">
+ <button type="button" class="btn btn-secondary btn-sm page-help-toggle" id="page-help-toggle"
+  aria-expanded="false" aria-controls="page-help">Help</button>
+</div>
+<aside class="page-help card" id="page-help" hidden>
+ <h2 class="page-help-title">About this page</h2>
+ <div class="page-help-body">
+  <p class="info-text">You sign in with your <strong>username</strong>. Each <strong>library</strong>
+  is a separate paper collection (fetch, prepare, clusters, screening, notes). Switch libraries from
+  the nav bar; jobs always use the active library.</p>
+  <p class="info-text">Optional email is for <strong>password recovery only</strong> after you verify
+  it — no newsletters. Change password signs out other sessions. Deleting the account permanently
+  removes all workspace data (export from Search first if you need a hand-in archive).</p>
+  <p class="info-text">Library codes create a <strong>full copy</strong> of someone else’s collection
+  into a new library of yours — not live access. Notes and stars stay private.</p>
+ </div>
+</aside>
+
 <section class="card">
  <h2>Profile</h2>
  <p class="info-text">Signed in as <strong>{{ user.username }}</strong>. Each <strong>library</strong> is a
@@ -149,14 +167,8 @@
 <section class="card" id="email-section">
  <h2>Email for account recovery <span class="help-text">(optional)</span></h2>
  <p class="info-text">You sign in with your <strong>username</strong>. Adding an email is optional and
- does one thing: if you forget your password, we can send a reset code to that address.</p>
- <details class="help-details">
-  <summary>Why verify, and what we do with it</summary>
-  <p class="info-text">An address only counts once you click the link we send — anyone can type any
-  address, so clicking is what proves it is yours. Until then it does nothing. We use it for password
-  recovery only: no newsletters, no sharing. You can remove it at any time, and removing it just means
-  you would need the person running this server to help if you ever get locked out.</p>
- </details>
+ does one thing: if you forget your password, we can send a reset code to that address. An address only
+ counts after you click the verification link.</p>
 
  <div id="email-unconfigured" class="u-callout" hidden>
   <strong>Email sending is not set up on this server</strong>, so an address cannot be verified and

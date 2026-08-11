@@ -410,11 +410,36 @@ def test_phase8_search_workbench_and_score_meter():
 
 
 def test_phase8_page_help_on_app_shell_pages():
-    """Help is one summonable panel on Search, DM, Clean up, Clusters."""
+    """Help is one summonable panel on Search, DM, Clean up, Clusters, Account."""
     common = (REPO / "static" / "js" / "common.js").read_text(encoding="utf-8")
     assert "function initPageHelp" in common
-    for name in ("search.html", "data_management.html", "statistics.html", "clusters.html"):
+    for name in (
+        "search.html",
+        "data_management.html",
+        "statistics.html",
+        "clusters.html",
+        "account.html",
+    ):
         html = (REPO / "templates" / name).read_text(encoding="utf-8")
         assert 'id="page-help-toggle"' in html, name
         assert 'id="page-help"' in html, name
         assert "page-help-body" in html, name
+
+
+def test_phase8_workbench_shell_splits_workflow_and_tools():
+    """Direction B: shell-primary (steps) vs shell-tools (utilities)."""
+    base = (REPO / "templates" / "base.html").read_text(encoding="utf-8")
+    assert "app-shell" in base
+    assert "shell-primary" in base
+    assert "shell-tools" in base
+    assert 'id="nav-links-panel"' in base
+    assert 'id="mode-toggle"' in base
+    # Workflow still lives under primary; tools under shell-tools.
+    primary = base[base.find("shell-primary") : base.find("shell-tools")]
+    tools = base[base.find("shell-tools") :]
+    assert "nav-links-panel" in primary
+    assert "mode-toggle" in tools
+    assert "nav-library-select" in tools
+    css = CSS
+    assert ".shell-primary" in css
+    assert ".shell-tools" in css

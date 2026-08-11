@@ -29,12 +29,12 @@ and this project aims to follow Semantic Versioning for app version strings
   so a broken browser script previously shipped with every Python test green.
 
 ### Changed
-- **UI revamp A — Reading Room (Phase 8, in progress):** body-scale `.info-text`
-  and larger `.help-text` (no reading copy below 14px); Search query prompt at
-  `--fs-xl`; Search workbench with sticky query rail beside results; result rows
-  show a numeric 0–1 similarity meter (not Low/Medium/High); summonable page
-  **Help** on Search, Data Management, Clean up, and Clusters; dark theme grounds
-  shifted to neutral graphite (`#16181a` / `#1e2124`); denser 380px result rows.
+- **UI revamp Phase 8 (Reading Room A + Workbench B shell):** body-scale
+  `.info-text` / larger `.help-text`; Search sticky query rail + results;
+  numeric 0–1 score meters; summonable **Help** on Search, Data Management,
+  Clean up, Clusters, and Account; Workbench shell splits **workflow steps**
+  from **tools** (library / mode / theme / account) in `base.html`; dark
+  graphite grounds; denser 380px chrome.
 - **UI refresh (Phase 7):** design-system type / spacing / radius scales;
   editorial serif headings and abstracts with hairline card sections; live
   per-source fetch progress; list skeletons; optimistic star / note / Not

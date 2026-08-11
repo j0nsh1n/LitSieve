@@ -219,18 +219,19 @@ is left is **information architecture and density**.
   contrast; 380px has no horizontal scroll or overlapped controls; and the
   Simple/Advanced guards in `tests/test_simple_mode.py` still pass unchanged
   (proving presentation-only)
-- Status: [ ] in progress — 2026-08-10 A (Reading Room) largely landed on
-  `feat/phase6-guest-demo`. Remaining: optional Account Help, more density
-  pass, direction B (Workbench shell rewrite) deferred.
-- Landed for A (2026-08-10):
+- Status: [x] 2026-08-10 — A (Reading Room) + B shell (Workbench) landed on
+  `feat/phase6-guest-demo`. Full B “instrument” IA (ochre signal, deeper
+  rewrite) still optional backlog; shell split addresses the ten-control bar.
+- Landed for A + B shell (2026-08-10):
   - Type C borrowings: `.info-text` → `--fs-base` / `--lh-normal`; `.help-text`
     → `--fs-sm`; `#query-text` → `--fs-xl` serif; mobile no longer re-shrinks
     info-text
   - Search workbench: sticky query rail + results column; 380px stack polish
   - Result rows with numeric 0–1 score meter (`--score-pct` CSSOM, CSP-safe)
   - Dark grounds graphite `#16181a` / `#1e2124` / `#2c2f33` (both dark blocks)
-  - Summonable **Help** panel (`initPageHelp` in `common.js`) on Search, Data
-    Management, Clean up, Clusters; long inline `help-details` folded into it
+  - Summonable **Help** on Search, Data Management, Clean up, Clusters, Account
+  - **Workbench shell:** `shell-primary` (brand + steps) vs `shell-tools`
+    (library / mode / theme / account / logout / count)
 - Landed 2026-08-10 (not part of A, found while setting up a local preview):
   **CSP inline-style removal.** `style-src 'self'` blocks `style-src-attr`, so
   the five literal `style="…"` attributes still injected by `account.js`,

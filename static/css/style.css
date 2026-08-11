@@ -278,14 +278,18 @@ body {
     box-shadow: var(--focus-ring);
 }
 
-/* === Navigation (workflow order: 1→2→3→4; dropdown on small screens) === */
-.navbar {
+/* === Navigation — Phase 8 B Workbench shell ===
+   shell-primary: brand + workflow steps (the instrument)
+   shell-tools: library / mode / theme / account (utilities)
+   Theme toggle must never rearrange layout — shell is the same in light/dark. */
+.navbar,
+.app-shell {
     background: var(--nav-blur);
     color: var(--text);
     padding: var(--space-2) var(--space-5) var(--space-2);
     display: flex;
     flex-direction: column;
-    gap: var(--space-1);
+    gap: var(--space-2);
     position: sticky;
     top: 0;
     z-index: 100;
@@ -300,14 +304,27 @@ body {
     box-shadow: var(--elev-1);
 }
 
-.navbar-top {
+.shell-primary {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: var(--space-3);
-    min-height: 2rem;
     min-width: 0;
-    width: 100%;
+    flex: 1 1 auto;
+}
+
+.shell-tools {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+    min-width: 0;
+    flex: 0 1 auto;
+}
+
+/* Legacy alias — older CSS/tests may still mention navbar-top */
+.navbar-top {
+    display: contents;
 }
 
 .nav-brand {
@@ -339,18 +356,32 @@ body {
     padding: var(--space-1) 0 var(--space-1);
 }
 
-/* Force strip visible on wide screens even if a leftover open/closed class is set */
+/* Desktop Workbench: one instrument bar — steps grow, tools pin right */
 @media (min-width: 901px) {
     .nav-menu-toggle {
         display: none !important;
     }
-    /* Brand left, trailing controls right (menu toggle is display:none). */
-    .navbar-top {
-        display: flex;
-        justify-content: space-between;
+    .app-shell,
+    .navbar {
+        flex-direction: row;
+        align-items: center;
+        flex-wrap: nowrap;
+        gap: var(--space-4);
+        padding: var(--space-2) var(--space-5);
     }
+    .shell-primary {
+        flex: 1 1 auto;
+        min-width: 0;
+        gap: var(--space-4);
+    }
+    .shell-tools,
     .nav-stats {
-        margin-left: auto;
+        margin-left: 0;
+        flex: 0 0 auto;
+        padding: var(--space-1) var(--space-2);
+        border: 1px solid var(--rule);
+        border-radius: var(--radius-md);
+        background: color-mix(in srgb, var(--surface) 70%, transparent);
     }
     .nav-links,
     #nav-links-panel,
@@ -363,6 +394,8 @@ body {
         border-top: none;
         margin: 0;
         width: auto;
+        flex: 1 1 auto;
+        padding: 0;
     }
     .nav-flow-arrow {
         display: inline-flex !important;
@@ -668,7 +701,7 @@ body {
     max-width: 880px;
     width: 100%;
     margin: 0 auto;
-    padding: var(--space-6) var(--space-4);
+    padding: var(--space-5) var(--space-4);
     flex: 1;
     /* Page shell transitions (JS adds .page-enter / .page-exit on body) */
     transition:
@@ -3606,26 +3639,25 @@ html, body {
     max-width: 100%;
 }
 
-/* Tablet and below: steps collapse into a centered dropdown button */
+/* Tablet and below: brand | steps menu | tools; steps expand full width below */
 @media (max-width: 900px) {
-    .navbar {
+    .navbar,
+    .app-shell {
         padding: var(--space-2) var(--space-4) var(--space-2);
         gap: 0;
         position: sticky;
         overflow: visible;
-    }
-    .navbar-top {
-        /* brand | steps menu (center) | trailing controls */
         display: grid;
         grid-template-columns: minmax(0, auto) minmax(0, 1fr) minmax(0, auto);
+        grid-template-rows: auto auto;
         align-items: center;
-        gap: var(--space-2) var(--space-2);
-        min-height: 2.5rem;
-        min-width: 0;
-        width: 100%;
+    }
+    .shell-primary {
+        display: contents;
     }
     .nav-brand {
         grid-column: 1;
+        grid-row: 1;
         max-width: 7.5rem;
         font-size: var(--fs-base);
         justify-self: start;
@@ -3633,18 +3665,24 @@ html, body {
     .nav-menu-toggle {
         display: inline-flex !important;
         grid-column: 2;
+        grid-row: 1;
         justify-self: center;
         max-width: min(100%, 14rem);
         width: auto;
         min-width: 0;
     }
+    .shell-tools,
     .nav-stats {
         grid-column: 3;
+        grid-row: 1;
         gap: var(--space-1);
         flex-wrap: nowrap;
         justify-content: flex-end;
         min-width: 0;
         max-width: 100%;
+        border: none;
+        background: transparent;
+        padding: 0;
     }
     .stat-badge { display: none; }
     .nav-username { max-width: 5.5rem; }
@@ -3656,6 +3694,8 @@ html, body {
     .nav-links,
     #nav-links-panel {
         display: none !important;
+        grid-column: 1 / -1;
+        grid-row: 2;
         flex-direction: column;
         align-items: stretch;
         flex-wrap: nowrap;
@@ -3763,9 +3803,9 @@ html, body {
     .navbar {
         padding: var(--space-2) var(--space-3) var(--space-1);
     }
-    .navbar-top {
-        gap: var(--space-1) var(--space-1);
-        min-height: 2.35rem;
+    .app-shell,
+    .navbar {
+        gap: var(--space-1);
         grid-template-columns: minmax(0, 5.75rem) minmax(0, 1fr) minmax(0, auto);
     }
     .nav-brand {
@@ -4309,7 +4349,8 @@ html, body {
         order: 0;
     }
 
-    .navbar-top {
+    .app-shell,
+    .navbar {
         grid-template-columns: minmax(0, 4.75rem) minmax(0, 1fr) minmax(0, auto);
     }
     .nav-brand { max-width: 4.75rem; font-size: var(--fs-sm); }
