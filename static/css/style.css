@@ -1434,6 +1434,7 @@ input[type="range"]::-moz-range-thumb:hover {
     gap: var(--space-1);
     width: 3.75rem;
     flex-shrink: 0;
+    cursor: help;
 }
 .score-meter-track {
     display: block;
@@ -1588,8 +1589,13 @@ input[type="range"]::-moz-range-thumb:hover {
 /* Extractive key points (from the abstract — not AI-generated) */
 /* Account: AI settings */
 /* === AI Ask modal (Campus Editorial) === */
+/* Pin the page under a dialog: overflow alone still scrolls on iOS without fixed. */
 body.lra-modal-open {
     overflow: hidden;
+    position: fixed;
+    width: 100%;
+    left: 0;
+    right: 0;
 }
 .lra-modal-root {
     position: fixed;
@@ -1600,6 +1606,8 @@ body.lra-modal-open {
     justify-content: center;
     padding: var(--space-4);
     box-sizing: border-box;
+    /* Keep dialog above soft keyboard when visualViewport resizes (mobile). */
+    max-height: 100dvh;
 }
 .lra-modal-backdrop {
     position: absolute;
@@ -1618,6 +1626,29 @@ body.lra-modal-open {
     box-shadow: var(--elev-2, 0 12px 40px color-mix(in srgb, var(--text) 18%, transparent));
     border: 1px solid var(--rule);
     background: var(--surface, var(--bg));
+}
+/* Phones: bottom sheet so inputs stay above the soft keyboard. */
+@media (max-width: 640px) {
+    .lra-modal-root {
+        align-items: flex-end;
+        justify-content: center;
+        padding: 0;
+    }
+    .lra-modal-card {
+        width: 100%;
+        max-width: none;
+        max-height: min(85dvh, 100%);
+        border-radius: var(--radius-lg, 12px) var(--radius-lg, 12px) 0 0;
+        padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+    }
+    .lra-modal-actions {
+        flex-direction: column-reverse;
+        align-items: stretch;
+    }
+    .lra-modal-actions .btn {
+        width: 100%;
+        justify-content: center;
+    }
 }
 .lra-modal-title {
     margin: 0 0 var(--space-2);
@@ -4526,6 +4557,41 @@ html[data-mode="simple"] .nav-menu-current.nav-label-simple {
 /* Data Management */
 html[data-mode="simple"] section.card:has(#source-option-grid),
 html[data-mode="simple"] section.card:has(#coverage-bars),
+/* Simple: fetch replace/add radios live in a dialog; keep DOM for Advanced. */
+html[data-mode="simple"] .form-row:has(input[name="fetch-mode"]) {
+    display: none !important;
+}
+/* Dense fetch report (Simple default collapsed via <details>). */
+.fetch-source-report-details {
+    margin-top: var(--space-2);
+}
+.fetch-source-report-details > summary {
+    cursor: pointer;
+    list-style: none;
+    color: var(--text);
+    font-size: var(--fs-base);
+    line-height: var(--lh-normal);
+}
+.fetch-source-report-details > summary::-webkit-details-marker {
+    display: none;
+}
+.fetch-source-report-summary-line {
+    color: var(--muted, var(--text-muted, inherit));
+    font-size: var(--fs-sm);
+    margin-top: var(--space-1);
+}
+.fetch-source-report-full {
+    margin-top: var(--space-2);
+}
+.fetch-source-report-muted {
+    color: var(--muted, var(--text-muted, inherit));
+    font-size: var(--fs-sm);
+}
+.fetch-source-tips {
+    margin-top: var(--space-2);
+    font-size: var(--fs-sm);
+    color: var(--muted, var(--text-muted, inherit));
+}
 html[data-mode="simple"] details.advanced-details:has(#fetch-email),
 html[data-mode="simple"] details.advanced-details:has(#embedding-model) {
     display: none !important;
@@ -4762,6 +4828,31 @@ html[data-mode="simple"] .search-simple-panel:not([hidden]) {
     border-left: 4px solid var(--accent, #2a5f6e);
     padding-left: var(--space-4);
     padding-right: var(--space-2);
+}
+/* Confirm the research question after prepare — do not assume fetch text is final. */
+.simple-screen-confirm {
+    margin: var(--space-3) 0 var(--space-4);
+    padding: var(--space-4);
+    border: 2px solid var(--accent, #2a5f6e);
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--accent, #2a5f6e) 12%, var(--surface, #fff));
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent, #2a5f6e) 20%, transparent);
+}
+.simple-screen-confirm-title {
+    margin: 0 0 var(--space-1);
+    font-weight: 700;
+    font-size: var(--fs-base);
+    color: var(--text);
+}
+.simple-screen-confirm .help-text {
+    margin: 0 0 var(--space-3);
+}
+.simple-screen-confirm .form-group {
+    margin-bottom: 0;
+}
+.simple-screen-confirm input[type="text"] {
+    width: 100%;
+
 }
 .simple-screen-levels {
     border: none;
