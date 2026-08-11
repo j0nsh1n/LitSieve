@@ -175,6 +175,9 @@
     <h2>Seed paper</h2>
     <p class="info-text" id="seed-banner-text"></p>
    </section>
+
+   {# Simple: Save your work lives on the query side so Results can use full main width. #}
+   {% include "partials/simple_search_panel.html" %}
   </div>
  </aside>
 
@@ -186,8 +189,6 @@
     </div>
     <div id="results-list"></div>
    </section>
-
-   {% include "partials/simple_search_panel.html" %}
   </div>
 
   <section class="card" id="export-results-section" hidden>
@@ -254,5 +255,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/search.js?v=20260810c"></script>
+<script src="/static/js/search.js?v=20260810e"></script>
 {% endblock %}

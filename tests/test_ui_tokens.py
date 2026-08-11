@@ -396,6 +396,11 @@ def test_phase8_search_workbench_and_score_meter():
     assert "search-workbench" in search_html
     assert "search-rail" in search_html
     assert 'id="page-help"' in search_html
+    # Save-your-work panel sits in the rail so Results can use full main width.
+    rail = search_html[search_html.find("search-rail") : search_html.find("search-main")]
+    main = search_html[search_html.find("search-main") :]
+    assert "simple_search_panel" in rail
+    assert "simple_search_panel" not in main
     js = (REPO / "static" / "js" / "search.js").read_text(encoding="utf-8")
     assert "score-meter" in js
     assert "score-meter-fill" in js
