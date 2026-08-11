@@ -25,6 +25,8 @@
 <div class="search-workbench search-work" id="search-workbench">
  <aside class="search-rail" id="search-rail" aria-label="Search query and options">
   <div class="search-rail-sticky">
+   {# Scrollable controls; Save panel is pinned below so it cannot scroll away. #}
+   <div class="search-rail-scroll">
    <div class="page-help-toolbar">
     <button type="button" class="btn btn-secondary btn-sm page-help-toggle" id="page-help-toggle"
      aria-expanded="false" aria-controls="page-help">Help</button>
@@ -175,8 +177,9 @@
     <h2>Seed paper</h2>
     <p class="info-text" id="seed-banner-text"></p>
    </section>
+   </div>{# /.search-rail-scroll #}
 
-   {# Simple: Save your work lives on the query side so Results can use full main width. #}
+   {# Simple: pinned under the rail (not inside the scroll area) so it stays visible. #}
    {% include "partials/simple_search_panel.html" %}
   </div>
  </aside>
@@ -255,5 +258,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/search.js?v=20260810e"></script>
+<script src="/static/js/search.js?v=20260810f"></script>
 {% endblock %}

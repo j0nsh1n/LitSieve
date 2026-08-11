@@ -902,16 +902,35 @@ function renderResults(results) {
  * Download exactly the papers currently on screen (lastResults), in that order.
  * Primary path for RIS → Zotero File → Import.
  */
-/** Phase 6 Simple: show sticky export/report panel once results exist. */
+/** Phase 6 Simple: show export/report panel once results exist (left rail). */
 function updateSimpleSearchPanel(hasResults) {
  const panel = document.getElementById('search-simple-panel');
  const resultsSec = document.getElementById('results-section');
  if (!panel) return;
  const simple = typeof isSimpleMode === 'function' && isSimpleMode();
  const show = !!(simple && hasResults);
- panel.hidden = !show;
+ if (show) {
+  panel.removeAttribute('hidden');
+  panel.hidden = false;
+ } else {
+  panel.setAttribute('hidden', '');
+  panel.hidden = true;
+ }
  if (resultsSec) resultsSec.classList.toggle('has-simple-panel', show);
 }
+
+// If the user toggles Simple/Advanced after a search, re-show the panel.
+document.addEventListener('DOMContentLoaded', () => {
+ const modeBtn = document.getElementById('mode-toggle');
+ if (modeBtn) {
+  modeBtn.addEventListener('click', () => {
+   // common.js flips data-mode first in the same tick; re-evaluate after.
+   queueAnimationFrame(() => {
+    updateSimpleSearchPanel(!!(lastResults && lastResults.length));
+   });
+  });
+ }
+});
 
 async function doExportResults(format) {
  if (!lastResults || !lastResults.length) {

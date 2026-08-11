@@ -1476,6 +1476,14 @@ input[type="range"]::-moz-range-thumb:hover {
     position: sticky;
     top: 5rem;
     max-height: calc(100vh - 6rem);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden; /* panel pinned; only .search-rail-scroll scrolls */
+}
+.search-rail-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
     overflow: auto;
     -webkit-overflow-scrolling: touch;
 }
@@ -1518,6 +1526,11 @@ input[type="range"]::-moz-range-thumb:hover {
         max-height: none;
         overflow: visible;
         margin-bottom: var(--space-4);
+        display: block;
+    }
+    .search-rail-scroll {
+        overflow: visible;
+        max-height: none;
     }
 }
 
@@ -4639,12 +4652,16 @@ html[data-mode="simple"] .search-results-layout {
 }
 html[data-mode="simple"] .search-simple-panel:not([hidden]) {
     display: block;
-    margin-top: var(--space-4);
+    flex: 0 0 auto;
+    margin-top: var(--space-3);
     border: 1px solid var(--rule);
     border-radius: var(--radius-md);
     padding: var(--space-4);
     background: var(--surface);
     box-sizing: border-box;
+    /* Keep above the rail scroll so Save your work is always in view on desktop. */
+    z-index: 2;
+    box-shadow: 0 -8px 20px color-mix(in srgb, var(--bg) 85%, transparent);
 }
 .search-simple-panel-title {
     font-family: var(--font-serif);
