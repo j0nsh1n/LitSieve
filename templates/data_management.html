@@ -11,6 +11,27 @@
  {{ scope_fetch() }}
 </section>
 
+<div class="page-help-toolbar">
+ <button type="button" class="btn btn-secondary btn-sm page-help-toggle" id="page-help-toggle"
+  aria-expanded="false" aria-controls="page-help">Help</button>
+</div>
+<aside class="page-help card" id="page-help" hidden>
+ <h2 class="page-help-title">About this page</h2>
+ <div class="page-help-body">
+  <p class="info-text">Pick topics (and sources in Advanced), type a research question, then
+  <strong>Fetch Articles</strong>. Preparing for search runs automatically afterward. You can leave
+  the page open while progress runs.</p>
+  <p class="info-text">Sources are free public databases, not a college library package. Some may
+  fail (rate limits) while others succeed — that is normal. Coverage map shows empty recommended
+  sources after a fetch.</p>
+  <p class="info-text page-help-advanced">Preparing creates embeddings (meaning fingerprints) for Search,
+  Clusters, and duplicates. Re-prepare is optional if that step failed or you change the model.
+  Guest demos load sample papers only (no multi-source fetch).</p>
+  <p class="info-text page-help-simple">After prepare finishes, you may get a short screening step
+  (Low / Medium / High), then Go to Search. Guest demos use sample papers only.</p>
+ </div>
+</aside>
+
 <section class="card getting-started-card" id="getting-started-card" hidden>
  <div class="getting-started-header">
   <h2>Getting started</h2>
@@ -33,12 +54,6 @@
 <section class="card">
  <h2>1. Select Topics</h2>
  <p class="info-text">Choose the academic areas you care about - we use them to recommend sources.</p>
- <details class="help-details">
-  <summary>How topics are used</summary>
-  <p class="info-text">Topics drive two things: which databases get recommended below, and the
-  <strong>coverage map</strong> after a fetch (are you missing sources people often expect for this
-  topic?). Your collection stays private to this account.</p>
- </details>
  <div class="topic-grid" id="topic-grid"></div>
  <h3 class="topic-packs-heading">Quick packs for common topics</h3>
  <p class="info-text">One click sets topics and checks common free sources for that area. You can still adjust checkboxes.</p>
@@ -49,16 +64,6 @@
 <section class="card">
  <h2>2. Choose Sources</h2>
  <p class="info-text" id="source-hint">Select topics above to see recommended sources, or choose manually below.</p>
- <details class="help-details">
-  <summary>About the sources</summary>
-  <p class="info-text">Each source is a <strong>free public</strong> academic database (not a college
-  library package). Every checkbox has a <strong>Student tip</strong> (what it is good for and what
-  it misses). NASA ADS needs a free server token — without it that source simply skips.
-  <strong>bioRxiv / medRxiv</strong> are preprints (not peer-reviewed; recent window only).
-  <strong>DBLP</strong> is strong on CS titles/venues but many records have no real abstract
-  (those are skipped). Topics + coverage map use the same recommended source lists so they stay
-  aligned.</p>
- </details>
  <div class="source-option-grid" id="source-option-grid"></div>
 </section>
 
@@ -69,16 +74,6 @@
  <p class="info-text">Searches every selected source at once, saves the papers to your private
  collection, then <strong>automatically prepares them for search</strong> (you can leave this page
  open while progress runs).</p>
- <details class="help-details">
-  <summary>How fetching works</summary>
-  <p class="info-text">The query runs against every selected source <strong>in parallel</strong> as a
-  background job (progress bar; Cancel stops after the current source). Saves title, abstract,
-  authors, year, and journal. Records without an abstract are skipped (later steps need text).
-  When at least one paper is saved, prepare-for-search starts next as another background job
-  (same progress area). Some sources may fail (rate limits, API rules) while others succeed —
-  that is normal; check the per-source list. Your last query, sources, and email are remembered
-  in this browser.</p>
- </details>
  {% include "partials/guest_fetch_note.html" %}
  <form id="fetch-form" action="/data-management" method="get">
  <div class="form-row">
@@ -150,16 +145,6 @@
  Use this only if prepare failed, you changed the analysis model, or you need to run it again.</p>
  <p class="info-text prepare-lead prepare-lead-simple"><strong>Optional.</strong> Papers are prepared automatically after you fetch.
  Use this only if prepare failed, or you need to run it again.</p>
- <details class="help-details">
-  <summary>What preparing does (embeddings)</summary>
-  <p class="info-text">Preparing creates <strong>embeddings</strong>: each abstract becomes a numerical
-  "meaning fingerprint" that powers Search (hybrid ranking, seed, and more-like-starred), Clusters,
-  and Duplicate detection. It runs as a background job with a progress bar (you can leave the page
-  open) and uses your GPU when available. The model is chosen from your topics
-  (biomedical → pubmedbert, hard science → specter, otherwise general) unless you pick one under
-  Advanced. <strong>Only prepare new papers</strong> turns on for <em>Add to collection</em> and
-  off for <em>Replace</em>. Switching models reprocesses everything so dimensions stay consistent.</p>
- </details>
  <p class="info-text" id="embedding-info">Loading article info...</p>
  <p class="help-text" id="model-auto-hint"></p>
  <details class="advanced-details">

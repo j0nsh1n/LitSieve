@@ -992,15 +992,30 @@ function setUiMode(mode) {
     updateNavStepNumbers();
 }
 
+/** Phase 8: one summonable Help panel per page (`#page-help` + toggle). */
+function initPageHelp() {
+    const helpToggle = document.getElementById('page-help-toggle');
+    const helpPanel = document.getElementById('page-help');
+    if (!helpToggle || !helpPanel) return;
+    helpToggle.addEventListener('click', () => {
+        const open = helpPanel.hasAttribute('hidden');
+        if (open) helpPanel.removeAttribute('hidden');
+        else helpPanel.setAttribute('hidden', '');
+        helpToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     const btn = document.getElementById('mode-toggle');
-    if (!btn) return;
-    // theme-init already set data-mode; sync chrome only.
-    updateModeToggleButton();
-    updateNavStepNumbers();
-    btn.addEventListener('click', function() {
-        setUiMode(isSimpleMode() ? 'advanced' : 'simple');
-    });
+    if (btn) {
+        // theme-init already set data-mode; sync chrome only.
+        updateModeToggleButton();
+        updateNavStepNumbers();
+        btn.addEventListener('click', function() {
+            setUiMode(isSimpleMode() ? 'advanced' : 'simple');
+        });
+    }
+    initPageHelp();
 });
 
 // === Long-abstract clamp + expand (Search results, etc.) ===

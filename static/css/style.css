@@ -1449,13 +1449,13 @@ input[type="range"]::-moz-range-thumb:hover {
 .search-rail .card {
     padding: var(--space-4) 0;
 }
-.search-rail-toolbar {
+.page-help-toolbar {
     display: flex;
     justify-content: flex-end;
-    margin-bottom: var(--space-2);
+    margin: 0 0 var(--space-3);
 }
 .page-help {
-    margin-bottom: var(--space-3);
+    margin-bottom: var(--space-4);
     padding: var(--space-3) var(--space-4);
     border: 1px solid var(--rule);
     background: var(--surface);
@@ -4271,6 +4271,44 @@ html, body {
     body {
         overflow-x: hidden;
     }
+    .search-workbench {
+        gap: var(--space-3);
+    }
+    .search-rail .card {
+        padding: var(--space-3) 0;
+    }
+    .page-help-toolbar {
+        margin-bottom: var(--space-2);
+    }
+    .page-help {
+        padding: var(--space-2) var(--space-3);
+        margin-bottom: var(--space-3);
+    }
+    .page-help-title {
+        font-size: var(--fs-base);
+    }
+    .result-row {
+        padding: var(--space-3) var(--space-2);
+    }
+    .result-row-head {
+        flex-wrap: wrap;
+        gap: var(--space-2);
+    }
+    .score-meter {
+        width: 3.25rem;
+    }
+    .result-row-title {
+        flex: 1 1 100%;
+        order: 2;
+    }
+    .result-row-head .star-btn {
+        order: 1;
+        margin-left: auto;
+    }
+    .score-meter {
+        order: 0;
+    }
+
     .navbar-top {
         grid-template-columns: minmax(0, 4.75rem) minmax(0, 1fr) minmax(0, auto);
     }
@@ -4538,11 +4576,13 @@ html[data-mode="simple"] .sim-badge {
 html[data-mode="simple"] .score-meter {
     display: flex !important;
 }
-/* Simple: hide Advanced-only help blurb inside the Help panel */
-html[data-mode="simple"] .page-help .search-help-advanced {
+/* Simple / Advanced blurb inside Help panels */
+html[data-mode="simple"] .page-help .search-help-advanced,
+html[data-mode="simple"] .page-help .page-help-advanced {
     display: none !important;
 }
-html:not([data-mode="simple"]) .page-help .search-help-simple {
+html:not([data-mode="simple"]) .page-help .search-help-simple,
+html:not([data-mode="simple"]) .page-help .page-help-simple {
     display: none !important;
 }
 

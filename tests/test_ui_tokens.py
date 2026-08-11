@@ -407,3 +407,14 @@ def test_phase8_search_workbench_and_score_meter():
     assert ".search-workbench" in css
     assert ".score-meter-fill" in css
     assert "var(--score-pct" in css
+
+
+def test_phase8_page_help_on_app_shell_pages():
+    """Help is one summonable panel on Search, DM, Clean up, Clusters."""
+    common = (REPO / "static" / "js" / "common.js").read_text(encoding="utf-8")
+    assert "function initPageHelp" in common
+    for name in ("search.html", "data_management.html", "statistics.html", "clusters.html"):
+        html = (REPO / "templates" / name).read_text(encoding="utf-8")
+        assert 'id="page-help-toggle"' in html, name
+        assert 'id="page-help"' in html, name
+        assert "page-help-body" in html, name

@@ -41,17 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
  const starredBtn = document.getElementById('starred-search-btn');
  if (starredBtn) starredBtn.addEventListener('click', doStarredSearch);
 
- // Phase 8: one summonable Help panel (replaces inline help-details on Search).
- const helpToggle = document.getElementById('page-help-toggle');
- const helpPanel = document.getElementById('page-help');
- if (helpToggle && helpPanel) {
-  helpToggle.addEventListener('click', () => {
-   const open = helpPanel.hasAttribute('hidden');
-   if (open) helpPanel.removeAttribute('hidden');
-   else helpPanel.setAttribute('hidden', '');
-   helpToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-  });
- }
+ // Page Help toggle is wired in common.js (initPageHelp).
 
  const risBtn = document.getElementById('export-results-ris');
  if (risBtn) risBtn.addEventListener('click', () => doExportResults('ris'));
