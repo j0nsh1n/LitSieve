@@ -925,7 +925,7 @@ document.addEventListener('DOMContentLoaded', () => {
  if (modeBtn) {
   modeBtn.addEventListener('click', () => {
    // common.js flips data-mode first in the same tick; re-evaluate after.
-   queueAnimationFrame(() => {
+   requestAnimationFrame(() => {
     updateSimpleSearchPanel(!!(lastResults && lastResults.length));
    });
   });
