@@ -29,6 +29,11 @@ and this project aims to follow Semantic Versioning for app version strings
   so a broken browser script previously shipped with every Python test green.
 
 ### Changed
+- **UI revamp A — Reading Room (Phase 8, in progress):** body-scale `.info-text`
+  and larger `.help-text` (no reading copy below 14px); Search query prompt at
+  `--fs-xl`; Search workbench with sticky query rail beside results; result rows
+  show a numeric 0–1 similarity meter (not Low/Medium/High); page Help panel on
+  Search; dark theme grounds shifted to neutral graphite (`#16181a` / `#1e2124`).
 - **UI refresh (Phase 7):** design-system type / spacing / radius scales;
   editorial serif headings and abstracts with hairline card sections; live
   per-source fetch progress; list skeletons; optimistic star / note / Not

@@ -219,8 +219,17 @@ is left is **information architecture and density**.
   contrast; 380px has no horizontal scroll or overlapped controls; and the
   Simple/Advanced guards in `tests/test_simple_mode.py` still pass unchanged
   (proving presentation-only)
-- Status: [ ] planning — concepts pitched and direction chosen 2026-08-10. Only
-  the CSP fix below has landed; no layout or type work started.
+- Status: [ ] in progress — 2026-08-10 A (Reading Room) layout+type started on
+  `feat/phase6-guest-demo` after Windows planning session. Remaining: fold Help
+  on other pages (DM/Clean up/Clusters), polish 380px workbench, optional
+  further density pass. Direction B (Workbench shell rewrite) still deferred.
+- Landed for A (2026-08-10, continued on Linux host):
+  - Type C borrowings: `.info-text` → `--fs-base` / `--lh-normal`; `.help-text`
+    → `--fs-sm`; `#query-text` → `--fs-xl` serif; mobile no longer re-shrinks
+    info-text
+  - Search workbench: sticky query rail + results column; Help summonable panel
+  - Result rows with numeric 0–1 score meter (`--score-pct` CSSOM, CSP-safe)
+  - Dark grounds graphite `#16181a` / `#1e2124` / `#2c2f33` (both dark blocks)
 - Landed 2026-08-10 (not part of A, found while setting up a local preview):
   **CSP inline-style removal.** `style-src 'self'` blocks `style-src-attr`, so
   the five literal `style="…"` attributes still injected by `account.js`,
@@ -228,10 +237,8 @@ is left is **information architecture and density**.
   margins, and a "Revoked" badge that never rendered red (it also referenced
   `--danger`, which is not a defined token; the theme uses `--err`). Replaced
   with `.is-revoked`, `.join-preview-lead`, `.u-m-0`, and the existing
-  `.u-mt-sm`; asset cache-bust bumped to `v=20260810a`. Verified against a
-  running server: Data Management, Search, and Account now load with an empty
-  console. The `.is-revoked` path is not exercised by the guest demo (guests
-  cannot create share codes), so that one line is by inspection only.
+  `.u-mt-sm`; asset cache-bust bumped to `v=20260810a` then Phase 8 to
+  `v=20260810b`.
 - Notes: the current warm-linen + Georgia + teal palette is close to this
   year's generic AI-generated house style. A preserves brand continuity but not
   distinctiveness; D ("Card Catalog" — index cards, typed slips, stamped match

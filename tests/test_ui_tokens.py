@@ -372,3 +372,38 @@ def test_run_multi_fetch_publishes_per_source_counts_including_failures(monkeypa
     finally:
         with core._progress_lock:
             core._all_progress.pop(uid, None)
+
+
+def test_phase8_info_text_is_body_scale():
+    """Phase 8 C-borrowing: explanatory copy is body size, not fine print."""
+    css = CSS
+    # .info-text block must set --fs-base (not only --fs-sm).
+    m = re.search(r"\.info-text\s*\{[^}]+\}", css)
+    assert m, ".info-text rule missing"
+    block = m.group(0)
+    assert "var(--fs-base)" in block, block
+    m2 = re.search(r"\.help-text\s*\{[^}]+\}", css)
+    assert m2, ".help-text rule missing"
+    assert "var(--fs-sm)" in m2.group(0)
+    # Dark grounds graphite (Phase 8).
+    assert "--bg: #16181a" in css or "--bg:#16181a" in css
+    assert "--surface: #1e2124" in css or "--surface:#1e2124" in css
+
+
+def test_phase8_search_workbench_and_score_meter():
+    """Query rail + numeric score meter are presentation contracts."""
+    search_html = (REPO / "templates" / "search.html").read_text(encoding="utf-8")
+    assert "search-workbench" in search_html
+    assert "search-rail" in search_html
+    assert 'id="page-help"' in search_html
+    js = (REPO / "static" / "js" / "search.js").read_text(encoding="utf-8")
+    assert "score-meter" in js
+    assert "score-meter-fill" in js
+    assert "--score-pct" in js
+    assert "result-row" in js
+    # Low/Medium/High tier labels no longer drive the result chrome.
+    assert "simTier" not in js
+    css = CSS
+    assert ".search-workbench" in css
+    assert ".score-meter-fill" in css
+    assert "var(--score-pct" in css

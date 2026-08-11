@@ -41,6 +41,18 @@ document.addEventListener('DOMContentLoaded', () => {
  const starredBtn = document.getElementById('starred-search-btn');
  if (starredBtn) starredBtn.addEventListener('click', doStarredSearch);
 
+ // Phase 8: one summonable Help panel (replaces inline help-details on Search).
+ const helpToggle = document.getElementById('page-help-toggle');
+ const helpPanel = document.getElementById('page-help');
+ if (helpToggle && helpPanel) {
+  helpToggle.addEventListener('click', () => {
+   const open = helpPanel.hasAttribute('hidden');
+   if (open) helpPanel.removeAttribute('hidden');
+   else helpPanel.setAttribute('hidden', '');
+   helpToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+ }
+
  const risBtn = document.getElementById('export-results-ris');
  if (risBtn) risBtn.addEventListener('click', () => doExportResults('ris'));
 
@@ -635,15 +647,14 @@ function renderStudyTypeBadge(article) {
 }
 
 function buildResultCard(article, idx) {
- const details = document.createElement('details');
- details.className = 'article-card';
- if (idx < 3) details.setAttribute('open', '');
+ // Phase 8: scannable row with numeric 0–1 score meter (not Low/Medium/High details).
+ const card = document.createElement('article');
+ card.className = 'article-card result-row';
+ card.dataset.resultIndex = String(idx);
 
- const sim = article.similarity_score || 0;
- let simClass = 'sim-low';
- let simTier = 'Low';
- if (sim >= 0.7) { simClass = 'sim-high'; simTier = 'High'; }
- else if (sim >= 0.4) { simClass = 'sim-med'; simTier = 'Medium'; }
+ const sim = Number(article.similarity_score) || 0;
+ const simPct = Math.max(0, Math.min(100, Math.round(sim * 1000) / 10));
+ const simLabel = sim.toFixed(3);
 
  const url = getArticleUrl(article.article_id, article.source);
  const idText = escapeHtml(article.article_id || '');
@@ -668,13 +679,16 @@ function buildResultCard(article, idx) {
  ? `<span><strong>Cluster:</strong> ${escapeHtml(String(article.cluster_label))}</span>`
  : '';
 
- details.innerHTML = `
- <summary>
- <span class="sim-badge ${simClass}" title="Similarity score: ${Number(sim).toFixed(3)} (0-1)">${simTier}</span>
- <span class="article-title">${escapeHtml(article.title || '')}</span>
+ card.innerHTML = `
+ <div class="result-row-head">
+ <div class="score-meter" role="img" aria-label="Similarity ${simLabel} of 1">
+  <span class="score-meter-track"><span class="score-meter-fill"></span></span>
+  <span class="score-meter-value">${escapeHtml(simLabel)}</span>
+ </div>
+ <h3 class="article-title result-row-title">${escapeHtml(article.title || '')}</h3>
  <button type="button" class="star-btn ${starred ? 'is-starred' : ''}" title="Bookmark" aria-label="Star article">${starred ? '★' : '☆'}</button>
- </summary>
- <div class="article-body">
+ </div>
+ <div class="article-body result-row-body">
  <div class="article-meta">
  <span><strong>Year:</strong> ${escapeHtml(article.year || '')}</span>
  <span><strong>Journal:</strong> ${escapeHtml(article.journal || '')}</span>
@@ -702,11 +716,15 @@ function buildResultCard(article, idx) {
  </div>
  `;
 
- const noteField = details.querySelector('.note-field');
+ // CSP: no style= attributes — set bar width via CSS variable on the fill.
+ const fill = card.querySelector('.score-meter-fill');
+ if (fill) fill.style.setProperty('--score-pct', `${simPct}%`);
+
+ const noteField = card.querySelector('.note-field');
  noteField.value = noteVal;
 
- const noteToggle = details.querySelector('.note-toggle');
- const noteRow = details.querySelector('.note-row');
+ const noteToggle = card.querySelector('.note-toggle');
+ const noteRow = card.querySelector('.note-row');
  noteToggle.addEventListener('click', (e) => {
  e.preventDefault();
  noteToggle.hidden = true;
@@ -715,10 +733,10 @@ function buildResultCard(article, idx) {
  });
 
  if (typeof bindAiArticleActions === 'function') {
- bindAiArticleActions(details, article);
+ bindAiArticleActions(card, article);
  }
 
- const starBtn = details.querySelector('.star-btn');
+ const starBtn = card.querySelector('.star-btn');
  starBtn.addEventListener('click', async (e) => {
  e.preventDefault();
  e.stopPropagation();
@@ -743,7 +761,7 @@ function buildResultCard(article, idx) {
  }
  });
 
- const saveBtn = details.querySelector('.note-save');
+ const saveBtn = card.querySelector('.note-save');
  saveBtn.addEventListener('click', async (e) => {
  e.preventDefault();
  const prev = saveBtn.textContent;
@@ -770,16 +788,16 @@ function buildResultCard(article, idx) {
  }
  });
 
- const notRelBtn = details.querySelector('.not-relevant-btn');
+ const notRelBtn = card.querySelector('.not-relevant-btn');
  if (notRelBtn) {
  notRelBtn.addEventListener('click', async (e) => {
  e.preventDefault();
  e.stopPropagation();
  notRelBtn.disabled = true;
  // Optimistic remove; restore card if the write fails.
- const parent = details.parentNode;
- const nextSibling = details.nextSibling;
- replaceCardWithUndo(details, article, { pending: true });
+ const parent = card.parentNode;
+ const nextSibling = card.nextSibling;
+ replaceCardWithUndo(card, article, { pending: true });
  const strip = parent && parent.querySelector('.not-relevant-undo.is-pending');
  try {
  await apiCall('/api/screening', {
@@ -799,9 +817,9 @@ function buildResultCard(article, idx) {
  if (countEl) countEl.textContent = String(lastResults.length);
  } catch (err) {
  if (strip && parent) {
-  parent.replaceChild(details, strip);
+  parent.replaceChild(card, strip);
  } else if (parent) {
-  parent.insertBefore(details, nextSibling);
+  parent.insertBefore(card, nextSibling);
  }
  notRelBtn.disabled = false;
  showNotification(`Could not screen out: ${err.message}`, 'error');
@@ -809,7 +827,7 @@ function buildResultCard(article, idx) {
  });
  }
 
- return details;
+ return card;
 }
 
 /** Swap a result card for a short-lived undo strip after Not relevant. */

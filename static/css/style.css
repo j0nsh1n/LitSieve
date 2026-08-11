@@ -79,11 +79,12 @@
 /* Dark mode — system default (evening study lamp) */
 @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-        --bg: #12151a;            /* cool-warm slate, easier at night */
-        --surface: #1a1e26;       /* raised panels */
-        --text: #ebe6dc;          /* soft paper text */
+        /* Phase 8: graphite ground (was blue-slate #12151a / #1a1e26 / #2e343f) */
+        --bg: #16181a;
+        --surface: #1e2124;
+        --text: #ebe6dc;          /* soft paper text — brand ink stays */
         --text-soft: #b8b3a8;
-        --rule: #2e343f;
+        --rule: #2c2f33;
         --hover: rgba(126, 184, 196, 0.08);
         --accent: #7eb8c4;        /* lighter teal for dark contrast */
         --accent-hover: #9accd6;
@@ -101,11 +102,12 @@
 
 /* Dark mode — explicit toggle */
 [data-theme="dark"] {
-    --bg: #12151a;
-    --surface: #1a1e26;
+    /* Match prefers-color-scheme graphite grounds (Phase 8). */
+    --bg: #16181a;
+    --surface: #1e2124;
     --text: #ebe6dc;
     --text-soft: #b8b3a8;
-    --rule: #2e343f;
+    --rule: #2c2f33;
     --hover: rgba(126, 184, 196, 0.08);
     --accent: #7eb8c4;
     --accent-hover: #9accd6;
@@ -849,12 +851,14 @@ textarea { resize: vertical; }
 
 .help-text {
     display: block;
-    font-size: var(--fs-xs);
+    /* Phase 8: reading chrome ≥14px — --fs-xs reserved for badges/meta only */
+    font-size: var(--fs-sm);
     color: var(--text-soft);
     margin-top: var(--space-1);
     text-transform: none;
     letter-spacing: 0;
     font-weight: 400;
+    line-height: var(--lh-snug);
 }
 
 /* === Radio & checkbox chips === */
@@ -1369,6 +1373,119 @@ input[type="range"]::-moz-range-thumb:hover {
     padding: 0 var(--space-2);
     border: 1px solid currentColor;
     flex-shrink: 0;
+}
+
+/* Phase 8 — scannable result rows + 0–1 score meter */
+.result-row {
+    padding: var(--space-3) var(--space-4);
+}
+.result-row-head {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    margin-bottom: var(--space-2);
+}
+.result-row-title {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    font-family: var(--font-serif);
+    font-size: var(--fs-base);
+    font-weight: 500;
+    line-height: var(--lh-snug);
+}
+.score-meter {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-1);
+    width: 3.75rem;
+    flex-shrink: 0;
+}
+.score-meter-track {
+    display: block;
+    height: 0.4rem;
+    border-radius: var(--radius-full);
+    background: color-mix(in srgb, var(--rule) 80%, transparent);
+    overflow: hidden;
+}
+.score-meter-fill {
+    display: block;
+    height: 100%;
+    width: var(--score-pct, 0%);
+    max-width: 100%;
+    border-radius: var(--radius-full);
+    background: var(--accent);
+    transition: width var(--dur-med) var(--ease-out);
+}
+.score-meter-value {
+    font-size: var(--fs-xs);
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    color: var(--text-soft);
+    text-align: center;
+    line-height: 1;
+}
+.result-row-body {
+    padding: 0;
+    border-top: none;
+}
+
+/* Phase 8 — Search workbench: sticky query rail + results */
+.search-workbench {
+    display: grid;
+    grid-template-columns: minmax(16rem, 22rem) minmax(0, 1fr);
+    gap: var(--space-5);
+    align-items: start;
+    margin-bottom: var(--space-5);
+}
+.search-rail-sticky {
+    position: sticky;
+    top: 5rem;
+    max-height: calc(100vh - 6rem);
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+}
+.search-rail .card {
+    padding: var(--space-4) 0;
+}
+.search-rail-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: var(--space-2);
+}
+.page-help {
+    margin-bottom: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--rule);
+    background: var(--surface);
+}
+.page-help-title {
+    font-family: var(--font-serif);
+    font-size: var(--fs-md);
+    margin: 0 0 var(--space-2);
+    line-height: var(--lh-tight);
+}
+.page-help-body .info-text:last-child {
+    margin-bottom: 0;
+}
+.search-main #results-section {
+    margin-bottom: var(--space-4);
+}
+.search-main #results-section:not(.u-hidden) {
+    display: block;
+}
+
+@media (max-width: 900px) {
+    .search-workbench {
+        display: block;
+    }
+    .search-rail-sticky {
+        position: static;
+        max-height: none;
+        overflow: visible;
+        margin-bottom: var(--space-4);
+    }
 }
 
 .sim-high { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 55%, var(--rule)); }
@@ -2607,9 +2724,18 @@ body.lra-modal-open {
 .info-text {
     font-family: var(--font-sans);
     color: var(--text-body);
-    font-size: var(--fs-sm);
-    line-height: var(--lh-snug);
+    /* Phase 8: body-scale explanatory copy (was --fs-sm / --lh-snug) */
+    font-size: var(--fs-base);
+    line-height: var(--lh-normal);
     margin-bottom: var(--space-3);
+}
+
+/* Search query prompt — page opens on the question, not chrome */
+#query-text {
+    font-size: var(--fs-xl);
+    line-height: var(--lh-snug);
+    font-family: var(--font-serif);
+    min-height: 6.5rem;
 }
 
 /* === Progressive disclosure (help + advanced) ===
@@ -3745,8 +3871,14 @@ html, body {
     }
     .card h3 { font-size: var(--fs-base); }
     .info-text {
-        font-size: var(--fs-sm);
+        /* Keep body scale on phones — do not silently re-shrink reading copy */
+        font-size: var(--fs-base);
+        line-height: var(--lh-normal);
         margin-bottom: var(--space-3);
+    }
+    #query-text {
+        font-size: var(--fs-lg);
+        min-height: 5.5rem;
     }
     .card.empty-state-card > .info-text,
     .card.empty-state-card .info-text#dup-empty-msg,
@@ -4400,6 +4532,17 @@ html[data-mode="simple"] .input-method-toggle label:has(input[value="seed"]),
 html[data-mode="simple"] #seed-input-panel,
 html[data-mode="simple"] #seed-banner,
 html[data-mode="simple"] .sim-badge {
+    display: none !important;
+}
+/* Score meter stays visible in Simple (numeric 0–1, not Low/Med/High). */
+html[data-mode="simple"] .score-meter {
+    display: flex !important;
+}
+/* Simple: hide Advanced-only help blurb inside the Help panel */
+html[data-mode="simple"] .page-help .search-help-advanced {
+    display: none !important;
+}
+html:not([data-mode="simple"]) .page-help .search-help-simple {
     display: none !important;
 }
 

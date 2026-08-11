@@ -78,7 +78,8 @@ Guest User (is_guest) → sample corpus only; purged by age
 ## Session Handoff
 - **Date:** 2026-08-10
 - **Branch:** `feat/phase6-guest-demo` (do not push without explicit ask)
-- **Done:** Public-safe trim of SELFHOST + context (less host fingerprinting);
-  Phase 7 UI work remains local ahead of origin.
-- **Next:** Open repo only after operator review; restart uvicorn after deploy
-  when shipping code.
+- **Done:** Phase 8 A (Reading Room) started — type scale for info/help,
+  Search workbench + score meters, graphite dark grounds, Help panel on Search;
+  CSP fix + public-safe docs already on branch. Tests green (~491).
+- **Next:** Help panels on other app pages if needed; 380px workbench polish;
+  commit/PR when asked; restart uvicorn after deploy.

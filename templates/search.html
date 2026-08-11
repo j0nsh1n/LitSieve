@@ -21,237 +21,238 @@
  </p>
 </section>
 
-<section class="card search-work" id="search-query-section">
- <p class="info-text">Searches <strong>your collection only</strong> (not the whole internet). Plain
- language works - the app compares meaning, not just keywords.</p>
- <details class="help-details search-help-advanced">
-  <summary>The three input modes and what gets searched</summary>
-  <p class="info-text"><strong>Text</strong> is a free research question; <strong>PICO</strong> is for
-  clinical-style questions (Population / Intervention / Comparison / Outcome); <strong>Seed</strong>
-  starts from one paper already in your collection. You can also run <strong>More like my
-  starred</strong> after bookmarking papers with ★. The app compares meaning, then slightly boosts
-  papers that also share your exact words. Papers you screened out (Quick screen, Not relevant,
-  Clusters, or duplicates) never appear here.</p>
- </details>
- <details class="help-details search-help-simple">
-  <summary>How search works</summary>
-  <p class="info-text"><strong>Text</strong> is a free research question; <strong>PICO</strong> is for
-  clinical-style questions (Population / Intervention / Comparison / Outcome). You can also run
-  <strong>More like my starred</strong> after bookmarking papers with ★. The app compares meaning,
-  then slightly boosts papers that also share your exact words. Papers you screened out (Quick
-  screen, Not relevant, or duplicates) never appear here.</p>
- </details>
- <div class="input-method-toggle">
- <label class="radio-label">
- <input type="radio" name="input_method" value="text" checked> Text Input
- </label>
- <label class="radio-label">
- <input type="radio" name="input_method" value="pico"> PICO Format
- </label>
- <label class="radio-label">
- <input type="radio" name="input_method" value="seed"> Seed paper
- </label>
- </div>
-
- <div id="text-input-panel">
- <textarea id="query-text" placeholder="Enter your study description or research question..." rows="4"></textarea>
- </div>
-
- <div class="u-hidden" id="pico-input-panel">
- <p class="info-text">Fill in the parts you know.</p>
- <div class="pico-grid">
- <div class="form-group">
- <label>Population</label>
- <input type="text" id="pico-population" placeholder="e.g., Adults with type 2 diabetes">
- </div>
- <div class="form-group">
- <label>Intervention</label>
- <input type="text" id="pico-intervention" placeholder="e.g., Metformin treatment">
- </div>
- <div class="form-group">
- <label>Comparison</label>
- <input type="text" id="pico-comparison" placeholder="e.g., Placebo or standard care">
- </div>
- <div class="form-group">
- <label>Outcome</label>
- <input type="text" id="pico-outcome" placeholder="e.g., Glycemic control">
- </div>
- </div>
- </div>
-
- <div class="u-hidden" id="seed-input-panel">
- <p class="info-text"><strong>Seed paper:</strong> paste an article id (e.g. PubMed ID or DOI) or part
- of a title from a paper already in your collection - the app ranks the rest by similarity to it.
- Useful when a teacher gives you one starter citation.</p>
- <div class="form-group">
- <label>Seed id or title fragment</label>
- <input type="text" id="seed-query" placeholder="e.g. 10.1038/... or climate warming oceans">
- </div>
- </div>
-</section>
-
-<section class="card search-work" id="search-controls-section">
- <div class="param-row">
- <div class="param-group">
- <label>Results: <strong id="topk-display">10</strong></label>
- <input type="range" id="top-k" min="1" max="50" value="10">
- </div>
- <div class="param-group">
- <label>Sort by</label>
- <select id="sort-by">
- <option value="similarity">Similarity Score</option>
- <option value="year">Publication Year (newest first)</option>
- <option value="journal">Journal Name (A-Z)</option>
- <option value="title">Title (A-Z)</option>
- </select>
- </div>
- <div class="param-group year-range-group">
- <label>From year</label>
- <input type="number" id="year-min" class="year-input" min="1900" max="2100" step="1" placeholder="e.g. 2015">
- </div>
- <div class="param-group year-range-group">
- <label>To year</label>
- <input type="number" id="year-max" class="year-input" min="1900" max="2100" step="1" placeholder="e.g. 2024">
- <p class="help-text year-range-hint">Papers with unknown year are hidden when a range is set.</p>
- </div>
- </div>
-
- <details class="advanced-details">
-  <summary>Advanced: ranking options and source filter</summary>
-  <div class="advanced-body">
-   <div class="param-row">
-   <div class="param-group">
-   <label class="radio-label">
-   <input type="checkbox" id="lexical-boost" checked> Prefer exact words (hybrid)
-   </label>
-   <span class="help-text">Blend meaning similarity with TF-IDF word overlap (on by default).</span>
+{# Phase 8: sticky query rail + results column (query and hits co-visible). #}
+<div class="search-workbench search-work" id="search-workbench">
+ <aside class="search-rail" id="search-rail" aria-label="Search query and options">
+  <div class="search-rail-sticky">
+   <div class="search-rail-toolbar">
+    <button type="button" class="btn btn-secondary btn-sm page-help-toggle" id="page-help-toggle"
+     aria-expanded="false" aria-controls="page-help">Help</button>
    </div>
-   <div class="param-group">
-   <label class="radio-label">
-   <input type="checkbox" id="pico-boost"> Prefer PICO matches
-   </label>
-   <span class="help-text">Slight boost when abstract text overlaps your query terms (does not replace similarity).</span>
-   </div>
-   </div>
-   <div class="param-group">
-   <label>Sources (all included by default)</label>
-   <div class="source-selector">
-   <label class="radio-label"><input type="checkbox" name="search-source" value="pubmed" checked> PubMed</label>
-   <label class="radio-label"><input type="checkbox" name="search-source" value="europepmc" checked> Europe PMC</label>
-   <label class="radio-label"><input type="checkbox" name="search-source" value="clinicaltrials" checked> ClinicalTrials.gov</label>
-   <label class="radio-label"><input type="checkbox" name="search-source" value="openalex" checked> OpenAlex</label>
-   <label class="radio-label"><input type="checkbox" name="search-source" value="arxiv" checked> arXiv</label>
-   <label class="radio-label"><input type="checkbox" name="search-source" value="semanticscholar" checked> Semantic Scholar</label>
-   <label class="radio-label"><input type="checkbox" name="search-source" value="eric" checked> ERIC</label>
-   <label class="radio-label"><input type="checkbox" name="search-source" value="zenodo" checked> Zenodo</label>
-   <label class="radio-label"><input type="checkbox" name="search-source" value="crossref" checked> CrossRef</label>
-   <label class="radio-label"><input type="checkbox" name="search-source" value="doaj" checked> DOAJ</label>
-   <label class="radio-label"><input type="checkbox" name="search-source" value="nasa_ads" checked> NASA ADS</label>
-   <label class="radio-label"><input type="checkbox" name="search-source" value="biorxiv" checked> bioRxiv</label>
-   <label class="radio-label"><input type="checkbox" name="search-source" value="medrxiv" checked> medRxiv</label>
-   <label class="radio-label"><input type="checkbox" name="search-source" value="dblp" checked> DBLP</label>
-   <label class="radio-label"><input type="checkbox" name="search-source" value="openaire" checked> OpenAIRE</label>
-   <label class="radio-label"><input type="checkbox" name="search-source" value="plos" checked> PLOS</label>
-   <label class="radio-label"><input type="checkbox" name="search-source" value="hal" checked> HAL</label>
-   </div>
-   <div class="help-text u-mt-sm" id="source-availability-hint"></div>
-   </div>
-  </div>
- </details>
+   <aside class="page-help card" id="page-help" hidden>
+    <h2 class="page-help-title">About this page</h2>
+    <div class="page-help-body">
+     <p class="info-text search-help-advanced">Searches <strong>your collection only</strong> (not the whole internet).
+     <strong>Text</strong> is a free research question; <strong>PICO</strong> is for clinical-style questions;
+     <strong>Seed</strong> starts from one paper already in your collection. <strong>More like my starred</strong>
+     uses bookmarked papers. Screened-out papers never appear. The score meter shows the 0–1 similarity rank.</p>
+     <p class="info-text search-help-simple">Searches <strong>your collection only</strong>.
+     <strong>Text</strong> or <strong>PICO</strong> for your question; <strong>More like my starred</strong>
+     after bookmarking with ★. Screened-out papers never appear. The score meter shows how well each paper matches (0–1).</p>
+    </div>
+   </aside>
 
- <button id="search-btn" class="btn btn-primary btn-block">Search</button>
- <button type="button" id="starred-search-btn" class="btn btn-secondary btn-block u-mt-md">
- More like my starred (<span id="starred-count">0</span>)
- </button>
- <p class="help-text">Finds papers similar to the ones you starred (the starred papers themselves are left out).</p>
-</section>
+   <section class="card" id="search-query-section">
+    <p class="info-text">Searches <strong>your collection only</strong> (not the whole internet). Plain
+    language works - the app compares meaning, not just keywords.</p>
+    <div class="input-method-toggle">
+    <label class="radio-label">
+    <input type="radio" name="input_method" value="text" checked> Text Input
+    </label>
+    <label class="radio-label">
+    <input type="radio" name="input_method" value="pico"> PICO Format
+    </label>
+    <label class="radio-label">
+    <input type="radio" name="input_method" value="seed"> Seed paper
+    </label>
+    </div>
 
-<section id="seed-banner" class="card search-work u-hidden">
- <h2>Seed paper</h2>
- <p class="info-text" id="seed-banner-text"></p>
-</section>
+    <div id="text-input-panel">
+    <label class="u-visually-hidden" for="query-text">Research question</label>
+    <textarea id="query-text" placeholder="Enter your study description or research question..." rows="4"></textarea>
+    </div>
 
-<div class="search-results-layout" id="search-results-layout">
-<section class="search-work u-hidden" id="results-section">
- <div class="results-header">
- <h2>Results: <span id="result-count">0</span> articles found</h2>
- </div>
- <details class="help-details">
-  <summary>Reading these results</summary>
-  <p class="info-text">The match badge shows how strong the similarity is (hover for the exact 0-1
-  score). A <strong>Type</strong> tag is a rough automated guess from the title and abstract
-  (review, trial, survey, …). An exclamation mark means low or medium confidence - the tag is
-  often wrong. It is <strong>not</strong> an evidence grade or quality score. Matching words from
-  your query are <mark class="hl-demo">highlighted</mark> in abstracts. Use ★ to bookmark and
-  <em>Add note</em> for private notes.</p>
- </details>
- <div id="results-list"></div>
-</section>
+    <div class="u-hidden" id="pico-input-panel">
+    <p class="info-text">Fill in the parts you know.</p>
+    <div class="pico-grid">
+    <div class="form-group">
+    <label>Population</label>
+    <input type="text" id="pico-population" placeholder="e.g., Adults with type 2 diabetes">
+    </div>
+    <div class="form-group">
+    <label>Intervention</label>
+    <input type="text" id="pico-intervention" placeholder="e.g., Metformin treatment">
+    </div>
+    <div class="form-group">
+    <label>Comparison</label>
+    <input type="text" id="pico-comparison" placeholder="e.g., Placebo or standard care">
+    </div>
+    <div class="form-group">
+    <label>Outcome</label>
+    <input type="text" id="pico-outcome" placeholder="e.g., Glycemic control">
+    </div>
+    </div>
+    </div>
 
-{% include "partials/simple_search_panel.html" %}
-</div>
+    <div class="u-hidden" id="seed-input-panel">
+    <p class="info-text"><strong>Seed paper:</strong> paste an article id (e.g. PubMed ID or DOI) or part
+    of a title from a paper already in your collection - the app ranks the rest by similarity to it.
+    Useful when a teacher gives you one starter citation.</p>
+    <div class="form-group">
+    <label>Seed id or title fragment</label>
+    <input type="text" id="seed-query" placeholder="e.g. 10.1038/... or climate warming oceans">
+    </div>
+    </div>
+   </section>
 
-<section class="card search-work" id="export-results-section" hidden>
- <h2>Export these search results</h2>
- <p class="info-text">Download the papers <strong>currently shown above</strong> as one RIS file
- for free <a href="https://www.zotero.org/download/" target="_blank" rel="noopener">Zotero</a>
- (APA / MLA / Chicago after import). Only this ranked list — not your whole library.</p>
- <div class="export-row export-row-primary">
-  <button type="button" id="export-results-ris" class="btn btn-primary btn-lg btn-download"
-   title="Citation file of the search results on screen — for Zotero File → Import">
-   Download RIS (these results)</button>
- </div>
- <div id="export-results-status" class="status-indicator"></div>
-
- <div class="citation-tools" aria-label="Import into Zotero">
-  <h3 class="citation-tools-heading">Then format citations in Zotero (free)</h3>
-  <ol class="export-format-list zotero-steps">
-   <li>Click <strong>Download RIS (these results)</strong> above.</li>
-   <li>Open the <a href="https://www.zotero.org/download/" target="_blank" rel="noopener">Zotero</a>
-    desktop app (install once if needed).</li>
-   <li>In Zotero’s <strong>top menu bar</strong> (not a right‑click): choose
-    <strong>File → Import…</strong>.</li>
-   <li>Select <strong>A file (BibTeX, RIS, Zotero RDF, etc.)</strong> → <strong>Next</strong>.</li>
-   <li>Browse to the downloaded <code>search_results.ris</code> → <strong>Open</strong> →
-    <strong>Next / Finish</strong>.</li>
-   <li>You should now see <strong>many paper titles</strong> in your library — not a single row
-    named “library” or “search_results” with a paperclip/file icon.</li>
-   <li>Click the first paper, then Shift‑click the last to select them all (or Ctrl/Cmd‑A in the
-    list). Right‑click → <strong>Create Bibliography from Items…</strong> → choose APA or MLA →
-    copy into your document.</li>
-  </ol>
-  <p class="help-text"><strong>If you only see one item called “library” or “search_results”:</strong>
-  you attached the file instead of importing it. Delete that row, then use
-  <strong>File → Import…</strong> again — do <em>not</em> drag the file into the middle of the
-  Zotero window.</p>
- </div>
-
- <details class="advanced-details u-mt-xl">
-  <summary>Export whole library instead (not just this search)</summary>
-  <div class="advanced-body">
-   <p class="info-text">Use this only if you need every paper in a scope (all / included / screened
-   out / starred), not the ranked list above. Same Zotero import steps.</p>
-   <div class="export-scope-row">
-    <label for="lib-export-scope" class="help-text export-scope-label">Scope</label>
-    <select id="lib-export-scope" class="export-scope-select"
-     title="Which papers to include in the library download">
-     <option value="all">All articles</option>
-     <option value="included" selected>Included only</option>
-     <option value="excluded">Screened out only</option>
-     <option value="starred">Starred only</option>
+   <section class="card" id="search-controls-section">
+    <div class="param-row">
+    <div class="param-group">
+    <label>Results: <strong id="topk-display">10</strong></label>
+    <input type="range" id="top-k" min="1" max="50" value="10">
+    </div>
+    <div class="param-group">
+    <label>Sort by</label>
+    <select id="sort-by">
+    <option value="similarity">Similarity Score</option>
+    <option value="year">Publication Year (newest first)</option>
+    <option value="journal">Journal Name (A-Z)</option>
+    <option value="title">Title (A-Z)</option>
     </select>
-   </div>
-   <div class="export-row export-row-primary">
-    <button type="button" class="btn btn-primary btn-lg btn-download" data-lib-export-format="ris"
-     title="Whole-library RIS for Zotero File → Import">Download library RIS</button>
-   </div>
-   <p class="help-text">Process counts (how many collected / excluded / kept) are on
-   <a href="/statistics">Clean up → Screening report</a>.</p>
+    </div>
+    <div class="param-group year-range-group">
+    <label>From year</label>
+    <input type="number" id="year-min" class="year-input" min="1900" max="2100" step="1" placeholder="e.g. 2015">
+    </div>
+    <div class="param-group year-range-group">
+    <label>To year</label>
+    <input type="number" id="year-max" class="year-input" min="1900" max="2100" step="1" placeholder="e.g. 2024">
+    <p class="help-text year-range-hint">Papers with unknown year are hidden when a range is set.</p>
+    </div>
+    </div>
+
+    <details class="advanced-details">
+     <summary>Advanced: ranking options and source filter</summary>
+     <div class="advanced-body">
+      <div class="param-row">
+      <div class="param-group">
+      <label class="radio-label">
+      <input type="checkbox" id="lexical-boost" checked> Prefer exact words (hybrid)
+      </label>
+      <span class="help-text">Blend meaning similarity with TF-IDF word overlap (on by default).</span>
+      </div>
+      <div class="param-group">
+      <label class="radio-label">
+      <input type="checkbox" id="pico-boost"> Prefer PICO matches
+      </label>
+      <span class="help-text">Slight boost when abstract text overlaps your query terms (does not replace similarity).</span>
+      </div>
+      </div>
+      <div class="param-group">
+      <label>Sources (all included by default)</label>
+      <div class="source-selector">
+      <label class="radio-label"><input type="checkbox" name="search-source" value="pubmed" checked> PubMed</label>
+      <label class="radio-label"><input type="checkbox" name="search-source" value="europepmc" checked> Europe PMC</label>
+      <label class="radio-label"><input type="checkbox" name="search-source" value="clinicaltrials" checked> ClinicalTrials.gov</label>
+      <label class="radio-label"><input type="checkbox" name="search-source" value="openalex" checked> OpenAlex</label>
+      <label class="radio-label"><input type="checkbox" name="search-source" value="arxiv" checked> arXiv</label>
+      <label class="radio-label"><input type="checkbox" name="search-source" value="semanticscholar" checked> Semantic Scholar</label>
+      <label class="radio-label"><input type="checkbox" name="search-source" value="eric" checked> ERIC</label>
+      <label class="radio-label"><input type="checkbox" name="search-source" value="zenodo" checked> Zenodo</label>
+      <label class="radio-label"><input type="checkbox" name="search-source" value="crossref" checked> CrossRef</label>
+      <label class="radio-label"><input type="checkbox" name="search-source" value="doaj" checked> DOAJ</label>
+      <label class="radio-label"><input type="checkbox" name="search-source" value="nasa_ads" checked> NASA ADS</label>
+      <label class="radio-label"><input type="checkbox" name="search-source" value="biorxiv" checked> bioRxiv</label>
+      <label class="radio-label"><input type="checkbox" name="search-source" value="medrxiv" checked> medRxiv</label>
+      <label class="radio-label"><input type="checkbox" name="search-source" value="dblp" checked> DBLP</label>
+      <label class="radio-label"><input type="checkbox" name="search-source" value="openaire" checked> OpenAIRE</label>
+      <label class="radio-label"><input type="checkbox" name="search-source" value="plos" checked> PLOS</label>
+      <label class="radio-label"><input type="checkbox" name="search-source" value="hal" checked> HAL</label>
+      </div>
+      <div class="help-text u-mt-sm" id="source-availability-hint"></div>
+      </div>
+     </div>
+    </details>
+
+    <button id="search-btn" class="btn btn-primary btn-block">Search</button>
+    <button type="button" id="starred-search-btn" class="btn btn-secondary btn-block u-mt-md">
+    More like my starred (<span id="starred-count">0</span>)
+    </button>
+    <p class="help-text">Finds papers similar to the ones you starred (the starred papers themselves are left out).</p>
+   </section>
+
+   <section id="seed-banner" class="card u-hidden">
+    <h2>Seed paper</h2>
+    <p class="info-text" id="seed-banner-text"></p>
+   </section>
   </div>
- </details>
-</section>
+ </aside>
+
+ <div class="search-main" id="search-main">
+  <div class="search-results-layout" id="search-results-layout">
+   <section class="u-hidden" id="results-section">
+    <div class="results-header">
+    <h2>Results: <span id="result-count">0</span> articles found</h2>
+    </div>
+    <div id="results-list"></div>
+   </section>
+
+   {% include "partials/simple_search_panel.html" %}
+  </div>
+
+  <section class="card" id="export-results-section" hidden>
+   <h2>Export these search results</h2>
+   <p class="info-text">Download the papers <strong>currently shown above</strong> as one RIS file
+   for free <a href="https://www.zotero.org/download/" target="_blank" rel="noopener">Zotero</a>
+   (APA / MLA / Chicago after import). Only this ranked list — not your whole library.</p>
+   <div class="export-row export-row-primary">
+    <button type="button" id="export-results-ris" class="btn btn-primary btn-lg btn-download"
+     title="Citation file of the search results on screen — for Zotero File → Import">
+     Download RIS (these results)</button>
+   </div>
+   <div id="export-results-status" class="status-indicator"></div>
+
+   <div class="citation-tools" aria-label="Import into Zotero">
+    <h3 class="citation-tools-heading">Then format citations in Zotero (free)</h3>
+    <ol class="export-format-list zotero-steps">
+     <li>Click <strong>Download RIS (these results)</strong> above.</li>
+     <li>Open the <a href="https://www.zotero.org/download/" target="_blank" rel="noopener">Zotero</a>
+      desktop app (install once if needed).</li>
+     <li>In Zotero’s <strong>top menu bar</strong> (not a right‑click): choose
+      <strong>File → Import…</strong>.</li>
+     <li>Select <strong>A file (BibTeX, RIS, Zotero RDF, etc.)</strong> → <strong>Next</strong>.</li>
+     <li>Browse to the downloaded <code>search_results.ris</code> → <strong>Open</strong> →
+      <strong>Next / Finish</strong>.</li>
+     <li>You should now see <strong>many paper titles</strong> in your library — not a single row
+      named “library” or “search_results” with a paperclip/file icon.</li>
+     <li>Click the first paper, then Shift‑click the last to select them all (or Ctrl/Cmd‑A in the
+      list). Right‑click → <strong>Create Bibliography from Items…</strong> → choose APA or MLA →
+      copy into your document.</li>
+    </ol>
+    <p class="help-text"><strong>If you only see one item called “library” or “search_results”:</strong>
+    you attached the file instead of importing it. Delete that row, then use
+    <strong>File → Import…</strong> again — do <em>not</em> drag the file into the middle of the
+    Zotero window.</p>
+   </div>
+
+   <details class="advanced-details u-mt-xl">
+    <summary>Export whole library instead (not just this search)</summary>
+    <div class="advanced-body">
+     <p class="info-text">Use this only if you need every paper in a scope (all / included / screened
+     out / starred), not the ranked list above. Same Zotero import steps.</p>
+     <div class="export-scope-row">
+      <label for="lib-export-scope" class="help-text export-scope-label">Scope</label>
+      <select id="lib-export-scope" class="export-scope-select"
+       title="Which papers to include in the library download">
+       <option value="all">All articles</option>
+       <option value="included" selected>Included only</option>
+       <option value="excluded">Screened out only</option>
+       <option value="starred">Starred only</option>
+      </select>
+     </div>
+     <div class="export-row export-row-primary">
+      <button type="button" class="btn btn-primary btn-lg btn-download" data-lib-export-format="ris"
+       title="Whole-library RIS for Zotero File → Import">Download library RIS</button>
+     </div>
+     <p class="help-text">Process counts (how many collected / excluded / kept) are on
+     <a href="/statistics">Clean up → Screening report</a>.</p>
+    </div>
+   </details>
+  </section>
+ </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/search.js?v=20260807d"></script>
+<script src="/static/js/search.js?v=20260810b"></script>
 {% endblock %}
