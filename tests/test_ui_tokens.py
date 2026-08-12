@@ -189,6 +189,19 @@ def test_search_optimistic_star_and_skeletons():
     search = (REPO / "static" / "js" / "search.js").read_text(encoding="utf-8")
     assert "function showResultSkeletons" in search
     assert "showResultSkeletons" in search
+    # Failed search must clear skeletons (not leave infinite loading rows).
+    assert "function clearResultSkeletonsOnError" in search
+    assert "clearResultSkeletonsOnError" in search
+    # Not-relevant undo strip is tracked per row; Undo disabled while exclude pending.
+    assert "return strip" in search
+    not_rel = search[
+        search.find("notRelBtn.addEventListener") : search.find(
+            "function replaceCardWithUndo"
+        )
+    ]
+    assert "const strip = replaceCardWithUndo" in not_rel
+    assert "querySelector('.not-relevant-undo.is-pending')" not in not_rel
+    assert "undoBtn.disabled = false" in not_rel or "undoBtn.disabled=false" in not_rel
     # Optimistic star flips UI before await (note-save appears earlier in the file).
     start = search.find("starBtn.addEventListener")
     assert start != -1

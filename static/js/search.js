@@ -485,6 +485,8 @@ async function doSearch(opts) {
  await saveSearchSession(method);
  } catch (e) {
  if (!fromRestore) showNotification(`Search failed: ${e.message}`, 'error');
+ // Drop loading skeletons so a failed search does not look stuck mid-load.
+ clearResultSkeletonsOnError(fromRestore);
  } finally {
  setLoading(btn, false);
  }
@@ -557,6 +559,7 @@ async function doStarredSearch(opts) {
  await saveSearchSession('starred');
  } catch (e) {
  if (!fromRestore) showNotification(`Starred search failed: ${e.message}`, 'error');
+ clearResultSkeletonsOnError(fromRestore);
  } finally {
  setLoading(btn, false);
  }
@@ -789,10 +792,10 @@ function buildResultCard(article, idx) {
  e.stopPropagation();
  notRelBtn.disabled = true;
  // Optimistic remove; restore card if the write fails.
+ // Keep the strip returned for *this* row — never look up the first pending strip.
  const parent = card.parentNode;
  const nextSibling = card.nextSibling;
- replaceCardWithUndo(card, article, { pending: true });
- const strip = parent && parent.querySelector('.not-relevant-undo.is-pending');
+ const strip = replaceCardWithUndo(card, article, { pending: true });
  try {
  await apiCall('/api/screening', {
  method: 'POST',
@@ -802,7 +805,15 @@ function buildResultCard(article, idx) {
  reason: 'off_topic',
  },
  });
- if (strip) strip.classList.remove('is-pending');
+ if (strip) {
+  strip.classList.remove('is-pending');
+  const undoBtn = strip.querySelector('.undo-not-relevant');
+  // Undo stays disabled until exclude finishes (avoids include-before-exclude race).
+  if (undoBtn) {
+   undoBtn.disabled = false;
+   undoBtn.removeAttribute('aria-disabled');
+  }
+ }
  showNotification('Marked not relevant (screened out).', 'success');
  lastResults = lastResults.filter(
  (a) => !(a.article_id === article.article_id && a.source === article.source)
@@ -810,7 +821,7 @@ function buildResultCard(article, idx) {
  const countEl = document.getElementById('result-count');
  if (countEl) countEl.textContent = String(lastResults.length);
  } catch (err) {
- if (strip && parent) {
+ if (strip && parent && strip.parentNode === parent) {
   parent.replaceChild(card, strip);
  } else if (parent) {
   parent.insertBefore(card, nextSibling);
@@ -824,19 +835,23 @@ function buildResultCard(article, idx) {
  return card;
 }
 
-/** Swap a result card for a short-lived undo strip after Not relevant. */
+/** Swap a result card for a short-lived undo strip after Not relevant. Returns the strip. */
 function replaceCardWithUndo(cardEl, article, opts) {
  const parent = cardEl.parentNode;
- if (!parent) return;
+ if (!parent) return null;
+ const pending = !!(opts && opts.pending);
  const strip = document.createElement('div');
- strip.className = 'article-card not-relevant-undo' + (opts && opts.pending ? ' is-pending' : '');
+ strip.className = 'article-card not-relevant-undo' + (pending ? ' is-pending' : '');
  strip.innerHTML =
  `<span class="info-text">Screened out: <em>${escapeHtml(article.title || 'paper')}</em></span>`
- + ` <button type="button" class="btn btn-sm btn-secondary undo-not-relevant">Undo</button>`;
+ + ` <button type="button" class="btn btn-sm btn-secondary undo-not-relevant"${
+  pending ? ' disabled aria-disabled="true"' : ''
+ }>Undo</button>`;
  parent.replaceChild(strip, cardEl);
  const undoBtn = strip.querySelector('.undo-not-relevant');
  undoBtn.addEventListener('click', async (e) => {
  e.preventDefault();
+ if (strip.classList.contains('is-pending') || undoBtn.disabled) return;
  undoBtn.disabled = true;
  try {
  await apiCall('/api/screening', {
@@ -846,7 +861,9 @@ function replaceCardWithUndo(cardEl, article, opts) {
  action: 'include',
  },
  });
- parent.replaceChild(cardEl, strip);
+ if (strip.parentNode === parent) {
+  parent.replaceChild(cardEl, strip);
+ }
  const nr = cardEl.querySelector('.not-relevant-btn');
  if (nr) nr.disabled = false;
  showNotification('Restored to included set.', 'success');
@@ -862,6 +879,7 @@ function replaceCardWithUndo(cardEl, article, opts) {
  showNotification(`Undo failed: ${err.message}`, 'error');
  }
  });
+ return strip;
 }
 
 /** Skeleton rows matching .article-card geometry (prevents layout jump). */
@@ -880,6 +898,28 @@ function showResultSkeletons(n) {
   );
  }
  container.innerHTML = bits.join('');
+}
+
+/**
+ * After a failed search, remove skeleton rows so the UI does not look mid-load.
+ * Prefer restoring the previous hit list when we still have one.
+ */
+function clearResultSkeletonsOnError(fromRestore) {
+ const container = document.getElementById('results-list');
+ if (!container) return;
+ const hasSkeletons = !!container.querySelector('.skeleton-card');
+ if (!hasSkeletons && lastResults && lastResults.length) return;
+ if (lastResults && lastResults.length) {
+  renderResults(lastResults);
+  const countEl = document.getElementById('result-count');
+  if (countEl) countEl.textContent = String(lastResults.length);
+  return;
+ }
+ container.innerHTML = fromRestore
+  ? ''
+  : '<p class="info-text">Search failed. Try again.</p>';
+ const countEl = document.getElementById('result-count');
+ if (countEl) countEl.textContent = '0';
 }
 
 function renderResults(results) {

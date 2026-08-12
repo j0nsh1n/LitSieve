@@ -8,7 +8,10 @@ from __future__ import annotations
 import json
 import pathlib
 import re
+import shutil
 import subprocess
+
+import pytest
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 JS = ROOT / "static" / "js"
@@ -71,6 +74,7 @@ def test_fetch_report_uses_details_and_escapeHtml():
     assert "innerHTML = ''" in chunk or 'innerHTML = ""' in chunk
 
 
+@pytest.mark.skipif(shutil.which("node") is None, reason="Node.js not installed")
 def test_build_fetch_source_report_model_top5_via_node():
     """Ranking: top successes by count; muted zeros summarised.
 
@@ -225,7 +229,7 @@ def test_simple_prepare_dialog_not_on_auto_chain():
     fn = DM[DM.index("async function doCreateEmbeddings") :
             DM.index("async function doCreateEmbeddings") + 800]
     assert "fromAutoChain" in fn
-    assert "simple && !fromAutoChain" in fn.replace(" ", "") or "simple && !fromAutoChain" in fn
+    assert "simple && !fromAutoChain" in fn
 
 
 def test_reprepare_clears_low_relevance_for_pending_screening():
@@ -240,5 +244,5 @@ def test_advanced_keeps_radios_and_full_report_path():
     assert 'name="fetch-mode"' in (ROOT / "templates" / "data_management.html").read_text(encoding="utf-8")
     assert "only-missing" in (ROOT / "templates" / "data_management.html").read_text(encoding="utf-8")
     # Advanced report path does not force <details>.
-    assert "advancedNoDetails" or "simple: false" in DM
+    assert "advancedNoDetails" in DM or "simple: false" in DM or "{ simple }" in DM
     assert "renderFetchSourceReportHtml(model, { simple })" in DM or "simple }" in DM

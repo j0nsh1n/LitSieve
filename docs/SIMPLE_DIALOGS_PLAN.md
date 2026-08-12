@@ -102,35 +102,38 @@ Opens on **Fetch** click, before the request:
 
 ### Correcting the premise
 
-The original idea was for this dialog to ask whether the student wants to
-**change their research question**. It cannot: `POST /api/create-embeddings`
-takes `{model, only_missing}` only. The research question is not an input to
-preparing — it is used by the screening card (`quick-preview`) and by Search.
+`POST /api/create-embeddings` still takes `{model, only_missing}` only — the
+research question is **not** sent to prepare. Students still need to verify the
+question before re-prepare, because the same text drives **Narrow it down** next
+and should not be assumed identical to the last fetch.
 
-The intent is still right, but it splits into two places:
+### Implemented dialog (one popup)
 
-**(a) The one real choice at re-prepare** is *all papers* vs *only new ones*
-(`only_missing`), currently a checkbox inside Advanced options
-(`#only-missing`), hidden in Simple. Ask that:
+Manual **Re-prepare Papers** (Simple only; not the post-fetch auto-chain) opens
+a single site dialog that always includes a required research-question field
+(`openSiteChoice` + `withInput: true`):
 
 > **Re-prepare papers for search**
-> Only new papers need this most of the time.
+> Check that this research question is still what you want…
 >
-> [Only new papers] [Redo all 231] [Cancel]
+> **Your research question** `[editable, pre-filled]`
+>
+> When papers are already prepared: [Only new papers] [Redo all 231] [Cancel]
+> When nothing is prepared yet: [Continue] [Cancel]
 
-- "Only new papers" → `only_missing: true`
-- "Redo all" → `only_missing: false`, and say how many will be redone
-- Skip the dialog entirely when there are **no** already-prepared papers —
-  there is nothing to choose.
+- Verified text is written into `#fetch-query`, `#simple-screen-query`, and
+  fetch prefs (`applyVerifiedResearchQuestion`).
+- "Only new papers" / Continue with nothing prepared → `only_missing: true`
+- "Redo all N" → `only_missing: false`
+- Cancel → no prepare request
+- Auto-chain after fetch does **not** open this dialog
 
-**(b) Changing the question belongs on the screening card**, which already has
-an editable, pre-filled question field. After a re-prepare completes, the
-screening card should return to its *pending* state so the student can edit the
-question and re-screen. Do not add a question field to the prepare dialog.
+### Screening after re-prepare
 
-Pending/complete is derived from the corpus (prepared papers, and whether any
-`low_relevance` exclusions exist) — keep that. If re-preparing should re-open
-screening, achieve it through corpus state, not a JS flag.
+After a successful **manual** re-prepare, re-include any `low_relevance`
+exclusions via existing `POST /api/screening` so the screening card returns to
+*pending* from **corpus state** (not a JS flag). The Narrow it down card also
+shows its own confirm box when pending.
 
 ---
 
@@ -185,7 +188,8 @@ do not build HTML from raw API strings.
 2. **Dense source report** (`<details>`, top-5 + summary, notes inside,
    live-rows conflict resolved).
 3. **Fetch mode dialog** (empty → no dialog; non-empty → ask).
-4. **Re-prepare dialog** (only-new vs all; skip when nothing is prepared).
+4. **Re-prepare dialog** (research question + only-new vs all; always verify
+   prompt; Continue-only when nothing is prepared).
 
 Order matters: 1 is a prerequisite for 3 and 4, and 2 is independent, so it
 ships first and de-risks the release.
@@ -202,11 +206,14 @@ ships first and de-risks the release.
 - [ ] Simple + **non-empty**: dialog shows the real paper count; each button
       sends the correct `clear_first`; Cancel sends no request.
 - [ ] The `only-missing` hint still reflects the chosen mode.
-- [ ] Simple re-prepare with nothing prepared: no dialog.
-- [ ] Simple re-prepare with papers prepared: dialog offers only-new vs all and
-      sends the matching `only_missing`.
-- [ ] After re-prepare, screening returns to pending **derived from corpus
-      state**, not a JS flag, and survives a reload.
+- [ ] Simple re-prepare always shows **Your research question** in the same
+      popup (required, pre-filled); Cancel sends no prepare request.
+- [ ] Simple re-prepare with nothing prepared: Continue / Cancel only (no
+      only-new vs all choice); Continue sets `only_missing: true`.
+- [ ] Simple re-prepare with papers prepared: Only new / Redo all / Cancel and
+      the matching `only_missing`.
+- [ ] After manual re-prepare, screening returns to pending **derived from
+      corpus state** (low_relevance cleared via include), and survives a reload.
 - [ ] Source report collapsed by default in Simple: ≤5 success rows + one
       summary line; notes inside the expander; full list on expand.
 - [ ] Live per-source rows and the final report are never both showing the same
@@ -223,7 +230,8 @@ ships first and de-risks the release.
   `true` in that path.
 - Fetch dialog appears when `total_articles > 0`, and each choice maps to the
   correct `clear_first`; Cancel issues no fetch request.
-- Re-prepare dialog is skipped when nothing is prepared.
+- Re-prepare dialog includes `withInput` research-question field in the same
+  popup; nothing-prepared path uses Continue without only-new/all.
 - Re-prepare choices map to the correct `only_missing`.
 - Source report renders ≤5 success rows collapsed and the full set expanded;
   notes appear only in the expanded view.

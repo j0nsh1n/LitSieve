@@ -796,13 +796,8 @@ async function refreshSimpleScreeningCard() {
     undoBtn.hidden = false;
     undoBtn.textContent = 'Undo';
    }
-   // Warm the undo list from cache or API (do not block the UI chrome).
-   fetchLowRelevanceUndoItems().then((items) => {
-    if (undoBtn && !(items && items.length) && lowRel > 0) {
-     // API failed but exclusions exist — still show Undo; click will re-fetch.
-     undoBtn.hidden = false;
-    }
-   });
+   // Warm the undo cache in the background; the button stays visible either way.
+   fetchLowRelevanceUndoItems();
    setSimpleScreenGotoVisible(true);
    return;
   }
@@ -1106,14 +1101,12 @@ async function doSimpleScreenUndo() {
  const btn = document.getElementById('simple-screen-undo-btn');
  setLoading(btn, true);
  try {
+  // Cache first; otherwise one corpus request (errors surface to catch).
   let items = loadSimpleScreenUndoItems();
   if (!items || !items.length) {
-   items = await fetchLowRelevanceUndoItems();
-  }
-  if (!items || !items.length) {
-   // Last resort: re-query the corpus directly.
    const data = await apiCall('/api/screening/excluded?reason=low_relevance');
    items = (data && data.items) || [];
+   if (items.length) saveSimpleScreenUndoItems(items);
   }
   if (!items.length) {
    showNotification('Nothing to undo.', 'info');
