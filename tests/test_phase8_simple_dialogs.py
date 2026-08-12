@@ -200,15 +200,24 @@ def test_simple_prepare_resolver_exists():
     assert "function resolveSimplePrepareModeBeforeRequest" in DM
     assert "Only new papers" in DM
     assert "only_missing" in DM
+    # Research question lives in the same re-prepare popup (withInput).
+    assert "function applyVerifiedResearchQuestion" in DM
+    assert "withInput: true" in DM or "withInput:true" in DM
+    assert "Your research question" in DM
 
 
-def test_simple_prepare_skips_dialog_when_nothing_prepared():
+def test_simple_prepare_prompt_is_inside_same_popup():
+    """Question field is in the re-prepare dialog, not a separate first modal."""
     fn = DM[DM.index("async function resolveSimplePrepareModeBeforeRequest") :
             DM.index("async function doCreateEmbeddings")]
-    assert "ready <= 0" in fn
+    assert "withInput" in fn
     assert "openSiteChoice" in fn
-    # Dialog is after the ready check.
-    assert fn.index("ready <= 0") < fn.index("openSiteChoice")
+    assert "applyVerifiedResearchQuestion" in fn
+    # No separate openSitePrompt step before the scope dialog.
+    assert "openSitePrompt" not in fn
+    common = (ROOT / "static" / "js" / "common.js").read_text(encoding="utf-8")
+    assert "o.withInput" in common
+    assert "mode === 'choice' && o.withInput" in common or 'mode === "choice" && o.withInput' in common
 
 
 def test_simple_prepare_dialog_not_on_auto_chain():

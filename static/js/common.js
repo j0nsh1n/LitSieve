@@ -399,18 +399,25 @@ function openSiteModal(opts) {
             : '';
 
         let fieldHtml = '';
-        if (mode === 'prompt') {
+        // prompt mode always shows an input; choice mode can opt in via withInput
+        // (e.g. Simple re-prepare: verify research question in the same dialog).
+        const showInput = mode === 'prompt' || !!(mode === 'choice' && o.withInput);
+        if (showInput) {
+            const fieldLabel = o.inputLabel
+                ? escapeHtml(String(o.inputLabel))
+                : escapeHtml(title);
+            const labelClass = o.inputLabel ? 'help-text' : 'u-visually-hidden';
             if (o.multiline) {
                 fieldHtml = `
-            <div class="form-group">
-              <label class="u-visually-hidden" for="site-modal-input">${escapeHtml(title)}</label>
+            <div class="form-group lra-modal-input-group">
+              <label class="${labelClass}" for="site-modal-input">${fieldLabel}</label>
               <textarea id="site-modal-input" class="lra-modal-textarea" rows="6"
                 placeholder="${escapeHtml(o.placeholder || '')}"></textarea>
             </div>`;
             } else {
                 fieldHtml = `
-            <div class="form-group">
-              <label class="u-visually-hidden" for="site-modal-input">${escapeHtml(title)}</label>
+            <div class="form-group lra-modal-input-group">
+              <label class="${labelClass}" for="site-modal-input">${fieldLabel}</label>
               <input id="site-modal-input" class="lra-modal-input" type="${escapeHtml(o.inputType || 'text')}"
                 placeholder="${escapeHtml(o.placeholder || '')}" autocomplete="off">
             </div>`;
@@ -560,6 +567,21 @@ function openSiteModal(opts) {
                         close(choice.value !== undefined ? choice.value : null);
                         return;
                     }
+                    // Optional input in the same dialog (Simple re-prepare prompt verify).
+                    if (o.withInput) {
+                        const val = input ? input.value : '';
+                        const trimmed = String(val).trim();
+                        if (o.requireNonEmpty && !trimmed) {
+                            showNotification(
+                                o.emptyMessage || 'Please confirm your research question.',
+                                'error'
+                            );
+                            if (input) input.focus();
+                            return;
+                        }
+                        close({ value: choice.value, input: val });
+                        return;
+                    }
                     close(choice.value);
                 });
             });
@@ -603,6 +625,10 @@ function openSiteModal(opts) {
             input.addEventListener('keydown', (ev) => {
                 if (ev.key === 'Enter' && !ev.shiftKey) {
                     ev.preventDefault();
+                    // Choice+input: Enter should not auto-pick a scope button.
+                    if (mode === 'choice' && o.withInput) {
+                        return;
+                    }
                     confirmBtn && confirmBtn.click();
                 }
             });

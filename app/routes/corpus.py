@@ -416,6 +416,29 @@ async def api_screening(req: ScreeningRequest, request: Request):
         release_pipeline(uid)
 
 
+@router.get("/api/screening/excluded")
+async def api_screening_excluded(request: Request, reason: str = "low_relevance"):
+    """List papers excluded with a given reason (Simple-mode Undo after Narrow it down)."""
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    uid = user["user_id"]
+    p = get_pipeline(uid)
+    try:
+        code = normalize_reason(reason, default="low_relevance")
+        items = p.db.get_excluded_items_for_reason(code)
+        return {
+            "status": "success",
+            "reason": code,
+            "count": len(items),
+            "items": items,
+        }
+    except Exception as e:
+        return server_error(e)
+    finally:
+        release_pipeline(uid)
+
+
 @router.post("/api/screening/quick-preview")
 async def api_screening_quick_preview(req: QuickScreenPreviewRequest, request: Request):
     """Rank papers against a research question; return least-related for review.

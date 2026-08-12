@@ -1691,6 +1691,15 @@ body.lra-modal-open {
     white-space: pre-wrap;
     word-break: break-word;
 }
+.lra-modal-input-group {
+    margin: var(--space-3) 0 0;
+}
+.lra-modal-input-group .help-text {
+    display: block;
+    margin-bottom: var(--space-2);
+    font-weight: 600;
+    color: var(--text);
+}
 .lra-modal-input {
     width: 100%;
     font: inherit;

@@ -836,6 +836,21 @@ class ArticleDatabase:
             cursor.execute("SELECT article_id, source FROM screening")
             return {(row[0], row[1]) for row in cursor.fetchall()}
 
+    def get_excluded_items_for_reason(self, reason: str) -> List[Dict[str, str]]:
+        """List excluded papers for one screening reason (for Simple-mode Undo)."""
+        from app.content.screening_reasons import normalize_reason
+        reason = normalize_reason(reason, default="manual")
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                "SELECT article_id, source FROM screening WHERE reason = ?",
+                (reason,),
+            )
+            return [
+                {"article_id": row[0], "source": row[1]}
+                for row in cursor.fetchall()
+            ]
+
     def get_cluster_article_keys(self, cluster_id: int) -> List[Tuple[str, str]]:
         """Return (article_id, source) keys for every article in a cluster."""
         with self._lock:

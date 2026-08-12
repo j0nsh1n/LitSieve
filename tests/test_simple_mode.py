@@ -790,10 +790,45 @@ def test_simple_screen_apply_and_undo_use_low_relevance():
     apply_fn = dm[dm.find("async function doSimpleScreenApply") : dm.find("function doSimpleScreenSkip")]
     assert 'action: "exclude"' in apply_fn or "action: 'exclude'" in apply_fn
     assert "low_relevance" in apply_fn
+    # After apply: small Undo is unhidden and last items are persisted for this tab.
+    assert "saveSimpleScreenUndoItems" in apply_fn
+    assert "undoBtn.hidden = false" in apply_fn or "undoBtn.hidden=false" in apply_fn
     undo_fn = dm[dm.find("async function doSimpleScreenUndo") : dm.find("async function silentResolveDuplicatesAfterPrepare")]
     if "async function doSimpleScreenUndo" not in dm:
         undo_fn = dm[dm.find("async function doSimpleScreenUndo") :]
     assert 'action: "include"' in undo_fn or "action: 'include'" in undo_fn
+    assert "loadSimpleScreenUndoItems" in undo_fn
+    assert "clearSimpleScreenUndoItems" in undo_fn
+
+
+def test_simple_screen_confirm_question_box_after_prepare():
+    """After prepare, Simple mode must not silently assume the fetch query is final."""
+    html = _read("templates", "partials", "simple_screening_card.html")
+    assert 'id="simple-screen-confirm"' in html
+    assert "Confirm your research question" in html
+    assert "Check it, edit if needed" in html or "edit if needed" in html
+    assert 'id="simple-screen-query"' in html
+    css = _read("static", "css", "style.css")
+    assert ".simple-screen-confirm" in css
+    dm = _read("static", "js", "data_management.js")
+    assert "setSimpleScreenConfirmVisible" in dm
+    # Pending shows the confirm box; complete/skip hides it.
+    refresh = dm[
+        dm.find("async function refreshSimpleScreeningCard") : dm.find(
+            "async function loadSimpleScreenCounts"
+        )
+    ]
+    assert "setSimpleScreenConfirmVisible(true)" in refresh
+    assert "setSimpleScreenConfirmVisible(false)" in refresh
+    # Re-prepare must refresh the card so the box appears without a full reload.
+    assert "await refreshSimpleScreeningCard()" in dm
+    # Undo after complete is corpus-backed (survives restart).
+    assert "fetchLowRelevanceUndoItems" in dm
+    assert "/api/screening/excluded" in dm
+    assert "get_excluded_items_for_reason" in _read("app", "storage", "database.py")
+    assert '("/api/screening/excluded"' in _read("app", "routes", "corpus.py") or (
+        "/api/screening/excluded" in _read("app", "routes", "corpus.py")
+    )
 
 
 def test_simple_screen_skip_leaves_no_exclusion_call():

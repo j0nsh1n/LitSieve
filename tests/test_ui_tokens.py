@@ -411,12 +411,16 @@ def test_phase8_search_workbench_and_score_meter():
     assert "score-meter-fill" in js
     assert "--score-pct" in js
     assert "result-row" in js
+    # Hover title defines the 0–1 similarity score for users.
+    assert "scoreHelp" in js
+    assert "Similarity score (0–1)" in js
     # Low/Medium/High tier labels no longer drive the result chrome.
     assert "simTier" not in js
     css = CSS
     assert ".search-workbench" in css
     assert ".score-meter-fill" in css
     assert "var(--score-pct" in css
+    assert "cursor: help" in css
 
 
 def test_phase8_page_help_on_app_shell_pages():

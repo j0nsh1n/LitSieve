@@ -1646,10 +1646,42 @@ function applyFetchResult(data, sources) {
  * Sets the fetch-mode radios so saveFetchPrefs / only-missing hint stay correct.
  */
 /**
- * Simple re-prepare: ask only-new vs all when something is already prepared.
- * Skip dialog when nothing is prepared (nothing to choose).
- * Sets #only-missing so Advanced checkbox + prefs stay in sync.
- * Returns false if cancelled.
+ * Best-known research question for Simple re-prepare / Narrow it down.
+ * Prefers the screening field, then fetch query, then saved prefs.
+ */
+function getResearchQuestionCandidate() {
+ const screen = document.getElementById('simple-screen-query');
+ if (screen && screen.value.trim()) return screen.value.trim();
+ const fetchQ = document.getElementById('fetch-query');
+ if (fetchQ && fetchQ.value.trim()) return fetchQ.value.trim();
+ try {
+  const prefs = JSON.parse(localStorage.getItem(FETCH_PREFS_KEY) || 'null');
+  if (prefs && prefs.query && String(prefs.query).trim()) {
+   return String(prefs.query).trim();
+  }
+ } catch (e) { /* ignore */ }
+ return '';
+}
+
+/** Write a verified question into fetch + screening fields and persist prefs. */
+function applyVerifiedResearchQuestion(query) {
+ const q = String(query || '').trim();
+ if (!q) return;
+ const fetchQ = document.getElementById('fetch-query');
+ if (fetchQ) fetchQ.value = q;
+ const screen = document.getElementById('simple-screen-query');
+ if (screen) screen.value = q;
+ // Counts were for the old question — force a re-rank after re-prepare.
+ _simpleScreenCounts = { low: null, medium: null, high: null };
+ try {
+  saveFetchPrefs();
+ } catch (e) { /* ignore */ }
+}
+
+/**
+ * Simple re-prepare dialog: research question lives *in the same popup* as
+ * only-new / redo-all (not a separate step). Sets #only-missing + verified
+ * query. Returns false if cancelled.
  */
 async function resolveSimplePrepareModeBeforeRequest() {
  if (typeof isSimpleMode !== 'function' || !isSimpleMode()) {
@@ -1666,26 +1698,54 @@ async function resolveSimplePrepareModeBeforeRequest() {
   console.warn('Could not load prepare counts for dialog:', err);
  }
  const box = document.getElementById('only-missing');
- // Nothing prepared yet — only one sensible path (prepare everything missing).
- if (ready <= 0) {
-  if (box) box.checked = true;
+ const current = getResearchQuestionCandidate();
+
+ // Always open a re-prepare dialog with the research question field visible.
+ // When nothing is prepared yet, only Continue / Cancel (no scope choice).
+ if (typeof openSiteChoice !== 'function') {
+  if (ready <= 0 && box) box.checked = true;
   return true;
  }
- if (typeof openSiteChoice !== 'function') return true;
- const allLabel = total > 0
-  ? `Redo all ${total}`
-  : 'Redo all papers';
- const choice = await openSiteChoice({
-  title: 'Re-prepare papers for search',
-  message: 'Only new papers need this most of the time.',
-  choices: [
+
+ const allLabel = total > 0 ? `Redo all ${total}` : 'Redo all papers';
+ const choices = ready <= 0
+  ? [
+   { label: 'Continue', value: 'missing', primary: true },
+   { label: 'Cancel', value: null, cancel: true },
+  ]
+  : [
    { label: 'Only new papers', value: 'missing', primary: true },
    { label: allLabel, value: 'all' },
    { label: 'Cancel', value: null, cancel: true },
-  ],
+  ];
+
+ const result = await openSiteChoice({
+  title: 'Re-prepare papers for search',
+  message: ready <= 0
+   ? 'Check that this research question is still what you want. Edit if needed — Narrow it down will use it next.'
+   : 'Check that this research question is still what you want, then choose how much to re-prepare. Only new papers need this most of the time.',
+  withInput: true,
+  inputLabel: 'Your research question',
+  defaultValue: current,
+  placeholder: 'e.g., climate change effects on ecosystems',
+  requireNonEmpty: true,
+  emptyMessage: 'Please confirm your research question before re-preparing.',
+  selectAll: !current,
+  choices,
  });
- if (choice == null) return false;
- if (box) box.checked = choice !== 'all';
+ if (result == null) return false;
+
+ // withInput → { value, input }; bare string if modal helper is older.
+ let scope = result;
+ let question = current;
+ if (result && typeof result === 'object' && 'value' in result) {
+  scope = result.value;
+  question = result.input;
+ }
+ if (scope == null) return false;
+
+ applyVerifiedResearchQuestion(String(question || '').trim());
+ if (box) box.checked = scope !== 'all';
  return true;
 }
 

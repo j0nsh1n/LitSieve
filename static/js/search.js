@@ -645,6 +645,10 @@ function buildResultCard(article, idx) {
  const sim = Number(article.similarity_score) || 0;
  const simPct = Math.max(0, Math.min(100, Math.round(sim * 1000) / 10));
  const simLabel = sim.toFixed(3);
+ // Hover definition: 0–1 rank of meaning match vs the query (not a quality grade).
+ const scoreHelp =
+  'Similarity score (0–1): how closely this paper matches your query by meaning. '
+  + 'Higher is a stronger match. Not a quality or evidence grade.';
 
  const url = getArticleUrl(article.article_id, article.source);
  const idText = escapeHtml(article.article_id || '');
@@ -671,7 +675,7 @@ function buildResultCard(article, idx) {
 
  card.innerHTML = `
  <div class="result-row-head">
- <div class="score-meter" role="img" aria-label="Similarity ${simLabel} of 1">
+ <div class="score-meter" role="img" aria-label="Similarity ${simLabel} of 1. Higher is a closer match to your query." title="${escapeHtml(scoreHelp)}">
   <span class="score-meter-track"><span class="score-meter-fill"></span></span>
   <span class="score-meter-value">${escapeHtml(simLabel)}</span>
  </div>
