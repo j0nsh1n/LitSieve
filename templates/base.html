@@ -6,7 +6,7 @@
     <title>{% block title %}LitSieve{% endblock %}</title>
     <link rel="icon" href="/static/favicon.ico?v=20260803a" sizes="32x32">
     <link rel="apple-touch-icon" href="/static/favicon.png?v=20260803a">
-    <link rel="stylesheet" href="/static/css/style.css?v=20260806c">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260811d">
     <script src="/static/js/theme-init.js?v=20260805a"></script>
 </head>
 <body{% if user and user.is_guest %} data-guest="1"{% endif %}>
@@ -38,8 +38,9 @@
         {% endif %}
     {% endfor %}
 
-    <nav class="navbar" id="site-navbar" role="navigation" aria-label="Main">
-        <div class="navbar-top">
+    {# Phase 8 B — Workbench shell: workflow steps as the instrument; tools separate. #}
+    <nav class="navbar app-shell" id="site-navbar" role="navigation" aria-label="Main">
+        <div class="shell-primary">
             <div class="nav-brand">LitSieve</div>
             <button type="button"
                     class="nav-menu-toggle"
@@ -59,51 +60,51 @@
                 </span>
                 <span class="nav-menu-caret" aria-hidden="true">▾</span>
             </button>
-            <div class="nav-stats">
-                {% if user %}
-                <label class="nav-library-wrap" title="Switch library (separate paper collections)">
-                    <span class="nav-library-label">Library</span>
-                    <select id="nav-library-select" class="nav-library-select" aria-label="Active library">
-                        <option value="">Loading…</option>
-                    </select>
-                </label>
+            <div class="nav-links" id="nav-links-panel" aria-label="Workflow steps in order">
+                {% for key, label, simple_label, href, tip, simple_step in workflow %}
+                {% if not loop.first %}
+                <span class="nav-flow-arrow nav-flow-arrow-before-{{ key }}" aria-hidden="true">→</span>
                 {% endif %}
-                <button type="button" class="mode-toggle" id="mode-toggle"
-                    title="Switch to Simple mode"
-                    aria-label="Switch to Simple mode" aria-pressed="false">Advanced</button>
-                <button type="button" class="theme-toggle" id="theme-toggle" title="Toggle theme" aria-label="Toggle theme">🌙</button>
-                {% if user %}
-                <a href="/account"
-                   class="nav-username {% if active_page == 'account' %}active{% endif %}"
-                   title="Account settings"
-                   aria-label="Account settings ({{ user.username }})">
-                    <span class="nav-username-full">{{ user.username }}</span>
-                    <span class="nav-username-short">Account</span>
+                <a href="{{ href }}"
+                   class="nav-link nav-step-{{ key }} {% if active_page == key %}active{% endif %}"
+                   title="{{ tip }}"
+                   data-step-advanced="{{ loop.index }}"
+                   data-step-simple="{{ simple_step }}"
+                   {% if active_page == key %}aria-current="page"{% endif %}>
+                    <span class="nav-step-num">{{ loop.index }}</span>
+                    <span class="nav-step-label nav-label-advanced">{{ label }}</span>
+                    {% if simple_label %}
+                    <span class="nav-step-label nav-label-simple">{{ simple_label }}</span>
+                    {% endif %}
                 </a>
-                <a href="/logout" class="nav-logout">Logout</a>
-                {% endif %}
-                <span class="stat-badge" id="nav-article-count" aria-live="polite">-- articles</span>
+                {% endfor %}
             </div>
         </div>
 
-        <div class="nav-links" id="nav-links-panel" aria-label="Workflow steps in order">
-            {% for key, label, simple_label, href, tip, simple_step in workflow %}
-            {% if not loop.first %}
-            <span class="nav-flow-arrow nav-flow-arrow-before-{{ key }}" aria-hidden="true">→</span>
+        <div class="shell-tools nav-stats" aria-label="Workspace tools">
+            {% if user %}
+            <label class="nav-library-wrap" title="Switch library (separate paper collections)">
+                <span class="nav-library-label">Library</span>
+                <select id="nav-library-select" class="nav-library-select" aria-label="Active library">
+                    <option value="">Loading…</option>
+                </select>
+            </label>
             {% endif %}
-            <a href="{{ href }}"
-               class="nav-link nav-step-{{ key }} {% if active_page == key %}active{% endif %}"
-               title="{{ tip }}"
-               data-step-advanced="{{ loop.index }}"
-               data-step-simple="{{ simple_step }}"
-               {% if active_page == key %}aria-current="page"{% endif %}>
-                <span class="nav-step-num">{{ loop.index }}</span>
-                <span class="nav-step-label nav-label-advanced">{{ label }}</span>
-                {% if simple_label %}
-                <span class="nav-step-label nav-label-simple">{{ simple_label }}</span>
-                {% endif %}
+            <button type="button" class="mode-toggle" id="mode-toggle"
+                title="Switch to Simple mode"
+                aria-label="Switch to Simple mode" aria-pressed="false">Advanced</button>
+            <button type="button" class="theme-toggle" id="theme-toggle" title="Toggle theme" aria-label="Toggle theme">🌙</button>
+            {% if user %}
+            <a href="/account"
+               class="nav-username {% if active_page == 'account' %}active{% endif %}"
+               title="Account settings"
+               aria-label="Account settings ({{ user.username }})">
+                <span class="nav-username-full">{{ user.username }}</span>
+                <span class="nav-username-short">Account</span>
             </a>
-            {% endfor %}
+            <a href="/logout" class="nav-logout">Logout</a>
+            {% endif %}
+            <span class="stat-badge" id="nav-article-count" aria-live="polite">-- articles</span>
         </div>
     </nav>
 
@@ -118,7 +119,7 @@
         {{ scope_footer() }}
     </footer>
 
-    <script src="/static/js/common.js?v=20260806a"></script>
+    <script src="/static/js/common.js?v=20260811d"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -8,6 +8,24 @@
  Keep the best copy of each paper and a clear screening report for hand-ins.</p>
 </section>
 
+<div class="page-help-toolbar">
+ <button type="button" class="btn btn-secondary btn-sm page-help-toggle" id="page-help-toggle"
+  aria-expanded="false" aria-controls="page-help">Help</button>
+</div>
+<aside class="page-help card" id="page-help" hidden>
+ <h2 class="page-help-title">About this page</h2>
+ <div class="page-help-body">
+  <p class="info-text"><strong>Remove duplicates</strong> finds near-identical papers across sources
+  so you keep one copy. Auto-resolve prefers the most complete abstract (and stronger sources when
+  lengths are similar). Redundant copies are screened out (hidden from Search), not deleted.</p>
+  <p class="info-text"><strong>Quick screen</strong> ranks against your research question and can
+  screen out the least-related set; preview first if you want. Prefer topic groups?
+  Advanced users can still open Clusters.</p>
+  <p class="info-text">The <strong>screening report</strong> is plain-text counts for hand-ins
+  (PRISMA-style), not a bibliography — use Search → RIS for Zotero citations.</p>
+ </div>
+</aside>
+
 <section class="stats-cards">
  <div class="stat-card">
  <div class="stat-value" id="stat-total">--</div>
@@ -35,16 +53,6 @@
  <h2>1. Remove duplicates</h2>
  <p class="info-text">Finds near-identical papers across your sources so you can keep one copy of each.
  Removed copies are screened out, never deleted.</p>
- <details class="help-details">
-  <summary>How detection and auto-resolve work</summary>
-  <p class="info-text">Detection needs prepared papers (Data Management). Match strictness:
-  higher values find only near-identical articles, lower values find more loosely related ones.
-  <strong>Auto-Resolve All</strong> keeps the most complete abstract in each group; if lengths are
-  similar it prefers higher-quality sources (PubMed &gt; Europe PMC &gt; CrossRef &gt; OpenAlex &gt; …).
-  Redundant copies are screened out (hidden from Search, not deleted) and the screening report counts
-  update. You can restore anything later, or use per-group
-  <strong>Keep this</strong> to choose the winner by hand.</p>
- </details>
  <div class="form-row">
  <div class="param-group">
  <label>Match strictness: <strong id="threshold-display">0.98</strong></label>
@@ -106,15 +114,6 @@
  </div>
  <button type="button" id="screening-report-btn" class="btn btn-secondary btn-lg">Screening report</button>
  </div>
- <details class="help-details">
-  <summary>What this file is for (vs Search exports)</summary>
-  <p class="info-text">This is a <strong>plain-text accounting report</strong> (PRISMA-style numbers):
-  papers collected, removed as duplicates, excluded by Quick screen or cluster triage, excluded manually, included
-  set, stars, prepared papers, clusters, and papers-by-year. The on-screen view and
-  <strong>Download (.txt)</strong> use the same text - good to attach to a reflection or lab report.</p>
-  <p class="info-text">It is <strong>not</strong> a bibliography. For citation files, use Search →
-  Export your library (RIS for Zotero).</p>
- </details>
  <div id="screening-report-panel" class="screening-report-panel" hidden>
  <pre id="screening-report-body" class="screening-report-body"></pre>
  <p class="screening-report-actions">
@@ -137,5 +136,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/statistics.js?v=20260805l"></script>
+<script src="/static/js/statistics.js?v=20260807d"></script>
 {% endblock %}

@@ -62,11 +62,12 @@ MAX_LOADED_MODELS=3
 # cloudflared: Public Hostname www.litpilot.org → http://127.0.0.1:7860
 ```
 
-**Cloudflare Tunnel** — used on CGNAT ISPs (e.g. T‑Mobile Home Internet):
+**Cloudflare Tunnel** — good default when the origin is behind CGNAT or has no
+stable inbound ports:
 
 - Outbound-only; no router port-forward required for public access.
 - Visitors use HTTPS to Cloudflare; origin stays plain HTTP on loopback.
-- Store tunnel tokens only under `secrets/` (gitignored).
+- Store tunnel tokens only under `secrets/` (gitignored). Never commit them.
 
 Optional LAN Caddy (`deploy/Caddyfile*`) is separate from the public hostname.
 
@@ -82,8 +83,8 @@ Optional LAN Caddy (`deploy/Caddyfile*`) is separate from the public hostname.
 | No `--reload` in prod | Reload doubles process churn. |
 | Bind `127.0.0.1` | Only the tunnel/proxy should face the network. |
 
-Heavy work (fetch, embed, cluster) is CPU/GPU and disk on this host either way;
-the edge path only shuttles bytes.
+Heavy work (fetch, embed, cluster) is CPU/GPU and disk on the origin machine
+either way; the edge path only shuttles bytes.
 
 ---
 
@@ -312,6 +313,6 @@ stick (Secure cookies). Use HTTPS (tunnel or reverse proxy) for real logins.
 
 - [ ] `SECRET_KEY` set from a secret store; `DEBUG=false` on the public host
 - [ ] `PUBLIC_BASE_URL` matches the public origin (if using email)
-- [ ] Quota / SMTP / SQLCipher choices documented for this host
+- [ ] Quota / SMTP / SQLCipher choices documented for the operator
 - [ ] `GET /health` returns 200 on the intended host
 - [ ] `user_data/` (or equivalent volume) persists across restarts

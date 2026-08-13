@@ -29,6 +29,17 @@ and this project aims to follow Semantic Versioning for app version strings
   so a broken browser script previously shipped with every Python test green.
 
 ### Changed
+- **UI revamp Phase 8 (Reading Room A + Workbench B shell):** body-scale
+  `.info-text` / larger `.help-text`; Search sticky query rail + results;
+  numeric 0–1 score meters; summonable **Help** on Search, Data Management,
+  Clean up, Clusters, and Account; Workbench shell splits **workflow steps**
+  from **tools** (library / mode / theme / account) in `base.html`; dark
+  graphite grounds; denser 380px chrome.
+- **UI refresh (Phase 7):** design-system type / spacing / radius scales;
+  editorial serif headings and abstracts with hairline card sections; live
+  per-source fetch progress; list skeletons; optimistic star / note / Not
+  relevant; denser 380px mobile layout; motion vocabulary with reduced-motion
+  covering shimmer.
 - Simple nav is **Get papers → Search** only (contiguous steps 1–2). Clean up
   remains on `/statistics` for Advanced.
 - Simple post-prepare shortcut is **Go to Search** (replaces the Phase 5
@@ -46,6 +57,15 @@ and this project aims to follow Semantic Versioning for app version strings
   running after a fetch. Progress is shown on the fetch bar during the chain.
 - Source and year bar charts scale to each series max under CSP (`style-src
   'self'`) via `--bar-pct` CSS variables instead of ignored inline widths.
+- Share/library panels render their spacing and the **Revoked** badge colour
+  again. Five script-injected `style="…"` attributes in `account.js`, `join.js`,
+  and `data_management.js` were silently dropped under CSP (`style-src 'self'`
+  blocks `style-src-attr`), so join previews and the coverage hint lost their
+  margins and the Revoked badge never turned red — it also referenced a
+  `--danger` variable the themes do not define. Replaced with real classes
+  (`.library-manage-badge.is-revoked` using `--err`, `.join-preview-lead`,
+  `.u-m-0`, and the existing `.u-mt-sm`). Runtime `element.style` writes are
+  unaffected by CSP and were left alone.
 - All templates request the same `?v=` build of `theme-init.js` and
   `style.css`. Only `base.html` had been bumped, so returning visitors on the
   public pages (login, register, landing) kept a cached older script.

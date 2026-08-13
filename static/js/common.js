@@ -357,19 +357,28 @@ function renderKeyPointsHtml(bullets, options) {
 }
 
 /**
- * Shared site modal shell (confirm / prompt / alert). Replaces browser popups.
+ * Shared site modal shell (confirm / prompt / alert / choice). Replaces browser popups.
  * opts: {
- *   title, message, mode: 'confirm'|'prompt'|'alert',
+ *   title, message, mode: 'confirm'|'prompt'|'alert'|'choice',
  *   defaultValue, placeholder, inputType, multiline, selectAll,
- *   confirmLabel, cancelLabel, danger, requireNonEmpty
+ *   confirmLabel, cancelLabel, danger, requireNonEmpty,
+ *   choices: [{ label, value, primary?, danger?, cancel? }]  // mode 'choice'
  * }
  * confirm → Promise<boolean>
  * prompt  → Promise<string|null>  (null = cancelled)
  * alert   → Promise<void>
+ * choice  → Promise<any>  (value from chosen button; cancel buttons use value null)
+ *
+ * Accessibility (Phase 8): focus trap, restore focus to opener, body scroll lock
+ * with scroll-position restore. Mobile (≤640px): bottom-sheet card layout in CSS.
  */
 function openSiteModal(opts) {
     const o = opts || {};
     const mode = o.mode || 'alert';
+    const opener = (typeof document !== 'undefined'
+        && document.activeElement instanceof HTMLElement)
+        ? document.activeElement
+        : null;
     return new Promise((resolve) => {
         const existing = document.getElementById('site-modal-root');
         if (existing) existing.remove();
@@ -390,70 +399,193 @@ function openSiteModal(opts) {
             : '';
 
         let fieldHtml = '';
-        if (mode === 'prompt') {
+        // prompt mode always shows an input; choice mode can opt in via withInput
+        // (e.g. Simple re-prepare: verify research question in the same dialog).
+        const showInput = mode === 'prompt' || !!(mode === 'choice' && o.withInput);
+        if (showInput) {
+            const fieldLabel = o.inputLabel
+                ? escapeHtml(String(o.inputLabel))
+                : escapeHtml(title);
+            const labelClass = o.inputLabel ? 'help-text' : 'u-visually-hidden';
             if (o.multiline) {
                 fieldHtml = `
-            <div class="form-group">
-              <label class="u-visually-hidden" for="site-modal-input">${escapeHtml(title)}</label>
+            <div class="form-group lra-modal-input-group">
+              <label class="${labelClass}" for="site-modal-input">${fieldLabel}</label>
               <textarea id="site-modal-input" class="lra-modal-textarea" rows="6"
                 placeholder="${escapeHtml(o.placeholder || '')}"></textarea>
             </div>`;
             } else {
                 fieldHtml = `
-            <div class="form-group">
-              <label class="u-visually-hidden" for="site-modal-input">${escapeHtml(title)}</label>
+            <div class="form-group lra-modal-input-group">
+              <label class="${labelClass}" for="site-modal-input">${fieldLabel}</label>
               <input id="site-modal-input" class="lra-modal-input" type="${escapeHtml(o.inputType || 'text')}"
                 placeholder="${escapeHtml(o.placeholder || '')}" autocomplete="off">
             </div>`;
             }
         }
 
-        const cancelBtn = mode === 'alert'
-            ? ''
-            : `<button type="button" class="btn btn-secondary" data-site-modal-cancel>${escapeHtml(cancelLabel)}</button>`;
+        let actionsHtml = '';
+        if (mode === 'choice' && Array.isArray(o.choices) && o.choices.length) {
+            actionsHtml = o.choices.map((c, i) => {
+                const label = escapeHtml(String(c.label != null ? c.label : 'OK'));
+                let cls = 'btn btn-secondary';
+                if (c.danger) cls = 'btn btn-danger';
+                else if (c.primary) cls = 'btn btn-primary';
+                const cancelAttr = c.cancel ? ' data-site-modal-cancel="1"' : '';
+                return `<button type="button" class="${cls}" data-site-modal-choice="${i}"${cancelAttr}>${label}</button>`;
+            }).join('');
+        } else {
+            const cancelBtn = mode === 'alert'
+                ? ''
+                : `<button type="button" class="btn btn-secondary" data-site-modal-cancel>${escapeHtml(cancelLabel)}</button>`;
+            actionsHtml = `${cancelBtn}
+              <button type="button" class="${confirmClass}" id="site-modal-confirm">${escapeHtml(confirmLabel)}</button>`;
+        }
 
         root.innerHTML = `
           <div class="lra-modal-backdrop" data-site-modal-cancel></div>
-          <div class="lra-modal-card card">
+          <div class="lra-modal-card card" data-site-modal-card>
             <h2 id="site-modal-title" class="lra-modal-title">${escapeHtml(title)}</h2>
             ${msgHtml}
             ${fieldHtml}
             <div class="lra-modal-actions">
-              ${cancelBtn}
-              <button type="button" class="${confirmClass}" id="site-modal-confirm">${escapeHtml(confirmLabel)}</button>
+              ${actionsHtml}
             </div>
           </div>
         `;
-        document.body.appendChild(root);
+
+        // Body scroll lock — pin page so background cannot scroll under the dialog.
+        const scrollY = window.scrollY || window.pageYOffset || 0;
+        document.body.dataset.lraScrollY = String(scrollY);
+        document.body.style.top = `-${scrollY}px`;
         document.body.classList.add('lra-modal-open');
+        document.body.appendChild(root);
 
         const input = root.querySelector('#site-modal-input');
         const confirmBtn = root.querySelector('#site-modal-confirm');
         let settled = false;
 
+        const focusableSelector = [
+            'button:not([disabled])',
+            '[href]',
+            'input:not([disabled]):not([type="hidden"])',
+            'select:not([disabled])',
+            'textarea:not([disabled])',
+            '[tabindex]:not([tabindex="-1"])',
+        ].join(',');
+
+        const getFocusable = () => {
+            const card = root.querySelector('[data-site-modal-card]') || root;
+            return Array.from(card.querySelectorAll(focusableSelector)).filter((el) => {
+                if (el.hasAttribute('disabled') || el.getAttribute('aria-hidden') === 'true') {
+                    return false;
+                }
+                // offsetParent is null for fixed/absolute in some cases; use size instead.
+                const r = el.getBoundingClientRect();
+                return r.width > 0 || r.height > 0;
+            });
+        };
+
         const close = (value) => {
             if (settled) return;
             settled = true;
             document.body.classList.remove('lra-modal-open');
+            document.body.style.top = '';
+            const y = parseInt(document.body.dataset.lraScrollY || '0', 10) || 0;
+            delete document.body.dataset.lraScrollY;
             root.remove();
-            document.removeEventListener('keydown', onKey);
+            document.removeEventListener('keydown', onKey, true);
+            window.scrollTo(0, y);
+            if (opener && typeof opener.focus === 'function') {
+                try {
+                    opener.focus({ preventScroll: true });
+                } catch (_e) {
+                    try { opener.focus(); } catch (_e2) { /* ignore */ }
+                }
+            }
             resolve(value);
+        };
+
+        const cancelValue = () => {
+            if (mode === 'confirm') return false;
+            if (mode === 'prompt' || mode === 'choice') return null;
+            return undefined;
         };
 
         const onKey = (ev) => {
             if (ev.key === 'Escape') {
                 ev.preventDefault();
-                close(mode === 'confirm' ? false : mode === 'prompt' ? null : undefined);
+                ev.stopPropagation();
+                close(cancelValue());
+                return;
+            }
+            if (ev.key !== 'Tab') return;
+            const list = getFocusable();
+            if (!list.length) {
+                ev.preventDefault();
+                return;
+            }
+            const first = list[0];
+            const last = list[list.length - 1];
+            const active = document.activeElement;
+            if (ev.shiftKey) {
+                if (active === first || !root.contains(active)) {
+                    ev.preventDefault();
+                    last.focus();
+                }
+            } else if (active === last || !root.contains(active)) {
+                ev.preventDefault();
+                first.focus();
             }
         };
-        document.addEventListener('keydown', onKey);
+        // Capture phase so Tab is trapped even if children stop bubbling.
+        document.addEventListener('keydown', onKey, true);
 
         root.querySelectorAll('[data-site-modal-cancel]').forEach((el) => {
             el.addEventListener('click', (ev) => {
+                // Choice buttons with cancel:true also carry data-site-modal-choice;
+                // let the choice handler run instead when both are present.
+                if (el.hasAttribute('data-site-modal-choice') && mode === 'choice') {
+                    return;
+                }
                 ev.preventDefault();
-                close(mode === 'confirm' ? false : mode === 'prompt' ? null : undefined);
+                close(cancelValue());
             });
         });
+
+        if (mode === 'choice') {
+            root.querySelectorAll('[data-site-modal-choice]').forEach((btn) => {
+                btn.addEventListener('click', (ev) => {
+                    ev.preventDefault();
+                    const idx = parseInt(btn.getAttribute('data-site-modal-choice'), 10);
+                    const choice = (o.choices || [])[idx];
+                    if (!choice) {
+                        close(null);
+                        return;
+                    }
+                    if (choice.cancel) {
+                        close(choice.value !== undefined ? choice.value : null);
+                        return;
+                    }
+                    // Optional input in the same dialog (Simple re-prepare prompt verify).
+                    if (o.withInput) {
+                        const val = input ? input.value : '';
+                        const trimmed = String(val).trim();
+                        if (o.requireNonEmpty && !trimmed) {
+                            showNotification(
+                                o.emptyMessage || 'Please confirm your research question.',
+                                'error'
+                            );
+                            if (input) input.focus();
+                            return;
+                        }
+                        close({ value: choice.value, input: val });
+                        return;
+                    }
+                    close(choice.value);
+                });
+            });
+        }
 
         if (confirmBtn) {
             confirmBtn.addEventListener('click', (ev) => {
@@ -493,6 +625,10 @@ function openSiteModal(opts) {
             input.addEventListener('keydown', (ev) => {
                 if (ev.key === 'Enter' && !ev.shiftKey) {
                     ev.preventDefault();
+                    // Choice+input: Enter should not auto-pick a scope button.
+                    if (mode === 'choice' && o.withInput) {
+                        return;
+                    }
                     confirmBtn && confirmBtn.click();
                 }
             });
@@ -500,8 +636,12 @@ function openSiteModal(opts) {
                 input.focus();
                 if (o.selectAll && typeof input.select === 'function') input.select();
             }, 30);
-        } else if (confirmBtn) {
-            setTimeout(() => confirmBtn.focus(), 30);
+        } else {
+            setTimeout(() => {
+                const list = getFocusable();
+                const preferred = root.querySelector('.btn-primary') || list[0];
+                if (preferred) preferred.focus();
+            }, 30);
         }
     });
 }
@@ -516,6 +656,11 @@ function openSitePrompt(opts) {
 
 function openSiteAlert(opts) {
     return openSiteModal(Object.assign({}, opts, { mode: 'alert' }));
+}
+
+/** Multi-button dialog. Resolves to the chosen `value`, or null if cancelled. */
+function openSiteChoice(opts) {
+    return openSiteModal(Object.assign({}, opts, { mode: 'choice' }));
 }
 
 /**
@@ -935,8 +1080,9 @@ function updateModeToggleButton() {
     const btn = document.getElementById('mode-toggle');
     if (!btn) return;
     const simple = isSimpleMode();
-    btn.setAttribute('aria-pressed', simple ? 'true' : 'false');
-    btn.classList.toggle('is-active', simple);
+    // Highlight when Advanced is active (not Simple) — power mode reads as "on".
+    btn.setAttribute('aria-pressed', simple ? 'false' : 'true');
+    btn.classList.toggle('is-active', !simple);
     btn.textContent = simple ? 'Simple' : 'Advanced';
     btn.title = simple
         ? 'Switch to Advanced mode — full controls'
@@ -991,15 +1137,30 @@ function setUiMode(mode) {
     updateNavStepNumbers();
 }
 
+/** Phase 8: one summonable Help panel per page (`#page-help` + toggle). */
+function initPageHelp() {
+    const helpToggle = document.getElementById('page-help-toggle');
+    const helpPanel = document.getElementById('page-help');
+    if (!helpToggle || !helpPanel) return;
+    helpToggle.addEventListener('click', () => {
+        const open = helpPanel.hasAttribute('hidden');
+        if (open) helpPanel.removeAttribute('hidden');
+        else helpPanel.setAttribute('hidden', '');
+        helpToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     const btn = document.getElementById('mode-toggle');
-    if (!btn) return;
-    // theme-init already set data-mode; sync chrome only.
-    updateModeToggleButton();
-    updateNavStepNumbers();
-    btn.addEventListener('click', function() {
-        setUiMode(isSimpleMode() ? 'advanced' : 'simple');
-    });
+    if (btn) {
+        // theme-init already set data-mode; sync chrome only.
+        updateModeToggleButton();
+        updateNavStepNumbers();
+        btn.addEventListener('click', function() {
+            setUiMode(isSimpleMode() ? 'advanced' : 'simple');
+        });
+    }
+    initPageHelp();
 });
 
 // === Long-abstract clamp + expand (Search results, etc.) ===

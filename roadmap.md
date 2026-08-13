@@ -112,6 +112,183 @@ Simple collapses to `Get papers` → `Search`. **Advanced is unchanged.**
   Guest demo (`/guest`, sample-only, 30‑min purge) ships alongside as a low-friction
   try-without-register path; not a separate roadmap phase.
 
+## Phase 7 — UI/UX refresh (design system + editorial)
+Full build doc: **[docs/UI_REFRESH_PLAN.md](docs/UI_REFRESH_PLAN.md)**.
+Presentation only — no flow, endpoint, or copy changes.
+- Tasks:
+  - **Token layer**: type / line-height / spacing / radius scales in `:root`,
+    alongside the existing colour + motion tokens (which stay). Re-point the
+    `.u-mt-*` utilities rather than deleting them
+  - **Collapse the hand-tuned values**: 38 distinct font sizes → 8, 29 paddings
+    → 6, 6 radii → 3, section by section through the 41 CSS banners
+  - **Editorial pass**: serif headings + abstracts, sans for UI chrome, hairline
+    rules instead of shadows for cards, accent reserved for actions/focus
+  - **Design the waiting** (the UX half): live per-source fetch narrative from
+    data the API already returns, skeletons matched to real card geometry,
+    optimistic star / not-relevant / note-save, and no async layout shift
+  - **Mobile first** at 380 / 640 / 900 — a different layout, not a squeeze
+  - **Motion vocabulary**: one enter, one exit, one emphasis, with a single
+    `prefers-reduced-motion` block that neutralises all of it
+- Complete when: ≤8 font sizes / ≤6 paddings / ≤3 radii remain; both themes hold
+  contrast; every interactive element shows the focus ring; 380px has no
+  horizontal scroll or overlapped controls; loading regions show skeletons
+  rather than blank space; and the Simple/Advanced guards in
+  `tests/test_simple_mode.py` still pass unchanged (proving presentation-only)
+- Status: [x] 2026-08-10 — implemented on `feat/phase6-guest-demo` (local
+  commits; presentation only). Token scales, value collapse, editorial pass,
+  fetch narrative + skeletons + optimistic writes, mobile 380 layout, motion
+  vocabulary + reduced-motion covering shimmer.
+- Notes: the colour/motion layer was preserved (existing tokens not renamed).
+  Dark mode is derived via `color-mix` — re-check contrast after future colour
+  edits. Public templates do not extend `base.html`. `--measure` stays off
+  Search result cards.
+
+## Phase 8 — UI revamp (information architecture)
+Concept pitch (four directions, mockups built from the real markup):
+**<https://claude.ai/code/artifact/7b79cf7f-fc3f-4c5e-8758-77988e54db6d>**
+
+Premise: Phase 7 already won the token layer — all 177 `font-size` declarations
+read from `--fs-*`, no raw `rem` values, and templates carry no inline styles.
+So another repaint would spend effort on the one layer that is not broken. What
+is left is **information architecture and density**.
+
+- Findings this phase is judged against (measured, not taste):
+  1. **Smallness is concentrated in the explanatory layer.** 123 rules use
+     `--fs-sm`/`--fs-xs` against 21 at `--fs-base`. Nuance worth keeping
+     straight: `.article-abstract` and `body` are *already* `--fs-base` with
+     `--lh-relaxed`, so abstracts are fine. The offenders are `.info-text`
+     (14px, `--lh-snug`, 77 uses) and `.help-text` (12px, 36 uses) — which is
+     exactly where LitSieve puts most of its words.
+  2. **The nav carries ten controls** in one strip plus a second row of four
+     workflow steps; identity and workflow-position share one bar (`base.html`).
+  3. **Search is five stacked `.card` sections** — query and results are never
+     on screen together.
+  4. **Results hide themselves** — `buildResultCard` renders `<details>` with
+     only the first three open, and shows Low/Medium/High instead of the 0–1
+     similarity score that ordered the list.
+  5. **Help outweighs the controls** — 74 inline `info-text`/`help-details`
+     blocks across five templates (22 on Data Management), plus 17 flat source
+     checkboxes.
+- Chosen direction: **A ("Reading Room") now, B ("Workbench") next**, and take
+  C's type sizes immediately. A keeps the linen/teal identity and `base.html`
+  untouched, so it can ship behind the same presentation-only guard Phase 7
+  used. B is the right end state if LitSieve should feel like an instrument, but
+  it rewrites the shell and `search.js` — its own phase, not a bolt-on.
+- Tasks (A):
+  - **Type — the C borrowings.** These are the four things taken from direction
+    C, and the cheapest real win on the list:
+    - `.info-text` → `--fs-base` / `--lh-normal` (from 14px / `--lh-snug`).
+      77 uses; this is body copy and should read as such
+    - `.help-text` → `--fs-sm` (from `--fs-xs`). 36 uses
+    - `--fs-xs` (12px) reserved for badges, meta, and true fine print —
+      **no reading copy below 14px anywhere**
+    - the Search query prompt set large (`--fs-xl`), so the page opens on the
+      question rather than on chrome
+    - Watch the `@media` override at ~3747 and the `.empty-state-card` /
+      `.help-details` / `.advanced-details` specificity chains, so mobile
+      resets do not silently undo the sizes
+    - *Not* taken from C: the single-column front-door IA and Simple-as-the-
+      product. That is a product decision about whether Advanced stays a mode,
+      and it should be settled on its own terms, not as a side effect of a
+      type change
+  - **Search layout**: sticky query rail beside a results column, replacing the
+    five-card stack. Query and results visible together
+  - **Results**: scannable rows showing the real 0–1 score as a meter, instead
+    of `<details>` collapsibles labelled Low/Medium/High
+  - **Help**: fold the inline blocks into one summonable panel per page
+  - **Dark theme — decided: re-ground A's dark on B's graphite.** Today's dark
+    reads blue-slate; B's ground is a neutral-warm graphite, and that is the
+    part of B worth having early. Change the *grounds only* and keep A's warm
+    paper ink and teal accent, because brand continuity is A's whole point —
+    B's ochre signal does not come along:
+    - `--bg` `#12151a` → `#16181a`
+    - `--surface` `#1a1e26` → `#1e2124`
+    - `--rule` `#2e343f` → `#2c2f33` (the most obviously blue of the three)
+    - `--text`, `--text-soft`, `--accent` (`#7eb8c4` teal) unchanged
+    - Both dark blocks must change: the `prefers-color-scheme` media query
+      (~line 82) *and* the explicit `[data-theme="dark"]` toggle (~line 104).
+      `--text-body`, `--accent-soft`, `--nav-blur`, `--wash-*`, and
+      `--focus-ring` are `color-mix`-derived from these, so re-check contrast
+      on both themes after the swap rather than assuming it held
+  - Note A and B are **not** light/dark variants of one design — they differ in
+    layout, and a theme toggle must never rearrange the page. Each direction
+    needs both of its own themes; borrowing B's ground is a palette decision,
+    not a merge of the two directions
+- Complete when: query and results are co-visible on Search; every result row
+  shows its numeric score; no reading surface below 14px; both themes hold
+  contrast; 380px has no horizontal scroll or overlapped controls; and the
+  Simple/Advanced guards in `tests/test_simple_mode.py` still pass unchanged
+  (proving presentation-only)
+- Status: [x] 2026-08-10 — A (Reading Room) + B shell (Workbench) landed on
+  `feat/phase6-guest-demo`. Full B “instrument” IA (ochre signal, deeper
+  rewrite) still optional backlog; shell split addresses the ten-control bar.
+- Landed for A + B shell (2026-08-10):
+  - Type C borrowings: `.info-text` → `--fs-base` / `--lh-normal`; `.help-text`
+    → `--fs-sm`; `#query-text` → `--fs-xl` serif; mobile no longer re-shrinks
+    info-text
+  - Search workbench: sticky query rail + results column; 380px stack polish
+  - Result rows with numeric 0–1 score meter (`--score-pct` CSSOM, CSP-safe)
+  - Dark grounds graphite `#16181a` / `#1e2124` / `#2c2f33` (both dark blocks)
+  - Summonable **Help** on Search, Data Management, Clean up, Clusters, Account
+  - **Workbench shell:** `shell-primary` (brand + steps) vs `shell-tools`
+    (library / mode / theme / account / logout / count)
+- Landed 2026-08-10 (not part of A, found while setting up a local preview):
+  **CSP inline-style removal.** `style-src 'self'` blocks `style-src-attr`, so
+  the five literal `style="…"` attributes still injected by `account.js`,
+  `join.js`, and `data_management.js` were being dropped in production — lost
+  margins, and a "Revoked" badge that never rendered red (it also referenced
+  `--danger`, which is not a defined token; the theme uses `--err`). Replaced
+  with `.is-revoked`, `.join-preview-lead`, `.u-m-0`, and the existing
+  `.u-mt-sm`; asset cache-bust bumped to `v=20260810a` then Phase 8 to
+  `v=20260810b`.
+- Notes: the current warm-linen + Georgia + teal palette is close to this
+  year's generic AI-generated house style. A preserves brand continuity but not
+  distinctiveness; D ("Card Catalog" — index cards, typed slips, stamped match
+  grades) was the only direction with a real point of view, and is parked rather
+  than rejected.
+- Notes on Windows (explored 2026-08-10, then reverted — host stays Linux):
+  the full stack does install and run on **Python 3.14.6** (torch 2.13.0+cpu,
+  faiss-cpu 1.15.0, sentence-transformers 5.7.0, umap-learn 0.5.12 / numba
+  0.66, scikit-learn 1.9.0) — no wheel gaps, and the app imports even without
+  torch/faiss/umap because those sit behind try/except and function-level
+  imports. Two things a future Windows attempt should expect: **17 test
+  failures that are portability, not bugs** (14 × `UnicodeDecodeError` from
+  `read_text()` with no `encoding="utf-8"` under cp1252; one POSIX `0600`
+  assertion in `test_backup.py`; and `test_hashing_does_not_block_the_event_loop`,
+  whose `ticks > 10` bar is unreachable because `asyncio.sleep(0.001)` resolves
+  at ~15ms on Windows vs ~1ms on Linux — an *idle* loop scores 10). Also
+  `sqlcipher3-binary` has no Windows wheel at all, which skips all 5
+  at-rest-encryption tests. Run the suite as CI does (`SECRET_KEY` + `DEBUG`
+  only): setting `USER_DATA_DIR` breaks `test_delete_account_flow`, which
+  asserts a hardcoded relative `user_data`, and setting `CI=true` makes
+  `test_db_encryption.py` hard-import sqlcipher3 by design.
+
+## Phase 8 — Simple-mode dialogs + dense source report
+Full build doc: **[docs/SIMPLE_DIALOGS_PLAN.md](docs/SIMPLE_DIALOGS_PLAN.md)**.
+Condenses Data Management in Simple mode. **Advanced is unchanged.**
+- Tasks:
+  - **Modal shell first** (prerequisite): `openSiteModal` lacks a focus trap,
+    focus restore, and body scroll lock. This phase puts dialogs in the main
+    flow on phones, where all three bite
+  - **Dense per-source report**: top 5 successes + one summary line, classroom
+    notes inside a `<details>` expander, failures summarised and muted (a source
+    returning nothing is normal). Must not double up with the Phase 7 live rows
+  - **Fetch mode dialog**: replace/add only *means* something once the library
+    has papers, so skip the dialog entirely on an empty collection and ask —
+    with the real paper count — when it is real
+  - **Re-prepare dialog**: asks the one real choice, only-new vs all
+    (`only_missing`); skipped when nothing is prepared
+- Complete when: Advanced renders exactly as today; Simple skips both dialogs in
+  the cases where the choice is meaningless; hidden radios still drive
+  `clear_first` and the only-missing hint; the collapsed report shows ≤5 rows;
+  and the existing Simple/guest guards pass unchanged
+- Status: [x] 2026-08-11 — modal shell, dense report, Simple fetch/prepare dialogs (local commits; not pushed)
+- Notes: the research question is **not** an input to prepare
+  (`/api/create-embeddings` takes `{model, only_missing}`), so "change your
+  question" belongs on the screening card, which already has an editable field —
+  not in the prepare dialog. After re-prepare, screening should return to
+  pending via corpus state, never a JS flag.
+
 ## Backlog (unscheduled)
 - Make `pyright app` blocking in CI after clearing the current error backlog
 - Dependency lockfile (pip-tools / uv) if reproducibility becomes a priority

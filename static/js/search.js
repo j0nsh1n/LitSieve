@@ -41,6 +41,8 @@ document.addEventListener('DOMContentLoaded', () => {
  const starredBtn = document.getElementById('starred-search-btn');
  if (starredBtn) starredBtn.addEventListener('click', doStarredSearch);
 
+ // Page Help toggle is wired in common.js (initPageHelp).
+
  const risBtn = document.getElementById('export-results-ris');
  if (risBtn) risBtn.addEventListener('click', () => doExportResults('ris'));
 
@@ -401,6 +403,12 @@ async function doSearch(opts) {
  }
  const btn = document.getElementById('search-btn');
  setLoading(btn, true);
+ const resultsSec = document.getElementById('results-section');
+ if (resultsSec) {
+  resultsSec.classList.remove('u-hidden');
+  resultsSec.style.display = 'block';
+ }
+ showResultSkeletons(6);
 
  lastSearchParams = {
  query_text: queryText,
@@ -477,6 +485,8 @@ async function doSearch(opts) {
  await saveSearchSession(method);
  } catch (e) {
  if (!fromRestore) showNotification(`Search failed: ${e.message}`, 'error');
+ // Drop loading skeletons so a failed search does not look stuck mid-load.
+ clearResultSkeletonsOnError(fromRestore);
  } finally {
  setLoading(btn, false);
  }
@@ -491,6 +501,12 @@ async function doStarredSearch(opts) {
  }
  const btn = document.getElementById('starred-search-btn');
  setLoading(btn, true);
+ const resultsSec = document.getElementById('results-section');
+ if (resultsSec) {
+  resultsSec.classList.remove('u-hidden');
+  resultsSec.style.display = 'block';
+ }
+ showResultSkeletons(6);
  lastSearchParams = {
  query_text: '',
  top_k: filters.top_k,
@@ -543,6 +559,7 @@ async function doStarredSearch(opts) {
  await saveSearchSession('starred');
  } catch (e) {
  if (!fromRestore) showNotification(`Starred search failed: ${e.message}`, 'error');
+ clearResultSkeletonsOnError(fromRestore);
  } finally {
  setLoading(btn, false);
  }
@@ -623,15 +640,18 @@ function renderStudyTypeBadge(article) {
 }
 
 function buildResultCard(article, idx) {
- const details = document.createElement('details');
- details.className = 'article-card';
- if (idx < 3) details.setAttribute('open', '');
+ // Phase 8: scannable row with numeric 0–1 score meter (not Low/Medium/High details).
+ const card = document.createElement('article');
+ card.className = 'article-card result-row';
+ card.dataset.resultIndex = String(idx);
 
- const sim = article.similarity_score || 0;
- let simClass = 'sim-low';
- let simTier = 'Low';
- if (sim >= 0.7) { simClass = 'sim-high'; simTier = 'High'; }
- else if (sim >= 0.4) { simClass = 'sim-med'; simTier = 'Medium'; }
+ const sim = Number(article.similarity_score) || 0;
+ const simPct = Math.max(0, Math.min(100, Math.round(sim * 1000) / 10));
+ const simLabel = sim.toFixed(3);
+ // Hover definition: 0–1 rank of meaning match vs the query (not a quality grade).
+ const scoreHelp =
+  'Similarity score (0–1): how closely this paper matches your query by meaning. '
+  + 'Higher is a stronger match. Not a quality or evidence grade.';
 
  const url = getArticleUrl(article.article_id, article.source);
  const idText = escapeHtml(article.article_id || '');
@@ -656,13 +676,16 @@ function buildResultCard(article, idx) {
  ? `<span><strong>Cluster:</strong> ${escapeHtml(String(article.cluster_label))}</span>`
  : '';
 
- details.innerHTML = `
- <summary>
- <span class="sim-badge ${simClass}" title="Similarity score: ${Number(sim).toFixed(3)} (0-1)">${simTier}</span>
- <span class="article-title">${escapeHtml(article.title || '')}</span>
+ card.innerHTML = `
+ <div class="result-row-head">
+ <div class="score-meter" role="img" aria-label="Similarity ${simLabel} of 1. Higher is a closer match to your query." title="${escapeHtml(scoreHelp)}">
+  <span class="score-meter-track"><span class="score-meter-fill"></span></span>
+  <span class="score-meter-value">${escapeHtml(simLabel)}</span>
+ </div>
+ <h3 class="article-title result-row-title">${escapeHtml(article.title || '')}</h3>
  <button type="button" class="star-btn ${starred ? 'is-starred' : ''}" title="Bookmark" aria-label="Star article">${starred ? '★' : '☆'}</button>
- </summary>
- <div class="article-body">
+ </div>
+ <div class="article-body result-row-body">
  <div class="article-meta">
  <span><strong>Year:</strong> ${escapeHtml(article.year || '')}</span>
  <span><strong>Journal:</strong> ${escapeHtml(article.journal || '')}</span>
@@ -690,11 +713,15 @@ function buildResultCard(article, idx) {
  </div>
  `;
 
- const noteField = details.querySelector('.note-field');
+ // CSP: no style= attributes — set bar width via CSS variable on the fill.
+ const fill = card.querySelector('.score-meter-fill');
+ if (fill) fill.style.setProperty('--score-pct', `${simPct}%`);
+
+ const noteField = card.querySelector('.note-field');
  noteField.value = noteVal;
 
- const noteToggle = details.querySelector('.note-toggle');
- const noteRow = details.querySelector('.note-row');
+ const noteToggle = card.querySelector('.note-toggle');
+ const noteRow = card.querySelector('.note-row');
  noteToggle.addEventListener('click', (e) => {
  e.preventDefault();
  noteToggle.hidden = true;
@@ -703,14 +730,17 @@ function buildResultCard(article, idx) {
  });
 
  if (typeof bindAiArticleActions === 'function') {
- bindAiArticleActions(details, article);
+ bindAiArticleActions(card, article);
  }
 
- const starBtn = details.querySelector('.star-btn');
+ const starBtn = card.querySelector('.star-btn');
  starBtn.addEventListener('click', async (e) => {
  e.preventDefault();
  e.stopPropagation();
  const next = !starBtn.classList.contains('is-starred');
+ // Optimistic: flip immediately; roll back on failure.
+ starBtn.classList.toggle('is-starred', next);
+ starBtn.textContent = next ? '★' : '☆';
  try {
  await apiCall('/api/notes', {
  method: 'POST',
@@ -720,17 +750,20 @@ function buildResultCard(article, idx) {
  starred: next,
  },
  });
- starBtn.classList.toggle('is-starred', next);
- starBtn.textContent = next ? '★' : '☆';
  refreshStarredCount();
  } catch (err) {
+ starBtn.classList.toggle('is-starred', !next);
+ starBtn.textContent = next ? '☆' : '★';
  showNotification(`Could not save star: ${err.message}`, 'error');
  }
  });
 
- const saveBtn = details.querySelector('.note-save');
+ const saveBtn = card.querySelector('.note-save');
  saveBtn.addEventListener('click', async (e) => {
  e.preventDefault();
+ const prev = saveBtn.textContent;
+ saveBtn.disabled = true;
+ saveBtn.textContent = 'Saved';
  try {
  await apiCall('/api/notes', {
  method: 'POST',
@@ -742,16 +775,27 @@ function buildResultCard(article, idx) {
  });
  showNotification('Note saved.', 'success');
  } catch (err) {
+ saveBtn.textContent = prev;
  showNotification(`Could not save note: ${err.message}`, 'error');
+ } finally {
+ saveBtn.disabled = false;
+ if (saveBtn.textContent === 'Saved') {
+  setTimeout(() => { if (saveBtn.textContent === 'Saved') saveBtn.textContent = prev; }, 1200);
+ }
  }
  });
 
- const notRelBtn = details.querySelector('.not-relevant-btn');
+ const notRelBtn = card.querySelector('.not-relevant-btn');
  if (notRelBtn) {
  notRelBtn.addEventListener('click', async (e) => {
  e.preventDefault();
  e.stopPropagation();
  notRelBtn.disabled = true;
+ // Optimistic remove; restore card if the write fails.
+ // Keep the strip returned for *this* row — never look up the first pending strip.
+ const parent = card.parentNode;
+ const nextSibling = card.nextSibling;
+ const strip = replaceCardWithUndo(card, article, { pending: true });
  try {
  await apiCall('/api/screening', {
  method: 'POST',
@@ -761,7 +805,15 @@ function buildResultCard(article, idx) {
  reason: 'off_topic',
  },
  });
- replaceCardWithUndo(details, article);
+ if (strip) {
+  strip.classList.remove('is-pending');
+  const undoBtn = strip.querySelector('.undo-not-relevant');
+  // Undo stays disabled until exclude finishes (avoids include-before-exclude race).
+  if (undoBtn) {
+   undoBtn.disabled = false;
+   undoBtn.removeAttribute('aria-disabled');
+  }
+ }
  showNotification('Marked not relevant (screened out).', 'success');
  lastResults = lastResults.filter(
  (a) => !(a.article_id === article.article_id && a.source === article.source)
@@ -769,28 +821,37 @@ function buildResultCard(article, idx) {
  const countEl = document.getElementById('result-count');
  if (countEl) countEl.textContent = String(lastResults.length);
  } catch (err) {
+ if (strip && parent && strip.parentNode === parent) {
+  parent.replaceChild(card, strip);
+ } else if (parent) {
+  parent.insertBefore(card, nextSibling);
+ }
  notRelBtn.disabled = false;
  showNotification(`Could not screen out: ${err.message}`, 'error');
  }
  });
  }
 
- return details;
+ return card;
 }
 
-/** Swap a result card for a short-lived undo strip after Not relevant. */
-function replaceCardWithUndo(cardEl, article) {
+/** Swap a result card for a short-lived undo strip after Not relevant. Returns the strip. */
+function replaceCardWithUndo(cardEl, article, opts) {
  const parent = cardEl.parentNode;
- if (!parent) return;
+ if (!parent) return null;
+ const pending = !!(opts && opts.pending);
  const strip = document.createElement('div');
- strip.className = 'article-card not-relevant-undo';
+ strip.className = 'article-card not-relevant-undo' + (pending ? ' is-pending' : '');
  strip.innerHTML =
  `<span class="info-text">Screened out: <em>${escapeHtml(article.title || 'paper')}</em></span>`
- + ` <button type="button" class="btn btn-sm btn-secondary undo-not-relevant">Undo</button>`;
+ + ` <button type="button" class="btn btn-sm btn-secondary undo-not-relevant"${
+  pending ? ' disabled aria-disabled="true"' : ''
+ }>Undo</button>`;
  parent.replaceChild(strip, cardEl);
  const undoBtn = strip.querySelector('.undo-not-relevant');
  undoBtn.addEventListener('click', async (e) => {
  e.preventDefault();
+ if (strip.classList.contains('is-pending') || undoBtn.disabled) return;
  undoBtn.disabled = true;
  try {
  await apiCall('/api/screening', {
@@ -800,7 +861,9 @@ function replaceCardWithUndo(cardEl, article) {
  action: 'include',
  },
  });
- parent.replaceChild(cardEl, strip);
+ if (strip.parentNode === parent) {
+  parent.replaceChild(cardEl, strip);
+ }
  const nr = cardEl.querySelector('.not-relevant-btn');
  if (nr) nr.disabled = false;
  showNotification('Restored to included set.', 'success');
@@ -816,6 +879,47 @@ function replaceCardWithUndo(cardEl, article) {
  showNotification(`Undo failed: ${err.message}`, 'error');
  }
  });
+ return strip;
+}
+
+/** Skeleton rows matching .article-card geometry (prevents layout jump). */
+function showResultSkeletons(n) {
+ const container = document.getElementById('results-list');
+ if (!container) return;
+ const count = Math.max(1, Math.min(n || 5, 10));
+ const bits = [];
+ for (let i = 0; i < count; i++) {
+  bits.push(
+   '<div class="skeleton-card" aria-hidden="true">'
+   + '<div class="skeleton-line skeleton-line-title"></div>'
+   + '<div class="skeleton-line skeleton-line-meta"></div>'
+   + '<div class="skeleton-line skeleton-line-body"></div>'
+   + '</div>'
+  );
+ }
+ container.innerHTML = bits.join('');
+}
+
+/**
+ * After a failed search, remove skeleton rows so the UI does not look mid-load.
+ * Prefer restoring the previous hit list when we still have one.
+ */
+function clearResultSkeletonsOnError(fromRestore) {
+ const container = document.getElementById('results-list');
+ if (!container) return;
+ const hasSkeletons = !!container.querySelector('.skeleton-card');
+ if (!hasSkeletons && lastResults && lastResults.length) return;
+ if (lastResults && lastResults.length) {
+  renderResults(lastResults);
+  const countEl = document.getElementById('result-count');
+  if (countEl) countEl.textContent = String(lastResults.length);
+  return;
+ }
+ container.innerHTML = fromRestore
+  ? ''
+  : '<p class="info-text">Search failed. Try again.</p>';
+ const countEl = document.getElementById('result-count');
+ if (countEl) countEl.textContent = '0';
 }
 
 function renderResults(results) {
@@ -842,16 +946,35 @@ function renderResults(results) {
  * Download exactly the papers currently on screen (lastResults), in that order.
  * Primary path for RIS → Zotero File → Import.
  */
-/** Phase 6 Simple: show sticky export/report panel once results exist. */
+/** Phase 6 Simple: show export/report panel once results exist (left rail). */
 function updateSimpleSearchPanel(hasResults) {
  const panel = document.getElementById('search-simple-panel');
  const resultsSec = document.getElementById('results-section');
  if (!panel) return;
  const simple = typeof isSimpleMode === 'function' && isSimpleMode();
  const show = !!(simple && hasResults);
- panel.hidden = !show;
+ if (show) {
+  panel.removeAttribute('hidden');
+  panel.hidden = false;
+ } else {
+  panel.setAttribute('hidden', '');
+  panel.hidden = true;
+ }
  if (resultsSec) resultsSec.classList.toggle('has-simple-panel', show);
 }
+
+// If the user toggles Simple/Advanced after a search, re-show the panel.
+document.addEventListener('DOMContentLoaded', () => {
+ const modeBtn = document.getElementById('mode-toggle');
+ if (modeBtn) {
+  modeBtn.addEventListener('click', () => {
+   // common.js flips data-mode first in the same tick; re-evaluate after.
+   requestAnimationFrame(() => {
+    updateSimpleSearchPanel(!!(lastResults && lastResults.length));
+   });
+  });
+ }
+});
 
 async function doExportResults(format) {
  if (!lastResults || !lastResults.length) {

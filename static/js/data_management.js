@@ -546,6 +546,9 @@ let _simpleScreenCandidates = [];
 let _simpleScreenLastItems = null;
 /** Session-only: skip hides the decision UI until reload (pending is corpus-derived). */
 let _simpleScreenSkippedSession = false;
+// Last Narrow-it-down exclusion set (per library) so Undo survives a soft reload.
+// Corpus API is the source of truth after restart; this is a fast path.
+const SIMPLE_SCREEN_UNDO_KEY = 'lra_simple_screen_undo_v1';
 
 // Skip is remembered per library, not just per page view.
 //
@@ -616,6 +619,76 @@ function setSimpleScreenSkipped(skipped) {
   // Private mode / storage disabled: fall back to session-only behaviour.
  }
 }
+
+function _simpleScreenUndoStore() {
+ try {
+  return JSON.parse(localStorage.getItem(SIMPLE_SCREEN_UNDO_KEY) || '{}') || {};
+ } catch (e) {
+  return {};
+ }
+}
+
+/** Persist last set-aside items (localStorage) as a fast path; corpus API is authoritative. */
+function saveSimpleScreenUndoItems(items) {
+ _simpleScreenLastItems = items && items.length ? items : null;
+ const lib = _activeLibraryId();
+ if (!lib) return;
+ try {
+  const store = _simpleScreenUndoStore();
+  if (_simpleScreenLastItems) {
+   store[lib] = _simpleScreenLastItems;
+  } else {
+   delete store[lib];
+  }
+  localStorage.setItem(SIMPLE_SCREEN_UNDO_KEY, JSON.stringify(store));
+ } catch (e) {
+  // Private mode: in-memory only.
+ }
+}
+
+function loadSimpleScreenUndoItems() {
+ if (_simpleScreenLastItems && _simpleScreenLastItems.length) {
+  return _simpleScreenLastItems;
+ }
+ const lib = _activeLibraryId();
+ if (!lib) return null;
+ try {
+  const stored = _simpleScreenUndoStore()[lib];
+  if (Array.isArray(stored) && stored.length) {
+   _simpleScreenLastItems = stored;
+   return stored;
+  }
+ } catch (e) { /* ignore */ }
+ return null;
+}
+
+function clearSimpleScreenUndoItems() {
+ saveSimpleScreenUndoItems(null);
+}
+
+/** Load low_relevance exclusions from the server so Undo works after a full restart. */
+async function fetchLowRelevanceUndoItems() {
+ const cached = loadSimpleScreenUndoItems();
+ if (cached && cached.length) return cached;
+ try {
+  const data = await apiCall('/api/screening/excluded?reason=low_relevance');
+  const items = (data && data.items) || [];
+  if (items.length) {
+   saveSimpleScreenUndoItems(items);
+   return items;
+  }
+ } catch (e) {
+  console.warn('fetchLowRelevanceUndoItems failed:', e);
+ }
+ return null;
+}
+
+/** Show/hide the confirm-your-question box with the decision UI (pending only). */
+function setSimpleScreenConfirmVisible(visible) {
+ const el = document.getElementById('simple-screen-confirm');
+ if (el) el.hidden = !visible;
+}
+
 let _simpleScreenWired = false;
 
 function simpleScreenSelectedLevel() {
@@ -636,7 +709,10 @@ function simpleScreenQuery() {
 
 function prefillSimpleScreenQuery() {
  const el = document.getElementById('simple-screen-query');
- if (!el || el.value.trim()) return;
+ if (!el) return;
+ // Always surface a candidate so the confirm box is never empty when we know one,
+ // but do not overwrite if the student already edited the field.
+ if (el.value.trim()) return;
  try {
   const prefs = JSON.parse(localStorage.getItem('lra_fetch_prefs_v1') || 'null');
   if (prefs && prefs.query) {
@@ -702,6 +778,7 @@ async function refreshSimpleScreeningCard() {
    // Complete: already screened this library.
    if (decision) decision.hidden = true;
    if (actions) actions.hidden = true;
+   setSimpleScreenConfirmVisible(false);
    if (preview) {
     preview.hidden = true;
     preview.classList.add('u-hidden');
@@ -714,10 +791,13 @@ async function refreshSimpleScreeningCard() {
     outcomeMsg.textContent =
      `Set aside ${lowRel} paper${lowRel === 1 ? '' : 's'} as less related to your question.`;
    }
+   // Always offer a small Undo when low_relevance exclusions exist (corpus-backed).
    if (undoBtn) {
-    // Undo of prior apply needs the exact items; only enable after this session's apply.
-    undoBtn.hidden = !_simpleScreenLastItems || !_simpleScreenLastItems.length;
+    undoBtn.hidden = false;
+    undoBtn.textContent = 'Undo';
    }
+   // Warm the undo cache in the background; the button stays visible either way.
+   fetchLowRelevanceUndoItems();
    setSimpleScreenGotoVisible(true);
    return;
   }
@@ -725,6 +805,7 @@ async function refreshSimpleScreeningCard() {
   if (isSimpleScreenSkipped()) {
    if (decision) decision.hidden = true;
    if (actions) actions.hidden = true;
+   setSimpleScreenConfirmVisible(false);
    if (outcome) {
     outcome.hidden = false;
     outcome.classList.remove('u-hidden');
@@ -737,13 +818,15 @@ async function refreshSimpleScreeningCard() {
    return;
   }
 
-  // Pending: show levels + actions; fetch counts once.
+  // Pending: confirm question + levels + actions; fetch counts once.
   if (decision) decision.hidden = false;
   if (actions) actions.hidden = false;
+  setSimpleScreenConfirmVisible(true);
   if (outcome) {
    outcome.hidden = true;
    outcome.classList.add('u-hidden');
   }
+  if (undoBtn) undoBtn.hidden = true;
   setSimpleScreenGotoVisible(false);
   const totalEl = document.getElementById('simple-screen-total');
   if (totalEl) {
@@ -946,13 +1029,14 @@ async function doSimpleScreenApply() {
    method: 'POST',
    body: { items, action: 'exclude', reason: 'low_relevance' },
   });
-  _simpleScreenLastItems = items;
+  saveSimpleScreenUndoItems(items);
   _simpleScreenCandidates = [];
   const n = applied.count || items.length;
   const decision = document.getElementById('simple-screen-levels');
   const actions = document.getElementById('simple-screen-actions');
   if (decision) decision.hidden = true;
   if (actions) actions.hidden = true;
+  setSimpleScreenConfirmVisible(false);
   const outcome = document.getElementById('simple-screen-outcome');
   const outcomeMsg = document.getElementById('simple-screen-outcome-msg');
   const undoBtn = document.getElementById('simple-screen-undo-btn');
@@ -963,7 +1047,11 @@ async function doSimpleScreenApply() {
   if (outcomeMsg) {
    outcomeMsg.textContent = `Set aside ${n} paper${n === 1 ? '' : 's'}.`;
   }
-  if (undoBtn) undoBtn.hidden = false;
+  // Always offer a small Undo after Narrow it down completes (this tab session).
+  if (undoBtn) {
+   undoBtn.hidden = false;
+   undoBtn.textContent = 'Undo';
+  }
   const preview = document.getElementById('simple-screen-preview');
   if (preview) {
    preview.hidden = true;
@@ -983,11 +1071,13 @@ async function doSimpleScreenApply() {
 
 function doSimpleScreenSkip() {
  setSimpleScreenSkipped(true);
+ clearSimpleScreenUndoItems();
  const decision = document.getElementById('simple-screen-levels');
  const actions = document.getElementById('simple-screen-actions');
  const preview = document.getElementById('simple-screen-preview');
  if (decision) decision.hidden = true;
  if (actions) actions.hidden = true;
+ setSimpleScreenConfirmVisible(false);
  if (preview) {
   preview.hidden = true;
   preview.classList.add('u-hidden');
@@ -1009,18 +1099,25 @@ function doSimpleScreenSkip() {
 
 async function doSimpleScreenUndo() {
  const btn = document.getElementById('simple-screen-undo-btn');
- if (!_simpleScreenLastItems || !_simpleScreenLastItems.length) {
-  showNotification('Nothing to undo from this session.', 'info');
-  return;
- }
  setLoading(btn, true);
  try {
+  // Cache first; otherwise one corpus request (errors surface to catch).
+  let items = loadSimpleScreenUndoItems();
+  if (!items || !items.length) {
+   const data = await apiCall('/api/screening/excluded?reason=low_relevance');
+   items = (data && data.items) || [];
+   if (items.length) saveSimpleScreenUndoItems(items);
+  }
+  if (!items.length) {
+   showNotification('Nothing to undo.', 'info');
+   return;
+  }
   await apiCall('/api/screening', {
    method: 'POST',
-   body: { items: _simpleScreenLastItems, action: 'include' },
+   body: { items, action: 'include' },
   });
-  const n = _simpleScreenLastItems.length;
-  _simpleScreenLastItems = null;
+  const n = items.length;
+  clearSimpleScreenUndoItems();
   setSimpleScreenSkipped(false);
   _simpleScreenCounts = { low: null, medium: null, high: null };
   setStatus('simple-screen-status', `Restored ${n} paper(s).`, 'success');
@@ -1222,7 +1319,7 @@ async function refreshCoverage() {
  }).join('');
  sug.innerHTML = '<strong>Suggested sources you are missing:</strong>'
  + `<ul class="coverage-suggest-list">${items}</ul>`
- + '<p class="help-text" style="margin-top:0.4rem;">Check them under Choose Sources on the next fetch.</p>';
+ + '<p class="help-text u-mt-sm">Check them under Choose Sources on the next fetch.</p>';
  } else if (keys.length) {
  sug.textContent = selectedTopics.size
  ? 'Coverage looks good for your selected topics - recommended sources each have at least one paper.'
@@ -1240,13 +1337,53 @@ async function refreshCoverage() {
 // Must see active=true at least once before accepting a finished result — otherwise
 // a poll that lands before the job flips active (or sees a stale idle slot) resolves
 // with {} and the auto-chain never starts prepare.
+/** Render live per-source fetch rows from progress payload only (no invented counts). */
+function renderFetchLiveSources(p) {
+ const host = document.getElementById('fetch-live-sources');
+ if (!host) return;
+ const sources = Array.isArray(p && p.sources) ? p.sources : [];
+ const by = (p && p.by_source) || {};
+ const status = (p && p.source_status) || {};
+ if (!sources.length) {
+  host.innerHTML = '';
+  return;
+ }
+ const rows = sources.map((src) => {
+  const name = typeof getSourceName === 'function' ? getSourceName(src) : src;
+  const done = Object.prototype.hasOwnProperty.call(by, src);
+  const count = done ? Number(by[src]) || 0 : null;
+  const kind = status[src] || '';
+  let detail;
+  let rowClass = 'fetch-live-row';
+  if (!done) {
+   detail = 'searching…';
+   rowClass += ' is-pending';
+  } else if (kind && kind !== 'ok' && kind !== 'no_results') {
+   // Muted — per-source failure is normal while the job overall succeeds.
+   detail = String(kind).replace(/_/g, ' ');
+   rowClass += ' is-muted';
+  } else if (kind === 'no_results' || count === 0) {
+   detail = '0 papers';
+   rowClass += ' is-muted';
+  } else {
+   detail = `${count} paper${count === 1 ? '' : 's'}`;
+   rowClass += ' is-ok';
+  }
+  return `<div class="${rowClass}"><span class="fetch-live-name">${escapeHtml(name)}</span>`
+   + `<span class="fetch-live-detail">${escapeHtml(detail)}</span></div>`;
+ });
+ host.innerHTML = rows.join('');
+}
+
 function waitForJob(task, fillId, labelId, wrapId, formatLabel, timeoutMs = 600000) {
  return new Promise((resolve, reject) => {
  const fill = document.getElementById(fillId);
  const label = document.getElementById(labelId);
  const wrap = document.getElementById(wrapId);
+ const live = document.getElementById('fetch-live-sources');
  if (wrap) wrap.style.display = 'block';
  if (fill) fill.style.width = '0%';
+ if (task === 'fetch' && live) live.innerHTML = '';
  const started = Date.now();
  let sawActive = false;
  let settled = false;
@@ -1260,6 +1397,7 @@ function waitForJob(task, fillId, labelId, wrapId, formatLabel, timeoutMs = 6000
    setTimeout(() => {
     wrap.style.display = 'none';
     if (fill) fill.style.width = '0%';
+    if (live && task === 'fetch') live.innerHTML = '';
    }, 800);
   }
   if (err) reject(err);
@@ -1284,6 +1422,7 @@ function waitForJob(task, fillId, labelId, wrapId, formatLabel, timeoutMs = 6000
       ? p.message
       : (typeof formatLabel === 'function' ? formatLabel(p.done, p.total, pct, p) : '');
     }
+    if (task === 'fetch') renderFetchLiveSources(p);
     return;
    }
    // Idle: only finish after we observed this job running, or after a short
@@ -1311,6 +1450,133 @@ function waitForJob(task, fillId, labelId, wrapId, formatLabel, timeoutMs = 6000
  });
 }
 
+/**
+ * Build a structured per-source report model from a fetch result.
+ * Pure (no DOM) so Simple can collapse to top-5 successes + summary.
+ */
+function buildFetchSourceReportModel(data, sources) {
+ const counts = (data && data.by_source) || {};
+ const errors = (data && data.errors) || {};
+ const kinds = (data && data.error_kinds) || {};
+ const used = new Set(sources || []);
+ Object.keys(counts).forEach((s) => used.add(s));
+ Object.keys(errors).forEach((s) => used.add(s));
+ Object.keys(kinds).forEach((s) => used.add(s));
+
+ const successes = [];
+ const muted = []; // no results / soft failures (not alarming)
+
+ used.forEach((src) => {
+  const name = typeof getSourceName === 'function' ? getSourceName(src) : src;
+  const count = Number(counts[src]) || 0;
+  const err = errors[src];
+  const kind = kinds[src] || '';
+  if (err) {
+   const kindBit = kind ? ` [${kind}]` : '';
+   muted.push({
+    src,
+    name,
+    line: `✗ ${name}${kindBit}: ${err}`,
+    zero: false,
+   });
+   return;
+  }
+  if (kind === 'no_results' || count === 0) {
+   muted.push({
+    src,
+    name,
+    line: `· ${name}: no results`,
+    zero: true,
+   });
+   return;
+  }
+  successes.push({
+   src,
+   name,
+   count,
+   line: `✓ ${name}: ${count}`,
+  });
+ });
+
+ successes.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+ muted.sort((a, b) => a.name.localeCompare(b.name));
+
+ // Classroom notes for tricky sources (preprints / DBLP abstracts).
+ const tipLines = [];
+ if (used.has('biorxiv') || used.has('medrxiv')) {
+  tipLines.push(
+   'Note: bioRxiv / medRxiv are preprints — not peer-reviewed, and only recent posts in a rolling date window.'
+  );
+ }
+ if (used.has('dblp')) {
+  tipLines.push(
+   'Note: DBLP often has title and venue only; papers without a real abstract are skipped, so counts can look low.'
+  );
+ }
+ if (used.has('arxiv') && (counts.arxiv || 0) > 0) {
+  tipLines.push('Note: arXiv items are preprints and may not be peer-reviewed yet.');
+ }
+
+ return { successes, muted, tipLines };
+}
+
+/**
+ * Render the final source report HTML.
+ * Simple: <details> collapsed by default — top 5 successes + summary of the rest.
+ * Advanced: full list expanded (open attribute).
+ * All dynamic strings go through escapeHtml.
+ */
+function renderFetchSourceReportHtml(model, opts) {
+ const simple = !!(opts && opts.simple);
+ const successes = (model && model.successes) || [];
+ const muted = (model && model.muted) || [];
+ const tipLines = (model && model.tipLines) || [];
+ const topN = 5;
+ const top = successes.slice(0, topN);
+ const restOk = successes.slice(topN);
+ const zeroCount = muted.filter((m) => m.zero).length;
+ const otherMuted = muted.length - zeroCount;
+
+ const topHtml = top.map((s) => escapeHtml(s.line)).join('<br>');
+ let summaryBits = [];
+ if (restOk.length) summaryBits.push(`${restOk.length} more`);
+ if (zeroCount) {
+  summaryBits.push(
+   zeroCount === 1 ? '1 returned nothing' : `${zeroCount} returned nothing`
+  );
+ }
+ if (otherMuted > 0) {
+  summaryBits.push(
+   otherMuted === 1 ? '1 with an error' : `${otherMuted} with errors`
+  );
+ }
+ const summaryLine = summaryBits.length
+  ? `<div class="fetch-source-report-summary-line">${escapeHtml('and ' + summaryBits.join(' · '))}</div>`
+  : '';
+
+ const fullLines = [
+  ...successes.map((s) => s.line),
+  ...muted.map((m) => m.line),
+ ];
+ const fullHtml = fullLines.map((ln) => escapeHtml(ln)).join('<br>');
+ const tipHtml = tipLines.length
+  ? `<div class="fetch-source-tips">${tipLines.map(escapeHtml).join('<br>')}</div>`
+  : '';
+
+ if (!simple) {
+  // Advanced: full list always visible (no collapse).
+  return `<div class="fetch-source-report-full">${fullHtml}${tipHtml}</div>`;
+ }
+
+ // Simple: collapsed default — show top successes + one summary line.
+ const collapsedBody = (topHtml || escapeHtml('(no sources returned papers)')) + summaryLine;
+ const openAttr = ''; // collapsed by default
+ return `<details class="fetch-source-report-details help-details"${openAttr}>
+  <summary>${collapsedBody}<span class="help-text"> · Show all sources</span></summary>
+  <div class="fetch-source-report-full">${fullHtml}${tipHtml}</div>
+ </details>`;
+}
+
 function applyFetchResult(data, sources) {
  syncOnlyMissingFromFetchMode();
  saveFetchPrefs();
@@ -1318,46 +1584,20 @@ function applyFetchResult(data, sources) {
  loadPageData();
  refreshCoverage();
 
- const okLines = Object.entries(data.by_source || {})
- .filter(([src]) => !(data.errors || {})[src])
- .map(([src, count]) => `✓ ${getSourceName(src)}: ${count}`);
- const kinds = data.error_kinds || {};
- const errLines = Object.entries(data.errors || {})
- .map(([src, msg]) => {
- const kind = kinds[src] ? ` [${kinds[src]}]` : '';
- return `✗ ${getSourceName(src)}${kind}: ${msg}`;
- });
- // Surface no-results sources gently
- Object.entries(kinds).forEach(([src, kind]) => {
- if (kind === 'no_results' && !(data.errors || {})[src]) {
- errLines.push(`· ${getSourceName(src)}: no results`);
- }
- });
- // Classroom notes for tricky sources (preprints / DBLP abstracts).
- const tipLines = [];
- const used = new Set(sources || []);
- const counts = data.by_source || {};
- if ((used.has('biorxiv') || used.has('medrxiv')) &&
- ((counts.biorxiv || 0) + (counts.medrxiv || 0) > 0 || used.has('biorxiv') || used.has('medrxiv'))) {
- tipLines.push(
- 'Note: bioRxiv / medRxiv are preprints — not peer-reviewed, and only recent posts in a rolling date window.'
- );
- }
- if (used.has('dblp')) {
- tipLines.push(
- 'Note: DBLP often has title and venue only; papers without a real abstract are skipped, so counts can look low.'
- );
- }
- if (used.has('arxiv') && (counts.arxiv || 0) > 0) {
- tipLines.push('Note: arXiv items are preprints and may not be peer-reviewed yet.');
- }
+ // Clear live per-source rows so they never sit next to the final report.
+ const live = document.getElementById('fetch-live-sources');
+ if (live) live.innerHTML = '';
+ const progressWrap = document.getElementById('fetch-progress-wrap');
+ if (progressWrap) progressWrap.style.display = 'none';
 
+ const model = buildFetchSourceReportModel(data, sources);
+ const simple = typeof isSimpleMode === 'function' && isSimpleMode();
  const report = document.getElementById('fetch-source-report');
- report.style.display = 'block';
- const tipHtml = tipLines.length
- ? `<div class="fetch-source-tips">${tipLines.map(escapeHtml).join('<br>')}</div>`
- : '';
- report.innerHTML = [...okLines, ...errLines].map(escapeHtml).join('<br>') + tipHtml;
+ if (report) {
+  report.style.display = 'block';
+  report.classList.remove('u-hidden');
+  report.innerHTML = renderFetchSourceReportHtml(model, { simple });
+ }
 
  const errorCount = Object.keys(data.errors || {}).length;
  const breakdown = Object.entries(data.by_source || {})
@@ -1391,6 +1631,161 @@ function applyFetchResult(data, sources) {
  }
 }
 
+/**
+ * Simple mode only: decide replace vs append before fetch.
+ * Empty library → no dialog, force replace (clear_first true).
+ * Non-empty → dialog with real count from /api/statistics.
+ * Returns false if the user cancelled (no request should be sent).
+ * Sets the fetch-mode radios so saveFetchPrefs / only-missing hint stay correct.
+ */
+/**
+ * Best-known research question for Simple re-prepare / Narrow it down.
+ * Prefers the screening field, then fetch query, then saved prefs.
+ */
+function getResearchQuestionCandidate() {
+ const screen = document.getElementById('simple-screen-query');
+ if (screen && screen.value.trim()) return screen.value.trim();
+ const fetchQ = document.getElementById('fetch-query');
+ if (fetchQ && fetchQ.value.trim()) return fetchQ.value.trim();
+ try {
+  const prefs = JSON.parse(localStorage.getItem(FETCH_PREFS_KEY) || 'null');
+  if (prefs && prefs.query && String(prefs.query).trim()) {
+   return String(prefs.query).trim();
+  }
+ } catch (e) { /* ignore */ }
+ return '';
+}
+
+/** Write a verified question into fetch + screening fields and persist prefs. */
+function applyVerifiedResearchQuestion(query) {
+ const q = String(query || '').trim();
+ if (!q) return;
+ const fetchQ = document.getElementById('fetch-query');
+ if (fetchQ) fetchQ.value = q;
+ const screen = document.getElementById('simple-screen-query');
+ if (screen) screen.value = q;
+ // Counts were for the old question — force a re-rank after re-prepare.
+ _simpleScreenCounts = { low: null, medium: null, high: null };
+ try {
+  saveFetchPrefs();
+ } catch (e) { /* ignore */ }
+}
+
+/**
+ * Simple re-prepare dialog: research question lives *in the same popup* as
+ * only-new / redo-all (not a separate step). Sets #only-missing + verified
+ * query. Returns false if cancelled.
+ */
+async function resolveSimplePrepareModeBeforeRequest() {
+ if (typeof isSimpleMode !== 'function' || !isSimpleMode()) {
+  return true;
+ }
+ let ready = 0;
+ let total = Number(_lastTotalArticles) || 0;
+ try {
+  const stats = await apiCall('/api/statistics');
+  ready = Number(stats.articles_with_embeddings) || 0;
+  total = Number(stats.total_articles) || total;
+  _lastTotalArticles = total;
+ } catch (err) {
+  console.warn('Could not load prepare counts for dialog:', err);
+ }
+ const box = document.getElementById('only-missing');
+ const current = getResearchQuestionCandidate();
+
+ // Always open a re-prepare dialog with the research question field visible.
+ // When nothing is prepared yet, only Continue / Cancel (no scope choice).
+ if (typeof openSiteChoice !== 'function') {
+  if (ready <= 0 && box) box.checked = true;
+  return true;
+ }
+
+ const allLabel = total > 0 ? `Redo all ${total}` : 'Redo all papers';
+ const choices = ready <= 0
+  ? [
+   { label: 'Continue', value: 'missing', primary: true },
+   { label: 'Cancel', value: null, cancel: true },
+  ]
+  : [
+   { label: 'Only new papers', value: 'missing', primary: true },
+   { label: allLabel, value: 'all' },
+   { label: 'Cancel', value: null, cancel: true },
+  ];
+
+ const result = await openSiteChoice({
+  title: 'Re-prepare papers for search',
+  message: ready <= 0
+   ? 'Check that this research question is still what you want. Edit if needed — Narrow it down will use it next.'
+   : 'Check that this research question is still what you want, then choose how much to re-prepare. Only new papers need this most of the time.',
+  withInput: true,
+  inputLabel: 'Your research question',
+  defaultValue: current,
+  placeholder: 'e.g., climate change effects on ecosystems',
+  requireNonEmpty: true,
+  emptyMessage: 'Please confirm your research question before re-preparing.',
+  selectAll: !current,
+  choices,
+ });
+ if (result == null) return false;
+
+ // withInput → { value, input }; bare string if modal helper is older.
+ let scope = result;
+ let question = current;
+ if (result && typeof result === 'object' && 'value' in result) {
+  scope = result.value;
+  question = result.input;
+ }
+ if (scope == null) return false;
+
+ applyVerifiedResearchQuestion(String(question || '').trim());
+ if (box) box.checked = scope !== 'all';
+ return true;
+}
+
+async function resolveSimpleFetchModeBeforeRequest() {
+ if (typeof isSimpleMode !== 'function' || !isSimpleMode()) {
+  return true;
+ }
+ let total = Number(_lastTotalArticles) || 0;
+ try {
+  const stats = await apiCall('/api/statistics');
+  if (stats && stats.total_articles != null) {
+   total = Number(stats.total_articles) || 0;
+   _lastTotalArticles = total;
+  }
+ } catch (err) {
+  console.warn('Could not load paper count for fetch dialog:', err);
+ }
+ const setMode = (value) => {
+  const radio = document.querySelector(`input[name="fetch-mode"][value="${value}"]`);
+  if (radio) radio.checked = true;
+  syncOnlyMissingFromFetchMode();
+ };
+ // Empty collection: choice is meaningless — start fresh, no dialog.
+ if (total <= 0) {
+  setMode('replace');
+  return true;
+ }
+ if (typeof openSiteChoice !== 'function') {
+  // Fallback: keep radios (hidden in Simple CSS) if modal helper missing.
+  return true;
+ }
+ const nLabel = total === 1 ? '1 paper' : `${total} papers`;
+ const choice = await openSiteChoice({
+  title: 'You already have papers',
+  message:
+   `You already have ${nLabel} — start fresh, or add these results to what you have?`,
+  choices: [
+   { label: 'Start fresh', value: 'replace', primary: true },
+   { label: 'Add to them', value: 'append' },
+   { label: 'Cancel', value: null, cancel: true },
+  ],
+ });
+ if (choice == null) return false;
+ setMode(choice === 'append' ? 'append' : 'replace');
+ return true;
+}
+
 async function doFetch() {
  const sources = Array.from(
  document.querySelectorAll('#source-option-grid input[type="checkbox"]:checked')
@@ -1398,12 +1793,17 @@ async function doFetch() {
  const query = document.getElementById('fetch-query').value.trim();
  const maxResults = parseInt(document.getElementById('fetch-max').value, 10);
  const email = document.getElementById('fetch-email').value.trim();
- const mode = (document.querySelector('input[name="fetch-mode"]:checked') || {}).value || 'replace';
- const clearFirst = mode === 'replace';
 
  setNextStepVisible(false);
  if (!query) { showNotification('Please enter a search query.', 'error'); return; }
  if (sources.length === 0) { showNotification('Please select at least one source.', 'error'); return; }
+
+ // Simple: dialog (or skip when empty) must run BEFORE reading fetch-mode.
+ const proceed = await resolveSimpleFetchModeBeforeRequest();
+ if (!proceed) return;
+
+ const mode = (document.querySelector('input[name="fetch-mode"]:checked') || {}).value || 'replace';
+ const clearFirst = mode === 'replace';
 
  saveFetchPrefs();
 
@@ -1412,7 +1812,7 @@ async function doFetch() {
  // Hide Simple re-prepare for the whole fetch (+ auto-chain) window.
  _pipelineBusy = true;
  setSimpleScreenSkipped(false);
- _simpleScreenLastItems = null;
+ clearSimpleScreenUndoItems();
  _simpleScreenCounts = { low: null, medium: null, high: null };
  updatePrepareSectionVisibility(_lastTotalArticles);
  setNextStepVisible(false);
@@ -1548,6 +1948,12 @@ async function doCreateEmbeddings(opts) {
  const simple = typeof isSimpleMode === 'function' && isSimpleMode();
  const modelEl = document.getElementById('embedding-model');
  const model = (modelEl && modelEl.value) || 'general';
+ // Simple manual re-prepare: dialog before reading only_missing.
+ // Auto-chain after fetch keeps the radio-driven only-missing state (no dialog).
+ if (simple && !fromAutoChain) {
+  const ok = await resolveSimplePrepareModeBeforeRequest();
+  if (!ok) return;
+ }
  const onlyMissing = document.getElementById('only-missing')?.checked || false;
  const btn = document.getElementById('embeddings-btn');
  saveFetchPrefs();
@@ -1637,7 +2043,37 @@ async function doCreateEmbeddings(opts) {
  );
  showNotification('Papers prepared for search!', 'success');
  }
+ // Manual Simple re-prepare: clear low_relevance exclusions so screening
+ // returns to *pending* via corpus state (not a JS flag) and survives reload.
+ // Uses existing POST /api/screening include — no new endpoint.
+ if (simple && !fromAutoChain) {
+  try {
+   const excl = await apiCall('/api/screening/excluded?reason=low_relevance');
+   const items = (excl && excl.items) || [];
+   if (items.length) {
+    await apiCall('/api/screening', {
+     method: 'POST',
+     body: { items, action: 'include', reason: 'low_relevance' },
+    });
+   }
+   setSimpleScreenSkipped(false);
+   clearSimpleScreenUndoItems();
+  } catch (screenErr) {
+   console.warn('Could not reset screening after re-prepare:', screenErr);
+  }
+ }
  await loadPageData();
+ // Manual re-prepare (and auto-chain) must refresh Narrow it down so the
+ // confirm-your-question box appears without a full page reload.
+ await refreshSimpleScreeningCard();
+ if (simple) {
+  const card = document.getElementById('simple-screening-card');
+  if (card && !card.hidden) {
+   try {
+    card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+   } catch (e) { /* ignore */ }
+  }
+ }
  return data;
  } catch (e) {
  const msg = e.message || '';

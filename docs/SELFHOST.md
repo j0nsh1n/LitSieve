@@ -1,43 +1,46 @@
 # Self-host LitSieve
 
-## Architecture (do not change)
+Generic runbook for an operator-owned host. Paths and unit names below match
+the examples under `deploy/`; rename if your install differs.
+
+## Architecture
 
 ```text
 Browser  --HTTPS-->  Cloudflare  --HTTP-->  cloudflared  --HTTP-->  uvicorn
-                     (TLS here)              (this PC)              127.0.0.1:7860
+                     (TLS at edge)           (origin host)         127.0.0.1:7860
 ```
 
 | Edge | Origin |
 |------|--------|
-| **Public URL** | `https://www.litpilot.org` |
+| **Public URL** (example) | `https://www.litpilot.org` |
 | **Local FastAPI** | `http://127.0.0.1:7860` only (no TLS on Uvicorn) |
 
 Cloudflare Tunnel **terminates HTTPS**. Do **not** give Uvicorn certificates or
 `--ssl-keyfile` / `--ssl-certfile`. Optional Caddy is only for LAN experiments,
 not for the public hostname.
 
-Public access on T‑Mobile Home Internet uses the tunnel (CGNAT; no inbound
-port-forward).
+Use a tunnel (or similar outbound connector) whenever the host is behind CGNAT
+or has no stable inbound ports — do not depend on ISP port-forward.
 
 ## Machine layout
 
 | Piece | Role |
 |-------|------|
 | LitSieve | `uvicorn` **HTTP** on `127.0.0.1:7860` only |
-| `cloudflared` | Outbound tunnel; public hostname `www.litpilot.org` → origin |
-| Caddy (optional) | LAN-only reverse proxy — not required for www.litpilot.org |
-| Pi-hole | Admin on high ports (e.g. 8080 / 8444) if still installed |
+| `cloudflared` | Outbound tunnel; public hostname → origin HTTP |
+| Caddy (optional) | LAN-only reverse proxy — not required for the public hostname |
 
 ## Required app env (gitignored `.env`)
 
 ```bash
 DEBUG=false
-PUBLIC_BASE_URL=https://www.litpilot.org
+PUBLIC_BASE_URL=https://www.example.com   # your public HTTPS origin
 # SECRET_KEY=…  required when DEBUG=false
 # SMTP_* optional — recovery links use PUBLIC_BASE_URL
 ```
 
-Public hostname: **`www.litpilot.org`** (Cloudflare Tunnel → `http://127.0.0.1:7860`).
+Point the tunnel at **`http://127.0.0.1:7860`**. Set `PUBLIC_BASE_URL` to the
+HTTPS URL users type in the browser.
 
 ## Cloudflare Tunnel
 
@@ -50,7 +53,7 @@ Public hostname: **`www.litpilot.org`** (Cloudflare Tunnel → `http://127.0.0.1
    TUNNEL_TOKEN=…
    ```
 
-4. Run with the user service (example):
+4. Run with a user service (example unit in `deploy/`):
 
    ```bash
    systemctl --user enable --now cloudflared-litpilot-token.service
@@ -58,21 +61,21 @@ Public hostname: **`www.litpilot.org`** (Cloudflare Tunnel → `http://127.0.0.1
    ```
 
 5. In the dashboard, add a **Public Hostname**:
-   - Subdomain: `www`
-   - Domain: `litpilot.org`
+   - Hostname: your public name (e.g. `www` + your domain)
    - Service: **HTTP** → `http://127.0.0.1:7860`
-   - Optional second rule: apex `litpilot.org` → same service (or redirect to www)
+   - Optional: apex hostname → same service (or redirect to www)
 
-6. Keep LitSieve running (see **Run it as a service** below — do not leave it
-   running in a terminal, it dies with the session).
+6. Keep LitSieve running (see **Run it as a service** — do not leave it only
+   in a terminal session).
 
 ## Run it as a service (starts at boot)
 
 Running `uvicorn` in a terminal means the site dies when that session ends, does
 not restart if it crashes, and does not come back after a reboot. Install the
-unit instead — the same way `cloudflared` already runs.
+unit instead — same idea as the tunnel service.
 
 ```bash
+# From the repo root on the origin host:
 mkdir -p ~/.config/systemd/user
 cp deploy/litsieve-uvicorn.service ~/.config/systemd/user/
 systemctl --user daemon-reload
@@ -80,8 +83,7 @@ systemctl --user enable --now litsieve-uvicorn.service
 systemctl --user status litsieve-uvicorn.service
 ```
 
-**Linger** is what makes user services survive logout and start at boot. It is
-already enabled on this host (cloudflared needs it too), but on a fresh machine:
+**Linger** makes user services survive logout and start at boot:
 
 ```bash
 loginctl show-user "$USER" --property=Linger   # want Linger=yes
@@ -92,7 +94,6 @@ Switching over from a manually started server: stop the old process first, or
 the service will fail with "address already in use".
 
 ```bash
-# find whatever is holding 7860, then stop it
 ss -ltnp | grep 7860
 systemctl --user start litsieve-uvicorn.service
 curl -sS http://127.0.0.1:7860/health
@@ -113,11 +114,11 @@ Notes:
 
 ## Everyday commands
 
-The four things you actually do. Run them from `~/HealthDatabaseAccess`.
+Run these from the **repo root** on the origin host.
 
 ### After a reboot — nothing
 
-The service is `enabled` and the account has `Linger=yes`, so it starts on its
+If the service is `enabled` and the account has `Linger=yes`, it starts on its
 own. Confirm if you want:
 
 ```bash
@@ -125,9 +126,9 @@ systemctl --user status litsieve-uvicorn.service
 curl -sS http://127.0.0.1:7860/health     # {"status":"healthy","version":"…"}
 ```
 
-Check the *local* URL, not the public one: Cloudflare serves a managed
-challenge, so `curl https://www.litpilot.org/health` returns 403
-(`cf-mitigated: challenge`) even when the site is perfectly healthy.
+Prefer the **local** URL for health checks. Some edges (including Cloudflare
+managed challenges) return 403 to bare `curl` against the public hostname even
+when the app is healthy — that is not a reliable up/down signal by itself.
 
 ### After changing code
 
@@ -139,7 +140,7 @@ systemctl --user restart litsieve-uvicorn.service
 curl -sS http://127.0.0.1:7860/health
 ```
 
-A couple of seconds of downtime. Skipping the tests risks restarting the public
+A couple of seconds of downtime. Skipping the tests risks restarting a public
 site into a broken state.
 
 ### While developing
@@ -149,13 +150,13 @@ site into a broken state.
 ```
 
 Auto-reloads on save, on a spare port, against **throwaway data**
-(`dev_users.db`, `dev_data/`, `logs/dev.log`) — the live site on 7860 keeps
-running and its accounts and libraries are untouched. The script prints which
-stores it is using and warns if you override it back onto live data.
+(`dev_users.db`, `dev_data/`, `logs/dev.log`) so a live process on 7860 can keep
+its accounts and libraries untouched. The script prints which stores it is using
+and warns if you override it back onto live data.
 
 Note it forces `DEBUG=true`, so cookies are not `Secure` and reset codes may
-render on screen. Correct for `http://localhost`, but it means the dev server is
-not a faithful test of the production auth path.
+render on screen. Correct for `http://localhost`, but the dev server is not a
+faithful test of the production auth path.
 
 ### When something looks wrong
 
@@ -174,16 +175,13 @@ Service will not start? Usually one of:
 
 ## Watchdog (know when it breaks)
 
-On 2026-08-05 the site was down for **4h47m** and nothing said so. The tunnel
-token had been revoked the day before, but cloudflared never re-authenticates an
-*already established* connection — so the site kept serving until the machine's
-unattended ~05:01 reboot forced a fresh registration, which failed. Every signal
-looked healthy: the tunnel unit was `active`, the app answered `/health` 200,
-and `curl` against the public hostname returns 403 either way.
+A tunnel unit can show `active` while the public edge is dead (for example after
+a token revoke that only fails on the next reconnect). Local `/health` can also
+look fine while the tunnel has no registered connections.
 
-`tools/watchdog.py` checks the two things that actually distinguish up from
-down — the app answers locally, and the tunnel currently holds registered
-connections — and emails on state changes (not every poll).
+`tools/watchdog.py` checks both signals the operator actually cares about — the
+app answers locally, and the tunnel currently holds registered connections —
+and emails on **state changes** (not every poll).
 
 Install:
 
@@ -199,8 +197,7 @@ systemctl --user enable --now litsieve-watchdog.timer
 WATCHDOG_EMAIL_TO=you@example.com
 ```
 
-It reuses the app's existing `SMTP_*` settings, so there is nothing else to
-configure. Check and tune:
+It reuses the app's existing `SMTP_*` settings. Check and tune:
 
 ```bash
 systemctl --user list-timers litsieve-watchdog.timer     # next run
@@ -214,7 +211,7 @@ cat logs/watchdog_state.json                             # last known state
 | `WATCHDOG_EMAIL_TO` | *(unset)* | Alert recipient. Unset = no email. |
 | `WATCHDOG_REMIND_HOURS` | `12` | Re-send while still down. `0` = once only. |
 | `WATCHDOG_HEALTH_URL` | `http://127.0.0.1:7860/health` | App check |
-| `WATCHDOG_TUNNEL_UNIT` | `cloudflared-litpilot-token` | Tunnel unit to inspect |
+| `WATCHDOG_TUNNEL_UNIT` | `cloudflared-litpilot-token` | Tunnel unit to inspect (rename if needed) |
 
 Exit codes: `0` healthy, `1` down (already emailed), `2` the check itself could
 not run. The unit treats `1` as success so a genuine outage does not also show
@@ -222,13 +219,12 @@ up as a failed unit.
 
 ## Backups
 
-Everything is on one desktop: `users.db` (real accounts) and `user_data/`
-(libraries, embeddings, notes, screening decisions). A dead disk loses all of
-it.
+On a single-machine deploy, `users.db` and `user_data/` are a single point of
+failure: accounts, libraries, embeddings, notes, and screening decisions.
 
-`tools/backup.py` runs daily via `litsieve-backup.timer` and writes to
-`~/litsieve-backups/` — deliberately outside the repo, so a bad deploy or
-`git clean` cannot take the backups with it.
+`tools/backup.py` runs daily via `litsieve-backup.timer` and writes under
+`BACKUP_DIR` (default `~/litsieve-backups/`) — deliberately **outside** the
+repo so a bad deploy or `git clean` cannot delete archives with the code tree.
 
 ```bash
 cp deploy/litsieve-backup.{service,timer} ~/.config/systemd/user/
@@ -257,33 +253,33 @@ Two things make this more than `cp -r`:
 **The archive contains every user's data and, by default, `.env` — including
 `SECRET_KEY`.** That is deliberate: without it, stored AI keys cannot be
 decrypted, so a restore would be partial. Archives are written `0600`. Use
-`--no-env` to exclude it, and encrypt any copy you move off this machine.
+`--no-env` to exclude it, and encrypt any copy you move off the machine.
 
 ### Restoring
 
 ```bash
+# REPO = path to the LitSieve checkout on the origin host
 tar -xzf ~/litsieve-backups/litsieve-YYYYMMDD-HHMMSS.tar.gz -C /tmp/restore
 systemctl --user stop litsieve-uvicorn.service
-cp /tmp/restore/litsieve/users.db ~/HealthDatabaseAccess/
-cp -r /tmp/restore/litsieve/user_data ~/HealthDatabaseAccess/
+cp /tmp/restore/litsieve/users.db "$REPO/"
+cp -r /tmp/restore/litsieve/user_data "$REPO/"
 systemctl --user start litsieve-uvicorn.service
 ```
 
-Off-machine copies are still the gap: this protects against a bad deploy, an
-accidental delete, or filesystem corruption — not against the disk dying or the
-house burning down. Copying the newest archive somewhere else periodically
-closes that.
+Off-machine copies remain the operator’s job: local archives protect against a
+bad deploy, accidental delete, or filesystem corruption — not against total
+loss of the host disk. Copy the newest archive somewhere else periodically.
 
 ### Smoke
 
 ```bash
 curl -sS http://127.0.0.1:7860/health
-curl -sS https://www.litpilot.org/health
+# Public URL may return edge challenge responses to curl; prefer local /health.
 ```
 
 ## Optional: Caddy on the LAN
 
-If you still want HTTPS on the LAN without going through Cloudflare, see
+If you want HTTPS on the LAN without going through Cloudflare, see
 `deploy/Caddyfile.privileged` (needs `cap_net_bind_service` for :80/:443).
 
 ## Security (good crypto, light on the CPU)

@@ -70,7 +70,7 @@ function renderPreview(data) {
   card.hidden = false;
   card.innerHTML = `
     <h3 class="join-preview-title">${escapeHtml(data.title || 'Library')}</h3>
-    <p class="info-text" style="margin:0.35rem 0;">From <strong>${escapeHtml(data.owner_username || 'another account')}</strong>
+    <p class="info-text join-preview-lead">From <strong>${escapeHtml(data.owner_username || 'another account')}</strong>
       · code <code>${escapeHtml(data.code || '')}</code></p>
     <ul class="join-preview-stats">
       <li><strong>${Number(data.article_count) || 0}</strong> papers</li>

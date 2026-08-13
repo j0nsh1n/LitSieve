@@ -5,11 +5,18 @@
 <section class="card simple-screening-card" id="simple-screening-card" hidden>
  <h2>Narrow it down</h2>
  <p class="info-text">Set aside papers that are least related to your question before you search.</p>
- <div class="form-group">
-  <label for="simple-screen-query">Your question</label>
-  <input type="text" id="simple-screen-query" name="simple-screen-query"
-   placeholder="e.g., climate change effects on ecosystems" autocomplete="off">
+
+ {# Confirm box: do not silently assume the fetch query is still correct. #}
+ <div class="simple-screen-confirm" id="simple-screen-confirm">
+  <p class="simple-screen-confirm-title">Confirm your research question</p>
+  <p class="help-text">We filled this from your last fetch. Check it, edit if needed, then choose how much to set aside.</p>
+  <div class="form-group">
+   <label for="simple-screen-query">Your question</label>
+   <input type="text" id="simple-screen-query" name="simple-screen-query"
+    placeholder="e.g., climate change effects on ecosystems" autocomplete="off">
+  </div>
  </div>
+
  <fieldset class="simple-screen-levels" id="simple-screen-levels">
   <legend class="simple-screen-legend">How much should we set aside?</legend>
   <label class="simple-screen-level radio-label">

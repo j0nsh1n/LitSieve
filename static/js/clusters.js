@@ -248,6 +248,14 @@ function renderClusters(clusters) {
 }
 
 async function loadClusterArticles(clusterId, bodyEl) {
+ bodyEl.innerHTML =
+  '<div class="skeleton-card" aria-hidden="true">'
+  + '<div class="skeleton-line skeleton-line-title"></div>'
+  + '<div class="skeleton-line skeleton-line-meta"></div>'
+  + '<div class="skeleton-line skeleton-line-body"></div></div>'
+  + '<div class="skeleton-card" aria-hidden="true">'
+  + '<div class="skeleton-line skeleton-line-title"></div>'
+  + '<div class="skeleton-line skeleton-line-meta"></div></div>';
  try {
  const data = await apiCall(`/api/clusters/${clusterId}/articles`);
  renderClusterArticles(data.articles || [], bodyEl);

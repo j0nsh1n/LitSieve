@@ -462,6 +462,16 @@ async function doDetectDuplicates() {
  const btn = document.getElementById('detect-btn');
  setLoading(btn, true);
  setStatus('duplicates-status', 'Analyzing similarity matrix...', 'info');
+ const list = document.getElementById('duplicates-list');
+ if (list) {
+  list.innerHTML =
+   '<div class="skeleton-card" aria-hidden="true">'
+   + '<div class="skeleton-line skeleton-line-title"></div>'
+   + '<div class="skeleton-line skeleton-line-meta"></div></div>'
+   + '<div class="skeleton-card" aria-hidden="true">'
+   + '<div class="skeleton-line skeleton-line-title"></div>'
+   + '<div class="skeleton-line skeleton-line-meta"></div></div>';
+ }
 
  try {
  const data = await apiCall('/api/detect-duplicates', {
