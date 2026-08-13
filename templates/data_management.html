@@ -28,7 +28,10 @@
   Clusters, and duplicates. Re-prepare is optional if that step failed or you change the model.
   Guest demos load sample papers only (no multi-source fetch).</p>
   <p class="info-text page-help-simple">After prepare finishes, you may get a short screening step
-  (Low / Medium / High), then Go to Search. Guest demos use sample papers only.</p>
+  (Low / Medium / High), then Go to Search. Fetch is locked once this collection has papers —
+  use <strong>Start over or add papers</strong> if you really need another search, or
+  <strong>Re-prepare</strong> if you only need to get them ready again. Guest demos use sample
+  papers only.</p>
  </div>
 </aside>
 
@@ -71,10 +74,16 @@
 <section class="card">
  <h2 class="dm-step-heading dm-step-advanced">3. Fetch Articles</h2>
  <h2 class="dm-step-heading dm-step-simple">2. Fetch Articles</h2>
- <p class="info-text">Searches every selected source at once, saves the papers to your private
+ <p class="info-text" id="fetch-lead">Searches every selected source at once, saves the papers to your private
  collection, then <strong>automatically prepares them for search</strong> (you can leave this page
  open while progress runs).</p>
  {% include "partials/guest_fetch_note.html" %}
+ <div id="simple-fetch-locked" class="simple-fetch-locked" hidden>
+  <p class="info-text" id="simple-fetch-locked-msg">This collection already has papers. Fetching again
+   can replace them or mix in a new search. Use Re-prepare if you only need to get them ready for
+   search again.</p>
+  <button type="button" id="simple-fetch-unlock-btn" class="btn btn-secondary">Start over or add papers</button>
+ </div>
  <form id="fetch-form" action="/data-management" method="get">
  <div class="form-row">
  <div class="form-group flex-2">
@@ -184,5 +193,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/data_management.js?v=20260811d"></script>
+<script src="/static/js/data_management.js?v=20260812a"></script>
 {% endblock %}

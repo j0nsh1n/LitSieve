@@ -4655,8 +4655,15 @@ html:not([data-mode="simple"]) #simple-screening-card {
 
 /* Guest demo: hide multi-source fetch form (server also 403s the API).
    Keep the fetch *section* for status/progress after sample prepare. */
-body[data-guest="1"] #fetch-form {
+body[data-guest="1"] #fetch-form,
+body[data-guest="1"] #simple-fetch-locked {
     display: none !important;
+}
+.simple-fetch-locked {
+    margin: var(--space-3) 0 var(--space-4);
+}
+.simple-fetch-locked .btn {
+    margin-top: var(--space-2);
 }
 body[data-guest="1"] .guest-fetch-note {
     display: block !important;

@@ -29,6 +29,11 @@ and this project aims to follow Semantic Versioning for app version strings
   so a broken browser script previously shipped with every Python test green.
 
 ### Changed
+- **Simple fetch lock:** after this library has papers, Simple hides the Fetch
+  Articles form so a second search is not the main action. A secondary
+  **Start over or add papers** control reuses the existing replace/add dialog,
+  then the form returns for that one fetch. Re-prepare, the source report,
+  screening, and Advanced are unchanged. Guests still cannot fetch.
 - **UI revamp Phase 8 (Reading Room A + Workbench B shell):** body-scale
   `.info-text` / larger `.help-text`; Search sticky query rail + results;
   numeric 0–1 score meters; summonable **Help** on Search, Data Management,

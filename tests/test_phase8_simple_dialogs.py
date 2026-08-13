@@ -184,7 +184,7 @@ def test_simple_fetch_cancel_returns_false_before_request():
     fn = DM[DM.index("async function resolveSimpleFetchModeBeforeRequest") :
             DM.index("async function doFetch")]
     assert "if (choice == null) return false" in fn
-    do = DM[DM.index("async function doFetch") : DM.index("async function doFetch") + 900]
+    do = DM[DM.index("async function doFetch") : DM.index("async function doCreateEmbeddings")]
     assert "if (!proceed) return" in do
 
 

@@ -12,7 +12,9 @@
 - Tests: `SECRET_KEY=x DEBUG=true ./venv/bin/python -m pytest -q` — prefer
   `./venv` for sqlcipher. Count drifts with the branch; re-run before release.
 - UI: Simple/Advanced via `localStorage.uiMode` + `data-mode` (theme-init pre-paint).
-  Simple nav: Get papers → Search. Advanced: full steps including Clean up + Clusters.
+  Simple nav: Get papers → Search. After a library has papers, Simple hides the
+  fetch form (Start over / add papers unlocks one more fetch). Advanced: full
+  steps including Clean up + Clusters.
 - Guest: `/guest` → sample corpus, multi-source fetch 403, purge after 30 minutes.
 - Ops: systemd user unit for uvicorn; optional backup + watchdog timers — see
   `docs/SELFHOST.md` and `docs/DEPLOY.md` (generic operator runbooks).
@@ -76,7 +78,9 @@ Guest User (is_guest) → sample corpus only; purged by age
 - Host entry: `app.main:app` port 7860; Linux `./venv`
 
 ## Session Handoff
-- **Date:** 2026-08-10
+- **Date:** 2026-08-12
 - **Branch:** `feat/phase6-guest-demo` (do not push without explicit ask)
-- **Done:** Phase 8 A+B shell — Account Help, Workbench nav split, docs.
-- **Next:** Push/PR (requested); restart uvicorn after deploy.
+- **Done:** Simple fetch lock after a library has papers; Start over reuses
+  replace/add dialog; report / screening / Re-prepare kept; Advanced unchanged.
+- **Next:** Human-confirm on a library with papers (lock + Start over + Advanced
+  still fetches). PR #55 already open; do not push unless asked.

@@ -189,6 +189,10 @@ document.addEventListener('DOMContentLoaded', () => {
  }
  const cancelBtn = document.getElementById('fetch-cancel-btn');
  if (cancelBtn) cancelBtn.addEventListener('click', cancelFetch);
+ const unlockBtn = document.getElementById('simple-fetch-unlock-btn');
+ if (unlockBtn) {
+  unlockBtn.addEventListener('click', unlockSimpleFetch);
+ }
  document.getElementById('embeddings-btn').addEventListener('click', doCreateEmbeddings);
  document.getElementById('coverage-refresh').addEventListener('click', refreshCoverage);
  const dismissGs = document.getElementById('dismiss-getting-started');
@@ -508,6 +512,13 @@ function restoreFetchPrefs() {
 let _lastTotalArticles = 0;
 /** Papers with embeddings (ready for search). Optional prepare card gates on this. */
 let _lastReadyArticles = 0;
+/**
+ * Simple: student chose Start over / add papers, so the fetch form is live
+ * again until this fetch finishes (or the page reloads).
+ */
+let _simpleFetchUnlocked = false;
+/** Unlock dialog already set replace/append — skip asking again on submit. */
+let _simpleFetchModePicked = false;
 /**
  * True while a fetch is running or the post-fetch auto-prepare is in flight.
  * Both modes keep the optional prepare card fully hidden for this whole
@@ -1132,6 +1143,61 @@ async function doSimpleScreenUndo() {
  }
 }
 
+function isGuestSession() {
+ return !!(document.body && document.body.getAttribute('data-guest') === '1');
+}
+
+/**
+ * Simple + this library already has papers: hide Fetch Articles unless the
+ * student explicitly unlocked via Start over. Advanced and empty libraries
+ * stay unchanged. Guests never see the fetch form (CSS + server 403).
+ */
+function isSimpleFetchLocked() {
+ if (typeof isSimpleMode !== 'function' || !isSimpleMode()) return false;
+ if (isGuestSession()) return false;
+ if (_pipelineBusy) return false;
+ if (_simpleFetchUnlocked) return false;
+ return _lastTotalArticles > 0;
+}
+
+function updateSimpleFetchLock() {
+ const lock = isSimpleFetchLocked();
+ const form = document.getElementById('fetch-form');
+ const lead = document.getElementById('fetch-lead');
+ const banner = document.getElementById('simple-fetch-locked');
+ const heading = document.querySelector('.dm-step-heading.dm-step-simple');
+ if (form) form.hidden = lock;
+ if (lead) lead.hidden = lock;
+ if (banner) {
+  banner.hidden = !lock;
+  const msg = document.getElementById('simple-fetch-locked-msg');
+  if (lock && msg) {
+   const n = Number(_lastTotalArticles) || 0;
+   const nLabel = n === 1 ? '1 paper' : `${n} papers`;
+   msg.textContent =
+    `This collection already has ${nLabel}. Fetching again can replace them or mix in a new search. Use Re-prepare if you only need to get them ready for search again.`;
+  }
+ }
+ if (heading) {
+  heading.textContent = lock ? '2. Your papers' : '2. Fetch Articles';
+ }
+}
+
+async function unlockSimpleFetch() {
+ if (typeof isSimpleMode !== 'function' || !isSimpleMode()) return;
+ if (isGuestSession()) return;
+ const proceed = await resolveSimpleFetchModeBeforeRequest();
+ if (!proceed) return;
+ _simpleFetchUnlocked = true;
+ _simpleFetchModePicked = true;
+ updateSimpleFetchLock();
+ const q = document.getElementById('fetch-query');
+ if (q) {
+  q.focus();
+  if (typeof q.select === 'function') q.select();
+ }
+}
+
 function updatePrepareSectionVisibility(totalArticles, opts) {
  const sec = document.getElementById('prepare-section');
  if (!sec) return;
@@ -1145,14 +1211,17 @@ function updatePrepareSectionVisibility(totalArticles, opts) {
  // Busy (fetch or auto-chain): never show the re-prepare card (Simple or Advanced).
  if (_pipelineBusy) {
   sec.hidden = true;
+  updateSimpleFetchLock();
   return;
  }
  if (forceShow) {
   sec.hidden = false;
+  updateSimpleFetchLock();
   return;
  }
  // Optional re-prepare only once something is actually ready for search.
  sec.hidden = !(_lastReadyArticles > 0);
+ updateSimpleFetchLock();
 }
 
 async function loadPageData() {
@@ -1172,10 +1241,15 @@ async function loadPageData() {
  window._corpusEmbeddingModel = stats.embedding_model || null;
  applyModelRecommendation();
  updateGettingStartedCard(total);
+ // Stats refresh (incl. library reload / sample load): lock fetch again in Simple.
+ _simpleFetchUnlocked = false;
+ _simpleFetchModePicked = false;
  updatePrepareSectionVisibility(total, { readyArticles: ready });
  } catch (e) {
  document.getElementById('embedding-info').textContent = 'Unable to load article info.';
  updateGettingStartedCard(0);
+ _simpleFetchUnlocked = false;
+ _simpleFetchModePicked = false;
  updatePrepareSectionVisibility(0, { readyArticles: 0 });
  }
 }
@@ -1787,6 +1861,10 @@ async function resolveSimpleFetchModeBeforeRequest() {
 }
 
 async function doFetch() {
+ if (isSimpleFetchLocked()) {
+  showNotification('This collection already has papers. Use Start over if you want to fetch again.', 'info');
+  return;
+ }
  const sources = Array.from(
  document.querySelectorAll('#source-option-grid input[type="checkbox"]:checked')
  ).map(cb => cb.value);
@@ -1799,7 +1877,13 @@ async function doFetch() {
  if (sources.length === 0) { showNotification('Please select at least one source.', 'error'); return; }
 
  // Simple: dialog (or skip when empty) must run BEFORE reading fetch-mode.
- const proceed = await resolveSimpleFetchModeBeforeRequest();
+ // Unlock already ran that dialog — do not ask twice.
+ let proceed = true;
+ if (_simpleFetchModePicked) {
+  _simpleFetchModePicked = false;
+ } else {
+  proceed = await resolveSimpleFetchModeBeforeRequest();
+ }
  if (!proceed) return;
 
  const mode = (document.querySelector('input[name="fetch-mode"]:checked') || {}).value || 'replace';
@@ -1902,6 +1986,8 @@ async function doFetch() {
  }
  } finally {
  _pipelineBusy = false;
+ _simpleFetchUnlocked = false;
+ _simpleFetchModePicked = false;
  // After a failed auto-prepare with papers in hand, force the re-prepare card open
  // so the student has a control (ready count may still be 0).
  if (autoChainFailed && _lastTotalArticles > 0) {

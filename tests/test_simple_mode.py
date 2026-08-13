@@ -753,6 +753,66 @@ def test_next_step_shortcut_is_simple_mode_only_and_resets():
     assert "setNextStepVisible(visible)" in src or "setNextStepVisible(show)" in src
 
 
+def test_simple_locks_fetch_after_library_has_papers():
+    """Simple hides Fetch Articles once this library has papers.
+
+    Advanced keeps the form. Guests already cannot fetch. Start over reuses the
+    existing replace/add dialog, then doFetch must not ask again. A locked
+    submit is a no-op (no /api/fetch-articles-multi).
+    """
+    html = _read("templates", "data_management.html")
+    assert 'id="simple-fetch-locked"' in html
+    assert 'id="simple-fetch-unlock-btn"' in html
+    assert 'id="fetch-lead"' in html
+    assert 'id="fetch-form"' in html
+    # Form stays in the DOM (Advanced / empty / unlocked).
+    assert 'name="fetch-mode"' in html
+
+    src = _dm_js()
+    assert "function isSimpleFetchLocked" in src
+    assert "function updateSimpleFetchLock" in src
+    assert "function unlockSimpleFetch" in src
+    assert "_simpleFetchUnlocked" in src
+    assert "_simpleFetchModePicked" in src
+
+    lock_fn = src[
+        src.find("function isSimpleFetchLocked") : src.find("function updateSimpleFetchLock")
+    ]
+    assert "isSimpleMode" in lock_fn
+    assert "_lastTotalArticles > 0" in lock_fn
+    assert "_simpleFetchUnlocked" in lock_fn
+    assert "_pipelineBusy" in lock_fn
+    assert "isGuestSession" in lock_fn
+
+    unlock_fn = src[
+        src.find("async function unlockSimpleFetch") : src.find(
+            "function updatePrepareSectionVisibility"
+        )
+    ]
+    assert "resolveSimpleFetchModeBeforeRequest" in unlock_fn
+    assert "_simpleFetchUnlocked = true" in unlock_fn
+    assert "_simpleFetchModePicked = true" in unlock_fn
+
+    do = src[src.find("async function doFetch") : src.find("async function doCreateEmbeddings")]
+    assert "isSimpleFetchLocked" in do
+    assert do.find("isSimpleFetchLocked") < do.find("/api/fetch-articles-multi")
+    # Unlock already chose replace/append — do not open the dialog twice.
+    assert "_simpleFetchModePicked" in do
+    # After the job, lock again.
+    assert "_simpleFetchUnlocked = false" in do
+
+    vis = src[
+        src.find("function updatePrepareSectionVisibility") : src.find("async function loadPageData")
+    ]
+    assert "updateSimpleFetchLock" in vis
+    # Prepare-card gate stays mode-agnostic (lock lives in its own helper).
+    assert "if (!simple)" not in vis
+
+    css = _read("static", "css", "style.css")
+    assert "body[data-guest=\"1\"] #simple-fetch-locked" in css
+    assert ".simple-fetch-locked" in css
+
+
 # --- Phase 6: two-page Simple (screening card + silent dedup already above) ---
 
 SIMPLE_SCREEN_FRACTIONS = {"low": 0.10, "medium": 0.25, "high": 0.50}
