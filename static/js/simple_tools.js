@@ -413,6 +413,9 @@ async function refreshSimpleScreeningCard() {
    // missed just because the nav select has not populated yet.
    ensureActiveLibraryId(),
   ]);
+  if (typeof fillSimpleRailStats === 'function') {
+   fillSimpleRailStats(stats, report);
+  }
   const ready = Number(stats.articles_with_embeddings) || 0;
   const lowRel = Number(
    report && report.excluded && report.excluded.low_relevance

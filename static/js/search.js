@@ -281,11 +281,37 @@ function updateSearchWorkVisibility(stats) {
  });
 }
 
+function fillSimpleRailStats(stats, report) {
+ const host = document.getElementById('simple-rail-stats');
+ if (!host) return;
+ const total = Number((report && report.total_articles) || (stats && stats.total_articles) || 0);
+ const dups = Number(report && report.excluded && report.excluded.duplicate) || 0;
+ const out = Number(report && report.excluded && report.excluded.total) || 0;
+ const kept = report && report.included != null
+  ? Number(report.included)
+  : Math.max(0, total - out);
+ const set = (id, n) => {
+  const el = document.getElementById(id);
+  if (el) el.textContent = String(n);
+ };
+ set('rail-stat-fetched', total);
+ set('rail-stat-dups', dups);
+ set('rail-stat-out', out);
+ set('rail-stat-kept', kept);
+ host.hidden = total <= 0;
+}
+
 async function loadSearchEmptyState() {
  try {
  const stats = await apiCall('/api/statistics');
  if (typeof syncSimpleOnePageState === 'function') {
   syncSimpleOnePageState(stats);
+ }
+ try {
+  const report = await apiCall('/api/screening-report?format=json');
+  fillSimpleRailStats(stats, report);
+ } catch (e) {
+  fillSimpleRailStats(stats, null);
  }
  const simple = typeof isSimpleMode === 'function' && isSimpleMode();
  if (!simple && typeof applyEmptyState === 'function') {

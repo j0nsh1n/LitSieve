@@ -1588,6 +1588,19 @@ input[type="range"]::-moz-range-thumb:hover {
     align-items: start;
     margin-bottom: var(--space-5);
 }
+@media (min-width: 901px) {
+    .search-rail .card {
+        background: var(--surface);
+        border: 1px solid var(--rule);
+        border-radius: var(--radius-md);
+        padding: var(--space-4);
+        margin-bottom: var(--space-3);
+        border-bottom: 1px solid var(--rule);
+    }
+    .search-rail .card:last-of-type {
+        margin-bottom: 0;
+    }
+}
 .search-rail-sticky {
     position: sticky;
     top: 5rem;
@@ -4985,12 +4998,39 @@ html[data-mode="simple"] .search-simple-panel:not([hidden]) {
     box-sizing: border-box;
     /* Keep above the rail scroll so Save your work is always in view on desktop. */
     z-index: 2;
-    box-shadow: 0 -8px 20px color-mix(in srgb, var(--bg) 85%, transparent);
+    box-shadow: none;
 }
 .search-simple-panel-title {
-    font-family: var(--font-serif);
-    font-size: var(--fs-md);
+    font-family: var(--font-sans);
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    border-top: 3px double var(--text);
+    padding-top: var(--space-3);
     margin: 0 0 var(--space-2);
+}
+.rail-stats {
+    margin-top: var(--space-3);
+}
+.rail-stat {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: var(--fs-xs);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-soft);
+    padding: var(--space-2) 0;
+    border-top: 1px solid var(--rule);
+}
+.rail-stat b {
+    font-family: var(--font-serif);
+    font-size: var(--fs-sm);
+    font-weight: 700;
+    letter-spacing: 0;
+    color: var(--text);
+    font-variant-numeric: oldstyle-nums;
 }
 .search-simple-panel-lead {
     margin: 0 0 var(--space-3);
@@ -5023,9 +5063,10 @@ html[data-mode="simple"] .search-simple-panel:not([hidden]) {
         max-height: 40vh;
         overflow: auto;
     }
-    /* Bottom bar is buttons only — title/lead hide so the bar stays short. */
+    /* Bottom bar is buttons only — title/lead/stats hide so the bar stays short. */
     html[data-mode="simple"] .search-simple-panel-title,
-    html[data-mode="simple"] .search-simple-panel-lead {
+    html[data-mode="simple"] .search-simple-panel-lead,
+    html[data-mode="simple"] .rail-stats {
         display: none;
     }
     /* Measured bar height (--simple-panel-h); 40vh fallback matches max-height. */
