@@ -3665,11 +3665,15 @@ html[data-mode="simple"] body.simple-collecting #search-query-top {
     font-weight: 700;
     letter-spacing: -0.025em;
     line-height: var(--lh-tight);
-    margin-bottom: 0;
+    margin: 0 auto;
     color: var(--text);
+    text-align: center;
 }
 
 .landing-header .pagehead {
+    display: flex;
+    justify-content: center;
+    width: 100%;
     margin-bottom: var(--space-4);
 }
 
