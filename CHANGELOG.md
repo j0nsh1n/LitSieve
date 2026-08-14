@@ -14,6 +14,9 @@ and this project aims to follow Semantic Versioning for app version strings
   `--radius-lg` fallback.
 - **Dark theme (Phase 10):** warm newsprint charcoal (`#1c1a15` / `#242118`)
   in both the system-dark and `[data-theme=dark]` blocks.
+- **Masthead nav (Phase 10):** double ink rule; desktop steps are a segmented
+  control with inverted active; article count and library wrap are serif
+  italic badges. Mobile menu is unchanged.
 
 ### Added
 - **Guest demo** (`/guest`): temporary sample-corpus account (no multi-source
