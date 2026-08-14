@@ -27,6 +27,7 @@ from app.routes import (  # noqa: E402
     ai,
     auth,
     corpus,
+    start_over,
     exports,
     libraries,
     pages,
@@ -37,6 +38,7 @@ from app.security import SecurityHeadersMiddleware  # noqa: E402
 
 configure_logging()
 logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -62,7 +64,7 @@ app.add_middleware(SecurityHeadersMiddleware)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Route modules, in workflow order (pages first so "/" resolves predictably).
-for _module in (pages, auth, libraries, shares, corpus, search, exports, ai):
+for _module in (pages, auth, libraries, shares, corpus, start_over, search, exports, ai):
     app.include_router(_module.router)
 
 
