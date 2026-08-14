@@ -741,6 +741,31 @@ def test_next_step_shortcut_exists_and_starts_hidden():
     assert href == "/search", href
 
 
+def test_search_display_filter_chips_are_easy_options():
+    """Show chips filter the on-screen list (no new search). Both modes."""
+    html = _read("templates", "search.html")
+    assert 'id="display-filters"' in html
+    assert 'data-filter="all"' in html
+    assert 'data-filter="starred"' in html
+    assert 'data-filter="noted"' in html
+    assert 'data-filter="recent"' in html
+    js = _read("static", "js", "search.js")
+    assert "function visibleResults" in js
+    assert "function showSearchResults" in js
+    assert "function wireDisplayFilters" in js
+    assert "displayFilterState.starred" in js
+    assert "displayFilterState.noted" in js
+    assert "displayFilterState.recent" in js
+    # Export the filtered on-screen set, not the unfiltered hit list.
+    exp = js[js.find("async function doExportResults") : js.find("async function doExportResults") + 900]
+    assert "visibleResults" in exp
+    css = _read("static", "css", "style.css")
+    assert ".display-filter-chip" in css
+    # Simple must not hide the chips.
+    assert 'html[data-mode="simple"] .display-filter' not in css
+    assert 'html[data-mode="simple"] #display-filters' not in css
+
+
 def test_next_step_shortcut_is_simple_mode_only_and_resets():
     src = _dm_js()
     assert "function setNextStepVisible" in src

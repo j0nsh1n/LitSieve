@@ -40,7 +40,9 @@
      uses bookmarked papers. Screened-out papers never appear. The score meter shows the 0–1 similarity rank.</p>
      <p class="info-text search-help-simple">Searches <strong>your collection only</strong>.
      <strong>Text</strong> or <strong>PICO</strong> for your question; <strong>More like my starred</strong>
-     after bookmarking with ★. Screened-out papers never appear. The score meter shows how well each paper matches (0–1).</p>
+     after bookmarking with ★. After a search, <strong>Show</strong> chips filter the list on this
+     page (starred, notes, recent years, source) without running a new search. Screened-out papers
+     never appear. The score meter shows how well each paper matches (0–1).</p>
     </div>
    </aside>
 
@@ -190,6 +192,17 @@
     <div class="results-header">
     <h2>Results: <span id="result-count">0</span> articles found</h2>
     </div>
+    <div class="display-filters" id="display-filters" hidden>
+     <span class="display-filters-label" id="display-filters-label">Show</span>
+     <div class="display-filter-chips" id="display-filter-chips" role="group"
+      aria-labelledby="display-filters-label">
+      <button type="button" class="display-filter-chip is-on" data-filter="all">All</button>
+      <button type="button" class="display-filter-chip" data-filter="starred">Starred</button>
+      <button type="button" class="display-filter-chip" data-filter="noted">Has a note</button>
+      <button type="button" class="display-filter-chip" data-filter="recent" id="display-filter-recent">Since 2021</button>
+     </div>
+     <p class="help-text" id="display-filter-status"></p>
+    </div>
     <div id="results-list"></div>
    </section>
   </div>
@@ -258,5 +271,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/search.js?v=20260811d"></script>
+<script src="/static/js/search.js?v=20260813a"></script>
 {% endblock %}

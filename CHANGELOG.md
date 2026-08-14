@@ -27,11 +27,14 @@ and this project aims to follow Semantic Versioning for app version strings
   they contain user data and `SECRET_KEY`.
 - JavaScript syntax checking in the test suite. There is no npm or build step,
   so a broken browser script previously shipped with every Python test green.
+- **Search Show chips:** after a search, one-click filters on the current list
+  (All, Starred, Has a note, Since last-five-years, plus a chip per source in
+  the results). No new search. Export uses the filtered list.
 
 ### Changed
-- **Start fresh copy (Simple):** the existing replace/add dialog now says that
-  notes, stars, and saved AI key points are deleted too, and that this cannot
-  be undone. Same buttons, no extra click.
+- **Start fresh copy (Simple):** the existing replace/add dialog now says notes,
+  stars, and saved AI key points stay on papers that come back; papers that do
+  not return (and their notes) are deleted. Same buttons, no extra click.
 - **Advanced replace-fetch:** a live line next to the Replace radio names the
   paper / note / star / AI key-point counts when the collection is not empty.
   No new modal. Append and empty libraries hide the line.

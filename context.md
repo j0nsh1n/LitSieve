@@ -80,6 +80,6 @@ Guest User (is_guest) → sample corpus only; purged by age
 ## Session Handoff
 - **Date:** 2026-08-13
 - **Branch:** `feat/phase6-guest-demo` (do not push without explicit ask)
-- **Done:** Phase 9 staging swap — failed replace-fetch leaves the library;
-  success keeps notes/stars/AI key points on papers that return.
-- **Next:** Human-confirm Start fresh on a library with notes. Do not push.
+- **Done:** Search Show chips (starred / note / recent / source) filter the
+  on-screen list and export; Phase 9 staging swap landed earlier.
+- **Next:** Human-confirm Show chips on Search. Do not push.

@@ -4,6 +4,16 @@ let lastSearchParams = null;
 let lastQueryTokens = [];
 /** Last on-screen result list (export “these results” uses this exact order). */
 let lastResults = [];
+/** Client-side Show chips: filter the current hit list without a new search. */
+const displayFilterState = {
+ starred: false,
+ noted: false,
+ recent: false,
+ sources: {},
+};
+function displayRecentYear() {
+ return new Date().getFullYear() - 5;
+}
 
 /** sessionStorage key: refresh keeps query + filters; re-runs search on load. */
 const SEARCH_SESSION_KEY = 'lra_search_session_v1';
@@ -37,6 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
  topkDisplay.textContent = topkSlider.value;
  });
 
+ wireDisplayFilters();
  document.getElementById('search-btn').addEventListener('click', doSearch);
  const starredBtn = document.getElementById('starred-search-btn');
  if (starredBtn) starredBtn.addEventListener('click', doStarredSearch);
@@ -468,19 +479,7 @@ async function doSearch(opts) {
 
  const results = data.results || [];
  lastResults = results;
- renderResults(results);
- document.getElementById('result-count').textContent = results.length;
- const resultsSec = document.getElementById('results-section');
- if (resultsSec) {
-  resultsSec.classList.remove('u-hidden');
-  resultsSec.style.display = 'block';
- }
- const exportSec = document.getElementById('export-results-section');
- if (exportSec) {
-  exportSec.hidden = !results.length;
-  exportSec.style.display = results.length ? 'block' : 'none';
- }
- updateSimpleSearchPanel(results.length > 0);
+ showSearchResults(results);
  // Persist query + filters so a browser refresh restores this search.
  await saveSearchSession(method);
  } catch (e) {
@@ -542,19 +541,7 @@ async function doStarredSearch(opts) {
  results = clientSort(results, filters.sort_by);
  }
  lastResults = results;
- renderResults(results);
- document.getElementById('result-count').textContent = results.length;
- const resultsSec = document.getElementById('results-section');
- if (resultsSec) {
-  resultsSec.classList.remove('u-hidden');
-  resultsSec.style.display = 'block';
- }
- const exportSec = document.getElementById('export-results-section');
- if (exportSec) {
-  exportSec.hidden = !results.length;
-  exportSec.style.display = results.length ? 'block' : 'none';
- }
- updateSimpleSearchPanel(results.length > 0);
+ showSearchResults(results);
  await refreshStarredCount();
  await saveSearchSession('starred');
  } catch (e) {
@@ -750,7 +737,9 @@ function buildResultCard(article, idx) {
  starred: next,
  },
  });
+ patchLastResult(article, { starred: next });
  refreshStarredCount();
+ if (displayFilterState.starred) showSearchResults();
  } catch (err) {
  starBtn.classList.toggle('is-starred', !next);
  starBtn.textContent = next ? '☆' : '★';
@@ -773,7 +762,9 @@ function buildResultCard(article, idx) {
  note: noteField.value,
  },
  });
+ patchLastResult(article, { note: noteField.value });
  showNotification('Note saved.', 'success');
+ if (displayFilterState.noted) showSearchResults();
  } catch (err) {
  saveBtn.textContent = prev;
  showNotification(`Could not save note: ${err.message}`, 'error');
@@ -818,8 +809,7 @@ function buildResultCard(article, idx) {
  lastResults = lastResults.filter(
  (a) => !(a.article_id === article.article_id && a.source === article.source)
  );
- const countEl = document.getElementById('result-count');
- if (countEl) countEl.textContent = String(lastResults.length);
+ showSearchResults();
  } catch (err) {
  if (strip && parent && strip.parentNode === parent) {
   parent.replaceChild(card, strip);
@@ -872,8 +862,7 @@ function replaceCardWithUndo(cardEl, article, opts) {
  )) {
  lastResults.push(article);
  }
- const countEl = document.getElementById('result-count');
- if (countEl) countEl.textContent = String(lastResults.length);
+ showSearchResults();
  } catch (err) {
  undoBtn.disabled = false;
  showNotification(`Undo failed: ${err.message}`, 'error');
@@ -910,9 +899,7 @@ function clearResultSkeletonsOnError(fromRestore) {
  const hasSkeletons = !!container.querySelector('.skeleton-card');
  if (!hasSkeletons && lastResults && lastResults.length) return;
  if (lastResults && lastResults.length) {
-  renderResults(lastResults);
-  const countEl = document.getElementById('result-count');
-  if (countEl) countEl.textContent = String(lastResults.length);
+  showSearchResults();
   return;
  }
  container.innerHTML = fromRestore
@@ -920,6 +907,147 @@ function clearResultSkeletonsOnError(fromRestore) {
   : '<p class="info-text">Search failed. Try again.</p>';
  const countEl = document.getElementById('result-count');
  if (countEl) countEl.textContent = '0';
+}
+
+function displayFiltersActive() {
+ if (displayFilterState.starred || displayFilterState.noted || displayFilterState.recent) {
+  return true;
+ }
+ return Object.keys(displayFilterState.sources).some((k) => displayFilterState.sources[k]);
+}
+
+function visibleResults() {
+ const srcOn = Object.keys(displayFilterState.sources).filter(
+  (k) => displayFilterState.sources[k]
+ );
+ const recentYear = displayRecentYear();
+ return (lastResults || []).filter((a) => {
+  if (displayFilterState.starred && !a.starred) return false;
+  if (displayFilterState.noted && !String(a.note || '').trim()) return false;
+  if (displayFilterState.recent && parseYear(a.year) < recentYear) return false;
+  if (srcOn.length && srcOn.indexOf(a.source) === -1) return false;
+  return true;
+ });
+}
+
+function showSearchResults(fullList) {
+ if (Array.isArray(fullList)) lastResults = fullList;
+ const bar = document.getElementById('display-filters');
+ const hasHits = !!(lastResults && lastResults.length);
+ if (bar) bar.hidden = !hasHits;
+ syncDisplayFilterSourceChips();
+ syncDisplayFilterChipState();
+ const shown = visibleResults();
+ renderResults(shown);
+ const countEl = document.getElementById('result-count');
+ if (countEl) {
+  countEl.textContent = displayFiltersActive() && hasHits
+   ? `${shown.length} of ${lastResults.length}`
+   : String(hasHits ? lastResults.length : 0);
+ }
+ const status = document.getElementById('display-filter-status');
+ if (status) {
+  status.textContent = displayFiltersActive() && hasHits
+   ? (shown.length
+    ? `Showing ${shown.length} of ${lastResults.length} on this page.`
+    : 'No papers match these filters. Click All to show everything.')
+   : '';
+ }
+ const resultsSec = document.getElementById('results-section');
+ if (resultsSec) {
+  resultsSec.classList.remove('u-hidden');
+  resultsSec.style.display = 'block';
+ }
+ const exportSec = document.getElementById('export-results-section');
+ if (exportSec) {
+  exportSec.hidden = !shown.length;
+  exportSec.style.display = shown.length ? 'block' : 'none';
+ }
+ updateSimpleSearchPanel(hasHits);
+}
+
+function syncDisplayFilterSourceChips() {
+ const host = document.getElementById('display-filter-chips');
+ if (!host) return;
+ host.querySelectorAll('[data-filter-source]').forEach((el) => el.remove());
+ const seen = {};
+ (lastResults || []).forEach((a) => {
+  if (a && a.source) seen[a.source] = true;
+ });
+ const ids = Object.keys(seen).sort();
+ if (ids.length < 2) {
+  Object.keys(displayFilterState.sources).forEach((k) => {
+   if (!seen[k]) delete displayFilterState.sources[k];
+  });
+  return;
+ }
+ ids.forEach((id) => {
+  if (!(id in displayFilterState.sources)) displayFilterState.sources[id] = false;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'display-filter-chip';
+  btn.setAttribute('data-filter-source', id);
+  const name = typeof getSourceName === 'function' ? getSourceName(id) : id;
+  btn.textContent = name;
+  host.appendChild(btn);
+ });
+ Object.keys(displayFilterState.sources).forEach((k) => {
+  if (!seen[k]) delete displayFilterState.sources[k];
+ });
+}
+
+function syncDisplayFilterChipState() {
+ const host = document.getElementById('display-filter-chips');
+ if (!host) return;
+ const any = displayFiltersActive();
+ host.querySelectorAll('[data-filter]').forEach((btn) => {
+  const key = btn.getAttribute('data-filter');
+  if (key === 'all') btn.classList.toggle('is-on', !any);
+  else btn.classList.toggle('is-on', !!displayFilterState[key]);
+ });
+ host.querySelectorAll('[data-filter-source]').forEach((btn) => {
+  const id = btn.getAttribute('data-filter-source');
+  btn.classList.toggle('is-on', !!displayFilterState.sources[id]);
+ });
+}
+
+function wireDisplayFilters() {
+ const recentBtn = document.getElementById('display-filter-recent');
+ if (recentBtn) recentBtn.textContent = `Since ${displayRecentYear()}`;
+ const host = document.getElementById('display-filter-chips');
+ if (!host || host.dataset.wired === '1') return;
+ host.dataset.wired = '1';
+ host.addEventListener('click', (ev) => {
+  const btn = ev.target && ev.target.closest
+   ? ev.target.closest('[data-filter], [data-filter-source]')
+   : null;
+  if (!btn || !host.contains(btn)) return;
+  ev.preventDefault();
+  const src = btn.getAttribute('data-filter-source');
+  const key = btn.getAttribute('data-filter');
+  if (key === 'all' || (!src && !key)) {
+   displayFilterState.starred = false;
+   displayFilterState.noted = false;
+   displayFilterState.recent = false;
+   Object.keys(displayFilterState.sources).forEach((k) => {
+    displayFilterState.sources[k] = false;
+   });
+  } else if (src) {
+   displayFilterState.sources[src] = !displayFilterState.sources[src];
+  } else if (key === 'starred' || key === 'noted' || key === 'recent') {
+   displayFilterState[key] = !displayFilterState[key];
+  }
+  showSearchResults();
+ });
+}
+
+function patchLastResult(article, patch) {
+ if (!article || !lastResults) return;
+ lastResults.forEach((a) => {
+  if (a.article_id === article.article_id && a.source === article.source) {
+   Object.assign(a, patch);
+  }
+ });
 }
 
 function renderResults(results) {
@@ -977,7 +1105,8 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function doExportResults(format) {
- if (!lastResults || !lastResults.length) {
+ const exportRows = visibleResults();
+ if (!exportRows.length) {
   showNotification('Run a search first, then export the results shown on screen.', 'error');
   return;
  }
@@ -988,7 +1117,7 @@ async function doExportResults(format) {
   status.className = 'status-indicator loading';
  }
  if (simpleStatus) simpleStatus.textContent = 'Preparing download…';
- const items = lastResults.map((a) => ({
+ const items = exportRows.map((a) => ({
   article_id: a.article_id,
   source: a.source,
  }));

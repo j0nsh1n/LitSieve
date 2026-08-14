@@ -1194,6 +1194,50 @@ input[type="range"]::-moz-range-thumb:hover {
     font-weight: 700;
 }
 
+.display-filters {
+    margin: 0 0 var(--space-4);
+}
+.display-filters-label {
+    display: block;
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    margin-bottom: var(--space-2);
+    color: var(--text-soft, var(--text));
+}
+.display-filter-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+}
+.display-filter-chip {
+    appearance: none;
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: var(--fs-sm);
+    line-height: var(--lh-snug);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-full);
+    min-height: 44px;
+    cursor: pointer;
+}
+.display-filter-chip:hover,
+.display-filter-chip:focus-visible {
+    border-color: var(--accent);
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+.display-filter-chip.is-on {
+    background: color-mix(in srgb, var(--accent) 16%, var(--surface));
+    border-color: var(--accent);
+    color: var(--text);
+    font-weight: 600;
+}
+#display-filter-status:empty {
+    display: none;
+}
+
 .year-input {
     width: 7rem;
     max-width: 100%;
