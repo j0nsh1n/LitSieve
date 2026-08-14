@@ -311,11 +311,14 @@ async function loadSearchEmptyState() {
  if (typeof syncSimpleOnePageState === 'function') {
   syncSimpleOnePageState(stats);
  }
- try {
-  const report = await apiCall('/api/screening-report?format=json');
-  fillSimpleRailStats(stats, report);
- } catch (e) {
-  fillSimpleRailStats(stats, null);
+ if (document.getElementById('simple-rail-stats')
+  && typeof isSimpleMode === 'function' && isSimpleMode()) {
+  try {
+   const report = await apiCall('/api/screening-report?format=json');
+   fillSimpleRailStats(stats, report);
+  } catch (e) {
+   fillSimpleRailStats(stats, null);
+  }
  }
  const simple = typeof isSimpleMode === 'function' && isSimpleMode();
  if (!simple && typeof applyEmptyState === 'function') {
