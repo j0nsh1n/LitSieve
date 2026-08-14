@@ -289,6 +289,21 @@ Condenses Data Management in Simple mode. **Advanced is unchanged.**
   not in the prepare dialog. After re-prepare, screening should return to
   pending via corpus state, never a JS flag.
 
+## Phase 9 — Destructive operations become reversible
+Design: **[docs/PHASE9_STAGING_SWAP.md](docs/PHASE9_STAGING_SWAP.md)**.
+Failed replace-fetch must not wipe the library. No new Simple confirmation.
+- Tasks:
+  - Honest Start-fresh copy (notes / stars / AI key points)
+  - Advanced replace consequence inline (no modal)
+  - Staging-swap design (same-DB `staging_articles`; swap only if ≥1 paper)
+  - Sample corpus: load rows, then clear, then insert
+- Complete when: a failed replace-fetch leaves articles, notes, stars, and AI
+  key points unchanged; the xfail in `tests/test_phase9_reversible_fetch.py`
+  is removed and passing; Advanced still has every control; Simple gains no
+  new dialog
+- Status: [ ] in progress — Steps 1, 2, 4 landed 2026-08-13; Step 3 design
+  written, not implemented (awaiting review)
+
 ## Backlog (unscheduled)
 - Make `pyright app` blocking in CI after clearing the current error backlog
 - Dependency lockfile (pip-tools / uv) if reproducibility becomes a priority

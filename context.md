@@ -80,6 +80,6 @@ Guest User (is_guest) → sample corpus only; purged by age
 ## Session Handoff
 - **Date:** 2026-08-13
 - **Branch:** `feat/phase6-guest-demo` (do not push without explicit ask)
-- **Done:** Phase 9 Steps 1, 2, 4 — Start-fresh copy; Advanced live replace
-  line; sample corpus loads rows before clear; xfail failed-replace wipe.
-- **Next:** Phase 9 Step 3 staging-swap design (do not implement).
+- **Done:** Phase 9 Steps 1, 2, 4 + Step 3 design
+  (`docs/PHASE9_STAGING_SWAP.md`). Staging swap not implemented; xfail remains.
+- **Next:** Review the staging design, then implement or revise. Do not push.
