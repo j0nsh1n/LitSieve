@@ -3040,14 +3040,21 @@ select option,
 .site-disclaimer strong {
     color: var(--text);
 }
-.landing .site-disclaimer {
+.landing .site-disclaimer,
+.guide-page .site-disclaimer {
     max-width: 46rem;
-    margin-left: auto;
-    margin-right: auto;
     text-align: left;
 }
+.landing .site-disclaimer {
+    margin-left: auto;
+    margin-right: auto;
+}
+.guide-page .site-disclaimer {
+    margin-left: 0;
+    margin-right: 0;
+}
 .footer .site-disclaimer-foot,
-.landing-footer .site-disclaimer-foot {
+.public-footer .site-disclaimer-foot {
     margin: var(--space-1) 0 0;
     font-size: var(--fs-xs);
     color: var(--text-soft);
@@ -3561,7 +3568,12 @@ html[data-mode="simple"] body.simple-collecting #search-query-top {
     margin-bottom: var(--space-1);
 }
 
-/* === Public pages (landing + /learn guides) — Phase 10 broadsheet === */
+/* === Public pages (landing + /learn guides) ===
+   Shared chrome: .public-body / .public-nav / .public-kicker / .public-footer
+   Home only:     .landing-*
+   Guides only:   .guide-*
+   Site tokens (.nav-brand, .theme-toggle, .btn) stay shared with the app. */
+
 .public-body {
     min-height: 100vh;
 }
@@ -3595,9 +3607,10 @@ html[data-mode="simple"] body.simple-collecting #search-query-top {
     margin-left: auto;
 }
 
-.public-nav > .theme-toggle {
+.public-nav .theme-toggle {
     flex: 0 0 auto;
     margin-left: auto;
+    border: 1px solid var(--rule);
 }
 
 .public-nav-link {
@@ -3615,10 +3628,43 @@ html[data-mode="simple"] body.simple-collecting #search-query-top {
     color: var(--text);
 }
 
-.public-nav .theme-toggle {
-    border: 1px solid var(--rule);
+.public-kicker {
+    font-size: var(--fs-xs);
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--accent);
+    margin: 0 0 var(--space-2);
 }
 
+.public-footer {
+    text-align: left;
+    color: var(--text-soft);
+    font-size: var(--fs-xs);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    border-top: 1px solid var(--rule);
+    padding-top: var(--space-4);
+    margin-top: var(--space-4);
+}
+
+.public-folio {
+    margin: 0 0 var(--space-2);
+    font-family: var(--font-sans);
+    font-style: normal;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-soft);
+}
+
+.public-footer .site-disclaimer-foot {
+    text-transform: none;
+    letter-spacing: 0;
+    font-family: var(--font-serif);
+    font-style: italic;
+}
+
+/* --- Home --- */
 .landing {
     max-width: 68rem;
     width: 100%;
@@ -3650,15 +3696,6 @@ html[data-mode="simple"] body.simple-collecting #search-query-top {
     animation: ruleGrow var(--dur-slow) var(--ease-out) 0.2s both;
 }
 
-.landing-kicker {
-    font-size: var(--fs-xs);
-    letter-spacing: 0.22em;
-    text-transform: uppercase;
-    font-weight: 600;
-    color: var(--accent);
-    margin: 0 0 var(--space-2);
-}
-
 .landing-title {
     font-family: var(--font-serif);
     font-size: var(--fs-3xl);
@@ -3678,7 +3715,6 @@ html[data-mode="simple"] body.simple-collecting #search-query-top {
     line-height: 1.6;
     max-width: 42rem;
     margin: 0 auto;
-    animation: fadeUp var(--dur-slow) var(--ease-out) 0.08s both;
 }
 
 .landing-cta {
@@ -3687,14 +3723,11 @@ html[data-mode="simple"] body.simple-collecting #search-query-top {
     justify-content: center;
     margin-top: var(--space-5);
     flex-wrap: wrap;
-    animation: fadeUp var(--dur-slow) var(--ease-out) 0.14s both;
 }
 
-.landing-cta-start {
-    justify-content: flex-start;
+.landing-cta .btn {
+    padding: var(--space-3) var(--space-6);
 }
-
-.landing-cta .btn { padding: var(--space-3) var(--space-6); }
 
 .landing-section-title {
     display: block;
@@ -3763,11 +3796,19 @@ html[data-mode="simple"] body.simple-collecting #search-query-top {
     color: var(--text);
 }
 
-.landing-path-card p {
+.landing-path-copy {
     font-family: var(--font-serif);
     font-size: var(--fs-sm);
     color: var(--text-body);
     line-height: 1.6;
+    margin: 0;
+}
+
+.landing-features-hint {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-size: var(--fs-sm);
+    color: var(--text-soft);
     margin: 0;
 }
 
@@ -3784,14 +3825,6 @@ html[data-mode="simple"] body.simple-collecting #search-query-top {
     }
 }
 
-.landing-features-hint {
-    font-family: var(--font-serif);
-    font-style: italic;
-    font-size: var(--fs-sm);
-    color: var(--text-soft);
-    margin: 0;
-}
-
 .feature-card {
     position: relative;
     display: flex;
@@ -3803,26 +3836,15 @@ html[data-mode="simple"] body.simple-collecting #search-query-top {
     overflow: hidden;
     text-decoration: none;
     color: inherit;
-    cursor: pointer;
     min-height: 11rem;
     animation: fadeUp var(--dur-med) var(--ease-out) both;
-    transition: border-color var(--dur-fast) var(--ease-soft),
-                background-color var(--dur-fast) var(--ease-soft);
+    transition: border-color var(--dur-fast) var(--ease-soft);
 }
 
 a.feature-card:focus-visible {
     box-shadow: var(--focus-ring);
     outline: none;
 }
-
-.feature-card:nth-child(1) { animation-delay: 0.06s; }
-.feature-card:nth-child(2) { animation-delay: 0.10s; }
-.feature-card:nth-child(3) { animation-delay: 0.14s; }
-.feature-card:nth-child(4) { animation-delay: 0.18s; }
-.feature-card:nth-child(5) { animation-delay: 0.22s; }
-.feature-card:nth-child(6) { animation-delay: 0.26s; }
-.feature-card:nth-child(7) { animation-delay: 0.30s; }
-.feature-card:nth-child(8) { animation-delay: 0.34s; }
 
 .feature-card::before {
     content: "";
@@ -3846,13 +3868,6 @@ a.feature-card:focus-visible {
     text-transform: uppercase;
     color: var(--accent);
     margin-bottom: var(--space-2);
-}
-
-.feature-icon {
-    font-size: var(--fs-xl);
-    display: block;
-    margin-bottom: var(--space-2);
-    line-height: 1;
 }
 
 .feature-card h3 {
@@ -3880,54 +3895,45 @@ a.feature-card:focus-visible {
     text-transform: uppercase;
     letter-spacing: 0.14em;
     color: var(--accent);
-    transition: color var(--dur-fast) var(--ease-soft);
 }
 
 .feature-card:hover .feature-more {
     color: var(--text);
 }
 
-/* === Feature guide pages (/learn/…) === */
-.guide-body {
-    min-height: 100vh;
-}
-
+/* --- /learn guides --- */
 .guide-page {
     max-width: 42rem;
+    width: 100%;
+    margin: 0 auto;
+    padding: var(--space-7) var(--space-6) var(--space-8);
+    flex: 1;
 }
-
-.guide-nav {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: var(--space-4);
-    margin-bottom: var(--space-5);
-    flex-wrap: wrap;
-}
-
-.guide-back {
-    font-size: var(--fs-sm);
-    color: var(--text-soft);
-    text-decoration: none;
-    transition: color var(--dur-fast) var(--ease-soft);
-}
-
-.guide-back:hover { color: var(--accent); }
 
 .guide-header {
     text-align: left;
     margin-bottom: var(--space-5);
-}
-
-.guide-header.page-header {
+    padding-bottom: var(--space-4);
     border-bottom: 1px solid var(--text);
 }
 
-.guide-icon {
+.guide-header h1 {
+    font-family: var(--font-serif);
     font-size: var(--fs-2xl);
-    display: block;
-    margin-bottom: var(--space-2);
-    line-height: 1;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: var(--lh-tight);
+    margin: 0 0 var(--space-2);
+    color: var(--text);
+}
+
+.guide-lede {
+    font-family: var(--font-serif);
+    font-style: italic;
+    color: var(--text-body);
+    font-size: var(--fs-base);
+    line-height: var(--lh-snug);
+    margin: 0;
 }
 
 .guide-section {
@@ -3972,6 +3978,14 @@ a.feature-card:focus-visible {
     font-weight: 700;
 }
 
+.guide-cta {
+    display: flex;
+    gap: var(--space-3);
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    margin-top: var(--space-5);
+}
+
 .guide-pager {
     display: flex;
     justify-content: space-between;
@@ -3983,8 +3997,14 @@ a.feature-card:focus-visible {
     flex-wrap: wrap;
 }
 
-.guide-pager-side { flex: 1; min-width: 140px; }
-.guide-pager-next { text-align: right; }
+.guide-pager-side {
+    flex: 1;
+    min-width: 140px;
+}
+
+.guide-pager-next {
+    text-align: right;
+}
 
 .guide-pager-link {
     display: inline-flex;
@@ -3997,7 +4017,7 @@ a.feature-card:focus-visible {
     transition: color var(--dur-fast) var(--ease-soft);
 }
 
-.guide-pager-link .help-text {
+.guide-pager-label {
     font-family: var(--font-sans);
     font-size: var(--fs-xs);
     letter-spacing: 0.16em;
@@ -4006,14 +4026,14 @@ a.feature-card:focus-visible {
     color: var(--text-soft);
 }
 
-.guide-pager-link:hover { color: var(--accent); }
+.guide-pager-link:hover {
+    color: var(--accent);
+}
 
 .guide-index {
     list-style: none;
     margin: 0;
     padding: 0;
-    display: grid;
-    gap: 0;
 }
 
 .guide-index li {
@@ -4021,7 +4041,10 @@ a.feature-card:focus-visible {
     padding: var(--space-2) 0;
 }
 
-.guide-index li:first-child { border-top: none; padding-top: 0; }
+.guide-index li:first-child {
+    border-top: none;
+    padding-top: 0;
+}
 
 .guide-index a {
     color: var(--accent);
@@ -4030,48 +4053,15 @@ a.feature-card:focus-visible {
     font-size: var(--fs-base);
 }
 
-.guide-index a:hover { color: var(--text); text-decoration: underline; }
+.guide-index a:hover {
+    color: var(--text);
+    text-decoration: underline;
+}
 
 .guide-index strong {
     color: var(--text);
     font-family: var(--font-serif);
     font-size: var(--fs-base);
-}
-
-.landing-steps {
-    font-family: var(--font-serif);
-    font-style: italic;
-    color: var(--text-soft);
-    font-size: var(--fs-sm);
-    margin-bottom: var(--space-6);
-    letter-spacing: 0.01em;
-}
-
-.landing-footer {
-    text-align: left;
-    color: var(--text-soft);
-    font-size: var(--fs-xs);
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    border-top: 1px solid var(--rule);
-    padding-top: var(--space-4);
-    margin-top: var(--space-4);
-}
-
-.landing-folio {
-    margin: 0 0 var(--space-2);
-    font-family: var(--font-sans);
-    font-style: normal;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--text-soft);
-}
-
-.landing-footer .site-disclaimer-foot {
-    text-transform: none;
-    letter-spacing: 0;
-    font-family: var(--font-serif);
-    font-style: italic;
 }
 
 /* === Screening / triage (clusters + duplicates) === */
@@ -4827,10 +4817,11 @@ html, body {
         grid-column: 1;
         grid-row: 1;
     }
-    .public-nav > .theme-toggle {
+    .public-nav .theme-toggle {
         grid-column: 2;
         grid-row: 1;
         justify-self: end;
+        margin-left: 0;
     }
     .public-nav-tools {
         grid-column: 1 / -1;
@@ -4881,18 +4872,20 @@ html, body {
     }
     .feature-card h3 { font-size: var(--fs-md); }
     .feature-card p { font-size: var(--fs-sm); }
-    .landing-steps {
-        font-size: var(--fs-sm);
-        line-height: 1.55;
-    }
     .landing-features-hint {
         font-size: var(--fs-sm);
-        margin: 0;
     }
     .landing-section-head {
         flex-direction: column;
         align-items: flex-start;
         gap: var(--space-1);
+    }
+    .guide-cta {
+        flex-direction: column;
+    }
+    .guide-cta .btn {
+        width: 100%;
+        min-height: 2.85rem;
     }
 
     /* --- Auth --- */
@@ -4912,20 +4905,8 @@ html, body {
 
     /* --- Guides --- */
     .guide-page {
-        padding-left: var(--space-4);
-        padding-right: var(--space-4);
+        padding: var(--space-5) var(--space-4) var(--space-6);
         max-width: 100%;
-    }
-    .guide-nav {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: var(--space-3);
-    }
-    .guide-nav-actions {
-        width: 100%;
-    }
-    .guide-nav-actions .btn {
-        width: 100%;
     }
     .guide-section {
         padding: var(--space-4) 0;
@@ -5068,7 +5049,8 @@ html, body {
     .public-nav {
         padding: var(--space-2) var(--space-3);
     }
-    .landing {
+    .landing,
+    .guide-page {
         padding: var(--space-4) var(--space-3) var(--space-5);
     }
     .export-row .btn {

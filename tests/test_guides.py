@@ -96,3 +96,43 @@ def test_guides_reflect_simple_advanced_and_clean_up():
     ):
         r = client.get(f"/learn/{slug}")
         assert r.status_code == 200, slug
+
+
+def test_public_pages_use_one_class_per_job():
+    """Landing and guides must not reuse Search chrome or leftover public classes."""
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent
+    landing = (root / "templates" / "landing.html").read_text(encoding="utf-8")
+    guide = (root / "templates" / "feature_guide.html").read_text(encoding="utf-8")
+    css = (root / "static" / "css" / "style.css").read_text(encoding="utf-8")
+
+    assert 'class="landing-title"' in landing
+    assert "pagehead" not in landing
+    assert 'class="public-kicker"' in landing
+    assert 'class="public-footer"' in landing
+    assert 'class="landing-footer"' not in landing
+
+    assert 'class="guide-page"' in guide
+    assert "page-header" not in guide
+    assert "guide-body" not in guide
+    assert 'class="guide-lede"' in guide
+    assert 'class="guide-cta"' in guide
+    assert "landing-cta" not in guide
+    assert "u-row-start" not in guide
+    # Guide main is not also .landing
+    assert 'class="landing guide-page"' not in guide
+
+    for dead in (
+        "landing-kicker",
+        "landing-footer",
+        "landing-steps",
+        "landing-cta-start",
+        "feature-icon",
+        "guide-nav",
+        "guide-back",
+        "guide-icon",
+        "guide-body",
+        "guide-checklist",
+    ):
+        assert dead not in css, dead

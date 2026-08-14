@@ -6,10 +6,10 @@
  <title>{{ guide.title }} - LitSieve</title>
     <link rel="icon" href="/static/favicon.ico?v=20260803a" sizes="32x32">
     <link rel="apple-touch-icon" href="/static/favicon.png?v=20260803a">
- <link rel="stylesheet" href="/static/css/style.css?v=20260814t">
+ <link rel="stylesheet" href="/static/css/style.css?v=20260814u">
  <script src="/static/js/theme-init.js?v=20260814d"></script>
 </head>
-<body class="guide-body public-body">
+<body class="public-body">
  <nav class="public-nav" aria-label="Site">
   <a href="/" class="nav-brand">LitSieve</a>
   <div class="public-nav-tools">
@@ -23,11 +23,11 @@
   </div>
   <button type="button" class="theme-toggle" id="theme-toggle" title="Toggle theme" aria-label="Toggle theme">🌙</button>
  </nav>
- <main class="landing guide-page">
- <header class="guide-header page-header">
- <p class="landing-kicker">Guide</p>
+ <main class="guide-page">
+ <header class="guide-header">
+ <p class="public-kicker">Guide</p>
  <h1>{{ guide.title }}</h1>
- <p class="subtitle">{{ guide.tagline }}</p>
+ <p class="guide-lede">{{ guide.tagline }}</p>
  </header>
 
  {% from "macros/disclaimers.html" import scope_banner %}
@@ -63,7 +63,7 @@
   {% if block.intro %}
   <p class="guide-prose">{{ block.intro }}</p>
   {% endif %}
-  <ul class="guide-tips guide-checklist">
+  <ul class="guide-tips">
    {% for item in block.checks %}
    <li>{{ item }}</li>
    {% endfor %}
@@ -75,7 +75,7 @@
  <section class="guide-section">
  <h2>Where to find it</h2>
  <p class="guide-prose">{{ guide.where_in_app }}</p>
- <div class="landing-cta landing-cta-start u-row-start u-mt-xl">
+ <div class="guide-cta">
  {% if user %}
  <a href="{{ guide.app_path }}" class="btn btn-primary">{{ guide.app_label }}</a>
  <a href="/" class="btn btn-secondary">Home</a>
@@ -90,7 +90,7 @@
  <div class="guide-pager-side">
  {% if prev %}
  <a href="/learn/{{ prev.slug }}" class="guide-pager-link">
- <span class="help-text">Previous</span>
+ <span class="guide-pager-label">Previous</span>
  <span>{{ prev.title }}</span>
  </a>
  {% endif %}
@@ -98,7 +98,7 @@
  <div class="guide-pager-side guide-pager-next">
  {% if next %}
  <a href="/learn/{{ next.slug }}" class="guide-pager-link">
- <span class="help-text">Next</span>
+ <span class="guide-pager-label">Next</span>
  <span>{{ next.title }}</span>
  </a>
  {% endif %}
@@ -120,8 +120,8 @@
  </ul>
  </section>
 
- <footer class="landing-footer">
-  <p class="landing-folio">LitSieve · v5.0.0</p>
+ <footer class="public-footer">
+  <p class="public-folio">LitSieve · v5.0.0</p>
  </footer>
  </main>
     {# No common.js on public pages — it talks to authenticated APIs. #}
