@@ -2,9 +2,14 @@
 {% block title %}Search - LitSieve{% endblock %}
 {% block container_mod %}container-wide{% endblock %}
 {% block content %}
-<section class="page-header">
- <h1 class="search-title-advanced">Search for Similar Articles</h1>
- <h1 class="search-title-simple">Search</h1>
+<section class="page-header search-page-header">
+ <p class="search-kicker search-kicker-advanced">Step 4 of 4 · Rank &amp; export</p>
+ <p class="search-kicker search-kicker-simple">Rank &amp; export</p>
+ <div class="pagehead">
+  <h1 class="search-title-advanced">Search for Similar Articles</h1>
+  <h1 class="search-title-simple">Search your collection</h1>
+  <span class="results-count-line" id="results-count-line">Ranked against your question · <span id="result-count">0</span> shown</span>
+ </div>
  <p class="subtitle search-sub-advanced"><strong>Step 4 of 4 (last).</strong> Rank the papers you kept by how well they
  match your question, then export your list.</p>
  <p class="subtitle search-sub-simple">Rank the papers you kept by how well they match your question,
@@ -13,11 +18,71 @@
  {{ scope_search() }}
 </section>
 
+<div class="search-query-top search-work" id="search-query-top">
+ <div class="input-method-toggle" id="input-method-toggle">
+  <label class="radio-label">
+   <input type="radio" name="input_method" value="text" checked> Text Input
+  </label>
+  <label class="radio-label">
+   <input type="radio" name="input_method" value="pico"> PICO Format
+  </label>
+  <label class="radio-label">
+   <input type="radio" name="input_method" value="seed"> Seed paper
+  </label>
+ </div>
+ <div class="searchcard" id="searchcard">
+  <div id="text-input-panel">
+   <label class="u-visually-hidden" for="query-text">Research question</label>
+   <input type="text" id="query-text" name="query-text"
+    placeholder="How do school start times affect adolescent sleep?" autocomplete="off">
+  </div>
+  <button id="search-btn" class="btn btn-primary">Search</button>
+ </div>
+ <div class="u-hidden" id="pico-input-panel">
+  <p class="info-text">Fill in the parts you know.</p>
+  <div class="pico-grid">
+   <div class="form-group">
+    <label>Population</label>
+    <input type="text" id="pico-population" placeholder="e.g., Adults with type 2 diabetes">
+   </div>
+   <div class="form-group">
+    <label>Intervention</label>
+    <input type="text" id="pico-intervention" placeholder="e.g., Metformin treatment">
+   </div>
+   <div class="form-group">
+    <label>Comparison</label>
+    <input type="text" id="pico-comparison" placeholder="e.g., Placebo or standard care">
+   </div>
+   <div class="form-group">
+    <label>Outcome</label>
+    <input type="text" id="pico-outcome" placeholder="e.g., Glycemic control">
+   </div>
+  </div>
+ </div>
+ <div class="u-hidden" id="seed-input-panel">
+  <p class="info-text"><strong>Seed paper:</strong> paste an article id (e.g. PubMed ID or DOI) or part
+   of a title from a paper already in your collection - the app ranks the rest by similarity to it.
+   Useful when a teacher gives you one starter citation.</p>
+  <div class="form-group">
+   <label>Seed id or title fragment</label>
+   <input type="text" id="seed-query" placeholder="e.g. 10.1038/... or climate warming oceans">
+  </div>
+ </div>
+</div>
+
+{% include "partials/simple_screening_card.html" %}
+<input type="checkbox" id="only-missing" hidden checked>
+
+{# Simple empty / start-over: topics + fetch live here. Hidden in Advanced. #}
+<div id="search-collect" hidden>
+{% include "partials/collect_ui.html" %}
+</div>
+
 <section class="card empty-state-card" id="search-empty-state" hidden>
  <h2>Nothing to search yet</h2>
  <p class="info-text" id="search-empty-msg">Fetch papers and prepare them for search on Data Management first.</p>
  <p class="empty-state-actions">
-  <a class="btn btn-primary btn-sm" href="/data-management">Go to Data Management</a>
+  <a class="btn btn-primary btn-sm" href="/data-management">Get papers</a>
  </p>
 </section>
 
@@ -40,61 +105,15 @@
      uses bookmarked papers. Screened-out papers never appear. The score meter shows the 0–1 similarity rank.</p>
      <p class="info-text search-help-simple">Searches <strong>your collection only</strong>.
      <strong>Text</strong> or <strong>PICO</strong> for your question; <strong>More like my starred</strong>
-     after bookmarking with ★. Screened-out papers never appear. The score meter shows how well each paper matches (0–1).</p>
+     after bookmarking with ★. After a search, <strong>Show</strong> chips filter the list on this
+     page (starred, notes, recent years, source) without running a new search. Screened-out papers
+     never appear. The score meter shows how well each paper matches (0–1).</p>
     </div>
    </aside>
 
    <section class="card" id="search-query-section">
     <p class="info-text">Searches <strong>your collection only</strong> (not the whole internet). Plain
     language works - the app compares meaning, not just keywords.</p>
-    <div class="input-method-toggle">
-    <label class="radio-label">
-    <input type="radio" name="input_method" value="text" checked> Text Input
-    </label>
-    <label class="radio-label">
-    <input type="radio" name="input_method" value="pico"> PICO Format
-    </label>
-    <label class="radio-label">
-    <input type="radio" name="input_method" value="seed"> Seed paper
-    </label>
-    </div>
-
-    <div id="text-input-panel">
-    <label class="u-visually-hidden" for="query-text">Research question</label>
-    <textarea id="query-text" placeholder="Enter your study description or research question..." rows="4"></textarea>
-    </div>
-
-    <div class="u-hidden" id="pico-input-panel">
-    <p class="info-text">Fill in the parts you know.</p>
-    <div class="pico-grid">
-    <div class="form-group">
-    <label>Population</label>
-    <input type="text" id="pico-population" placeholder="e.g., Adults with type 2 diabetes">
-    </div>
-    <div class="form-group">
-    <label>Intervention</label>
-    <input type="text" id="pico-intervention" placeholder="e.g., Metformin treatment">
-    </div>
-    <div class="form-group">
-    <label>Comparison</label>
-    <input type="text" id="pico-comparison" placeholder="e.g., Placebo or standard care">
-    </div>
-    <div class="form-group">
-    <label>Outcome</label>
-    <input type="text" id="pico-outcome" placeholder="e.g., Glycemic control">
-    </div>
-    </div>
-    </div>
-
-    <div class="u-hidden" id="seed-input-panel">
-    <p class="info-text"><strong>Seed paper:</strong> paste an article id (e.g. PubMed ID or DOI) or part
-    of a title from a paper already in your collection - the app ranks the rest by similarity to it.
-    Useful when a teacher gives you one starter citation.</p>
-    <div class="form-group">
-    <label>Seed id or title fragment</label>
-    <input type="text" id="seed-query" placeholder="e.g. 10.1038/... or climate warming oceans">
-    </div>
-    </div>
    </section>
 
    <section class="card" id="search-controls-section">
@@ -166,7 +185,6 @@
      </div>
     </details>
 
-    <button id="search-btn" class="btn btn-primary btn-block">Search</button>
     <button type="button" id="starred-search-btn" class="btn btn-secondary btn-block u-mt-md">
     More like my starred (<span id="starred-count">0</span>)
     </button>
@@ -188,7 +206,18 @@
   <div class="search-results-layout" id="search-results-layout">
    <section class="u-hidden" id="results-section">
     <div class="results-header">
-    <h2>Results: <span id="result-count">0</span> articles found</h2>
+    <h2 class="results-count-line results-count-line-legacy">Results</h2>
+    </div>
+    <div class="display-filters" id="display-filters" hidden>
+     <span class="display-filters-label" id="display-filters-label">Show</span>
+     <div class="display-filter-chips" id="display-filter-chips" role="group"
+      aria-labelledby="display-filters-label">
+      <button type="button" class="display-filter-chip is-on" data-filter="all" aria-pressed="true">All</button>
+      <button type="button" class="display-filter-chip" data-filter="starred" aria-pressed="false">Starred</button>
+      <button type="button" class="display-filter-chip" data-filter="noted" aria-pressed="false">Has a note</button>
+      <button type="button" class="display-filter-chip" data-filter="recent" id="display-filter-recent" aria-pressed="false">Since 2021</button>
+     </div>
+     <p class="help-text" id="display-filter-status"></p>
     </div>
     <div id="results-list"></div>
    </section>
@@ -258,5 +287,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/search.js?v=20260811d"></script>
+<script src="/static/js/simple_tools.js?v=20260814f"></script>
+<script src="/static/js/data_management.js?v=20260814c"></script>
+<script src="/static/js/search.js?v=20260814k"></script>
 {% endblock %}

@@ -289,6 +289,34 @@ Condenses Data Management in Simple mode. **Advanced is unchanged.**
   not in the prepare dialog. After re-prepare, screening should return to
   pending via corpus state, never a JS flag.
 
+## Phase 9 — Destructive operations become reversible
+Design: **[docs/PHASE9_STAGING_SWAP.md](docs/PHASE9_STAGING_SWAP.md)**.
+Failed replace-fetch must not wipe the library. No new Simple confirmation.
+- Tasks:
+  - Honest Start-fresh copy (notes / stars / AI key points)
+  - Advanced replace consequence inline (no modal)
+  - Staging-swap design (same-DB `staging_articles`; swap only if ≥1 paper)
+  - Sample corpus: load rows, then clear, then insert
+- Complete when: a failed replace-fetch leaves articles, notes, stars, and AI
+  key points unchanged; the xfail in `tests/test_phase9_reversible_fetch.py`
+  is removed and passing; Advanced still has every control; Simple gains no
+  new dialog
+- Status: [x] 2026-08-13 — staging swap with reattach of notes / stars / AI
+  key points on papers that come back; failed fetch leaves the library intact
+
+## Phase 10 — Broadsheet visual identity
+Approved mockup: `design_mockups/final_broadsheet.html` (not committed).
+Presentation only — no flow or endpoint changes.
+- Tasks:
+  - Radius tokens 2px / 3px; drop undefined `--radius-lg`
+  - Dark theme warm newsprint in both dark blocks + parity test
+  - Masthead nav (double rule, segmented desktop steps)
+  - Search notice band, boxed query control, result cards, boxed rail
+- Complete when: mockup identity is on Search; public pages still render;
+  Simple/guest/phase-8 tests pass unchanged; radii and dark parity tests
+  hold
+- Status: [x] 2026-08-13 — shipped on `feat/phase6-guest-demo` as **v5.0.0**
+
 ## Backlog (unscheduled)
 - Make `pyright app` blocking in CI after clearing the current error backlog
 - Dependency lockfile (pip-tools / uv) if reproducibility becomes a priority

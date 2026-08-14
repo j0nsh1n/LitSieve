@@ -5,6 +5,25 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+/** Attribute-safe encoding. escapeHtml does not encode quotes. */
+function escapeAttr(text) {
+    return String(text == null ? '' : text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+/** HTML id token for modal fields (labels / getElementById). */
+function safeDomId(raw) {
+    const s = String(raw == null ? '' : raw).replace(/[^A-Za-z0-9_-]/g, '');
+    return s || 'field';
+}
+
+/** Shared localStorage key for last fetch query / replace-vs-append. */
+var FETCH_PREFS_KEY = 'lra_fetch_prefs_v1';
+
 // === Classroom UI flags (env: HIDE_STUDY_TYPE_TAGS, HIDE_AI_BUTTONS) ===
 // Defaults keep features on until /api/ui-flags loads.
 window.LRA_UI = window.LRA_UI || {
@@ -390,7 +409,7 @@ function openSiteModal(opts) {
         root.setAttribute('aria-modal', 'true');
         root.setAttribute('aria-labelledby', 'site-modal-title');
 
-        const title = o.title || (mode === 'confirm' ? 'Please confirm' : mode === 'prompt' ? 'Input needed' : 'Notice');
+        const title = o.title || (mode === 'confirm' ? 'Please confirm' : mode === 'prompt' ? 'Input needed' : mode === 'form' ? 'Options' : 'Notice');
         const confirmLabel = o.confirmLabel || (mode === 'confirm' ? 'Confirm' : 'OK');
         const cancelLabel = o.cancelLabel || 'Cancel';
         const confirmClass = o.danger ? 'btn btn-danger' : 'btn btn-primary';
@@ -399,9 +418,11 @@ function openSiteModal(opts) {
             : '';
 
         let fieldHtml = '';
+        const formFields = Array.isArray(o.fields) ? o.fields : [];
+        const isForm = mode === 'form' && formFields.length > 0;
         // prompt mode always shows an input; choice mode can opt in via withInput
         // (e.g. Simple re-prepare: verify research question in the same dialog).
-        const showInput = mode === 'prompt' || !!(mode === 'choice' && o.withInput);
+        const showInput = !isForm && (mode === 'prompt' || !!(mode === 'choice' && o.withInput));
         if (showInput) {
             const fieldLabel = o.inputLabel
                 ? escapeHtml(String(o.inputLabel))
@@ -412,16 +433,33 @@ function openSiteModal(opts) {
             <div class="form-group lra-modal-input-group">
               <label class="${labelClass}" for="site-modal-input">${fieldLabel}</label>
               <textarea id="site-modal-input" class="lra-modal-textarea" rows="6"
-                placeholder="${escapeHtml(o.placeholder || '')}"></textarea>
+                placeholder="${escapeAttr(o.placeholder || '')}"></textarea>
             </div>`;
             } else {
+                const inputType = escapeAttr(o.inputType || 'text');
                 fieldHtml = `
             <div class="form-group lra-modal-input-group">
               <label class="${labelClass}" for="site-modal-input">${fieldLabel}</label>
-              <input id="site-modal-input" class="lra-modal-input" type="${escapeHtml(o.inputType || 'text')}"
-                placeholder="${escapeHtml(o.placeholder || '')}" autocomplete="off">
+              <input id="site-modal-input" class="lra-modal-input" type="${inputType}"
+                placeholder="${escapeAttr(o.placeholder || '')}" autocomplete="off">
             </div>`;
             }
+        }
+        if (isForm) {
+            fieldHtml = `<div class="lra-modal-fields">${formFields.map((f) => {
+                const fid = escapeAttr(safeDomId(f.id));
+                const label = escapeHtml(String(f.label || f.id || ''));
+                const typ = escapeAttr(String(f.type || 'text'));
+                const ph = escapeAttr(f.placeholder || '');
+                const min = f.min != null ? ` min="${escapeAttr(String(f.min))}"` : '';
+                const max = f.max != null ? ` max="${escapeAttr(String(f.max))}"` : '';
+                const step = f.step != null ? ` step="${escapeAttr(String(f.step))}"` : '';
+                return `<div class="form-group lra-modal-input-group" data-field="${fid}">
+              <label class="help-text" for="site-modal-field-${fid}">${label}</label>
+              <input id="site-modal-field-${fid}" class="lra-modal-input" type="${typ}"
+                placeholder="${ph}"${min}${max}${step} autocomplete="off">
+            </div>`;
+            }).join('')}</div>`;
         }
 
         let actionsHtml = '';
@@ -508,7 +546,7 @@ function openSiteModal(opts) {
 
         const cancelValue = () => {
             if (mode === 'confirm') return false;
-            if (mode === 'prompt' || mode === 'choice') return null;
+            if (mode === 'prompt' || mode === 'choice' || mode === 'form') return null;
             return undefined;
         };
 
@@ -598,6 +636,22 @@ function openSiteModal(opts) {
                     close(undefined);
                     return;
                 }
+                if (isForm) {
+                    const values = {};
+                    formFields.forEach((f) => {
+                        const el = root.querySelector('#site-modal-field-' + safeDomId(f.id));
+                        values[f.id] = el ? el.value : '';
+                    });
+                    if (typeof o.validate === 'function') {
+                        const err = o.validate(values);
+                        if (err) {
+                            showNotification(String(err), 'error');
+                            return;
+                        }
+                    }
+                    close(values);
+                    return;
+                }
                 // prompt
                 const val = input ? input.value : '';
                 const trimmed = String(val).trim();
@@ -620,7 +674,24 @@ function openSiteModal(opts) {
             });
         }
 
-        if (input) {
+        if (isForm) {
+            formFields.forEach((f) => {
+                const el = root.querySelector('#site-modal-field-' + safeDomId(f.id));
+                if (el && f.value != null) el.value = String(f.value);
+            });
+            root.querySelectorAll('.lra-modal-fields .lra-modal-input').forEach((el) => {
+                el.addEventListener('keydown', (ev) => {
+                    if (ev.key === 'Enter' && !ev.shiftKey) {
+                        ev.preventDefault();
+                        confirmBtn && confirmBtn.click();
+                    }
+                });
+            });
+            const firstField = root.querySelector('.lra-modal-fields .lra-modal-input');
+            setTimeout(() => {
+                if (firstField) firstField.focus();
+            }, 30);
+        } else if (input) {
             input.value = o.defaultValue != null ? String(o.defaultValue) : '';
             input.addEventListener('keydown', (ev) => {
                 if (ev.key === 'Enter' && !ev.shiftKey) {
@@ -661,6 +732,11 @@ function openSiteAlert(opts) {
 /** Multi-button dialog. Resolves to the chosen `value`, or null if cancelled. */
 function openSiteChoice(opts) {
     return openSiteModal(Object.assign({}, opts, { mode: 'choice' }));
+}
+
+/** Multi-field dialog. Resolves to `{ id: value, … }` or null if cancelled. */
+function openSiteForm(opts) {
+    return openSiteModal(Object.assign({}, opts, { mode: 'form' }));
 }
 
 /**
@@ -957,40 +1033,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-// === Theme toggle (with smooth crossfade) ===
-document.addEventListener('DOMContentLoaded', function() {
-    const root = document.documentElement;
-    const btn = document.getElementById('theme-toggle');
-    if (!btn) return;
-
-    function getEffectiveTheme() {
-        const saved = localStorage.getItem('theme');
-        if (saved) return saved;
-        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    }
-
-    function updateButton(theme) {
-        // Icon = current mode (moon while dark, sun while light).
-        // Title describes the action of the next click.
-        btn.textContent = theme === 'dark' ? '🌙' : '☀';
-        btn.title = theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
-        btn.setAttribute('aria-label', btn.title);
-    }
-
-    updateButton(getEffectiveTheme());
-
-    btn.addEventListener('click', function() {
-        const next = getEffectiveTheme() === 'dark' ? 'light' : 'dark';
-        const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        if (!reduce) {
-            root.classList.add('theme-animating');
-            setTimeout(() => root.classList.remove('theme-animating'), 320);
-        }
-        localStorage.setItem('theme', next);
-        root.setAttribute('data-theme', next);
-        updateButton(next);
-    });
-});
+// Theme toggle lives only in theme-init.js (public pages cannot load this file).
 
 // === Sticky nav elevation on scroll ===
 document.addEventListener('DOMContentLoaded', function() {
@@ -1090,6 +1133,14 @@ function updateModeToggleButton() {
     btn.setAttribute('aria-label', btn.title);
 }
 
+function _collectQueryOn() {
+    try {
+        return new URL(location.href).searchParams.get('collect') === '1';
+    } catch (e) {
+        return /[?&]collect=1(?:[&#]|$)/.test(location.search || '');
+    }
+}
+
 function updateNavStepNumbers() {
     const simple = isSimpleMode();
     document.querySelectorAll('.nav-link[data-step-advanced]').forEach((a) => {
@@ -1124,6 +1175,42 @@ function updateNavStepNumbers() {
             if (adv) menuStep.textContent = adv;
         }
     }
+    const getPapers = document.querySelector('.nav-step-data_management');
+    const searchLink = document.querySelector('.nav-step-search');
+    // Literals only — do not copy data-href-* from the DOM into href
+    // (CodeQL js/xss-through-dom). Simple collect is /search?collect=1.
+    if (getPapers) {
+        getPapers.setAttribute('href', simple ? '/search?collect=1' : '/data-management');
+    }
+    if (getPapers && searchLink) {
+        const path = location.pathname || '';
+        const collecting = simple && (
+            _collectQueryOn()
+            || !!(document.body && document.body.classList.contains('simple-collecting'))
+        );
+        if (simple) {
+            const onSearch = path.indexOf('/search') !== -1;
+            getPapers.classList.toggle('active', collecting);
+            searchLink.classList.toggle('active', onSearch && !collecting);
+            if (collecting) {
+                getPapers.setAttribute('aria-current', 'page');
+                searchLink.removeAttribute('aria-current');
+            } else if (onSearch) {
+                searchLink.setAttribute('aria-current', 'page');
+                getPapers.removeAttribute('aria-current');
+            }
+        } else {
+            getPapers.classList.toggle('active', path.indexOf('/data-management') !== -1);
+            searchLink.classList.toggle('active', path.indexOf('/search') !== -1);
+            if (path.indexOf('/data-management') !== -1) {
+                getPapers.setAttribute('aria-current', 'page');
+                searchLink.removeAttribute('aria-current');
+            } else if (path.indexOf('/search') !== -1) {
+                searchLink.setAttribute('aria-current', 'page');
+                getPapers.removeAttribute('aria-current');
+            }
+        }
+    }
 }
 
 function setUiMode(mode) {
@@ -1133,6 +1220,9 @@ function setUiMode(mode) {
     try {
         localStorage.setItem('uiMode', m);
     } catch (e) { /* private mode */ }
+    try {
+        document.cookie = 'ui_mode=' + m + '; Path=/; SameSite=Lax; Max-Age=31536000';
+    } catch (e2) { /* ignore */ }
     updateModeToggleButton();
     updateNavStepNumbers();
 }
@@ -1231,6 +1321,26 @@ function _syncAbstractClamp(el) {
 
 document.addEventListener('DOMContentLoaded', function() {
     enhanceAbstracts(document);
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    const endDemo = document.querySelector('.guest-banner-logout');
+    if (!endDemo) return;
+    endDemo.addEventListener('click', async function(ev) {
+        ev.preventDefault();
+        const href = endDemo.getAttribute('href') || '/logout';
+        if (typeof openSiteConfirm === 'function') {
+            const ok = await openSiteConfirm({
+                title: 'End this demo?',
+                message: 'Notes and screening in this demo will be gone. You can start a new demo from the home page anytime.',
+                confirmLabel: 'End demo',
+                cancelLabel: 'Keep demo',
+                danger: true,
+            });
+            if (!ok) return;
+        }
+        window.location.href = href;
+    });
 });
 
 // === Page transitions (internal same-origin navigations) ===

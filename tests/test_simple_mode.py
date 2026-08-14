@@ -27,6 +27,22 @@ def _read(*parts: str) -> str:
     return (REPO.joinpath(*parts)).read_text(encoding="utf-8")
 
 
+def _simple_js() -> str:
+    """Simple tools + Data Management (screening/dialogs live in simple_tools.js)."""
+    return _read("static", "js", "simple_tools.js") + "\n" + _read(
+        "static", "js", "data_management.js"
+    )
+
+
+def _dm_markup() -> str:
+    """Data Management page plus the shared collect partial."""
+    return (
+        _read("templates", "data_management.html")
+        + "\n"
+        + _read("templates", "partials", "collect_ui.html")
+    )
+
+
 # ---------------------------------------------------------------------------
 # Pre-paint + toggle (both modes)
 # ---------------------------------------------------------------------------
@@ -64,6 +80,8 @@ def test_mode_toggle_replaces_reading_mode():
     assert "setUiMode" in common
     assert "isSimpleMode" in common
     assert "updateNavStepNumbers" in common
+    # Get papers hrefs are literals (not copied from data-href-* into href).
+    assert "getPapers.setAttribute('href', simple ? '/search?collect=1' : '/data-management')" in common
     assert "reading-toggle" not in common
     assert "setReadingMode" not in common
     # Highlight the control when Advanced is active (not Simple).
@@ -107,12 +125,13 @@ def test_register_seeds_simple_mode_cookie(tmp_path, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# Nav: Phase 6 Simple is Get papers → Search (1, 2); Advanced keeps four steps
+# Nav: Simple shows an unnumbered Search tab only (one page). Get papers /
+# Clusters / Clean up stay hidden. Collect is still /search?collect=1.
 # ---------------------------------------------------------------------------
 
 
-def test_simple_nav_steps_are_contiguous():
-    """Phase 6: Simple hides Clusters + Clean up; remaining steps are 1, 2."""
+def test_simple_nav_shows_unnumbered_search():
+    """Simple: Search tab, no step number. Advanced keeps four numbered steps."""
     base = _read("templates", "base.html")
     # (key, advanced_label, simple_label, href, tip, simple_step)
     rows = re.findall(
@@ -124,19 +143,21 @@ def test_simple_nav_steps_are_contiguous():
     assert "clusters" in by_key, by_key
     assert by_key["clusters"] == "", "Clusters has no Simple step number (hidden)"
     assert by_key["statistics"] == "", "Clean up has no Simple step number (hidden)"
-    visible = [by_key[k] for k in ("data_management", "search")]
-    assert visible == ["1", "2"], f"Simple steps must be contiguous 1-2, got {visible}"
-    # Advanced step indices still 1–4 on the same workflow loop.
+    assert by_key["search"] == "2", by_key
     assert "data-step-advanced" in base
     assert 'data-step-simple="{{ simple_step }}"' in base or 'data-step-simple="' in base
+    assert 'class="nav-brand"' in base and 'href="/"' in base
 
     css = _read("static", "css", "style.css")
+    assert 'html[data-mode="simple"] .nav-step-data_management' in css
     assert 'html[data-mode="simple"] .nav-step-clusters' in css
     assert 'html[data-mode="simple"] .nav-step-statistics' in css
+    assert 'html[data-mode="simple"] .nav-step-search .nav-step-num' in css
+    assert 'html[data-mode="simple"] .nav-links' in css
     assert "nav-flow-arrow-before-clusters" in css
     assert "nav-flow-arrow-before-statistics" in css
 
-    # Advanced still labels Clean up (not Duplicates); Simple uses Get papers.
+    # Advanced still labels Clean up (not Duplicates).
     assert "Clean up" in base
     assert re.search(r'"statistics"\s*,\s*"Clean up"', base)
     assert "Get papers" in base
@@ -184,7 +205,7 @@ def test_simple_css_hides_power_surfaces_not_controls_from_dom():
         assert needle in css, f"Simple hide rule missing target: {needle}"
 
     # Sources / advanced options still exist in templates for Advanced + submit.
-    dm = _read("templates", "data_management.html")
+    dm = _dm_markup()
     assert 'id="source-option-grid"' in dm
     assert 'id="embedding-model"' in dm
     assert "Choose Sources" in dm or "source-option-grid" in dm
@@ -219,7 +240,7 @@ def test_hidden_source_grid_still_submits_checked_sources():
 
 def test_simple_mode_renumbers_fetch_not_advanced():
     """Simple: Fetch is step 2 (sources hidden). Advanced keeps Fetch as step 3."""
-    html = _read("templates", "data_management.html")
+    html = _dm_markup()
     assert "dm-step-simple" in html
     assert "dm-step-advanced" in html
     assert "2. Fetch Articles" in html
@@ -274,7 +295,7 @@ def test_fetch_form_submits_on_enter():
     *before* the submit listener was registered, so Enter/click posted the form
     to the GET-only page route and returned 405 Method Not Allowed.
     """
-    html = _read("templates", "data_management.html")
+    html = _dm_markup()
     assert 'id="fetch-form"' in html
     assert 'type="submit"' in html and 'id="fetch-btn"' in html
     form = re.search(r'<form[^>]*id="fetch-form"[^>]*>', html)
@@ -691,9 +712,7 @@ def test_ai_saved_key_points_survive_append_not_replace(tmp_path):
 # --- Fetch → prepare handoff (added after live review) ----------------------
 
 def _dm_js() -> str:
-    import pathlib
-    return (pathlib.Path(__file__).resolve().parent.parent
-            / "static" / "js" / "data_management.js").read_text()
+    return _simple_js()
 
 
 def test_prepare_card_stays_hidden_while_auto_chain_runs():
@@ -741,6 +760,31 @@ def test_next_step_shortcut_exists_and_starts_hidden():
     assert href == "/search", href
 
 
+def test_search_display_filter_chips_are_easy_options():
+    """Show chips filter the on-screen list (no new search). Both modes."""
+    html = _read("templates", "search.html")
+    assert 'id="display-filters"' in html
+    assert 'data-filter="all"' in html
+    assert 'data-filter="starred"' in html
+    assert 'data-filter="noted"' in html
+    assert 'data-filter="recent"' in html
+    js = _read("static", "js", "search.js")
+    assert "function visibleResults" in js
+    assert "function showSearchResults" in js
+    assert "function wireDisplayFilters" in js
+    assert "displayFilterState.starred" in js
+    assert "displayFilterState.noted" in js
+    assert "displayFilterState.recent" in js
+    # Export the filtered on-screen set, not the unfiltered hit list.
+    exp = js[js.find("async function doExportResults") : js.find("async function doExportResults") + 900]
+    assert "visibleResults" in exp
+    css = _read("static", "css", "style.css")
+    assert ".display-filter-chip" in css
+    # Simple must not hide the chips.
+    assert 'html[data-mode="simple"] .display-filter' not in css
+    assert 'html[data-mode="simple"] #display-filters' not in css
+
+
 def test_next_step_shortcut_is_simple_mode_only_and_resets():
     src = _dm_js()
     assert "function setNextStepVisible" in src
@@ -753,6 +797,66 @@ def test_next_step_shortcut_is_simple_mode_only_and_resets():
     assert "setNextStepVisible(visible)" in src or "setNextStepVisible(show)" in src
 
 
+def test_simple_locks_fetch_after_library_has_papers():
+    """Simple hides Fetch Articles once this library has papers.
+
+    Advanced keeps the form. Guests already cannot fetch. Start over reuses the
+    existing replace/add dialog, then doFetch must not ask again. A locked
+    submit is a no-op (no /api/fetch-articles-multi).
+    """
+    html = _dm_markup()
+    assert 'id="simple-fetch-locked"' in html
+    assert 'id="simple-fetch-unlock-btn"' in html
+    assert 'id="fetch-lead"' in html
+    assert 'id="fetch-form"' in html
+    # Form stays in the DOM (Advanced / empty / unlocked).
+    assert 'name="fetch-mode"' in html
+
+    src = _dm_js()
+    assert "function isSimpleFetchLocked" in src
+    assert "function updateSimpleFetchLock" in src
+    assert "function unlockSimpleFetch" in src
+    assert "_simpleFetchUnlocked" in src
+    assert "_simpleFetchModePicked" in src
+
+    lock_fn = src[
+        src.find("function isSimpleFetchLocked") : src.find("function updateSimpleFetchLock")
+    ]
+    assert "isSimpleMode" in lock_fn
+    assert "_lastTotalArticles > 0" in lock_fn
+    assert "_simpleFetchUnlocked" in lock_fn
+    assert "_pipelineBusy" in lock_fn
+    assert "isGuestSession" in lock_fn
+
+    unlock_fn = src[
+        src.find("async function unlockSimpleFetch") : src.find(
+            "function updatePrepareSectionVisibility"
+        )
+    ]
+    assert "resolveSimpleFetchModeBeforeRequest" in unlock_fn
+    assert "_simpleFetchUnlocked = true" in unlock_fn
+    assert "_simpleFetchModePicked = true" in unlock_fn
+
+    do = src[src.find("async function doFetch") : src.find("async function doCreateEmbeddings")]
+    assert "isSimpleFetchLocked" in do
+    assert do.find("isSimpleFetchLocked") < do.find("/api/fetch-articles-multi")
+    # Unlock already chose replace/append — do not open the dialog twice.
+    assert "_simpleFetchModePicked" in do
+    # After the job, lock again.
+    assert "_simpleFetchUnlocked = false" in do
+
+    vis = src[
+        src.find("function updatePrepareSectionVisibility") : src.find("async function loadPageData")
+    ]
+    assert "updateSimpleFetchLock" in vis
+    # Prepare-card gate stays mode-agnostic (lock lives in its own helper).
+    assert "if (!simple)" not in vis
+
+    css = _read("static", "css", "style.css")
+    assert "body[data-guest=\"1\"] #simple-fetch-locked" in css
+    assert ".simple-fetch-locked" in css
+
+
 # --- Phase 6: two-page Simple (screening card + silent dedup already above) ---
 
 SIMPLE_SCREEN_FRACTIONS = {"low": 0.10, "medium": 0.25, "high": 0.50}
@@ -760,7 +864,7 @@ SIMPLE_SCREEN_FRACTIONS = {"low": 0.10, "medium": 0.25, "high": 0.50}
 
 def test_simple_screen_levels_map_to_documented_fractions():
     """Low/Medium/High must match 0.10 / 0.25 / 0.50 and stay in API bounds."""
-    dm = _read("static", "js", "data_management.js")
+    dm = _simple_js()
     assert "SIMPLE_SCREEN_LEVELS" in dm
     for level, frac in SIMPLE_SCREEN_FRACTIONS.items():
         assert f"{level}: {frac}" in dm or f"{level}:{frac}" in dm, level
@@ -774,11 +878,14 @@ def test_simple_screen_levels_map_to_documented_fractions():
     assert 'value="medium"' in html
     assert 'value="high"' in html
     assert 'id="simple-screening-card"' in html
+    assert 'id="simple-screen-modal"' in html
+    assert 'id="simple-screen-open-btn"' in html
+    assert "Narrow it down" in html
 
 
 def test_simple_screen_preview_does_not_exclude():
     """Preview must only call quick-preview — never /api/screening exclude."""
-    dm = _read("static", "js", "data_management.js")
+    dm = _simple_js()
     fn = dm[dm.find("async function doSimpleScreenPreview") : dm.find("async function doSimpleScreenApply")]
     assert "/api/screening/quick-preview" in fn
     assert 'action: \'exclude\'' not in fn and 'action: "exclude"' not in fn
@@ -786,7 +893,7 @@ def test_simple_screen_preview_does_not_exclude():
 
 
 def test_simple_screen_apply_and_undo_use_low_relevance():
-    dm = _read("static", "js", "data_management.js")
+    dm = _simple_js()
     apply_fn = dm[dm.find("async function doSimpleScreenApply") : dm.find("function doSimpleScreenSkip")]
     assert 'action: "exclude"' in apply_fn or "action: 'exclude'" in apply_fn
     assert "low_relevance" in apply_fn
@@ -810,7 +917,7 @@ def test_simple_screen_confirm_question_box_after_prepare():
     assert 'id="simple-screen-query"' in html
     css = _read("static", "css", "style.css")
     assert ".simple-screen-confirm" in css
-    dm = _read("static", "js", "data_management.js")
+    dm = _simple_js()
     assert "setSimpleScreenConfirmVisible" in dm
     # Pending shows the confirm box; complete/skip hides it.
     refresh = dm[
@@ -832,7 +939,7 @@ def test_simple_screen_confirm_question_box_after_prepare():
 
 
 def test_simple_screen_skip_leaves_no_exclusion_call():
-    dm = _read("static", "js", "data_management.js")
+    dm = _simple_js()
     fn = dm[dm.find("function doSimpleScreenSkip") : dm.find("async function doSimpleScreenUndo")]
     assert "/api/screening" not in fn, "skip must not exclude anything"
     # Records the choice through the helper, which also persists it per library
@@ -842,7 +949,7 @@ def test_simple_screen_skip_leaves_no_exclusion_call():
 
 def test_simple_screen_pending_from_corpus_not_js_flag():
     """Pending uses statistics + screening-report (low_relevance), not a job flag."""
-    dm = _read("static", "js", "data_management.js")
+    dm = _simple_js()
     fn = dm[dm.find("async function refreshSimpleScreeningCard") : dm.find("async function loadSimpleScreenCounts")]
     assert "/api/statistics" in fn
     assert "/api/screening-report" in fn
@@ -854,7 +961,7 @@ def test_simple_screen_pending_from_corpus_not_js_flag():
 
 def test_simple_screen_counts_fetched_once_not_per_radio():
     """All three fractions load together; radio change does not re-call the API."""
-    dm = _read("static", "js", "data_management.js")
+    dm = _simple_js()
     assert "loadSimpleScreenCounts" in dm
     # Parallel fetch of all levels
     assert "Object.keys(SIMPLE_SCREEN_LEVELS)" in dm or "SIMPLE_SCREEN_LEVELS" in dm
@@ -867,6 +974,21 @@ def test_simple_screening_card_hidden_in_advanced_css():
     css = _read("static", "css", "style.css")
     assert 'html:not([data-mode="simple"]) #simple-screening-card' in css
     assert "display: none" in css.split('simple-screening-card')[1][:200]
+
+
+def test_simple_screen_options_open_in_a_popup():
+    """Low/Medium/High stay; the decision UI is a dialog, not a page card."""
+    html = _read("templates", "partials", "simple_screening_card.html")
+    assert 'id="simple-screen-modal"' in html
+    assert 'id="simple-screen-open-btn"' in html
+    assert 'name="simple-screen-level"' in html
+    dm = _simple_js()
+    assert "function openSimpleScreenModal" in dm
+    assert "function closeSimpleScreenModal" in dm
+    apply_fn = dm[dm.find("async function doSimpleScreenApply") : dm.find("function doSimpleScreenSkip")]
+    assert "closeSimpleScreenModal" in apply_fn
+    skip_fn = dm[dm.find("function doSimpleScreenSkip") : dm.find("async function doSimpleScreenUndo")]
+    assert "closeSimpleScreenModal" in skip_fn
 
 
 def test_go_to_search_not_clean_up_in_simple_next_step():
@@ -967,9 +1089,11 @@ def test_simple_mode_markup_lives_in_labeled_partials():
     """
     dm = _read("templates", "data_management.html")
     search = _read("templates", "search.html")
+    collect = _read("templates", "partials", "collect_ui.html")
+    assert 'include "partials/collect_ui.html"' in dm
     assert 'include "partials/simple_screening_card.html"' in dm
     assert 'include "partials/simple_go_to_search.html"' in dm
-    assert 'include "partials/guest_fetch_note.html"' in dm
+    assert 'include "partials/guest_fetch_note.html"' in collect
     assert 'include "partials/simple_search_panel.html"' in search
     # Markup itself lives in the partial, not duplicated on the page.
     assert 'id="simple-screening-card"' not in dm

@@ -254,7 +254,7 @@ async def register_submit(
     token = create_token(
         user["id"], user["username"], user.get("token_version", 0),
     )
-    response = RedirectResponse(url="/data-management", status_code=302)
+    response = RedirectResponse(url="/search", status_code=302)
     _set_auth_cookies(response, token)
     # One-shot seed: theme-init reads this when localStorage.uiMode is unset,
     # sets Simple mode for brand-new accounts, then clears the cookie.
@@ -318,7 +318,7 @@ async def _start_guest_session(request: Request) -> RedirectResponse:
     token = create_token(
         user["id"], user["username"], user.get("token_version", 0),
     )
-    response = RedirectResponse(url="/data-management", status_code=302)
+    response = RedirectResponse(url="/search", status_code=302)
     # Cookies expire with the demo window so browsers drop the session too.
     _set_auth_cookies(
         response, token, max_age=core.GUEST_MAX_AGE_MINUTES * 60,

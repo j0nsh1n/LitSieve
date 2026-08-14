@@ -34,7 +34,7 @@ function initQuickScreen() {
 
  // Prefill from last fetch query (browser-local prefs).
  try {
- const prefs = JSON.parse(localStorage.getItem('lra_fetch_prefs_v1') || 'null');
+ const prefs = JSON.parse(localStorage.getItem(FETCH_PREFS_KEY) || 'null');
  if (prefs && prefs.query && !queryEl.value) {
  queryEl.value = prefs.query;
  }

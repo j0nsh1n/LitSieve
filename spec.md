@@ -27,9 +27,10 @@ a substitute for school library databases.
 - **Simple / Advanced UI mode** (client preference: `localStorage.uiMode` +
   `data-mode` on `<html>`, applied pre-paint). Simple does not remove Advanced
   capability; Advanced keeps every control
-  - **Simple nav:** Get papers (`/data-management`) → Search. After auto-prepare:
-    optional inline **screening card** (preview counts, apply/undo/skip), silent
-    preferred-source duplicate resolve, then Go to Search
+  - **Simple nav:** one page (`/search`) with an empty collect state (topics +
+    fetch + progress) and a papers-present search state (rank, Show chips,
+    export). Screening, re-prepare, start over, and the source report are
+    popups. `/data-management` in Simple redirects to `/search`.
   - **Advanced nav:** Data Management → Clean up → Clusters → Search (plus Account)
 - **Screening / triage** (exclude/restore with reason codes), not only on Clusters:
   - Clean up (`/statistics`): near-duplicates, preferred-source auto-resolve,
@@ -54,12 +55,13 @@ a substitute for school library databases.
 - Local run: `./run_dev.sh` → http://127.0.0.1:7860  
   Or: `DEBUG=true SECRET_KEY=… ./venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 7860 --reload`
   Dev isolation (preferred): `./run_dev.sh 7861` uses separate DB/data/log paths.
-- Example (Simple): register or **Try the demo** → Get papers (topics → Fetch →
-  auto-prepare → optional screen) → Search → export RIS
+- Example (Simple): register or **Try the demo** → Search (empty: topics →
+  Fetch → auto-prepare; then rank + export). Optional Narrow it down /
+  Re-prepare / Start over as popups.
 - Example (Advanced): log in → Data Management (topics/sources → Fetch →
   auto-prepare) → Clean up (dedup / Quick screen / report) → optional Clusters →
   Search → Download RIS
-- Health: `GET /health` → `{"status":"healthy","version":"4.5.0"}` (version as of
+- Health: `GET /health` → `{"status":"healthy","version":"5.0.0"}` (version as of
   this writing; bump when releasing)
 
 ## Architecture

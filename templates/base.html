@@ -6,17 +6,19 @@
     <title>{% block title %}LitSieve{% endblock %}</title>
     <link rel="icon" href="/static/favicon.ico?v=20260803a" sizes="32x32">
     <link rel="apple-touch-icon" href="/static/favicon.png?v=20260803a">
-    <link rel="stylesheet" href="/static/css/style.css?v=20260811d">
-    <script src="/static/js/theme-init.js?v=20260805a"></script>
+    <link rel="stylesheet" href="/static/css/style.css?v=20260814w">
+    <script src="/static/js/theme-init.js?v=20260814e"></script>
 </head>
 <body{% if user and user.is_guest %} data-guest="1"{% endif %}>
     {% if user and user.is_guest %}
     <div class="guest-banner" role="status">
      <p class="guest-banner-text">
       <strong>Demo mode</strong> (ends after 30 minutes). Sample papers only — no real database fetch.
-      <a href="/register">Create a free account</a> to keep your work and search public sources.
-      <a href="/logout" class="guest-banner-logout">End demo</a>
      </p>
+     <div class="guest-banner-actions">
+      <a href="/register" class="btn btn-primary btn-sm guest-banner-register">Create a free account</a>
+      <a href="/logout" class="btn btn-secondary btn-sm guest-banner-logout" data-no-transition="1">End demo</a>
+     </div>
     </div>
     {% endif %}
     {# Recommended order (Advanced): Fetch/Embed → Cluster → Clean up → Search.
@@ -41,7 +43,7 @@
     {# Phase 8 B — Workbench shell: workflow steps as the instrument; tools separate. #}
     <nav class="navbar app-shell" id="site-navbar" role="navigation" aria-label="Main">
         <div class="shell-primary">
-            <div class="nav-brand">LitSieve</div>
+            <a href="/" class="nav-brand">LitSieve</a>
             <button type="button"
                     class="nav-menu-toggle"
                     id="nav-menu-toggle"
@@ -70,6 +72,10 @@
                    title="{{ tip }}"
                    data-step-advanced="{{ loop.index }}"
                    data-step-simple="{{ simple_step }}"
+                   {% if key == "data_management" %}
+                   data-href-advanced="/data-management"
+                   data-href-simple="/search?collect=1"
+                   {% endif %}
                    {% if active_page == key %}aria-current="page"{% endif %}>
                     <span class="nav-step-num">{{ loop.index }}</span>
                     <span class="nav-step-label nav-label-advanced">{{ label }}</span>
@@ -115,11 +121,11 @@
 
     {% from "macros/disclaimers.html" import scope_footer %}
     <footer class="footer">
-        <p>LitSieve - v4.5.0</p>
+        <p>LitSieve - v5.0.0</p>
         {{ scope_footer() }}
     </footer>
 
-    <script src="/static/js/common.js?v=20260811d"></script>
+    <script src="/static/js/common.js?v=20260814h"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

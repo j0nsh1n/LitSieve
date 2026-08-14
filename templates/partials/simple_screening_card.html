@@ -1,50 +1,73 @@
-{# Phase 6 Simple only: inline screening after fetch→prepare.
-   Hidden in Advanced via CSS (html:not([data-mode=simple])) + JS.
-   Pending state is derived from the corpus (prepared papers, no
-   low_relevance exclusions) — survives reload without a job flag. #}
-<section class="card simple-screening-card" id="simple-screening-card" hidden>
- <h2>Narrow it down</h2>
- <p class="info-text">Set aside papers that are least related to your question before you search.</p>
-
- {# Confirm box: do not silently assume the fetch query is still correct. #}
- <div class="simple-screen-confirm" id="simple-screen-confirm">
-  <p class="simple-screen-confirm-title">Confirm your research question</p>
-  <p class="help-text">We filled this from your last fetch. Check it, edit if needed, then choose how much to set aside.</p>
-  <div class="form-group">
-   <label for="simple-screen-query">Your question</label>
-   <input type="text" id="simple-screen-query" name="simple-screen-query"
-    placeholder="e.g., climate change effects on ecosystems" autocomplete="off">
+{# Simple only: Narrow it down. Options live in a popup; the page keeps a
+   short dock (open / outcome / undo / Go to Search). Hidden in Advanced. #}
+<div id="simple-screening-card" hidden>
+ <div class="simple-screen-dock simple-tools-strip" id="simple-screen-dock">
+  <button type="button" class="simple-tools-count" id="simple-tools-count"
+   title="What we fetched" hidden></button>
+  <button type="button" class="btn btn-primary" id="simple-screen-open-btn">
+   Narrow it down
+  </button>
+  <button type="button" class="btn btn-secondary simple-tools-search-only" id="simple-tools-reprepare-btn">
+   Re-prepare
+  </button>
+  <button type="button" class="btn btn-secondary simple-tools-search-only" id="simple-tools-startover-btn">
+   Start over
+  </button>
+  <span class="help-text" id="simple-tools-status"></span>
+  <p class="help-text" id="simple-screen-dock-hint">Set aside papers least related to your question, or skip.</p>
+  <div id="simple-screen-outcome" class="simple-screen-outcome u-hidden" hidden>
+   <p class="info-text" id="simple-screen-outcome-msg"></p>
+   <button type="button" class="btn btn-secondary btn-sm" id="simple-screen-undo-btn" hidden>Undo</button>
+  </div>
+  <div class="u-mt-md" id="simple-screen-goto" hidden>
+   <a href="/search" class="btn btn-primary" id="simple-screen-goto-link">Go to Search →</a>
   </div>
  </div>
 
- <fieldset class="simple-screen-levels" id="simple-screen-levels">
-  <legend class="simple-screen-legend">How much should we set aside?</legend>
-  <label class="simple-screen-level radio-label">
-   <input type="radio" name="simple-screen-level" value="low">
-   <span class="simple-screen-level-text">Low — sets aside about <strong id="simple-screen-count-low">…</strong></span>
-  </label>
-  <label class="simple-screen-level radio-label">
-   <input type="radio" name="simple-screen-level" value="medium" checked>
-   <span class="simple-screen-level-text">Medium — sets aside about <strong id="simple-screen-count-medium">…</strong></span>
-  </label>
-  <label class="simple-screen-level radio-label">
-   <input type="radio" name="simple-screen-level" value="high">
-   <span class="simple-screen-level-text">High — sets aside about <strong id="simple-screen-count-high">…</strong></span>
-  </label>
- </fieldset>
- <p class="info-text simple-screen-total" id="simple-screen-total" hidden></p>
- <div class="form-row simple-screen-actions" id="simple-screen-actions">
-  <button type="button" class="btn btn-secondary" id="simple-screen-preview-btn">Show me what would go</button>
-  <button type="button" class="btn btn-primary" id="simple-screen-apply-btn">Set them aside</button>
-  <button type="button" class="btn btn-secondary" id="simple-screen-skip-btn">Skip this</button>
+ <div id="simple-screen-modal" class="lra-modal-root simple-screen-modal" hidden>
+  <div class="lra-modal-backdrop" id="simple-screen-modal-backdrop" data-simple-screen-close></div>
+  <div class="lra-modal-card card simple-screen-modal-card" role="dialog" aria-modal="true"
+   aria-labelledby="simple-screen-modal-title" data-site-modal-card>
+   <h2 id="simple-screen-modal-title" class="lra-modal-title">Narrow it down</h2>
+   <p class="info-text">Set aside papers that are least related to your question. Low, Medium, and
+    High show how many papers would go before anything is excluded.</p>
+
+   <div class="simple-screen-confirm" id="simple-screen-confirm">
+    <p class="simple-screen-confirm-title">Confirm your research question</p>
+    <p class="help-text">We filled this from your last fetch. Check it, edit if needed, then choose how much to set aside.</p>
+    <div class="form-group">
+     <label for="simple-screen-query">Your question</label>
+     <input type="text" id="simple-screen-query" name="simple-screen-query"
+      placeholder="e.g., climate change effects on ecosystems" autocomplete="off">
+    </div>
+   </div>
+
+   <fieldset class="simple-screen-levels" id="simple-screen-levels">
+    <legend class="simple-screen-legend">How much should we set aside?</legend>
+    <label class="simple-screen-level radio-label">
+     <input type="radio" name="simple-screen-level" value="low">
+     <span class="simple-screen-level-text">Low — sets aside about <strong id="simple-screen-count-low">…</strong></span>
+    </label>
+    <label class="simple-screen-level radio-label">
+     <input type="radio" name="simple-screen-level" value="medium" checked>
+     <span class="simple-screen-level-text">Medium — sets aside about <strong id="simple-screen-count-medium">…</strong></span>
+    </label>
+    <label class="simple-screen-level radio-label">
+     <input type="radio" name="simple-screen-level" value="high">
+     <span class="simple-screen-level-text">High — sets aside about <strong id="simple-screen-count-high">…</strong></span>
+    </label>
+   </fieldset>
+   <p class="info-text simple-screen-total" id="simple-screen-total" hidden></p>
+   <div class="form-row simple-screen-actions" id="simple-screen-actions">
+    <button type="button" class="btn btn-secondary" id="simple-screen-preview-btn">Show me what would go</button>
+    <button type="button" class="btn btn-primary" id="simple-screen-apply-btn">Set them aside</button>
+    <button type="button" class="btn btn-secondary" id="simple-screen-skip-btn">Skip this</button>
+   </div>
+   <div id="simple-screen-preview" class="simple-screen-preview u-hidden" hidden></div>
+   <div id="simple-screen-status" class="status-indicator"></div>
+   <div class="lra-modal-actions">
+    <button type="button" class="btn btn-secondary" id="simple-screen-modal-close" data-simple-screen-close>Close</button>
+   </div>
+  </div>
  </div>
- <div id="simple-screen-preview" class="simple-screen-preview u-hidden" hidden></div>
- <div id="simple-screen-outcome" class="simple-screen-outcome u-hidden" hidden>
-  <p class="info-text" id="simple-screen-outcome-msg"></p>
-  <button type="button" class="btn btn-secondary btn-sm" id="simple-screen-undo-btn" hidden>Undo</button>
- </div>
- <div id="simple-screen-status" class="status-indicator"></div>
- <div class="u-mt-md" id="simple-screen-goto" hidden>
-  <a href="/search" class="btn btn-primary" id="simple-screen-goto-link">Go to Search →</a>
- </div>
-</section>
+</div>

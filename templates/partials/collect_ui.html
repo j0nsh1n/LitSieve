@@ -1,0 +1,116 @@
+{# Shared collect UI: topics, sources, fetch, coverage.
+   Data Management (Advanced) and Search (Simple empty / start-over). #}
+<section class="page-header collect-header-simple">
+ <h1>Get papers</h1>
+ <p class="subtitle">Pick topics and fetch papers. Preparing for search starts
+  automatically after a successful fetch.</p>
+ {% from "macros/disclaimers.html" import scope_fetch %}
+ {{ scope_fetch() }}
+</section>
+
+<section class="card getting-started-card" id="getting-started-card" hidden>
+ <div class="getting-started-header">
+  <h2>Getting started</h2>
+  <button type="button" class="btn btn-sm btn-secondary" id="dismiss-getting-started" title="Hide this checklist">Dismiss</button>
+ </div>
+ <p class="info-text">Three quick steps. Preparing papers for search runs itself after the fetch.</p>
+ <ol class="getting-started-list">
+  <li data-step="topics"><span class="gs-check" aria-hidden="true">○</span> Pick one or more topics below</li>
+  <li data-step="query"><span class="gs-check" aria-hidden="true">○</span> Type a research question in Fetch</li>
+  <li data-step="fetch"><span class="gs-check" aria-hidden="true">○</span> Press <strong>Fetch Articles</strong> (prepare for search runs next automatically)</li>
+ </ol>
+ <p class="info-text u-mt-lg">
+  Prefer a dry run with no APIs?
+  <button type="button" id="load-sample-btn" class="btn btn-secondary btn-sm">Load sample papers</button>
+  (~20 education-themed demos; replaces an empty collection)
+ </p>
+</section>
+
+<!-- Step 1: Topics -->
+<section class="card" id="collect-topics-card">
+ <h2>1. Select Topics</h2>
+ <p class="info-text">Choose the academic areas you care about - we use them to recommend sources.</p>
+ <div class="topic-grid" id="topic-grid"></div>
+ <h3 class="topic-packs-heading">Quick packs for common topics</h3>
+ <p class="info-text">One click sets topics and checks common free sources for that area. You can still adjust checkboxes.</p>
+ <div class="topic-pack-grid" id="topic-pack-grid" role="group" aria-label="Quick packs for common topics"></div>
+</section>
+
+<!-- Step 2: Sources -->
+<section class="card" id="collect-sources-card">
+ <h2>2. Choose Sources</h2>
+ <p class="info-text" id="source-hint">Select topics above to see recommended sources, or choose manually below.</p>
+ <div class="source-option-grid" id="source-option-grid"></div>
+</section>
+
+<!-- Fetch: Advanced step 3 (sources is 2); Simple step 2 (sources hidden). -->
+<section class="card" id="collect-fetch-card">
+ <h2 class="dm-step-heading dm-step-advanced">3. Fetch Articles</h2>
+ <h2 class="dm-step-heading dm-step-simple">2. Fetch Articles</h2>
+ <p class="info-text" id="fetch-lead">Searches every selected source at once, saves the papers to your private
+ collection, then <strong>automatically prepares them for search</strong> (you can leave this page
+ open while progress runs).</p>
+ {% include "partials/guest_fetch_note.html" %}
+ <div id="simple-fetch-locked" class="simple-fetch-locked" hidden>
+  <p class="info-text" id="simple-fetch-locked-msg">This collection already has papers. Fetching again
+   can replace them or mix in a new search. Use Re-prepare if you only need to get them ready for
+   search again.</p>
+  <button type="button" id="simple-fetch-unlock-btn" class="btn btn-secondary">Start over or add papers</button>
+ </div>
+ <form id="fetch-form" action="/data-management" method="get">
+ <div class="form-row">
+ <div class="form-group flex-2">
+ <label for="fetch-query">Search Query</label>
+ <input type="text" id="fetch-query" name="fetch-query" placeholder="e.g., climate change effects on ecosystems" autocomplete="off">
+ </div>
+ <div class="form-group">
+ <label for="fetch-max">Max Results per Source</label>
+ <input type="number" id="fetch-max" name="fetch-max" value="100" min="10" max="2000" step="10">
+ </div>
+ </div>
+ <div class="form-row">
+ <div class="form-group">
+ <label class="radio-label">
+ <input type="radio" name="fetch-mode" value="replace" checked>
+ Replace collection (clear first - clean start)
+ </label>
+ <label class="radio-label">
+ <input type="radio" name="fetch-mode" value="append">
+ Add to collection (keep existing papers; same ids update)
+ </label>
+ <p class="help-text" id="fetch-replace-consequence" hidden></p>
+ </div>
+ </div>
+ <details class="advanced-details">
+  <summary>Advanced fetch options</summary>
+  <div class="advanced-body">
+   <div class="form-group">
+   <label for="fetch-email">Email <span class="help-text">(optional - PubMed and Europe PMC ask for a contact email)</span></label>
+   <input type="email" id="fetch-email" name="fetch-email" placeholder="your.email@example.com" autocomplete="email">
+   </div>
+  </div>
+ </details>
+ <div class="form-row fetch-actions">
+ <button type="submit" id="fetch-btn" class="btn btn-primary">Fetch Articles</button>
+ <button type="button" id="fetch-cancel-btn" class="btn btn-secondary" hidden>Cancel fetch</button>
+ </div>
+ </form>
+ <div id="fetch-status" class="status-indicator"></div>
+ <div id="fetch-source-report" class="info-text u-hidden u-mt-md"></div>
+ <div class="u-hidden" id="fetch-progress-wrap">
+ <div class="progress-bar-track"><div class="progress-bar-fill" id="fetch-progress-fill"></div></div>
+ <div class="progress-bar-label" id="fetch-progress-label"></div>
+ <!-- Reserved height: live per-source rows (API counts only; no invented progress). -->
+ <div id="fetch-live-sources" class="fetch-live-sources" aria-live="polite"></div>
+ </div>
+</section>
+
+<!-- Coverage map (health check after a fetch) -->
+<section class="card" id="collect-coverage-card">
+ <h2>Coverage map</h2>
+ <p class="info-text">A quick health check after a fetch: papers per source, and which recommended
+ sources are still empty.</p>
+ <div id="coverage-bars"></div>
+ <div id="coverage-suggestions" class="info-text u-mt-lg"></div>
+ <button type="button" id="coverage-refresh" class="btn btn-secondary btn-sm">Refresh coverage</button>
+</section>

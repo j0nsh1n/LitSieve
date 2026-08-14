@@ -4,6 +4,16 @@ let lastSearchParams = null;
 let lastQueryTokens = [];
 /** Last on-screen result list (export “these results” uses this exact order). */
 let lastResults = [];
+/** Client-side Show chips: filter the current hit list without a new search. */
+const displayFilterState = {
+ starred: false,
+ noted: false,
+ recent: false,
+ sources: {},
+};
+function displayRecentYear() {
+ return new Date().getFullYear() - 5;
+}
 
 /** sessionStorage key: refresh keeps query + filters; re-runs search on load. */
 const SEARCH_SESSION_KEY = 'lra_search_session_v1';
@@ -15,7 +25,18 @@ document.addEventListener('DOMContentLoaded', () => {
  loadSearchEmptyState()
   .then((stats) => {
    const ready = !!(stats && (stats.articles_with_embeddings || 0) > 0);
+   const collecting = typeof wantsSimpleCollectView === 'function'
+    && wantsSimpleCollectView(stats);
    return applyAvailableSources().then(() => {
+    // Start over / empty collect must not revive the previous query.
+    if (collecting) {
+     clearSearchWorkspace();
+     if (typeof _collectQueryOn === 'function' && _collectQueryOn()
+      && typeof resetSearchAndNarrowingForStartOver === 'function') {
+      return resetSearchAndNarrowingForStartOver();
+     }
+     return;
+    }
     if (ready) return restoreSearchSession();
    });
   })
@@ -28,6 +49,8 @@ document.addEventListener('DOMContentLoaded', () => {
  document.getElementById('text-input-panel').style.display = v === 'text' ? 'block' : 'none';
  document.getElementById('pico-input-panel').style.display = v === 'pico' ? 'block' : 'none';
  document.getElementById('seed-input-panel').style.display = v === 'seed' ? 'block' : 'none';
+ const card = document.getElementById('searchcard');
+ if (card) card.classList.toggle('is-alt-method', v !== 'text');
  });
  });
 
@@ -37,6 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
  topkDisplay.textContent = topkSlider.value;
  });
 
+ wireDisplayFilters();
  document.getElementById('search-btn').addEventListener('click', doSearch);
  const starredBtn = document.getElementById('starred-search-btn');
  if (starredBtn) starredBtn.addEventListener('click', doStarredSearch);
@@ -198,7 +222,46 @@ function applySearchSessionToForm(state) {
  }
 }
 
+function clearSearchWorkspace() {
+ try {
+  sessionStorage.removeItem(SEARCH_SESSION_KEY);
+ } catch (e) { /* quota / private mode */ }
+ lastSearchParams = null;
+ lastQueryTokens = [];
+ lastResults = [];
+ const qt = document.getElementById('query-text');
+ if (qt) qt.value = '';
+ ['pico-population', 'pico-intervention', 'pico-comparison', 'pico-outcome', 'seed-query']
+  .forEach((id) => {
+   const el = document.getElementById(id);
+   if (el) el.value = '';
+  });
+ const list = document.getElementById('results-list');
+ if (list) list.innerHTML = '';
+ const resultsSec = document.getElementById('results-section');
+ if (resultsSec) {
+  resultsSec.classList.add('u-hidden');
+  resultsSec.style.display = 'none';
+ }
+ const exportSec = document.getElementById('export-results-section');
+ if (exportSec) {
+  exportSec.hidden = true;
+  exportSec.style.display = 'none';
+ }
+ const countEl = document.getElementById('result-count');
+ if (countEl) countEl.textContent = '0';
+ const banner = document.getElementById('seed-banner');
+ if (banner) banner.style.display = 'none';
+ displayFilterState.starred = false;
+ displayFilterState.noted = false;
+ displayFilterState.recent = false;
+ displayFilterState.sources = {};
+ syncDisplayFilterChipState();
+ if (typeof updateSimpleSearchPanel === 'function') updateSimpleSearchPanel(false);
+}
+
 async function restoreSearchSession() {
+ if (typeof _collectQueryOn === 'function' && _collectQueryOn()) return;
  const state = readSearchSession();
  if (!state) return;
 
@@ -270,15 +333,55 @@ function updateSearchWorkVisibility(stats) {
  });
 }
 
+function fillSimpleRailStats(stats, report) {
+ const host = document.getElementById('simple-rail-stats');
+ if (!host) return;
+ const total = Number((report && report.total_articles) || (stats && stats.total_articles) || 0);
+ const dups = Number(report && report.excluded && report.excluded.duplicate) || 0;
+ const excludedTotal = Number(report && report.excluded && report.excluded.total) || 0;
+ // Screened out is non-duplicate exclusions (PRISMA / txt report split).
+ const out = Math.max(0, excludedTotal - dups);
+ const kept = report && report.included != null
+  ? Number(report.included)
+  : Math.max(0, total - excludedTotal);
+ const set = (id, n) => {
+  const el = document.getElementById(id);
+  if (el) el.textContent = String(n);
+ };
+ set('rail-stat-fetched', total);
+ set('rail-stat-dups', dups);
+ set('rail-stat-out', out);
+ set('rail-stat-kept', kept);
+ host.hidden = total <= 0;
+}
+
 async function loadSearchEmptyState() {
  try {
  const stats = await apiCall('/api/statistics');
- if (typeof applyEmptyState === 'function') {
+ if (typeof syncSimpleOnePageState === 'function') {
+  syncSimpleOnePageState(stats);
+ }
+ if (document.getElementById('simple-rail-stats')
+  && typeof isSimpleMode === 'function' && isSimpleMode()) {
+  try {
+   const report = await apiCall('/api/screening-report?format=json');
+   fillSimpleRailStats(stats, report);
+  } catch (e) {
+   fillSimpleRailStats(stats, null);
+  }
+ }
+ const simple = typeof isSimpleMode === 'function' && isSimpleMode();
+ if (!simple && typeof applyEmptyState === 'function') {
  applyEmptyState('search-empty-state', stats, 'embeddings', 'search-empty-msg');
  }
- updateSearchWorkVisibility(stats);
+ if (!simple || !wantsSimpleCollectView(stats)) {
+  updateSearchWorkVisibility(stats);
+ }
  return stats;
  } catch (e) {
+ if (typeof syncSimpleOnePageState === 'function') {
+  syncSimpleOnePageState({ articles_with_embeddings: 0, total_articles: 0 });
+ }
  updateSearchWorkVisibility({ articles_with_embeddings: 0 });
  return null;
  }
@@ -385,6 +488,77 @@ function escapeRegExp(s) {
  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+async function promptSimpleSearchScope() {
+ if (typeof isSimpleMode !== 'function' || !isSimpleMode()) return true;
+ if (typeof openSiteForm !== 'function') return true;
+ const topkEl = document.getElementById('top-k');
+ const yminEl = document.getElementById('year-min');
+ const ymaxEl = document.getElementById('year-max');
+ const result = await openSiteForm({
+  title: 'Search options',
+  message: 'How many papers should we show? You can also limit the years.',
+  confirmLabel: 'Search',
+  fields: [
+   {
+    id: 'count',
+    label: 'How many papers',
+    type: 'number',
+    value: (topkEl && topkEl.value) || '10',
+    min: 1,
+    max: 50,
+    step: 1,
+   },
+   {
+    id: 'year_min',
+    label: 'From year (optional)',
+    type: 'number',
+    value: yminEl ? yminEl.value : '',
+    placeholder: 'e.g. 2015',
+    min: 1900,
+    max: 2100,
+    step: 1,
+   },
+   {
+    id: 'year_max',
+    label: 'To year (optional)',
+    type: 'number',
+    value: ymaxEl ? ymaxEl.value : '',
+    placeholder: 'e.g. 2024',
+    min: 1900,
+    max: 2100,
+    step: 1,
+   },
+  ],
+  validate: (vals) => {
+   const n = parseInt(vals.count, 10);
+   if (!Number.isFinite(n) || n < 1 || n > 50) {
+    return 'Choose how many papers to show (1–50).';
+   }
+   const yminRaw = String(vals.year_min || '').trim();
+   const ymaxRaw = String(vals.year_max || '').trim();
+   const ymin = yminRaw === '' ? null : parseInt(yminRaw, 10);
+   const ymax = ymaxRaw === '' ? null : parseInt(ymaxRaw, 10);
+   if (yminRaw && !Number.isFinite(ymin)) return 'From year must be a number.';
+   if (ymaxRaw && !Number.isFinite(ymax)) return 'To year must be a number.';
+   if (ymin != null && (ymin < 1900 || ymin > 2100)) return 'From year must be between 1900 and 2100.';
+   if (ymax != null && (ymax < 1900 || ymax > 2100)) return 'To year must be between 1900 and 2100.';
+   if (ymin != null && ymax != null && ymin > ymax) return 'From year must be before To year.';
+   return null;
+  },
+ });
+ if (result == null) return false;
+ const n = parseInt(result.count, 10);
+ if (topkEl) {
+  topkEl.value = String(n);
+  const topkDisplay = document.getElementById('topk-display');
+  if (topkDisplay) topkDisplay.textContent = String(n);
+  if (typeof updateRangeFill === 'function') updateRangeFill(topkEl);
+ }
+ if (yminEl) yminEl.value = String(result.year_min || '').trim();
+ if (ymaxEl) ymaxEl.value = String(result.year_max || '').trim();
+ return true;
+}
+
 async function doSearch(opts) {
  const fromRestore = !!(opts && opts.fromRestore);
  const method = document.querySelector('input[name="input_method"]:checked').value;
@@ -394,6 +568,10 @@ async function doSearch(opts) {
   showNotification(method === 'seed' ? 'Enter a seed id or title.' : 'Please enter a search query.', 'error');
  }
  return;
+ }
+ if (!fromRestore) {
+  const scoped = await promptSimpleSearchScope();
+  if (!scoped) return;
  }
 
  const filters = collectSearchFilters();
@@ -468,19 +646,7 @@ async function doSearch(opts) {
 
  const results = data.results || [];
  lastResults = results;
- renderResults(results);
- document.getElementById('result-count').textContent = results.length;
- const resultsSec = document.getElementById('results-section');
- if (resultsSec) {
-  resultsSec.classList.remove('u-hidden');
-  resultsSec.style.display = 'block';
- }
- const exportSec = document.getElementById('export-results-section');
- if (exportSec) {
-  exportSec.hidden = !results.length;
-  exportSec.style.display = results.length ? 'block' : 'none';
- }
- updateSimpleSearchPanel(results.length > 0);
+ showSearchResults(results);
  // Persist query + filters so a browser refresh restores this search.
  await saveSearchSession(method);
  } catch (e) {
@@ -494,6 +660,10 @@ async function doSearch(opts) {
 
 async function doStarredSearch(opts) {
  const fromRestore = !!(opts && opts.fromRestore);
+ if (!fromRestore) {
+  const scoped = await promptSimpleSearchScope();
+  if (!scoped) return;
+ }
  const filters = collectSearchFilters();
  if (filters.source_filter.length === 0) {
  if (!fromRestore) showNotification('Please select at least one source.', 'error');
@@ -542,19 +712,7 @@ async function doStarredSearch(opts) {
  results = clientSort(results, filters.sort_by);
  }
  lastResults = results;
- renderResults(results);
- document.getElementById('result-count').textContent = results.length;
- const resultsSec = document.getElementById('results-section');
- if (resultsSec) {
-  resultsSec.classList.remove('u-hidden');
-  resultsSec.style.display = 'block';
- }
- const exportSec = document.getElementById('export-results-section');
- if (exportSec) {
-  exportSec.hidden = !results.length;
-  exportSec.style.display = results.length ? 'block' : 'none';
- }
- updateSimpleSearchPanel(results.length > 0);
+ showSearchResults(results);
  await refreshStarredCount();
  await saveSearchSession('starred');
  } catch (e) {
@@ -676,33 +834,42 @@ function buildResultCard(article, idx) {
  ? `<span><strong>Cluster:</strong> ${escapeHtml(String(article.cluster_label))}</span>`
  : '';
 
+ const journal = escapeHtml(article.journal || '');
+ const year = escapeHtml(article.year || '');
+ const venueBits = [];
+ if (journal) venueBits.push(journal);
+ if (year) venueBits.push(year);
+ const venue = venueBits.join(' · ');
+ const byline = authors
+  ? `${escapeHtml(authors)}${journal ? ' — ' + journal : ''}`
+  : journal;
+
  card.innerHTML = `
- <div class="result-row-head">
+ <div class="result-row-head result-row-meta">
  <div class="score-meter" role="img" aria-label="Similarity ${simLabel} of 1. Higher is a closer match to your query." title="${escapeHtml(scoreHelp)}">
-  <span class="score-meter-track"><span class="score-meter-fill"></span></span>
   <span class="score-meter-value">${escapeHtml(simLabel)}</span>
+  <span class="score-meter-track"><span class="score-meter-fill"></span></span>
+ </div>
+ <span class="result-venue">${venue}</span>
+ <span class="result-tags">
+  <span class="tag">${escapeHtml(getSourceName(article.source))}</span>
+  ${studyTypeHtml}
+ </span>
  </div>
  <h3 class="article-title result-row-title">${escapeHtml(article.title || '')}</h3>
- <button type="button" class="star-btn ${starred ? 'is-starred' : ''}" title="Bookmark" aria-label="Star article">${starred ? '★' : '☆'}</button>
- </div>
+ <div class="byline result-byline">${byline}</div>
  <div class="article-body result-row-body">
- <div class="article-meta">
- <span><strong>Year:</strong> ${escapeHtml(article.year || '')}</span>
- <span><strong>Journal:</strong> ${escapeHtml(article.journal || '')}</span>
- <span><strong>Source:</strong> ${escapeHtml(getSourceName(article.source))}</span>
+ <div class="article-meta result-row-ids">
  <span><strong>ID:</strong> ${idLink}</span>
  ${clusterBit}
- ${studyTypeHtml}
- </div>
- <div class="article-meta meta-authors">
- <span><strong>Authors:</strong> ${escapeHtml(authors)}</span>
  </div>
  ${keyPointsHtml}
  <div class="article-abstract">${abstractHtml}</div>
  ${picoHtml}
  <div class="article-actions-row">
- <button type="button" class="note-toggle" ${noteVal ? 'hidden' : ''}>✎ Add note</button>
- <button type="button" class="btn btn-sm btn-secondary not-relevant-btn"
+ <button type="button" class="star-btn ${starred ? 'is-starred' : ''}" title="Bookmark" aria-label="Star article" aria-pressed="${starred ? 'true' : 'false'}">${starred ? '★ Starred' : '☆ Star'}</button>
+ <button type="button" class="note-toggle" ${noteVal ? 'hidden' : ''}>Add note</button>
+ <button type="button" class="not-relevant-btn"
   title="Screen this paper out as not about your topic">Not relevant</button>
  </div>
  <div class="note-row" ${noteVal ? '' : 'hidden'}>
@@ -740,7 +907,8 @@ function buildResultCard(article, idx) {
  const next = !starBtn.classList.contains('is-starred');
  // Optimistic: flip immediately; roll back on failure.
  starBtn.classList.toggle('is-starred', next);
- starBtn.textContent = next ? '★' : '☆';
+ starBtn.textContent = next ? '★ Starred' : '☆ Star';
+ starBtn.setAttribute('aria-pressed', next ? 'true' : 'false');
  try {
  await apiCall('/api/notes', {
  method: 'POST',
@@ -750,10 +918,13 @@ function buildResultCard(article, idx) {
  starred: next,
  },
  });
+ patchLastResult(article, { starred: next });
  refreshStarredCount();
+ if (displayFilterState.starred) showSearchResults();
  } catch (err) {
  starBtn.classList.toggle('is-starred', !next);
- starBtn.textContent = next ? '☆' : '★';
+ starBtn.textContent = next ? '☆ Star' : '★ Starred';
+ starBtn.setAttribute('aria-pressed', next ? 'false' : 'true');
  showNotification(`Could not save star: ${err.message}`, 'error');
  }
  });
@@ -773,7 +944,9 @@ function buildResultCard(article, idx) {
  note: noteField.value,
  },
  });
+ patchLastResult(article, { note: noteField.value });
  showNotification('Note saved.', 'success');
+ if (displayFilterState.noted) showSearchResults();
  } catch (err) {
  saveBtn.textContent = prev;
  showNotification(`Could not save note: ${err.message}`, 'error');
@@ -818,8 +991,7 @@ function buildResultCard(article, idx) {
  lastResults = lastResults.filter(
  (a) => !(a.article_id === article.article_id && a.source === article.source)
  );
- const countEl = document.getElementById('result-count');
- if (countEl) countEl.textContent = String(lastResults.length);
+ showSearchResults();
  } catch (err) {
  if (strip && parent && strip.parentNode === parent) {
   parent.replaceChild(card, strip);
@@ -872,8 +1044,7 @@ function replaceCardWithUndo(cardEl, article, opts) {
  )) {
  lastResults.push(article);
  }
- const countEl = document.getElementById('result-count');
- if (countEl) countEl.textContent = String(lastResults.length);
+ showSearchResults();
  } catch (err) {
  undoBtn.disabled = false;
  showNotification(`Undo failed: ${err.message}`, 'error');
@@ -910,9 +1081,7 @@ function clearResultSkeletonsOnError(fromRestore) {
  const hasSkeletons = !!container.querySelector('.skeleton-card');
  if (!hasSkeletons && lastResults && lastResults.length) return;
  if (lastResults && lastResults.length) {
-  renderResults(lastResults);
-  const countEl = document.getElementById('result-count');
-  if (countEl) countEl.textContent = String(lastResults.length);
+  showSearchResults();
   return;
  }
  container.innerHTML = fromRestore
@@ -920,6 +1089,153 @@ function clearResultSkeletonsOnError(fromRestore) {
   : '<p class="info-text">Search failed. Try again.</p>';
  const countEl = document.getElementById('result-count');
  if (countEl) countEl.textContent = '0';
+}
+
+function displayFiltersActive() {
+ if (displayFilterState.starred || displayFilterState.noted || displayFilterState.recent) {
+  return true;
+ }
+ return Object.keys(displayFilterState.sources).some((k) => displayFilterState.sources[k]);
+}
+
+function visibleResults() {
+ const srcOn = Object.keys(displayFilterState.sources).filter(
+  (k) => displayFilterState.sources[k]
+ );
+ const recentYear = displayRecentYear();
+ return (lastResults || []).filter((a) => {
+  if (displayFilterState.starred && !a.starred) return false;
+  if (displayFilterState.noted && !String(a.note || '').trim()) return false;
+  if (displayFilterState.recent && parseYear(a.year) < recentYear) return false;
+  if (srcOn.length && srcOn.indexOf(a.source) === -1) return false;
+  return true;
+ });
+}
+
+function showSearchResults(fullList) {
+ if (Array.isArray(fullList)) lastResults = fullList;
+ const bar = document.getElementById('display-filters');
+ const hasHits = !!(lastResults && lastResults.length);
+ if (bar) bar.hidden = !hasHits;
+ syncDisplayFilterSourceChips();
+ syncDisplayFilterChipState();
+ const shown = visibleResults();
+ renderResults(shown);
+ const countEl = document.getElementById('result-count');
+ if (countEl) {
+  countEl.textContent = displayFiltersActive() && hasHits
+   ? `${shown.length} of ${lastResults.length}`
+   : String(hasHits ? lastResults.length : 0);
+ }
+ const countLine = document.getElementById('results-count-line');
+ if (countLine) countLine.hidden = !hasHits;
+ const status = document.getElementById('display-filter-status');
+ if (status) {
+  status.textContent = displayFiltersActive() && hasHits
+   ? (shown.length
+    ? `Showing ${shown.length} of ${lastResults.length} on this page.`
+    : 'No papers match these filters. Click All to show everything.')
+   : '';
+ }
+ const resultsSec = document.getElementById('results-section');
+ if (resultsSec) {
+  resultsSec.classList.remove('u-hidden');
+  resultsSec.style.display = 'block';
+ }
+ const exportSec = document.getElementById('export-results-section');
+ if (exportSec) {
+  exportSec.hidden = !shown.length;
+  exportSec.style.display = shown.length ? 'block' : 'none';
+ }
+ updateSimpleSearchPanel(hasHits);
+}
+
+function syncDisplayFilterSourceChips() {
+ const host = document.getElementById('display-filter-chips');
+ if (!host) return;
+ host.querySelectorAll('[data-filter-source]').forEach((el) => el.remove());
+ const seen = {};
+ (lastResults || []).forEach((a) => {
+  if (a && a.source) seen[a.source] = true;
+ });
+ const ids = Object.keys(seen).sort();
+ if (ids.length < 2) {
+  Object.keys(displayFilterState.sources).forEach((k) => {
+   if (!seen[k]) delete displayFilterState.sources[k];
+  });
+  return;
+ }
+ ids.forEach((id) => {
+  if (!(id in displayFilterState.sources)) displayFilterState.sources[id] = false;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'display-filter-chip';
+  btn.setAttribute('data-filter-source', id);
+  btn.setAttribute('aria-pressed', 'false');
+  const name = typeof getSourceName === 'function' ? getSourceName(id) : id;
+  btn.textContent = name;
+  host.appendChild(btn);
+ });
+ Object.keys(displayFilterState.sources).forEach((k) => {
+  if (!seen[k]) delete displayFilterState.sources[k];
+ });
+}
+
+function syncDisplayFilterChipState() {
+ const host = document.getElementById('display-filter-chips');
+ if (!host) return;
+ const any = displayFiltersActive();
+ host.querySelectorAll('[data-filter]').forEach((btn) => {
+  const key = btn.getAttribute('data-filter');
+  const on = key === 'all' ? !any : !!displayFilterState[key];
+  btn.classList.toggle('is-on', on);
+  btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+ });
+ host.querySelectorAll('[data-filter-source]').forEach((btn) => {
+  const id = btn.getAttribute('data-filter-source');
+  const on = !!displayFilterState.sources[id];
+  btn.classList.toggle('is-on', on);
+  btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+ });
+}
+
+function wireDisplayFilters() {
+ const recentBtn = document.getElementById('display-filter-recent');
+ if (recentBtn) recentBtn.textContent = `Since ${displayRecentYear()}`;
+ const host = document.getElementById('display-filter-chips');
+ if (!host || host.dataset.wired === '1') return;
+ host.dataset.wired = '1';
+ host.addEventListener('click', (ev) => {
+  const btn = ev.target && ev.target.closest
+   ? ev.target.closest('[data-filter], [data-filter-source]')
+   : null;
+  if (!btn || !host.contains(btn)) return;
+  ev.preventDefault();
+  const src = btn.getAttribute('data-filter-source');
+  const key = btn.getAttribute('data-filter');
+  if (key === 'all' || (!src && !key)) {
+   displayFilterState.starred = false;
+   displayFilterState.noted = false;
+   displayFilterState.recent = false;
+   Object.keys(displayFilterState.sources).forEach((k) => {
+    displayFilterState.sources[k] = false;
+   });
+  } else if (src) {
+   displayFilterState.sources[src] = !displayFilterState.sources[src];
+  } else if (key === 'starred' || key === 'noted' || key === 'recent') {
+   displayFilterState[key] = !displayFilterState[key];
+  }
+  showSearchResults();
+ });
+}
+
+function patchLastResult(article, patch) {
+ if (!article || !lastResults) return;
+ lastResults.forEach((a) => {
+  if (a.article_id === article.article_id && a.source === article.source) {
+   Object.assign(a, patch);
+  }
+ });
 }
 
 function renderResults(results) {
@@ -961,10 +1277,39 @@ function updateSimpleSearchPanel(hasResults) {
   panel.hidden = true;
  }
  if (resultsSec) resultsSec.classList.toggle('has-simple-panel', show);
+ syncSimplePanelClearance();
+}
+
+function syncSimplePanelClearance() {
+ const panel = document.getElementById('search-simple-panel');
+ const resultsSec = document.getElementById('results-section');
+ if (!resultsSec) return;
+ if (!panel || panel.hidden || !resultsSec.classList.contains('has-simple-panel')) {
+  resultsSec.style.removeProperty('--simple-panel-h');
+  return;
+ }
+ const pos = window.getComputedStyle(panel).position;
+ if (pos !== 'fixed') {
+  resultsSec.style.removeProperty('--simple-panel-h');
+  return;
+ }
+ resultsSec.style.setProperty('--simple-panel-h', `${panel.offsetHeight}px`);
+}
+
+function watchSimplePanelClearance() {
+ const panel = document.getElementById('search-simple-panel');
+ if (!panel || panel.dataset.clearanceWired === '1') return;
+ panel.dataset.clearanceWired = '1';
+ if (typeof ResizeObserver === 'function') {
+  const ro = new ResizeObserver(() => syncSimplePanelClearance());
+  ro.observe(panel);
+ }
+ window.addEventListener('resize', syncSimplePanelClearance);
 }
 
 // If the user toggles Simple/Advanced after a search, re-show the panel.
 document.addEventListener('DOMContentLoaded', () => {
+ watchSimplePanelClearance();
  const modeBtn = document.getElementById('mode-toggle');
  if (modeBtn) {
   modeBtn.addEventListener('click', () => {
@@ -977,7 +1322,8 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function doExportResults(format) {
- if (!lastResults || !lastResults.length) {
+ const exportRows = visibleResults();
+ if (!exportRows.length) {
   showNotification('Run a search first, then export the results shown on screen.', 'error');
   return;
  }
@@ -988,7 +1334,7 @@ async function doExportResults(format) {
   status.className = 'status-indicator loading';
  }
  if (simpleStatus) simpleStatus.textContent = 'Preparing download…';
- const items = lastResults.map((a) => ({
+ const items = exportRows.map((a) => ({
   article_id: a.article_id,
   source: a.source,
  }));

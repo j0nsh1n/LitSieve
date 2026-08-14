@@ -155,6 +155,19 @@ def test_border_radius_scale_discipline():
     assert used
 
 
+def test_phase10_radius_tokens_are_two_and_three_px():
+    """Phase 10 broadsheet: --radius-sm/md are 2px/3px (was 4/8)."""
+    root = _root_block()
+    sm = re.search(r"--radius-sm\s*:\s*([^;]+);", root)
+    md = re.search(r"--radius-md\s*:\s*([^;]+);", root)
+    assert sm, "missing --radius-sm in :root"
+    assert md, "missing --radius-md in :root"
+    assert sm.group(1).strip() == "2px", sm.group(1)
+    assert md.group(1).strip() == "3px", md.group(1)
+    # The undefined --radius-lg fallback is gone; bottom sheets use --radius-md.
+    assert "radius-lg" not in _css_without_comments()
+
+
 def test_padding_uses_spacing_scale_only():
     """Padding lengths come from --space-* (or 0 / env / max / calc of those)."""
     for prop in (
@@ -171,7 +184,7 @@ def test_padding_uses_spacing_scale_only():
 
 def test_fetch_live_sources_markup_and_renderer():
     """Waiting state: live per-source list is reserved and rendered from API data."""
-    dm_html = (REPO / "templates" / "data_management.html").read_text(encoding="utf-8")
+    dm_html = (REPO / "templates" / "partials" / "collect_ui.html").read_text(encoding="utf-8")
     assert 'id="fetch-live-sources"' in dm_html
     dm_js = (REPO / "static" / "js" / "data_management.js").read_text(encoding="utf-8")
     assert "function renderFetchLiveSources" in dm_js
@@ -217,6 +230,28 @@ def test_mobile_380_has_overflow_guard_and_tap_targets():
     assert "overflow-x: hidden" in block or "overflow-x:hidden" in block
     assert "min-height: 2.75rem" in CSS  # 44px-class targets used on small screens
     assert "flex-direction: column" in block  # form-row stacks
+    # Library switcher stays reachable (do not hide the wrap).
+    assert ".nav-library-wrap { display: none" not in block
+    assert ".nav-library-wrap { display: none; }" not in block
+
+
+def test_simple_results_clear_the_fixed_export_bar():
+    """Results padding tracks the measured bar, with 40vh as fallback."""
+    css = CSS
+    assert "--simple-panel-h" in css
+    assert "40vh" in css
+    search = (REPO / "static" / "js" / "search.js").read_text(encoding="utf-8")
+    assert "function syncSimplePanelClearance" in search
+    assert "ResizeObserver" in search
+    assert "--simple-panel-h" in search
+
+
+def test_notifications_stack_above_site_modals():
+    css = CSS
+    # Modal root is 1200; toasts must sit above a full-viewport bottom sheet.
+    assert "z-index: 1300" in css or "z-index:1300" in css
+    modal = css[css.find(".lra-modal-root") : css.find(".lra-modal-root") + 400]
+    assert "1200" in modal
 
 
 def test_prefers_reduced_motion_covers_shimmer():
@@ -301,7 +336,7 @@ def test_run_multi_fetch_publishes_per_source_counts_including_failures(monkeypa
     with core._progress_lock:
         core._all_progress.pop(uid, None)
 
-    monkeypatch.setattr(corpus_routes.quota, "is_over_quota", lambda _uid: False)
+    monkeypatch.setattr(corpus_routes.quota, "is_over_quota", lambda _uid, **_k: False)
     monkeypatch.setattr(
         corpus_routes.quota,
         "usage_report",
@@ -333,6 +368,7 @@ def test_run_multi_fetch_publishes_per_source_counts_including_failures(monkeypa
             email,
             progress_callback,
             cancel_check,
+            into_staging=False,
         ):
             # Match real pipeline callback shape (done, total, **extra).
             steps = [
@@ -398,9 +434,49 @@ def test_phase8_info_text_is_body_scale():
     m2 = re.search(r"\.help-text\s*\{[^}]+\}", css)
     assert m2, ".help-text rule missing"
     assert "var(--fs-sm)" in m2.group(0)
-    # Dark grounds graphite (Phase 8).
-    assert "--bg: #16181a" in css or "--bg:#16181a" in css
-    assert "--surface: #1e2124" in css or "--surface:#1e2124" in css
+    # Dark grounds warm newsprint (Phase 10; was graphite #16181a / #1e2124).
+    assert "--bg: #1c1a15" in css or "--bg:#1c1a15" in css
+    assert "--surface: #242118" in css or "--surface:#242118" in css
+
+
+def _css_block_tokens(block: str) -> dict[str, str]:
+    """`--name: value` declarations inside one CSS rule body."""
+    return {
+        m.group(1): re.sub(r"\s+", " ", m.group(2)).strip()
+        for m in re.finditer(r"(--[\w-]+)\s*:\s*([^;]+);", block)
+    }
+
+
+def test_phase10_dark_blocks_stay_in_parity():
+    """Phase 10: prefers-color-scheme dark and [data-theme=dark] must match.
+
+    These two blocks have drifted before. Every token they both define must
+    have the same value so system-dark and toggled-dark stay identical.
+    """
+    css = CSS
+    pref = re.search(
+        r"@media\s*\(\s*prefers-color-scheme\s*:\s*dark\s*\)\s*\{"
+        r"\s*:root:not\(\[data-theme=\"light\"\]\)\s*\{([^}]+)\}",
+        css,
+    )
+    explicit = re.search(r"\[data-theme=\"dark\"\]\s*\{([^}]+)\}", css)
+    assert pref, "prefers-color-scheme dark block missing"
+    assert explicit, "[data-theme=dark] block missing"
+    a = _css_block_tokens(pref.group(1))
+    b = _css_block_tokens(explicit.group(1))
+    assert a, "no tokens in prefers-color-scheme dark"
+    assert b, "no tokens in [data-theme=dark]"
+    shared = set(a) & set(b)
+    assert shared, "dark blocks share no tokens"
+    drifted = {k: (a[k], b[k]) for k in sorted(shared) if a[k] != b[k]}
+    assert not drifted, f"dark blocks drifted: {drifted}"
+    # Phase 10 newsprint ink (both blocks).
+    for tokens in (a, b):
+        assert tokens.get("--bg") == "#1c1a15"
+        assert tokens.get("--surface") == "#242118"
+        assert tokens.get("--text") == "#eae4d4"
+        assert tokens.get("--text-soft") == "#a59d8c"
+        assert tokens.get("--rule") == "#3b372c"
 
 
 def test_phase8_search_workbench_and_score_meter():

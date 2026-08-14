@@ -142,6 +142,29 @@ def test_fetch_refused_with_507_when_over_quota(app_module, monkeypatch):
     assert body["quota"]["over_limit"] is True
 
 
+def test_wait_true_fetch_conflicts_with_active_job(app_module):
+    """wait=True must use the same per-user fetch slot as background jobs."""
+    from app import core
+
+    c = TestClient(app_module.app)
+    headers = _register(c, "fetchlock")
+    uid = core.user_db.get_by_username("fetchlock")["id"]
+    with core._progress_lock:
+        core._ensure_progress(uid)["fetch"].update(
+            {"active": True, "done": 0, "total": 1, "result": None, "error": None}
+        )
+    r = c.post(
+        "/api/fetch-articles-multi",
+        json={
+            "sources": ["pubmed"], "query": "x", "max_results": 1,
+            "wait": True, "clear_first": True,
+        },
+        headers=headers,
+    )
+    assert r.status_code == 409, r.text
+    assert "already running" in r.json()["detail"].lower()
+
+
 def test_fetch_clear_first_allowed_when_over_quota(app_module, monkeypatch):
     """Replace-mode fetch must not be blocked so an over-limit account can recover."""
     from app.routes import corpus as corpus_routes

@@ -145,12 +145,16 @@ const MODEL_LABELS = {
  multilingual: 'multilingual (non-English collections)',
 };
 
-const FETCH_PREFS_KEY = 'lra_fetch_prefs_v1';
-
 let selectedTopics = new Set();
 let modelManual = false; // true once the user picks a model under Advanced
 
 document.addEventListener('DOMContentLoaded', () => {
+ // Simple home is /search. Do not bounce when collect already lives on Search.
+ if (typeof isSimpleMode === 'function' && isSimpleMode()
+  && location.pathname.indexOf('/data-management') !== -1
+  && !/[#?&]collect=1(?:&|$)/.test(location.search)) {
+  window.location.replace('/search');
+ }
  // Catalog first so tips/topics match source_catalog.py (Phase R4).
  loadSourceCatalog().finally(() => {
  renderTopicGrid();
@@ -185,12 +189,19 @@ document.addEventListener('DOMContentLoaded', () => {
    doFetch();
   });
  } else {
-  document.getElementById('fetch-btn').addEventListener('click', doFetch);
+  const fetchBtn = document.getElementById('fetch-btn');
+  if (fetchBtn) fetchBtn.addEventListener('click', doFetch);
  }
  const cancelBtn = document.getElementById('fetch-cancel-btn');
  if (cancelBtn) cancelBtn.addEventListener('click', cancelFetch);
- document.getElementById('embeddings-btn').addEventListener('click', doCreateEmbeddings);
- document.getElementById('coverage-refresh').addEventListener('click', refreshCoverage);
+ const unlockBtn = document.getElementById('simple-fetch-unlock-btn');
+ if (unlockBtn) {
+  unlockBtn.addEventListener('click', unlockSimpleFetch);
+ }
+ const embeddingsBtn = document.getElementById('embeddings-btn');
+ if (embeddingsBtn) embeddingsBtn.addEventListener('click', doCreateEmbeddings);
+ const coverageBtn = document.getElementById('coverage-refresh');
+ if (coverageBtn) coverageBtn.addEventListener('click', refreshCoverage);
  const dismissGs = document.getElementById('dismiss-getting-started');
  if (dismissGs) dismissGs.addEventListener('click', () => {
  if (typeof dismissGettingStarted === 'function') dismissGettingStarted();
@@ -211,17 +222,21 @@ document.addEventListener('DOMContentLoaded', () => {
  if (el) el.addEventListener('change', saveFetchPrefs);
  });
     // A hand-picked model overrides the automatic topic-based choice.
- document.getElementById('embedding-model').addEventListener('change', () => {
- modelManual = true;
- updateModelHint();
- saveFetchPrefs();
- });
+ const modelSel = document.getElementById('embedding-model');
+ if (modelSel) {
+  modelSel.addEventListener('change', () => {
+   modelManual = true;
+   updateModelHint();
+   saveFetchPrefs();
+  });
+ }
  updateModelHint();
  document.querySelectorAll('input[name="fetch-mode"]').forEach(el => {
  el.addEventListener('change', () => {
             // Append → prefer only-new; Replace → re-embed all by default.
  syncOnlyMissingFromFetchMode();
  saveFetchPrefs();
+ updateReplaceConsequence();
  });
  });
  const onlyMissingEl = document.getElementById('only-missing');
@@ -340,7 +355,8 @@ function recommendModel() {
 /** Set the model dropdown from the topic recommendation unless the user chose one by hand. */
 function applyModelRecommendation() {
  if (!modelManual) {
- document.getElementById('embedding-model').value = recommendModel();
+  const sel = document.getElementById('embedding-model');
+  if (sel) sel.value = recommendModel();
  }
  updateModelHint();
 }
@@ -349,6 +365,7 @@ function updateModelHint() {
  const hint = document.getElementById('model-auto-hint');
  if (!hint) return;
  const sel = document.getElementById('embedding-model');
+ if (!sel) return;
  const current = MODEL_LABELS[sel.value] || sel.value;
  const rec = recommendModel();
  const corpus = window._corpusEmbeddingModel || null;
@@ -458,15 +475,15 @@ function saveFetchPrefs() {
  ).map(cb => cb.value);
  const mode = (document.querySelector('input[name="fetch-mode"]:checked') || {}).value || 'replace';
  const prefs = {
- query: document.getElementById('fetch-query').value,
- max: document.getElementById('fetch-max').value,
- email: document.getElementById('fetch-email').value,
+ query: (document.getElementById('fetch-query') || {}).value || '',
+ max: (document.getElementById('fetch-max') || {}).value || '',
+ email: (document.getElementById('fetch-email') || {}).value || '',
  sources,
  mode,
  topics: [...selectedTopics],
- model: document.getElementById('embedding-model').value,
+ model: (document.getElementById('embedding-model') || {}).value,
  modelManual,
- onlyMissing: document.getElementById('only-missing').checked,
+ onlyMissing: !!(document.getElementById('only-missing') || {}).checked,
  };
  try { localStorage.setItem(FETCH_PREFS_KEY, JSON.stringify(prefs)); } catch (e) { /* ignore */ }
 }
@@ -475,10 +492,18 @@ function restoreFetchPrefs() {
  let prefs;
  try { prefs = JSON.parse(localStorage.getItem(FETCH_PREFS_KEY) || 'null'); } catch (e) { prefs = null; }
  if (!prefs) return;
- if (prefs.query) document.getElementById('fetch-query').value = prefs.query;
- if (prefs.max) document.getElementById('fetch-max').value = prefs.max;
- if (prefs.email) document.getElementById('fetch-email').value = prefs.email;
- if (prefs.model) document.getElementById('embedding-model').value = prefs.model;
+ if (prefs.query && document.getElementById('fetch-query')) {
+  document.getElementById('fetch-query').value = prefs.query;
+ }
+ if (prefs.max && document.getElementById('fetch-max')) {
+  document.getElementById('fetch-max').value = prefs.max;
+ }
+ if (prefs.email && document.getElementById('fetch-email')) {
+  document.getElementById('fetch-email').value = prefs.email;
+ }
+ if (prefs.model && document.getElementById('embedding-model')) {
+  document.getElementById('embedding-model').value = prefs.model;
+ }
  modelManual = !!prefs.modelManual;
  if (prefs.mode) {
  const radio = document.querySelector(`input[name="fetch-mode"][value="${prefs.mode}"]`);
@@ -504,10 +529,20 @@ function restoreFetchPrefs() {
  updateModelHint();
 }
 
-/** Last known article count (for prepare section + mode toggles). */
-let _lastTotalArticles = 0;
+/** Last known article count — declared in simple_tools.js (shared). */
 /** Papers with embeddings (ready for search). Optional prepare card gates on this. */
 let _lastReadyArticles = 0;
+/** Student-authored rows used by the Advanced replace-consequence line. */
+let _lastNotesCount = 0;
+let _lastStarredCount = 0;
+let _lastAiKeyPoints = 0;
+/**
+ * Simple: student chose Start over / add papers, so the fetch form is live
+ * again until this fetch finishes (or the page reloads).
+ */
+let _simpleFetchUnlocked = false;
+/** Unlock dialog already set replace/append — skip asking again on submit. */
+let _simpleFetchModePicked = false;
 /**
  * True while a fetch is running or the post-fetch auto-prepare is in flight.
  * Both modes keep the optional prepare card fully hidden for this whole
@@ -533,602 +568,88 @@ function setNextStepVisible(visible) {
  el.classList.toggle('u-hidden', !show);
 }
 
-// --- Phase 6 Simple screening card ------------------------------------------
-// Levels → quick-preview fraction. Counts fetched once, not on every radio click.
-const SIMPLE_SCREEN_LEVELS = {
- low: 0.10,
- medium: 0.25,
- high: 0.50,
-};
-/** @type {Record<string, {proposed_count:number, total_ranked:number, candidates:array}|null>} */
-let _simpleScreenCounts = { low: null, medium: null, high: null };
-let _simpleScreenCandidates = [];
-let _simpleScreenLastItems = null;
-/** Session-only: skip hides the decision UI until reload (pending is corpus-derived). */
-let _simpleScreenSkippedSession = false;
-// Last Narrow-it-down exclusion set (per library) so Undo survives a soft reload.
-// Corpus API is the source of truth after restart; this is a fast path.
-const SIMPLE_SCREEN_UNDO_KEY = 'lra_simple_screen_undo_v1';
+// Moved to simple_tools.js (lines 552-1265 historically).
 
-// Skip is remembered per library, not just per page view.
-//
-// "Pending vs complete" is derived from the corpus (prepared papers, and
-// whether any low_relevance exclusions exist), which is correct and survives a
-// reload. Skipping leaves no trace in the corpus by definition, so without
-// this the card reappears on refresh and — worse — the "Go to Search" button
-// they were just offered disappears with it.
-//
-// Per library, because skipping one collection says nothing about the next.
-const SKIP_KEY = 'lra_screen_skipped_v1';
-
-// Resolved once per page and cached. The nav select is populated
-// asynchronously by common.js, so reading it during the first card refresh
-// races and comes back empty — which would silently lose a persisted skip.
-let _activeLibIdCache = '';
-
-function _activeLibraryId() {
- const sel = document.getElementById('nav-library-select');
- return (sel && sel.value) || _activeLibIdCache || '';
-}
-
-/** Authoritative active library id; falls back to the API before the nav loads. */
-async function ensureActiveLibraryId() {
- const fromSelect = (document.getElementById('nav-library-select') || {}).value;
- if (fromSelect) {
-  _activeLibIdCache = fromSelect;
-  return fromSelect;
- }
- if (_activeLibIdCache) return _activeLibIdCache;
- try {
-  const data = await apiCall('/api/libraries');
-  _activeLibIdCache = (data && data.active_id) || '';
- } catch (e) {
-  _activeLibIdCache = '';
- }
- return _activeLibIdCache;
-}
-
-function _skipStore() {
- try {
-  return JSON.parse(localStorage.getItem(SKIP_KEY) || '{}') || {};
- } catch (e) {
-  return {};
- }
-}
-
-function isSimpleScreenSkipped() {
- if (_simpleScreenSkippedSession) return true;
- const lib = _activeLibraryId();
- if (!lib) return false;
- return _skipStore()[lib] === true;
-}
-
-function setSimpleScreenSkipped(skipped) {
- _simpleScreenSkippedSession = skipped;
- const lib = _activeLibraryId();
- if (!lib) return;
- try {
-  const store = _skipStore();
-  if (skipped) {
-   store[lib] = true;
-  } else {
-   delete store[lib];
-  }
-  localStorage.setItem(SKIP_KEY, JSON.stringify(store));
- } catch (e) {
-  // Private mode / storage disabled: fall back to session-only behaviour.
- }
-}
-
-function _simpleScreenUndoStore() {
- try {
-  return JSON.parse(localStorage.getItem(SIMPLE_SCREEN_UNDO_KEY) || '{}') || {};
- } catch (e) {
-  return {};
- }
-}
-
-/** Persist last set-aside items (localStorage) as a fast path; corpus API is authoritative. */
-function saveSimpleScreenUndoItems(items) {
- _simpleScreenLastItems = items && items.length ? items : null;
- const lib = _activeLibraryId();
- if (!lib) return;
- try {
-  const store = _simpleScreenUndoStore();
-  if (_simpleScreenLastItems) {
-   store[lib] = _simpleScreenLastItems;
-  } else {
-   delete store[lib];
-  }
-  localStorage.setItem(SIMPLE_SCREEN_UNDO_KEY, JSON.stringify(store));
- } catch (e) {
-  // Private mode: in-memory only.
- }
-}
-
-function loadSimpleScreenUndoItems() {
- if (_simpleScreenLastItems && _simpleScreenLastItems.length) {
-  return _simpleScreenLastItems;
- }
- const lib = _activeLibraryId();
- if (!lib) return null;
- try {
-  const stored = _simpleScreenUndoStore()[lib];
-  if (Array.isArray(stored) && stored.length) {
-   _simpleScreenLastItems = stored;
-   return stored;
-  }
- } catch (e) { /* ignore */ }
- return null;
-}
-
-function clearSimpleScreenUndoItems() {
- saveSimpleScreenUndoItems(null);
-}
-
-/** Load low_relevance exclusions from the server so Undo works after a full restart. */
-async function fetchLowRelevanceUndoItems() {
- const cached = loadSimpleScreenUndoItems();
- if (cached && cached.length) return cached;
- try {
-  const data = await apiCall('/api/screening/excluded?reason=low_relevance');
-  const items = (data && data.items) || [];
-  if (items.length) {
-   saveSimpleScreenUndoItems(items);
-   return items;
-  }
- } catch (e) {
-  console.warn('fetchLowRelevanceUndoItems failed:', e);
- }
- return null;
-}
-
-/** Show/hide the confirm-your-question box with the decision UI (pending only). */
-function setSimpleScreenConfirmVisible(visible) {
- const el = document.getElementById('simple-screen-confirm');
- if (el) el.hidden = !visible;
-}
-
-let _simpleScreenWired = false;
-
-function simpleScreenSelectedLevel() {
- const el = document.querySelector('input[name="simple-screen-level"]:checked');
- return (el && el.value) || 'medium';
-}
-
-function simpleScreenFraction(level) {
- return SIMPLE_SCREEN_LEVELS[level] != null ? SIMPLE_SCREEN_LEVELS[level] : 0.25;
-}
-
-function simpleScreenQuery() {
- const el = document.getElementById('simple-screen-query');
- if (el && el.value.trim()) return el.value.trim();
- const fetchQ = document.getElementById('fetch-query');
- return (fetchQ && fetchQ.value.trim()) || '';
-}
-
-function prefillSimpleScreenQuery() {
- const el = document.getElementById('simple-screen-query');
- if (!el) return;
- // Always surface a candidate so the confirm box is never empty when we know one,
- // but do not overwrite if the student already edited the field.
- if (el.value.trim()) return;
- try {
-  const prefs = JSON.parse(localStorage.getItem('lra_fetch_prefs_v1') || 'null');
-  if (prefs && prefs.query) {
-   el.value = prefs.query;
-   return;
-  }
- } catch (e) { /* ignore */ }
- const fetchQ = document.getElementById('fetch-query');
- if (fetchQ && fetchQ.value.trim()) el.value = fetchQ.value.trim();
-}
-
-function setSimpleScreenGotoVisible(visible) {
- const el = document.getElementById('simple-screen-goto');
- if (el) el.hidden = !visible;
- setNextStepVisible(visible);
+function isGuestSession() {
+ return !!(document.body && document.body.getAttribute('data-guest') === '1');
 }
 
 /**
- * Pending/complete from corpus, not a job flag:
- *  - pending: prepared papers exist and no low_relevance exclusions yet
- *  - complete: low_relevance > 0 (applied at least once)
+ * Simple + this library already has papers: hide Fetch Articles unless the
+ * student explicitly unlocked via Start over. Advanced and empty libraries
+ * stay unchanged. Guests never see the fetch form (CSS + server 403).
  */
-async function refreshSimpleScreeningCard() {
- const card = document.getElementById('simple-screening-card');
- if (!card) return;
- const simple = typeof isSimpleMode === 'function' && isSimpleMode();
- if (!simple || _pipelineBusy) {
-  card.hidden = true;
-  return;
+function isSimpleFetchLocked() {
+ if (typeof isSimpleMode !== 'function' || !isSimpleMode()) return false;
+ if (isGuestSession()) return false;
+ if (_pipelineBusy) return false;
+ if (_simpleFetchUnlocked) return false;
+ return _lastTotalArticles > 0;
+}
+
+function updateSimpleFetchLock() {
+ const lock = isSimpleFetchLocked();
+ const form = document.getElementById('fetch-form');
+ const lead = document.getElementById('fetch-lead');
+ const banner = document.getElementById('simple-fetch-locked');
+ const heading = document.querySelector('.dm-step-heading.dm-step-simple');
+ if (form) form.hidden = lock;
+ if (lead) lead.hidden = lock;
+ if (banner) {
+  banner.hidden = !lock;
+  const msg = document.getElementById('simple-fetch-locked-msg');
+  if (lock && msg) {
+   const n = Number(_lastTotalArticles) || 0;
+   const nLabel = n === 1 ? '1 paper' : `${n} papers`;
+   msg.textContent =
+    `This collection already has ${nLabel}. Fetching again can replace them or mix in a new search. Use Re-prepare if you only need to get them ready for search again.`;
+  }
  }
- try {
-  const [stats, report] = await Promise.all([
-   apiCall('/api/statistics'),
-   apiCall('/api/screening-report?format=json'),
-   // Resolves (and caches) the active library so a persisted skip is not
-   // missed just because the nav select has not populated yet.
-   ensureActiveLibraryId(),
-  ]);
-  const ready = Number(stats.articles_with_embeddings) || 0;
-  const lowRel = Number(
-   report && report.excluded && report.excluded.low_relevance
-  ) || 0;
-  const total = Number(stats.total_articles) || 0;
-
-  if (ready <= 0) {
-   card.hidden = true;
-   setSimpleScreenGotoVisible(false);
-   return;
-  }
-
-  card.hidden = false;
-  prefillSimpleScreenQuery();
-  wireSimpleScreeningCard();
-
-  const decision = document.getElementById('simple-screen-levels');
-  const actions = document.getElementById('simple-screen-actions');
-  const outcome = document.getElementById('simple-screen-outcome');
-  const outcomeMsg = document.getElementById('simple-screen-outcome-msg');
-  const undoBtn = document.getElementById('simple-screen-undo-btn');
-  const preview = document.getElementById('simple-screen-preview');
-
-  if (lowRel > 0) {
-   // Complete: already screened this library.
-   if (decision) decision.hidden = true;
-   if (actions) actions.hidden = true;
-   setSimpleScreenConfirmVisible(false);
-   if (preview) {
-    preview.hidden = true;
-    preview.classList.add('u-hidden');
-   }
-   if (outcome) {
-    outcome.hidden = false;
-    outcome.classList.remove('u-hidden');
-   }
-   if (outcomeMsg) {
-    outcomeMsg.textContent =
-     `Set aside ${lowRel} paper${lowRel === 1 ? '' : 's'} as less related to your question.`;
-   }
-   // Always offer a small Undo when low_relevance exclusions exist (corpus-backed).
-   if (undoBtn) {
-    undoBtn.hidden = false;
-    undoBtn.textContent = 'Undo';
-   }
-   // Warm the undo cache in the background; the button stays visible either way.
-   fetchLowRelevanceUndoItems();
-   setSimpleScreenGotoVisible(true);
-   return;
-  }
-
-  if (isSimpleScreenSkipped()) {
-   if (decision) decision.hidden = true;
-   if (actions) actions.hidden = true;
-   setSimpleScreenConfirmVisible(false);
-   if (outcome) {
-    outcome.hidden = false;
-    outcome.classList.remove('u-hidden');
-   }
-   if (outcomeMsg) {
-    outcomeMsg.textContent = 'Screening skipped — you can still search everything you fetched.';
-   }
-   if (undoBtn) undoBtn.hidden = true;
-   setSimpleScreenGotoVisible(true);
-   return;
-  }
-
-  // Pending: confirm question + levels + actions; fetch counts once.
-  if (decision) decision.hidden = false;
-  if (actions) actions.hidden = false;
-  setSimpleScreenConfirmVisible(true);
-  if (outcome) {
-   outcome.hidden = true;
-   outcome.classList.add('u-hidden');
-  }
-  if (undoBtn) undoBtn.hidden = true;
-  setSimpleScreenGotoVisible(false);
-  const totalEl = document.getElementById('simple-screen-total');
-  if (totalEl) {
-   totalEl.hidden = false;
-   totalEl.textContent = `${ready} paper${ready === 1 ? '' : 's'} ready to rank`
-    + (total > ready ? ` (${total} in collection).` : '.');
-  }
-  await loadSimpleScreenCounts();
- } catch (e) {
-  console.warn('refreshSimpleScreeningCard failed:', e);
-  card.hidden = true;
+ if (heading) {
+  heading.textContent = lock ? '2. Your papers' : '2. Fetch Articles';
  }
 }
 
-async function loadSimpleScreenCounts() {
- const query = simpleScreenQuery();
- const status = document.getElementById('simple-screen-status');
- if (!query) {
-  ['low', 'medium', 'high'].forEach((level) => {
-   const el = document.getElementById(`simple-screen-count-${level}`);
-   if (el) el.textContent = '…';
-  });
-  if (status) {
-   setStatus('simple-screen-status', 'Enter a research question to see how many papers each level would set aside.', 'info');
-  }
-  return;
- }
- if (status) setStatus('simple-screen-status', 'Counting papers for each level…', 'info');
- // Fetch all three fractions once (parallel). Reuse until query changes.
- const qKey = query;
- if (_simpleScreenCounts._query === qKey
-  && _simpleScreenCounts.low && _simpleScreenCounts.medium && _simpleScreenCounts.high) {
-  applySimpleScreenCountLabels();
-  if (status) setStatus('simple-screen-status', '', 'info');
-  return;
- }
- try {
-  const entries = await Promise.all(
-   Object.keys(SIMPLE_SCREEN_LEVELS).map(async (level) => {
-    const fraction = SIMPLE_SCREEN_LEVELS[level];
-    const data = await apiCall('/api/screening/quick-preview', {
-     method: 'POST',
-     body: { query, fraction },
-    });
-    return [level, data];
-   })
-  );
-  _simpleScreenCounts = { low: null, medium: null, high: null, _query: qKey };
-  entries.forEach(([level, data]) => {
-   _simpleScreenCounts[level] = data;
-  });
-  applySimpleScreenCountLabels();
-  if (status) setStatus('simple-screen-status', '', 'info');
- } catch (e) {
-  if (status) setStatus('simple-screen-status', `Could not rank papers: ${e.message}`, 'error');
-  console.warn('loadSimpleScreenCounts failed:', e);
+async function unlockSimpleFetch() {
+ if (typeof isSimpleMode !== 'function' || !isSimpleMode()) return;
+ if (isGuestSession()) return;
+ const proceed = await resolveSimpleFetchModeBeforeRequest();
+ if (!proceed) return;
+ _simpleFetchUnlocked = true;
+ _simpleFetchModePicked = true;
+ updateSimpleFetchLock();
+ const q = document.getElementById('fetch-query');
+ if (q) {
+  q.focus();
+  if (typeof q.select === 'function') q.select();
  }
 }
 
-function applySimpleScreenCountLabels() {
- const total =
-  (_simpleScreenCounts.medium && _simpleScreenCounts.medium.total_ranked)
-  || (_simpleScreenCounts.low && _simpleScreenCounts.low.total_ranked)
-  || 0;
- ['low', 'medium', 'high'].forEach((level) => {
-  const el = document.getElementById(`simple-screen-count-${level}`);
-  if (!el) return;
-  const data = _simpleScreenCounts[level];
-  if (!data) {
-   el.textContent = '…';
-   return;
-  }
-  const n = Number(data.proposed_count) || 0;
-  const t = Number(data.total_ranked) || total || 0;
-  el.textContent = t ? `${n} of ${t}` : String(n);
- });
-}
-
-function wireSimpleScreeningCard() {
- if (_simpleScreenWired) return;
- _simpleScreenWired = true;
- const previewBtn = document.getElementById('simple-screen-preview-btn');
- const applyBtn = document.getElementById('simple-screen-apply-btn');
- const skipBtn = document.getElementById('simple-screen-skip-btn');
- const undoBtn = document.getElementById('simple-screen-undo-btn');
- const queryEl = document.getElementById('simple-screen-query');
- if (previewBtn) previewBtn.addEventListener('click', doSimpleScreenPreview);
- if (applyBtn) applyBtn.addEventListener('click', doSimpleScreenApply);
- if (skipBtn) skipBtn.addEventListener('click', doSimpleScreenSkip);
- if (undoBtn) undoBtn.addEventListener('click', doSimpleScreenUndo);
- if (queryEl) {
-  let t = null;
-  queryEl.addEventListener('change', () => {
-   _simpleScreenCounts = { low: null, medium: null, high: null };
-   loadSimpleScreenCounts();
-  });
-  queryEl.addEventListener('input', () => {
-   clearTimeout(t);
-   t = setTimeout(() => {
-    _simpleScreenCounts = { low: null, medium: null, high: null };
-    loadSimpleScreenCounts();
-   }, 600);
-  });
- }
- // Radios only switch labels already loaded — no re-fetch.
-}
-
-async function doSimpleScreenPreview() {
- const level = simpleScreenSelectedLevel();
- const fraction = simpleScreenFraction(level);
- const query = simpleScreenQuery();
- const btn = document.getElementById('simple-screen-preview-btn');
- const panel = document.getElementById('simple-screen-preview');
- if (!query) {
-  showNotification('Enter a research question first.', 'error');
-  return;
- }
- setLoading(btn, true);
- setStatus('simple-screen-status', 'Finding the least related papers…', 'info');
- try {
-  let data = _simpleScreenCounts[level];
-  if (!data || _simpleScreenCounts._query !== query) {
-   data = await apiCall('/api/screening/quick-preview', {
-    method: 'POST',
-    body: { query, fraction },
-   });
-   _simpleScreenCounts[level] = data;
-   _simpleScreenCounts._query = query;
-   applySimpleScreenCountLabels();
-  }
-  const candidates = data.candidates || [];
-  _simpleScreenCandidates = candidates;
-  if (!panel) return;
-  panel.innerHTML = '';
-  if (!candidates.length) {
-   panel.innerHTML = '<p class="info-text">Nothing to set aside at this level.</p>';
-  } else {
-   const list = document.createElement('div');
-   list.className = 'simple-screen-list';
-   candidates.forEach((c) => {
-    const row = document.createElement('div');
-    row.className = 'quick-screen-row';
-    const title = document.createElement('span');
-    title.className = 'qs-title';
-    title.textContent = c.title || '(no title)';
-    const meta = document.createElement('span');
-    meta.className = 'qs-meta help-text';
-    meta.textContent =
-     `${c.year || ''} · ${typeof getSourceName === 'function' ? getSourceName(c.source) : c.source}`;
-    row.appendChild(title);
-    row.appendChild(meta);
-    list.appendChild(row);
-   });
-   panel.appendChild(list);
-  }
-  panel.hidden = false;
-  panel.classList.remove('u-hidden');
-  setStatus(
-   'simple-screen-status',
-   `Showing ${candidates.length} paper(s) that would be set aside. Nothing is excluded yet.`,
-   'info'
-  );
- } catch (e) {
-  setStatus('simple-screen-status', `Preview failed: ${e.message}`, 'error');
-  showNotification(`Preview failed: ${e.message}`, 'error');
- } finally {
-  setLoading(btn, false);
- }
-}
-
-async function doSimpleScreenApply() {
- const level = simpleScreenSelectedLevel();
- const fraction = simpleScreenFraction(level);
- const query = simpleScreenQuery();
- const btn = document.getElementById('simple-screen-apply-btn');
- if (!query) {
-  showNotification('Enter a research question first.', 'error');
-  return;
- }
- setLoading(btn, true);
- setStatus('simple-screen-status', 'Setting aside the least related papers…', 'info');
- try {
-  let data = _simpleScreenCounts[level];
-  if (!data || _simpleScreenCounts._query !== query) {
-   data = await apiCall('/api/screening/quick-preview', {
-    method: 'POST',
-    body: { query, fraction },
-   });
-  }
-  const candidates = data.candidates || [];
-  if (!candidates.length) {
-   setStatus('simple-screen-status', 'Nothing to set aside at this level.', 'info');
-   return;
-  }
-  const items = candidates.map((c) => ({
-   article_id: c.article_id,
-   source: c.source,
-  }));
-  const applied = await apiCall('/api/screening', {
-   method: 'POST',
-   body: { items, action: 'exclude', reason: 'low_relevance' },
-  });
-  saveSimpleScreenUndoItems(items);
-  _simpleScreenCandidates = [];
-  const n = applied.count || items.length;
-  const decision = document.getElementById('simple-screen-levels');
-  const actions = document.getElementById('simple-screen-actions');
-  if (decision) decision.hidden = true;
-  if (actions) actions.hidden = true;
-  setSimpleScreenConfirmVisible(false);
-  const outcome = document.getElementById('simple-screen-outcome');
-  const outcomeMsg = document.getElementById('simple-screen-outcome-msg');
-  const undoBtn = document.getElementById('simple-screen-undo-btn');
-  if (outcome) {
-   outcome.hidden = false;
-   outcome.classList.remove('u-hidden');
-  }
-  if (outcomeMsg) {
-   outcomeMsg.textContent = `Set aside ${n} paper${n === 1 ? '' : 's'}.`;
-  }
-  // Always offer a small Undo after Narrow it down completes (this tab session).
-  if (undoBtn) {
-   undoBtn.hidden = false;
-   undoBtn.textContent = 'Undo';
-  }
-  const preview = document.getElementById('simple-screen-preview');
-  if (preview) {
-   preview.hidden = true;
-   preview.classList.add('u-hidden');
-  }
-  setStatus('simple-screen-status', `Set aside ${n} paper(s). You can undo once.`, 'success');
-  showNotification(`Set aside ${n} paper(s).`, 'success');
-  setSimpleScreenGotoVisible(true);
-  updateNavStats();
- } catch (e) {
-  setStatus('simple-screen-status', `Could not set papers aside: ${e.message}`, 'error');
-  showNotification(`Could not set papers aside: ${e.message}`, 'error');
- } finally {
-  setLoading(btn, false);
- }
-}
-
-function doSimpleScreenSkip() {
- setSimpleScreenSkipped(true);
- clearSimpleScreenUndoItems();
- const decision = document.getElementById('simple-screen-levels');
- const actions = document.getElementById('simple-screen-actions');
- const preview = document.getElementById('simple-screen-preview');
- if (decision) decision.hidden = true;
- if (actions) actions.hidden = true;
- setSimpleScreenConfirmVisible(false);
- if (preview) {
-  preview.hidden = true;
-  preview.classList.add('u-hidden');
- }
- const outcome = document.getElementById('simple-screen-outcome');
- const outcomeMsg = document.getElementById('simple-screen-outcome-msg');
- const undoBtn = document.getElementById('simple-screen-undo-btn');
- if (outcome) {
-  outcome.hidden = false;
-  outcome.classList.remove('u-hidden');
- }
- if (outcomeMsg) {
-  outcomeMsg.textContent = 'Screening skipped — you can still search everything you fetched.';
- }
- if (undoBtn) undoBtn.hidden = true;
- setStatus('simple-screen-status', '', 'info');
- setSimpleScreenGotoVisible(true);
-}
-
-async function doSimpleScreenUndo() {
- const btn = document.getElementById('simple-screen-undo-btn');
- setLoading(btn, true);
- try {
-  // Cache first; otherwise one corpus request (errors surface to catch).
-  let items = loadSimpleScreenUndoItems();
-  if (!items || !items.length) {
-   const data = await apiCall('/api/screening/excluded?reason=low_relevance');
-   items = (data && data.items) || [];
-   if (items.length) saveSimpleScreenUndoItems(items);
-  }
-  if (!items.length) {
-   showNotification('Nothing to undo.', 'info');
-   return;
-  }
-  await apiCall('/api/screening', {
-   method: 'POST',
-   body: { items, action: 'include' },
-  });
-  const n = items.length;
-  clearSimpleScreenUndoItems();
-  setSimpleScreenSkipped(false);
-  _simpleScreenCounts = { low: null, medium: null, high: null };
-  setStatus('simple-screen-status', `Restored ${n} paper(s).`, 'success');
-  showNotification(`Restored ${n} paper(s).`, 'success');
-  await refreshSimpleScreeningCard();
-  updateNavStats();
- } catch (e) {
-  setStatus('simple-screen-status', `Undo failed: ${e.message}`, 'error');
-  showNotification(`Undo failed: ${e.message}`, 'error');
- } finally {
-  setLoading(btn, false);
+/**
+ * Advanced only (Simple hides the radio row): live line next to Replace
+ * when this library is non-empty. No modal — the radios stay the control.
+ */
+function updateReplaceConsequence() {
+ const el = document.getElementById('fetch-replace-consequence');
+ if (!el) return;
+ const mode = (document.querySelector('input[name="fetch-mode"]:checked') || {}).value || 'replace';
+ const show = mode === 'replace' && _lastTotalArticles > 0;
+ el.hidden = !show;
+ if (!show) return;
+ const n = Number(_lastTotalArticles) || 0;
+ const nLabel = n === 1 ? '1 paper' : `${n} papers`;
+ const notes = Number(_lastNotesCount) || 0;
+ const stars = Number(_lastStarredCount) || 0;
+ const kps = Number(_lastAiKeyPoints) || 0;
+ if (notes || stars || kps) {
+  el.textContent =
+   `Start fresh keeps notes, stars, and saved AI key points on papers that come back. ` +
+   `The rest of these ${nLabel} (${notes} note${notes === 1 ? '' : 's'}, ` +
+   `${stars} star${stars === 1 ? '' : 's'}, ${kps} saved AI key point${kps === 1 ? '' : 's'}) will be deleted.`;
+ } else {
+  el.textContent =
+   `Start fresh keeps notes, stars, and saved AI key points on papers that come back. ` +
+   `Papers among these ${nLabel} that do not return are deleted.`;
  }
 }
 
@@ -1145,14 +666,20 @@ function updatePrepareSectionVisibility(totalArticles, opts) {
  // Busy (fetch or auto-chain): never show the re-prepare card (Simple or Advanced).
  if (_pipelineBusy) {
   sec.hidden = true;
+  updateSimpleFetchLock();
+  updateReplaceConsequence();
   return;
  }
  if (forceShow) {
   sec.hidden = false;
+  updateSimpleFetchLock();
+  updateReplaceConsequence();
   return;
  }
  // Optional re-prepare only once something is actually ready for search.
  sec.hidden = !(_lastReadyArticles > 0);
+ updateSimpleFetchLock();
+ updateReplaceConsequence();
 }
 
 async function loadPageData() {
@@ -1161,21 +688,36 @@ async function loadPageData() {
  const model = stats.embedding_model || ' - ';
  const total = stats.total_articles || 0;
  const ready = stats.articles_with_embeddings || 0;
+ _lastNotesCount = Number(stats.notes) || 0;
+ _lastStarredCount = Number(stats.starred) || 0;
+ _lastAiKeyPoints = Number(stats.ai_key_points) || 0;
  const missing = stats.missing_embeddings ?? Math.max(0, total - ready);
- document.getElementById('embedding-info').textContent =
- `${ready} of ${total} papers are ready for search` +
- (ready ? ` (model: ${model})` : '') +
- (missing ? ` · ${missing} still need preparing` : '') + '.';
+ const info = document.getElementById('embedding-info');
+ if (info) {
+  info.textContent =
+   `${ready} of ${total} papers are ready for search` +
+   (ready ? ` (model: ${model})` : '') +
+   (missing ? ` · ${missing} still need preparing` : '') + '.';
+ }
  // Topic recommendation drives the dropdown (unless the user overrode it).
  // Do NOT force the corpus's stored model into the select — that made
  // pubmedbert "stick" after a biomedical prep even when topics say specter.
  window._corpusEmbeddingModel = stats.embedding_model || null;
  applyModelRecommendation();
  updateGettingStartedCard(total);
+ // Stats refresh (incl. library reload / sample load): lock fetch again in Simple.
+ _simpleFetchUnlocked = false;
+ _simpleFetchModePicked = false;
  updatePrepareSectionVisibility(total, { readyArticles: ready });
+ if (typeof syncSimpleOnePageState === 'function') {
+  syncSimpleOnePageState(stats);
+ }
  } catch (e) {
- document.getElementById('embedding-info').textContent = 'Unable to load article info.';
+ const infoErr = document.getElementById('embedding-info');
+ if (infoErr) infoErr.textContent = 'Unable to load article info.';
  updateGettingStartedCard(0);
+ _simpleFetchUnlocked = false;
+ _simpleFetchModePicked = false;
  updatePrepareSectionVisibility(0, { readyArticles: 0 });
  }
 }
@@ -1257,6 +799,7 @@ async function cancelFetch() {
 async function refreshCoverage() {
  const bars = document.getElementById('coverage-bars');
  const sug = document.getElementById('coverage-suggestions');
+ if (!bars || !sug) return;
  try {
  const data = await apiCall('/api/coverage', {
  method: 'POST',
@@ -1592,6 +1135,12 @@ function applyFetchResult(data, sources) {
 
  const model = buildFetchSourceReportModel(data, sources);
  const simple = typeof isSimpleMode === 'function' && isSimpleMode();
+ const reportLines = [
+  ...((model && model.successes) || []).map((s) => s.line),
+  ...((model && model.muted) || []).map((m) => m.line),
+  ...((model && model.tipLines) || []),
+ ].filter(Boolean);
+ _lastFetchSourceReportText = reportLines.join('\n');
  const report = document.getElementById('fetch-source-report');
  if (report) {
   report.style.display = 'block';
@@ -1617,8 +1166,20 @@ function applyFetchResult(data, sources) {
   'warning'
  );
  } else if (data.cancelled || data.status === 'cancelled') {
- setStatus('fetch-status', `Fetch cancelled after ${data.total_fetched || 0} articles - ${breakdown}`, 'warning');
- showNotification(`Fetch cancelled (${data.total_fetched || 0} papers kept).`, 'warning');
+ const keptOld = data.cleared_first === false;
+ setStatus(
+  'fetch-status',
+  keptOld
+   ? `Fetch cancelled — your previous papers are unchanged. ${breakdown}`
+   : `Fetch cancelled after ${data.total_fetched || 0} articles - ${breakdown}`,
+  'warning'
+ );
+ showNotification(
+  keptOld
+   ? 'Fetch cancelled — your previous papers are unchanged.'
+   : `Fetch cancelled (${data.total_fetched || 0} papers kept).`,
+  'warning'
+ );
  } else if (errorCount === 0) {
  setStatus('fetch-status', `Fetched ${data.total_fetched} articles - ${breakdown}`, 'success');
  showNotification(`Fetched ${data.total_fetched} articles!`, 'success');
@@ -1631,175 +1192,32 @@ function applyFetchResult(data, sources) {
  }
 }
 
-/**
- * Simple mode only: decide replace vs append before fetch.
- * Empty library → no dialog, force replace (clear_first true).
- * Non-empty → dialog with real count from /api/statistics.
- * Returns false if the user cancelled (no request should be sent).
- * Sets the fetch-mode radios so saveFetchPrefs / only-missing hint stay correct.
- */
-/**
- * Best-known research question for Simple re-prepare / Narrow it down.
- * Prefers the screening field, then fetch query, then saved prefs.
- */
-function getResearchQuestionCandidate() {
- const screen = document.getElementById('simple-screen-query');
- if (screen && screen.value.trim()) return screen.value.trim();
- const fetchQ = document.getElementById('fetch-query');
- if (fetchQ && fetchQ.value.trim()) return fetchQ.value.trim();
- try {
-  const prefs = JSON.parse(localStorage.getItem(FETCH_PREFS_KEY) || 'null');
-  if (prefs && prefs.query && String(prefs.query).trim()) {
-   return String(prefs.query).trim();
-  }
- } catch (e) { /* ignore */ }
- return '';
-}
-
-/** Write a verified question into fetch + screening fields and persist prefs. */
-function applyVerifiedResearchQuestion(query) {
- const q = String(query || '').trim();
- if (!q) return;
- const fetchQ = document.getElementById('fetch-query');
- if (fetchQ) fetchQ.value = q;
- const screen = document.getElementById('simple-screen-query');
- if (screen) screen.value = q;
- // Counts were for the old question — force a re-rank after re-prepare.
- _simpleScreenCounts = { low: null, medium: null, high: null };
- try {
-  saveFetchPrefs();
- } catch (e) { /* ignore */ }
-}
-
-/**
- * Simple re-prepare dialog: research question lives *in the same popup* as
- * only-new / redo-all (not a separate step). Sets #only-missing + verified
- * query. Returns false if cancelled.
- */
-async function resolveSimplePrepareModeBeforeRequest() {
- if (typeof isSimpleMode !== 'function' || !isSimpleMode()) {
-  return true;
- }
- let ready = 0;
- let total = Number(_lastTotalArticles) || 0;
- try {
-  const stats = await apiCall('/api/statistics');
-  ready = Number(stats.articles_with_embeddings) || 0;
-  total = Number(stats.total_articles) || total;
-  _lastTotalArticles = total;
- } catch (err) {
-  console.warn('Could not load prepare counts for dialog:', err);
- }
- const box = document.getElementById('only-missing');
- const current = getResearchQuestionCandidate();
-
- // Always open a re-prepare dialog with the research question field visible.
- // When nothing is prepared yet, only Continue / Cancel (no scope choice).
- if (typeof openSiteChoice !== 'function') {
-  if (ready <= 0 && box) box.checked = true;
-  return true;
- }
-
- const allLabel = total > 0 ? `Redo all ${total}` : 'Redo all papers';
- const choices = ready <= 0
-  ? [
-   { label: 'Continue', value: 'missing', primary: true },
-   { label: 'Cancel', value: null, cancel: true },
-  ]
-  : [
-   { label: 'Only new papers', value: 'missing', primary: true },
-   { label: allLabel, value: 'all' },
-   { label: 'Cancel', value: null, cancel: true },
-  ];
-
- const result = await openSiteChoice({
-  title: 'Re-prepare papers for search',
-  message: ready <= 0
-   ? 'Check that this research question is still what you want. Edit if needed — Narrow it down will use it next.'
-   : 'Check that this research question is still what you want, then choose how much to re-prepare. Only new papers need this most of the time.',
-  withInput: true,
-  inputLabel: 'Your research question',
-  defaultValue: current,
-  placeholder: 'e.g., climate change effects on ecosystems',
-  requireNonEmpty: true,
-  emptyMessage: 'Please confirm your research question before re-preparing.',
-  selectAll: !current,
-  choices,
- });
- if (result == null) return false;
-
- // withInput → { value, input }; bare string if modal helper is older.
- let scope = result;
- let question = current;
- if (result && typeof result === 'object' && 'value' in result) {
-  scope = result.value;
-  question = result.input;
- }
- if (scope == null) return false;
-
- applyVerifiedResearchQuestion(String(question || '').trim());
- if (box) box.checked = scope !== 'all';
- return true;
-}
-
-async function resolveSimpleFetchModeBeforeRequest() {
- if (typeof isSimpleMode !== 'function' || !isSimpleMode()) {
-  return true;
- }
- let total = Number(_lastTotalArticles) || 0;
- try {
-  const stats = await apiCall('/api/statistics');
-  if (stats && stats.total_articles != null) {
-   total = Number(stats.total_articles) || 0;
-   _lastTotalArticles = total;
-  }
- } catch (err) {
-  console.warn('Could not load paper count for fetch dialog:', err);
- }
- const setMode = (value) => {
-  const radio = document.querySelector(`input[name="fetch-mode"][value="${value}"]`);
-  if (radio) radio.checked = true;
-  syncOnlyMissingFromFetchMode();
- };
- // Empty collection: choice is meaningless — start fresh, no dialog.
- if (total <= 0) {
-  setMode('replace');
-  return true;
- }
- if (typeof openSiteChoice !== 'function') {
-  // Fallback: keep radios (hidden in Simple CSS) if modal helper missing.
-  return true;
- }
- const nLabel = total === 1 ? '1 paper' : `${total} papers`;
- const choice = await openSiteChoice({
-  title: 'You already have papers',
-  message:
-   `You already have ${nLabel} — start fresh, or add these results to what you have?`,
-  choices: [
-   { label: 'Start fresh', value: 'replace', primary: true },
-   { label: 'Add to them', value: 'append' },
-   { label: 'Cancel', value: null, cancel: true },
-  ],
- });
- if (choice == null) return false;
- setMode(choice === 'append' ? 'append' : 'replace');
- return true;
-}
+// resolveSimpleFetchModeBeforeRequest / research-question helpers: simple_tools.js
 
 async function doFetch() {
+ if (isSimpleFetchLocked()) {
+  showNotification('This collection already has papers. Use Start over if you want to fetch again.', 'info');
+  return;
+ }
  const sources = Array.from(
  document.querySelectorAll('#source-option-grid input[type="checkbox"]:checked')
  ).map(cb => cb.value);
- const query = document.getElementById('fetch-query').value.trim();
- const maxResults = parseInt(document.getElementById('fetch-max').value, 10);
- const email = document.getElementById('fetch-email').value.trim();
+ const query = ((document.getElementById('fetch-query') || {}).value || '').trim();
+ const maxResults = parseInt((document.getElementById('fetch-max') || {}).value, 10) || 100;
+ const email = ((document.getElementById('fetch-email') || {}).value || '').trim();
 
  setNextStepVisible(false);
  if (!query) { showNotification('Please enter a search query.', 'error'); return; }
  if (sources.length === 0) { showNotification('Please select at least one source.', 'error'); return; }
 
  // Simple: dialog (or skip when empty) must run BEFORE reading fetch-mode.
- const proceed = await resolveSimpleFetchModeBeforeRequest();
+ // Unlock already ran that dialog — do not ask twice.
+ let proceed = true;
+ if (_simpleFetchModePicked) {
+  _simpleFetchModePicked = false;
+ } else {
+  proceed = await resolveSimpleFetchModeBeforeRequest();
+ }
  if (!proceed) return;
 
  const mode = (document.querySelector('input[name="fetch-mode"]:checked') || {}).value || 'replace';
@@ -1822,7 +1240,8 @@ async function doFetch() {
  cancelBtn.hidden = false;
  cancelBtn.disabled = false;
  }
- document.getElementById('fetch-source-report').style.display = 'none';
+ const hideReport = document.getElementById('fetch-source-report');
+ if (hideReport) hideReport.style.display = 'none';
  setStatus(
  'fetch-status',
  clearFirst
@@ -1902,6 +1321,8 @@ async function doFetch() {
  }
  } finally {
  _pipelineBusy = false;
+ _simpleFetchUnlocked = false;
+ _simpleFetchModePicked = false;
  // After a failed auto-prepare with papers in hand, force the re-prepare card open
  // so the student has a control (ready count may still be 0).
  if (autoChainFailed && _lastTotalArticles > 0) {
@@ -2045,8 +1466,11 @@ async function doCreateEmbeddings(opts) {
  }
  // Manual Simple re-prepare: clear low_relevance exclusions so screening
  // returns to *pending* via corpus state (not a JS flag) and survives reload.
+ // Start over: do the same after the following fetch/prepare, including
+ // auto-chain — replace-fetch can otherwise restore the old set-asides.
  // Uses existing POST /api/screening include — no new endpoint.
- if (simple && !fromAutoChain) {
+ const startOverReset = typeof _resetAfterStartOver !== 'undefined' && _resetAfterStartOver;
+ if (simple && (!fromAutoChain || startOverReset)) {
   try {
    const excl = await apiCall('/api/screening/excluded?reason=low_relevance');
    const items = (excl && excl.items) || [];
@@ -2062,11 +1486,29 @@ async function doCreateEmbeddings(opts) {
    console.warn('Could not reset screening after re-prepare:', screenErr);
   }
  }
+ // Always drop the flag after the screening reset, even on Advanced DM
+ // (no #search-collect). Leaving it true would treat the next auto-chain
+ // prepare as another Start over and restore every low_relevance set-aside.
+ if (startOverReset) {
+  _resetAfterStartOver = false;
+ }
  await loadPageData();
  // Manual re-prepare (and auto-chain) must refresh Narrow it down so the
  // confirm-your-question box appears without a full page reload.
  await refreshSimpleScreeningCard();
- if (simple) {
+ if (simple && document.getElementById('search-collect')) {
+  clearCollectQueryFromUrl();
+  if (startOverReset && typeof clearSearchWorkspace === 'function') {
+   clearSearchWorkspace();
+  }
+  try {
+   const stats = await apiCall('/api/statistics');
+   syncSimpleOnePageState(stats);
+   if (typeof loadSearchEmptyState === 'function') {
+    await loadSearchEmptyState();
+   }
+  } catch (e) { /* stay on collect if stats fail */ }
+ } else if (simple) {
   const card = document.getElementById('simple-screening-card');
   if (card && !card.hidden) {
    try {

@@ -39,7 +39,7 @@ def test_guest_start_loads_sample_and_blocks_fetch(tmp_path, monkeypatch):
     client = TestClient(app)
     r = client.get("/guest", follow_redirects=False)
     assert r.status_code in (302, 303), r.text
-    assert r.headers.get("location") == "/data-management"
+    assert r.headers.get("location") == "/search"
     assert client.cookies.get("access_token")
     assert client.cookies.get("csrf_token")
 
@@ -76,6 +76,27 @@ def test_guest_start_loads_sample_and_blocks_fetch(tmp_path, monkeypatch):
         headers={"X-CSRF-Token": csrf or ""},
     )
     assert ok.status_code == 200, ok.text
+
+
+def test_guest_end_demo_is_guarded_and_tappable():
+    """End demo is a secondary 44px control, not an inline link next to Register."""
+    base = _read("templates", "base.html")
+    assert 'class="guest-banner-actions"' in base or "guest-banner-actions" in base
+    assert "guest-banner-register" in base
+    assert "guest-banner-logout" in base
+    assert 'href="/register"' in base
+    assert 'href="/logout"' in base
+    css = _read("static", "css", "style.css")
+    assert ".guest-banner-actions" in css
+    assert ".guest-banner-actions .btn" in css
+    common = _read("static", "js", "common.js")
+    start = common.index("querySelector('.guest-banner-logout')")
+    handler = common[start : start + 700]
+    assert "addEventListener('click'" in handler
+    assert "preventDefault" in handler
+    assert "openSiteConfirm" in handler
+    assert "End this demo?" in handler
+    assert "window.location.href" in handler
 
 
 def test_guest_cta_on_public_pages():
@@ -166,7 +187,7 @@ def test_guest_start_never_replaces_a_signed_in_session(tmp_path, monkeypatch):
     ):
         resp = call()
         assert resp.status_code in (302, 303), resp.text
-        assert resp.headers.get("location") == "/data-management"
+        assert resp.headers.get("location") == "/data-management" or resp.headers.get("location") == "/search"
         # Session untouched: same token, and still the real account.
         assert client.cookies.get("access_token") == token_before
         who = client.get("/api/statistics")

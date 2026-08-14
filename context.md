@@ -1,7 +1,7 @@
 # context.md — LitSieve
 
 ## Current State
-- App version **4.5.0** (`app/main.py`, `GET /health`). Product name **LitSieve**.
+- App version **5.0.0** (`app/main.py`, `GET /health`). Product name **LitSieve**.
 - Example public deployment pattern: HTTPS at the edge (e.g. Cloudflare Tunnel)
   → `uvicorn` HTTP on `127.0.0.1:7860` only. Operator sets `PUBLIC_BASE_URL` and
   `DEBUG=false` with a real `SECRET_KEY` in gitignored `.env`.
@@ -12,7 +12,10 @@
 - Tests: `SECRET_KEY=x DEBUG=true ./venv/bin/python -m pytest -q` — prefer
   `./venv` for sqlcipher. Count drifts with the branch; re-run before release.
 - UI: Simple/Advanced via `localStorage.uiMode` + `data-mode` (theme-init pre-paint).
-  Simple nav: Get papers → Search. Advanced: full steps including Clean up + Clusters.
+  Simple: one `/search` page (empty collect vs papers). `/data-management`
+  redirects in Simple. After papers exist, topics/fetch hide; Start over is a
+  popup. Advanced: full steps including Clean up + Clusters. Phase 10
+  broadsheet tokens: 2px/3px radii, warm-newsprint dark, masthead nav.
 - Guest: `/guest` → sample corpus, multi-source fetch 403, purge after 30 minutes.
 - Ops: systemd user unit for uvicorn; optional backup + watchdog timers — see
   `docs/SELFHOST.md` and `docs/DEPLOY.md` (generic operator runbooks).
@@ -76,7 +79,11 @@ Guest User (is_guest) → sample corpus only; purged by age
 - Host entry: `app.main:app` port 7860; Linux `./venv`
 
 ## Session Handoff
-- **Date:** 2026-08-10
-- **Branch:** `feat/phase6-guest-demo` (do not push without explicit ask)
-- **Done:** Phase 8 A+B shell — Account Help, Workbench nav split, docs.
-- **Next:** Push/PR (requested); restart uvicorn after deploy.
+- **Date:** 2026-08-14
+- **Branch:** `feat/phase6-guest-demo` — PR #56 vs `main`, tip `01aaa69`
+- **Done:** Public broadsheet + homepage theme toggle; Start over resets
+  query/narrowing/Show chips; Simple Search count/year dialog; CodeQL
+  nav-href fix; CodeRabbit: quota no longer swaps a partial Start over,
+  start-over flag/cache/a11y/CSS, wait=True shares the fetch slot,
+  embeddings kept only when title+abstract match.
+- **Next:** Human merges PR #56. `design_mockups/` stays untracked.

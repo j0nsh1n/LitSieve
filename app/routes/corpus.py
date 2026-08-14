@@ -20,6 +20,7 @@ from app.core import (
     run_in_thread,
     server_error,
     start_user_job,
+    try_begin_user_job,
     update_progress,
 )
 from app.schemas import (
@@ -65,9 +66,10 @@ def _run_multi_fetch(p, *, query, sources, max_results, email, clear_first, uid)
         articles_so_far=0, message='Starting fetch…', cancel=False,
         sources=list(sources), by_source={}, source_status={},
     )
+    reclaimable = 0
     if clear_first:
-        p.db.clear_all()
-        p.invalidate_corpus_cache()
+        reclaimable = quota.library_file_bytes(getattr(p.db, "db_path", "") or "")
+        p.db.reset_staging_articles()
 
     def on_source_done(done, total, **extra):
         arts = extra.get('articles_so_far', 0)
@@ -90,16 +92,44 @@ def _run_multi_fetch(p, *, query, sources, max_results, email, clear_first, uid)
             source_status=dict(live_status),
         )
 
-    results = p.fetch_articles_parallel(
-        query=query,
-        sources=sources,
-        max_results=max_results,
-        email=email or "user@example.com",
-        progress_callback=on_source_done,
-        cancel_check=lambda: is_job_cancelled(uid, 'fetch') or quota.is_over_quota(uid),
-    )
+    actually_cleared = False
+    try:
+        results = p.fetch_articles_parallel(
+            query=query,
+            sources=sources,
+            max_results=max_results,
+            email=email or "user@example.com",
+            progress_callback=on_source_done,
+            cancel_check=lambda: (
+                is_job_cancelled(uid, 'fetch')
+                or quota.is_over_quota(uid, reclaimable=reclaimable)
+            ),
+            into_staging=bool(clear_first),
+        )
+        total = sum(v['count'] for v in results.values())
+        user_cancel = is_job_cancelled(uid, 'fetch')
+        # Quota stop is not a user cancel. Do not swap a partial staging set
+        # over the live library — keep what the student already has.
+        hit_quota = quota.is_over_quota(uid, reclaimable=reclaimable)
+        if clear_first:
+            staged = p.db.count_staging_articles()
+            if staged > 0 and not user_cancel and not hit_quota:
+                p.db.replace_from_staging()
+                actually_cleared = True
+                total = staged
+            else:
+                p.db.drop_staging_articles()
+                if user_cancel or hit_quota:
+                    total = 0
+    except Exception:
+        if clear_first:
+            try:
+                p.db.drop_staging_articles()
+            except Exception:
+                logger.exception("Could not drop staging after failed replace-fetch")
+        raise
+
     p.invalidate_corpus_cache()
-    total = sum(v['count'] for v in results.values())
     errors = {src: v['error'] for src, v in results.items() if v['error']}
     error_kinds = {
         src: v.get('error_kind')
@@ -107,7 +137,7 @@ def _run_multi_fetch(p, *, query, sources, max_results, email, clear_first, uid)
         if v.get('error_kind')
     }
     ok = {src: v['count'] for src, v in results.items() if not v['error']}
-    hit_quota = quota.is_over_quota(uid)
+    hit_quota = quota.is_over_quota(uid, reclaimable=reclaimable if not actually_cleared else 0)
     status, cancelled_flag = quota.fetch_finish_status(
         cancelled=is_job_cancelled(uid, 'fetch'),
         hit_quota=hit_quota,
@@ -121,7 +151,7 @@ def _run_multi_fetch(p, *, query, sources, max_results, email, clear_first, uid)
         "ok_sources": ok,
         "errors": errors,
         "error_kinds": error_kinds,
-        "cleared_first": clear_first,
+        "cleared_first": actually_cleared,
         "cancelled": cancelled_flag,
     }
 
@@ -163,13 +193,21 @@ async def api_fetch_multi(req: MultiFetchRequest, request: Request):
             )
         return JSONResponse(status_code=202, content={"status": "started"})
 
-    p = get_pipeline(uid)
-    update_progress(
-        uid, 'fetch', active=True, done=0, total=len(req.sources),
-        result=None, error=None, cancel=False, articles_so_far=0,
-        sources=list(req.sources), by_source={}, source_status={},
-    )
+    # Same per-user fetch slot as wait=False. Staging is library-wide; two
+    # overlapping fetches (sync or background) would reset or mix staged rows.
+    if not try_begin_user_job(
+        uid, 'fetch',
+        total=len(req.sources),
+        sources=list(req.sources),
+        by_source={},
+        source_status={},
+    ):
+        return JSONResponse(
+            status_code=409,
+            content={"detail": "A fetch is already running"},
+        )
     try:
+        p = get_pipeline(uid)
         result = await run_in_thread(_run_multi_fetch, p, **job_kwargs)
         update_progress(uid, 'fetch', active=False, result=result, error=None)
         return result
@@ -521,9 +559,14 @@ async def api_load_sample_corpus(req: SampleCorpusRequest, request: Request):
             )
     p = get_pipeline(uid)
     try:
+        articles = get_sample_articles()
+        if not articles:
+            return JSONResponse(
+                status_code=500,
+                content={"detail": "Sample corpus is empty; collection left unchanged."},
+            )
         if req.clear_first:
             p.db.clear_all()
-        articles = get_sample_articles()
         stats = p.db.insert_articles(articles, dedupe=True)
         p.invalidate_corpus_cache()
         inserted = stats.get("inserted", 0) if isinstance(stats, dict) else 0

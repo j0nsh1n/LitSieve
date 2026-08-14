@@ -26,7 +26,7 @@ async def health():
         _core.purge_expired_guests()
     except Exception:
         logger.exception("purge_expired_guests from /health failed")
-    return {"status": "healthy", "version": "4.5.0"}
+    return {"status": "healthy", "version": "5.0.0"}
 
 
 # Browsers and crawlers request these at the site root, where the /static mount
@@ -123,11 +123,27 @@ async def search_page(request: Request):
     return templates.TemplateResponse(request, "search.html", context={"active_page": "search", "user": user})
 
 
+def _cookie_wants_simple(request: Request) -> bool:
+    """Simple/Advanced is a client preference; we persist ui_mode so pages can redirect."""
+    mode = (request.cookies.get("ui_mode") or "").strip().lower()
+    if mode == "simple":
+        return True
+    if mode == "advanced":
+        return False
+    return (request.cookies.get("ui_mode_seed") or "").strip().lower() == "simple"
+
+
 @router.get("/data-management")
 async def data_management_page(request: Request):
     user = current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=302)
+    # Simple home is /search (empty collect vs papers). ?collect=1 opens the
+    # collect state on Search (Start over). Advanced still renders this page.
+    if _cookie_wants_simple(request):
+        collect = (request.query_params.get("collect") or "").strip() == "1"
+        dest = "/search?collect=1" if collect else "/search"
+        return RedirectResponse(url=dest, status_code=302)
     return templates.TemplateResponse(request, "data_management.html", context={"active_page": "data_management", "user": user})
 
 

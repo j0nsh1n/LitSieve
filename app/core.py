@@ -256,6 +256,24 @@ def request_job_cancel(user_id: str, task: str) -> bool:
         return True
 
 
+def try_begin_user_job(uid: str, task: str, **extra) -> bool:
+    """Claim the per-user job slot. Returns False if that task is already active.
+
+    Covers wait=True and wait=False so two fetches cannot share staging.
+    """
+    with _progress_lock:
+        p = _ensure_progress(uid)
+        if p[task].get('active'):
+            return False
+        slot = {
+            'active': True, 'done': 0, 'total': 0, 'result': None, 'error': None,
+            'cancel': False, 'articles_so_far': 0, 'message': '',
+        }
+        slot.update(extra)
+        p[task].update(slot)
+        return True
+
+
 def start_user_job(uid: str, task: str, fn, /, **kwargs) -> bool:
     """Run fn(pipeline, **kwargs) in a thread; progress + result in _all_progress.
 
@@ -263,14 +281,8 @@ def start_user_job(uid: str, task: str, fn, /, **kwargs) -> bool:
     The worker holds the pipeline ref until completion (release in done callback).
     Jobs bind to the library that was active when the job started.
     """
-    with _progress_lock:
-        p = _ensure_progress(uid)
-        if p[task].get('active'):
-            return False
-        p[task].update({
-            'active': True, 'done': 0, 'total': 0, 'result': None, 'error': None,
-            'cancel': False, 'articles_so_far': 0, 'message': '',
-        })
+    if not try_begin_user_job(uid, task):
+        return False
 
     lib_id = get_active_library_id(uid)
     pipe = get_pipeline(uid, lib_id)

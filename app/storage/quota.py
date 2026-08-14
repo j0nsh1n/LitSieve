@@ -17,6 +17,7 @@ from __future__ import annotations
 import logging
 import math
 import os
+from pathlib import Path
 
 from app.storage.libraries import user_dir
 
@@ -101,13 +102,32 @@ def check_quota(user_id: str) -> None:
         raise QuotaExceeded(used, cap)
 
 
-def is_over_quota(user_id: str) -> bool:
-    """Boolean form for use inside a running job (never raises)."""
+def library_file_bytes(db_path: str) -> int:
+    """On-disk size of a library SQLite file plus WAL/SHM sidecars."""
+    path = Path(db_path)
+    total = 0
+    for candidate in (path, Path(str(path) + "-wal"), Path(str(path) + "-shm")):
+        try:
+            if candidate.is_file():
+                total += candidate.stat().st_size
+        except OSError:
+            continue
+    return total
+
+
+def is_over_quota(user_id: str, *, reclaimable: int = 0) -> bool:
+    """Boolean form for use inside a running job (never raises).
+
+    ``reclaimable`` is subtracted from usage (replace-fetch credit: the live
+    library will be dropped if the fetch produces papers).
+    """
     try:
-        check_quota(user_id)
-        return False
-    except QuotaExceeded:
-        return True
+        cap = limit_bytes()
+        if not cap:
+            return False
+        used = usage_bytes(user_id)
+        effective = max(0, used - max(0, int(reclaimable or 0)))
+        return effective >= cap
     except Exception:
         logger.exception("Quota check failed for %s; allowing the operation", user_id)
         return False

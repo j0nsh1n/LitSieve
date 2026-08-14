@@ -17,7 +17,9 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 JS = ROOT / "static" / "js"
 CSS = ROOT / "static" / "css" / "style.css"
 COMMON = (JS / "common.js").read_text(encoding="utf-8")
-DM = (JS / "data_management.js").read_text(encoding="utf-8")
+DM = (JS / "simple_tools.js").read_text(encoding="utf-8") + "\n" + (
+    JS / "data_management.js"
+).read_text(encoding="utf-8")
 STYLE = CSS.read_text(encoding="utf-8")
 
 
@@ -53,6 +55,12 @@ def test_modal_shell_body_scroll_lock_and_restore():
 def test_openSiteChoice_exists_for_multi_button_dialogs():
     assert "function openSiteChoice" in COMMON
     assert "mode === 'choice'" in COMMON or "mode: 'choice'" in COMMON
+
+
+def test_openSiteForm_exists_for_multi_field_dialogs():
+    assert "function openSiteForm" in COMMON
+    assert "mode === 'form'" in COMMON or "mode: 'form'" in COMMON
+    assert "o.fields" in COMMON or "formFields" in COMMON
 
 
 # ── Dense source report ────────────────────────────────────────────────────
@@ -163,7 +171,7 @@ def test_simple_fetch_mode_resolver_exists():
     assert "function resolveSimpleFetchModeBeforeRequest" in DM
     assert "resolveSimpleFetchModeBeforeRequest" in DM
     # Called before mode/clearFirst read in doFetch.
-    do = DM[DM.index("async function doFetch") : DM.index("async function doFetch") + 1200]
+    do = DM[DM.index("async function doFetch") : DM.index("async function doCreateEmbeddings")]
     assert "resolveSimpleFetchModeBeforeRequest" in do
     assert do.index("resolveSimpleFetchModeBeforeRequest") < do.index("clearFirst")
 
@@ -184,12 +192,12 @@ def test_simple_fetch_cancel_returns_false_before_request():
     fn = DM[DM.index("async function resolveSimpleFetchModeBeforeRequest") :
             DM.index("async function doFetch")]
     assert "if (choice == null) return false" in fn
-    do = DM[DM.index("async function doFetch") : DM.index("async function doFetch") + 900]
+    do = DM[DM.index("async function doFetch") : DM.index("async function doCreateEmbeddings")]
     assert "if (!proceed) return" in do
 
 
 def test_fetch_mode_radios_still_in_template_for_advanced():
-    html = (ROOT / "templates" / "data_management.html").read_text(encoding="utf-8")
+    html = (ROOT / "templates" / "partials" / "collect_ui.html").read_text(encoding="utf-8")
     assert 'name="fetch-mode"' in html
     assert 'value="replace"' in html
     assert 'value="append"' in html
@@ -241,8 +249,10 @@ def test_reprepare_clears_low_relevance_for_pending_screening():
 # ── Advanced unchanged (source-level) ──────────────────────────────────────
 
 def test_advanced_keeps_radios_and_full_report_path():
-    assert 'name="fetch-mode"' in (ROOT / "templates" / "data_management.html").read_text(encoding="utf-8")
-    assert "only-missing" in (ROOT / "templates" / "data_management.html").read_text(encoding="utf-8")
+    collect = (ROOT / "templates" / "partials" / "collect_ui.html").read_text(encoding="utf-8")
+    dm = (ROOT / "templates" / "data_management.html").read_text(encoding="utf-8")
+    assert 'name="fetch-mode"' in collect
+    assert "only-missing" in dm
     # Advanced report path does not force <details>.
     assert "advancedNoDetails" in DM or "simple: false" in DM or "{ simple }" in DM
     assert "renderFetchSourceReportHtml(model, { simple })" in DM or "simple }" in DM

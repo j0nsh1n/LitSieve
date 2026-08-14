@@ -9,6 +9,71 @@ and this project aims to follow Semantic Versioning for app version strings
 ## [Unreleased]
 
 ### Added
+- Public homepage and `/learn` guides use the Phase 10 broadsheet masthead,
+  boxed path/guide cards, and a dark/light toggle (no `common.js` on public
+  pages).
+- Simple Search asks **how many papers** (1–50) and an optional **year range**
+  in a dialog before ranking. Advanced still uses the rail.
+
+### Fixed
+- Replace-fetch that hits the storage cap keeps the current library
+  instead of swapping in a partial new collection.
+- Sync and background fetches share one per-account job slot so two
+  Start-over fetches cannot mix staging rows.
+- Start over keeps embeddings only when title and abstract are unchanged
+  (changed text is re-prepared).
+- **Start over** clears the last search query/results, Show chips, and
+  Narrow it down set-asides. Stars, notes, and saved AI key points stay
+  on papers that come back.
+- Simple result cards show **key points** and **Refine with AI** again.
+- Homepage masthead: brand left, theme toggle right; LitSieve title centered
+  without reusing Search’s `.pagehead`.
+- **Search broadsheet layout:** Simple Search now matches the approved mockup
+  composition — kicker + title + count on one line, notice as a single
+  italic band, full-width one-line query + Search, results with the Save
+  rail on the right. Result cards use score / journal · year / tags, then
+  title and text-link actions. Segmented Get papers → Search is back in
+  the Simple masthead.
+- **Simple Get papers step** goes to `/search?collect=1` (collect state), not
+  `/data-management`.
+- **Advanced query toggle** sits with the top search bar; PICO/seed open
+  under it. Rail keeps ranking options and starred search.
+- Simple rail **Collected / Duplicates / Screened out / Kept** no longer
+  double-count duplicates.
+- Simple nav is one page again (no 1 / 2 stepper). The query bar is a
+  single-line field joined to Search (no textarea spinner).
+- Library (and other) `<select>` option lists use dark ink on paper so
+  dark-mode cream text is not washed out until hover.
+- Simple mobile nav: brand + tools on the first row, library on its own
+  full-width row (no more 5rem “Parkinso” chip).
+- LitSieve wordmark in the app nav links to `/` (the public homepage).
+- Simple nav shows an unnumbered **Search** tab (no 1/2 stepper).
+- Light/dark toggle interpolates only background-color, color, and
+  border-color at 160ms (no lag from transitioning background images).
+
+## [5.0.0] - 2026-08-13
+
+### Changed
+- **Broadsheet radii (Phase 10):** `--radius-sm` / `--radius-md` are 2px / 3px
+  (was 4 / 8). Modal bottom sheets use `--radius-md` instead of an undefined
+  `--radius-lg` fallback.
+- **Dark theme (Phase 10):** warm newsprint charcoal (`#1c1a15` / `#242118`)
+  in both the system-dark and `[data-theme=dark]` blocks.
+- **Masthead nav (Phase 10):** double ink rule; desktop steps are a segmented
+  control with inverted active; article count and library wrap are serif
+  italic badges. Mobile menu is unchanged.
+- **Search notice band (Phase 10):** “Please note” label, 4px accent spine,
+  wash background, serif italic body. Query + Search are one joined boxed
+  control. Result count is letterspaced caps.
+- **Search result cards (Phase 10):** bordered cards with a teal spine, serif
+  score numeral + 3px bar (`--score-pct` unchanged), uppercase meta, tag
+  chips, and a hairline actions row.
+- **Search rail (Phase 10):** boxed Simple Save panel at desktop (bottom bar
+  at ≤900px unchanged). Advanced query cards boxed the same way. Simple rail
+  shows Fetched / Duplicates / Screened out / Kept from the existing
+  screening-report payload.
+
+### Added
 - **Guest demo** (`/guest`): temporary sample-corpus account (no multi-source
   fetch), 30-minute expiry/purge, landing/login CTA. Signed-in sessions are
   never swapped for a guest account.
@@ -27,8 +92,40 @@ and this project aims to follow Semantic Versioning for app version strings
   they contain user data and `SECRET_KEY`.
 - JavaScript syntax checking in the test suite. There is no npm or build step,
   so a broken browser script previously shipped with every Python test green.
+- **Search Show chips:** after a search, one-click filters on the current list
+  (All, Starred, Has a note, Since last-five-years, plus a chip per source in
+  the results). No new search. Export uses the filtered list.
+- **Narrow it down** in Simple is a popup: Low / Medium / High, preview, set
+  aside, and skip stay; the page only keeps a short button plus undo / Go to
+  Search after you decide.
+- **Simple Search is home** once papers are prepared: Get papers redirects to
+  Search. A one-line strip on Search has Narrow it down, Re-prepare, and Start
+  over (Start over opens Get papers with `?collect=1`). Empty libraries still
+  open Get papers.
+- **Simple is one page:** `/search` is collect (empty) or rank/export (papers).
+  `/data-management` in Simple always redirects to Search (`?collect=1` opens
+  start-over). Nav has no step 1/2. Topics, fetch form, and coverage hide after
+  papers exist; source counts open from the papers chip.
 
 ### Changed
+- **Start fresh copy (Simple):** the existing replace/add dialog now says notes,
+  stars, and saved AI key points stay on papers that come back; papers that do
+  not return (and their notes) are deleted. Same buttons, no extra click.
+- **Advanced replace-fetch:** a live line next to the Replace radio names the
+  paper / note / star / AI key-point counts when the collection is not empty.
+  No new modal. Append and empty libraries hide the line.
+- **Sample corpus load** now builds the demo list before clearing, so a missing
+  sample set cannot wipe the library.
+- **Replace-fetch is no longer wipe-first.** New papers land in a staging
+  table and replace the library only if at least one paper arrived. Notes,
+  stars, and saved AI key points stay on papers that come back; papers that
+  do not return (and their notes) are deleted. A failed or cancelled fetch
+  leaves the previous collection in place.
+- **Simple fetch lock:** after this library has papers, Simple hides the Fetch
+  Articles form so a second search is not the main action. A secondary
+  **Start over or add papers** control reuses the existing replace/add dialog,
+  then the form returns for that one fetch. Re-prepare, the source report,
+  screening, and Advanced are unchanged. Guests still cannot fetch.
 - **UI revamp Phase 8 (Reading Room A + Workbench B shell):** body-scale
   `.info-text` / larger `.help-text`; Search sticky query rail + results;
   numeric 0–1 score meters; summonable **Help** on Search, Data Management,
@@ -40,12 +137,19 @@ and this project aims to follow Semantic Versioning for app version strings
   per-source fetch progress; list skeletons; optimistic star / note / Not
   relevant; denser 380px mobile layout; motion vocabulary with reduced-motion
   covering shimmer.
-- Simple nav is **Get papers → Search** only (contiguous steps 1–2). Clean up
-  remains on `/statistics` for Advanced.
+- Simple nav is **one Search page** (no step control). Clean up remains on
+  `/statistics` for Advanced.
 - Simple post-prepare shortcut is **Go to Search** (replaces the Phase 5
   “Next: Clean up your papers” bar once screening is applied or skipped).
 
 ### Fixed
+- Simple Search bottom bar no longer covers the last result: padding tracks
+  the measured bar height (`--simple-panel-h`) with a 40vh fallback; title and
+  lead hide when the panel is a fixed bar.
+- Guest **End demo** is a 44px secondary button on its own row (not an inline
+  link next to Register) and asks before ending the session.
+- Library switcher stays on the nav at ≤380px (article count hides instead).
+- Site toasts stack above dialogs (`z-index` 1300 vs modal 1200).
 - Mobile nav (≤640px) again exposes **Account**: the profile link was
   `display: none`, so phones could only log out. Shows a compact “Account”
   control that still opens `/account`.
