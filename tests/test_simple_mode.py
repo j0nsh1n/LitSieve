@@ -123,14 +123,13 @@ def test_register_seeds_simple_mode_cookie(tmp_path, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# Nav: Simple is one page (brand + tools). Human chose this over the mockup
-# stepper (2026-08-14): a 1/2 control undoes one-page and the numbers never
-# lined up. Collect stays on /search (?collect=1 / Start over).
+# Nav: Simple shows an unnumbered Search tab only (one page). Get papers /
+# Clusters / Clean up stay hidden. Collect is still /search?collect=1.
 # ---------------------------------------------------------------------------
 
 
-def test_simple_nav_hides_stepper():
-    """Simple one-page: no Get papers / Search stepper. Advanced keeps four steps."""
+def test_simple_nav_shows_unnumbered_search():
+    """Simple: Search tab, no step number. Advanced keeps four numbered steps."""
     base = _read("templates", "base.html")
     # (key, advanced_label, simple_label, href, tip, simple_step)
     rows = re.findall(
@@ -142,17 +141,17 @@ def test_simple_nav_hides_stepper():
     assert "clusters" in by_key, by_key
     assert by_key["clusters"] == "", "Clusters has no Simple step number (hidden)"
     assert by_key["statistics"] == "", "Clean up has no Simple step number (hidden)"
-    assert by_key["data_management"] == "1", by_key
     assert by_key["search"] == "2", by_key
     assert "data-step-advanced" in base
     assert 'data-step-simple="{{ simple_step }}"' in base or 'data-step-simple="' in base
+    assert 'class="nav-brand"' in base and 'href="/"' in base
 
     css = _read("static", "css", "style.css")
-    assert 'html[data-mode="simple"] .nav-menu-toggle' in css
-    assert 'html[data-mode="simple"] .nav-links' in css
-    assert 'html[data-mode="simple"] #nav-links-panel' in css
+    assert 'html[data-mode="simple"] .nav-step-data_management' in css
     assert 'html[data-mode="simple"] .nav-step-clusters' in css
     assert 'html[data-mode="simple"] .nav-step-statistics' in css
+    assert 'html[data-mode="simple"] .nav-step-search .nav-step-num' in css
+    assert 'html[data-mode="simple"] .nav-links' in css
     assert "nav-flow-arrow-before-clusters" in css
     assert "nav-flow-arrow-before-statistics" in css
 

@@ -27,6 +27,9 @@ and this project aims to follow Semantic Versioning for app version strings
   dark-mode cream text is not washed out until hover.
 - Simple mobile nav: brand + tools on the first row, library on its own
   full-width row (no more 5rem “Parkinso” chip).
+- LitSieve wordmark in the app nav links to `/` (the public homepage).
+- Simple nav shows an unnumbered **Search** tab (no 1/2 stepper).
+- Light/dark toggle uses one 280ms transition on every paint property.
 
 ## [5.0.0] - 2026-08-13
 

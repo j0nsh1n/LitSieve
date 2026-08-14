@@ -984,7 +984,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
         if (!reduce) {
             root.classList.add('theme-animating');
-            setTimeout(() => root.classList.remove('theme-animating'), 320);
+            setTimeout(() => root.classList.remove('theme-animating'), 280);
         }
         localStorage.setItem('theme', next);
         root.setAttribute('data-theme', next);
