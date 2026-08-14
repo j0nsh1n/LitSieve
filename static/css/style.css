@@ -2078,6 +2078,13 @@ body.lra-modal-open {
     background: transparent;
     color: var(--text);
 }
+/* Native <option> menus ignore theme tokens and usually sit on a light OS
+   list. Dark-mode --text (cream) then looks disabled until hover. */
+select option,
+.nav-library-select option {
+    color: #1a1712;
+    background-color: #fdfbf5;
+}
 .library-manage-list {
     list-style: none;
     margin: var(--space-3) 0 0;

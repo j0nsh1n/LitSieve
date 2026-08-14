@@ -23,6 +23,8 @@ and this project aims to follow Semantic Versioning for app version strings
   double-count duplicates.
 - Simple nav is one page again (no 1 / 2 stepper). The query bar is a
   single-line field joined to Search (no textarea spinner).
+- Library (and other) `<select>` option lists use dark ink on paper so
+  dark-mode cream text is not washed out until hover.
 
 ## [5.0.0] - 2026-08-13
 
