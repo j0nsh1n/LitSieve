@@ -1,1 +1,295 @@
-SEARCH_PLACEHOLDER_WILL_FIX
+{% extends "base.html" %}
+{% block title %}Search - LitSieve{% endblock %}
+{% block container_mod %}container-wide{% endblock %}
+{% block content %}
+<section class="page-header search-page-header">
+ <p class="search-kicker search-kicker-advanced">Step 4 of 4 · Rank &amp; export</p>
+ <p class="search-kicker search-kicker-simple">Rank &amp; export</p>
+ <div class="pagehead">
+  <h1 class="search-title-advanced">Search for Similar Articles</h1>
+  <h1 class="search-title-simple">Search your collection</h1>
+  <span class="results-count-line" id="results-count-line">Ranked against your question · <span id="result-count">0</span> shown</span>
+ </div>
+ <p class="subtitle search-sub-advanced"><strong>Step 4 of 4 (last).</strong> Rank the papers you kept by how well they
+ match your question, then export your list.</p>
+ <p class="subtitle search-sub-simple">Rank the papers you kept by how well they match your question,
+ then export your list for Zotero.</p>
+ {% from "macros/disclaimers.html" import scope_search %}
+ {{ scope_search() }}
+</section>
+
+<div class="search-query-top search-work" id="search-query-top">
+ <div class="input-method-toggle" id="input-method-toggle">
+  <label class="radio-label">
+   <input type="radio" name="input_method" value="text" checked> Text Input
+  </label>
+  <label class="radio-label">
+   <input type="radio" name="input_method" value="pico"> PICO Format
+  </label>
+  <label class="radio-label">
+   <input type="radio" name="input_method" value="seed"> Seed paper
+  </label>
+ </div>
+ <div class="searchcard" id="searchcard">
+  <div id="text-input-panel">
+   <label class="u-visually-hidden" for="query-text">Research question</label>
+   <input type="text" id="query-text" name="query-text"
+    placeholder="How do school start times affect adolescent sleep?" autocomplete="off">
+  </div>
+  <button id="search-btn" class="btn btn-primary">Search</button>
+ </div>
+ <div class="u-hidden" id="pico-input-panel">
+  <p class="info-text">Fill in the parts you know.</p>
+  <div class="pico-grid">
+   <div class="form-group">
+    <label>Population</label>
+    <input type="text" id="pico-population" placeholder="e.g., Adults with type 2 diabetes">
+   </div>
+   <div class="form-group">
+    <label>Intervention</label>
+    <input type="text" id="pico-intervention" placeholder="e.g., Metformin treatment">
+   </div>
+   <div class="form-group">
+    <label>Comparison</label>
+    <input type="text" id="pico-comparison" placeholder="e.g., Placebo or standard care">
+   </div>
+   <div class="form-group">
+    <label>Outcome</label>
+    <input type="text" id="pico-outcome" placeholder="e.g., Glycemic control">
+   </div>
+  </div>
+ </div>
+ <div class="u-hidden" id="seed-input-panel">
+  <p class="info-text"><strong>Seed paper:</strong> paste an article id (e.g. PubMed ID or DOI) or part
+   of a title from a paper already in your collection - the app ranks the rest by similarity to it.
+   Useful when a teacher gives you one starter citation.</p>
+  <div class="form-group">
+   <label>Seed id or title fragment</label>
+   <input type="text" id="seed-query" placeholder="e.g. 10.1038/... or climate warming oceans">
+  </div>
+ </div>
+</div>
+
+{% include "partials/simple_screening_card.html" %}
+<input type="checkbox" id="only-missing" hidden checked>
+
+{# Simple empty / start-over: topics + fetch live here. Hidden in Advanced. #}
+<div id="search-collect" hidden>
+{% include "partials/collect_ui.html" %}
+</div>
+
+<section class="card empty-state-card" id="search-empty-state" hidden>
+ <h2>Nothing to search yet</h2>
+ <p class="info-text" id="search-empty-msg">Fetch papers and prepare them for search on Data Management first.</p>
+ <p class="empty-state-actions">
+  <a class="btn btn-primary btn-sm" href="/data-management">Get papers</a>
+ </p>
+</section>
+
+{# Phase 8: sticky query rail + results column (query and hits co-visible). #}
+<div class="search-workbench search-work" id="search-workbench">
+ <aside class="search-rail" id="search-rail" aria-label="Search query and options">
+  <div class="search-rail-sticky">
+   {# Scrollable controls; Save panel is pinned below so it cannot scroll away. #}
+   <div class="search-rail-scroll">
+   <div class="page-help-toolbar">
+    <button type="button" class="btn btn-secondary btn-sm page-help-toggle" id="page-help-toggle"
+     aria-expanded="false" aria-controls="page-help">Help</button>
+   </div>
+   <aside class="page-help card" id="page-help" hidden>
+    <h2 class="page-help-title">About this page</h2>
+    <div class="page-help-body">
+     <p class="info-text search-help-advanced">Searches <strong>your collection only</strong> (not the whole internet).
+     <strong>Text</strong> is a free research question; <strong>PICO</strong> is for clinical-style questions;
+     <strong>Seed</strong> starts from one paper already in your collection. <strong>More like my starred</strong>
+     uses bookmarked papers. Screened-out papers never appear. The score meter shows the 0–1 similarity rank.</p>
+     <p class="info-text search-help-simple">Searches <strong>your collection only</strong>.
+     <strong>Text</strong> or <strong>PICO</strong> for your question; <strong>More like my starred</strong>
+     after bookmarking with ★. After a search, <strong>Show</strong> chips filter the list on this
+     page (starred, notes, recent years, source) without running a new search. Screened-out papers
+     never appear. The score meter shows how well each paper matches (0–1).</p>
+    </div>
+   </aside>
+
+   <section class="card" id="search-query-section">
+    <p class="info-text">Searches <strong>your collection only</strong> (not the whole internet). Plain
+    language works - the app compares meaning, not just keywords.</p>
+   </section>
+
+   <section class="card" id="search-controls-section">
+    <div class="param-row">
+    <div class="param-group">
+    <label>Results: <strong id="topk-display">10</strong></label>
+    <input type="range" id="top-k" min="1" max="50" value="10">
+    </div>
+    <div class="param-group">
+    <label>Sort by</label>
+    <select id="sort-by">
+    <option value="similarity">Similarity Score</option>
+    <option value="year">Publication Year (newest first)</option>
+    <option value="journal">Journal Name (A-Z)</option>
+    <option value="title">Title (A-Z)</option>
+    </select>
+    </div>
+    <div class="param-group year-range-group">
+    <label>From year</label>
+    <input type="number" id="year-min" class="year-input" min="1900" max="2100" step="1" placeholder="e.g. 2015">
+    </div>
+    <div class="param-group year-range-group">
+    <label>To year</label>
+    <input type="number" id="year-max" class="year-input" min="1900" max="2100" step="1" placeholder="e.g. 2024">
+    <p class="help-text year-range-hint">Papers with unknown year are hidden when a range is set.</p>
+    </div>
+    </div>
+
+    <details class="advanced-details">
+     <summary>Advanced: ranking options and source filter</summary>
+     <div class="advanced-body">
+      <div class="param-row">
+      <div class="param-group">
+      <label class="radio-label">
+      <input type="checkbox" id="lexical-boost" checked> Prefer exact words (hybrid)
+      </label>
+      <span class="help-text">Blend meaning similarity with TF-IDF word overlap (on by default).</span>
+      </div>
+      <div class="param-group">
+      <label class="radio-label">
+      <input type="checkbox" id="pico-boost"> Prefer PICO matches
+      </label>
+      <span class="help-text">Slight boost when abstract text overlaps your query terms (does not replace similarity).</span>
+      </div>
+      </div>
+      <div class="param-group">
+      <label>Sources (all included by default)</label>
+      <div class="source-selector">
+      <label class="radio-label"><input type="checkbox" name="search-source" value="pubmed" checked> PubMed</label>
+      <label class="radio-label"><input type="checkbox" name="search-source" value="europepmc" checked> Europe PMC</label>
+      <label class="radio-label"><input type="checkbox" name="search-source" value="clinicaltrials" checked> ClinicalTrials.gov</label>
+      <label class="radio-label"><input type="checkbox" name="search-source" value="openalex" checked> OpenAlex</label>
+      <label class="radio-label"><input type="checkbox" name="search-source" value="arxiv" checked> arXiv</label>
+      <label class="radio-label"><input type="checkbox" name="search-source" value="semanticscholar" checked> Semantic Scholar</label>
+      <label class="radio-label"><input type="checkbox" name="search-source" value="eric" checked> ERIC</label>
+      <label class="radio-label"><input type="checkbox" name="search-source" value="zenodo" checked> Zenodo</label>
+      <label class="radio-label"><input type="checkbox" name="search-source" value="crossref" checked> CrossRef</label>
+      <label class="radio-label"><input type="checkbox" name="search-source" value="doaj" checked> DOAJ</label>
+      <label class="radio-label"><input type="checkbox" name="search-source" value="nasa_ads" checked> NASA ADS</label>
+      <label class="radio-label"><input type="checkbox" name="search-source" value="biorxiv" checked> bioRxiv</label>
+      <label class="radio-label"><input type="checkbox" name="search-source" value="medrxiv" checked> medRxiv</label>
+      <label class="radio-label"><input type="checkbox" name="search-source" value="dblp" checked> DBLP</label>
+      <label class="radio-label"><input type="checkbox" name="search-source" value="openaire" checked> OpenAIRE</label>
+      <label class="radio-label"><input type="checkbox" name="search-source" value="plos" checked> PLOS</label>
+      <label class="radio-label"><input type="checkbox" name="search-source" value="hal" checked> HAL</label>
+      </div>
+      <div class="help-text u-mt-sm" id="source-availability-hint"></div>
+      </div>
+     </div>
+    </details>
+
+    <button type="button" id="starred-search-btn" class="btn btn-secondary btn-block u-mt-md">
+    More like my starred (<span id="starred-count">0</span>)
+    </button>
+    <p class="help-text">Finds papers similar to the ones you starred (the starred papers themselves are left out).</p>
+   </section>
+
+   <section id="seed-banner" class="card u-hidden">
+    <h2>Seed paper</h2>
+    <p class="info-text" id="seed-banner-text"></p>
+   </section>
+   </div>{# /.search-rail-scroll #}
+
+   {# Simple: pinned under the rail (not inside the scroll area) so it stays visible. #}
+   {% include "partials/simple_search_panel.html" %}
+  </div>
+ </aside>
+
+ <div class="search-main" id="search-main">
+  <div class="search-results-layout" id="search-results-layout">
+   <section class="u-hidden" id="results-section">
+    <div class="results-header">
+    <h2 class="results-count-line results-count-line-legacy">Results</h2>
+    </div>
+    <div class="display-filters" id="display-filters" hidden>
+     <span class="display-filters-label" id="display-filters-label">Show</span>
+     <div class="display-filter-chips" id="display-filter-chips" role="group"
+      aria-labelledby="display-filters-label">
+      <button type="button" class="display-filter-chip is-on" data-filter="all" aria-pressed="true">All</button>
+      <button type="button" class="display-filter-chip" data-filter="starred" aria-pressed="false">Starred</button>
+      <button type="button" class="display-filter-chip" data-filter="noted" aria-pressed="false">Has a note</button>
+      <button type="button" class="display-filter-chip" data-filter="recent" id="display-filter-recent" aria-pressed="false">Since 2021</button>
+     </div>
+     <p class="help-text" id="display-filter-status"></p>
+    </div>
+    <div id="results-list"></div>
+   </section>
+  </div>
+
+  <section class="card" id="export-results-section" hidden>
+   <h2>Export these search results</h2>
+   <p class="info-text">Download the papers <strong>currently shown above</strong> as one RIS file
+   for free <a href="https://www.zotero.org/download/" target="_blank" rel="noopener">Zotero</a>
+   (APA / MLA / Chicago after import). Only this ranked list — not your whole library.</p>
+   <div class="export-row export-row-primary">
+    <button type="button" id="export-results-ris" class="btn btn-primary btn-lg btn-download"
+     title="Citation file of the search results on screen — for Zotero File → Import">
+     Download RIS (these results)</button>
+   </div>
+   <div id="export-results-status" class="status-indicator"></div>
+
+   <div class="citation-tools" aria-label="Import into Zotero">
+    <h3 class="citation-tools-heading">Then format citations in Zotero (free)</h3>
+    <ol class="export-format-list zotero-steps">
+     <li>Click <strong>Download RIS (these results)</strong> above.</li>
+     <li>Open the <a href="https://www.zotero.org/download/" target="_blank" rel="noopener">Zotero</a>
+      desktop app (install once if needed).</li>
+     <li>In Zotero’s <strong>top menu bar</strong> (not a right‑click): choose
+      <strong>File → Import…</strong>.</li>
+     <li>Select <strong>A file (BibTeX, RIS, Zotero RDF, etc.)</strong> → <strong>Next</strong>.</li>
+     <li>Browse to the downloaded <code>search_results.ris</code> → <strong>Open</strong> →
+      <strong>Next / Finish</strong>.</li>
+     <li>You should now see <strong>many paper titles</strong> in your library — not a single row
+      named “library” or “search_results” with a paperclip/file icon.</li>
+     <li>Click the first paper, then Shift‑click the last to select them all (or Ctrl/Cmd‑A in the
+      list). Right‑click → <strong>Create Bibliography from Items…</strong> → choose APA or MLA →
+      copy into your document.</li>
+    </ol>
+    <p class="help-text"><strong>If you only see one item called “library” or “search_results”:</strong>
+    you attached the file instead of importing it. Delete that row, then use
+    <strong>File → Import…</strong> again — do <em>not</em> drag the file into the middle of the
+    Zotero window.</p>
+   </div>
+
+   <details class="advanced-details u-mt-xl">
+    <summary>Export whole library instead (not just this search)</summary>
+    <div class="advanced-body">
+     <p class="info-text">Use this only if you need every paper in a scope (all / included / screened
+     out / starred), not the ranked list above. Same Zotero import steps.</p>
+     <div class="export-scope-row">
+      <label for="lib-export-scope" class="help-text export-scope-label">Scope</label>
+      <select id="lib-export-scope" class="export-scope-select"
+       title="Which papers to include in the library download">
+       <option value="all">All articles</option>
+       <option value="included" selected>Included only</option>
+       <option value="excluded">Screened out only</option>
+       <option value="starred">Starred only</option>
+      </select>
+     </div>
+     <div class="export-row export-row-primary">
+      <button type="button" class="btn btn-primary btn-lg btn-download" data-lib-export-format="ris"
+       title="Whole-library RIS for Zotero File → Import">Download library RIS</button>
+     </div>
+     <p class="help-text">Process counts (how many collected / excluded / kept) are on
+     <a href="/statistics">Clean up → Screening report</a>.</p>
+    </div>
+   </details>
+  </section>
+ </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/simple_tools.js?v=20260814f"></script>
+<script src="/static/js/start_over_fix.js?v=20260814a"></script>
+<script src="/static/js/data_management.js?v=20260814c"></script>
+<script src="/static/js/search.js?v=20260814k"></script>
+<script src="/static/js/fetch_stall_hint.js?v=20260814a"></script>
+{% endblock %}
