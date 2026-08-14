@@ -46,6 +46,9 @@ def test_search_includes_collect_and_simple_tools():
             "function wireSimpleToolsStrip"
         )
     ]
+    assert "/api/start-over" in start_over
+    assert "openSiteConfirm" in start_over
+    assert "resolveSimpleFetchModeBeforeRequest" not in start_over
     assert "resetSearchAndNarrowingForStartOver" in start_over
     reset_fn = tools[
         tools.index("async function resetSearchAndNarrowingForStartOver") : tools.index(
@@ -239,3 +242,67 @@ def test_simple_css_hides_leftover_collect():
     js = _read("static", "js", "simple_tools.js")
     assert "has-papers" in js
     assert "simple-collecting" in js
+
+
+def test_start_over_api_keeps_starred_and_drops_unmarked(tmp_path, monkeypatch):
+    """POST /api/start-over is option B: starred/noted stay, unmarked go."""
+    from app import core
+    from app.core import get_pipeline, release_pipeline
+    from app.storage.user_db import UserDatabase
+
+    db = UserDatabase(str(tmp_path / "users.db"))
+    monkeypatch.setattr(core, "user_db", db)
+    monkeypatch.setenv("USER_DATA_DIR", str(tmp_path / "user_data"))
+
+    client = TestClient(app)
+    r = client.post(
+        "/register",
+        data={
+            "username": "startover1",
+            "password": TEST_PASSWORD,
+            "password_confirm": TEST_PASSWORD,
+        },
+        follow_redirects=False,
+    )
+    assert r.status_code in (302, 303), r.text
+    csrf = client.cookies.get("csrf_token")
+    loaded = client.post(
+        "/api/load-sample-corpus",
+        json={"clear_first": True},
+        headers={"X-CSRF-Token": csrf or ""},
+    )
+    assert loaded.status_code == 200, loaded.text
+
+    rec = db.get_by_username("startover1")
+    pipe = get_pipeline(rec["id"])
+    try:
+        arts = pipe.db.get_all_articles()
+        assert len(arts) >= 3
+        a, b, c = arts[0], arts[1], arts[2]
+        pipe.db.upsert_note(a["article_id"], a["source"], starred=True)
+        pipe.db.upsert_note(b["article_id"], b["source"], note="keep me")
+        before = pipe.db.get_statistics()["total_articles"]
+    finally:
+        release_pipeline(rec["id"])
+
+    out = client.post(
+        "/api/start-over",
+        json={},
+        headers={"X-CSRF-Token": csrf or ""},
+    )
+    assert out.status_code == 200, out.text
+    body = out.json()
+    assert body.get("status") == "success"
+    assert body.get("remaining") == 2
+    assert body.get("deleted") == before - 2
+
+    pipe = get_pipeline(rec["id"])
+    try:
+        ids = {(x["article_id"], x["source"]) for x in pipe.db.get_all_articles()}
+        assert ids == {
+            (a["article_id"], a["source"]),
+            (b["article_id"], b["source"]),
+        }
+        assert (c["article_id"], c["source"]) not in ids
+    finally:
+        release_pipeline(rec["id"])

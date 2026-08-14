@@ -16,9 +16,9 @@ and this project aims to follow Semantic Versioning for app version strings
   in a dialog before ranking. Advanced still uses the rail.
 
 ### Fixed
-- **Start over (option B):** keeps starred and noted papers, removes the rest
-  immediately via `POST /api/start-over`, so the article count resets and
-  Simple fetch unlocks instead of leaving the full collection locked.
+- **Start over** now keeps starred and noted papers and removes the rest
+  immediately (`POST /api/start-over`). Fetch unlocks so you can search
+  again. Confirm copy matches this, not the fetch Start-fresh dialog.
 - **Library switcher after idle:** rehydrates the nav library select on tab
   focus / visibility change so long idle no longer drops the active library.
 - **Fetch progress stall hint:** when a source makes no progress for ~45s,

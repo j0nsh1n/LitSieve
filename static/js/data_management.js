@@ -930,6 +930,9 @@ function waitForJob(task, fillId, labelId, wrapId, formatLabel, timeoutMs = 6000
  const started = Date.now();
  let sawActive = false;
  let settled = false;
+ let lastSig = '';
+ let lastChangeAt = Date.now();
+ let stallHintShown = false;
 
  const finish = (err, result) => {
   if (settled) return;
@@ -959,11 +962,23 @@ function waitForJob(task, fillId, labelId, wrapId, formatLabel, timeoutMs = 6000
    if (p.active) {
     sawActive = true;
     const pct = p.total > 0 ? Math.round((p.done / p.total) * 100) : 0;
+    const sig = `${p.done}|${p.total}|${p.articles_so_far || 0}|${p.message || ''}`;
+    if (sig !== lastSig) {
+     lastSig = sig;
+     lastChangeAt = Date.now();
+     stallHintShown = false;
+    }
     if (fill) fill.style.width = pct + '%';
     if (label) {
-     label.textContent = p.message
+     let text = p.message
       ? p.message
       : (typeof formatLabel === 'function' ? formatLabel(p.done, p.total, pct, p) : '');
+     if (!stallHintShown && Date.now() - lastChangeAt > 45000) {
+      stallHintShown = true;
+      text = (text ? text + ' · ' : '')
+       + 'Still working — large sources can take a minute with no new progress.';
+     }
+     label.textContent = text;
     }
     if (task === 'fetch') renderFetchLiveSources(p);
     return;
