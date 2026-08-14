@@ -40,6 +40,39 @@ def test_search_includes_collect_and_simple_tools():
     assert "/search?collect=1" in tools
     assert "function openSimpleScreenModal" in tools
     assert "function openSimpleSourceReport" in tools
+    assert "function resetSearchAndNarrowingForStartOver" in tools
+    start_over = tools[
+        tools.index("async function simpleToolsStartOver") : tools.index(
+            "function wireSimpleToolsStrip"
+        )
+    ]
+    assert "resetSearchAndNarrowingForStartOver" in start_over
+    reset_fn = tools[
+        tools.index("async function resetSearchAndNarrowingForStartOver") : tools.index(
+            "async function simpleToolsStartOver"
+        )
+    ]
+    assert "low_relevance" in reset_fn
+    assert "clearSearchWorkspace" in reset_fn
+    assert "setSimpleScreenSkipped(false)" in reset_fn
+    search_js = _read("static", "js", "search.js")
+    assert "function clearSearchWorkspace" in search_js
+    assert "SEARCH_SESSION_KEY" in search_js
+    assert "clearSearchWorkspace()" in search_js
+    # Collect / start-over must not auto-restore the last query.
+    boot = search_js[
+        search_js.index("loadSearchEmptyState()") : search_js.index("refreshStarredCount")
+    ]
+    assert "wantsSimpleCollectView" in boot
+    assert "clearSearchWorkspace()" in boot
+    css = _read("static", "css", "style.css")
+    simple_hide = css[
+        css.find('html[data-mode="simple"] .result-row-ids') : css.find(
+            "html[data-mode=\"simple\"] body.simple-collecting"
+        )
+    ]
+    assert ".key-points" not in simple_hide
+    assert ".ai-actions" not in simple_hide
 
 
 def test_collect_query_on_data_management_redirects_to_search(tmp_path, monkeypatch):

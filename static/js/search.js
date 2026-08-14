@@ -25,7 +25,14 @@ document.addEventListener('DOMContentLoaded', () => {
  loadSearchEmptyState()
   .then((stats) => {
    const ready = !!(stats && (stats.articles_with_embeddings || 0) > 0);
+   const collecting = typeof wantsSimpleCollectView === 'function'
+    && wantsSimpleCollectView(stats);
    return applyAvailableSources().then(() => {
+    // Start over / empty collect must not revive the previous query.
+    if (collecting) {
+     clearSearchWorkspace();
+     return;
+    }
     if (ready) return restoreSearchSession();
    });
   })
@@ -211,7 +218,41 @@ function applySearchSessionToForm(state) {
  }
 }
 
+function clearSearchWorkspace() {
+ try {
+  sessionStorage.removeItem(SEARCH_SESSION_KEY);
+ } catch (e) { /* quota / private mode */ }
+ lastSearchParams = null;
+ lastQueryTokens = [];
+ lastResults = [];
+ const qt = document.getElementById('query-text');
+ if (qt) qt.value = '';
+ ['pico-population', 'pico-intervention', 'pico-comparison', 'pico-outcome', 'seed-query']
+  .forEach((id) => {
+   const el = document.getElementById(id);
+   if (el) el.value = '';
+  });
+ const list = document.getElementById('results-list');
+ if (list) list.innerHTML = '';
+ const resultsSec = document.getElementById('results-section');
+ if (resultsSec) {
+  resultsSec.classList.add('u-hidden');
+  resultsSec.style.display = 'none';
+ }
+ const exportSec = document.getElementById('export-results-section');
+ if (exportSec) {
+  exportSec.hidden = true;
+  exportSec.style.display = 'none';
+ }
+ const countEl = document.getElementById('result-count');
+ if (countEl) countEl.textContent = '0';
+ const banner = document.getElementById('seed-banner');
+ if (banner) banner.style.display = 'none';
+ if (typeof updateSimpleSearchPanel === 'function') updateSimpleSearchPanel(false);
+}
+
 async function restoreSearchSession() {
+ if (typeof _collectQueryOn === 'function' && _collectQueryOn()) return;
  const state = readSearchSession();
  if (!state) return;
 

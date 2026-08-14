@@ -5350,9 +5350,7 @@ html[data-mode="simple"] #search-rail .page-help-toolbar {
     display: none;
 }
 html[data-mode="simple"] .result-row-ids,
-html[data-mode="simple"] .key-points,
-html[data-mode="simple"] .study-type-meaning,
-html[data-mode="simple"] .ai-actions {
+html[data-mode="simple"] .study-type-meaning {
     display: none !important;
 }
 html[data-mode="simple"] body.simple-collecting #searchcard,

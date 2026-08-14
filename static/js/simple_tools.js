@@ -1098,6 +1098,30 @@ function _waitForEmbedJob(timeoutMs) {
  });
 }
 
+/** Start over: drop last search + Narrow it down. Notes/stars/AI key points stay. */
+async function resetSearchAndNarrowingForStartOver() {
+ if (typeof clearSearchWorkspace === 'function') {
+  clearSearchWorkspace();
+ }
+ setSimpleScreenSkipped(false);
+ clearSimpleScreenUndoItems();
+ _simpleScreenCounts = { low: null, medium: null, high: null };
+ const screen = document.getElementById('simple-screen-query');
+ if (screen) screen.value = '';
+ try {
+  const excl = await apiCall('/api/screening/excluded?reason=low_relevance');
+  const items = (excl && excl.items) || [];
+  if (items.length) {
+   await apiCall('/api/screening', {
+    method: 'POST',
+    body: { items, action: 'include', reason: 'low_relevance' },
+   });
+  }
+ } catch (e) {
+  console.warn('Could not reset Narrow it down after start over:', e);
+ }
+}
+
 async function simpleToolsStartOver() {
  if (typeof resolveSimpleFetchModeBeforeRequest !== 'function') {
   window.location.href = '/search?collect=1';
@@ -1105,6 +1129,7 @@ async function simpleToolsStartOver() {
  }
  const proceed = await resolveSimpleFetchModeBeforeRequest();
  if (!proceed) return;
+ await resetSearchAndNarrowingForStartOver();
  if (_onSearchPage()) {
   setCollectQueryOnUrl();
   if (typeof _simpleFetchUnlocked !== 'undefined') {
