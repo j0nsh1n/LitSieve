@@ -38,6 +38,8 @@ document.addEventListener('DOMContentLoaded', () => {
  document.getElementById('text-input-panel').style.display = v === 'text' ? 'block' : 'none';
  document.getElementById('pico-input-panel').style.display = v === 'pico' ? 'block' : 'none';
  document.getElementById('seed-input-panel').style.display = v === 'seed' ? 'block' : 'none';
+ const card = document.getElementById('searchcard');
+ if (card) card.classList.toggle('is-alt-method', v !== 'text');
  });
  });
 

@@ -3075,6 +3075,28 @@ body.lra-modal-open {
     min-height: 6.5rem;
 }
 
+.search-query-top {
+    margin: var(--space-3) 0 0;
+}
+.search-query-top .input-method-toggle {
+    margin-bottom: var(--space-3);
+}
+.search-query-top #pico-input-panel,
+.search-query-top #seed-input-panel {
+    margin-top: var(--space-3);
+    padding: var(--space-4);
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-md);
+}
+html[data-mode="simple"] .search-query-top .input-method-toggle,
+html[data-mode="simple"] .search-query-top #pico-input-panel,
+html[data-mode="simple"] .search-query-top #seed-input-panel {
+    display: none !important;
+}
+html[data-mode="simple"] body.simple-collecting #search-query-top {
+    display: none !important;
+}
 /* Phase 10 broadsheet: query + Search joined as one boxed control */
 .searchcard {
     display: flex;
@@ -3118,6 +3140,12 @@ body.lra-modal-open {
     color: var(--bg);
     border: 1px solid var(--text);
     min-width: 7.5rem;
+}
+.searchcard.is-alt-method {
+    justify-content: flex-end;
+}
+.searchcard.is-alt-method #search-btn {
+    border-radius: var(--radius-sm);
 }
 
 /* === Progressive disclosure (help + advanced) ===
@@ -4997,7 +5025,8 @@ html[data-mode="simple"] .study-type-meaning,
 html[data-mode="simple"] .ai-actions {
     display: none !important;
 }
-html[data-mode="simple"] body.simple-collecting #searchcard {
+html[data-mode="simple"] body.simple-collecting #searchcard,
+html[data-mode="simple"] body.simple-collecting #search-query-top {
     display: none !important;
 }
 

@@ -18,12 +18,55 @@
  {{ scope_search() }}
 </section>
 
-<div class="searchcard search-work" id="searchcard">
- <div id="text-input-panel">
-  <label class="u-visually-hidden" for="query-text">Research question</label>
-  <textarea id="query-text" placeholder="How do school start times affect adolescent sleep?" rows="1"></textarea>
+<div class="search-query-top search-work" id="search-query-top">
+ <div class="input-method-toggle" id="input-method-toggle">
+  <label class="radio-label">
+   <input type="radio" name="input_method" value="text" checked> Text Input
+  </label>
+  <label class="radio-label">
+   <input type="radio" name="input_method" value="pico"> PICO Format
+  </label>
+  <label class="radio-label">
+   <input type="radio" name="input_method" value="seed"> Seed paper
+  </label>
  </div>
- <button id="search-btn" class="btn btn-primary">Search</button>
+ <div class="searchcard" id="searchcard">
+  <div id="text-input-panel">
+   <label class="u-visually-hidden" for="query-text">Research question</label>
+   <textarea id="query-text" placeholder="How do school start times affect adolescent sleep?" rows="1"></textarea>
+  </div>
+  <button id="search-btn" class="btn btn-primary">Search</button>
+ </div>
+ <div class="u-hidden" id="pico-input-panel">
+  <p class="info-text">Fill in the parts you know.</p>
+  <div class="pico-grid">
+   <div class="form-group">
+    <label>Population</label>
+    <input type="text" id="pico-population" placeholder="e.g., Adults with type 2 diabetes">
+   </div>
+   <div class="form-group">
+    <label>Intervention</label>
+    <input type="text" id="pico-intervention" placeholder="e.g., Metformin treatment">
+   </div>
+   <div class="form-group">
+    <label>Comparison</label>
+    <input type="text" id="pico-comparison" placeholder="e.g., Placebo or standard care">
+   </div>
+   <div class="form-group">
+    <label>Outcome</label>
+    <input type="text" id="pico-outcome" placeholder="e.g., Glycemic control">
+   </div>
+  </div>
+ </div>
+ <div class="u-hidden" id="seed-input-panel">
+  <p class="info-text"><strong>Seed paper:</strong> paste an article id (e.g. PubMed ID or DOI) or part
+   of a title from a paper already in your collection - the app ranks the rest by similarity to it.
+   Useful when a teacher gives you one starter citation.</p>
+  <div class="form-group">
+   <label>Seed id or title fragment</label>
+   <input type="text" id="seed-query" placeholder="e.g. 10.1038/... or climate warming oceans">
+  </div>
+ </div>
 </div>
 
 {% include "partials/simple_screening_card.html" %}
@@ -70,49 +113,6 @@
    <section class="card" id="search-query-section">
     <p class="info-text">Searches <strong>your collection only</strong> (not the whole internet). Plain
     language works - the app compares meaning, not just keywords.</p>
-    <div class="input-method-toggle">
-    <label class="radio-label">
-    <input type="radio" name="input_method" value="text" checked> Text Input
-    </label>
-    <label class="radio-label">
-    <input type="radio" name="input_method" value="pico"> PICO Format
-    </label>
-    <label class="radio-label">
-    <input type="radio" name="input_method" value="seed"> Seed paper
-    </label>
-    </div>
-
-    <div class="u-hidden" id="pico-input-panel">
-    <p class="info-text">Fill in the parts you know.</p>
-    <div class="pico-grid">
-    <div class="form-group">
-    <label>Population</label>
-    <input type="text" id="pico-population" placeholder="e.g., Adults with type 2 diabetes">
-    </div>
-    <div class="form-group">
-    <label>Intervention</label>
-    <input type="text" id="pico-intervention" placeholder="e.g., Metformin treatment">
-    </div>
-    <div class="form-group">
-    <label>Comparison</label>
-    <input type="text" id="pico-comparison" placeholder="e.g., Placebo or standard care">
-    </div>
-    <div class="form-group">
-    <label>Outcome</label>
-    <input type="text" id="pico-outcome" placeholder="e.g., Glycemic control">
-    </div>
-    </div>
-    </div>
-
-    <div class="u-hidden" id="seed-input-panel">
-    <p class="info-text"><strong>Seed paper:</strong> paste an article id (e.g. PubMed ID or DOI) or part
-    of a title from a paper already in your collection - the app ranks the rest by similarity to it.
-    Useful when a teacher gives you one starter citation.</p>
-    <div class="form-group">
-    <label>Seed id or title fragment</label>
-    <input type="text" id="seed-query" placeholder="e.g. 10.1038/... or climate warming oceans">
-    </div>
-    </div>
    </section>
 
    <section class="card" id="search-controls-section">
@@ -288,5 +288,5 @@
 {% block scripts %}
 <script src="/static/js/simple_tools.js?v=20260814b"></script>
 <script src="/static/js/data_management.js?v=20260813f"></script>
-<script src="/static/js/search.js?v=20260814c"></script>
+<script src="/static/js/search.js?v=20260814d"></script>
 {% endblock %}
