@@ -193,8 +193,9 @@ def test_corpus_growth_endpoints_are_quota_gated():
     assert source.count("quota.check_quota(uid)") >= 3, (
         "a corpus-growth endpoint lost its quota.check_quota() gate"
     )
-    # A running fetch must also stop when the account crosses the cap.
-    assert "quota.is_over_quota(uid)" in source
+    # A running fetch must also stop when the account crosses the cap
+    # (replace-fetch may pass reclaimable= for the live-library credit).
+    assert "quota.is_over_quota(uid" in source
 
 
 def test_passwords_use_bcrypt_directly_not_passlib():

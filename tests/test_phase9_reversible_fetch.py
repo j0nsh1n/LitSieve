@@ -1,15 +1,13 @@
 """Phase 9 — destructive fetch should become reversible.
 
-Step 1 is copy only. The wipe-on-failed-replace test is xfail until the
-staging swap (Step 3) lands: clear_all() still runs before any source is
-queried.
+Replace-fetch stages into staging_articles and swaps only when at least one
+paper arrived. Notes / stars / saved AI key points stay on papers that come
+back; papers that do not return (and their notes) are deleted.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
-
-import pytest
 
 from app.content.sample_corpus import get_sample_articles
 from app.fetchers.base import FetchError
@@ -30,7 +28,7 @@ def test_simple_start_fresh_copy_names_what_it_destroys():
         )
     ]
     assert "Start fresh" in fn
-    assert "this cannot be undone" in fn.lower()
+    assert "come back" in fn.lower()
     for word in ("notes", "stars", "key points"):
         assert word in fn.lower(), word
 
@@ -101,13 +99,38 @@ class _FailingFetcher:
         raise FetchError("network down", kind="network")
 
 
-@pytest.mark.xfail(
-    reason=(
-        "replace-fetch still calls clear_all() before any source is queried "
-        "(Phase 9 Step 3 staging swap)"
-    ),
-    strict=True,
-)
+class _OnlyAFetcher:
+    SOURCE_NAME = "pubmed"
+
+    def __init__(self, email=None, **kwargs):
+        self.email = email
+
+    def search_and_fetch(self, query, max_results=200):
+        return [
+            {
+                "article_id": "a1",
+                "source": "pubmed",
+                "title": "Paper A again",
+                "abstract": "Returned on the new search.",
+                "year": "2020",
+                "authors": ["A"],
+                "journal": "J",
+            }
+        ]
+
+
+def _paper(aid, title):
+    return {
+        "article_id": aid,
+        "source": "pubmed",
+        "title": title,
+        "abstract": f"Abstract for {title}",
+        "year": "2020",
+        "authors": ["A"],
+        "journal": "J",
+    }
+
+
 def test_failed_replace_fetch_leaves_collection_intact(tmp_path, monkeypatch):
     """All sources error → library, notes, stars, and AI key points unchanged."""
     monkeypatch.setattr(corpus_routes, "update_progress", lambda *a, **k: None)
@@ -140,6 +163,8 @@ def test_failed_replace_fetch_leaves_collection_intact(tmp_path, monkeypatch):
         )
         assert result["total_fetched"] == 0
         assert result["errors"]
+        assert result["cleared_first"] is False
+        assert p.db.count_staging_articles() == 0
 
         assert p.db.get_statistics()["total_articles"] == before_total
         assert p.db.get_note(key[0], key[1])["note"] == "keep this note"
@@ -147,3 +172,94 @@ def test_failed_replace_fetch_leaves_collection_intact(tmp_path, monkeypatch):
         assert key in p.db.get_ai_key_points_keys()
     finally:
         p.close()
+
+
+def test_successful_replace_keeps_work_on_papers_that_return(tmp_path, monkeypatch):
+    """Overlap keeps notes/stars/AI key points; gone papers (and their notes) drop."""
+    import numpy as np
+
+    monkeypatch.setattr(corpus_routes, "update_progress", lambda *a, **k: None)
+    monkeypatch.setitem(pipeline_mod.FETCHERS, "pubmed", _OnlyAFetcher)
+
+    p = LiteratureSearchPipeline(db_path=str(tmp_path / "swap.db"))
+    try:
+        p.db.insert_articles([_paper("a1", "Paper A"), _paper("b1", "Paper B")], dedupe=False)
+        p.db.upsert_note("a1", "pubmed", note="keep me", starred=True)
+        p.db.upsert_note("b1", "pubmed", note="drop me", starred=True)
+        p.db.insert_key_points({("a1", "pubmed"): ["saved A"]}, origin="ai")
+        p.db.insert_key_points({("b1", "pubmed"): ["extractive B"]}, origin="extractive")
+        p.db.exclude_articles([("a1", "pubmed")], reason="off_topic")
+        p.db.insert_embeddings(
+            {("a1", "pubmed"): np.array([1.0, 0.0], dtype=np.float32)},
+            model_name="general",
+        )
+
+        result = corpus_routes._run_multi_fetch(
+            p,
+            query="new query",
+            sources=["pubmed"],
+            max_results=5,
+            email=None,
+            clear_first=True,
+            uid="phase9-swap",
+        )
+        assert result["total_fetched"] == 1
+        assert result["cleared_first"] is True
+        assert p.db.count_staging_articles() == 0
+
+        ids = {(a["article_id"], a["source"]) for a in p.db.get_all_articles()}
+        assert ids == {("a1", "pubmed")}
+        note_a = p.db.get_note("a1", "pubmed")
+        assert note_a["note"] == "keep me"
+        assert note_a["starred"] is True
+        assert ("a1", "pubmed") in p.db.get_ai_key_points_keys()
+        assert p.db.get_note("b1", "pubmed")["note"] == ""
+        assert ("b1", "pubmed") not in p.db.get_ai_key_points_keys()
+        assert ("a1", "pubmed") in p.db.get_excluded_keys()
+        assert ("a1", "pubmed") in p.db.get_embedding_keys()
+        titles = {a["title"] for a in p.db.get_all_articles()}
+        assert "Paper A again" in titles
+    finally:
+        p.close()
+
+
+def test_append_fetch_does_not_use_staging(tmp_path, monkeypatch):
+    monkeypatch.setattr(corpus_routes, "update_progress", lambda *a, **k: None)
+    monkeypatch.setitem(pipeline_mod.FETCHERS, "pubmed", _OnlyAFetcher)
+
+    p = LiteratureSearchPipeline(db_path=str(tmp_path / "append.db"))
+    try:
+        p.db.insert_articles([_paper("b1", "Paper B")], dedupe=False)
+        p.db.upsert_note("b1", "pubmed", note="old note", starred=False)
+        result = corpus_routes._run_multi_fetch(
+            p,
+            query="x",
+            sources=["pubmed"],
+            max_results=5,
+            email=None,
+            clear_first=False,
+            uid="phase9-append",
+        )
+        assert result["cleared_first"] is False
+        assert result["total_fetched"] >= 1
+        ids = {(a["article_id"], a["source"]) for a in p.db.get_all_articles()}
+        assert ("b1", "pubmed") in ids
+        assert ("a1", "pubmed") in ids
+        assert p.db.get_note("b1", "pubmed")["note"] == "old note"
+        assert p.db.count_staging_articles() == 0
+    finally:
+        p.close()
+
+
+def test_replace_quota_credit_ignores_live_library_size(tmp_path, monkeypatch):
+    from app.storage import quota
+
+    db_path = tmp_path / "lib" / "articles.db"
+    db_path.parent.mkdir(parents=True)
+    db_path.write_bytes(b"x" * 2000)
+    monkeypatch.setattr(quota, "limit_bytes", lambda: 100)
+    monkeypatch.setattr(quota, "usage_bytes", lambda uid: 2000)
+    assert quota.is_over_quota("u") is True
+    credit = quota.library_file_bytes(str(db_path))
+    assert credit == 2000
+    assert quota.is_over_quota("u", reclaimable=credit) is False

@@ -80,6 +80,6 @@ Guest User (is_guest) → sample corpus only; purged by age
 ## Session Handoff
 - **Date:** 2026-08-13
 - **Branch:** `feat/phase6-guest-demo` (do not push without explicit ask)
-- **Done:** Phase 9 Steps 1, 2, 4 + Step 3 design
-  (`docs/PHASE9_STAGING_SWAP.md`). Staging swap not implemented; xfail remains.
-- **Next:** Review the staging design, then implement or revise. Do not push.
+- **Done:** Phase 9 staging swap — failed replace-fetch leaves the library;
+  success keeps notes/stars/AI key points on papers that return.
+- **Next:** Human-confirm Start fresh on a library with notes. Do not push.

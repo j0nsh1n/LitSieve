@@ -301,7 +301,7 @@ def test_run_multi_fetch_publishes_per_source_counts_including_failures(monkeypa
     with core._progress_lock:
         core._all_progress.pop(uid, None)
 
-    monkeypatch.setattr(corpus_routes.quota, "is_over_quota", lambda _uid: False)
+    monkeypatch.setattr(corpus_routes.quota, "is_over_quota", lambda _uid, **_k: False)
     monkeypatch.setattr(
         corpus_routes.quota,
         "usage_report",
@@ -333,6 +333,7 @@ def test_run_multi_fetch_publishes_per_source_counts_including_failures(monkeypa
             email,
             progress_callback,
             cancel_check,
+            into_staging=False,
         ):
             # Match real pipeline callback shape (done, total, **extra).
             steps = [

@@ -1,6 +1,8 @@
 # Phase 9 Step 3 — Staging swap (design only)
 
-**Status:** design, not implemented. Review before any migration.
+**Status:** implemented 2026-08-13. Successful Start fresh reattaches notes,
+stars, saved AI key points, screening, and embeddings for keys that still
+exist. Papers that do not return are deleted.
 
 **Defect:** `_run_multi_fetch` calls `clear_all()` before any source is queried.
 `clear_all()` deletes `key_points`, `notes`, `screening`, `clusters`,
@@ -59,30 +61,22 @@ table rename.
 **Failed, cancelled, or restarted fetch:** live rows never move. Notes, stars,
 AI key points, screening, clusters, embeddings stay.
 
-**Successful replace (`total_fetched >= 1`):** two honest options.
+**Successful replace (`total_fetched >= 1`):** reattach student-authored rows
+for keys that still exist.
 
-1. **Strict start-fresh (today's success semantics).** In one transaction:
-   delete live children + articles, insert `staging_articles` into `articles`,
-   drop staging. Overlapping papers lose notes. Matches the Step 1 copy.
+Same transaction:
 
-2. **Reattach student-authored rows for keys that still exist** (recommended).
-   Same transaction:
-   - snapshot `notes`, `key_points` where `origin='ai'`, and `screening`
-     whose `(article_id, source)` is in `staging_articles`
-   - delete live children + articles
-   - insert new articles from staging
-   - restore the snapshotted notes / AI key points / screening
-   - drop staging
-   - drop clusters always (they describe the old set)
-   - drop embeddings for keys **not** in the new set; keep matching embedding
-     rows so auto-prepare `only_missing` can skip them
+- snapshot `notes`, `key_points` where `origin='ai'`, and `screening`
+  whose `(article_id, source)` is in `staging_articles`
+- delete live children + articles
+- insert new articles from staging
+- restore the snapshotted notes / AI key points / screening
+- drop staging
+- drop clusters always (they describe the old set)
+- drop embeddings for keys **not** in the new set; keep matching embedding
+  rows so auto-prepare `only_missing` can skip them
 
-   Start fresh still replaces the paper set. It no longer throws away a note
-   on a paper that came back. If this is accepted, update the Step 1 dialog
-   copy from “deletes those papers and any notes…” to “deletes papers that
-   do not come back, and their notes / stars / saved key points.”
-
-Extractive key points are regenerated on prepare; do not reattach them.
+Extractive key points are regenerated on prepare; they are not reattached.
 
 ### Cancel (`POST /api/jobs/fetch/cancel`)
 
@@ -177,7 +171,7 @@ second file. Heavy work stays in `start_user_job`. No new endpoint.
 | Mid-fetch `QuotaExceeded` with credit | Unchanged | Dropped |
 | Process restart / deploy | Unchanged | Dropped on next open |
 | Swap transaction crash | Unchanged (WAL rollback) | Dropped on next open if leftover |
-| Success, ≥1 paper | Replaced (reattach policy as decided) | Dropped inside the transaction |
+| Success, ≥1 paper | Replaced; notes/stars/AI kp kept on overlap | Dropped inside the transaction |
 
 ---
 

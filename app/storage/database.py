@@ -34,6 +34,8 @@ class ArticleDatabase:
         self._lock = threading.Lock()
         self.create_tables()
         self.migrate_schema()
+        # Crash / restart leftover: jobs are in-memory, so never auto-swap.
+        self.drop_staging_articles()
 
     def create_tables(self):
         """Create database tables if they don't exist"""
@@ -269,11 +271,176 @@ class ArticleDatabase:
             self.conn.commit()
             logger.info("Schema migration complete.")
 
-    def clear_all(self):
-        """Wipe the library (replace-fetch / sample reset).
+    STAGING_TABLE = "staging_articles"
 
-        This is the only path that drops student-saved AI key points. Append
-        fetch and re-prepare leave origin=ai rows intact.
+    def _staging_exists(self, cursor) -> bool:
+        cursor.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+            (self.STAGING_TABLE,),
+        )
+        return cursor.fetchone() is not None
+
+    def ensure_staging_articles(self) -> None:
+        """Create the replace-fetch staging table (no FKs to live rows)."""
+        with self._lock:
+            self.conn.execute(
+                f"""
+                CREATE TABLE IF NOT EXISTS {self.STAGING_TABLE} (
+                    article_id TEXT NOT NULL,
+                    source TEXT NOT NULL DEFAULT 'pubmed',
+                    title TEXT NOT NULL,
+                    abstract TEXT NOT NULL,
+                    year TEXT,
+                    authors TEXT,
+                    journal TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (article_id, source)
+                )
+                """
+            )
+            self.conn.commit()
+
+    def drop_staging_articles(self) -> None:
+        with self._lock:
+            self.conn.execute(f"DROP TABLE IF EXISTS {self.STAGING_TABLE}")
+            self.conn.commit()
+
+    def reset_staging_articles(self) -> None:
+        self.drop_staging_articles()
+        self.ensure_staging_articles()
+
+    def count_staging_articles(self) -> int:
+        with self._lock:
+            cursor = self.conn.cursor()
+            if not self._staging_exists(cursor):
+                return 0
+            cursor.execute(f"SELECT COUNT(*) FROM {self.STAGING_TABLE}")
+            return int(cursor.fetchone()[0] or 0)
+
+    def replace_from_staging(self) -> int:
+        """Swap live articles for staging; keep notes/stars/AI key points/screening
+        and embeddings for keys that still exist. Drops clusters. No-op if empty.
+        """
+        with self._lock:
+            cursor = self.conn.cursor()
+            if not self._staging_exists(cursor):
+                return 0
+            cursor.execute(f"SELECT COUNT(*) FROM {self.STAGING_TABLE}")
+            n = int(cursor.fetchone()[0] or 0)
+            if n <= 0:
+                cursor.execute(f"DROP TABLE IF EXISTS {self.STAGING_TABLE}")
+                self.conn.commit()
+                return 0
+            try:
+                for tmp in (
+                    "_swap_keep_notes",
+                    "_swap_keep_ai_kp",
+                    "_swap_keep_screening",
+                    "_swap_keep_emb",
+                ):
+                    cursor.execute(f"DROP TABLE IF EXISTS {tmp}")
+                cursor.execute(
+                    f"""
+                    CREATE TABLE _swap_keep_notes AS
+                    SELECT n.article_id, n.source, n.note, n.starred, n.updated_at
+                    FROM notes n
+                    INNER JOIN {self.STAGING_TABLE} s
+                      ON n.article_id = s.article_id AND n.source = s.source
+                    """
+                )
+                cursor.execute(
+                    f"""
+                    CREATE TABLE _swap_keep_ai_kp AS
+                    SELECT k.article_id, k.source, k.bullets, k.origin, k.created_at
+                    FROM key_points k
+                    INNER JOIN {self.STAGING_TABLE} s
+                      ON k.article_id = s.article_id AND k.source = s.source
+                    WHERE k.origin = 'ai'
+                    """
+                )
+                cursor.execute(
+                    f"""
+                    CREATE TABLE _swap_keep_screening AS
+                    SELECT sc.article_id, sc.source, sc.reason, sc.created_at
+                    FROM screening sc
+                    INNER JOIN {self.STAGING_TABLE} s
+                      ON sc.article_id = s.article_id AND sc.source = s.source
+                    """
+                )
+                cursor.execute(
+                    f"""
+                    CREATE TABLE _swap_keep_emb AS
+                    SELECT e.article_id, e.source, e.embedding, e.dtype, e.shape,
+                           e.model_name, e.created_at
+                    FROM embeddings e
+                    INNER JOIN {self.STAGING_TABLE} s
+                      ON e.article_id = s.article_id AND e.source = s.source
+                    """
+                )
+                cursor.execute("DELETE FROM key_points")
+                cursor.execute("DELETE FROM notes")
+                cursor.execute("DELETE FROM screening")
+                cursor.execute("DELETE FROM clusters")
+                cursor.execute("DELETE FROM embeddings")
+                cursor.execute("DELETE FROM articles")
+                cursor.execute(
+                    f"""
+                    INSERT INTO articles
+                    (article_id, source, title, abstract, year, authors, journal, created_at)
+                    SELECT article_id, source, title, abstract, year, authors, journal, created_at
+                    FROM {self.STAGING_TABLE}
+                    """
+                )
+                cursor.execute(
+                    """
+                    INSERT INTO notes (article_id, source, note, starred, updated_at)
+                    SELECT article_id, source, note, starred, updated_at
+                    FROM _swap_keep_notes
+                    """
+                )
+                cursor.execute(
+                    """
+                    INSERT INTO key_points
+                    (article_id, source, bullets, origin, created_at)
+                    SELECT article_id, source, bullets, origin, created_at
+                    FROM _swap_keep_ai_kp
+                    """
+                )
+                cursor.execute(
+                    """
+                    INSERT INTO screening (article_id, source, reason, created_at)
+                    SELECT article_id, source, reason, created_at
+                    FROM _swap_keep_screening
+                    """
+                )
+                cursor.execute(
+                    """
+                    INSERT INTO embeddings
+                    (article_id, source, embedding, dtype, shape, model_name, created_at)
+                    SELECT article_id, source, embedding, dtype, shape, model_name, created_at
+                    FROM _swap_keep_emb
+                    """
+                )
+                cursor.execute(f"DROP TABLE IF EXISTS {self.STAGING_TABLE}")
+                for tmp in (
+                    "_swap_keep_notes",
+                    "_swap_keep_ai_kp",
+                    "_swap_keep_screening",
+                    "_swap_keep_emb",
+                ):
+                    cursor.execute(f"DROP TABLE IF EXISTS {tmp}")
+                self.conn.commit()
+            except Exception:
+                self.conn.rollback()
+                raise
+            return n
+
+    def clear_all(self):
+        """Wipe the library (sample reset / explicit empty).
+
+        Replace-fetch no longer uses this; it stages then swaps so a failed
+        fetch cannot leave an empty library. Append fetch and re-prepare leave
+        origin=ai rows intact.
         """
         with self._lock:
             cursor = self.conn.cursor()
@@ -306,7 +473,9 @@ class ArticleDatabase:
             return raw
         return ""
 
-    def insert_articles(self, articles: List[Dict], dedupe: bool = True) -> Dict:
+    def insert_articles(
+        self, articles: List[Dict], dedupe: bool = True, *, staging: bool = False
+    ) -> Dict:
         """
         Upsert articles into the database.
 
@@ -316,6 +485,9 @@ class ArticleDatabase:
         When dedupe=True, skip rows whose normalized title (or DOI) already
         exists under another source in the collection or earlier in this batch.
 
+        staging=True writes replace-fetch rows into staging_articles (dedupe
+        against staging only) so the live library stays intact until swap.
+
         Returns:
             dict with inserted, updated, skipped_duplicates, dropped counts.
         """
@@ -323,13 +495,14 @@ class ArticleDatabase:
         updated = 0
         skipped_duplicates = 0
         dropped = 0
+        table = self.STAGING_TABLE if staging else "articles"
 
         with self._lock:
             cursor = self.conn.cursor()
             existing_titles: set = set()
             existing_dois: set = set()
             if dedupe:
-                cursor.execute("SELECT article_id, source, title FROM articles")
+                cursor.execute(f"SELECT article_id, source, title FROM {table}")
                 for aid, src, title in cursor.fetchall():
                     nt = self._norm_title(title)
                     if nt:
@@ -350,7 +523,7 @@ class ArticleDatabase:
                     doi = self._norm_doi(aid, source)
 
                     cursor.execute(
-                        "SELECT 1 FROM articles WHERE article_id = ? AND source = ?",
+                        f"SELECT 1 FROM {table} WHERE article_id = ? AND source = ?",
                         (aid, source),
                     )
                     existed = cursor.fetchone() is not None
@@ -364,8 +537,8 @@ class ArticleDatabase:
                             skipped_duplicates += 1
                             continue
 
-                    cursor.execute("""
-                        INSERT INTO articles
+                    cursor.execute(f"""
+                        INSERT INTO {table}
                         (article_id, source, title, abstract, year, authors, journal)
                         VALUES (?, ?, ?, ?, ?, ?, ?)
                         ON CONFLICT(article_id, source) DO UPDATE SET

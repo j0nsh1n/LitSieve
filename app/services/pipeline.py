@@ -143,6 +143,7 @@ class LiteratureSearchPipeline:
         email: str = "your.email@example.com",
         progress_callback=None,
         cancel_check=None,
+        into_staging: bool = False,
     ) -> Dict:
         """
         Fetch from multiple sources concurrently; insert each source as it completes.
@@ -195,7 +196,9 @@ class LiteratureSearchPipeline:
                 inserted = 0
                 skipped_dups = 0
                 if articles and not (cancel_check and cancel_check() and error == "Cancelled"):
-                    insert_stats = self.db.insert_articles(articles, dedupe=True)
+                    insert_stats = self.db.insert_articles(
+                        articles, dedupe=True, staging=into_staging
+                    )
                     if isinstance(insert_stats, dict):
                         inserted = int(insert_stats.get("inserted") or 0)
                         skipped_dups = int(insert_stats.get("skipped_duplicates") or 0)

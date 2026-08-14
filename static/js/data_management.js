@@ -1221,11 +1221,13 @@ function updateReplaceConsequence() {
  const kps = Number(_lastAiKeyPoints) || 0;
  if (notes || stars || kps) {
   el.textContent =
-   `Replace deletes these ${nLabel}, including ${notes} note${notes === 1 ? '' : 's'}, ` +
-   `${stars} star${stars === 1 ? '' : 's'}, and ${kps} saved AI key point${kps === 1 ? '' : 's'}.`;
+   `Start fresh keeps notes, stars, and saved AI key points on papers that come back. ` +
+   `The rest of these ${nLabel} (${notes} note${notes === 1 ? '' : 's'}, ` +
+   `${stars} star${stars === 1 ? '' : 's'}, ${kps} saved AI key point${kps === 1 ? '' : 's'}) will be deleted.`;
  } else {
   el.textContent =
-   `Replace deletes these ${nLabel} and any notes, stars, and saved AI key points.`;
+   `Start fresh keeps notes, stars, and saved AI key points on papers that come back. ` +
+   `Papers among these ${nLabel} that do not return are deleted.`;
  }
 }
 
@@ -1728,8 +1730,20 @@ function applyFetchResult(data, sources) {
   'warning'
  );
  } else if (data.cancelled || data.status === 'cancelled') {
- setStatus('fetch-status', `Fetch cancelled after ${data.total_fetched || 0} articles - ${breakdown}`, 'warning');
- showNotification(`Fetch cancelled (${data.total_fetched || 0} papers kept).`, 'warning');
+ const keptOld = data.cleared_first === false;
+ setStatus(
+  'fetch-status',
+  keptOld
+   ? `Fetch cancelled — your previous papers are unchanged. ${breakdown}`
+   : `Fetch cancelled after ${data.total_fetched || 0} articles - ${breakdown}`,
+  'warning'
+ );
+ showNotification(
+  keptOld
+   ? 'Fetch cancelled — your previous papers are unchanged.'
+   : `Fetch cancelled (${data.total_fetched || 0} papers kept).`,
+  'warning'
+ );
  } else if (errorCount === 0) {
  setStatus('fetch-status', `Fetched ${data.total_fetched} articles - ${breakdown}`, 'success');
  showNotification(`Fetched ${data.total_fetched} articles!`, 'success');
@@ -1885,9 +1899,9 @@ async function resolveSimpleFetchModeBeforeRequest() {
  const choice = await openSiteChoice({
   title: 'You already have papers',
   message:
-   `You already have ${nLabel}. Start fresh deletes those papers and any notes, ` +
-   `stars, and saved AI key points — this cannot be undone. Or add these results ` +
-   `to what you have?`,
+   `You already have ${nLabel}. Start fresh keeps notes, stars, and saved AI key points ` +
+   `only on papers that come back. Papers that do not return are deleted, ` +
+   `along with their notes. Or add these results to what you have?`,
   choices: [
    { label: 'Start fresh', value: 'replace', primary: true },
    { label: 'Add to them', value: 'append' },

@@ -301,8 +301,8 @@ Failed replace-fetch must not wipe the library. No new Simple confirmation.
   key points unchanged; the xfail in `tests/test_phase9_reversible_fetch.py`
   is removed and passing; Advanced still has every control; Simple gains no
   new dialog
-- Status: [ ] in progress — Steps 1, 2, 4 landed 2026-08-13; Step 3 design
-  written, not implemented (awaiting review)
+- Status: [x] 2026-08-13 — staging swap with reattach of notes / stars / AI
+  key points on papers that come back; failed fetch leaves the library intact
 
 ## Backlog (unscheduled)
 - Make `pyright app` blocking in CI after clearing the current error backlog

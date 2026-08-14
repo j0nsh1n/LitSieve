@@ -37,6 +37,11 @@ and this project aims to follow Semantic Versioning for app version strings
   No new modal. Append and empty libraries hide the line.
 - **Sample corpus load** now builds the demo list before clearing, so a missing
   sample set cannot wipe the library.
+- **Replace-fetch is no longer wipe-first.** New papers land in a staging
+  table and replace the library only if at least one paper arrived. Notes,
+  stars, and saved AI key points stay on papers that come back; papers that
+  do not return (and their notes) are deleted. A failed or cancelled fetch
+  leaves the previous collection in place.
 - **Simple fetch lock:** after this library has papers, Simple hides the Fetch
   Articles form so a second search is not the main action. A secondary
   **Start over or add papers** control reuses the existing replace/add dialog,
