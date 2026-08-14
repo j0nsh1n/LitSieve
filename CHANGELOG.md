@@ -8,6 +8,14 @@ and this project aims to follow Semantic Versioning for app version strings
 
 ## [Unreleased]
 
+### Fixed
+- **Search broadsheet layout:** Simple Search now matches the approved mockup
+  composition — kicker + title + count on one line, notice as a single
+  italic band, full-width one-line query + Search, results with the Save
+  rail on the right. Result cards use score / journal · year / tags, then
+  title and text-link actions. Segmented Get papers → Search is back in
+  the Simple masthead.
+
 ## [5.0.0] - 2026-08-13
 
 ### Changed

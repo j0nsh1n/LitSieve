@@ -698,33 +698,42 @@ function buildResultCard(article, idx) {
  ? `<span><strong>Cluster:</strong> ${escapeHtml(String(article.cluster_label))}</span>`
  : '';
 
+ const journal = escapeHtml(article.journal || '');
+ const year = escapeHtml(article.year || '');
+ const venueBits = [];
+ if (journal) venueBits.push(journal);
+ if (year) venueBits.push(year);
+ const venue = venueBits.join(' · ');
+ const byline = authors
+  ? `${escapeHtml(authors)}${journal ? ' — ' + journal : ''}`
+  : journal;
+
  card.innerHTML = `
- <div class="result-row-head">
+ <div class="result-row-head result-row-meta">
  <div class="score-meter" role="img" aria-label="Similarity ${simLabel} of 1. Higher is a closer match to your query." title="${escapeHtml(scoreHelp)}">
-  <span class="score-meter-track"><span class="score-meter-fill"></span></span>
   <span class="score-meter-value">${escapeHtml(simLabel)}</span>
+  <span class="score-meter-track"><span class="score-meter-fill"></span></span>
+ </div>
+ <span class="result-venue">${venue}</span>
+ <span class="result-tags">
+  <span class="tag">${escapeHtml(getSourceName(article.source))}</span>
+  ${studyTypeHtml}
+ </span>
  </div>
  <h3 class="article-title result-row-title">${escapeHtml(article.title || '')}</h3>
- <button type="button" class="star-btn ${starred ? 'is-starred' : ''}" title="Bookmark" aria-label="Star article">${starred ? '★' : '☆'}</button>
- </div>
+ <div class="byline result-byline">${byline}</div>
  <div class="article-body result-row-body">
- <div class="article-meta">
- <span><strong>Year:</strong> ${escapeHtml(article.year || '')}</span>
- <span><strong>Journal:</strong> ${escapeHtml(article.journal || '')}</span>
- <span class="tag">${escapeHtml(getSourceName(article.source))}</span>
+ <div class="article-meta result-row-ids">
  <span><strong>ID:</strong> ${idLink}</span>
  ${clusterBit}
- ${studyTypeHtml}
- </div>
- <div class="article-meta meta-authors">
- <span><strong>Authors:</strong> ${escapeHtml(authors)}</span>
  </div>
  ${keyPointsHtml}
  <div class="article-abstract">${abstractHtml}</div>
  ${picoHtml}
  <div class="article-actions-row">
- <button type="button" class="note-toggle" ${noteVal ? 'hidden' : ''}>✎ Add note</button>
- <button type="button" class="btn btn-sm btn-secondary not-relevant-btn"
+ <button type="button" class="star-btn ${starred ? 'is-starred' : ''}" title="Bookmark" aria-label="Star article">${starred ? '★ Starred' : '☆ Star'}</button>
+ <button type="button" class="note-toggle" ${noteVal ? 'hidden' : ''}>Add note</button>
+ <button type="button" class="not-relevant-btn"
   title="Screen this paper out as not about your topic">Not relevant</button>
  </div>
  <div class="note-row" ${noteVal ? '' : 'hidden'}>
@@ -762,7 +771,7 @@ function buildResultCard(article, idx) {
  const next = !starBtn.classList.contains('is-starred');
  // Optimistic: flip immediately; roll back on failure.
  starBtn.classList.toggle('is-starred', next);
- starBtn.textContent = next ? '★' : '☆';
+ starBtn.textContent = next ? '★ Starred' : '☆ Star';
  try {
  await apiCall('/api/notes', {
  method: 'POST',
@@ -777,7 +786,7 @@ function buildResultCard(article, idx) {
  if (displayFilterState.starred) showSearchResults();
  } catch (err) {
  starBtn.classList.toggle('is-starred', !next);
- starBtn.textContent = next ? '☆' : '★';
+ starBtn.textContent = next ? '☆ Star' : '★ Starred';
  showNotification(`Could not save star: ${err.message}`, 'error');
  }
  });
@@ -980,6 +989,8 @@ function showSearchResults(fullList) {
    ? `${shown.length} of ${lastResults.length}`
    : String(hasHits ? lastResults.length : 0);
  }
+ const countLine = document.getElementById('results-count-line');
+ if (countLine) countLine.hidden = !hasHits;
  const status = document.getElementById('display-filter-status');
  if (status) {
   status.textContent = displayFiltersActive() && hasHits

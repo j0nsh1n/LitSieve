@@ -7,12 +7,12 @@
 {% macro scope_banner() -%}
 <p class="site-disclaimer" role="note">
  <span class="notice-label">Please note</span>
- <strong>Starting point only.</strong> This tool searches a set of
+ <span class="site-disclaimer-body"><strong>Starting point only.</strong> This tool searches a set of
  <strong>publicly accessible</strong> research databases and helps you organise
  what you fetch. It is <strong>not</strong> a complete library search, not a
  substitute for your school library or librarian, and not medical, legal, or
  professional advice. Always verify important papers in the original sources and
- with your teacher or assignment requirements.
+ with your teacher or assignment requirements.</span>
 </p>
 {%- endmacro %}
 
@@ -38,11 +38,11 @@
 {% macro scope_fetch() -%}
 <p class="site-disclaimer" role="note">
  <span class="notice-label">Please note</span>
- <strong>Starting point only.</strong> Fetches only from the <strong>public research
+ <span class="site-disclaimer-body"><strong>Starting point only.</strong> Fetches only from the <strong>public research
  databases</strong> you select (and only what those APIs return). Paywalled or
  unindexed work will not appear. It is <strong>not</strong> a complete library
  search or professional advice. Cross-check important sources with your school
- library and assignment rules.
+ library and assignment rules.</span>
 </p>
 {%- endmacro %}
 
@@ -50,9 +50,9 @@
 {% macro scope_search() -%}
 <p class="site-disclaimer" role="note">
  <span class="notice-label">Please note</span>
- <strong>Starting point only.</strong> Ranks <strong>only papers already in your
+ <span class="site-disclaimer-body"><strong>Starting point only.</strong> Ranks <strong>only papers already in your
  collection</strong> (from public databases you fetched). It does not search the whole
  web or every journal. Not a complete library search. Follow up in original sources
- and your library for a full review.
+ and your library for a full review.</span>
 </p>
 {%- endmacro %}

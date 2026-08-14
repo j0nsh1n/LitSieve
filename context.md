@@ -81,7 +81,7 @@ Guest User (is_guest) → sample corpus only; purged by age
 ## Session Handoff
 - **Date:** 2026-08-13
 - **Branch:** `feat/phase6-guest-demo` (do not push without explicit ask)
-- **Done:** Phase 10 broadsheet restyle (radii, dark newsprint, masthead,
-  Search notice/searchcard/cards/rail) and version **5.0.0**.
-- **Next:** Browser-pass Search in both themes and 380px. Do not push unless
-  asked.
+- **Done:** Phase 10 broadsheet restyle + layout pass so Simple Search matches
+  the approved mockup (full-width query, results | Save rail, card meta).
+  Version **5.0.0**.
+- **Next:** Human visual check vs mockup. Do not push unless asked.

@@ -3,8 +3,13 @@
 {% block container_mod %}container-wide{% endblock %}
 {% block content %}
 <section class="page-header search-page-header">
- <h1 class="search-title-advanced">Search for Similar Articles</h1>
- <h1 class="search-title-simple">Search</h1>
+ <p class="search-kicker search-kicker-advanced">Step 4 of 4 · Rank &amp; export</p>
+ <p class="search-kicker search-kicker-simple">Step two · Rank &amp; export</p>
+ <div class="pagehead">
+  <h1 class="search-title-advanced">Search for Similar Articles</h1>
+  <h1 class="search-title-simple">Search your collection</h1>
+  <span class="results-count-line" id="results-count-line">Ranked against your question · <span id="result-count">0</span> shown</span>
+ </div>
  <p class="subtitle search-sub-advanced"><strong>Step 4 of 4 (last).</strong> Rank the papers you kept by how well they
  match your question, then export your list.</p>
  <p class="subtitle search-sub-simple">Rank the papers you kept by how well they match your question,
@@ -12,6 +17,14 @@
  {% from "macros/disclaimers.html" import scope_search %}
  {{ scope_search() }}
 </section>
+
+<div class="searchcard search-work" id="searchcard">
+ <div id="text-input-panel">
+  <label class="u-visually-hidden" for="query-text">Research question</label>
+  <textarea id="query-text" placeholder="How do school start times affect adolescent sleep?" rows="1"></textarea>
+ </div>
+ <button id="search-btn" class="btn btn-primary">Search</button>
+</div>
 
 {% include "partials/simple_screening_card.html" %}
 <input type="checkbox" id="only-missing" hidden checked>
@@ -67,14 +80,6 @@
     <label class="radio-label">
     <input type="radio" name="input_method" value="seed"> Seed paper
     </label>
-    </div>
-
-    <div class="searchcard" id="searchcard">
-    <div id="text-input-panel">
-    <label class="u-visually-hidden" for="query-text">Research question</label>
-    <textarea id="query-text" placeholder="Enter your study description or research question..." rows="4"></textarea>
-    </div>
-    <button id="search-btn" class="btn btn-primary">Search</button>
     </div>
 
     <div class="u-hidden" id="pico-input-panel">
@@ -200,7 +205,7 @@
   <div class="search-results-layout" id="search-results-layout">
    <section class="u-hidden" id="results-section">
     <div class="results-header">
-    <h2 class="results-count-line">Ranked against your question · <span id="result-count">0</span> shown</h2>
+    <h2 class="results-count-line results-count-line-legacy">Results</h2>
     </div>
     <div class="display-filters" id="display-filters" hidden>
      <span class="display-filters-label" id="display-filters-label">Show</span>
@@ -283,5 +288,5 @@
 {% block scripts %}
 <script src="/static/js/simple_tools.js?v=20260814a"></script>
 <script src="/static/js/data_management.js?v=20260813f"></script>
-<script src="/static/js/search.js?v=20260814b"></script>
+<script src="/static/js/search.js?v=20260814c"></script>
 {% endblock %}

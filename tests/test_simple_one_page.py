@@ -161,10 +161,8 @@ def test_simple_data_management_always_redirects_to_search(tmp_path, monkeypatch
     assert b"fetch-form" in stay_adv.content
 
 
-def test_simple_css_hides_stepper_and_leftover_collect():
+def test_simple_css_hides_leftover_collect():
     css = _read("static", "css", "style.css")
-    assert 'html[data-mode="simple"] .nav-menu-toggle' in css
-    assert 'html[data-mode="simple"] #nav-links-panel' in css
     assert 'html[data-mode="simple"] #search-collect.has-papers #collect-topics-card' in css
     assert 'html[data-mode="simple"] #search-collect.has-papers #fetch-form' in css
     assert 'html:not([data-mode="simple"]) #search-collect' in css

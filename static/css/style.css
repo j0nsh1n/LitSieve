@@ -811,6 +811,44 @@ body {
     line-height: var(--lh-snug);
 }
 
+.search-page-header {
+    border-bottom: none;
+    padding-bottom: 0;
+    margin-bottom: var(--space-4);
+}
+.search-page-header::after {
+    display: none;
+}
+.search-kicker {
+    font-size: var(--fs-xs);
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 var(--space-2);
+}
+.search-kicker-simple {
+    display: none;
+}
+.pagehead {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-4);
+    flex-wrap: wrap;
+}
+.pagehead h1 {
+    margin-bottom: 0;
+}
+#results-count-line {
+    font-size: var(--fs-xs);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-soft);
+    font-weight: 500;
+}
+.results-count-line-legacy {
+    display: none;
+}
+
 /* === Sections (cards become rule-divided sections, not boxes) === */
 .card {
     background: transparent;
@@ -1521,22 +1559,47 @@ input[type="range"]::-moz-range-thumb:hover {
     width: 3px;
     background: var(--accent);
 }
-.result-row-head {
+.result-row-head,
+.result-row-meta {
     display: flex;
     align-items: flex-start;
     gap: var(--space-3);
     margin-bottom: var(--space-2);
 }
+.result-venue {
+    font-size: var(--fs-xs);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-soft);
+    padding-top: var(--space-1);
+}
+.result-tags {
+    margin-left: auto;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    justify-content: flex-end;
+}
+.result-tags .tag,
+.result-tags .study-type-badge {
+    margin-left: 0;
+}
 .result-row-title {
-    flex: 1;
     min-width: 0;
-    margin: 0;
+    margin: var(--space-1) 0 var(--space-2);
     font-family: var(--font-serif);
     font-size: var(--fs-xl);
     font-weight: 700;
     letter-spacing: -0.01em;
     line-height: var(--lh-snug);
     text-wrap: balance;
+}
+.result-byline {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-size: var(--fs-sm);
+    color: var(--text-soft);
+    margin: 0 0 var(--space-3);
 }
 .score-meter {
     display: inline-flex;
@@ -2943,8 +3006,6 @@ body.lra-modal-open {
     border-radius: var(--radius-md);
     background: var(--wash-accent);
     color: var(--text-body, var(--text));
-    font-family: var(--font-serif);
-    font-style: italic;
     font-size: var(--fs-base);
     line-height: var(--lh-snug);
 }
@@ -2958,6 +3019,13 @@ body.lra-modal-open {
     text-transform: uppercase;
     color: var(--accent);
     white-space: nowrap;
+}
+.site-disclaimer-body {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-family: var(--font-serif);
+    font-style: italic;
+    line-height: 1.5;
 }
 .site-disclaimer strong {
     color: var(--text);
@@ -3027,7 +3095,12 @@ body.lra-modal-open {
     border-right: 0;
     border-radius: var(--radius-sm) 0 0 var(--radius-sm);
     background: var(--bg);
-    min-height: 4.5rem;
+    min-height: 2.6rem;
+    height: 2.6rem;
+    resize: none;
+    font-size: var(--fs-md);
+    padding: var(--space-2) var(--space-4);
+    line-height: 1.4;
 }
 .searchcard #query-text:focus {
     box-shadow: inset 0 -2px 0 var(--accent);
@@ -3040,10 +3113,11 @@ body.lra-modal-open {
     text-transform: uppercase;
     font-weight: 600;
     font-size: var(--fs-xs);
-    padding: var(--space-3) var(--space-5);
+    padding: var(--space-2) var(--space-5);
     background: var(--text);
     color: var(--bg);
     border: 1px solid var(--text);
+    min-width: 7.5rem;
 }
 
 /* === Progressive disclosure (help + advanced) ===
@@ -4198,6 +4272,11 @@ html, body {
         font-size: var(--fs-lg);
         min-height: 5.5rem;
     }
+    .searchcard #query-text {
+        font-size: var(--fs-md);
+        min-height: 2.6rem;
+        height: 2.6rem;
+    }
     .card.empty-state-card > .info-text,
     .card.empty-state-card .info-text#dup-empty-msg,
     .card.empty-state-card .info-text#search-empty-msg,
@@ -4787,17 +4866,7 @@ html[data-mode="simple"] .nav-step-statistics,
 html[data-mode="simple"] .nav-flow-arrow-before-statistics {
     display: none !important;
 }
-/* Step 4: Simple is one page — hide the workflow stepper. Advanced unchanged. */
-html[data-mode="simple"] .nav-menu-toggle,
-html[data-mode="simple"] .nav-links,
-html[data-mode="simple"] #nav-links-panel,
-html[data-mode="simple"] .nav-flow-arrow,
-html[data-mode="simple"] body.nav-menu-open #nav-links-panel,
-html[data-mode="simple"] .navbar.nav-open #nav-links-panel,
-html[data-mode="simple"] .navbar.nav-open .nav-links,
-html[data-mode="simple"] body.nav-menu-open .navbar .nav-links {
-    display: none !important;
-}
+/* Broadsheet: Simple still shows Get papers → Search as the segmented masthead. */
 /* Dual nav labels: Advanced names by default; Simple swaps in. */
 .nav-label-simple {
     display: none !important;
@@ -4874,6 +4943,7 @@ html[data-mode="simple"] .prepare-heading-advanced,
 html[data-mode="simple"] .prepare-lead-advanced,
 html[data-mode="simple"] .search-sub-advanced,
 html[data-mode="simple"] .search-title-advanced,
+html[data-mode="simple"] .search-kicker-advanced,
 html[data-mode="simple"] .search-help-advanced {
     display: none !important;
 }
@@ -4881,9 +4951,14 @@ html[data-mode="simple"] .dm-step-simple,
 html[data-mode="simple"] .dm-sub-simple,
 html[data-mode="simple"] .prepare-heading-simple,
 html[data-mode="simple"] .prepare-lead-simple,
-html[data-mode="simple"] .search-sub-simple,
 html[data-mode="simple"] .search-title-simple {
     display: block !important;
+}
+html[data-mode="simple"] .search-kicker-simple {
+    display: block !important;
+}
+html[data-mode="simple"] .search-sub-simple {
+    display: none !important;
 }
 /* <details> is not a block paragraph — restore native display. */
 html[data-mode="simple"] .search-help-simple {
@@ -4894,6 +4969,35 @@ html[data-mode="simple"] .search-help-simple {
 html[data-mode="simple"] #source-breakdown-section,
 html[data-mode="simple"] #year-timeline-details,
 html[data-mode="simple"] .form-row:has(#threshold) {
+    display: none !important;
+}
+
+/* Phase 10: Simple Search is header + full-width query + results | rail */
+html[data-mode="simple"] .search-workbench {
+    grid-template-columns: minmax(0, 1fr) 16rem;
+}
+html[data-mode="simple"] #search-main {
+    grid-column: 1;
+    grid-row: 1;
+}
+html[data-mode="simple"] #search-rail {
+    grid-column: 2;
+    grid-row: 1;
+}
+html[data-mode="simple"] #search-rail .search-rail-scroll {
+    display: none !important;
+}
+html[data-mode="simple"] .search-page-header .page-help-toolbar,
+html[data-mode="simple"] #search-rail .page-help-toolbar {
+    display: none;
+}
+html[data-mode="simple"] .result-row-ids,
+html[data-mode="simple"] .key-points,
+html[data-mode="simple"] .study-type-meaning,
+html[data-mode="simple"] .ai-actions {
+    display: none !important;
+}
+html[data-mode="simple"] body.simple-collecting #searchcard {
     display: none !important;
 }
 
@@ -5344,6 +5448,28 @@ html[data-mode="simple"] body:has(#search-workbench) .simple-tools-search-only {
     font-size: var(--fs-xs);
     letter-spacing: 0.14em;
     text-transform: uppercase;
+}
+.article-actions-row .star-btn,
+.article-actions-row .note-toggle,
+.article-actions-row .not-relevant-btn {
+    background: none;
+    border: 0;
+    padding: 0;
+    color: var(--text-soft);
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    cursor: pointer;
+    min-height: 0;
+}
+.article-actions-row .star-btn.is-starred,
+.article-actions-row .star-btn:hover,
+.article-actions-row .note-toggle:hover,
+.article-actions-row .not-relevant-btn:hover {
+    color: var(--text);
+}
+.article-actions-row .star-btn.is-starred {
+    color: var(--accent);
 }
 .not-relevant-undo {
     display: flex;

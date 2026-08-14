@@ -127,8 +127,8 @@ def test_register_seeds_simple_mode_cookie(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_simple_nav_hides_stepper():
-    """Simple one-page: brand + tools only. Advanced still has four steps."""
+def test_simple_nav_shows_segmented_steps():
+    """Broadsheet: Simple keeps Get papers → Search as the masthead steps."""
     base = _read("templates", "base.html")
     # (key, advanced_label, simple_label, href, tip, simple_step)
     rows = re.findall(
@@ -147,9 +147,8 @@ def test_simple_nav_hides_stepper():
     assert 'data-step-simple="{{ simple_step }}"' in base or 'data-step-simple="' in base
 
     css = _read("static", "css", "style.css")
-    assert 'html[data-mode="simple"] .nav-menu-toggle' in css
-    assert 'html[data-mode="simple"] .nav-links' in css
-    assert 'html[data-mode="simple"] #nav-links-panel' in css
+    # Phase 10: do not hide the whole Simple stepper (segmented Get papers / Search).
+    assert 'html[data-mode="simple"] .nav-menu-toggle' not in css
     assert 'html[data-mode="simple"] .nav-step-clusters' in css
     assert 'html[data-mode="simple"] .nav-step-statistics' in css
     assert "nav-flow-arrow-before-clusters" in css
