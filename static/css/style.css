@@ -4231,17 +4231,17 @@ html, body {
     .nav-menu-current { font-size: var(--fs-xs); }
     .nav-menu-toggle-icon { font-size: var(--fs-sm); }
     .nav-stats {
-        gap: var(--space-1);
+        gap: var(--space-2);
     }
     /* Drop lower-priority chrome so brand + steps stay on screen */
     .nav-library-label { display: none; }
     .nav-library-wrap {
-        max-width: 5.25rem;
+        max-width: 8.5rem;
     }
     .nav-library-select {
-        max-width: 5.25rem;
+        max-width: 8.5rem;
         min-width: 0;
-        min-height: 2rem;
+        min-height: 2.75rem;
         font-size: var(--fs-xs);
         padding: var(--space-1) var(--space-1);
     }
@@ -4776,11 +4776,11 @@ html, body {
     .nav-menu-toggle { max-width: 100%; padding: var(--space-1) var(--space-1); min-height: 2.75rem; }
     .nav-library-wrap {
         display: inline-flex;
-        max-width: 4.75rem;
+        max-width: 8.5rem;
         min-height: 2.75rem;
     }
     .nav-library-select {
-        max-width: 4.75rem;
+        max-width: 8.5rem;
         min-width: 0;
         min-height: 2.75rem;
         font-size: var(--fs-xs);
@@ -4937,6 +4937,55 @@ html[data-mode="simple"] .navbar.nav-open #nav-links-panel,
 html[data-mode="simple"] .navbar.nav-open .nav-links,
 html[data-mode="simple"] body.nav-menu-open .navbar .nav-links {
     display: none !important;
+}
+/* Simple phones: brand + tools on row 1, full-width library on row 2.
+   The 3-column grid still reserved a center slot for the hidden stepper,
+   which jammed Library into a ~5rem chip next to Simple/Account. */
+@media (max-width: 900px) {
+    html[data-mode="simple"] .navbar,
+    html[data-mode="simple"] .app-shell {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-2) var(--space-3);
+    }
+    html[data-mode="simple"] .shell-primary {
+        display: flex;
+        flex: 0 0 auto;
+    }
+    html[data-mode="simple"] .shell-tools,
+    html[data-mode="simple"] .nav-stats {
+        display: flex;
+        flex: 1 1 auto;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        align-items: center;
+        gap: var(--space-2) var(--space-3);
+        min-width: 0;
+        max-width: none;
+        border: none;
+        background: transparent;
+        padding: 0;
+    }
+    html[data-mode="simple"] .nav-library-wrap {
+        flex: 1 1 100%;
+        order: 20;
+        max-width: none;
+        min-height: 2.75rem;
+        margin: 0;
+    }
+    html[data-mode="simple"] .nav-library-select {
+        width: 100%;
+        max-width: none;
+        min-width: 0;
+        min-height: 2.75rem;
+    }
+    html[data-mode="simple"] .mode-toggle,
+    html[data-mode="simple"] .theme-toggle,
+    html[data-mode="simple"] .nav-username,
+    html[data-mode="simple"] .nav-logout {
+        flex-shrink: 0;
+    }
 }
 /* Dual nav labels: Advanced names by default; Simple swaps in. */
 .nav-label-simple {

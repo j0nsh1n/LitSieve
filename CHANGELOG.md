@@ -25,6 +25,8 @@ and this project aims to follow Semantic Versioning for app version strings
   single-line field joined to Search (no textarea spinner).
 - Library (and other) `<select>` option lists use dark ink on paper so
   dark-mode cream text is not washed out until hover.
+- Simple mobile nav: brand + tools on the first row, library on its own
+  full-width row (no more 5rem “Parkinso” chip).
 
 ## [5.0.0] - 2026-08-13
 
