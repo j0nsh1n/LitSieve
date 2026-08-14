@@ -151,14 +151,11 @@ let selectedTopics = new Set();
 let modelManual = false; // true once the user picks a model under Advanced
 
 document.addEventListener('DOMContentLoaded', () => {
- // Simple + papers: Search is home (server also redirects when ui_mode cookie is set).
+ // Simple home is /search. Do not bounce when collect already lives on Search.
  if (typeof isSimpleMode === 'function' && isSimpleMode()
+  && location.pathname.indexOf('/data-management') !== -1
   && !/[#?&]collect=1(?:&|$)/.test(location.search)) {
-  apiCall('/api/statistics').then((s) => {
-   if (s && (Number(s.articles_with_embeddings) || 0) > 0) {
-    window.location.replace('/search');
-   }
-  }).catch(() => { /* stay on this page */ });
+  window.location.replace('/search');
  }
  // Catalog first so tips/topics match source_catalog.py (Phase R4).
  loadSourceCatalog().finally(() => {
@@ -194,7 +191,8 @@ document.addEventListener('DOMContentLoaded', () => {
    doFetch();
   });
  } else {
-  document.getElementById('fetch-btn').addEventListener('click', doFetch);
+  const fetchBtn = document.getElementById('fetch-btn');
+  if (fetchBtn) fetchBtn.addEventListener('click', doFetch);
  }
  const cancelBtn = document.getElementById('fetch-cancel-btn');
  if (cancelBtn) cancelBtn.addEventListener('click', cancelFetch);
@@ -202,8 +200,10 @@ document.addEventListener('DOMContentLoaded', () => {
  if (unlockBtn) {
   unlockBtn.addEventListener('click', unlockSimpleFetch);
  }
- document.getElementById('embeddings-btn').addEventListener('click', doCreateEmbeddings);
- document.getElementById('coverage-refresh').addEventListener('click', refreshCoverage);
+ const embeddingsBtn = document.getElementById('embeddings-btn');
+ if (embeddingsBtn) embeddingsBtn.addEventListener('click', doCreateEmbeddings);
+ const coverageBtn = document.getElementById('coverage-refresh');
+ if (coverageBtn) coverageBtn.addEventListener('click', refreshCoverage);
  const dismissGs = document.getElementById('dismiss-getting-started');
  if (dismissGs) dismissGs.addEventListener('click', () => {
  if (typeof dismissGettingStarted === 'function') dismissGettingStarted();
@@ -224,11 +224,14 @@ document.addEventListener('DOMContentLoaded', () => {
  if (el) el.addEventListener('change', saveFetchPrefs);
  });
     // A hand-picked model overrides the automatic topic-based choice.
- document.getElementById('embedding-model').addEventListener('change', () => {
- modelManual = true;
- updateModelHint();
- saveFetchPrefs();
- });
+ const modelSel = document.getElementById('embedding-model');
+ if (modelSel) {
+  modelSel.addEventListener('change', () => {
+   modelManual = true;
+   updateModelHint();
+   saveFetchPrefs();
+  });
+ }
  updateModelHint();
  document.querySelectorAll('input[name="fetch-mode"]').forEach(el => {
  el.addEventListener('change', () => {
@@ -354,7 +357,8 @@ function recommendModel() {
 /** Set the model dropdown from the topic recommendation unless the user chose one by hand. */
 function applyModelRecommendation() {
  if (!modelManual) {
- document.getElementById('embedding-model').value = recommendModel();
+  const sel = document.getElementById('embedding-model');
+  if (sel) sel.value = recommendModel();
  }
  updateModelHint();
 }
@@ -472,15 +476,15 @@ function saveFetchPrefs() {
  ).map(cb => cb.value);
  const mode = (document.querySelector('input[name="fetch-mode"]:checked') || {}).value || 'replace';
  const prefs = {
- query: document.getElementById('fetch-query').value,
- max: document.getElementById('fetch-max').value,
- email: document.getElementById('fetch-email').value,
+ query: (document.getElementById('fetch-query') || {}).value || '',
+ max: (document.getElementById('fetch-max') || {}).value || '',
+ email: (document.getElementById('fetch-email') || {}).value || '',
  sources,
  mode,
  topics: [...selectedTopics],
- model: document.getElementById('embedding-model').value,
+ model: (document.getElementById('embedding-model') || {}).value,
  modelManual,
- onlyMissing: document.getElementById('only-missing').checked,
+ onlyMissing: !!(document.getElementById('only-missing') || {}).checked,
  };
  try { localStorage.setItem(FETCH_PREFS_KEY, JSON.stringify(prefs)); } catch (e) { /* ignore */ }
 }
@@ -489,10 +493,18 @@ function restoreFetchPrefs() {
  let prefs;
  try { prefs = JSON.parse(localStorage.getItem(FETCH_PREFS_KEY) || 'null'); } catch (e) { prefs = null; }
  if (!prefs) return;
- if (prefs.query) document.getElementById('fetch-query').value = prefs.query;
- if (prefs.max) document.getElementById('fetch-max').value = prefs.max;
- if (prefs.email) document.getElementById('fetch-email').value = prefs.email;
- if (prefs.model) document.getElementById('embedding-model').value = prefs.model;
+ if (prefs.query && document.getElementById('fetch-query')) {
+  document.getElementById('fetch-query').value = prefs.query;
+ }
+ if (prefs.max && document.getElementById('fetch-max')) {
+  document.getElementById('fetch-max').value = prefs.max;
+ }
+ if (prefs.email && document.getElementById('fetch-email')) {
+  document.getElementById('fetch-email').value = prefs.email;
+ }
+ if (prefs.model && document.getElementById('embedding-model')) {
+  document.getElementById('embedding-model').value = prefs.model;
+ }
  modelManual = !!prefs.modelManual;
  if (prefs.mode) {
  const radio = document.querySelector(`input[name="fetch-mode"][value="${prefs.mode}"]`);
@@ -681,10 +693,13 @@ async function loadPageData() {
  _lastStarredCount = Number(stats.starred) || 0;
  _lastAiKeyPoints = Number(stats.ai_key_points) || 0;
  const missing = stats.missing_embeddings ?? Math.max(0, total - ready);
- document.getElementById('embedding-info').textContent =
- `${ready} of ${total} papers are ready for search` +
- (ready ? ` (model: ${model})` : '') +
- (missing ? ` · ${missing} still need preparing` : '') + '.';
+ const info = document.getElementById('embedding-info');
+ if (info) {
+  info.textContent =
+   `${ready} of ${total} papers are ready for search` +
+   (ready ? ` (model: ${model})` : '') +
+   (missing ? ` · ${missing} still need preparing` : '') + '.';
+ }
  // Topic recommendation drives the dropdown (unless the user overrode it).
  // Do NOT force the corpus's stored model into the select — that made
  // pubmedbert "stick" after a biomedical prep even when topics say specter.
@@ -695,8 +710,12 @@ async function loadPageData() {
  _simpleFetchUnlocked = false;
  _simpleFetchModePicked = false;
  updatePrepareSectionVisibility(total, { readyArticles: ready });
+ if (typeof syncSimpleOnePageState === 'function') {
+  syncSimpleOnePageState(stats);
+ }
  } catch (e) {
- document.getElementById('embedding-info').textContent = 'Unable to load article info.';
+ const infoErr = document.getElementById('embedding-info');
+ if (infoErr) infoErr.textContent = 'Unable to load article info.';
  updateGettingStartedCard(0);
  _simpleFetchUnlocked = false;
  _simpleFetchModePicked = false;
@@ -781,6 +800,7 @@ async function cancelFetch() {
 async function refreshCoverage() {
  const bars = document.getElementById('coverage-bars');
  const sug = document.getElementById('coverage-suggestions');
+ if (!bars) return;
  try {
  const data = await apiCall('/api/coverage', {
  method: 'POST',
@@ -1116,6 +1136,12 @@ function applyFetchResult(data, sources) {
 
  const model = buildFetchSourceReportModel(data, sources);
  const simple = typeof isSimpleMode === 'function' && isSimpleMode();
+ const reportLines = [
+  ...((model && model.successes) || []).map((s) => s.line),
+  ...((model && model.muted) || []).map((m) => m.line),
+  ...((model && model.tipLines) || []),
+ ].filter(Boolean);
+ _lastFetchSourceReportText = reportLines.join('\n');
  const report = document.getElementById('fetch-source-report');
  if (report) {
   report.style.display = 'block';
@@ -1177,9 +1203,9 @@ async function doFetch() {
  const sources = Array.from(
  document.querySelectorAll('#source-option-grid input[type="checkbox"]:checked')
  ).map(cb => cb.value);
- const query = document.getElementById('fetch-query').value.trim();
- const maxResults = parseInt(document.getElementById('fetch-max').value, 10);
- const email = document.getElementById('fetch-email').value.trim();
+ const query = ((document.getElementById('fetch-query') || {}).value || '').trim();
+ const maxResults = parseInt((document.getElementById('fetch-max') || {}).value, 10) || 100;
+ const email = ((document.getElementById('fetch-email') || {}).value || '').trim();
 
  setNextStepVisible(false);
  if (!query) { showNotification('Please enter a search query.', 'error'); return; }
@@ -1215,7 +1241,8 @@ async function doFetch() {
  cancelBtn.hidden = false;
  cancelBtn.disabled = false;
  }
- document.getElementById('fetch-source-report').style.display = 'none';
+ const hideReport = document.getElementById('fetch-source-report');
+ if (hideReport) hideReport.style.display = 'none';
  setStatus(
  'fetch-status',
  clearFirst
@@ -1461,7 +1488,16 @@ async function doCreateEmbeddings(opts) {
  // Manual re-prepare (and auto-chain) must refresh Narrow it down so the
  // confirm-your-question box appears without a full page reload.
  await refreshSimpleScreeningCard();
- if (simple) {
+ if (simple && document.getElementById('search-collect')) {
+  clearCollectQueryFromUrl();
+  try {
+   const stats = await apiCall('/api/statistics');
+   syncSimpleOnePageState(stats);
+   if (typeof loadSearchEmptyState === 'function') {
+    await loadSearchEmptyState();
+   }
+  } catch (e) { /* stay on collect if stats fail */ }
+ } else if (simple) {
   const card = document.getElementById('simple-screening-card');
   if (card && !card.hidden) {
    try {

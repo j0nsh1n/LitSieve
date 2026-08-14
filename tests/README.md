@@ -19,7 +19,7 @@ Tests must catch **real regressions**, not just smoke. When you **add, fix, or r
 | Concern | Where it lives |
 |--------|----------------|
 | Product invariants (deleted/required routes, auth, Account structure, clone wording) | `test_guardrails.py` |
-| Simple / Advanced dual-mode contracts (nav, auto-chain, screening card, two-page flow) | `test_simple_mode.py` |
+| Simple / Advanced dual-mode contracts (nav, auto-chain, screening card, one-page Search) | `test_simple_mode.py`, `test_simple_one_page.py` |
 | Guest demo (`/guest`, sample-only, 30‑min purge, no session hijack) | `test_guest_mode.py` |
 | Browser JS parse + CSP-safe bars + Account site modals + shared `?v=` | `test_static_js.py` |
 | AI opt-in / no bulk rewrite / panel collapsed | `test_ai_policy.py` |

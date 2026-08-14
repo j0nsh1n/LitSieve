@@ -1,7 +1,6 @@
 # Plan — Simple mode on one page
 
-**Status:** Steps 1–2 implemented 2026-08-13. Steps 3–5 wait on spec.md
-Simple-nav approval.
+**Status:** Steps 1–5 implemented 2026-08-13. spec.md Simple nav updated.
 
 Build note for collapsing Simple from Get papers → Search into **one surface**.
 Advanced is unchanged. Follows Phase 6 (`docs/SIMPLE_TWO_PAGE_PLAN.md`) and the
@@ -145,14 +144,14 @@ no topic grid, no fetch form, no coverage.
 
 ## Acceptance (whole phase)
 
-- [ ] Empty Simple: topics → fetch → auto-prepare on one URL
-- [ ] Full Simple: search, Show chips, export, Narrow it down / Re-prepare /
+- [x] Empty Simple: topics → fetch → auto-prepare on one URL
+- [x] Full Simple: search, Show chips, export, Narrow it down / Re-prepare /
       Start over as popups, same URL
-- [ ] No auto-opened screening dialog after fetch
-- [ ] Advanced pages, nav, and controls unchanged
-- [ ] Guest still cannot multi-source fetch
+- [x] No auto-opened screening dialog after fetch
+- [x] Advanced pages, nav, and controls unchanged
+- [x] Guest still cannot multi-source fetch
 - [ ] 380px: no horizontal scroll; export bar still clears the last result
-- [ ] `ruff check .` clean, full pytest green
+- [x] `ruff check .` clean, full pytest green
 
 ## spec.md (propose, do not edit until approved)
 

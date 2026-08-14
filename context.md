@@ -12,9 +12,9 @@
 - Tests: `SECRET_KEY=x DEBUG=true ./venv/bin/python -m pytest -q` — prefer
   `./venv` for sqlcipher. Count drifts with the branch; re-run before release.
 - UI: Simple/Advanced via `localStorage.uiMode` + `data-mode` (theme-init pre-paint).
-  Simple nav: Get papers → Search. After a library has papers, Simple hides the
-  fetch form (Start over / add papers unlocks one more fetch). Advanced: full
-  steps including Clean up + Clusters.
+  Simple: one `/search` page (empty collect vs papers). `/data-management`
+  redirects in Simple. After papers exist, topics/fetch hide; Start over is a
+  popup. Advanced: full steps including Clean up + Clusters.
 - Guest: `/guest` → sample corpus, multi-source fetch 403, purge after 30 minutes.
 - Ops: systemd user unit for uvicorn; optional backup + watchdog timers — see
   `docs/SELFHOST.md` and `docs/DEPLOY.md` (generic operator runbooks).
@@ -80,6 +80,8 @@ Guest User (is_guest) → sample corpus only; purged by age
 ## Session Handoff
 - **Date:** 2026-08-13
 - **Branch:** `feat/phase6-guest-demo` (do not push without explicit ask)
-- **Done:** Simple one-page steps 1–2 — prepared libraries redirect Get papers
-  → Search; Search tools strip (Narrow it down / Re-prepare / Start over).
-- **Next:** Steps 3–5 after spec.md Simple-nav approval. Do not push unless asked.
+- **Done:** Simple one-page steps 3–5 — collect UI on `/search`; Simple
+  `/data-management` always redirects; stepper hidden; leftover collect chrome
+  frozen after papers. spec.md Simple nav updated (approved).
+- **Next:** Browser-pass the empty fetch → prepare → search path. Do not push
+  unless asked.

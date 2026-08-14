@@ -108,9 +108,9 @@ Register/login for a private workspace, then:
 
 **Simple mode (default for new accounts)**
 
-1. **Get papers** (`/data-management`) → topics, **Fetch** (prepare runs next
-   automatically) → optional screening card → **Go to Search**.
-2. **Search** → rank, filter, export RIS / screening report from the side panel.
+1. **Search** (`/search`) — empty library: topics + **Fetch** (prepare runs next
+   automatically). After papers: rank, Show chips, export RIS. Optional
+   **Narrow it down**, **Re-prepare**, and **Start over** are popups.
 
 **Advanced mode** (toggle in the nav)
 

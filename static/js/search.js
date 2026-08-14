@@ -284,12 +284,21 @@ function updateSearchWorkVisibility(stats) {
 async function loadSearchEmptyState() {
  try {
  const stats = await apiCall('/api/statistics');
- if (typeof applyEmptyState === 'function') {
+ if (typeof syncSimpleOnePageState === 'function') {
+  syncSimpleOnePageState(stats);
+ }
+ const simple = typeof isSimpleMode === 'function' && isSimpleMode();
+ if (!simple && typeof applyEmptyState === 'function') {
  applyEmptyState('search-empty-state', stats, 'embeddings', 'search-empty-msg');
  }
- updateSearchWorkVisibility(stats);
+ if (!simple || !wantsSimpleCollectView(stats)) {
+  updateSearchWorkVisibility(stats);
+ }
  return stats;
  } catch (e) {
+ if (typeof syncSimpleOnePageState === 'function') {
+  syncSimpleOnePageState({ articles_with_embeddings: 0, total_articles: 0 });
+ }
  updateSearchWorkVisibility({ articles_with_embeddings: 0 });
  return null;
  }

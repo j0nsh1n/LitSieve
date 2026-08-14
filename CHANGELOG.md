@@ -37,6 +37,10 @@ and this project aims to follow Semantic Versioning for app version strings
   Search. A one-line strip on Search has Narrow it down, Re-prepare, and Start
   over (Start over opens Get papers with `?collect=1`). Empty libraries still
   open Get papers.
+- **Simple is one page:** `/search` is collect (empty) or rank/export (papers).
+  `/data-management` in Simple always redirects to Search (`?collect=1` opens
+  start-over). Nav has no step 1/2. Topics, fetch form, and coverage hide after
+  papers exist; source counts open from the papers chip.
 
 ### Changed
 - **Start fresh copy (Simple):** the existing replace/add dialog now says notes,
@@ -68,8 +72,8 @@ and this project aims to follow Semantic Versioning for app version strings
   per-source fetch progress; list skeletons; optimistic star / note / Not
   relevant; denser 380px mobile layout; motion vocabulary with reduced-motion
   covering shimmer.
-- Simple nav is **Get papers → Search** only (contiguous steps 1–2). Clean up
-  remains on `/statistics` for Advanced.
+- Simple nav is **one Search page** (no step control). Clean up remains on
+  `/statistics` for Advanced.
 - Simple post-prepare shortcut is **Go to Search** (replaces the Phase 5
   “Next: Clean up your papers” bar once screening is applied or skipped).
 

@@ -2,7 +2,7 @@
 {% block title %}Search - LitSieve{% endblock %}
 {% block container_mod %}container-wide{% endblock %}
 {% block content %}
-<section class="page-header">
+<section class="page-header search-page-header">
  <h1 class="search-title-advanced">Search for Similar Articles</h1>
  <h1 class="search-title-simple">Search</h1>
  <p class="subtitle search-sub-advanced"><strong>Step 4 of 4 (last).</strong> Rank the papers you kept by how well they
@@ -15,6 +15,11 @@
 
 {% include "partials/simple_screening_card.html" %}
 <input type="checkbox" id="only-missing" hidden checked>
+
+{# Simple empty / start-over: topics + fetch live here. Hidden in Advanced. #}
+<div id="search-collect" hidden>
+{% include "partials/collect_ui.html" %}
+</div>
 
 <section class="card empty-state-card" id="search-empty-state" hidden>
  <h2>Nothing to search yet</h2>
@@ -274,6 +279,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/simple_tools.js?v=20260813a"></script>
-<script src="/static/js/search.js?v=20260813c"></script>
+<script src="/static/js/simple_tools.js?v=20260813b"></script>
+<script src="/static/js/data_management.js?v=20260813f"></script>
+<script src="/static/js/search.js?v=20260813d"></script>
 {% endblock %}

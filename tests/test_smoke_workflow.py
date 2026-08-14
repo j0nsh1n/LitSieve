@@ -157,7 +157,7 @@ def test_smoke_register_sample_cluster_search_export(app_module):
     assert "collected" in report.text.lower() or "included" in report.text.lower() or len(report.text) > 20
 
     # App pages still render after the workflow (disclaimer + cache-bust smoke).
-    # Simple + prepared papers sends /data-management → /search; collect=1 keeps Get papers.
+    # Simple /data-management?collect=1 follows to /search?collect=1 (collect UI).
     for path in ("/data-management?collect=1", "/clusters", "/statistics", "/search", "/account"):
         page = c.get(path)
         assert page.status_code == 200, path

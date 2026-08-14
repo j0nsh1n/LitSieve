@@ -4604,6 +4604,17 @@ html[data-mode="simple"] .nav-step-statistics,
 html[data-mode="simple"] .nav-flow-arrow-before-statistics {
     display: none !important;
 }
+/* Step 4: Simple is one page — hide the workflow stepper. Advanced unchanged. */
+html[data-mode="simple"] .nav-menu-toggle,
+html[data-mode="simple"] .nav-links,
+html[data-mode="simple"] #nav-links-panel,
+html[data-mode="simple"] .nav-flow-arrow,
+html[data-mode="simple"] body.nav-menu-open #nav-links-panel,
+html[data-mode="simple"] .navbar.nav-open #nav-links-panel,
+html[data-mode="simple"] .navbar.nav-open .nav-links,
+html[data-mode="simple"] body.nav-menu-open .navbar .nav-links {
+    display: none !important;
+}
 /* Dual nav labels: Advanced names by default; Simple swaps in. */
 .nav-label-simple {
     display: none !important;
@@ -4915,6 +4926,51 @@ html[data-mode="simple"] .search-simple-panel:not([hidden]) {
 .simple-tools-count {
     font-weight: 600;
     margin-right: var(--space-1);
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    padding: 0;
+    cursor: pointer;
+    text-align: left;
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+}
+.simple-tools-count[hidden] {
+    display: none !important;
+}
+.collect-header-simple {
+    display: none;
+}
+html[data-mode="simple"] #search-collect .collect-header-simple {
+    display: block;
+}
+/* Advanced Search never shows collect; Simple never shows the Get-papers hop. */
+html:not([data-mode="simple"]) #search-collect {
+    display: none !important;
+}
+html[data-mode="simple"] #search-empty-state {
+    display: none !important;
+}
+html[data-mode="simple"] body.simple-collecting .search-page-header,
+html[data-mode="simple"] body.simple-collecting #search-workbench {
+    display: none !important;
+}
+/* Step 5: leftover collect chrome after papers exist (not start-over). */
+html[data-mode="simple"] #search-collect.has-papers #collect-topics-card,
+html[data-mode="simple"] #search-collect.has-papers #collect-sources-card,
+html[data-mode="simple"] #search-collect.has-papers #collect-coverage-card,
+html[data-mode="simple"] #search-collect.has-papers #getting-started-card,
+html[data-mode="simple"] #search-collect.has-papers #fetch-form,
+html[data-mode="simple"] #search-collect.has-papers #fetch-lead,
+html[data-mode="simple"] #search-collect.has-papers #fetch-source-report,
+html[data-mode="simple"] #search-collect #fetch-source-report {
+    display: none !important;
+}
+html[data-mode="simple"] body:has(#search-workbench) #simple-screen-goto,
+html[data-mode="simple"] body:has(#search-workbench) #fetch-next-step {
+    display: none !important;
 }
 .simple-tools-search-only {
     display: none;

@@ -171,7 +171,7 @@ def test_padding_uses_spacing_scale_only():
 
 def test_fetch_live_sources_markup_and_renderer():
     """Waiting state: live per-source list is reserved and rendered from API data."""
-    dm_html = (REPO / "templates" / "data_management.html").read_text(encoding="utf-8")
+    dm_html = (REPO / "templates" / "partials" / "collect_ui.html").read_text(encoding="utf-8")
     assert 'id="fetch-live-sources"' in dm_html
     dm_js = (REPO / "static" / "js" / "data_management.js").read_text(encoding="utf-8")
     assert "function renderFetchLiveSources" in dm_js

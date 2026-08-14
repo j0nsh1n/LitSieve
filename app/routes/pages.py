@@ -138,23 +138,12 @@ async def data_management_page(request: Request):
     user = current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=302)
-    # Simple + papers: Search is home. ?collect=1 keeps Get papers (Start over).
-    collect = (request.query_params.get("collect") or "").strip() == "1"
-    if not collect and _cookie_wants_simple(request):
-        from app.core import get_pipeline, release_pipeline
-        uid = user["user_id"]
-        p = None
-        try:
-            p = get_pipeline(uid)
-            stats = p.get_statistics() if p else {}
-            # Search is only home once papers can actually be ranked.
-            if (stats.get("articles_with_embeddings") or 0) > 0:
-                return RedirectResponse(url="/search", status_code=302)
-        except Exception:
-            logger.exception("Simple Get-papers redirect check failed")
-        finally:
-            if p is not None:
-                release_pipeline(uid)
+    # Simple home is /search (empty collect vs papers). ?collect=1 opens the
+    # collect state on Search (Start over). Advanced still renders this page.
+    if _cookie_wants_simple(request):
+        collect = (request.query_params.get("collect") or "").strip() == "1"
+        dest = "/search?collect=1" if collect else "/search"
+        return RedirectResponse(url=dest, status_code=302)
     return templates.TemplateResponse(request, "data_management.html", context={"active_page": "data_management", "user": user})
 
 

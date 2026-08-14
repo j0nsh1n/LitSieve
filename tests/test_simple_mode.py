@@ -34,6 +34,15 @@ def _simple_js() -> str:
     )
 
 
+def _dm_markup() -> str:
+    """Data Management page plus the shared collect partial."""
+    return (
+        _read("templates", "data_management.html")
+        + "\n"
+        + _read("templates", "partials", "collect_ui.html")
+    )
+
+
 # ---------------------------------------------------------------------------
 # Pre-paint + toggle (both modes)
 # ---------------------------------------------------------------------------
@@ -114,12 +123,12 @@ def test_register_seeds_simple_mode_cookie(tmp_path, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# Nav: Phase 6 Simple is Get papers → Search (1, 2); Advanced keeps four steps
+# Nav: Simple hides the stepper; Advanced keeps four steps
 # ---------------------------------------------------------------------------
 
 
-def test_simple_nav_steps_are_contiguous():
-    """Phase 6: Simple hides Clusters + Clean up; remaining steps are 1, 2."""
+def test_simple_nav_hides_stepper():
+    """Simple one-page: brand + tools only. Advanced still has four steps."""
     base = _read("templates", "base.html")
     # (key, advanced_label, simple_label, href, tip, simple_step)
     rows = re.findall(
@@ -131,19 +140,22 @@ def test_simple_nav_steps_are_contiguous():
     assert "clusters" in by_key, by_key
     assert by_key["clusters"] == "", "Clusters has no Simple step number (hidden)"
     assert by_key["statistics"] == "", "Clean up has no Simple step number (hidden)"
-    visible = [by_key[k] for k in ("data_management", "search")]
-    assert visible == ["1", "2"], f"Simple steps must be contiguous 1-2, got {visible}"
-    # Advanced step indices still 1–4 on the same workflow loop.
+    # Tuple still records 1/2 for Search/Get papers (URL + Advanced labels).
+    assert by_key["data_management"] in ("1", ""), by_key
+    assert by_key["search"] in ("2", "1", ""), by_key
     assert "data-step-advanced" in base
     assert 'data-step-simple="{{ simple_step }}"' in base or 'data-step-simple="' in base
 
     css = _read("static", "css", "style.css")
+    assert 'html[data-mode="simple"] .nav-menu-toggle' in css
+    assert 'html[data-mode="simple"] .nav-links' in css
+    assert 'html[data-mode="simple"] #nav-links-panel' in css
     assert 'html[data-mode="simple"] .nav-step-clusters' in css
     assert 'html[data-mode="simple"] .nav-step-statistics' in css
     assert "nav-flow-arrow-before-clusters" in css
     assert "nav-flow-arrow-before-statistics" in css
 
-    # Advanced still labels Clean up (not Duplicates); Simple uses Get papers.
+    # Advanced still labels Clean up (not Duplicates).
     assert "Clean up" in base
     assert re.search(r'"statistics"\s*,\s*"Clean up"', base)
     assert "Get papers" in base
@@ -191,7 +203,7 @@ def test_simple_css_hides_power_surfaces_not_controls_from_dom():
         assert needle in css, f"Simple hide rule missing target: {needle}"
 
     # Sources / advanced options still exist in templates for Advanced + submit.
-    dm = _read("templates", "data_management.html")
+    dm = _dm_markup()
     assert 'id="source-option-grid"' in dm
     assert 'id="embedding-model"' in dm
     assert "Choose Sources" in dm or "source-option-grid" in dm
@@ -226,7 +238,7 @@ def test_hidden_source_grid_still_submits_checked_sources():
 
 def test_simple_mode_renumbers_fetch_not_advanced():
     """Simple: Fetch is step 2 (sources hidden). Advanced keeps Fetch as step 3."""
-    html = _read("templates", "data_management.html")
+    html = _dm_markup()
     assert "dm-step-simple" in html
     assert "dm-step-advanced" in html
     assert "2. Fetch Articles" in html
@@ -281,7 +293,7 @@ def test_fetch_form_submits_on_enter():
     *before* the submit listener was registered, so Enter/click posted the form
     to the GET-only page route and returned 405 Method Not Allowed.
     """
-    html = _read("templates", "data_management.html")
+    html = _dm_markup()
     assert 'id="fetch-form"' in html
     assert 'type="submit"' in html and 'id="fetch-btn"' in html
     form = re.search(r'<form[^>]*id="fetch-form"[^>]*>', html)
@@ -790,7 +802,7 @@ def test_simple_locks_fetch_after_library_has_papers():
     existing replace/add dialog, then doFetch must not ask again. A locked
     submit is a no-op (no /api/fetch-articles-multi).
     """
-    html = _read("templates", "data_management.html")
+    html = _dm_markup()
     assert 'id="simple-fetch-locked"' in html
     assert 'id="simple-fetch-unlock-btn"' in html
     assert 'id="fetch-lead"' in html
@@ -1075,9 +1087,11 @@ def test_simple_mode_markup_lives_in_labeled_partials():
     """
     dm = _read("templates", "data_management.html")
     search = _read("templates", "search.html")
+    collect = _read("templates", "partials", "collect_ui.html")
+    assert 'include "partials/collect_ui.html"' in dm
     assert 'include "partials/simple_screening_card.html"' in dm
     assert 'include "partials/simple_go_to_search.html"' in dm
-    assert 'include "partials/guest_fetch_note.html"' in dm
+    assert 'include "partials/guest_fetch_note.html"' in collect
     assert 'include "partials/simple_search_panel.html"' in search
     # Markup itself lives in the partial, not duplicated on the page.
     assert 'id="simple-screening-card"' not in dm

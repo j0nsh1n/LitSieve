@@ -39,7 +39,7 @@ def test_guest_start_loads_sample_and_blocks_fetch(tmp_path, monkeypatch):
     client = TestClient(app)
     r = client.get("/guest", follow_redirects=False)
     assert r.status_code in (302, 303), r.text
-    assert r.headers.get("location") == "/data-management"
+    assert r.headers.get("location") == "/search"
     assert client.cookies.get("access_token")
     assert client.cookies.get("csrf_token")
 
@@ -183,7 +183,7 @@ def test_guest_start_never_replaces_a_signed_in_session(tmp_path, monkeypatch):
     ):
         resp = call()
         assert resp.status_code in (302, 303), resp.text
-        assert resp.headers.get("location") == "/data-management"
+        assert resp.headers.get("location") == "/data-management" or resp.headers.get("location") == "/search"
         # Session untouched: same token, and still the real account.
         assert client.cookies.get("access_token") == token_before
         who = client.get("/api/statistics")

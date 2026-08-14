@@ -1,9 +1,82 @@
 // Simple-mode tools shared by Data Management and Search.
-// Screening popup, re-prepare / start-over dialogs, Search tools strip.
-// Do not load data_management.js on Search — this file is the shared slice.
+// Screening popup, re-prepare / start-over dialogs, Search tools strip,
+// and the one-page collect/search state. Search also loads data_management.js
+// for fetch/topics (collect UI lives on /search).
 
 var _lastTotalArticles = (typeof _lastTotalArticles === 'number') ? _lastTotalArticles : 0;
 var _simpleOnlyMissing = true;
+var _lastFetchSourceReportText = '';
+
+function _isPipelineBusy() {
+ return typeof _pipelineBusy === 'boolean' && _pipelineBusy;
+}
+
+function _collectQueryOn() {
+ return /(?:\?|&|#)collect=1(?:&|$)/.test(location.search + location.hash);
+}
+
+/** Simple Search: collect (empty / unprepared / ?collect=1) vs rank/export. */
+function wantsSimpleCollectView(stats) {
+ if (typeof isSimpleMode !== 'function' || !isSimpleMode()) return false;
+ if (_collectQueryOn()) return true;
+ const ready = Number(stats && stats.articles_with_embeddings) || 0;
+ return ready <= 0;
+}
+
+function clearCollectQueryFromUrl() {
+ if (!_collectQueryOn()) return;
+ try {
+  const url = new URL(location.href);
+  url.searchParams.delete('collect');
+  const q = url.searchParams.toString();
+  history.replaceState({}, '', url.pathname + (q ? '?' + q : '') + url.hash);
+ } catch (e) { /* ignore */ }
+}
+
+function setCollectQueryOnUrl() {
+ try {
+  const url = new URL(location.href);
+  url.searchParams.set('collect', '1');
+  history.replaceState({}, '', url.pathname + '?' + url.searchParams.toString());
+ } catch (e) {
+  window.location.href = '/search?collect=1';
+ }
+}
+
+function syncSimpleOnePageState(stats) {
+ const collect = document.getElementById('search-collect');
+ if (!collect) return;
+ const simple = typeof isSimpleMode === 'function' && isSimpleMode();
+ const ready = Number(stats && stats.articles_with_embeddings) || 0;
+ const total = Number(stats && stats.total_articles) || _lastTotalArticles || 0;
+ const showCollect = simple && wantsSimpleCollectView(stats);
+ const forceCollect = simple && _collectQueryOn();
+ collect.hidden = !showCollect;
+ collect.classList.toggle('has-papers', simple && total > 0 && !forceCollect);
+ collect.classList.toggle('is-startover', !!forceCollect);
+ if (document.body) {
+  document.body.classList.toggle('simple-collecting', showCollect);
+ }
+ const empty = document.getElementById('search-empty-state');
+ if (empty) {
+  // Advanced empty-state only. Simple uses collect.
+  if (simple) empty.hidden = true;
+ }
+ const work = document.getElementById('search-workbench');
+ if (work) {
+  work.hidden = !ready || showCollect;
+ }
+ if (showCollect) {
+  const card = document.getElementById('simple-screening-card');
+  if (card) card.hidden = true;
+ }
+ if (typeof updateSearchWorkVisibility === 'function' && !showCollect) {
+  updateSearchWorkVisibility(stats || { articles_with_embeddings: ready });
+ }
+ if (typeof updateSimpleToolsStrip === 'function') {
+  updateSimpleToolsStrip(stats);
+ }
+}
 
 function setNextStepVisible(visible) {
  if (typeof window._lraSetNextStepVisible === 'function') {
@@ -219,8 +292,9 @@ function prefillSimpleScreenQuery() {
 
 function setSimpleScreenGotoVisible(visible) {
  const el = document.getElementById('simple-screen-goto');
- if (el) el.hidden = !visible;
- if (location.pathname.indexOf('/search') === -1) setNextStepVisible(visible);
+ const onSearch = _onSearchPage();
+ if (el) el.hidden = !visible || onSearch;
+ if (!onSearch) setNextStepVisible(visible);
 }
 
 let _simpleScreenModalOpener = null;
@@ -323,7 +397,11 @@ async function refreshSimpleScreeningCard() {
  const card = document.getElementById('simple-screening-card');
  if (!card) return;
  const simple = typeof isSimpleMode === 'function' && isSimpleMode();
- if (!simple || _pipelineBusy) {
+ if (!simple || _isPipelineBusy()) {
+  card.hidden = true;
+  return;
+ }
+ if (_collectQueryOn()) {
   card.hidden = true;
   return;
  }
@@ -342,6 +420,17 @@ async function refreshSimpleScreeningCard() {
   const total = Number(stats.total_articles) || 0;
 
   if (ready <= 0) {
+   if (total > 0 && _onSearchPage()) {
+    card.hidden = false;
+    wireSimpleToolsStrip();
+    updateSimpleToolsStrip(stats);
+    const openBtn = document.getElementById('simple-screen-open-btn');
+    if (openBtn) openBtn.hidden = true;
+    const dockHint = document.getElementById('simple-screen-dock-hint');
+    if (dockHint) dockHint.hidden = true;
+    setSimpleScreenGotoVisible(false);
+    return;
+   }
    card.hidden = true;
    setSimpleScreenGotoVisible(false);
    return;
@@ -901,12 +990,40 @@ function updateSimpleToolsStrip(stats) {
  const simple = typeof isSimpleMode === 'function' && isSimpleMode();
  const total = Number(stats && stats.total_articles) || 0;
  _lastTotalArticles = total;
+ const sources = (stats && stats.sources) || {};
+ const sourceCount = Object.keys(sources).filter((id) => (Number(sources[id]) || 0) > 0).length;
  const countEl = document.getElementById('simple-tools-count');
  if (countEl) {
-  countEl.textContent = total === 1 ? '1 paper' : `${total} papers`;
+  const papers = total === 1 ? '1 paper' : `${total} papers`;
+  const src = sourceCount
+   ? ` · ${sourceCount} source${sourceCount === 1 ? '' : 's'}`
+   : '';
+  countEl.textContent = papers + src;
+  countEl.hidden = total <= 0;
+  if (countEl.tagName === 'BUTTON' || countEl.getAttribute('type') === 'button') {
+   countEl.disabled = total <= 0;
+  }
  }
- const show = !!(simple && total > 0);
+ const show = !!(simple && total > 0 && !_collectQueryOn());
  strip.hidden = !show;
+}
+
+function openSimpleSourceReport(stats) {
+ const sources = (stats && stats.sources) || {};
+ const lines = Object.keys(sources)
+  .filter((id) => (Number(sources[id]) || 0) > 0)
+  .sort((a, b) => (Number(sources[b]) || 0) - (Number(sources[a]) || 0))
+  .map((id) => {
+   const name = typeof getSourceName === 'function' ? getSourceName(id) : id;
+   return `${name}: ${sources[id]}`;
+  });
+ const message = _lastFetchSourceReportText
+  || (lines.length ? lines.join('\n') : 'No source counts yet.');
+ if (typeof openSiteAlert === 'function') {
+  openSiteAlert({ title: 'What we fetched', message });
+ } else {
+  showNotification(message.replace(/\n/g, ' · '), 'info');
+ }
 }
 
 async function simpleToolsReprepare() {
@@ -979,17 +1096,41 @@ function _waitForEmbedJob(timeoutMs) {
 
 async function simpleToolsStartOver() {
  if (typeof resolveSimpleFetchModeBeforeRequest !== 'function') {
-  window.location.href = '/data-management?collect=1';
+  window.location.href = '/search?collect=1';
   return;
  }
  const proceed = await resolveSimpleFetchModeBeforeRequest();
  if (!proceed) return;
- window.location.href = '/data-management?collect=1';
+ if (_onSearchPage()) {
+  setCollectQueryOnUrl();
+  if (typeof _simpleFetchUnlocked !== 'undefined') {
+   _simpleFetchUnlocked = true;
+   _simpleFetchModePicked = true;
+  }
+  if (typeof updateSimpleFetchLock === 'function') updateSimpleFetchLock();
+  try {
+   const stats = await apiCall('/api/statistics');
+   syncSimpleOnePageState(stats);
+  } catch (e) {
+   syncSimpleOnePageState({
+    total_articles: _lastTotalArticles,
+    articles_with_embeddings: 0,
+   });
+  }
+  const q = document.getElementById('fetch-query');
+  if (q) {
+   q.focus();
+   if (typeof q.select === 'function') q.select();
+  }
+  return;
+ }
+ window.location.href = '/search?collect=1';
 }
 
 function wireSimpleToolsStrip() {
  const reprepare = document.getElementById('simple-tools-reprepare-btn');
  const startover = document.getElementById('simple-tools-startover-btn');
+ const countEl = document.getElementById('simple-tools-count');
  if (reprepare && reprepare.dataset.wired !== '1') {
   reprepare.dataset.wired = '1';
   reprepare.addEventListener('click', simpleToolsReprepare);
@@ -998,12 +1139,21 @@ function wireSimpleToolsStrip() {
   startover.dataset.wired = '1';
   startover.addEventListener('click', simpleToolsStartOver);
  }
+ if (countEl && countEl.dataset.wired !== '1') {
+  countEl.dataset.wired = '1';
+  countEl.addEventListener('click', () => {
+   apiCall('/api/statistics').then(openSimpleSourceReport).catch(() => {
+    openSimpleSourceReport(null);
+   });
+  });
+ }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
  wireSimpleToolsStrip();
  if (typeof isSimpleMode === 'function' && isSimpleMode() && _onSearchPage()) {
   apiCall('/api/statistics').then((stats) => {
+   syncSimpleOnePageState(stats);
    updateSimpleToolsStrip(stats);
    if (typeof refreshSimpleScreeningCard === 'function') {
     refreshSimpleScreeningCard();
@@ -1014,7 +1164,11 @@ document.addEventListener('DOMContentLoaded', () => {
  if (modeBtn) {
   modeBtn.addEventListener('click', () => {
    requestAnimationFrame(() => {
-    apiCall('/api/statistics').then(updateSimpleToolsStrip).catch(() => {});
+    apiCall('/api/statistics').then((stats) => {
+     if (typeof syncSimpleOnePageState === 'function') syncSimpleOnePageState(stats);
+     updateSimpleToolsStrip(stats);
+     if (typeof refreshSimpleScreeningCard === 'function') refreshSimpleScreeningCard();
+    }).catch(() => {});
    });
   });
  }

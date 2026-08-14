@@ -49,7 +49,7 @@ def test_sample_corpus_loads_rows_before_clearing():
 
 def test_advanced_replace_consequence_is_inline_not_a_modal():
     """Advanced: live line next to the radio. Simple already hides that row."""
-    html = (REPO / "templates" / "data_management.html").read_text(encoding="utf-8")
+    html = (REPO / "templates" / "partials" / "collect_ui.html").read_text(encoding="utf-8")
     assert 'id="fetch-replace-consequence"' in html
     assert 'name="fetch-mode"' in html
     css = (REPO / "static" / "css" / "style.css").read_text(encoding="utf-8")
