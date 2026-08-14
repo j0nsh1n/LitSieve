@@ -521,9 +521,14 @@ async def api_load_sample_corpus(req: SampleCorpusRequest, request: Request):
             )
     p = get_pipeline(uid)
     try:
+        articles = get_sample_articles()
+        if not articles:
+            return JSONResponse(
+                status_code=500,
+                content={"detail": "Sample corpus is empty; collection left unchanged."},
+            )
         if req.clear_first:
             p.db.clear_all()
-        articles = get_sample_articles()
         stats = p.db.insert_articles(articles, dedupe=True)
         p.invalidate_corpus_cache()
         inserted = stats.get("inserted", 0) if isinstance(stats, dict) else 0

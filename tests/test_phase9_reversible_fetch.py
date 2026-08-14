@@ -35,6 +35,18 @@ def test_simple_start_fresh_copy_names_what_it_destroys():
         assert word in fn.lower(), word
 
 
+def test_sample_corpus_loads_rows_before_clearing():
+    """In-process sample list must exist before clear_all; empty list must not wipe."""
+    src = (REPO / "app" / "routes" / "corpus.py").read_text(encoding="utf-8")
+    fn = src[
+        src.index("async def api_load_sample_corpus") : src.index(
+            "async def api_resolve_duplicates"
+        )
+    ]
+    assert fn.index("get_sample_articles()") < fn.index("clear_all()")
+    assert "Sample corpus is empty" in fn
+
+
 def test_advanced_replace_consequence_is_inline_not_a_modal():
     """Advanced: live line next to the radio. Simple already hides that row."""
     html = (REPO / "templates" / "data_management.html").read_text(encoding="utf-8")

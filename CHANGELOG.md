@@ -35,6 +35,8 @@ and this project aims to follow Semantic Versioning for app version strings
 - **Advanced replace-fetch:** a live line next to the Replace radio names the
   paper / note / star / AI key-point counts when the collection is not empty.
   No new modal. Append and empty libraries hide the line.
+- **Sample corpus load** now builds the demo list before clearing, so a missing
+  sample set cannot wipe the library.
 - **Simple fetch lock:** after this library has papers, Simple hides the Fetch
   Articles form so a second search is not the main action. A secondary
   **Start over or add papers** control reuses the existing replace/add dialog,
