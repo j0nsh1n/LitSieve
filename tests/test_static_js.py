@@ -53,7 +53,7 @@ def test_theme_init_stays_loadable_before_paint():
     theme/layout, and inline would break the `script-src 'self'` CSP.
     """
     root = pathlib.Path(__file__).resolve().parent.parent
-    for name in ("base.html", "login.html", "landing.html", "register.html"):
+    for name in ("base.html", "login.html", "landing.html", "register.html", "feature_guide.html"):
         html = (root / "templates" / name).read_text()
         tag = re.search(r"<script[^>]*theme-init[^>]*>", html)
         assert tag, f"{name} does not load theme-init.js"
@@ -90,6 +90,20 @@ def test_shared_assets_use_one_cache_bust_version():
             f"{asset} requested at multiple versions: "
             + "; ".join(f"{v} in {sorted(set(f))}" for v, f in versions.items())
         )
+
+
+def test_public_pages_have_theme_toggle_without_common_js():
+    """Landing and /learn guides can switch theme without loading common.js."""
+    root = pathlib.Path(__file__).resolve().parent.parent
+    init = (root / "static" / "js" / "theme-init.js").read_text(encoding="utf-8")
+    assert "getElementById('theme-toggle')" in init or 'getElementById("theme-toggle")' in init
+    assert "data-theme-bound" in init
+    assert "localStorage.setItem('theme'" in init or 'localStorage.setItem("theme"' in init
+
+    for name in ("landing.html", "feature_guide.html"):
+        html = (root / "templates" / name).read_text(encoding="utf-8")
+        assert 'id="theme-toggle"' in html, f"{name} missing theme toggle"
+        assert 'src="/static/js/common.js' not in html, f"{name} must not load common.js"
 
 
 def test_count_bars_scale_to_series_max():

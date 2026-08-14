@@ -6,25 +6,26 @@
  <title>{{ guide.title }} - LitSieve</title>
     <link rel="icon" href="/static/favicon.ico?v=20260803a" sizes="32x32">
     <link rel="apple-touch-icon" href="/static/favicon.png?v=20260803a">
- <link rel="stylesheet" href="/static/css/style.css?v=20260814n">
- <script src="/static/js/theme-init.js?v=20260813a"></script>
+ <link rel="stylesheet" href="/static/css/style.css?v=20260814p">
+ <script src="/static/js/theme-init.js?v=20260814d"></script>
 </head>
-<body class="guide-body">
- <main class="landing guide-page">
- <nav class="guide-nav" aria-label="Guide navigation">
- <a href="/" class="guide-back">← Back to home</a>
- <div class="guide-nav-actions">
- {% if user %}
- <a href="{{ guide.app_path }}" class="btn btn-sm btn-primary">{{ guide.app_label }}</a>
- {% else %}
- <a href="/register" class="btn btn-sm btn-secondary">Create account</a>
- <a href="/login" class="btn btn-sm btn-primary">Log in to try it</a>
- {% endif %}
- </div>
+<body class="guide-body public-body">
+ <nav class="public-nav" aria-label="Site">
+  <a href="/" class="nav-brand">LitSieve</a>
+  <div class="public-nav-tools">
+   <a href="/" class="public-nav-link">Home</a>
+   {% if user %}
+   <a href="{{ guide.app_path }}" class="btn btn-sm btn-primary">{{ guide.app_label }}</a>
+   {% else %}
+   <a href="/login" class="public-nav-link">Log in</a>
+   <a href="/register" class="btn btn-sm btn-primary">Create account</a>
+   {% endif %}
+  </div>
+  <button type="button" class="theme-toggle" id="theme-toggle" title="Toggle theme" aria-label="Toggle theme">🌙</button>
  </nav>
-
+ <main class="landing guide-page">
  <header class="guide-header page-header">
- <span class="guide-icon" aria-hidden="true">{{ guide.icon }}</span>
+ <p class="landing-kicker">Guide</p>
  <h1>{{ guide.title }}</h1>
  <p class="subtitle">{{ guide.tagline }}</p>
  </header>
@@ -32,12 +33,12 @@
  {% from "macros/disclaimers.html" import scope_banner %}
  {{ scope_banner() }}
 
- <section class="card guide-section">
+ <section class="guide-section">
  <h2>What it is</h2>
  <p class="guide-prose">{{ guide.summary }}</p>
  </section>
 
- <section class="card guide-section">
+ <section class="guide-section">
  <h2>How it works</h2>
  <ol class="guide-steps">
  {% for step in guide.how_it_works %}
@@ -46,7 +47,7 @@
  </ol>
  </section>
 
- <section class="card guide-section">
+ <section class="guide-section">
  <h2>Tips for teachers &amp; students</h2>
  <ul class="guide-tips">
  {% for tip in guide.tips %}
@@ -57,7 +58,7 @@
 
  {% if guide.checklists %}
  {% for block in guide.checklists %}
- <section class="card guide-section">
+ <section class="guide-section">
   <h2>{{ block.title }}</h2>
   {% if block.intro %}
   <p class="guide-prose">{{ block.intro }}</p>
@@ -71,10 +72,10 @@
  {% endfor %}
  {% endif %}
 
- <section class="card guide-section">
+ <section class="guide-section">
  <h2>Where to find it</h2>
  <p class="guide-prose">{{ guide.where_in_app }}</p>
- <div class="landing-cta u-row-start u-mt-xl">
+ <div class="landing-cta landing-cta-start u-row-start u-mt-xl">
  {% if user %}
  <a href="{{ guide.app_path }}" class="btn btn-primary">{{ guide.app_label }}</a>
  <a href="/" class="btn btn-secondary">Home</a>
@@ -90,7 +91,7 @@
  {% if prev %}
  <a href="/learn/{{ prev.slug }}" class="guide-pager-link">
  <span class="help-text">Previous</span>
- <span>{{ prev.icon }} {{ prev.title }}</span>
+ <span>{{ prev.title }}</span>
  </a>
  {% endif %}
  </div>
@@ -98,28 +99,30 @@
  {% if next %}
  <a href="/learn/{{ next.slug }}" class="guide-pager-link">
  <span class="help-text">Next</span>
- <span>{{ next.icon }} {{ next.title }}</span>
+ <span>{{ next.title }}</span>
  </a>
  {% endif %}
  </div>
  </nav>
 
- <section class="card guide-section">
+ <section class="guide-section">
  <h2>All features</h2>
  <ul class="guide-index">
  {% for g in all_guides %}
  <li>
  {% if g.slug == guide.slug %}
- <strong>{{ g.icon }} {{ g.title }}</strong>
+ <strong>{{ g.title }}</strong>
  {% else %}
- <a href="/learn/{{ g.slug }}">{{ g.icon }} {{ g.title }}</a>
+ <a href="/learn/{{ g.slug }}">{{ g.title }}</a>
  {% endif %}
  </li>
  {% endfor %}
  </ul>
  </section>
 
- <footer class="landing-footer">LitSieve - v5.0.0</footer>
+ <footer class="landing-footer">
+  <p class="landing-folio">LitSieve · v5.0.0</p>
+ </footer>
  </main>
     {# No common.js on public pages — it talks to authenticated APIs. #}
 </body>

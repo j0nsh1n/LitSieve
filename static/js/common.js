@@ -958,10 +958,13 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // === Theme toggle (with smooth crossfade) ===
+// Public pages bind this in theme-init.js (they cannot load common.js).
+// App pages load both scripts; skip if theme-init already bound the button.
 document.addEventListener('DOMContentLoaded', function() {
     const root = document.documentElement;
     const btn = document.getElementById('theme-toggle');
-    if (!btn) return;
+    if (!btn || btn.getAttribute('data-theme-bound') === '1') return;
+    btn.setAttribute('data-theme-bound', '1');
 
     function getEffectiveTheme() {
         const saved = localStorage.getItem('theme');

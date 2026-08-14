@@ -43,8 +43,9 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "authors, years, and journals into your private collection."
         ),
         "how_it_works": [
-            "On Data Management, choose academic topics (e.g. Education, Health). "
-            "Recommended databases light up based on those topics.",
+            "On Search (Simple collect) or Data Management (Advanced), choose "
+            "academic topics (e.g. Education, Health). Recommended databases "
+            "light up based on those topics.",
             "In Simple mode the source grid is hidden but still auto-checks "
             "recommended databases; Advanced lets you tick sources by hand.",
             "Type a normal research query (the kind you would type into a library site).",
@@ -71,8 +72,8 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "If a fetch is already running, wait for it to finish before starting "
             "another (the app will say so).",
         ],
-        "where_in_app": "Data Management → topics, sources (Advanced), fetch "
-        "(prepare runs after fetch).",
+        "where_in_app": "Search collect (Simple) · Data Management → topics, "
+        "sources (Advanced), fetch (prepare runs after fetch).",
         "app_path": "/data-management",
         "app_label": "Open Data Management",
     },
@@ -111,7 +112,8 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "Large collections take longer the first time; “only new papers” on "
             "Add makes later fetches cheap.",
         ],
-        "where_in_app": "Data Management — auto after fetch; optional Re-prepare.",
+        "where_in_app": "Automatic after fetch on Search (Simple) or Data "
+        "Management (Advanced); optional Re-prepare.",
         "app_path": "/data-management",
         "app_label": "Open Data Management",
     },
@@ -121,17 +123,18 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
         "icon": "🧩",
         "tagline": "Group papers by theme (Advanced), or Quick screen on Clean up.",
         "summary": (
-            "You can screen papers two ways. Simple mode leans on Clean up → Quick "
-            "screen (rank against your research question and drop least-related "
-            "papers, with undo). Advanced keeps the Clusters page: group papers by "
-            "theme with embeddings, then exclude off-topic piles. Search only ranks "
+            "You can screen papers two ways. Simple mode uses Narrow it down on "
+            "Search (the same idea as Quick screen: rank against your research "
+            "question and drop least-related papers, with undo). Advanced keeps "
+            "the Clusters page: group papers by theme with embeddings, then exclude "
+            "off-topic piles. Clean up still has Quick screen. Search only ranks "
             "what you kept. Cluster labels are best when they read like real topics; "
             "if they look weak, prefer Quick screen."
         ),
         "how_it_works": [
-            "Simple path: after prepare, open Clean up → Quick screen. Enter your "
-            "research question, pick how many least-related papers to drop, and "
-            "Screen out least related (or Preview first). Undo once if needed.",
+            "Simple path: after prepare, use Narrow it down on Search. Enter your "
+            "research question, pick how many least-related papers to set aside, "
+            "and confirm (or preview first). Undo once if needed.",
             "Advanced path: open Clusters after embeddings exist (prepare runs after "
             "fetch on Data Management).",
             "Density mode (recommended) finds natural topic groups and puts odd "
@@ -146,16 +149,16 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "show on the Clean up screening report for hand-ins.",
         ],
         "tips": [
-            "Students in Simple: Quick screen first, then Search; use Not relevant "
-            "on stragglers.",
+            "Students in Simple: Narrow it down on Search, then rank; use Not "
+            "relevant on stragglers. Advanced: Quick screen on Clean up or Clusters.",
             "Teachers: ask for the Clean up screening report plus a short note on "
             "what was excluded and why.",
             "Clusters stays in Advanced nav; Simple hides it but /clusters still "
             "works if bookmarked.",
             "Re-clustering refreshes groups but keeps your exclusion list.",
         ],
-        "where_in_app": "Clean up → Quick screen (Simple default) · Clusters "
-        "(Advanced group triage) · Search → Not relevant.",
+        "where_in_app": "Search → Narrow it down (Simple) · Clean up → Quick "
+        "screen · Clusters (Advanced group triage) · Search → Not relevant.",
         "app_path": "/statistics",
         "app_label": "Open Clean up",
     },
@@ -165,10 +168,11 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
         "icon": "🔄",
         "tagline": "Duplicates, Quick screen, and the hand-in report.",
         "summary": (
-            "The Clean up page (nav label: Clean up) is where you finish the "
-            "collection before Search: remove near-duplicate copies across databases, "
-            "optionally Quick-screen least-related papers, and download a screening "
-            "report (collected / excluded / included counts) for hand-ins."
+            "The Clean up page (nav label: Clean up, Advanced) is where you finish "
+            "the collection before Search: remove near-duplicate copies across "
+            "databases, optionally Quick-screen least-related papers, and download a "
+            "screening report (collected / excluded / included counts) for hand-ins. "
+            "Simple shows collected / dups / screened-out / kept on the Search rail."
         ),
         "how_it_works": [
             "Open Clean up after papers are prepared (auto after fetch).",
@@ -192,7 +196,8 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "Teachers: ask students to attach the screening report text with a "
             "short reflection on what they excluded.",
         ],
-        "where_in_app": "Clean up page (duplicates + Quick screen + screening report).",
+        "where_in_app": "Clean up page (duplicates + Quick screen + screening "
+        "report). Simple: Search rail counts plus Narrow it down.",
         "app_path": "/statistics",
         "app_label": "Open Clean up",
     },
@@ -268,8 +273,9 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "Optionally add an email on Account for password recovery. It only "
             "counts once you click the link we send, and it is used for "
             "recovery alone.",
-            "Log in to reach Data Management, Clean up, and Search. Advanced also "
-            "shows Clusters in the nav (Simple can still open /clusters by URL).",
+            "Log in to reach Search (Simple home: collect + rank). Advanced shows "
+            "Data Management, Clusters, Clean up, and Search in the nav "
+            "(Simple can still open those pages by URL).",
             "Use the Library switcher in the nav (or Account) to create and "
             "switch collections. Fetch, prepare, and search only touch "
             "the active library.",

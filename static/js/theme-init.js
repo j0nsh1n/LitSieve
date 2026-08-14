@@ -43,3 +43,44 @@
     }
     root.classList.add('js-ready');
 })();
+
+// Theme toggle for every page that has #theme-toggle — including public
+// landing / learn pages, which must not load common.js.
+document.addEventListener('DOMContentLoaded', function () {
+    var root = document.documentElement;
+    var btn = document.getElementById('theme-toggle');
+    if (!btn || btn.getAttribute('data-theme-bound') === '1') return;
+    btn.setAttribute('data-theme-bound', '1');
+
+    function getEffectiveTheme() {
+        try {
+            var saved = localStorage.getItem('theme');
+            if (saved) return saved;
+        } catch (e) { /* private mode */ }
+        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+
+    function updateButton(theme) {
+        btn.textContent = theme === 'dark' ? '🌙' : '☀';
+        btn.title = theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+        btn.setAttribute('aria-label', btn.title);
+    }
+
+    updateButton(getEffectiveTheme());
+
+    btn.addEventListener('click', function () {
+        var next = getEffectiveTheme() === 'dark' ? 'light' : 'dark';
+        var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (!reduce) {
+            root.classList.add('theme-animating');
+            setTimeout(function () {
+                root.classList.remove('theme-animating');
+            }, 180);
+        }
+        try {
+            localStorage.setItem('theme', next);
+        } catch (e2) { /* ignore */ }
+        root.setAttribute('data-theme', next);
+        updateButton(next);
+    });
+});
