@@ -859,6 +859,9 @@ def test_simple_screen_levels_map_to_documented_fractions():
     assert 'value="medium"' in html
     assert 'value="high"' in html
     assert 'id="simple-screening-card"' in html
+    assert 'id="simple-screen-modal"' in html
+    assert 'id="simple-screen-open-btn"' in html
+    assert "Narrow it down" in html
 
 
 def test_simple_screen_preview_does_not_exclude():
@@ -952,6 +955,21 @@ def test_simple_screening_card_hidden_in_advanced_css():
     css = _read("static", "css", "style.css")
     assert 'html:not([data-mode="simple"]) #simple-screening-card' in css
     assert "display: none" in css.split('simple-screening-card')[1][:200]
+
+
+def test_simple_screen_options_open_in_a_popup():
+    """Low/Medium/High stay; the decision UI is a dialog, not a page card."""
+    html = _read("templates", "partials", "simple_screening_card.html")
+    assert 'id="simple-screen-modal"' in html
+    assert 'id="simple-screen-open-btn"' in html
+    assert 'name="simple-screen-level"' in html
+    dm = _read("static", "js", "data_management.js")
+    assert "function openSimpleScreenModal" in dm
+    assert "function closeSimpleScreenModal" in dm
+    apply_fn = dm[dm.find("async function doSimpleScreenApply") : dm.find("function doSimpleScreenSkip")]
+    assert "closeSimpleScreenModal" in apply_fn
+    skip_fn = dm[dm.find("function doSimpleScreenSkip") : dm.find("async function doSimpleScreenUndo")]
+    assert "closeSimpleScreenModal" in skip_fn
 
 
 def test_go_to_search_not_clean_up_in_simple_next_step():

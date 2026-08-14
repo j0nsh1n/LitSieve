@@ -746,6 +746,97 @@ function setSimpleScreenGotoVisible(visible) {
  setNextStepVisible(visible);
 }
 
+let _simpleScreenModalOpener = null;
+let _simpleScreenModalKey = null;
+
+function isSimpleScreenModalOpen() {
+ const modal = document.getElementById('simple-screen-modal');
+ return !!(modal && !modal.hidden);
+}
+
+function closeSimpleScreenModal() {
+ const modal = document.getElementById('simple-screen-modal');
+ if (!modal || modal.hidden) return;
+ modal.hidden = true;
+ document.body.classList.remove('lra-modal-open');
+ document.body.style.top = '';
+ const y = parseInt(document.body.dataset.lraScrollY || '0', 10) || 0;
+ delete document.body.dataset.lraScrollY;
+ if (_simpleScreenModalKey) {
+  document.removeEventListener('keydown', _simpleScreenModalKey, true);
+  _simpleScreenModalKey = null;
+ }
+ window.scrollTo(0, y);
+ const opener = _simpleScreenModalOpener;
+ _simpleScreenModalOpener = null;
+ if (opener && typeof opener.focus === 'function') {
+  try { opener.focus({ preventScroll: true }); } catch (e) {
+   try { opener.focus(); } catch (e2) { /* ignore */ }
+  }
+ }
+}
+
+function openSimpleScreenModal() {
+ const modal = document.getElementById('simple-screen-modal');
+ const card = document.querySelector('.simple-screen-modal-card');
+ if (!modal) return;
+ if (isSimpleScreenSkipped()) {
+  setSimpleScreenSkipped(false);
+ }
+ _simpleScreenModalOpener = document.activeElement instanceof HTMLElement
+  ? document.activeElement
+  : document.getElementById('simple-screen-open-btn');
+ const scrollY = window.scrollY || window.pageYOffset || 0;
+ document.body.dataset.lraScrollY = String(scrollY);
+ document.body.style.top = `-${scrollY}px`;
+ document.body.classList.add('lra-modal-open');
+ modal.hidden = false;
+ prefillSimpleScreenQuery();
+ loadSimpleScreenCounts();
+
+ const focusableSelector = [
+  'button:not([disabled])',
+  '[href]',
+  'input:not([disabled]):not([type="hidden"])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+ ].join(',');
+ const host = card || modal;
+ const getFocusable = () => Array.from(host.querySelectorAll(focusableSelector)).filter((el) => {
+  const r = el.getBoundingClientRect();
+  return r.width > 0 || r.height > 0;
+ });
+ _simpleScreenModalKey = (ev) => {
+  if (ev.key === 'Escape') {
+   ev.preventDefault();
+   ev.stopPropagation();
+   closeSimpleScreenModal();
+   return;
+  }
+  if (ev.key !== 'Tab') return;
+  const list = getFocusable();
+  if (!list.length) return;
+  const first = list[0];
+  const last = list[list.length - 1];
+  const active = document.activeElement;
+  if (ev.shiftKey) {
+   if (active === first || !host.contains(active)) {
+    ev.preventDefault();
+    last.focus();
+   }
+  } else if (active === last || !host.contains(active)) {
+   ev.preventDefault();
+   first.focus();
+  }
+ };
+ document.addEventListener('keydown', _simpleScreenModalKey, true);
+ setTimeout(() => {
+  const q = document.getElementById('simple-screen-query');
+  if (q) q.focus();
+ }, 30);
+}
+
 /**
  * Pending/complete from corpus, not a job flag:
  *  - pending: prepared papers exist and no low_relevance exclusions yet
@@ -790,6 +881,9 @@ async function refreshSimpleScreeningCard() {
   const undoBtn = document.getElementById('simple-screen-undo-btn');
   const preview = document.getElementById('simple-screen-preview');
 
+  const openBtn = document.getElementById('simple-screen-open-btn');
+  const dockHint = document.getElementById('simple-screen-dock-hint');
+
   if (lowRel > 0) {
    // Complete: already screened this library.
    if (decision) decision.hidden = true;
@@ -812,6 +906,8 @@ async function refreshSimpleScreeningCard() {
     undoBtn.hidden = false;
     undoBtn.textContent = 'Undo';
    }
+   if (openBtn) openBtn.hidden = true;
+   if (dockHint) dockHint.hidden = true;
    // Warm the undo cache in the background; the button stays visible either way.
    fetchLowRelevanceUndoItems();
    setSimpleScreenGotoVisible(true);
@@ -830,6 +926,8 @@ async function refreshSimpleScreeningCard() {
     outcomeMsg.textContent = 'Screening skipped — you can still search everything you fetched.';
    }
    if (undoBtn) undoBtn.hidden = true;
+   if (openBtn) openBtn.hidden = false;
+   if (dockHint) dockHint.hidden = true;
    setSimpleScreenGotoVisible(true);
    return;
   }
@@ -843,6 +941,8 @@ async function refreshSimpleScreeningCard() {
    outcome.classList.add('u-hidden');
   }
   if (undoBtn) undoBtn.hidden = true;
+  if (openBtn) openBtn.hidden = false;
+  if (dockHint) dockHint.hidden = false;
   setSimpleScreenGotoVisible(false);
   const totalEl = document.getElementById('simple-screen-total');
   if (totalEl) {
@@ -933,6 +1033,14 @@ function wireSimpleScreeningCard() {
  if (applyBtn) applyBtn.addEventListener('click', doSimpleScreenApply);
  if (skipBtn) skipBtn.addEventListener('click', doSimpleScreenSkip);
  if (undoBtn) undoBtn.addEventListener('click', doSimpleScreenUndo);
+ const openBtn = document.getElementById('simple-screen-open-btn');
+ if (openBtn) openBtn.addEventListener('click', openSimpleScreenModal);
+ document.querySelectorAll('[data-simple-screen-close]').forEach((el) => {
+  el.addEventListener('click', (ev) => {
+   ev.preventDefault();
+   closeSimpleScreenModal();
+  });
+ });
  if (queryEl) {
   let t = null;
   queryEl.addEventListener('change', () => {
@@ -1077,6 +1185,9 @@ async function doSimpleScreenApply() {
   showNotification(`Set aside ${n} paper(s).`, 'success');
   setSimpleScreenGotoVisible(true);
   updateNavStats();
+  closeSimpleScreenModal();
+  const openBtn = document.getElementById('simple-screen-open-btn');
+  if (openBtn) openBtn.hidden = true;
  } catch (e) {
   setStatus('simple-screen-status', `Could not set papers aside: ${e.message}`, 'error');
   showNotification(`Could not set papers aside: ${e.message}`, 'error');
@@ -1111,6 +1222,11 @@ function doSimpleScreenSkip() {
  if (undoBtn) undoBtn.hidden = true;
  setStatus('simple-screen-status', '', 'info');
  setSimpleScreenGotoVisible(true);
+ closeSimpleScreenModal();
+ const openBtn = document.getElementById('simple-screen-open-btn');
+ if (openBtn) openBtn.hidden = false;
+ const hint = document.getElementById('simple-screen-dock-hint');
+ if (hint) hint.hidden = true;
 }
 
 async function doSimpleScreenUndo() {

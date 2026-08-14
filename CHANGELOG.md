@@ -30,6 +30,9 @@ and this project aims to follow Semantic Versioning for app version strings
 - **Search Show chips:** after a search, one-click filters on the current list
   (All, Starred, Has a note, Since last-five-years, plus a chip per source in
   the results). No new search. Export uses the filtered list.
+- **Narrow it down** in Simple is a popup: Low / Medium / High, preview, set
+  aside, and skip stay; the page only keeps a short button plus undo / Go to
+  Search after you decide.
 
 ### Changed
 - **Start fresh copy (Simple):** the existing replace/add dialog now says notes,
