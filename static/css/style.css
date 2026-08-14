@@ -79,12 +79,12 @@
 /* Dark mode — system default (evening study lamp) */
 @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-        /* Phase 8: graphite ground (was blue-slate #12151a / #1a1e26 / #2e343f) */
-        --bg: #16181a;
-        --surface: #1e2124;
-        --text: #ebe6dc;          /* soft paper text — brand ink stays */
-        --text-soft: #b8b3a8;
-        --rule: #2c2f33;
+        /* Phase 10 broadsheet: warm newsprint charcoal (not graphite). */
+        --bg: #1c1a15;
+        --surface: #242118;
+        --text: #eae4d4;
+        --text-soft: #a59d8c;
+        --rule: #3b372c;
         --hover: rgba(126, 184, 196, 0.08);
         --accent: #7eb8c4;        /* lighter teal for dark contrast */
         --accent-hover: #9accd6;
@@ -102,12 +102,12 @@
 
 /* Dark mode — explicit toggle */
 [data-theme="dark"] {
-    /* Match prefers-color-scheme graphite grounds (Phase 8). */
-    --bg: #16181a;
-    --surface: #1e2124;
-    --text: #ebe6dc;
-    --text-soft: #b8b3a8;
-    --rule: #2c2f33;
+    /* Phase 10 broadsheet: same warm newsprint as prefers-color-scheme. */
+    --bg: #1c1a15;
+    --surface: #242118;
+    --text: #eae4d4;
+    --text-soft: #a59d8c;
+    --rule: #3b372c;
     --hover: rgba(126, 184, 196, 0.08);
     --accent: #7eb8c4;
     --accent-hover: #9accd6;

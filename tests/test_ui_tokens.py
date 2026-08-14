@@ -434,9 +434,49 @@ def test_phase8_info_text_is_body_scale():
     m2 = re.search(r"\.help-text\s*\{[^}]+\}", css)
     assert m2, ".help-text rule missing"
     assert "var(--fs-sm)" in m2.group(0)
-    # Dark grounds graphite (Phase 8).
-    assert "--bg: #16181a" in css or "--bg:#16181a" in css
-    assert "--surface: #1e2124" in css or "--surface:#1e2124" in css
+    # Dark grounds warm newsprint (Phase 10; was graphite #16181a / #1e2124).
+    assert "--bg: #1c1a15" in css or "--bg:#1c1a15" in css
+    assert "--surface: #242118" in css or "--surface:#242118" in css
+
+
+def _css_block_tokens(block: str) -> dict[str, str]:
+    """`--name: value` declarations inside one CSS rule body."""
+    return {
+        m.group(1): re.sub(r"\s+", " ", m.group(2)).strip()
+        for m in re.finditer(r"(--[\w-]+)\s*:\s*([^;]+);", block)
+    }
+
+
+def test_phase10_dark_blocks_stay_in_parity():
+    """Phase 10: prefers-color-scheme dark and [data-theme=dark] must match.
+
+    These two blocks have drifted before. Every token they both define must
+    have the same value so system-dark and toggled-dark stay identical.
+    """
+    css = CSS
+    pref = re.search(
+        r"@media\s*\(\s*prefers-color-scheme\s*:\s*dark\s*\)\s*\{"
+        r"\s*:root:not\(\[data-theme=\"light\"\]\)\s*\{([^}]+)\}",
+        css,
+    )
+    explicit = re.search(r"\[data-theme=\"dark\"\]\s*\{([^}]+)\}", css)
+    assert pref, "prefers-color-scheme dark block missing"
+    assert explicit, "[data-theme=dark] block missing"
+    a = _css_block_tokens(pref.group(1))
+    b = _css_block_tokens(explicit.group(1))
+    assert a, "no tokens in prefers-color-scheme dark"
+    assert b, "no tokens in [data-theme=dark]"
+    shared = set(a) & set(b)
+    assert shared, "dark blocks share no tokens"
+    drifted = {k: (a[k], b[k]) for k in sorted(shared) if a[k] != b[k]}
+    assert not drifted, f"dark blocks drifted: {drifted}"
+    # Phase 10 newsprint ink (both blocks).
+    for tokens in (a, b):
+        assert tokens.get("--bg") == "#1c1a15"
+        assert tokens.get("--surface") == "#242118"
+        assert tokens.get("--text") == "#eae4d4"
+        assert tokens.get("--text-soft") == "#a59d8c"
+        assert tokens.get("--rule") == "#3b372c"
 
 
 def test_phase8_search_workbench_and_score_meter():

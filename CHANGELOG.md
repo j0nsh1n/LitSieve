@@ -12,6 +12,8 @@ and this project aims to follow Semantic Versioning for app version strings
 - **Broadsheet radii (Phase 10):** `--radius-sm` / `--radius-md` are 2px / 3px
   (was 4 / 8). Modal bottom sheets use `--radius-md` instead of an undefined
   `--radius-lg` fallback.
+- **Dark theme (Phase 10):** warm newsprint charcoal (`#1c1a15` / `#242118`)
+  in both the system-dark and `[data-theme=dark]` blocks.
 
 ### Added
 - **Guest demo** (`/guest`): temporary sample-corpus account (no multi-source
