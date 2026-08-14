@@ -3665,16 +3665,9 @@ html[data-mode="simple"] body.simple-collecting #search-query-top {
     font-weight: 700;
     letter-spacing: -0.025em;
     line-height: var(--lh-tight);
-    margin: 0 auto;
+    margin: 0 0 var(--space-4);
     color: var(--text);
     text-align: center;
-}
-
-.landing-header .pagehead {
-    display: flex;
-    justify-content: center;
-    width: 100%;
-    margin-bottom: var(--space-4);
 }
 
 .landing-tagline {
