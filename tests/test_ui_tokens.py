@@ -155,6 +155,19 @@ def test_border_radius_scale_discipline():
     assert used
 
 
+def test_phase10_radius_tokens_are_two_and_three_px():
+    """Phase 10 broadsheet: --radius-sm/md are 2px/3px (was 4/8)."""
+    root = _root_block()
+    sm = re.search(r"--radius-sm\s*:\s*([^;]+);", root)
+    md = re.search(r"--radius-md\s*:\s*([^;]+);", root)
+    assert sm, "missing --radius-sm in :root"
+    assert md, "missing --radius-md in :root"
+    assert sm.group(1).strip() == "2px", sm.group(1)
+    assert md.group(1).strip() == "3px", md.group(1)
+    # The undefined --radius-lg fallback is gone; bottom sheets use --radius-md.
+    assert "radius-lg" not in _css_without_comments()
+
+
 def test_padding_uses_spacing_scale_only():
     """Padding lengths come from --space-* (or 0 / env / max / calc of those)."""
     for prop in (

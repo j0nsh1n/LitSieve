@@ -62,9 +62,9 @@
     --space-7: 3rem;
     --space-8: 4rem;
 
-    /* Radii — three steps only */
-    --radius-sm:   4px;    /* inputs, chips, small controls */
-    --radius-md:   8px;    /* cards, buttons, panels */
+    /* Radii — three steps only (Phase 10 broadsheet: 2/3, not 4/8) */
+    --radius-sm:   2px;    /* inputs, chips, small controls */
+    --radius-md:   3px;    /* cards, buttons, panels */
     --radius-full: 999px;  /* pills, avatars */
 
     /* Atmosphere */
@@ -1682,7 +1682,7 @@ body.lra-modal-open {
         width: 100%;
         max-width: none;
         max-height: min(85dvh, 100%);
-        border-radius: var(--radius-lg, 12px) var(--radius-lg, 12px) 0 0;
+        border-radius: var(--radius-md) var(--radius-md) 0 0;
         padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
     }
     .lra-modal-actions {

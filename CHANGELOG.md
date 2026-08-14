@@ -8,6 +8,11 @@ and this project aims to follow Semantic Versioning for app version strings
 
 ## [Unreleased]
 
+### Changed
+- **Broadsheet radii (Phase 10):** `--radius-sm` / `--radius-md` are 2px / 3px
+  (was 4 / 8). Modal bottom sheets use `--radius-md` instead of an undefined
+  `--radius-lg` fallback.
+
 ### Added
 - **Guest demo** (`/guest`): temporary sample-corpus account (no multi-source
   fetch), 30-minute expiry/purge, landing/login CTA. Signed-in sessions are
