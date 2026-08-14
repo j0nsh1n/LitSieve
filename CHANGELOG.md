@@ -8,7 +8,20 @@ and this project aims to follow Semantic Versioning for app version strings
 
 ## [Unreleased]
 
+### Added
+- Public homepage and `/learn` guides use the Phase 10 broadsheet masthead,
+  boxed path/guide cards, and a dark/light toggle (no `common.js` on public
+  pages).
+- Simple Search asks **how many papers** (1–50) and an optional **year range**
+  in a dialog before ranking. Advanced still uses the rail.
+
 ### Fixed
+- **Start over** clears the last search query/results and Narrow it down
+  set-asides. Stars, notes, and saved AI key points stay on papers that
+  come back.
+- Simple result cards show **key points** and **Refine with AI** again.
+- Homepage masthead: brand left, theme toggle right; LitSieve title centered
+  without reusing Search’s `.pagehead`.
 - **Search broadsheet layout:** Simple Search now matches the approved mockup
   composition — kicker + title + count on one line, notice as a single
   italic band, full-width one-line query + Search, results with the Save
@@ -29,7 +42,8 @@ and this project aims to follow Semantic Versioning for app version strings
   full-width row (no more 5rem “Parkinso” chip).
 - LitSieve wordmark in the app nav links to `/` (the public homepage).
 - Simple nav shows an unnumbered **Search** tab (no 1/2 stepper).
-- Light/dark toggle uses one 280ms transition on every paint property.
+- Light/dark toggle interpolates only background-color, color, and
+  border-color at 160ms (no lag from transitioning background images).
 
 ## [5.0.0] - 2026-08-13
 
