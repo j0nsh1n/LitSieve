@@ -81,7 +81,7 @@ Guest User (is_guest) → sample corpus only; purged by age
 ## Session Handoff
 - **Date:** 2026-08-13
 - **Branch:** `feat/phase6-guest-demo` (do not push without explicit ask)
-- **Done:** Phase 10 broadsheet restyle + layout pass so Simple Search matches
-  the approved mockup (full-width query, results | Save rail, card meta).
-  Version **5.0.0**.
+- **Done:** Phase 10 review fixes — Simple step 1 → `/search?collect=1`;
+  Advanced toggle+PICO/seed with the top search bar; rail stats PRISMA
+  split; screening-report fetch guarded; active nav color inverted.
 - **Next:** Human visual check vs mockup. Do not push unless asked.

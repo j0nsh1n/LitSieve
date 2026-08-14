@@ -15,6 +15,12 @@ and this project aims to follow Semantic Versioning for app version strings
   rail on the right. Result cards use score / journal · year / tags, then
   title and text-link actions. Segmented Get papers → Search is back in
   the Simple masthead.
+- **Simple Get papers step** goes to `/search?collect=1` (collect state), not
+  `/data-management`.
+- **Advanced query toggle** sits with the top search bar; PICO/seed open
+  under it. Rail keeps ranking options and starred search.
+- Simple rail **Collected / Duplicates / Screened out / Kept** no longer
+  double-count duplicates.
 
 ## [5.0.0] - 2026-08-13
 
