@@ -288,10 +288,12 @@ function fillSimpleRailStats(stats, report) {
  if (!host) return;
  const total = Number((report && report.total_articles) || (stats && stats.total_articles) || 0);
  const dups = Number(report && report.excluded && report.excluded.duplicate) || 0;
- const out = Number(report && report.excluded && report.excluded.total) || 0;
+ const excludedTotal = Number(report && report.excluded && report.excluded.total) || 0;
+ // Screened out is non-duplicate exclusions (PRISMA / txt report split).
+ const out = Math.max(0, excludedTotal - dups);
  const kept = report && report.included != null
   ? Number(report.included)
-  : Math.max(0, total - out);
+  : Math.max(0, total - excludedTotal);
  const set = (id, n) => {
   const el = document.getElementById(id);
   if (el) el.textContent = String(n);
