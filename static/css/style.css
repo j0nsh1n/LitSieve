@@ -143,23 +143,16 @@
     --wash-ink: color-mix(in srgb, var(--text) 2.5%, transparent);
 }
 
-/* Theme toggle: one duration for every paint property so surfaces do not
-   stagger (body gradients, borders, and text used to keep their own times). */
+/* Theme toggle: short, cheap paint only. Interpolating background-image /
+   the background shorthand (body washes, nav blur) is what felt laggy. */
 html.theme-animating,
 html.theme-animating *,
 html.theme-animating *::before,
 html.theme-animating *::after {
     transition:
-        background-color var(--dur-med) var(--ease-soft),
-        background-image var(--dur-med) var(--ease-soft),
-        background var(--dur-med) var(--ease-soft),
-        color var(--dur-med) var(--ease-soft),
-        border-color var(--dur-med) var(--ease-soft),
-        outline-color var(--dur-med) var(--ease-soft),
-        fill var(--dur-med) var(--ease-soft),
-        stroke var(--dur-med) var(--ease-soft),
-        box-shadow var(--dur-med) var(--ease-soft),
-        caret-color var(--dur-med) var(--ease-soft) !important;
+        background-color var(--dur-fast) var(--ease-soft),
+        color var(--dur-fast) var(--ease-soft),
+        border-color var(--dur-fast) var(--ease-soft) !important;
 }
 
 /* === Keyframes ===
