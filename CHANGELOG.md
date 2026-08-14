@@ -18,6 +18,10 @@ and this project aims to follow Semantic Versioning for app version strings
 ### Fixed
 - Replace-fetch that hits the storage cap keeps the current library
   instead of swapping in a partial new collection.
+- Sync and background fetches share one per-account job slot so two
+  Start-over fetches cannot mix staging rows.
+- Start over keeps embeddings only when title and abstract are unchanged
+  (changed text is re-prepared).
 - **Start over** clears the last search query/results, Show chips, and
   Narrow it down set-asides. Stars, notes, and saved AI key points stay
   on papers that come back.

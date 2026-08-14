@@ -151,6 +151,7 @@ no topic grid, no fetch form, no coverage.
 - [x] Advanced pages, nav, and controls unchanged
 - [x] Guest still cannot multi-source fetch
 - [ ] 380px: no horizontal scroll; export bar still clears the last result
+      (CSS overflow-x + panel padding landed; still needs a device check)
 - [x] `ruff check .` clean, full pytest green
 
 ## spec.md (propose, do not edit until approved)

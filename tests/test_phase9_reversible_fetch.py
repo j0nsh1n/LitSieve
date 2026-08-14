@@ -218,9 +218,49 @@ def test_successful_replace_keeps_work_on_papers_that_return(tmp_path, monkeypat
         assert p.db.get_note("b1", "pubmed")["note"] == ""
         assert ("b1", "pubmed") not in p.db.get_ai_key_points_keys()
         assert ("a1", "pubmed") in p.db.get_excluded_keys()
-        assert ("a1", "pubmed") in p.db.get_embedding_keys()
+        # Title/abstract changed under the same key — old vector must not stay.
+        assert ("a1", "pubmed") not in p.db.get_embedding_keys()
         titles = {a["title"] for a in p.db.get_all_articles()}
         assert "Paper A again" in titles
+    finally:
+        p.close()
+
+
+def test_successful_replace_keeps_embedding_when_text_unchanged(tmp_path, monkeypatch):
+    """Same title + abstract under the same key keeps the stored vector."""
+    import numpy as np
+
+    monkeypatch.setattr(corpus_routes, "update_progress", lambda *a, **k: None)
+
+    class _SameAFetcher:
+        SOURCE_NAME = "pubmed"
+
+        def __init__(self, email=None, **kwargs):
+            self.email = email
+
+        def search_and_fetch(self, query, max_results=200):
+            return [_paper("a1", "Paper A")]
+
+    monkeypatch.setitem(pipeline_mod.FETCHERS, "pubmed", _SameAFetcher)
+
+    p = LiteratureSearchPipeline(db_path=str(tmp_path / "swap-same.db"))
+    try:
+        p.db.insert_articles([_paper("a1", "Paper A")], dedupe=False)
+        p.db.insert_embeddings(
+            {("a1", "pubmed"): np.array([1.0, 0.0], dtype=np.float32)},
+            model_name="general",
+        )
+        result = corpus_routes._run_multi_fetch(
+            p,
+            query="same",
+            sources=["pubmed"],
+            max_results=5,
+            email=None,
+            clear_first=True,
+            uid="phase9-same-text",
+        )
+        assert result["cleared_first"] is True
+        assert ("a1", "pubmed") in p.db.get_embedding_keys()
     finally:
         p.close()
 

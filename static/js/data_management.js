@@ -145,8 +145,6 @@ const MODEL_LABELS = {
  multilingual: 'multilingual (non-English collections)',
 };
 
-const FETCH_PREFS_KEY = 'lra_fetch_prefs_v1';
-
 let selectedTopics = new Set();
 let modelManual = false; // true once the user picks a model under Advanced
 
@@ -367,6 +365,7 @@ function updateModelHint() {
  const hint = document.getElementById('model-auto-hint');
  if (!hint) return;
  const sel = document.getElementById('embedding-model');
+ if (!sel) return;
  const current = MODEL_LABELS[sel.value] || sel.value;
  const rec = recommendModel();
  const corpus = window._corpusEmbeddingModel || null;
@@ -800,7 +799,7 @@ async function cancelFetch() {
 async function refreshCoverage() {
  const bars = document.getElementById('coverage-bars');
  const sug = document.getElementById('coverage-suggestions');
- if (!bars) return;
+ if (!bars || !sug) return;
  try {
  const data = await apiCall('/api/coverage', {
  method: 'POST',

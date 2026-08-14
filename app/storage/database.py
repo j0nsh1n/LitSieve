@@ -375,6 +375,10 @@ class ArticleDatabase:
                     FROM embeddings e
                     INNER JOIN {self.STAGING_TABLE} s
                       ON e.article_id = s.article_id AND e.source = s.source
+                    INNER JOIN articles a
+                      ON a.article_id = e.article_id AND a.source = e.source
+                    WHERE COALESCE(a.title, '') = COALESCE(s.title, '')
+                      AND COALESCE(a.abstract, '') = COALESCE(s.abstract, '')
                     """
                 )
                 cursor.execute("DELETE FROM key_points")

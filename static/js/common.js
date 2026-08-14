@@ -21,6 +21,9 @@ function safeDomId(raw) {
     return s || 'field';
 }
 
+/** Shared localStorage key for last fetch query / replace-vs-append. */
+var FETCH_PREFS_KEY = 'lra_fetch_prefs_v1';
+
 // === Classroom UI flags (env: HIDE_STUDY_TYPE_TAGS, HIDE_AI_BUTTONS) ===
 // Defaults keep features on until /api/ui-flags loads.
 window.LRA_UI = window.LRA_UI || {
@@ -1030,43 +1033,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-// === Theme toggle (with smooth crossfade) ===
-// Public pages bind this in theme-init.js (they cannot load common.js).
-// App pages load both scripts; skip if theme-init already bound the button.
-document.addEventListener('DOMContentLoaded', function() {
-    const root = document.documentElement;
-    const btn = document.getElementById('theme-toggle');
-    if (!btn || btn.getAttribute('data-theme-bound') === '1') return;
-    btn.setAttribute('data-theme-bound', '1');
-
-    function getEffectiveTheme() {
-        const saved = localStorage.getItem('theme');
-        if (saved) return saved;
-        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    }
-
-    function updateButton(theme) {
-        // Icon = current mode (moon while dark, sun while light).
-        // Title describes the action of the next click.
-        btn.textContent = theme === 'dark' ? '🌙' : '☀';
-        btn.title = theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
-        btn.setAttribute('aria-label', btn.title);
-    }
-
-    updateButton(getEffectiveTheme());
-
-    btn.addEventListener('click', function() {
-        const next = getEffectiveTheme() === 'dark' ? 'light' : 'dark';
-        const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        if (!reduce) {
-            root.classList.add('theme-animating');
-            setTimeout(() => root.classList.remove('theme-animating'), 180);
-        }
-        localStorage.setItem('theme', next);
-        root.setAttribute('data-theme', next);
-        updateButton(next);
-    });
-});
+// Theme toggle lives only in theme-init.js (public pages cannot load this file).
 
 // === Sticky nav elevation on scroll ===
 document.addEventListener('DOMContentLoaded', function() {

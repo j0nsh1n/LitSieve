@@ -90,9 +90,9 @@ function setNextStepVisible(visible) {
 
 function _persistFetchMode(mode) {
  try {
-  const prefs = JSON.parse(localStorage.getItem('lra_fetch_prefs_v1') || '{}') || {};
+  const prefs = JSON.parse(localStorage.getItem(FETCH_PREFS_KEY) || '{}') || {};
   prefs.mode = mode === 'append' ? 'append' : 'replace';
-  localStorage.setItem('lra_fetch_prefs_v1', JSON.stringify(prefs));
+  localStorage.setItem(FETCH_PREFS_KEY, JSON.stringify(prefs));
  } catch (e) { /* ignore */ }
 }
 
@@ -277,7 +277,7 @@ function prefillSimpleScreenQuery() {
  // but do not overwrite if the student already edited the field.
  if (el.value.trim()) return;
  try {
-  const prefs = JSON.parse(localStorage.getItem('lra_fetch_prefs_v1') || 'null');
+  const prefs = JSON.parse(localStorage.getItem(FETCH_PREFS_KEY) || 'null');
   if (prefs && prefs.query) {
    el.value = prefs.query;
    return;
@@ -306,15 +306,19 @@ function closeSimpleScreenModal() {
  const modal = document.getElementById('simple-screen-modal');
  if (!modal || modal.hidden) return;
  modal.hidden = true;
- document.body.classList.remove('lra-modal-open');
- document.body.style.top = '';
- const y = parseInt(document.body.dataset.lraScrollY || '0', 10) || 0;
- delete document.body.dataset.lraScrollY;
+ const ownsLock = modal.getAttribute('data-owns-scroll-lock') === '1';
+ modal.removeAttribute('data-owns-scroll-lock');
+ if (ownsLock) {
+  document.body.classList.remove('lra-modal-open');
+  document.body.style.top = '';
+  const y = parseInt(document.body.dataset.lraScrollY || '0', 10) || 0;
+  delete document.body.dataset.lraScrollY;
+  window.scrollTo(0, y);
+ }
  if (_simpleScreenModalKey) {
   document.removeEventListener('keydown', _simpleScreenModalKey, true);
   _simpleScreenModalKey = null;
  }
- window.scrollTo(0, y);
  const opener = _simpleScreenModalOpener;
  _simpleScreenModalOpener = null;
  if (opener && typeof opener.focus === 'function') {
@@ -334,10 +338,13 @@ function openSimpleScreenModal() {
  _simpleScreenModalOpener = document.activeElement instanceof HTMLElement
   ? document.activeElement
   : document.getElementById('simple-screen-open-btn');
- const scrollY = window.scrollY || window.pageYOffset || 0;
- document.body.dataset.lraScrollY = String(scrollY);
- document.body.style.top = `-${scrollY}px`;
- document.body.classList.add('lra-modal-open');
+ if (!document.body.classList.contains('lra-modal-open')) {
+  const scrollY = window.scrollY || window.pageYOffset || 0;
+  document.body.dataset.lraScrollY = String(scrollY);
+  document.body.style.top = `-${scrollY}px`;
+  document.body.classList.add('lra-modal-open');
+  modal.setAttribute('data-owns-scroll-lock', '1');
+ }
  modal.hidden = false;
  prefillSimpleScreenQuery();
  loadSimpleScreenCounts();
@@ -844,7 +851,7 @@ function getResearchQuestionCandidate() {
  const fetchQ = document.getElementById('fetch-query');
  if (fetchQ && fetchQ.value.trim()) return fetchQ.value.trim();
  try {
-  const prefs = JSON.parse(localStorage.getItem('lra_fetch_prefs_v1') || 'null');
+  const prefs = JSON.parse(localStorage.getItem(FETCH_PREFS_KEY) || 'null');
   if (prefs && prefs.query && String(prefs.query).trim()) {
    return String(prefs.query).trim();
   }

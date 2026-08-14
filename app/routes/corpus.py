@@ -20,6 +20,7 @@ from app.core import (
     run_in_thread,
     server_error,
     start_user_job,
+    try_begin_user_job,
     update_progress,
 )
 from app.schemas import (
@@ -192,13 +193,21 @@ async def api_fetch_multi(req: MultiFetchRequest, request: Request):
             )
         return JSONResponse(status_code=202, content={"status": "started"})
 
-    p = get_pipeline(uid)
-    update_progress(
-        uid, 'fetch', active=True, done=0, total=len(req.sources),
-        result=None, error=None, cancel=False, articles_so_far=0,
-        sources=list(req.sources), by_source={}, source_status={},
-    )
+    # Same per-user fetch slot as wait=False. Staging is library-wide; two
+    # overlapping fetches (sync or background) would reset or mix staged rows.
+    if not try_begin_user_job(
+        uid, 'fetch',
+        total=len(req.sources),
+        sources=list(req.sources),
+        by_source={},
+        source_status={},
+    ):
+        return JSONResponse(
+            status_code=409,
+            content={"detail": "A fetch is already running"},
+        )
     try:
+        p = get_pipeline(uid)
         result = await run_in_thread(_run_multi_fetch, p, **job_kwargs)
         update_progress(uid, 'fetch', active=False, result=result, error=None)
         return result
