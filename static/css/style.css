@@ -429,7 +429,11 @@ body {
         color: var(--bg);
         font-weight: 600;
     }
-    .nav-link.active .nav-step-label {
+    .nav-link.active,
+    .nav-link.active:hover,
+    .nav-link.active .nav-step-label,
+    .nav-link.active .nav-label-simple,
+    .nav-link.active .nav-label-advanced {
         color: var(--bg);
     }
     .nav-link.active .nav-step-num {
@@ -439,7 +443,6 @@ body {
     }
     .nav-link.active:hover {
         background: var(--text);
-        color: var(--bg);
     }
 }
 
