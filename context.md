@@ -78,9 +78,8 @@ Guest User (is_guest) → sample corpus only; purged by age
 - Host entry: `app.main:app` port 7860; Linux `./venv`
 
 ## Session Handoff
-- **Date:** 2026-08-12
+- **Date:** 2026-08-13
 - **Branch:** `feat/phase6-guest-demo` (do not push without explicit ask)
-- **Done:** Simple fetch lock after a library has papers; Start over reuses
-  replace/add dialog; report / screening / Re-prepare kept; Advanced unchanged.
-- **Next:** Human-confirm on a library with papers (lock + Start over + Advanced
-  still fetches). PR #55 already open; do not push unless asked.
+- **Done:** Phase 9 Step 1 — Simple Start-fresh dialog names notes / stars /
+  AI key points; xfail test for failed replace-fetch wipe (until Step 3).
+- **Next:** Phase 9 Step 2 (Advanced replace consequence, no modal).

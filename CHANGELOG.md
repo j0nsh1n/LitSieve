@@ -29,6 +29,9 @@ and this project aims to follow Semantic Versioning for app version strings
   so a broken browser script previously shipped with every Python test green.
 
 ### Changed
+- **Start fresh copy (Simple):** the existing replace/add dialog now says that
+  notes, stars, and saved AI key points are deleted too, and that this cannot
+  be undone. Same buttons, no extra click.
 - **Simple fetch lock:** after this library has papers, Simple hides the Fetch
   Articles form so a second search is not the main action. A secondary
   **Start over or add papers** control reuses the existing replace/add dialog,

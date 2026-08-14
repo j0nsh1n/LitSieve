@@ -1848,7 +1848,9 @@ async function resolveSimpleFetchModeBeforeRequest() {
  const choice = await openSiteChoice({
   title: 'You already have papers',
   message:
-   `You already have ${nLabel} — start fresh, or add these results to what you have?`,
+   `You already have ${nLabel}. Start fresh deletes those papers and any notes, ` +
+   `stars, and saved AI key points — this cannot be undone. Or add these results ` +
+   `to what you have?`,
   choices: [
    { label: 'Start fresh', value: 'replace', primary: true },
    { label: 'Add to them', value: 'append' },
