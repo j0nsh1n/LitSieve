@@ -1233,6 +1233,16 @@ input[type="range"]::-moz-range-thumb:hover {
     font-size: var(--fs-lg);
     font-weight: 700;
 }
+/* Phase 10: Search count sits as letterspaced caps (JS still writes #result-count). */
+#results-section .results-header h2,
+#results-section .results-count-line {
+    font-family: var(--font-sans);
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-soft);
+}
 
 .display-filters {
     margin: 0 0 var(--space-4);
@@ -2853,17 +2863,33 @@ body.lra-modal-open {
     line-height: 1.35;
 }
 
-/* Product scope / research-use disclaimer */
+/* Product scope / research-use disclaimer — Phase 10 notice band */
 .site-disclaimer {
-    margin: var(--space-3) 0 0;
+    display: flex;
+    gap: var(--space-3);
+    align-items: baseline;
+    margin: var(--space-4) 0 0;
     padding: var(--space-3) var(--space-4);
     border: 1px solid var(--rule);
-    border-left: 3px solid var(--accent, #2a5f6e);
+    border-left: 4px solid var(--accent);
     border-radius: var(--radius-md);
-    background: color-mix(in srgb, var(--surface) 88%, var(--accent, #2a5f6e) 12%);
+    background: var(--wash-accent);
     color: var(--text-body, var(--text));
-    font-size: var(--fs-sm);
-    line-height: 1.45;
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-size: var(--fs-base);
+    line-height: var(--lh-snug);
+}
+.notice-label {
+    flex: 0 0 auto;
+    font-family: var(--font-sans);
+    font-style: normal;
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--accent);
+    white-space: nowrap;
 }
 .site-disclaimer strong {
     color: var(--text);
@@ -2911,6 +2937,45 @@ body.lra-modal-open {
     line-height: var(--lh-snug);
     font-family: var(--font-serif);
     min-height: 6.5rem;
+}
+
+/* Phase 10 broadsheet: query + Search joined as one boxed control */
+.searchcard {
+    display: flex;
+    gap: 0;
+    align-items: stretch;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-md);
+    padding: var(--space-3);
+    margin: var(--space-3) 0 0;
+}
+.searchcard #text-input-panel {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+.searchcard #query-text {
+    border: 1px solid var(--text);
+    border-right: 0;
+    border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+    background: var(--bg);
+    min-height: 4.5rem;
+}
+.searchcard #query-text:focus {
+    box-shadow: inset 0 -2px 0 var(--accent);
+}
+.searchcard #search-btn {
+    flex: 0 0 auto;
+    align-self: stretch;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    font-weight: 600;
+    font-size: var(--fs-xs);
+    padding: var(--space-3) var(--space-5);
+    background: var(--text);
+    color: var(--bg);
+    border: 1px solid var(--text);
 }
 
 /* === Progressive disclosure (help + advanced) ===

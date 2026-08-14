@@ -17,6 +17,9 @@ and this project aims to follow Semantic Versioning for app version strings
 - **Masthead nav (Phase 10):** double ink rule; desktop steps are a segmented
   control with inverted active; article count and library wrap are serif
   italic badges. Mobile menu is unchanged.
+- **Search notice band (Phase 10):** “Please note” label, 4px accent spine,
+  wash background, serif italic body. Query + Search are one joined boxed
+  control. Result count is letterspaced caps.
 
 ### Added
 - **Guest demo** (`/guest`): temporary sample-corpus account (no multi-source

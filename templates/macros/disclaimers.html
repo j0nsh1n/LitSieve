@@ -6,6 +6,7 @@
 {# Full banner used on landing + feature guides (canonical wording). #}
 {% macro scope_banner() -%}
 <p class="site-disclaimer" role="note">
+ <span class="notice-label">Please note</span>
  <strong>Starting point only.</strong> This tool searches a set of
  <strong>publicly accessible</strong> research databases and helps you organise
  what you fetch. It is <strong>not</strong> a complete library search, not a
@@ -36,6 +37,7 @@
 {# Data Management: fetch scope (same limits + paywall note). #}
 {% macro scope_fetch() -%}
 <p class="site-disclaimer" role="note">
+ <span class="notice-label">Please note</span>
  <strong>Starting point only.</strong> Fetches only from the <strong>public research
  databases</strong> you select (and only what those APIs return). Paywalled or
  unindexed work will not appear. It is <strong>not</strong> a complete library
@@ -47,6 +49,7 @@
 {# Search: collection-only ranking note. #}
 {% macro scope_search() -%}
 <p class="site-disclaimer" role="note">
+ <span class="notice-label">Please note</span>
  <strong>Starting point only.</strong> Ranks <strong>only papers already in your
  collection</strong> (from public databases you fetched). It does not search the whole
  web or every journal. Not a complete library search. Follow up in original sources

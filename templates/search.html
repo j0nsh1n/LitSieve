@@ -69,9 +69,12 @@
     </label>
     </div>
 
+    <div class="searchcard" id="searchcard">
     <div id="text-input-panel">
     <label class="u-visually-hidden" for="query-text">Research question</label>
     <textarea id="query-text" placeholder="Enter your study description or research question..." rows="4"></textarea>
+    </div>
+    <button id="search-btn" class="btn btn-primary">Search</button>
     </div>
 
     <div class="u-hidden" id="pico-input-panel">
@@ -176,7 +179,6 @@
      </div>
     </details>
 
-    <button id="search-btn" class="btn btn-primary btn-block">Search</button>
     <button type="button" id="starred-search-btn" class="btn btn-secondary btn-block u-mt-md">
     More like my starred (<span id="starred-count">0</span>)
     </button>
@@ -198,7 +200,7 @@
   <div class="search-results-layout" id="search-results-layout">
    <section class="u-hidden" id="results-section">
     <div class="results-header">
-    <h2>Results: <span id="result-count">0</span> articles found</h2>
+    <h2 class="results-count-line">Ranked against your question · <span id="result-count">0</span> shown</h2>
     </div>
     <div class="display-filters" id="display-filters" hidden>
      <span class="display-filters-label" id="display-filters-label">Show</span>
