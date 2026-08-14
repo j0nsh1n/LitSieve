@@ -304,6 +304,19 @@ Failed replace-fetch must not wipe the library. No new Simple confirmation.
 - Status: [x] 2026-08-13 — staging swap with reattach of notes / stars / AI
   key points on papers that come back; failed fetch leaves the library intact
 
+## Phase 10 — Broadsheet visual identity
+Approved mockup: `design_mockups/final_broadsheet.html` (not committed).
+Presentation only — no flow or endpoint changes.
+- Tasks:
+  - Radius tokens 2px / 3px; drop undefined `--radius-lg`
+  - Dark theme warm newsprint in both dark blocks + parity test
+  - Masthead nav (double rule, segmented desktop steps)
+  - Search notice band, boxed query control, result cards, boxed rail
+- Complete when: mockup identity is on Search; public pages still render;
+  Simple/guest/phase-8 tests pass unchanged; radii and dark parity tests
+  hold
+- Status: [x] 2026-08-13 — shipped on `feat/phase6-guest-demo` as **v5.0.0**
+
 ## Backlog (unscheduled)
 - Make `pyright app` blocking in CI after clearing the current error backlog
 - Dependency lockfile (pip-tools / uv) if reproducibility becomes a priority

@@ -8,6 +8,8 @@ and this project aims to follow Semantic Versioning for app version strings
 
 ## [Unreleased]
 
+## [5.0.0] - 2026-08-13
+
 ### Changed
 - **Broadsheet radii (Phase 10):** `--radius-sm` / `--radius-md` are 2px / 3px
   (was 4 / 8). Modal bottom sheets use `--radius-md` instead of an undefined

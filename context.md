@@ -1,7 +1,7 @@
 # context.md — LitSieve
 
 ## Current State
-- App version **4.5.0** (`app/main.py`, `GET /health`). Product name **LitSieve**.
+- App version **5.0.0** (`app/main.py`, `GET /health`). Product name **LitSieve**.
 - Example public deployment pattern: HTTPS at the edge (e.g. Cloudflare Tunnel)
   → `uvicorn` HTTP on `127.0.0.1:7860` only. Operator sets `PUBLIC_BASE_URL` and
   `DEBUG=false` with a real `SECRET_KEY` in gitignored `.env`.
@@ -14,7 +14,8 @@
 - UI: Simple/Advanced via `localStorage.uiMode` + `data-mode` (theme-init pre-paint).
   Simple: one `/search` page (empty collect vs papers). `/data-management`
   redirects in Simple. After papers exist, topics/fetch hide; Start over is a
-  popup. Advanced: full steps including Clean up + Clusters.
+  popup. Advanced: full steps including Clean up + Clusters. Phase 10
+  broadsheet tokens: 2px/3px radii, warm-newsprint dark, masthead nav.
 - Guest: `/guest` → sample corpus, multi-source fetch 403, purge after 30 minutes.
 - Ops: systemd user unit for uvicorn; optional backup + watchdog timers — see
   `docs/SELFHOST.md` and `docs/DEPLOY.md` (generic operator runbooks).
@@ -80,8 +81,7 @@ Guest User (is_guest) → sample corpus only; purged by age
 ## Session Handoff
 - **Date:** 2026-08-13
 - **Branch:** `feat/phase6-guest-demo` (do not push without explicit ask)
-- **Done:** Simple one-page steps 3–5 — collect UI on `/search`; Simple
-  `/data-management` always redirects; stepper hidden; leftover collect chrome
-  frozen after papers. spec.md Simple nav updated (approved).
-- **Next:** Browser-pass the empty fetch → prepare → search path. Do not push
-  unless asked.
+- **Done:** Phase 10 broadsheet restyle (radii, dark newsprint, masthead,
+  Search notice/searchcard/cards/rail) and version **5.0.0**.
+- **Next:** Browser-pass Search in both themes and 380px. Do not push unless
+  asked.
