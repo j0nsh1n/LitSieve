@@ -685,7 +685,7 @@ function buildResultCard(article, idx) {
  <div class="article-meta">
  <span><strong>Year:</strong> ${escapeHtml(article.year || '')}</span>
  <span><strong>Journal:</strong> ${escapeHtml(article.journal || '')}</span>
- <span><strong>Source:</strong> ${escapeHtml(getSourceName(article.source))}</span>
+ <span class="tag">${escapeHtml(getSourceName(article.source))}</span>
  <span><strong>ID:</strong> ${idLink}</span>
  ${clusterBit}
  ${studyTypeHtml}

@@ -20,6 +20,9 @@ and this project aims to follow Semantic Versioning for app version strings
 - **Search notice band (Phase 10):** “Please note” label, 4px accent spine,
   wash background, serif italic body. Query + Search are one joined boxed
   control. Result count is letterspaced caps.
+- **Search result cards (Phase 10):** bordered cards with a teal spine, serif
+  score numeral + 3px bar (`--score-pct` unchanged), uppercase meta, tag
+  chips, and a hairline actions row.
 
 ### Added
 - **Guest demo** (`/guest`): temporary sample-corpus account (no multi-source

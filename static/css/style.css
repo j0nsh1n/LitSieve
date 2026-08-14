@@ -1502,9 +1502,24 @@ input[type="range"]::-moz-range-thumb:hover {
     flex-shrink: 0;
 }
 
-/* Phase 8 — scannable result rows + 0–1 score meter */
+/* Phase 8 / 10 — result cards + 0–1 score meter (width via --score-pct) */
 .result-row {
-    padding: var(--space-3) var(--space-4);
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    padding: var(--space-4) var(--space-5) var(--space-4);
+    margin-bottom: var(--space-4);
+}
+.result-row::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--accent);
 }
 .result-row-head {
     display: flex;
@@ -1517,24 +1532,38 @@ input[type="range"]::-moz-range-thumb:hover {
     min-width: 0;
     margin: 0;
     font-family: var(--font-serif);
-    font-size: var(--fs-base);
-    font-weight: 500;
+    font-size: var(--fs-xl);
+    font-weight: 700;
+    letter-spacing: -0.01em;
     line-height: var(--lh-snug);
+    text-wrap: balance;
 }
 .score-meter {
-    display: flex;
+    display: inline-flex;
     flex-direction: column;
     align-items: stretch;
     gap: var(--space-1);
-    width: 3.75rem;
+    min-width: 3.4rem;
+    width: 3.4rem;
     flex-shrink: 0;
     cursor: help;
 }
+.score-meter-value {
+    order: -1;
+    font-family: var(--font-serif);
+    font-size: var(--fs-base);
+    font-weight: 700;
+    font-variant-numeric: oldstyle-nums;
+    color: var(--accent);
+    text-align: left;
+    letter-spacing: 0;
+    line-height: 1;
+}
 .score-meter-track {
     display: block;
-    height: 0.4rem;
-    border-radius: var(--radius-full);
-    background: color-mix(in srgb, var(--rule) 80%, transparent);
+    height: 3px;
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--rule) 80%, var(--text-soft) 20%);
     overflow: hidden;
 }
 .score-meter-fill {
@@ -1542,17 +1571,9 @@ input[type="range"]::-moz-range-thumb:hover {
     height: 100%;
     width: var(--score-pct, 0%);
     max-width: 100%;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-sm);
     background: var(--accent);
     transition: width var(--dur-med) var(--ease-out);
-}
-.score-meter-value {
-    font-size: var(--fs-xs);
-    font-variant-numeric: tabular-nums;
-    font-weight: 600;
-    color: var(--text-soft);
-    text-align: center;
-    line-height: 1;
 }
 .result-row-body {
     padding: 0;
@@ -1655,6 +1676,40 @@ input[type="range"]::-moz-range-thumb:hover {
     margin-bottom: var(--space-2);
     flex-wrap: wrap;
     color: var(--text-soft);
+}
+.result-row .article-meta:not(.meta-authors) {
+    font-size: var(--fs-xs);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    align-items: flex-start;
+}
+.result-row .article-meta.meta-authors {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-size: var(--fs-sm);
+    letter-spacing: 0;
+    text-transform: none;
+}
+.result-row .tag,
+.result-row .study-type-badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-sm);
+    padding: var(--space-1) var(--space-2);
+    color: var(--text-soft);
+    background: var(--bg);
+    margin-left: auto;
+}
+.result-row .study-type-badge {
+    margin-left: 0;
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--wash-accent);
 }
 
 /* Short chips (Year/Journal/Source/ID) sit on one line each and wrap between
@@ -4005,6 +4060,9 @@ html, body {
         font-size: var(--fs-base);
         line-height: 1.6;
     }
+    .result-row {
+        padding: var(--space-3) var(--space-3);
+    }
 
     /* --- Nav --- */
     .navbar {
@@ -4535,7 +4593,9 @@ html, body {
         font-size: var(--fs-base);
     }
     .result-row {
-        padding: var(--space-3) var(--space-2);
+        padding: var(--space-3) var(--space-3);
+        margin-left: calc(-1 * var(--space-2));
+        margin-right: calc(-1 * var(--space-2));
     }
     .result-row-head {
         flex-wrap: wrap;
@@ -5235,9 +5295,14 @@ html[data-mode="simple"] body:has(#search-workbench) .simple-tools-search-only {
 .article-actions-row {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-2);
+    gap: var(--space-2) var(--space-4);
     align-items: center;
-    margin-top: var(--space-1);
+    margin-top: var(--space-3);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--rule);
+    font-size: var(--fs-xs);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
 }
 .not-relevant-undo {
     display: flex;
