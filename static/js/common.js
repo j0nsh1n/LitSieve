@@ -1018,6 +1018,13 @@ async function refreshLibrarySwitcher() {
     } catch (e) { /* ignore */ }
 }
 
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') refreshLibrarySwitcher();
+});
+window.addEventListener('focus', () => {
+    refreshLibrarySwitcher();
+});
+
 // === Range input fill ===
 function updateRangeFill(input) {
     const min = parseFloat(input.min) || 0;

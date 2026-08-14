@@ -169,3 +169,67 @@ def test_large_corpus_read_stays_fast(tmp_path):
         assert elapsed < 5.0, f"get_all_articles too slow: {elapsed:.2f}s"
     finally:
         db.close()
+
+
+def test_keep_starred_and_noted(article_db):
+    """Start over (option B): drop unmarked papers; keep starred/noted."""
+    articles = [
+        {
+            "article_id": "keep-star",
+            "source": "pubmed",
+            "title": "Starred paper",
+            "abstract": "Has a star",
+            "year": "2024",
+            "authors": ["A"],
+            "journal": "J",
+        },
+        {
+            "article_id": "keep-note",
+            "source": "openalex",
+            "title": "Noted paper",
+            "abstract": "Has a note",
+            "year": "2023",
+            "authors": ["B"],
+            "journal": "J",
+        },
+        {
+            "article_id": "drop-me",
+            "source": "arxiv",
+            "title": "Unmarked paper",
+            "abstract": "Should be deleted",
+            "year": "2022",
+            "authors": ["C"],
+            "journal": "J",
+        },
+        {
+            "article_id": "drop-empty-note",
+            "source": "pubmed",
+            "title": "Empty note only",
+            "abstract": "Empty note should not keep",
+            "year": "2021",
+            "authors": ["D"],
+            "journal": "J",
+        },
+    ]
+    article_db.insert_articles(articles, dedupe=False)
+    article_db.upsert_note("keep-star", "pubmed", starred=True)
+    article_db.upsert_note("keep-note", "openalex", note="Important finding")
+    article_db.upsert_note("drop-empty-note", "pubmed", note="   ")  # whitespace only
+
+    result = article_db.keep_starred_and_noted()
+    assert result["deleted"] == 2
+    assert result["remaining"] == 2
+    assert result["kept"] == 2
+
+    ids = {(a["article_id"], a["source"]) for a in article_db.get_all_articles()}
+    assert ids == {("keep-star", "pubmed"), ("keep-note", "openalex")}
+
+    star = article_db.get_note("keep-star", "pubmed")
+    assert star["starred"] is True
+    noted = article_db.get_note("keep-note", "openalex")
+    assert "Important" in noted["note"]
+
+    # Idempotent when only annotated papers remain
+    result2 = article_db.keep_starred_and_noted()
+    assert result2["deleted"] == 0
+    assert result2["remaining"] == 2

@@ -80,10 +80,7 @@ Guest User (is_guest) → sample corpus only; purged by age
 
 ## Session Handoff
 - **Date:** 2026-08-14
-- **Branch:** `feat/phase6-guest-demo` — PR #56 vs `main`, tip `01aaa69`
-- **Done:** Public broadsheet + homepage theme toggle; Start over resets
-  query/narrowing/Show chips; Simple Search count/year dialog; CodeQL
-  nav-href fix; CodeRabbit: quota no longer swaps a partial Start over,
-  start-over flag/cache/a11y/CSS, wait=True shares the fetch slot,
-  embeddings kept only when title+abstract match.
-- **Next:** Human merges PR #56. `design_mockups/` stays untracked.
+- **Branch:** `fix/start-over-keep-annotated` — PR #57 vs `main`
+- **Done:** Start over option B (keep starred/noted), library rehydrate on
+  focus, fetch stall hint after 45s. Overlays folded into real modules.
+- **Next:** Human merges PR #57. `design_mockups/` stays untracked.

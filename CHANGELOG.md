@@ -16,6 +16,14 @@ and this project aims to follow Semantic Versioning for app version strings
   in a dialog before ranking. Advanced still uses the rail.
 
 ### Fixed
+- **Start over** now keeps starred and noted papers and removes the rest
+  immediately (`POST /api/start-over`). Fetch unlocks so you can search
+  again. Confirm copy matches this, not the fetch Start-fresh dialog.
+- **Library switcher after idle:** rehydrates the nav library select on tab
+  focus / visibility change so long idle no longer drops the active library.
+- **Fetch progress stall hint:** when a source makes no progress for ~45s,
+  the progress label explains that large sources can pause without hanging.
+
 - Replace-fetch that hits the storage cap keeps the current library
   instead of swapping in a partial new collection.
 - Sync and background fetches share one per-account job slot so two
