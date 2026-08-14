@@ -8,6 +8,8 @@ and this project aims to follow Semantic Versioning for app version strings
 
 ## [Unreleased]
 
+## [5.0.1] - 2026-08-14
+
 ### Added
 - Public homepage and `/learn` guides use the Phase 10 broadsheet masthead,
   boxed path/guide cards, and a dark/light toggle (no `common.js` on public

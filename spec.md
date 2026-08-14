@@ -61,7 +61,7 @@ a substitute for school library databases.
 - Example (Advanced): log in → Data Management (topics/sources → Fetch →
   auto-prepare) → Clean up (dedup / Quick screen / report) → optional Clusters →
   Search → Download RIS
-- Health: `GET /health` → `{"status":"healthy","version":"5.0.0"}` (version as of
+- Health: `GET /health` → `{"status":"healthy","version":"5.0.1"}` (version as of
   this writing; bump when releasing)
 
 ## Architecture

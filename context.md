@@ -1,7 +1,7 @@
 # context.md — LitSieve
 
 ## Current State
-- App version **5.0.0** (`app/main.py`, `GET /health`). Product name **LitSieve**.
+- App version **5.0.1** (`app/main.py`, `GET /health`). Product name **LitSieve**.
 - Example public deployment pattern: HTTPS at the edge (e.g. Cloudflare Tunnel)
   → `uvicorn` HTTP on `127.0.0.1:7860` only. Operator sets `PUBLIC_BASE_URL` and
   `DEBUG=false` with a real `SECRET_KEY` in gitignored `.env`.
@@ -81,6 +81,6 @@ Guest User (is_guest) → sample corpus only; purged by age
 ## Session Handoff
 - **Date:** 2026-08-14
 - **Branch:** `fix/start-over-keep-annotated` — PR #57 vs `main`
-- **Done:** Start over option B (keep starred/noted), library rehydrate on
-  focus, fetch stall hint after 45s. Overlays folded into real modules.
+- **Done:** Start over option B, library rehydrate, fetch stall hint.
+  Version **5.0.1**.
 - **Next:** Human merges PR #57. `design_mockups/` stays untracked.
