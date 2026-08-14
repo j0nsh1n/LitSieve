@@ -1133,6 +1133,9 @@ function setUiMode(mode) {
     try {
         localStorage.setItem('uiMode', m);
     } catch (e) { /* private mode */ }
+    try {
+        document.cookie = 'ui_mode=' + m + '; Path=/; SameSite=Lax; Max-Age=31536000';
+    } catch (e2) { /* ignore */ }
     updateModeToggleButton();
     updateNavStepNumbers();
 }

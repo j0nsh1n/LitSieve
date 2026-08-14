@@ -17,7 +17,9 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 JS = ROOT / "static" / "js"
 CSS = ROOT / "static" / "css" / "style.css"
 COMMON = (JS / "common.js").read_text(encoding="utf-8")
-DM = (JS / "data_management.js").read_text(encoding="utf-8")
+DM = (JS / "simple_tools.js").read_text(encoding="utf-8") + "\n" + (
+    JS / "data_management.js"
+).read_text(encoding="utf-8")
 STYLE = CSS.read_text(encoding="utf-8")
 
 

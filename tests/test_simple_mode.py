@@ -27,6 +27,13 @@ def _read(*parts: str) -> str:
     return (REPO.joinpath(*parts)).read_text(encoding="utf-8")
 
 
+def _simple_js() -> str:
+    """Simple tools + Data Management (screening/dialogs live in simple_tools.js)."""
+    return _read("static", "js", "simple_tools.js") + "\n" + _read(
+        "static", "js", "data_management.js"
+    )
+
+
 # ---------------------------------------------------------------------------
 # Pre-paint + toggle (both modes)
 # ---------------------------------------------------------------------------
@@ -691,9 +698,7 @@ def test_ai_saved_key_points_survive_append_not_replace(tmp_path):
 # --- Fetch → prepare handoff (added after live review) ----------------------
 
 def _dm_js() -> str:
-    import pathlib
-    return (pathlib.Path(__file__).resolve().parent.parent
-            / "static" / "js" / "data_management.js").read_text()
+    return _simple_js()
 
 
 def test_prepare_card_stays_hidden_while_auto_chain_runs():
@@ -845,7 +850,7 @@ SIMPLE_SCREEN_FRACTIONS = {"low": 0.10, "medium": 0.25, "high": 0.50}
 
 def test_simple_screen_levels_map_to_documented_fractions():
     """Low/Medium/High must match 0.10 / 0.25 / 0.50 and stay in API bounds."""
-    dm = _read("static", "js", "data_management.js")
+    dm = _simple_js()
     assert "SIMPLE_SCREEN_LEVELS" in dm
     for level, frac in SIMPLE_SCREEN_FRACTIONS.items():
         assert f"{level}: {frac}" in dm or f"{level}:{frac}" in dm, level
@@ -866,7 +871,7 @@ def test_simple_screen_levels_map_to_documented_fractions():
 
 def test_simple_screen_preview_does_not_exclude():
     """Preview must only call quick-preview — never /api/screening exclude."""
-    dm = _read("static", "js", "data_management.js")
+    dm = _simple_js()
     fn = dm[dm.find("async function doSimpleScreenPreview") : dm.find("async function doSimpleScreenApply")]
     assert "/api/screening/quick-preview" in fn
     assert 'action: \'exclude\'' not in fn and 'action: "exclude"' not in fn
@@ -874,7 +879,7 @@ def test_simple_screen_preview_does_not_exclude():
 
 
 def test_simple_screen_apply_and_undo_use_low_relevance():
-    dm = _read("static", "js", "data_management.js")
+    dm = _simple_js()
     apply_fn = dm[dm.find("async function doSimpleScreenApply") : dm.find("function doSimpleScreenSkip")]
     assert 'action: "exclude"' in apply_fn or "action: 'exclude'" in apply_fn
     assert "low_relevance" in apply_fn
@@ -898,7 +903,7 @@ def test_simple_screen_confirm_question_box_after_prepare():
     assert 'id="simple-screen-query"' in html
     css = _read("static", "css", "style.css")
     assert ".simple-screen-confirm" in css
-    dm = _read("static", "js", "data_management.js")
+    dm = _simple_js()
     assert "setSimpleScreenConfirmVisible" in dm
     # Pending shows the confirm box; complete/skip hides it.
     refresh = dm[
@@ -920,7 +925,7 @@ def test_simple_screen_confirm_question_box_after_prepare():
 
 
 def test_simple_screen_skip_leaves_no_exclusion_call():
-    dm = _read("static", "js", "data_management.js")
+    dm = _simple_js()
     fn = dm[dm.find("function doSimpleScreenSkip") : dm.find("async function doSimpleScreenUndo")]
     assert "/api/screening" not in fn, "skip must not exclude anything"
     # Records the choice through the helper, which also persists it per library
@@ -930,7 +935,7 @@ def test_simple_screen_skip_leaves_no_exclusion_call():
 
 def test_simple_screen_pending_from_corpus_not_js_flag():
     """Pending uses statistics + screening-report (low_relevance), not a job flag."""
-    dm = _read("static", "js", "data_management.js")
+    dm = _simple_js()
     fn = dm[dm.find("async function refreshSimpleScreeningCard") : dm.find("async function loadSimpleScreenCounts")]
     assert "/api/statistics" in fn
     assert "/api/screening-report" in fn
@@ -942,7 +947,7 @@ def test_simple_screen_pending_from_corpus_not_js_flag():
 
 def test_simple_screen_counts_fetched_once_not_per_radio():
     """All three fractions load together; radio change does not re-call the API."""
-    dm = _read("static", "js", "data_management.js")
+    dm = _simple_js()
     assert "loadSimpleScreenCounts" in dm
     # Parallel fetch of all levels
     assert "Object.keys(SIMPLE_SCREEN_LEVELS)" in dm or "SIMPLE_SCREEN_LEVELS" in dm
@@ -963,7 +968,7 @@ def test_simple_screen_options_open_in_a_popup():
     assert 'id="simple-screen-modal"' in html
     assert 'id="simple-screen-open-btn"' in html
     assert 'name="simple-screen-level"' in html
-    dm = _read("static", "js", "data_management.js")
+    dm = _simple_js()
     assert "function openSimpleScreenModal" in dm
     assert "function closeSimpleScreenModal" in dm
     apply_fn = dm[dm.find("async function doSimpleScreenApply") : dm.find("function doSimpleScreenSkip")]

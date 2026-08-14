@@ -17,7 +17,9 @@ from app.services.pipeline import LiteratureSearchPipeline
 from app.storage.database import ArticleDatabase
 
 REPO = Path(__file__).resolve().parents[1]
-DM = (REPO / "static" / "js" / "data_management.js").read_text(encoding="utf-8")
+DM = (REPO / "static" / "js" / "simple_tools.js").read_text(encoding="utf-8") + "\n" + (
+    REPO / "static" / "js" / "data_management.js"
+).read_text(encoding="utf-8")
 
 
 def test_simple_start_fresh_copy_names_what_it_destroys():

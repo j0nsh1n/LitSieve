@@ -80,7 +80,6 @@ Guest User (is_guest) → sample corpus only; purged by age
 ## Session Handoff
 - **Date:** 2026-08-13
 - **Branch:** `feat/phase6-guest-demo` (do not push without explicit ask)
-- **Done:** Simple Narrow it down is a popup (same Low/Med/High options).
-  Mobile fail-safes and Phase 9 earlier.
-- **Next:** Human-confirm Narrow it down popup after prepare. Do not push
-  unless asked.
+- **Done:** Simple one-page steps 1–2 — prepared libraries redirect Get papers
+  → Search; Search tools strip (Narrow it down / Re-prepare / Start over).
+- **Next:** Steps 3–5 after spec.md Simple-nav approval. Do not push unless asked.

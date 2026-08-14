@@ -157,13 +157,14 @@ def test_smoke_register_sample_cluster_search_export(app_module):
     assert "collected" in report.text.lower() or "included" in report.text.lower() or len(report.text) > 20
 
     # App pages still render after the workflow (disclaimer + cache-bust smoke).
-    for path in ("/data-management", "/clusters", "/statistics", "/search", "/account"):
+    # Simple + prepared papers sends /data-management → /search; collect=1 keeps Get papers.
+    for path in ("/data-management?collect=1", "/clusters", "/statistics", "/search", "/account"):
         page = c.get(path)
         assert page.status_code == 200, path
         assert "LitSieve" in page.text or "LitPilot" in page.text or "text/html" in page.headers.get("content-type", "")
 
     # Advanced surfaces still present in HTML (Simple only CSS-hides them).
-    dm = c.get("/data-management")
+    dm = c.get("/data-management?collect=1")
     assert dm.status_code == 200
     assert "source-option-grid" in dm.text or "embedding-model" in dm.text
     stats_page = c.get("/statistics")

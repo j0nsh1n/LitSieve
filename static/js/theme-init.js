@@ -33,6 +33,9 @@
             }
         }
         root.setAttribute('data-mode', mode);
+        try {
+            document.cookie = 'ui_mode=' + mode + '; Path=/; SameSite=Lax; Max-Age=31536000';
+        } catch (e3) { /* ignore */ }
     } catch (e) {
         // localStorage can throw in private mode / with cookies blocked.
         // Falling back to the default theme/mode is fine; never break the page.

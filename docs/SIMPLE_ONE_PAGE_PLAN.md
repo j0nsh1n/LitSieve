@@ -1,7 +1,7 @@
 # Plan — Simple mode on one page
 
-**Status:** plan only (2026-08-13). Do not implement until the human approves
-this doc and the spec.md Simple-nav edit.
+**Status:** Steps 1–2 implemented 2026-08-13. Steps 3–5 wait on spec.md
+Simple-nav approval.
 
 Build note for collapsing Simple from Get papers → Search into **one surface**.
 Advanced is unchanged. Follows Phase 6 (`docs/SIMPLE_TWO_PAGE_PLAN.md`) and the

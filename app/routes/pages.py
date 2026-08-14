@@ -123,11 +123,38 @@ async def search_page(request: Request):
     return templates.TemplateResponse(request, "search.html", context={"active_page": "search", "user": user})
 
 
+def _cookie_wants_simple(request: Request) -> bool:
+    """Simple/Advanced is a client preference; we persist ui_mode so pages can redirect."""
+    mode = (request.cookies.get("ui_mode") or "").strip().lower()
+    if mode == "simple":
+        return True
+    if mode == "advanced":
+        return False
+    return (request.cookies.get("ui_mode_seed") or "").strip().lower() == "simple"
+
+
 @router.get("/data-management")
 async def data_management_page(request: Request):
     user = current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=302)
+    # Simple + papers: Search is home. ?collect=1 keeps Get papers (Start over).
+    collect = (request.query_params.get("collect") or "").strip() == "1"
+    if not collect and _cookie_wants_simple(request):
+        from app.core import get_pipeline, release_pipeline
+        uid = user["user_id"]
+        p = None
+        try:
+            p = get_pipeline(uid)
+            stats = p.get_statistics() if p else {}
+            # Search is only home once papers can actually be ranked.
+            if (stats.get("articles_with_embeddings") or 0) > 0:
+                return RedirectResponse(url="/search", status_code=302)
+        except Exception:
+            logger.exception("Simple Get-papers redirect check failed")
+        finally:
+            if p is not None:
+                release_pipeline(uid)
     return templates.TemplateResponse(request, "data_management.html", context={"active_page": "data_management", "user": user})
 
 

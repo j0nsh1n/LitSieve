@@ -1,10 +1,18 @@
 {# Simple only: Narrow it down. Options live in a popup; the page keeps a
    short dock (open / outcome / undo / Go to Search). Hidden in Advanced. #}
 <div id="simple-screening-card" hidden>
- <div class="simple-screen-dock" id="simple-screen-dock">
+ <div class="simple-screen-dock simple-tools-strip" id="simple-screen-dock">
+  <span class="simple-tools-count" id="simple-tools-count"></span>
   <button type="button" class="btn btn-primary" id="simple-screen-open-btn">
    Narrow it down
   </button>
+  <button type="button" class="btn btn-secondary simple-tools-search-only" id="simple-tools-reprepare-btn">
+   Re-prepare
+  </button>
+  <button type="button" class="btn btn-secondary simple-tools-search-only" id="simple-tools-startover-btn">
+   Start over
+  </button>
+  <span class="help-text" id="simple-tools-status"></span>
   <p class="help-text" id="simple-screen-dock-hint">Set aside papers least related to your question, or skip.</p>
   <div id="simple-screen-outcome" class="simple-screen-outcome u-hidden" hidden>
    <p class="info-text" id="simple-screen-outcome-msg"></p>

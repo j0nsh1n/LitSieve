@@ -33,6 +33,10 @@ and this project aims to follow Semantic Versioning for app version strings
 - **Narrow it down** in Simple is a popup: Low / Medium / High, preview, set
   aside, and skip stay; the page only keeps a short button plus undo / Go to
   Search after you decide.
+- **Simple Search is home** once papers are prepared: Get papers redirects to
+  Search. A one-line strip on Search has Narrow it down, Re-prepare, and Start
+  over (Start over opens Get papers with `?collect=1`). Empty libraries still
+  open Get papers.
 
 ### Changed
 - **Start fresh copy (Simple):** the existing replace/add dialog now says notes,
