@@ -80,6 +80,8 @@ def test_mode_toggle_replaces_reading_mode():
     assert "setUiMode" in common
     assert "isSimpleMode" in common
     assert "updateNavStepNumbers" in common
+    # Get papers hrefs are literals (not copied from data-href-* into href).
+    assert "getPapers.setAttribute('href', simple ? '/search?collect=1' : '/data-management')" in common
     assert "reading-toggle" not in common
     assert "setReadingMode" not in common
     # Highlight the control when Advanced is active (not Simple).

@@ -1155,14 +1155,6 @@ function _collectQueryOn() {
 
 function updateNavStepNumbers() {
     const simple = isSimpleMode();
-    // Phase 10: Simple "Get papers" is /search?collect=1 (real collect state),
-    // not /data-management (which 302s back to /search).
-    document.querySelectorAll('.nav-link[data-href-simple], .nav-link[data-href-advanced]').forEach((a) => {
-        const hrefAdv = a.getAttribute('data-href-advanced');
-        const hrefSim = a.getAttribute('data-href-simple');
-        const next = simple ? (hrefSim || hrefAdv) : (hrefAdv || hrefSim);
-        if (next) a.setAttribute('href', next);
-    });
     document.querySelectorAll('.nav-link[data-step-advanced]').forEach((a) => {
         const num = a.querySelector('.nav-step-num');
         if (!num) return;
@@ -1197,6 +1189,11 @@ function updateNavStepNumbers() {
     }
     const getPapers = document.querySelector('.nav-step-data_management');
     const searchLink = document.querySelector('.nav-step-search');
+    // Literals only — do not copy data-href-* from the DOM into href
+    // (CodeQL js/xss-through-dom). Simple collect is /search?collect=1.
+    if (getPapers) {
+        getPapers.setAttribute('href', simple ? '/search?collect=1' : '/data-management');
+    }
     if (getPapers && searchLink) {
         const path = location.pathname || '';
         const collecting = simple && (
