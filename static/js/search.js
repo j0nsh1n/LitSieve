@@ -483,6 +483,77 @@ function escapeRegExp(s) {
  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+async function promptSimpleSearchScope() {
+ if (typeof isSimpleMode !== 'function' || !isSimpleMode()) return true;
+ if (typeof openSiteForm !== 'function') return true;
+ const topkEl = document.getElementById('top-k');
+ const yminEl = document.getElementById('year-min');
+ const ymaxEl = document.getElementById('year-max');
+ const result = await openSiteForm({
+  title: 'Search options',
+  message: 'How many papers should we show? You can also limit the years.',
+  confirmLabel: 'Search',
+  fields: [
+   {
+    id: 'count',
+    label: 'How many papers',
+    type: 'number',
+    value: (topkEl && topkEl.value) || '10',
+    min: 1,
+    max: 50,
+    step: 1,
+   },
+   {
+    id: 'year_min',
+    label: 'From year (optional)',
+    type: 'number',
+    value: yminEl ? yminEl.value : '',
+    placeholder: 'e.g. 2015',
+    min: 1900,
+    max: 2100,
+    step: 1,
+   },
+   {
+    id: 'year_max',
+    label: 'To year (optional)',
+    type: 'number',
+    value: ymaxEl ? ymaxEl.value : '',
+    placeholder: 'e.g. 2024',
+    min: 1900,
+    max: 2100,
+    step: 1,
+   },
+  ],
+  validate: (vals) => {
+   const n = parseInt(vals.count, 10);
+   if (!Number.isFinite(n) || n < 1 || n > 50) {
+    return 'Choose how many papers to show (1–50).';
+   }
+   const yminRaw = String(vals.year_min || '').trim();
+   const ymaxRaw = String(vals.year_max || '').trim();
+   const ymin = yminRaw === '' ? null : parseInt(yminRaw, 10);
+   const ymax = ymaxRaw === '' ? null : parseInt(ymaxRaw, 10);
+   if (yminRaw && !Number.isFinite(ymin)) return 'From year must be a number.';
+   if (ymaxRaw && !Number.isFinite(ymax)) return 'To year must be a number.';
+   if (ymin != null && (ymin < 1900 || ymin > 2100)) return 'From year must be between 1900 and 2100.';
+   if (ymax != null && (ymax < 1900 || ymax > 2100)) return 'To year must be between 1900 and 2100.';
+   if (ymin != null && ymax != null && ymin > ymax) return 'From year must be before To year.';
+   return null;
+  },
+ });
+ if (result == null) return false;
+ const n = parseInt(result.count, 10);
+ if (topkEl) {
+  topkEl.value = String(n);
+  const topkDisplay = document.getElementById('topk-display');
+  if (topkDisplay) topkDisplay.textContent = String(n);
+  if (typeof updateRangeFill === 'function') updateRangeFill(topkEl);
+ }
+ if (yminEl) yminEl.value = String(result.year_min || '').trim();
+ if (ymaxEl) ymaxEl.value = String(result.year_max || '').trim();
+ return true;
+}
+
 async function doSearch(opts) {
  const fromRestore = !!(opts && opts.fromRestore);
  const method = document.querySelector('input[name="input_method"]:checked').value;
@@ -492,6 +563,10 @@ async function doSearch(opts) {
   showNotification(method === 'seed' ? 'Enter a seed id or title.' : 'Please enter a search query.', 'error');
  }
  return;
+ }
+ if (!fromRestore) {
+  const scoped = await promptSimpleSearchScope();
+  if (!scoped) return;
  }
 
  const filters = collectSearchFilters();
@@ -580,6 +655,10 @@ async function doSearch(opts) {
 
 async function doStarredSearch(opts) {
  const fromRestore = !!(opts && opts.fromRestore);
+ if (!fromRestore) {
+  const scoped = await promptSimpleSearchScope();
+  if (!scoped) return;
+ }
  const filters = collectSearchFilters();
  if (filters.source_filter.length === 0) {
  if (!fromRestore) showNotification('Please select at least one source.', 'error');

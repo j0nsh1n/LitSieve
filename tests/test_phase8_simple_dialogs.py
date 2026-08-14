@@ -57,6 +57,12 @@ def test_openSiteChoice_exists_for_multi_button_dialogs():
     assert "mode === 'choice'" in COMMON or "mode: 'choice'" in COMMON
 
 
+def test_openSiteForm_exists_for_multi_field_dialogs():
+    assert "function openSiteForm" in COMMON
+    assert "mode === 'form'" in COMMON or "mode: 'form'" in COMMON
+    assert "o.fields" in COMMON or "formFields" in COMMON
+
+
 # ── Dense source report ────────────────────────────────────────────────────
 
 def test_fetch_report_helpers_exist():

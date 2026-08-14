@@ -390,7 +390,7 @@ function openSiteModal(opts) {
         root.setAttribute('aria-modal', 'true');
         root.setAttribute('aria-labelledby', 'site-modal-title');
 
-        const title = o.title || (mode === 'confirm' ? 'Please confirm' : mode === 'prompt' ? 'Input needed' : 'Notice');
+        const title = o.title || (mode === 'confirm' ? 'Please confirm' : mode === 'prompt' ? 'Input needed' : mode === 'form' ? 'Options' : 'Notice');
         const confirmLabel = o.confirmLabel || (mode === 'confirm' ? 'Confirm' : 'OK');
         const cancelLabel = o.cancelLabel || 'Cancel';
         const confirmClass = o.danger ? 'btn btn-danger' : 'btn btn-primary';
@@ -399,9 +399,11 @@ function openSiteModal(opts) {
             : '';
 
         let fieldHtml = '';
+        const formFields = Array.isArray(o.fields) ? o.fields : [];
+        const isForm = mode === 'form' && formFields.length > 0;
         // prompt mode always shows an input; choice mode can opt in via withInput
         // (e.g. Simple re-prepare: verify research question in the same dialog).
-        const showInput = mode === 'prompt' || !!(mode === 'choice' && o.withInput);
+        const showInput = !isForm && (mode === 'prompt' || !!(mode === 'choice' && o.withInput));
         if (showInput) {
             const fieldLabel = o.inputLabel
                 ? escapeHtml(String(o.inputLabel))
@@ -422,6 +424,22 @@ function openSiteModal(opts) {
                 placeholder="${escapeHtml(o.placeholder || '')}" autocomplete="off">
             </div>`;
             }
+        }
+        if (isForm) {
+            fieldHtml = `<div class="lra-modal-fields">${formFields.map((f) => {
+                const fid = escapeHtml(String(f.id || ''));
+                const label = escapeHtml(String(f.label || f.id || ''));
+                const typ = escapeHtml(String(f.type || 'text'));
+                const ph = escapeHtml(String(f.placeholder || ''));
+                const min = f.min != null ? ` min="${escapeHtml(String(f.min))}"` : '';
+                const max = f.max != null ? ` max="${escapeHtml(String(f.max))}"` : '';
+                const step = f.step != null ? ` step="${escapeHtml(String(f.step))}"` : '';
+                return `<div class="form-group lra-modal-input-group" data-field="${fid}">
+              <label class="help-text" for="site-modal-field-${fid}">${label}</label>
+              <input id="site-modal-field-${fid}" class="lra-modal-input" type="${typ}"
+                placeholder="${ph}"${min}${max}${step} autocomplete="off">
+            </div>`;
+            }).join('')}</div>`;
         }
 
         let actionsHtml = '';
@@ -508,7 +526,7 @@ function openSiteModal(opts) {
 
         const cancelValue = () => {
             if (mode === 'confirm') return false;
-            if (mode === 'prompt' || mode === 'choice') return null;
+            if (mode === 'prompt' || mode === 'choice' || mode === 'form') return null;
             return undefined;
         };
 
@@ -598,6 +616,22 @@ function openSiteModal(opts) {
                     close(undefined);
                     return;
                 }
+                if (isForm) {
+                    const values = {};
+                    formFields.forEach((f) => {
+                        const el = root.querySelector('#site-modal-field-' + f.id);
+                        values[f.id] = el ? el.value : '';
+                    });
+                    if (typeof o.validate === 'function') {
+                        const err = o.validate(values);
+                        if (err) {
+                            showNotification(String(err), 'error');
+                            return;
+                        }
+                    }
+                    close(values);
+                    return;
+                }
                 // prompt
                 const val = input ? input.value : '';
                 const trimmed = String(val).trim();
@@ -620,7 +654,24 @@ function openSiteModal(opts) {
             });
         }
 
-        if (input) {
+        if (isForm) {
+            formFields.forEach((f) => {
+                const el = root.querySelector('#site-modal-field-' + f.id);
+                if (el && f.value != null) el.value = String(f.value);
+            });
+            root.querySelectorAll('.lra-modal-fields .lra-modal-input').forEach((el) => {
+                el.addEventListener('keydown', (ev) => {
+                    if (ev.key === 'Enter' && !ev.shiftKey) {
+                        ev.preventDefault();
+                        confirmBtn && confirmBtn.click();
+                    }
+                });
+            });
+            const firstField = root.querySelector('.lra-modal-fields .lra-modal-input');
+            setTimeout(() => {
+                if (firstField) firstField.focus();
+            }, 30);
+        } else if (input) {
             input.value = o.defaultValue != null ? String(o.defaultValue) : '';
             input.addEventListener('keydown', (ev) => {
                 if (ev.key === 'Enter' && !ev.shiftKey) {
@@ -661,6 +712,11 @@ function openSiteAlert(opts) {
 /** Multi-button dialog. Resolves to the chosen `value`, or null if cancelled. */
 function openSiteChoice(opts) {
     return openSiteModal(Object.assign({}, opts, { mode: 'choice' }));
+}
+
+/** Multi-field dialog. Resolves to `{ id: value, … }` or null if cancelled. */
+function openSiteForm(opts) {
+    return openSiteModal(Object.assign({}, opts, { mode: 'form' }));
 }
 
 /**

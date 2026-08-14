@@ -78,6 +78,21 @@ def test_search_includes_collect_and_simple_tools():
     assert ".ai-actions" not in simple_hide
 
 
+def test_simple_search_asks_count_and_year_range():
+    """Simple Search pops a form for how many + year range; Advanced keeps the rail."""
+    search_js = _read("static", "js", "search.js")
+    common = _read("static", "js", "common.js")
+    assert "function promptSimpleSearchScope" in search_js
+    assert "function openSiteForm" in common
+    assert "mode === 'form'" in common or "mode: 'form'" in common
+    do_search = search_js[search_js.index("async function doSearch") : search_js.index("async function doStarredSearch")]
+    assert "promptSimpleSearchScope" in do_search
+    assert "fromRestore" in do_search
+    assert "How many papers" in search_js
+    assert "year_min" in search_js[search_js.index("function promptSimpleSearchScope") :]
+    assert "year_max" in search_js[search_js.index("function promptSimpleSearchScope") :]
+
+
 def test_collect_query_on_data_management_redirects_to_search(tmp_path, monkeypatch):
     """Simple ?collect=1 on Get papers lands on Search collect, not DM."""
     from app import core

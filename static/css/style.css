@@ -1877,6 +1877,9 @@ body.lra-modal-open {
         width: 100%;
         justify-content: center;
     }
+    .lra-modal-fields {
+        grid-template-columns: 1fr;
+    }
 }
 .lra-modal-title {
     margin: 0 0 var(--space-2);
@@ -1918,6 +1921,18 @@ body.lra-modal-open {
     margin: 0 0 var(--space-3);
     white-space: pre-wrap;
     word-break: break-word;
+}
+.lra-modal-fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-3);
+    margin-top: var(--space-3);
+}
+.lra-modal-fields .lra-modal-input-group {
+    margin: 0;
+}
+.lra-modal-fields .lra-modal-input-group:first-child {
+    grid-column: 1 / -1;
 }
 .lra-modal-input-group {
     margin: var(--space-3) 0 0;

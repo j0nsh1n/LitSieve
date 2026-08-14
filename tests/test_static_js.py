@@ -152,6 +152,7 @@ def test_account_uses_site_modals_not_browser_dialogs():
     assert "function openSitePrompt" in common
     assert "function openSiteAlert" in common
     assert "function openSiteModal" in common
+    assert "function openSiteForm" in common
     # No browser dialogs left on Account.
     for bad in ("window.confirm", "window.prompt", "window.alert", "confirm(", "prompt(", "alert("):
         # allow openSiteConfirm / openSitePrompt names and variable names like password_confirm
