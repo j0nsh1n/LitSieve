@@ -32,6 +32,9 @@ and this project aims to follow Semantic Versioning for app version strings
 - **Start fresh copy (Simple):** the existing replace/add dialog now says that
   notes, stars, and saved AI key points are deleted too, and that this cannot
   be undone. Same buttons, no extra click.
+- **Advanced replace-fetch:** a live line next to the Replace radio names the
+  paper / note / star / AI key-point counts when the collection is not empty.
+  No new modal. Append and empty libraries hide the line.
 - **Simple fetch lock:** after this library has papers, Simple hides the Fetch
   Articles form so a second search is not the main action. A secondary
   **Start over or add papers** control reuses the existing replace/add dialog,

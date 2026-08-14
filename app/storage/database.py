@@ -1003,6 +1003,15 @@ class ArticleDatabase:
             cursor.execute("SELECT year FROM articles")
             year_rows = cursor.fetchall()
 
+            cursor.execute("SELECT COUNT(*) FROM notes WHERE TRIM(note) != ''")
+            notes_count = int(cursor.fetchone()[0] or 0)
+            cursor.execute("SELECT COUNT(*) FROM notes WHERE starred = 1")
+            starred_count = int(cursor.fetchone()[0] or 0)
+            cursor.execute(
+                "SELECT COUNT(*) FROM key_points WHERE origin = 'ai'"
+            )
+            ai_key_points = int(cursor.fetchone()[0] or 0)
+
         from app.utils import parse_year
         year_counts: Dict[str, int] = {}
         for (year_raw,) in year_rows:
@@ -1017,6 +1026,9 @@ class ArticleDatabase:
             'excluded_articles': excluded_count,
             'sources': sources,
             'year_counts': year_counts,
+            'notes': notes_count,
+            'starred': starred_count,
+            'ai_key_points': ai_key_points,
         }
 
     def build_screening_report_counts(self) -> Dict:

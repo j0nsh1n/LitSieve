@@ -226,6 +226,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Append → prefer only-new; Replace → re-embed all by default.
  syncOnlyMissingFromFetchMode();
  saveFetchPrefs();
+ updateReplaceConsequence();
  });
  });
  const onlyMissingEl = document.getElementById('only-missing');
@@ -512,6 +513,10 @@ function restoreFetchPrefs() {
 let _lastTotalArticles = 0;
 /** Papers with embeddings (ready for search). Optional prepare card gates on this. */
 let _lastReadyArticles = 0;
+/** Student-authored rows used by the Advanced replace-consequence line. */
+let _lastNotesCount = 0;
+let _lastStarredCount = 0;
+let _lastAiKeyPoints = 0;
 /**
  * Simple: student chose Start over / add papers, so the fetch form is live
  * again until this fetch finishes (or the page reloads).
@@ -1198,6 +1203,32 @@ async function unlockSimpleFetch() {
  }
 }
 
+/**
+ * Advanced only (Simple hides the radio row): live line next to Replace
+ * when this library is non-empty. No modal — the radios stay the control.
+ */
+function updateReplaceConsequence() {
+ const el = document.getElementById('fetch-replace-consequence');
+ if (!el) return;
+ const mode = (document.querySelector('input[name="fetch-mode"]:checked') || {}).value || 'replace';
+ const show = mode === 'replace' && _lastTotalArticles > 0;
+ el.hidden = !show;
+ if (!show) return;
+ const n = Number(_lastTotalArticles) || 0;
+ const nLabel = n === 1 ? '1 paper' : `${n} papers`;
+ const notes = Number(_lastNotesCount) || 0;
+ const stars = Number(_lastStarredCount) || 0;
+ const kps = Number(_lastAiKeyPoints) || 0;
+ if (notes || stars || kps) {
+  el.textContent =
+   `Replace deletes these ${nLabel}, including ${notes} note${notes === 1 ? '' : 's'}, ` +
+   `${stars} star${stars === 1 ? '' : 's'}, and ${kps} saved AI key point${kps === 1 ? '' : 's'}.`;
+ } else {
+  el.textContent =
+   `Replace deletes these ${nLabel} and any notes, stars, and saved AI key points.`;
+ }
+}
+
 function updatePrepareSectionVisibility(totalArticles, opts) {
  const sec = document.getElementById('prepare-section');
  if (!sec) return;
@@ -1212,16 +1243,19 @@ function updatePrepareSectionVisibility(totalArticles, opts) {
  if (_pipelineBusy) {
   sec.hidden = true;
   updateSimpleFetchLock();
+  updateReplaceConsequence();
   return;
  }
  if (forceShow) {
   sec.hidden = false;
   updateSimpleFetchLock();
+  updateReplaceConsequence();
   return;
  }
  // Optional re-prepare only once something is actually ready for search.
  sec.hidden = !(_lastReadyArticles > 0);
  updateSimpleFetchLock();
+ updateReplaceConsequence();
 }
 
 async function loadPageData() {
@@ -1230,6 +1264,9 @@ async function loadPageData() {
  const model = stats.embedding_model || ' - ';
  const total = stats.total_articles || 0;
  const ready = stats.articles_with_embeddings || 0;
+ _lastNotesCount = Number(stats.notes) || 0;
+ _lastStarredCount = Number(stats.starred) || 0;
+ _lastAiKeyPoints = Number(stats.ai_key_points) || 0;
  const missing = stats.missing_embeddings ?? Math.max(0, total - ready);
  document.getElementById('embedding-info').textContent =
  `${ready} of ${total} papers are ready for search` +
