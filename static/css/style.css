@@ -3042,8 +3042,8 @@ select option,
 }
 .landing .site-disclaimer {
     max-width: 46rem;
-    margin-left: 0;
-    margin-right: 0;
+    margin-left: auto;
+    margin-right: auto;
     text-align: left;
 }
 .footer .site-disclaimer-foot,
@@ -3569,7 +3569,9 @@ html[data-mode="simple"] body.simple-collecting #search-query-top {
 .public-nav {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: var(--space-3);
+    width: 100%;
     padding: var(--space-3) var(--space-6);
     border-bottom: 3px double var(--text);
     background: var(--bg);
@@ -3595,7 +3597,7 @@ html[data-mode="simple"] body.simple-collecting #search-query-top {
 
 .public-nav > .theme-toggle {
     flex: 0 0 auto;
-    margin-left: 0;
+    margin-left: auto;
 }
 
 .public-nav-link {
@@ -3618,7 +3620,7 @@ html[data-mode="simple"] body.simple-collecting #search-query-top {
 }
 
 .landing {
-    max-width: 56rem;
+    max-width: 68rem;
     width: 100%;
     margin: 0 auto;
     padding: var(--space-7) var(--space-6) var(--space-8);
@@ -3626,7 +3628,7 @@ html[data-mode="simple"] body.simple-collecting #search-query-top {
 }
 
 .landing-header {
-    text-align: left;
+    text-align: center;
     margin-bottom: var(--space-7);
     padding-bottom: var(--space-6);
     border-bottom: 1px solid var(--text);
@@ -3638,11 +3640,13 @@ html[data-mode="simple"] body.simple-collecting #search-query-top {
     content: "";
     position: absolute;
     left: 0;
+    right: 0;
     bottom: -1px;
+    margin: 0 auto;
     width: 4.5rem;
     height: 2px;
     background: var(--accent);
-    transform-origin: left center;
+    transform-origin: center;
     animation: ruleGrow var(--dur-slow) var(--ease-out) 0.2s both;
 }
 
@@ -3676,14 +3680,14 @@ html[data-mode="simple"] body.simple-collecting #search-query-top {
     font-size: var(--fs-md);
     line-height: 1.6;
     max-width: 42rem;
-    margin: 0;
+    margin: 0 auto;
     animation: fadeUp var(--dur-slow) var(--ease-out) 0.08s both;
 }
 
 .landing-cta {
     display: flex;
     gap: var(--space-3);
-    justify-content: flex-start;
+    justify-content: center;
     margin-top: var(--space-5);
     flex-wrap: wrap;
     animation: fadeUp var(--dur-slow) var(--ease-out) 0.14s both;
@@ -3696,6 +3700,7 @@ html[data-mode="simple"] body.simple-collecting #search-query-top {
 .landing-cta .btn { padding: var(--space-3) var(--space-6); }
 
 .landing-section-title {
+    display: block;
     font-size: var(--fs-xs);
     letter-spacing: 0.22em;
     text-transform: uppercase;
@@ -3704,6 +3709,23 @@ html[data-mode="simple"] body.simple-collecting #search-query-top {
     border-top: 3px double var(--text);
     padding-top: var(--space-3);
     margin: 0 0 var(--space-4);
+}
+
+.landing-section-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-4);
+    flex-wrap: wrap;
+    border-top: 3px double var(--text);
+    padding-top: var(--space-3);
+    margin: 0 0 var(--space-4);
+}
+
+.landing-section-head .landing-section-title {
+    border-top: none;
+    padding-top: 0;
+    margin: 0;
 }
 
 .landing-path {
@@ -3718,7 +3740,7 @@ html[data-mode="simple"] body.simple-collecting #search-query-top {
 
 .landing-path-card {
     background: var(--surface);
-    border: 1px solid var(--rule);
+    border: 1px solid var(--text);
     border-radius: var(--radius-md);
     padding: var(--space-4) var(--space-5);
     position: relative;
@@ -3754,9 +3776,15 @@ html[data-mode="simple"] body.simple-collecting #search-query-top {
 
 .feature-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--space-4);
     margin-bottom: var(--space-7);
+}
+
+@media (min-width: 1100px) {
+    .feature-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
 }
 
 .landing-features-hint {
@@ -3764,7 +3792,7 @@ html[data-mode="simple"] body.simple-collecting #search-query-top {
     font-style: italic;
     font-size: var(--fs-sm);
     color: var(--text-soft);
-    margin: calc(var(--space-4) * -1) 0 var(--space-4);
+    margin: 0;
 }
 
 .feature-card {
@@ -3779,6 +3807,7 @@ html[data-mode="simple"] body.simple-collecting #search-query-top {
     text-decoration: none;
     color: inherit;
     cursor: pointer;
+    min-height: 11rem;
     animation: fadeUp var(--dur-med) var(--ease-out) both;
     transition: border-color var(--dur-fast) var(--ease-soft),
                 background-color var(--dur-fast) var(--ease-soft);
@@ -4861,7 +4890,12 @@ html, body {
     }
     .landing-features-hint {
         font-size: var(--fs-sm);
-        margin: calc(var(--space-3) * -1) 0 var(--space-3);
+        margin: 0;
+    }
+    .landing-section-head {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--space-1);
     }
 
     /* --- Auth --- */
