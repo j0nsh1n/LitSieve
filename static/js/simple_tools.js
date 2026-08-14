@@ -1098,8 +1098,12 @@ function _waitForEmbedJob(timeoutMs) {
  });
 }
 
+/** After Start over, the next prepare must not revive search or Narrow it down. */
+var _resetAfterStartOver = false;
+
 /** Start over: drop last search + Narrow it down. Notes/stars/AI key points stay. */
 async function resetSearchAndNarrowingForStartOver() {
+ _resetAfterStartOver = true;
  if (typeof clearSearchWorkspace === 'function') {
   clearSearchWorkspace();
  }

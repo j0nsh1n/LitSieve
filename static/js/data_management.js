@@ -1467,8 +1467,10 @@ async function doCreateEmbeddings(opts) {
  }
  // Manual Simple re-prepare: clear low_relevance exclusions so screening
  // returns to *pending* via corpus state (not a JS flag) and survives reload.
+ // Start over: do the same after the following fetch/prepare, including
+ // auto-chain — replace-fetch can otherwise restore the old set-asides.
  // Uses existing POST /api/screening include — no new endpoint.
- if (simple && !fromAutoChain) {
+ if (simple && (!fromAutoChain || (typeof _resetAfterStartOver !== 'undefined' && _resetAfterStartOver))) {
   try {
    const excl = await apiCall('/api/screening/excluded?reason=low_relevance');
    const items = (excl && excl.items) || [];
@@ -1490,6 +1492,11 @@ async function doCreateEmbeddings(opts) {
  await refreshSimpleScreeningCard();
  if (simple && document.getElementById('search-collect')) {
   clearCollectQueryFromUrl();
+  if (typeof _resetAfterStartOver !== 'undefined' && _resetAfterStartOver
+   && typeof clearSearchWorkspace === 'function') {
+   clearSearchWorkspace();
+   _resetAfterStartOver = false;
+  }
   try {
    const stats = await apiCall('/api/statistics');
    syncSimpleOnePageState(stats);

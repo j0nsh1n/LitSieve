@@ -31,6 +31,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Start over / empty collect must not revive the previous query.
     if (collecting) {
      clearSearchWorkspace();
+     if (typeof _collectQueryOn === 'function' && _collectQueryOn()
+      && typeof resetSearchAndNarrowingForStartOver === 'function') {
+      return resetSearchAndNarrowingForStartOver();
+     }
      return;
     }
     if (ready) return restoreSearchSession();

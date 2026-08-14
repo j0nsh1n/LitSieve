@@ -55,6 +55,9 @@ def test_search_includes_collect_and_simple_tools():
     assert "low_relevance" in reset_fn
     assert "clearSearchWorkspace" in reset_fn
     assert "setSimpleScreenSkipped(false)" in reset_fn
+    assert "_resetAfterStartOver" in reset_fn
+    dm = _read("static", "js", "data_management.js")
+    assert "_resetAfterStartOver" in dm
     search_js = _read("static", "js", "search.js")
     assert "function clearSearchWorkspace" in search_js
     assert "SEARCH_SESSION_KEY" in search_js
