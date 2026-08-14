@@ -212,10 +212,10 @@
      <span class="display-filters-label" id="display-filters-label">Show</span>
      <div class="display-filter-chips" id="display-filter-chips" role="group"
       aria-labelledby="display-filters-label">
-      <button type="button" class="display-filter-chip is-on" data-filter="all">All</button>
-      <button type="button" class="display-filter-chip" data-filter="starred">Starred</button>
-      <button type="button" class="display-filter-chip" data-filter="noted">Has a note</button>
-      <button type="button" class="display-filter-chip" data-filter="recent" id="display-filter-recent">Since 2021</button>
+      <button type="button" class="display-filter-chip is-on" data-filter="all" aria-pressed="true">All</button>
+      <button type="button" class="display-filter-chip" data-filter="starred" aria-pressed="false">Starred</button>
+      <button type="button" class="display-filter-chip" data-filter="noted" aria-pressed="false">Has a note</button>
+      <button type="button" class="display-filter-chip" data-filter="recent" id="display-filter-recent" aria-pressed="false">Since 2021</button>
      </div>
      <p class="help-text" id="display-filter-status"></p>
     </div>
@@ -287,7 +287,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/simple_tools.js?v=20260814d"></script>
-<script src="/static/js/data_management.js?v=20260814a"></script>
-<script src="/static/js/search.js?v=20260814j"></script>
+<script src="/static/js/simple_tools.js?v=20260814e"></script>
+<script src="/static/js/data_management.js?v=20260814b"></script>
+<script src="/static/js/search.js?v=20260814k"></script>
 {% endblock %}

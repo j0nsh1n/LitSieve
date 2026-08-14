@@ -1470,7 +1470,8 @@ async function doCreateEmbeddings(opts) {
  // Start over: do the same after the following fetch/prepare, including
  // auto-chain — replace-fetch can otherwise restore the old set-asides.
  // Uses existing POST /api/screening include — no new endpoint.
- if (simple && (!fromAutoChain || (typeof _resetAfterStartOver !== 'undefined' && _resetAfterStartOver))) {
+ const startOverReset = typeof _resetAfterStartOver !== 'undefined' && _resetAfterStartOver;
+ if (simple && (!fromAutoChain || startOverReset)) {
   try {
    const excl = await apiCall('/api/screening/excluded?reason=low_relevance');
    const items = (excl && excl.items) || [];
@@ -1486,16 +1487,20 @@ async function doCreateEmbeddings(opts) {
    console.warn('Could not reset screening after re-prepare:', screenErr);
   }
  }
+ // Always drop the flag after the screening reset, even on Advanced DM
+ // (no #search-collect). Leaving it true would treat the next auto-chain
+ // prepare as another Start over and restore every low_relevance set-aside.
+ if (startOverReset) {
+  _resetAfterStartOver = false;
+ }
  await loadPageData();
  // Manual re-prepare (and auto-chain) must refresh Narrow it down so the
  // confirm-your-question box appears without a full page reload.
  await refreshSimpleScreeningCard();
  if (simple && document.getElementById('search-collect')) {
   clearCollectQueryFromUrl();
-  if (typeof _resetAfterStartOver !== 'undefined' && _resetAfterStartOver
-   && typeof clearSearchWorkspace === 'function') {
+  if (startOverReset && typeof clearSearchWorkspace === 'function') {
    clearSearchWorkspace();
-   _resetAfterStartOver = false;
   }
   try {
    const stats = await apiCall('/api/statistics');

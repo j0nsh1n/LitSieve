@@ -107,15 +107,18 @@ def _run_multi_fetch(p, *, query, sources, max_results, email, clear_first, uid)
         )
         total = sum(v['count'] for v in results.values())
         user_cancel = is_job_cancelled(uid, 'fetch')
+        # Quota stop is not a user cancel. Do not swap a partial staging set
+        # over the live library — keep what the student already has.
+        hit_quota = quota.is_over_quota(uid, reclaimable=reclaimable)
         if clear_first:
             staged = p.db.count_staging_articles()
-            if staged > 0 and not user_cancel:
+            if staged > 0 and not user_cancel and not hit_quota:
                 p.db.replace_from_staging()
                 actually_cleared = True
                 total = staged
             else:
                 p.db.drop_staging_articles()
-                if user_cancel:
+                if user_cancel or hit_quota:
                     total = 0
     except Exception:
         if clear_first:

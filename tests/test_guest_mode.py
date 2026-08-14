@@ -90,9 +90,13 @@ def test_guest_end_demo_is_guarded_and_tappable():
     assert ".guest-banner-actions" in css
     assert ".guest-banner-actions .btn" in css
     common = _read("static", "js", "common.js")
-    assert "End this demo?" in common
-    assert "guest-banner-logout" in common
-    assert "openSiteConfirm" in common
+    start = common.index("querySelector('.guest-banner-logout')")
+    handler = common[start : start + 700]
+    assert "addEventListener('click'" in handler
+    assert "preventDefault" in handler
+    assert "openSiteConfirm" in handler
+    assert "End this demo?" in handler
+    assert "window.location.href" in handler
 
 
 def test_guest_cta_on_public_pages():

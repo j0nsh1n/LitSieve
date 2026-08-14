@@ -5,6 +5,22 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+/** Attribute-safe encoding. escapeHtml does not encode quotes. */
+function escapeAttr(text) {
+    return String(text == null ? '' : text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+/** HTML id token for modal fields (labels / getElementById). */
+function safeDomId(raw) {
+    const s = String(raw == null ? '' : raw).replace(/[^A-Za-z0-9_-]/g, '');
+    return s || 'field';
+}
+
 // === Classroom UI flags (env: HIDE_STUDY_TYPE_TAGS, HIDE_AI_BUTTONS) ===
 // Defaults keep features on until /api/ui-flags loads.
 window.LRA_UI = window.LRA_UI || {
@@ -414,26 +430,27 @@ function openSiteModal(opts) {
             <div class="form-group lra-modal-input-group">
               <label class="${labelClass}" for="site-modal-input">${fieldLabel}</label>
               <textarea id="site-modal-input" class="lra-modal-textarea" rows="6"
-                placeholder="${escapeHtml(o.placeholder || '')}"></textarea>
+                placeholder="${escapeAttr(o.placeholder || '')}"></textarea>
             </div>`;
             } else {
+                const inputType = escapeAttr(o.inputType || 'text');
                 fieldHtml = `
             <div class="form-group lra-modal-input-group">
               <label class="${labelClass}" for="site-modal-input">${fieldLabel}</label>
-              <input id="site-modal-input" class="lra-modal-input" type="${escapeHtml(o.inputType || 'text')}"
-                placeholder="${escapeHtml(o.placeholder || '')}" autocomplete="off">
+              <input id="site-modal-input" class="lra-modal-input" type="${inputType}"
+                placeholder="${escapeAttr(o.placeholder || '')}" autocomplete="off">
             </div>`;
             }
         }
         if (isForm) {
             fieldHtml = `<div class="lra-modal-fields">${formFields.map((f) => {
-                const fid = escapeHtml(String(f.id || ''));
+                const fid = escapeAttr(safeDomId(f.id));
                 const label = escapeHtml(String(f.label || f.id || ''));
-                const typ = escapeHtml(String(f.type || 'text'));
-                const ph = escapeHtml(String(f.placeholder || ''));
-                const min = f.min != null ? ` min="${escapeHtml(String(f.min))}"` : '';
-                const max = f.max != null ? ` max="${escapeHtml(String(f.max))}"` : '';
-                const step = f.step != null ? ` step="${escapeHtml(String(f.step))}"` : '';
+                const typ = escapeAttr(String(f.type || 'text'));
+                const ph = escapeAttr(f.placeholder || '');
+                const min = f.min != null ? ` min="${escapeAttr(String(f.min))}"` : '';
+                const max = f.max != null ? ` max="${escapeAttr(String(f.max))}"` : '';
+                const step = f.step != null ? ` step="${escapeAttr(String(f.step))}"` : '';
                 return `<div class="form-group lra-modal-input-group" data-field="${fid}">
               <label class="help-text" for="site-modal-field-${fid}">${label}</label>
               <input id="site-modal-field-${fid}" class="lra-modal-input" type="${typ}"
@@ -619,7 +636,7 @@ function openSiteModal(opts) {
                 if (isForm) {
                     const values = {};
                     formFields.forEach((f) => {
-                        const el = root.querySelector('#site-modal-field-' + f.id);
+                        const el = root.querySelector('#site-modal-field-' + safeDomId(f.id));
                         values[f.id] = el ? el.value : '';
                     });
                     if (typeof o.validate === 'function') {
@@ -656,7 +673,7 @@ function openSiteModal(opts) {
 
         if (isForm) {
             formFields.forEach((f) => {
-                const el = root.querySelector('#site-modal-field-' + f.id);
+                const el = root.querySelector('#site-modal-field-' + safeDomId(f.id));
                 if (el && f.value != null) el.value = String(f.value);
             });
             root.querySelectorAll('.lra-modal-fields .lra-modal-input').forEach((el) => {
@@ -1150,7 +1167,11 @@ function updateModeToggleButton() {
 }
 
 function _collectQueryOn() {
-    return /(?:\?|&|#)collect=1(?:&|$)/.test((location.search || '') + (location.hash || ''));
+    try {
+        return new URL(location.href).searchParams.get('collect') === '1';
+    } catch (e) {
+        return /[?&]collect=1(?:[&#]|$)/.test(location.search || '');
+    }
 }
 
 function updateNavStepNumbers() {

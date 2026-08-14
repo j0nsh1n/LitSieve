@@ -62,6 +62,17 @@ def test_search_includes_collect_and_simple_tools():
     assert "function clearSearchWorkspace" in search_js
     assert "SEARCH_SESSION_KEY" in search_js
     assert "clearSearchWorkspace()" in search_js
+    clear_fn = search_js[
+        search_js.index("function clearSearchWorkspace") : search_js.index(
+            "async function restoreSearchSession"
+        )
+    ]
+    assert "displayFilterState.starred = false" in clear_fn
+    assert "displayFilterState.noted = false" in clear_fn
+    assert "displayFilterState.recent = false" in clear_fn
+    assert "function _simpleScreenEnsureQuery" in tools
+    assert "startOverReset" in dm
+    assert "_resetAfterStartOver = false" in dm
     # Collect / start-over must not auto-restore the last query.
     boot = search_js[
         search_js.index("loadSearchEmptyState()") : search_js.index("refreshStarredCount")

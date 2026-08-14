@@ -16,9 +16,11 @@ and this project aims to follow Semantic Versioning for app version strings
   in a dialog before ranking. Advanced still uses the rail.
 
 ### Fixed
-- **Start over** clears the last search query/results and Narrow it down
-  set-asides. Stars, notes, and saved AI key points stay on papers that
-  come back.
+- Replace-fetch that hits the storage cap keeps the current library
+  instead of swapping in a partial new collection.
+- **Start over** clears the last search query/results, Show chips, and
+  Narrow it down set-asides. Stars, notes, and saved AI key points stay
+  on papers that come back.
 - Simple result cards show **key points** and **Refine with AI** again.
 - Homepage masthead: brand left, theme toggle right; LitSieve title centered
   without reusing Search’s `.pagehead`.

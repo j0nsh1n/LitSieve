@@ -11,10 +11,6 @@ function _isPipelineBusy() {
  return typeof _pipelineBusy === 'boolean' && _pipelineBusy;
 }
 
-function _collectQueryOn() {
- return /(?:\?|&|#)collect=1(?:&|$)/.test(location.search + location.hash);
-}
-
 /** Simple Search: collect (empty / unprepared / ?collect=1) vs rank/export. */
 function wantsSimpleCollectView(stats) {
  if (typeof isSimpleMode !== 'function' || !isSimpleMode()) return false;
@@ -628,6 +624,12 @@ function wireSimpleScreeningCard() {
  // Radios only switch labels already loaded — no re-fetch.
 }
 
+function _simpleScreenEnsureQuery(query) {
+ if (_simpleScreenCounts._query !== query) {
+  _simpleScreenCounts = { low: null, medium: null, high: null, _query: query };
+ }
+}
+
 async function doSimpleScreenPreview() {
  const level = simpleScreenSelectedLevel();
  const fraction = simpleScreenFraction(level);
@@ -641,14 +643,14 @@ async function doSimpleScreenPreview() {
  setLoading(btn, true);
  setStatus('simple-screen-status', 'Finding the least related papers…', 'info');
  try {
+  _simpleScreenEnsureQuery(query);
   let data = _simpleScreenCounts[level];
-  if (!data || _simpleScreenCounts._query !== query) {
+  if (!data) {
    data = await apiCall('/api/screening/quick-preview', {
     method: 'POST',
     body: { query, fraction },
    });
    _simpleScreenCounts[level] = data;
-   _simpleScreenCounts._query = query;
    applySimpleScreenCountLabels();
   }
   const candidates = data.candidates || [];
@@ -703,12 +705,14 @@ async function doSimpleScreenApply() {
  setLoading(btn, true);
  setStatus('simple-screen-status', 'Setting aside the least related papers…', 'info');
  try {
+  _simpleScreenEnsureQuery(query);
   let data = _simpleScreenCounts[level];
-  if (!data || _simpleScreenCounts._query !== query) {
+  if (!data) {
    data = await apiCall('/api/screening/quick-preview', {
     method: 'POST',
     body: { query, fraction },
    });
+   _simpleScreenCounts[level] = data;
   }
   const candidates = data.candidates || [];
   if (!candidates.length) {

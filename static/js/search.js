@@ -252,6 +252,11 @@ function clearSearchWorkspace() {
  if (countEl) countEl.textContent = '0';
  const banner = document.getElementById('seed-banner');
  if (banner) banner.style.display = 'none';
+ displayFilterState.starred = false;
+ displayFilterState.noted = false;
+ displayFilterState.recent = false;
+ displayFilterState.sources = {};
+ syncDisplayFilterChipState();
  if (typeof updateSimpleSearchPanel === 'function') updateSimpleSearchPanel(false);
 }
 
@@ -862,7 +867,7 @@ function buildResultCard(article, idx) {
  <div class="article-abstract">${abstractHtml}</div>
  ${picoHtml}
  <div class="article-actions-row">
- <button type="button" class="star-btn ${starred ? 'is-starred' : ''}" title="Bookmark" aria-label="Star article">${starred ? '★ Starred' : '☆ Star'}</button>
+ <button type="button" class="star-btn ${starred ? 'is-starred' : ''}" title="Bookmark" aria-label="Star article" aria-pressed="${starred ? 'true' : 'false'}">${starred ? '★ Starred' : '☆ Star'}</button>
  <button type="button" class="note-toggle" ${noteVal ? 'hidden' : ''}>Add note</button>
  <button type="button" class="not-relevant-btn"
   title="Screen this paper out as not about your topic">Not relevant</button>
@@ -903,6 +908,7 @@ function buildResultCard(article, idx) {
  // Optimistic: flip immediately; roll back on failure.
  starBtn.classList.toggle('is-starred', next);
  starBtn.textContent = next ? '★ Starred' : '☆ Star';
+ starBtn.setAttribute('aria-pressed', next ? 'true' : 'false');
  try {
  await apiCall('/api/notes', {
  method: 'POST',
@@ -918,6 +924,7 @@ function buildResultCard(article, idx) {
  } catch (err) {
  starBtn.classList.toggle('is-starred', !next);
  starBtn.textContent = next ? '☆ Star' : '★ Starred';
+ starBtn.setAttribute('aria-pressed', next ? 'false' : 'true');
  showNotification(`Could not save star: ${err.message}`, 'error');
  }
  });
@@ -1164,6 +1171,7 @@ function syncDisplayFilterSourceChips() {
   btn.type = 'button';
   btn.className = 'display-filter-chip';
   btn.setAttribute('data-filter-source', id);
+  btn.setAttribute('aria-pressed', 'false');
   const name = typeof getSourceName === 'function' ? getSourceName(id) : id;
   btn.textContent = name;
   host.appendChild(btn);
@@ -1179,12 +1187,15 @@ function syncDisplayFilterChipState() {
  const any = displayFiltersActive();
  host.querySelectorAll('[data-filter]').forEach((btn) => {
   const key = btn.getAttribute('data-filter');
-  if (key === 'all') btn.classList.toggle('is-on', !any);
-  else btn.classList.toggle('is-on', !!displayFilterState[key]);
+  const on = key === 'all' ? !any : !!displayFilterState[key];
+  btn.classList.toggle('is-on', on);
+  btn.setAttribute('aria-pressed', on ? 'true' : 'false');
  });
  host.querySelectorAll('[data-filter-source]').forEach((btn) => {
   const id = btn.getAttribute('data-filter-source');
-  btn.classList.toggle('is-on', !!displayFilterState.sources[id]);
+  const on = !!displayFilterState.sources[id];
+  btn.classList.toggle('is-on', on);
+  btn.setAttribute('aria-pressed', on ? 'true' : 'false');
  });
 }
 

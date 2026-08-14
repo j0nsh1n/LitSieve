@@ -253,6 +253,52 @@ def test_append_fetch_does_not_use_staging(tmp_path, monkeypatch):
         p.close()
 
 
+def test_quota_stop_after_staged_source_keeps_live_library(tmp_path, monkeypatch):
+    """Quota after a source staged papers must not replace the live collection."""
+    from app.storage import quota
+
+    monkeypatch.setattr(corpus_routes, "update_progress", lambda *a, **k: None)
+    monkeypatch.setitem(pipeline_mod.FETCHERS, "pubmed", _OnlyAFetcher)
+    monkeypatch.setattr(quota, "is_over_quota", lambda uid, reclaimable=0: False)
+
+    p = LiteratureSearchPipeline(db_path=str(tmp_path / "quota-swap.db"))
+    try:
+        p.db.insert_articles([_paper("b1", "Paper B")], dedupe=False)
+        p.db.upsert_note("b1", "pubmed", note="keep me", starred=True)
+
+        orig = p.fetch_articles_parallel
+
+        def _fetch_then_trip_quota(*args, **kwargs):
+            out = orig(*args, **kwargs)
+            monkeypatch.setattr(quota, "is_over_quota", lambda uid, reclaimable=0: True)
+            return out
+
+        monkeypatch.setattr(p, "fetch_articles_parallel", _fetch_then_trip_quota)
+
+        result = corpus_routes._run_multi_fetch(
+            p,
+            query="new query",
+            sources=["pubmed"],
+            max_results=5,
+            email=None,
+            clear_first=True,
+            uid="phase9-quota",
+        )
+        assert result["quota_stopped"] is True
+        assert result["cleared_first"] is False
+        assert result["total_fetched"] == 0
+        assert p.db.count_staging_articles() == 0
+
+        ids = {(a["article_id"], a["source"]) for a in p.db.get_all_articles()}
+        assert ids == {("b1", "pubmed")}
+        assert p.db.get_note("b1", "pubmed")["note"] == "keep me"
+        titles = {a["title"] for a in p.db.get_all_articles()}
+        assert "Paper B" in titles
+        assert "Paper A again" not in titles
+    finally:
+        p.close()
+
+
 def test_replace_quota_credit_ignores_live_library_size(tmp_path, monkeypatch):
     from app.storage import quota
 

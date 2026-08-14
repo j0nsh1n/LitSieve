@@ -27,14 +27,16 @@
                     localStorage.setItem('uiMode', 'simple');
                 } catch (e2) { /* ignore */ }
                 // Clear the one-shot seed so later visits use localStorage only.
-                document.cookie = 'ui_mode_seed=; Max-Age=0; Path=/; SameSite=Lax';
+                document.cookie = 'ui_mode_seed=; Max-Age=0; Path=/; SameSite=Lax'
+                    + (location.protocol === 'https:' ? '; Secure' : '');
             } else {
                 mode = 'advanced';
             }
         }
         root.setAttribute('data-mode', mode);
         try {
-            document.cookie = 'ui_mode=' + mode + '; Path=/; SameSite=Lax; Max-Age=31536000';
+            var secure = location.protocol === 'https:' ? '; Secure' : '';
+            document.cookie = 'ui_mode=' + mode + '; Path=/; SameSite=Lax; Max-Age=31536000' + secure;
         } catch (e3) { /* ignore */ }
     } catch (e) {
         // localStorage can throw in private mode / with cookies blocked.

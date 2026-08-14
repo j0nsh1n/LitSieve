@@ -157,14 +157,19 @@ def test_smoke_register_sample_cluster_search_export(app_module):
     assert "collected" in report.text.lower() or "included" in report.text.lower() or len(report.text) > 20
 
     # App pages still render after the workflow (disclaimer + cache-bust smoke).
-    # Simple /data-management?collect=1 follows to /search?collect=1 (collect UI).
-    for path in ("/data-management?collect=1", "/clusters", "/statistics", "/search", "/account"):
+    # New accounts seed Simple; /data-management?collect=1 must redirect.
+    bounced = c.get("/data-management?collect=1", follow_redirects=False)
+    assert bounced.status_code in (301, 302, 303, 307, 308)
+    assert bounced.headers.get("location") == "/search?collect=1"
+
+    for path in ("/search?collect=1", "/clusters", "/statistics", "/search", "/account"):
         page = c.get(path)
         assert page.status_code == 200, path
         assert "LitSieve" in page.text or "LitPilot" in page.text or "text/html" in page.headers.get("content-type", "")
 
+    # Collect UI lives on Search after the Simple redirect.
     # Advanced surfaces still present in HTML (Simple only CSS-hides them).
-    dm = c.get("/data-management?collect=1")
+    dm = c.get("/search?collect=1")
     assert dm.status_code == 200
     assert "source-option-grid" in dm.text or "embedding-model" in dm.text
     stats_page = c.get("/statistics")

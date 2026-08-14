@@ -399,7 +399,12 @@ body {
         flex: 0 1 auto;
         padding: 0;
         gap: 0;
-        overflow: hidden;
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+    .nav-links::-webkit-scrollbar,
+    #nav-links-panel::-webkit-scrollbar {
+        display: none;
     }
     /* Phase 10 broadsheet: segmented steps, no flow arrows at desktop. */
     .nav-flow-arrow {
@@ -1782,6 +1787,9 @@ input[type="range"]::-moz-range-thumb:hover {
     padding: var(--space-1) var(--space-2);
     color: var(--text-soft);
     background: var(--bg);
+}
+.result-row > .tag,
+.result-row .result-row-head > .tag {
     margin-left: auto;
 }
 .result-row .study-type-badge {
@@ -5624,13 +5632,13 @@ html[data-mode="simple"] .search-simple-panel:not([hidden]) {
     gap: var(--space-2) var(--space-3);
 }
 .simple-tools-count {
-    font-weight: 600;
     margin-right: var(--space-1);
     appearance: none;
     border: 0;
     background: transparent;
     color: inherit;
     font: inherit;
+    font-weight: 600;
     padding: 0;
     cursor: pointer;
     text-align: left;
@@ -5846,6 +5854,14 @@ html[data-mode="simple"] body:has(#search-workbench) .simple-tools-search-only {
     text-transform: inherit;
     cursor: pointer;
     min-height: 0;
+}
+@media (pointer: coarse) {
+    .article-actions-row .star-btn,
+    .article-actions-row .note-toggle,
+    .article-actions-row .not-relevant-btn {
+        min-height: 2.75rem;
+        min-width: 2.75rem;
+    }
 }
 .article-actions-row .star-btn.is-starred,
 .article-actions-row .star-btn:hover,
