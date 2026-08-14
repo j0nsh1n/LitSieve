@@ -78,6 +78,23 @@ def test_guest_start_loads_sample_and_blocks_fetch(tmp_path, monkeypatch):
     assert ok.status_code == 200, ok.text
 
 
+def test_guest_end_demo_is_guarded_and_tappable():
+    """End demo is a secondary 44px control, not an inline link next to Register."""
+    base = _read("templates", "base.html")
+    assert 'class="guest-banner-actions"' in base or "guest-banner-actions" in base
+    assert "guest-banner-register" in base
+    assert "guest-banner-logout" in base
+    assert 'href="/register"' in base
+    assert 'href="/logout"' in base
+    css = _read("static", "css", "style.css")
+    assert ".guest-banner-actions" in css
+    assert ".guest-banner-actions .btn" in css
+    common = _read("static", "js", "common.js")
+    assert "End this demo?" in common
+    assert "guest-banner-logout" in common
+    assert "openSiteConfirm" in common
+
+
 def test_guest_cta_on_public_pages():
     landing = _read("templates", "landing.html")
     login = _read("templates", "login.html")

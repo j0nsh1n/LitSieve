@@ -2625,7 +2625,7 @@ body.lra-modal-open {
     position: fixed;
     top: 70px;
     right: 1.25rem;
-    z-index: 200;
+    z-index: 1300;
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
@@ -4452,7 +4452,18 @@ html, body {
     }
     .nav-brand { max-width: 4.75rem; font-size: var(--fs-sm); }
     .nav-menu-toggle { max-width: 100%; padding: var(--space-1) var(--space-1); min-height: 2.75rem; }
-    .nav-library-wrap { display: none; } /* switch libraries on tablet/desktop */
+    .nav-library-wrap {
+        display: inline-flex;
+        max-width: 4.75rem;
+        min-height: 2.75rem;
+    }
+    .nav-library-select {
+        max-width: 4.75rem;
+        min-width: 0;
+        min-height: 2.75rem;
+        font-size: var(--fs-xs);
+    }
+    #nav-article-count { display: none; }
     .mode-toggle { font-size: var(--fs-xs); padding: var(--space-1) var(--space-1); }
     .nav-logout { font-size: var(--fs-xs); }
     .container {
@@ -4730,17 +4741,23 @@ body[data-guest="1"] .guest-fetch-note {
     font-size: var(--fs-sm);
 }
 .guest-banner-text {
-    margin: 0;
+    margin: 0 auto var(--space-2);
     max-width: 70rem;
-    margin-inline: auto;
     line-height: 1.45;
 }
-.guest-banner a {
-    font-weight: 600;
+.guest-banner-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    align-items: center;
+    max-width: 70rem;
+    margin: 0 auto;
+}
+.guest-banner-actions .btn {
+    min-height: 2.75rem;
 }
 .guest-banner-logout {
-    margin-left: var(--space-1);
-    white-space: nowrap;
+    font-weight: 500;
 }
 
 /* Search */
@@ -4825,9 +4842,14 @@ html[data-mode="simple"] .search-simple-panel:not([hidden]) {
         max-height: 40vh;
         overflow: auto;
     }
-    /* Keep the last result card clear of the bottom bar. */
+    /* Bottom bar is buttons only — title/lead hide so the bar stays short. */
+    html[data-mode="simple"] .search-simple-panel-title,
+    html[data-mode="simple"] .search-simple-panel-lead {
+        display: none;
+    }
+    /* Measured bar height (--simple-panel-h); 40vh fallback matches max-height. */
     html[data-mode="simple"] #results-section.has-simple-panel {
-        padding-bottom: var(--space-8);
+        padding-bottom: var(--simple-panel-h, calc(40vh + env(safe-area-inset-bottom, 0px)));
     }
     html[data-mode="simple"] .search-simple-panel-title {
         font-size: var(--fs-base);
@@ -4856,9 +4878,6 @@ html[data-mode="simple"] .search-simple-panel:not([hidden]) {
     .simple-screen-preview {
         max-height: 12rem;
     }
-    html[data-mode="simple"] #results-section.has-simple-panel {
-        padding-bottom: var(--space-8);
-    }
 }
 
 @media (max-width: 380px) {
@@ -4869,9 +4888,6 @@ html[data-mode="simple"] .search-simple-panel:not([hidden]) {
     html[data-mode="simple"] .search-simple-panel:not([hidden]) {
         padding-left: var(--space-3);
         padding-right: var(--space-3);
-    }
-    html[data-mode="simple"] #results-section.has-simple-panel {
-        padding-bottom: var(--space-8);
     }
 }
 

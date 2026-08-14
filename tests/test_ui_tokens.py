@@ -217,6 +217,28 @@ def test_mobile_380_has_overflow_guard_and_tap_targets():
     assert "overflow-x: hidden" in block or "overflow-x:hidden" in block
     assert "min-height: 2.75rem" in CSS  # 44px-class targets used on small screens
     assert "flex-direction: column" in block  # form-row stacks
+    # Library switcher stays reachable (do not hide the wrap).
+    assert ".nav-library-wrap { display: none" not in block
+    assert ".nav-library-wrap { display: none; }" not in block
+
+
+def test_simple_results_clear_the_fixed_export_bar():
+    """Results padding tracks the measured bar, with 40vh as fallback."""
+    css = CSS
+    assert "--simple-panel-h" in css
+    assert "40vh" in css
+    search = (REPO / "static" / "js" / "search.js").read_text(encoding="utf-8")
+    assert "function syncSimplePanelClearance" in search
+    assert "ResizeObserver" in search
+    assert "--simple-panel-h" in search
+
+
+def test_notifications_stack_above_site_modals():
+    css = CSS
+    # Modal root is 1200; toasts must sit above a full-viewport bottom sheet.
+    assert "z-index: 1300" in css or "z-index:1300" in css
+    modal = css[css.find(".lra-modal-root") : css.find(".lra-modal-root") + 400]
+    assert "1200" in modal
 
 
 def test_prefers_reduced_motion_covers_shimmer():

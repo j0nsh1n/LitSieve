@@ -67,6 +67,13 @@ and this project aims to follow Semantic Versioning for app version strings
   “Next: Clean up your papers” bar once screening is applied or skipped).
 
 ### Fixed
+- Simple Search bottom bar no longer covers the last result: padding tracks
+  the measured bar height (`--simple-panel-h`) with a 40vh fallback; title and
+  lead hide when the panel is a fixed bar.
+- Guest **End demo** is a 44px secondary button on its own row (not an inline
+  link next to Register) and asks before ending the session.
+- Library switcher stays on the nav at ≤380px (article count hides instead).
+- Site toasts stack above dialogs (`z-index` 1300 vs modal 1200).
 - Mobile nav (≤640px) again exposes **Account**: the profile link was
   `display: none`, so phones could only log out. Shows a compact “Account”
   control that still opens `/account`.

@@ -1089,10 +1089,39 @@ function updateSimpleSearchPanel(hasResults) {
   panel.hidden = true;
  }
  if (resultsSec) resultsSec.classList.toggle('has-simple-panel', show);
+ syncSimplePanelClearance();
+}
+
+function syncSimplePanelClearance() {
+ const panel = document.getElementById('search-simple-panel');
+ const resultsSec = document.getElementById('results-section');
+ if (!resultsSec) return;
+ if (!panel || panel.hidden || !resultsSec.classList.contains('has-simple-panel')) {
+  resultsSec.style.removeProperty('--simple-panel-h');
+  return;
+ }
+ const pos = window.getComputedStyle(panel).position;
+ if (pos !== 'fixed') {
+  resultsSec.style.removeProperty('--simple-panel-h');
+  return;
+ }
+ resultsSec.style.setProperty('--simple-panel-h', `${panel.offsetHeight}px`);
+}
+
+function watchSimplePanelClearance() {
+ const panel = document.getElementById('search-simple-panel');
+ if (!panel || panel.dataset.clearanceWired === '1') return;
+ panel.dataset.clearanceWired = '1';
+ if (typeof ResizeObserver === 'function') {
+  const ro = new ResizeObserver(() => syncSimplePanelClearance());
+  ro.observe(panel);
+ }
+ window.addEventListener('resize', syncSimplePanelClearance);
 }
 
 // If the user toggles Simple/Advanced after a search, re-show the panel.
 document.addEventListener('DOMContentLoaded', () => {
+ watchSimplePanelClearance();
  const modeBtn = document.getElementById('mode-toggle');
  if (modeBtn) {
   modeBtn.addEventListener('click', () => {

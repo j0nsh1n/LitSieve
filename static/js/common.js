@@ -1233,6 +1233,26 @@ document.addEventListener('DOMContentLoaded', function() {
     enhanceAbstracts(document);
 });
 
+document.addEventListener('DOMContentLoaded', function() {
+    const endDemo = document.querySelector('.guest-banner-logout');
+    if (!endDemo) return;
+    endDemo.addEventListener('click', async function(ev) {
+        ev.preventDefault();
+        const href = endDemo.getAttribute('href') || '/logout';
+        if (typeof openSiteConfirm === 'function') {
+            const ok = await openSiteConfirm({
+                title: 'End this demo?',
+                message: 'Notes and screening in this demo will be gone. You can start a new demo from the home page anytime.',
+                confirmLabel: 'End demo',
+                cancelLabel: 'Keep demo',
+                danger: true,
+            });
+            if (!ok) return;
+        }
+        window.location.href = href;
+    });
+});
+
 // === Page transitions (internal same-origin navigations) ===
 // Uses the View Transitions API when available; otherwise a short fade-out
 // before navigating. Skips new tabs, downloads, anchors, external links,

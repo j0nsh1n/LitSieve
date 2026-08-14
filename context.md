@@ -80,6 +80,6 @@ Guest User (is_guest) → sample corpus only; purged by age
 ## Session Handoff
 - **Date:** 2026-08-13
 - **Branch:** `feat/phase6-guest-demo` (do not push without explicit ask)
-- **Done:** Search Show chips (starred / note / recent / source) filter the
-  on-screen list and export; Phase 9 staging swap landed earlier.
-- **Next:** Human-confirm Show chips on Search. Do not push.
+- **Done:** Mobile fail-safes — Simple bar clearance, End demo confirm,
+  library switcher at 380px, toasts above modals. Show chips + Phase 9 earlier.
+- **Next:** Human-confirm on a phone viewport after push.
