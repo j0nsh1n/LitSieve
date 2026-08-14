@@ -123,12 +123,14 @@ def test_register_seeds_simple_mode_cookie(tmp_path, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# Nav: Simple hides the stepper; Advanced keeps four steps
+# Nav: Phase 10 broadsheet — Simple keeps a real Get papers → Search stepper.
+# Decision: stepper stays (approved mockup) but step 1 is /search?collect=1,
+# not /data-management (that URL 302s back to /search in Simple).
 # ---------------------------------------------------------------------------
 
 
 def test_simple_nav_shows_segmented_steps():
-    """Broadsheet: Simple keeps Get papers → Search as the masthead steps."""
+    """Phase 10: Simple shows Get papers → Search; step 1 opens collect."""
     base = _read("templates", "base.html")
     # (key, advanced_label, simple_label, href, tip, simple_step)
     rows = re.findall(
@@ -140,19 +142,24 @@ def test_simple_nav_shows_segmented_steps():
     assert "clusters" in by_key, by_key
     assert by_key["clusters"] == "", "Clusters has no Simple step number (hidden)"
     assert by_key["statistics"] == "", "Clean up has no Simple step number (hidden)"
-    # Tuple still records 1/2 for Search/Get papers (URL + Advanced labels).
-    assert by_key["data_management"] in ("1", ""), by_key
-    assert by_key["search"] in ("2", "1", ""), by_key
+    assert by_key["data_management"] == "1", by_key
+    assert by_key["search"] == "2", by_key
     assert "data-step-advanced" in base
     assert 'data-step-simple="{{ simple_step }}"' in base or 'data-step-simple="' in base
+    assert 'data-href-simple="/search?collect=1"' in base
+    assert 'data-href-advanced="/data-management"' in base
 
     css = _read("static", "css", "style.css")
-    # Phase 10: do not hide the whole Simple stepper (segmented Get papers / Search).
     assert 'html[data-mode="simple"] .nav-menu-toggle' not in css
     assert 'html[data-mode="simple"] .nav-step-clusters' in css
     assert 'html[data-mode="simple"] .nav-step-statistics' in css
     assert "nav-flow-arrow-before-clusters" in css
     assert "nav-flow-arrow-before-statistics" in css
+
+    common = _read("static", "js", "common.js")
+    assert "data-href-simple" in common
+    assert "/search?collect=1" in common
+    assert "function updateNavStepNumbers" in common
 
     # Advanced still labels Clean up (not Duplicates).
     assert "Clean up" in base

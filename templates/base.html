@@ -72,6 +72,10 @@
                    title="{{ tip }}"
                    data-step-advanced="{{ loop.index }}"
                    data-step-simple="{{ simple_step }}"
+                   {% if key == "data_management" %}
+                   data-href-advanced="/data-management"
+                   data-href-simple="/search?collect=1"
+                   {% endif %}
                    {% if active_page == key %}aria-current="page"{% endif %}>
                     <span class="nav-step-num">{{ loop.index }}</span>
                     <span class="nav-step-label nav-label-advanced">{{ label }}</span>
@@ -121,7 +125,7 @@
         {{ scope_footer() }}
     </footer>
 
-    <script src="/static/js/common.js?v=20260813b"></script>
+    <script src="/static/js/common.js?v=20260814a"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -57,6 +57,7 @@ function syncSimpleOnePageState(stats) {
  if (document.body) {
   document.body.classList.toggle('simple-collecting', showCollect);
  }
+ if (typeof updateNavStepNumbers === 'function') updateNavStepNumbers();
  const empty = document.getElementById('search-empty-state');
  if (empty) {
   // Advanced empty-state only. Simple uses collect.

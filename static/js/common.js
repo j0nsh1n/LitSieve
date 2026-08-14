@@ -1090,8 +1090,20 @@ function updateModeToggleButton() {
     btn.setAttribute('aria-label', btn.title);
 }
 
+function _collectQueryOn() {
+    return /(?:\?|&|#)collect=1(?:&|$)/.test((location.search || '') + (location.hash || ''));
+}
+
 function updateNavStepNumbers() {
     const simple = isSimpleMode();
+    // Phase 10: Simple "Get papers" is /search?collect=1 (real collect state),
+    // not /data-management (which 302s back to /search).
+    document.querySelectorAll('.nav-link[data-href-simple], .nav-link[data-href-advanced]').forEach((a) => {
+        const hrefAdv = a.getAttribute('data-href-advanced');
+        const hrefSim = a.getAttribute('data-href-simple');
+        const next = simple ? (hrefSim || hrefAdv) : (hrefAdv || hrefSim);
+        if (next) a.setAttribute('href', next);
+    });
     document.querySelectorAll('.nav-link[data-step-advanced]').forEach((a) => {
         const num = a.querySelector('.nav-step-num');
         if (!num) return;
@@ -1122,6 +1134,37 @@ function updateNavStepNumbers() {
         } else {
             menuStep.hidden = false;
             if (adv) menuStep.textContent = adv;
+        }
+    }
+    const getPapers = document.querySelector('.nav-step-data_management');
+    const searchLink = document.querySelector('.nav-step-search');
+    if (getPapers && searchLink) {
+        const path = location.pathname || '';
+        const collecting = simple && (
+            _collectQueryOn()
+            || !!(document.body && document.body.classList.contains('simple-collecting'))
+        );
+        if (simple) {
+            const onSearch = path.indexOf('/search') !== -1;
+            getPapers.classList.toggle('active', collecting);
+            searchLink.classList.toggle('active', onSearch && !collecting);
+            if (collecting) {
+                getPapers.setAttribute('aria-current', 'page');
+                searchLink.removeAttribute('aria-current');
+            } else if (onSearch) {
+                searchLink.setAttribute('aria-current', 'page');
+                getPapers.removeAttribute('aria-current');
+            }
+        } else {
+            getPapers.classList.toggle('active', path.indexOf('/data-management') !== -1);
+            searchLink.classList.toggle('active', path.indexOf('/search') !== -1);
+            if (path.indexOf('/data-management') !== -1) {
+                getPapers.setAttribute('aria-current', 'page');
+                searchLink.removeAttribute('aria-current');
+            } else if (path.indexOf('/search') !== -1) {
+                searchLink.setAttribute('aria-current', 'page');
+                getPapers.removeAttribute('aria-current');
+            }
         }
     }
 }
