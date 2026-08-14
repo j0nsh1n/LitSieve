@@ -81,7 +81,6 @@ Guest User (is_guest) → sample corpus only; purged by age
 ## Session Handoff
 - **Date:** 2026-08-13
 - **Branch:** `feat/phase6-guest-demo` (do not push without explicit ask)
-- **Done:** Phase 10 review fixes — Simple step 1 → `/search?collect=1`;
-  Advanced toggle+PICO/seed with the top search bar; rail stats PRISMA
-  split; screening-report fetch guarded; active nav color inverted.
-- **Next:** Human visual check vs mockup. Do not push unless asked.
+- **Done:** Simple is one page again (stepper hidden). Search query is a
+  single-line field joined to Search. Version **5.0.0**.
+- **Next:** Human visual check. Do not push unless asked.

@@ -161,13 +161,12 @@ def test_simple_data_management_always_redirects_to_search(tmp_path, monkeypatch
     assert b"fetch-form" in stay_adv.content
 
 
-def test_simple_get_papers_step_targets_collect():
-    """Phase 10: Simple step 1 is /search?collect=1, not a /data-management bounce."""
+def test_simple_collect_url_stays_on_search():
+    """One-page Simple: collect is /search?collect=1 (Start over), not a second nav step."""
+    tools = _read("static", "js", "simple_tools.js")
+    assert "/search?collect=1" in tools
     base = _read("templates", "base.html")
     assert 'data-href-simple="/search?collect=1"' in base
-    common = _read("static", "js", "common.js")
-    assert "data-href-simple" in common
-    assert "/search?collect=1" in common
 
 
 def test_simple_css_hides_leftover_collect():

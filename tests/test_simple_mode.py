@@ -123,14 +123,14 @@ def test_register_seeds_simple_mode_cookie(tmp_path, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# Nav: Phase 10 broadsheet — Simple keeps a real Get papers → Search stepper.
-# Decision: stepper stays (approved mockup) but step 1 is /search?collect=1,
-# not /data-management (that URL 302s back to /search in Simple).
+# Nav: Simple is one page (brand + tools). Human chose this over the mockup
+# stepper (2026-08-14): a 1/2 control undoes one-page and the numbers never
+# lined up. Collect stays on /search (?collect=1 / Start over).
 # ---------------------------------------------------------------------------
 
 
-def test_simple_nav_shows_segmented_steps():
-    """Phase 10: Simple shows Get papers → Search; step 1 opens collect."""
+def test_simple_nav_hides_stepper():
+    """Simple one-page: no Get papers / Search stepper. Advanced keeps four steps."""
     base = _read("templates", "base.html")
     # (key, advanced_label, simple_label, href, tip, simple_step)
     rows = re.findall(
@@ -146,20 +146,15 @@ def test_simple_nav_shows_segmented_steps():
     assert by_key["search"] == "2", by_key
     assert "data-step-advanced" in base
     assert 'data-step-simple="{{ simple_step }}"' in base or 'data-step-simple="' in base
-    assert 'data-href-simple="/search?collect=1"' in base
-    assert 'data-href-advanced="/data-management"' in base
 
     css = _read("static", "css", "style.css")
-    assert 'html[data-mode="simple"] .nav-menu-toggle' not in css
+    assert 'html[data-mode="simple"] .nav-menu-toggle' in css
+    assert 'html[data-mode="simple"] .nav-links' in css
+    assert 'html[data-mode="simple"] #nav-links-panel' in css
     assert 'html[data-mode="simple"] .nav-step-clusters' in css
     assert 'html[data-mode="simple"] .nav-step-statistics' in css
     assert "nav-flow-arrow-before-clusters" in css
     assert "nav-flow-arrow-before-statistics" in css
-
-    common = _read("static", "js", "common.js")
-    assert "data-href-simple" in common
-    assert "/search?collect=1" in common
-    assert "function updateNavStepNumbers" in common
 
     # Advanced still labels Clean up (not Duplicates).
     assert "Clean up" in base

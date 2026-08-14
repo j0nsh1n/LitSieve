@@ -21,6 +21,8 @@ and this project aims to follow Semantic Versioning for app version strings
   under it. Rail keeps ranking options and starred search.
 - Simple rail **Collected / Duplicates / Screened out / Kept** no longer
   double-count duplicates.
+- Simple nav is one page again (no 1 / 2 stepper). The query bar is a
+  single-line field joined to Search (no textarea spinner).
 
 ## [5.0.0] - 2026-08-13
 
