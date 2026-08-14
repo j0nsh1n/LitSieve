@@ -79,8 +79,11 @@ Guest User (is_guest) → sample corpus only; purged by age
 - Host entry: `app.main:app` port 7860; Linux `./venv`
 
 ## Session Handoff
-- **Date:** 2026-08-13
-- **Branch:** `feat/phase6-guest-demo` (do not push without explicit ask)
-- **Done:** Simple is one page again (stepper hidden). Search query is a
-  single-line field joined to Search. Version **5.0.0**.
-- **Next:** Human visual check. Do not push unless asked.
+- **Date:** 2026-08-14
+- **Branch:** `feat/phase6-guest-demo` — PR #56 vs `main`, tip `01aaa69`
+- **Done:** Public broadsheet + homepage theme toggle; Start over resets
+  query/narrowing/Show chips; Simple Search count/year dialog; CodeQL
+  nav-href fix; CodeRabbit: quota no longer swaps a partial Start over,
+  start-over flag/cache/a11y/CSS, wait=True shares the fetch slot,
+  embeddings kept only when title+abstract match.
+- **Next:** Human merges PR #56. `design_mockups/` stays untracked.
