@@ -38,10 +38,13 @@ document.addEventListener('DOMContentLoaded', () => {
      return;
     }
     if (ready) return restoreSearchSession();
+   }).then(() => {
+    refreshStarredCount(stats == null ? null : stats.starred);
    });
   })
-  .catch(() => { /* ignore */ });
- refreshStarredCount();
+  .catch(() => {
+   refreshStarredCount(null);
+  });
 
  document.querySelectorAll('input[name="input_method"]').forEach(radio => {
  radio.addEventListener('change', () => {
@@ -387,17 +390,26 @@ async function loadSearchEmptyState() {
  }
 }
 
-async function refreshStarredCount() {
+function refreshStarredCount(known) {
  const el = document.getElementById('starred-count');
  if (!el) return;
- try {
- // Library export rows for starred scope is heavy; use screening report + notes via statistics if needed.
- // Cheap path: open a tiny search is wrong; count from export library is ok for small corpora.
- const r = await apiCall('/api/screening-report?format=json');
- el.textContent = String(r.starred || 0);
- } catch (e) {
- el.textContent = '?';
+ const n = Number(known);
+ if (known == null || Number.isNaN(n)) {
+  el.textContent = '?';
+  return;
  }
+ el.textContent = String(Math.max(0, Math.trunc(n)));
+}
+
+function bumpStarredCount(delta) {
+ const el = document.getElementById('starred-count');
+ if (!el) return;
+ const cur = parseInt(el.textContent, 10);
+ if (Number.isNaN(cur)) {
+  el.textContent = '?';
+  return;
+ }
+ el.textContent = String(Math.max(0, cur + delta));
 }
 
 async function applyAvailableSources() {
@@ -713,7 +725,7 @@ async function doStarredSearch(opts) {
  }
  lastResults = results;
  showSearchResults(results);
- await refreshStarredCount();
+ refreshStarredCount(data.seed_count);
  await saveSearchSession('starred');
  } catch (e) {
  if (!fromRestore) showNotification(`Starred search failed: ${e.message}`, 'error');
@@ -919,7 +931,7 @@ function buildResultCard(article, idx) {
  },
  });
  patchLastResult(article, { starred: next });
- refreshStarredCount();
+ bumpStarredCount(next ? 1 : -1);
  if (displayFilterState.starred) showSearchResults();
  } catch (err) {
  starBtn.classList.toggle('is-starred', !next);
