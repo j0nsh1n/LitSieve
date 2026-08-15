@@ -5247,12 +5247,17 @@ html[data-mode="simple"] #nav-links-panel {
         max-width: none;
         min-height: 2.75rem;
         margin: 0;
+        display: flex;
+        justify-content: center;
+        justify-self: center;
     }
     html[data-mode="simple"] .nav-library-select {
-        width: 100%;
-        max-width: none;
-        min-width: 0;
+        width: min(100%, 18rem);
+        max-width: 18rem;
+        min-width: min(100%, 12rem);
         min-height: 2.75rem;
+        margin-inline: auto;
+        text-align: center;
     }
     html[data-mode="simple"] .mode-toggle,
     html[data-mode="simple"] .theme-toggle,
