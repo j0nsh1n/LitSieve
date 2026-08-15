@@ -1145,7 +1145,8 @@ async function simpleToolsStartOver() {
    title: 'Start over?',
    message:
     'Remove papers that are not starred and have no note. '
-    + 'Starred papers and papers with notes stay. You can search again after this.',
+    + 'Starred papers and papers with notes stay, still ready to search '
+    + 'if they were already prepared.',
    confirmLabel: 'Start over',
    cancelLabel: 'Cancel',
    danger: true,
@@ -1162,7 +1163,6 @@ async function simpleToolsStartOver() {
   const deleted = Number(result && result.deleted) || 0;
   _lastTotalArticles = kept;
   if (typeof updateNavStats === 'function') updateNavStats();
-  await resetSearchAndNarrowingForStartOver();
   if (status) {
    status.textContent = deleted
     ? `Kept ${kept} annotated paper${kept === 1 ? '' : 's'}; removed ${deleted}.`
@@ -1178,37 +1178,48 @@ async function simpleToolsStartOver() {
      : 'Collection cleared for a new search.'),
    'success'
   );
+  let stats = { total_articles: kept, articles_with_embeddings: 0 };
+  try {
+   stats = await apiCall('/api/statistics');
+   _lastTotalArticles = Number(stats.total_articles) || kept;
+  } catch (e) { /* use counts from the start-over response */ }
+  const ready = Number(stats.articles_with_embeddings) || 0;
+  // Kept papers that are already prepared stay on Search. Do not force
+  // ?collect=1 or undo Narrow it down — those steps already happened.
+  if (kept > 0 && ready > 0) {
+   if (typeof clearSearchWorkspace === 'function') clearSearchWorkspace();
+  } else {
+   await resetSearchAndNarrowingForStartOver();
+  }
   if (_onSearchPage()) {
-   setCollectQueryOnUrl();
-   if (typeof _simpleFetchUnlocked !== 'undefined') {
-    _simpleFetchUnlocked = true;
-    _simpleFetchModePicked = true;
+   if (kept <= 0 || ready <= 0) {
+    setCollectQueryOnUrl();
+    if (typeof _simpleFetchUnlocked !== 'undefined') {
+     _simpleFetchUnlocked = true;
+     _simpleFetchModePicked = true;
+    }
    }
    if (typeof updateSimpleFetchLock === 'function') updateSimpleFetchLock();
-   try {
-    const stats = await apiCall('/api/statistics');
-    _lastTotalArticles = Number(stats.total_articles) || kept;
-    syncSimpleOnePageState(stats);
-    if (typeof updateSimpleToolsStrip === 'function') updateSimpleToolsStrip(stats);
-    if (typeof updatePrepareSectionVisibility === 'function') {
-     updatePrepareSectionVisibility(_lastTotalArticles, {
-      readyArticles: Number(stats.articles_with_embeddings) || 0,
-     });
-    }
-   } catch (e) {
-    syncSimpleOnePageState({
-     total_articles: kept,
-     articles_with_embeddings: 0,
+   syncSimpleOnePageState(stats);
+   if (typeof updateSimpleToolsStrip === 'function') updateSimpleToolsStrip(stats);
+   if (typeof updatePrepareSectionVisibility === 'function') {
+    updatePrepareSectionVisibility(_lastTotalArticles, {
+     readyArticles: ready,
     });
    }
-   const q = document.getElementById('fetch-query');
-   if (q) {
-    q.focus();
-    if (typeof q.select === 'function') q.select();
+   if (kept > 0 && ready > 0) {
+    const q = document.getElementById('query-text');
+    if (q && typeof q.focus === 'function') q.focus();
+   } else {
+    const q = document.getElementById('fetch-query');
+    if (q) {
+     q.focus();
+     if (typeof q.select === 'function') q.select();
+    }
    }
    return;
   }
-  window.location.href = '/search?collect=1';
+  window.location.href = (kept > 0 && ready > 0) ? '/search' : '/search?collect=1';
  } catch (e) {
   if (status) status.textContent = '';
   showNotification(`Could not start over: ${e.message}`, 'error');

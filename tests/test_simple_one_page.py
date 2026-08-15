@@ -49,7 +49,10 @@ def test_search_includes_collect_and_simple_tools():
     assert "/api/start-over" in start_over
     assert "openSiteConfirm" in start_over
     assert "resolveSimpleFetchModeBeforeRequest" not in start_over
-    assert "resetSearchAndNarrowingForStartOver" in start_over
+    assert "clearSearchWorkspace" in start_over
+    # Prepared leftover papers stay on Search — do not force collect=1.
+    assert "setCollectQueryOnUrl()" in start_over
+    assert "articles_with_embeddings" in start_over
     reset_fn = tools[
         tools.index("async function resetSearchAndNarrowingForStartOver") : tools.index(
             "async function simpleToolsStartOver"

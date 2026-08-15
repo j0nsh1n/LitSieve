@@ -19,8 +19,9 @@ and this project aims to follow Semantic Versioning for app version strings
 
 ### Fixed
 - **Start over** now keeps starred and noted papers and removes the rest
-  immediately (`POST /api/start-over`). Fetch unlocks so you can search
-  again. Confirm copy matches this, not the fetch Start-fresh dialog.
+  immediately (`POST /api/start-over`). If those papers are already
+  prepared, you stay on Search (prepare / Narrow it down are not undone).
+  An empty leftover collection still opens collect so you can fetch.
 - **Library switcher after idle:** rehydrates the nav library select on tab
   focus / visibility change so long idle no longer drops the active library.
 - **Fetch progress stall hint:** when a source makes no progress for ~45s,
