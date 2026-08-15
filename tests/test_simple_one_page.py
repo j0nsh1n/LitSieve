@@ -234,7 +234,8 @@ def test_simple_collect_url_stays_on_search():
     tools = _read("static", "js", "simple_tools.js")
     assert "/search?collect=1" in tools
     base = _read("templates", "base.html")
-    assert 'data-href-simple="/search?collect=1"' in base
+    assert "data-href-simple" not in base
+    assert "data-href-advanced" not in base
 
 
 def test_simple_css_hides_leftover_collect():
