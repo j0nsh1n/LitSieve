@@ -16,6 +16,7 @@
   redirects in Simple. After papers exist, topics/fetch hide; Start over is a
   popup. Advanced: full steps including Clean up + Clusters. Phase 10
   broadsheet tokens: 2px/3px radii, warm-newsprint dark, masthead nav.
+- Final Simple nav is one unnumbered Search tab (no stepper; collect via Start over); that contract supersedes the original Phase 10 “Simple/guest tests pass unchanged” criterion.
 - Guest: `/guest` → sample corpus, multi-source fetch 403, purge after 30 minutes.
 - Ops: systemd user unit for uvicorn; optional backup + watchdog timers — see
   `docs/SELFHOST.md` and `docs/DEPLOY.md` (generic operator runbooks).
