@@ -306,6 +306,32 @@ class UserDatabase:
         """Deprecated helper: prefer search_accounts (bounded). No password hashes."""
         return self.search_accounts("", limit=25)
 
+    def account_counts(self) -> Dict[str, int]:
+        """Aggregates only — no usernames. For the operator admin overview."""
+        now = self._utc_now()
+        with self._lock:
+            total = int(self.conn.execute("SELECT COUNT(*) FROM users").fetchone()[0])
+            guests = int(self.conn.execute(
+                "SELECT COUNT(*) FROM users WHERE COALESCE(is_guest, 0) = 1"
+            ).fetchone()[0])
+            locked = int(self.conn.execute(
+                "SELECT COUNT(*) FROM users "
+                "WHERE locked_until IS NOT NULL AND locked_until > ?",
+                (now,),
+            ).fetchone()[0])
+            unverified = int(self.conn.execute(
+                "SELECT COUNT(*) FROM users "
+                "WHERE email IS NOT NULL AND TRIM(email) != '' "
+                "AND COALESCE(email_verified, 0) = 0 "
+                "AND COALESCE(is_guest, 0) = 0"
+            ).fetchone()[0])
+        return {
+            "accounts": total - guests,
+            "guests": guests,
+            "locked": locked,
+            "unverified": unverified,
+        }
+
     def search_accounts(self, query: str, *, limit: int = 25) -> List[Dict]:
         """Exact id/username/email first, then prefix, then contains. Capped."""
         q = (query or "").strip()

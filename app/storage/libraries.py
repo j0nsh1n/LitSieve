@@ -38,8 +38,24 @@ def data_root() -> Path:
     return Path(os.getenv("USER_DATA_DIR", "user_data"))
 
 
+_SAFE_SEG = re.compile(r"^[A-Za-z0-9._-]+$")
+
+
+def _safe_fs_id(raw: str, *, label: str = "id") -> str:
+    """One path segment only — no slashes or '..' — so user_data/<id> stays inside the root."""
+    s = str(raw or "").strip()
+    if not _SAFE_SEG.fullmatch(s) or s in (".", ".."):
+        raise ValueError(f"Invalid {label}")
+    return s
+
+
 def user_dir(user_id: str) -> Path:
-    return data_root() / user_id
+    uid = _safe_fs_id(user_id, label="account id")
+    root = data_root().resolve()
+    path = (root / uid).resolve()
+    if os.path.commonpath([str(root), str(path)]) != str(root):
+        raise ValueError("Invalid account id")
+    return path
 
 
 def libraries_dir(user_id: str) -> Path:
@@ -51,7 +67,8 @@ def meta_path(user_id: str) -> Path:
 
 
 def library_db_path(user_id: str, library_id: str) -> Path:
-    return libraries_dir(user_id) / library_id / "articles.db"
+    lid = _safe_fs_id(library_id, label="library id")
+    return libraries_dir(user_id) / lid / "articles.db"
 
 
 def pipeline_cache_key(user_id: str, library_id: str) -> str:

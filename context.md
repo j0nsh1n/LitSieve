@@ -22,7 +22,7 @@
 - Guest: `/guest` → sample corpus, auto-prepare (set `GUEST_AUTO_PREPARE=0` in
   tests), multi-source fetch 403, purge after 30 minutes. Search treats an
   empty source filter as “all sources” when no source chips are enabled.
-- Helpdesk: `ADMIN_USERNAMES` unlocks `/admin`. One-student lookup, unlock,
+- Admin: `ADMIN_USERNAMES` unlocks `/admin`. Host snapshot, one-account lookup, unlock,
   session revoke, emailed reset / one-time login, notes, action log.
   Restart after changing `.env`.
 - Ops: systemd user unit for uvicorn; optional backup + watchdog timers — see

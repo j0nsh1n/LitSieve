@@ -1,6 +1,7 @@
-// Helpdesk console: one student at a time. common.js provides apiCall / modals.
+// Operator admin console. common.js provides apiCall / modals.
 
 document.addEventListener('DOMContentLoaded', () => {
+ loadOverview();
  const form = document.getElementById('helpdesk-search-form');
  if (form) {
   form.addEventListener('submit', (e) => {
@@ -21,6 +22,32 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 let _selected = null;
+
+async function loadOverview() {
+ const status = document.getElementById('admin-overview-status');
+ try {
+  const d = await apiCall('/api/admin/overview');
+  const c = d.counts || {};
+  const set = (id, v) => {
+   const el = document.getElementById(id);
+   if (el) el.textContent = String(v);
+  };
+  set('ov-accounts', c.accounts ?? '—');
+  set('ov-guests', c.guests ?? '—');
+  set('ov-locked', c.locked ?? '—');
+  set('ov-unverified', c.unverified ?? '—');
+  set('ov-smtp', d.smtp ? 'on' : 'off');
+  set('ov-ai', d.ai ? 'on' : 'off');
+  set('ov-quota', d.quota_mb ? `${d.quota_mb} MB` : 'off');
+  if (status) {
+   status.textContent = d.guest_auto_prepare
+    ? 'Guest demo auto-prepares sample papers.'
+    : 'Guest auto-prepare is off.';
+  }
+ } catch (e) {
+  if (status) status.textContent = e.message || 'Could not load host snapshot.';
+ }
+}
 
 function bind(id, fn) {
  const el = document.getElementById(id);
@@ -61,7 +88,7 @@ function renderResults(users) {
  const list = document.getElementById('helpdesk-results');
  if (!list) return;
  if (!users.length) {
-  list.innerHTML = '<li class="info-text">No students in this list.</li>';
+  list.innerHTML = '<li class="info-text">No accounts in this list.</li>';
   return;
  }
  list.innerHTML = users.map((u) => {
@@ -159,7 +186,7 @@ function renderDetail(d) {
    ? d.timeline.map((a) => `<li><span class="library-manage-name">${escapeHtml(a.action)}</span>`
     + `<span class="help-text">${escapeHtml([a.created_at, a.admin_username, a.reason].filter(Boolean).join(' · '))}</span></li>`)
     .join('')
-   : '<li class="info-text">No helpdesk actions yet.</li>';
+   : '<li class="info-text">No admin actions yet.</li>';
  }
  const pack = document.getElementById('hd-packet');
  if (pack) pack.href = '/api/admin/users/' + encodeURIComponent(d.id) + '/packet';

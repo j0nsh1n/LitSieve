@@ -306,7 +306,7 @@ stick (Secure cookies). Use HTTPS (tunnel or reverse proxy) for real logins.
   password change bumps `token_version` and signs out other sessions.
 - CSRF double-submit on mutating routes.
 - Do not commit `.env`, `user_data/`, `*.db`, or SMTP password files.
-- Operator console: set `ADMIN_USERNAMES=yourhandle` (comma-separated) and
+- Admin console: set `ADMIN_USERNAMES=yourhandle` (comma-separated) and
   restart, then open `/admin`. Guests cannot be admins.
 
 ---

@@ -11,13 +11,14 @@ and this project aims to follow Semantic Versioning for app version strings
 ## [5.0.3] - 2026-08-17
 
 ### Added
-- **Helpdesk** at `/admin` (`ADMIN_USERNAMES`). Search one student, unlock,
+- **Admin** at `/admin` (`ADMIN_USERNAMES`). Host snapshot, search one
+  account, unlock,
   revoke sessions, email a password reset or one-time sign-in link, add a
   note, and download a per-student support packet. Actions are logged.
   The console never lists the full roster or sets a password.
 
 ### Changed
-- Failed sign-ins lock an account after 8 tries (15 minutes). Helpdesk
+- Failed sign-ins lock an account after 8 tries (15 minutes). Admin
   unlock clears that.
 - **Simple fetch** asks for a **topic** (not the full research question).
   The question is entered in Narrow it down, then used to search the
@@ -39,6 +40,8 @@ and this project aims to follow Semantic Versioning for app version strings
   a Search checkbox. Ranking no longer requires a source chip when none
   are available. `/guest` starts preparing the sample in the background
   and Search waits on that job instead of showing an empty collect form.
+- Account data paths reject `..` / slashes; admin routes only accept a
+  UUID account id (CodeQL path-injection / exception leak on `/admin`).
 
 ## [5.0.1] - 2026-08-14
 

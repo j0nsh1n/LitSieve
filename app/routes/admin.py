@@ -1,12 +1,14 @@
-"""Helpdesk console: one-student lookup, unblock, note, log.
+"""Operator admin console: site snapshot, one-account lookup, unblock, note.
 
-Reuses ADMIN_USERNAMES / is_admin_user. Not a superadmin panel: no roster
-export, no bulk delete, no promote/demote, no global settings.
+Reuses ADMIN_USERNAMES / is_admin_user. No roster export, bulk delete,
+promote/demote, or writable global settings from this page.
 """
 
 from __future__ import annotations
 
 import logging
+import os
+import uuid
 from typing import Optional
 
 from fastapi import APIRouter, Request
@@ -39,6 +41,24 @@ _DESTRUCTIVE = frozenset({
 })
 
 
+def _account_id(raw: str) -> Optional[str]:
+    try:
+        return str(uuid.UUID(str(raw or "").strip()))
+    except (ValueError, AttributeError, TypeError):
+        return None
+
+
+def _load_account(user_id: str):
+    """UUID-check then DB lookup. Use rec['id'] afterward (not the raw path)."""
+    uid = _account_id(user_id)
+    if not uid:
+        return None, JSONResponse(status_code=404, content={"detail": "Account not found"})
+    rec = core.user_db.get_by_id(uid)
+    if not rec:
+        return None, JSONResponse(status_code=404, content={"detail": "Account not found"})
+    return rec, None
+
+
 def _require_admin(request: Request):
     user = current_user(request)
     if not user:
@@ -49,7 +69,7 @@ def _require_admin(request: Request):
 
 
 def _public(rec: dict) -> dict:
-    """Account fields safe for the helpdesk UI. Never includes password hashes."""
+    """Account fields safe for the admin UI. Never includes password hashes."""
     locked = core.user_db.is_locked(rec)
     return {
         "id": rec["id"],
@@ -60,7 +80,7 @@ def _public(rec: dict) -> dict:
         "is_admin": (not rec.get("is_guest")) and core.is_admin_username(rec["username"]),
         "role": (
             "guest" if rec.get("is_guest")
-            else ("helpdesk" if core.is_admin_username(rec["username"]) else "student")
+            else ("admin" if core.is_admin_username(rec["username"]) else "student")
         ),
         "created_at": rec.get("created_at"),
         "locked": locked,
@@ -113,6 +133,26 @@ async def admin_page(request: Request):
     )
 
 
+@router.get("/api/admin/overview")
+@limiter.limit("30/minute")
+async def api_admin_overview(request: Request):
+    """Counts and host flags only — no account list."""
+    _admin, err = _require_admin(request)
+    if err:
+        return err
+    counts = core.user_db.account_counts()
+    cap = quota.limit_bytes()
+    guest_prep = (os.getenv("GUEST_AUTO_PREPARE") or "1").strip().lower()
+    from app.services import llm as llm_svc
+    return {
+        "counts": counts,
+        "smtp": mailer.is_configured(),
+        "ai": llm_svc.is_configured(),
+        "quota_mb": round(cap / (1024 * 1024)) if cap else 0,
+        "guest_auto_prepare": guest_prep not in ("0", "false", "no", "off"),
+    }
+
+
 @router.get("/api/admin/search")
 @limiter.limit("30/minute")
 async def api_admin_search(request: Request, q: str = "", limit: int = 25):
@@ -152,9 +192,10 @@ async def api_admin_user_detail(user_id: str, request: Request):
     _admin, err = _require_admin(request)
     if err:
         return err
-    rec = core.user_db.get_by_id(user_id)
-    if not rec:
-        return JSONResponse(status_code=404, content={"detail": "Account not found"})
+    rec, missing = _load_account(user_id)
+    if missing:
+        return missing
+    user_id = rec["id"]
     used = quota.usage_bytes(user_id)
     core.user_db.set_storage_bytes(user_id, used)
     rec["storage_bytes"] = used
@@ -207,16 +248,20 @@ async def api_admin_note(user_id: str, request: Request):
         return err or JSONResponse(status_code=401, content={"detail": "Not authenticated"})
     if csrf_failed(request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
-    rec = core.user_db.get_by_id(user_id)
-    if not rec:
-        return JSONResponse(status_code=404, content={"detail": "Account not found"})
+    rec, missing = _load_account(user_id)
+    if missing:
+        return missing
+    user_id = rec["id"]
     body = await _read_json(request)
     try:
         note = core.user_db.add_support_note(
             user_id, admin["user_id"], admin["username"], str(body.get("body") or ""),
         )
-    except ValueError as e:
-        return JSONResponse(status_code=400, content={"detail": str(e)})
+    except ValueError:
+        return JSONResponse(
+            status_code=400,
+            content={"detail": "Note cannot be empty or is too long."},
+        )
     core.user_db.add_support_action(
         user_id, admin["user_id"], admin["username"], "note",
         reason="support note",
@@ -234,9 +279,10 @@ async def api_admin_unlock(user_id: str, request: Request):
         return err or JSONResponse(status_code=401, content={"detail": "Not authenticated"})
     if csrf_failed(request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
-    rec = core.user_db.get_by_id(user_id)
-    if not rec:
-        return JSONResponse(status_code=404, content={"detail": "Account not found"})
+    rec, missing = _load_account(user_id)
+    if missing:
+        return missing
+    user_id = rec["id"]
     body = await _read_json(request)
     bad = _require_reason(body)
     if bad:
@@ -263,9 +309,10 @@ async def api_admin_revoke(user_id: str, request: Request):
         return err or JSONResponse(status_code=401, content={"detail": "Not authenticated"})
     if csrf_failed(request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
-    rec = core.user_db.get_by_id(user_id)
-    if not rec:
-        return JSONResponse(status_code=404, content={"detail": "Account not found"})
+    rec, missing = _load_account(user_id)
+    if missing:
+        return missing
+    user_id = rec["id"]
     body = await _read_json(request)
     bad = _require_reason(body, confirm=rec["username"], username=rec["username"])
     if bad:
@@ -294,9 +341,10 @@ async def api_admin_resend_verify(user_id: str, request: Request):
         return err or JSONResponse(status_code=401, content={"detail": "Not authenticated"})
     if csrf_failed(request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
-    rec = core.user_db.get_by_id(user_id)
-    if not rec:
-        return JSONResponse(status_code=404, content={"detail": "Account not found"})
+    rec, missing = _load_account(user_id)
+    if missing:
+        return missing
+    user_id = rec["id"]
     body = await _read_json(request)
     bad = _require_reason(body)
     if bad:
@@ -334,9 +382,10 @@ async def api_admin_send_reset(user_id: str, request: Request):
         return err or JSONResponse(status_code=401, content={"detail": "Not authenticated"})
     if csrf_failed(request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
-    rec = core.user_db.get_by_id(user_id)
-    if not rec:
-        return JSONResponse(status_code=404, content={"detail": "Account not found"})
+    rec, missing = _load_account(user_id)
+    if missing:
+        return missing
+    user_id = rec["id"]
     if rec.get("is_guest"):
         return JSONResponse(status_code=400, content={"detail": "Guest demos have no password."})
     body = await _read_json(request)
@@ -380,9 +429,10 @@ async def api_admin_send_login_link(user_id: str, request: Request):
         return err or JSONResponse(status_code=401, content={"detail": "Not authenticated"})
     if csrf_failed(request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
-    rec = core.user_db.get_by_id(user_id)
-    if not rec:
-        return JSONResponse(status_code=404, content={"detail": "Account not found"})
+    rec, missing = _load_account(user_id)
+    if missing:
+        return missing
+    user_id = rec["id"]
     if rec.get("is_guest"):
         return JSONResponse(status_code=400, content={"detail": "Guest demos cannot use a login link."})
     body = await _read_json(request)
@@ -437,9 +487,10 @@ async def api_admin_cancel_job(user_id: str, request: Request):
         return err or JSONResponse(status_code=401, content={"detail": "Not authenticated"})
     if csrf_failed(request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
-    rec = core.user_db.get_by_id(user_id)
-    if not rec:
-        return JSONResponse(status_code=404, content={"detail": "Account not found"})
+    rec, missing = _load_account(user_id)
+    if missing:
+        return missing
+    user_id = rec["id"]
     body = await _read_json(request)
     bad = _require_reason(body, confirm=rec["username"])
     if bad:
@@ -468,9 +519,10 @@ async def api_admin_packet(user_id: str, request: Request):
     admin, err = _require_admin(request)
     if err or not admin:
         return err or JSONResponse(status_code=401, content={"detail": "Not authenticated"})
-    rec = core.user_db.get_by_id(user_id)
-    if not rec:
-        return JSONResponse(status_code=404, content={"detail": "Account not found"})
+    rec, missing = _load_account(user_id)
+    if missing:
+        return missing
+    user_id = rec["id"]
     used = quota.usage_bytes(user_id)
     report = quota.usage_report(user_id)
     notes = core.user_db.list_support_notes(user_id, limit=50)

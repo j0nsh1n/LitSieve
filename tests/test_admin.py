@@ -1,4 +1,4 @@
-"""Helpdesk console: ADMIN_USERNAMES gate, lookup, unlock, note, logs."""
+"""Admin console: ADMIN_USERNAMES gate, overview, lookup, unlock, note, logs."""
 
 from __future__ import annotations
 
@@ -50,8 +50,18 @@ def test_helpdesk_page_and_search_requires_admin(tmp_path, monkeypatch):
     client, db = _admin_client(tmp_path, monkeypatch, username="opadmin")
     page = client.get("/admin")
     assert page.status_code == 200
-    assert b"Find a student" in page.content
+    assert b"Admin" in page.content
+    assert b"This host" in page.content
+    assert b"Find a student" not in page.content
     assert b"admin.js" in page.content
+    snap = client.get("/api/admin/overview")
+    assert snap.status_code == 200, snap.text
+    body = snap.json()
+    assert "counts" in body
+    assert "users" not in body
+    assert body["counts"]["accounts"] >= 1
+    assert "smtp" in body
+    assert "ai" in body
 
     _register("needhelp")
     found = client.get("/api/admin/search?q=needhelp")
@@ -181,6 +191,9 @@ def test_helpdesk_no_roster_dump_or_promote(tmp_path, monkeypatch):
     client, db = _admin_client(tmp_path, monkeypatch, username="opadmin")
     for i in range(6):
         _register(f"stu{i}")
+    ov = client.get("/api/admin/overview")
+    assert ov.status_code == 200
+    assert "users" not in ov.json()
     listed = client.get("/api/admin/search?q=")
     assert listed.status_code == 200
     assert listed.json()["total"] <= 25
@@ -191,6 +204,13 @@ def test_helpdesk_no_roster_dump_or_promote(tmp_path, monkeypatch):
     assert "stu0" in text
     assert "hashed_password" not in text
     assert "stu5" not in text
+
+
+def test_admin_rejects_path_user_id(tmp_path, monkeypatch):
+    client, _db = _admin_client(tmp_path, monkeypatch, username="opadmin")
+    for raw in ("../etc/passwd", "not-a-uuid", "abcd"):
+        r = client.get(f"/api/admin/users/{raw}")
+        assert r.status_code == 404, raw
 
 
 def test_helpdesk_queue_locked(tmp_path, monkeypatch):
