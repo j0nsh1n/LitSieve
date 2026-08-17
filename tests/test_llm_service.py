@@ -77,6 +77,21 @@ def test_save_and_load_ai_settings(tmp_path, monkeypatch):
     assert "sk-secret-test" not in (pub.get("openai_api_key_masked") or "")
 
 
+def test_ollama_binary_finds_home_local_when_not_on_path(monkeypatch, tmp_path):
+    """Website host PATH often omits ~/.local/bin; Refine must still find ollama."""
+    bin_dir = tmp_path / ".local" / "bin"
+    bin_dir.mkdir(parents=True)
+    wrapper = bin_dir / "ollama"
+    wrapper.write_text("#!/bin/sh\nexit 0\n")
+    wrapper.chmod(0o755)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("PATH", "/usr/bin")
+    monkeypatch.setattr(llm_service.shutil, "which", lambda _name: None)
+    monkeypatch.setattr(llm_service, "load_ai_settings", lambda force=False: {})
+    found = llm_service._ollama_binary()
+    assert found == str(wrapper)
+
+
 def test_start_ollama_already_running(monkeypatch):
     monkeypatch.setenv("AI_ALLOW_OLLAMA_CONTROL", "true")
     monkeypatch.setattr(llm_service, "ollama_running", lambda force=False: True)

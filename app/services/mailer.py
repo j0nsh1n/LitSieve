@@ -125,6 +125,20 @@ def send_verification(to: str, username: str, token: str) -> None:
     )
 
 
+def send_one_time_login(to: str, username: str, link: str) -> None:
+    send(
+        to,
+        "One-time sign-in link — LitSieve",
+        (
+            f"Hi {username},\n\n"
+            "A teacher sent you a one-time sign-in link. It works once and "
+            "expires in 15 minutes:\n\n"
+            f"{link}\n\n"
+            "If you did not ask for this, you can ignore this email.\n"
+        ),
+    )
+
+
 def send_password_reset(to: str, username: str, code: str) -> None:
     link = f"{public_base_url()}/reset-password"
     send(

@@ -26,7 +26,7 @@ async def health():
         _core.purge_expired_guests()
     except Exception:
         logger.exception("purge_expired_guests from /health failed")
-    return {"status": "healthy", "version": "5.0.1"}
+    return {"status": "healthy", "version": "5.0.3"}
 
 
 # Browsers and crawlers request these at the site root, where the /static mount
@@ -60,6 +60,7 @@ async def robots():
         "Disallow: /statistics\n"
         "Disallow: /search\n"
         "Disallow: /account\n"
+        "Disallow: /admin\n"
     )
     return PlainTextResponse(body, media_type="text/plain")
 

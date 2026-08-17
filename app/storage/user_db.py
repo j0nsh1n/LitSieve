@@ -141,6 +141,87 @@ class UserDatabase:
             "CREATE INDEX IF NOT EXISTS idx_redemptions_student "
             "ON share_redemptions(student_user_id)"
         )
+        # Helpdesk support: access state + last-seen (no MFA/class/grades in this schema).
+        extra = {
+            row[1]
+            for row in self.conn.execute("PRAGMA table_info(users)").fetchall()
+        }
+        if "locked_until" not in extra:
+            self.conn.execute("ALTER TABLE users ADD COLUMN locked_until TEXT")
+        if "failed_logins" not in extra:
+            self.conn.execute(
+                "ALTER TABLE users ADD COLUMN failed_logins INTEGER NOT NULL DEFAULT 0"
+            )
+        if "last_login_at" not in extra:
+            self.conn.execute("ALTER TABLE users ADD COLUMN last_login_at TEXT")
+        if "last_seen_at" not in extra:
+            self.conn.execute("ALTER TABLE users ADD COLUMN last_seen_at TEXT")
+        if "password_changed_at" not in extra:
+            self.conn.execute("ALTER TABLE users ADD COLUMN password_changed_at TEXT")
+        if "storage_bytes" not in extra:
+            self.conn.execute(
+                "ALTER TABLE users ADD COLUMN storage_bytes INTEGER NOT NULL DEFAULT 0"
+            )
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS support_notes (
+                id              TEXT PRIMARY KEY,
+                student_id      TEXT NOT NULL,
+                admin_id        TEXT NOT NULL,
+                admin_username  TEXT NOT NULL,
+                body            TEXT NOT NULL,
+                created_at      TEXT NOT NULL
+            )
+        """)
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_support_notes_student "
+            "ON support_notes(student_id, created_at)"
+        )
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS support_actions (
+                id              TEXT PRIMARY KEY,
+                student_id      TEXT NOT NULL,
+                admin_id        TEXT NOT NULL,
+                admin_username  TEXT NOT NULL,
+                action          TEXT NOT NULL,
+                reason          TEXT NOT NULL,
+                old_value       TEXT,
+                new_value       TEXT,
+                ip              TEXT,
+                created_at      TEXT NOT NULL
+            )
+        """)
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_support_actions_student "
+            "ON support_actions(student_id, created_at)"
+        )
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS auth_events (
+                id          TEXT PRIMARY KEY,
+                user_id     TEXT,
+                username    TEXT,
+                kind        TEXT NOT NULL,
+                ip          TEXT,
+                detail      TEXT,
+                created_at  TEXT NOT NULL
+            )
+        """)
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_auth_events_user "
+            "ON auth_events(user_id, created_at)"
+        )
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_auth_events_kind_time "
+            "ON auth_events(kind, created_at)"
+        )
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS one_time_logins (
+                token_hash  TEXT PRIMARY KEY,
+                user_id     TEXT NOT NULL,
+                expires_at  TEXT NOT NULL,
+                used        INTEGER NOT NULL DEFAULT 0,
+                created_at  TEXT NOT NULL
+            )
+        """)
         self.conn.commit()
 
     def create_user(
@@ -174,47 +255,158 @@ class UserDatabase:
             "is_guest": bool(guest),
         }
 
+    _USER_COLS = (
+        "id, username, hashed_password, token_version, email, email_verified, "
+        "COALESCE(is_guest, 0), created_at, locked_until, "
+        "COALESCE(failed_logins, 0), last_login_at, last_seen_at, "
+        "password_changed_at, COALESCE(storage_bytes, 0)"
+    )
+
+    @staticmethod
+    def _utc_now() -> str:
+        return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+    def _row_to_user(self, row) -> Optional[Dict]:
+        if not row:
+            return None
+        return {
+            "id": row[0],
+            "username": row[1],
+            "hashed_password": row[2],
+            "token_version": int(row[3] or 0),
+            "email": row[4],
+            "email_verified": bool(row[5]),
+            "is_guest": bool(row[6]),
+            "created_at": row[7],
+            "locked_until": row[8],
+            "failed_logins": int(row[9] or 0),
+            "last_login_at": row[10],
+            "last_seen_at": row[11],
+            "password_changed_at": row[12],
+            "storage_bytes": int(row[13] or 0),
+        }
+
     def get_by_username(self, username: str) -> Optional[Dict]:
         with self._lock:
             row = self.conn.execute(
-                "SELECT id, username, hashed_password, token_version, email, email_verified, "
-                "COALESCE(is_guest, 0), created_at "
-                "FROM users WHERE username = ? COLLATE NOCASE",
+                f"SELECT {self._USER_COLS} FROM users WHERE username = ? COLLATE NOCASE",
                 (username,),
             ).fetchone()
-        if row:
-            return {
-                "id": row[0],
-                "username": row[1],
-                "hashed_password": row[2],
-                "token_version": int(row[3] or 0),
-                "email": row[4],
-                "email_verified": bool(row[5]),
-                "is_guest": bool(row[6]),
-                "created_at": row[7],
-            }
-        return None
+        return self._row_to_user(row)
 
     def get_by_id(self, user_id: str) -> Optional[Dict]:
         with self._lock:
             row = self.conn.execute(
-                "SELECT id, username, hashed_password, token_version, email, email_verified, "
-                "COALESCE(is_guest, 0), created_at "
-                "FROM users WHERE id = ?",
+                f"SELECT {self._USER_COLS} FROM users WHERE id = ?",
                 (user_id,),
             ).fetchone()
-        if row:
-            return {
-                "id": row[0],
-                "username": row[1],
-                "hashed_password": row[2],
-                "token_version": int(row[3] or 0),
-                "email": row[4],
-                "email_verified": bool(row[5]),
-                "is_guest": bool(row[6]),
-                "created_at": row[7],
-            }
-        return None
+        return self._row_to_user(row)
+
+    def list_accounts(self) -> List[Dict]:
+        """Deprecated helper: prefer search_accounts (bounded). No password hashes."""
+        return self.search_accounts("", limit=25)
+
+    def search_accounts(self, query: str, *, limit: int = 25) -> List[Dict]:
+        """Exact id/username/email first, then prefix, then contains. Capped."""
+        q = (query or "").strip()
+        limit = max(1, min(int(limit), 25))
+        seen: set = set()
+        out: List[Dict] = []
+
+        def _add(rows) -> None:
+            for row in rows:
+                rec = self._row_to_user(row)
+                if not rec or rec["id"] in seen:
+                    continue
+                seen.add(rec["id"])
+                out.append(rec)
+                if len(out) >= limit:
+                    return
+
+        with self._lock:
+            if q:
+                _add(self.conn.execute(
+                    f"SELECT {self._USER_COLS} FROM users "
+                    "WHERE id = ? OR username = ? COLLATE NOCASE "
+                    "OR email = ? COLLATE NOCASE",
+                    (q, q, q),
+                ).fetchall())
+                if len(out) < limit:
+                    like = f"{q}%"
+                    _add(self.conn.execute(
+                        f"SELECT {self._USER_COLS} FROM users "
+                        "WHERE username LIKE ? COLLATE NOCASE "
+                        "OR email LIKE ? COLLATE NOCASE "
+                        "ORDER BY username LIMIT ?",
+                        (like, like, limit),
+                    ).fetchall())
+                if len(out) < limit and len(q) >= 2:
+                    like = f"%{q}%"
+                    _add(self.conn.execute(
+                        f"SELECT {self._USER_COLS} FROM users "
+                        "WHERE username LIKE ? COLLATE NOCASE "
+                        "OR email LIKE ? COLLATE NOCASE "
+                        "ORDER BY username LIMIT ?",
+                        (like, like, limit),
+                    ).fetchall())
+            else:
+                _add(self.conn.execute(
+                    f"SELECT {self._USER_COLS} FROM users "
+                    "ORDER BY created_at DESC LIMIT ?",
+                    (limit,),
+                ).fetchall())
+        return out[:limit]
+
+    def queue_accounts(self, kind: str, *, limit: int = 25) -> List[Dict]:
+        """Small support queues. kind: locked | unverified | quota | errors."""
+        limit = max(1, min(int(limit), 25))
+        now = self._utc_now()
+        with self._lock:
+            if kind == "locked":
+                rows = self.conn.execute(
+                    f"SELECT {self._USER_COLS} FROM users "
+                    "WHERE locked_until IS NOT NULL AND locked_until > ? "
+                    "ORDER BY locked_until DESC LIMIT ?",
+                    (now, limit),
+                ).fetchall()
+            elif kind == "unverified":
+                rows = self.conn.execute(
+                    f"SELECT {self._USER_COLS} FROM users "
+                    "WHERE email IS NOT NULL AND TRIM(email) != '' "
+                    "AND COALESCE(email_verified, 0) = 0 "
+                    "AND COALESCE(is_guest, 0) = 0 "
+                    "ORDER BY created_at DESC LIMIT ?",
+                    (limit,),
+                ).fetchall()
+            elif kind == "quota":
+                rows = self.conn.execute(
+                    f"SELECT {self._USER_COLS} FROM users "
+                    "WHERE COALESCE(storage_bytes, 0) > 0 "
+                    "ORDER BY storage_bytes DESC LIMIT ?",
+                    (limit,),
+                ).fetchall()
+            elif kind == "errors":
+                hour_ago = (
+                    datetime.now(timezone.utc) - timedelta(hours=1)
+                ).strftime("%Y-%m-%d %H:%M:%S")
+                rows = self.conn.execute(
+                    f"SELECT {self._USER_COLS} FROM users "
+                    "WHERE id IN ("
+                    "  SELECT user_id FROM auth_events "
+                    "  WHERE kind IN ('login_fail', 'lockout') "
+                    "  AND created_at >= ? AND user_id IS NOT NULL "
+                    "  GROUP BY user_id HAVING COUNT(*) >= 3"
+                    ") ORDER BY last_seen_at DESC LIMIT ?",
+                    (hour_ago, limit),
+                ).fetchall()
+            else:
+                rows = []
+        found = []
+        for r in rows:
+            rec = self._row_to_user(r)
+            if rec:
+                found.append(rec)
+        return found
 
     def list_expired_guest_ids(self, max_age_minutes: int = 30) -> list:
         """Guest account ids older than max_age_minutes (SQLite UTC datetime)."""
@@ -242,14 +434,311 @@ class UserDatabase:
 
     def update_password(self, user_id: str, hashed_password: str) -> bool:
         """Set password hash and bump token_version so other sessions die."""
+        now = self._utc_now()
         with self._lock:
             cur = self.conn.execute(
                 "UPDATE users SET hashed_password = ?, "
-                "token_version = token_version + 1 WHERE id = ?",
-                (hashed_password, user_id),
+                "token_version = token_version + 1, password_changed_at = ? "
+                "WHERE id = ?",
+                (hashed_password, now, user_id),
             )
             self.conn.commit()
             return cur.rowcount > 0
+
+    LOCKOUT_AFTER = 8
+    LOCKOUT_MINUTES = 15
+    LAST_SEEN_THROTTLE_SEC = 300
+
+    def is_locked(self, user: Optional[Dict]) -> bool:
+        if not user:
+            return False
+        until = user.get("locked_until")
+        if not until:
+            return False
+        return str(until) > self._utc_now()
+
+    def record_login_failure(self, username: str, ip: str = "") -> Dict:
+        """Increment fail count; lock after LOCKOUT_AFTER. Returns {locked, user_id}."""
+        user = self.get_by_username(username)
+        uid = user["id"] if user else None
+        uname = (user["username"] if user else username) or username
+        locked = False
+        if user:
+            now = self._utc_now()
+            fails = int(user.get("failed_logins") or 0) + 1
+            until = None
+            if fails >= self.LOCKOUT_AFTER:
+                until = (
+                    datetime.now(timezone.utc)
+                    + timedelta(minutes=self.LOCKOUT_MINUTES)
+                ).strftime("%Y-%m-%d %H:%M:%S")
+                locked = True
+            with self._lock:
+                self.conn.execute(
+                    "UPDATE users SET failed_logins = ?, locked_until = ? WHERE id = ?",
+                    (fails, until, uid),
+                )
+                self.conn.commit()
+            self.record_auth_event(uid, uname, "login_fail", ip, f"fails={fails}")
+            if locked:
+                self.record_auth_event(uid, uname, "lockout", ip, f"until={until}")
+        else:
+            self.record_auth_event(None, uname, "login_fail", ip, "unknown_user")
+        return {"locked": locked, "user_id": uid}
+
+    def record_login_success(self, user_id: str, ip: str = "") -> None:
+        now = self._utc_now()
+        with self._lock:
+            self.conn.execute(
+                "UPDATE users SET failed_logins = 0, locked_until = NULL, "
+                "last_login_at = ?, last_seen_at = ? WHERE id = ?",
+                (now, now, user_id),
+            )
+            self.conn.commit()
+        user = self.get_by_id(user_id)
+        if user:
+            self.record_auth_event(user_id, user["username"], "login_ok", ip, "")
+
+    def touch_last_seen(self, user_id: str) -> None:
+        """Write last_seen at most once per LAST_SEEN_THROTTLE_SEC."""
+        now = datetime.now(timezone.utc)
+        user = self.get_by_id(user_id)
+        if not user:
+            return
+        prev = user.get("last_seen_at")
+        if prev:
+            try:
+                prev_dt = datetime.strptime(str(prev)[:19], "%Y-%m-%d %H:%M:%S").replace(
+                    tzinfo=timezone.utc
+                )
+                if (now - prev_dt).total_seconds() < self.LAST_SEEN_THROTTLE_SEC:
+                    return
+            except ValueError:
+                pass
+        stamp = now.strftime("%Y-%m-%d %H:%M:%S")
+        with self._lock:
+            self.conn.execute(
+                "UPDATE users SET last_seen_at = ? WHERE id = ?",
+                (stamp, user_id),
+            )
+            self.conn.commit()
+
+    def unlock_account(self, user_id: str) -> bool:
+        with self._lock:
+            cur = self.conn.execute(
+                "UPDATE users SET locked_until = NULL, failed_logins = 0 WHERE id = ?",
+                (user_id,),
+            )
+            self.conn.commit()
+            return cur.rowcount > 0
+
+    def bump_sessions(self, user_id: str) -> bool:
+        """Invalidate all JWTs for this account."""
+        with self._lock:
+            cur = self.conn.execute(
+                "UPDATE users SET token_version = token_version + 1 WHERE id = ?",
+                (user_id,),
+            )
+            self.conn.commit()
+            return cur.rowcount > 0
+
+    def set_storage_bytes(self, user_id: str, used: int) -> None:
+        with self._lock:
+            self.conn.execute(
+                "UPDATE users SET storage_bytes = ? WHERE id = ?",
+                (int(used or 0), user_id),
+            )
+            self.conn.commit()
+
+    def record_auth_event(
+        self,
+        user_id: Optional[str],
+        username: str,
+        kind: str,
+        ip: str = "",
+        detail: str = "",
+    ) -> None:
+        now = self._utc_now()
+        with self._lock:
+            self.conn.execute(
+                "INSERT INTO auth_events "
+                "(id, user_id, username, kind, ip, detail, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (str(uuid.uuid4()), user_id, username or "", kind, ip or "", detail or "", now),
+            )
+            self.conn.commit()
+
+    def list_auth_events(self, user_id: str, *, limit: int = 20) -> List[Dict]:
+        limit = max(1, min(int(limit), 50))
+        with self._lock:
+            rows = self.conn.execute(
+                "SELECT id, kind, ip, detail, created_at FROM auth_events "
+                "WHERE user_id = ? ORDER BY created_at DESC LIMIT ?",
+                (user_id, limit),
+            ).fetchall()
+        return [
+            {
+                "id": r[0],
+                "kind": r[1],
+                "ip": r[2],
+                "detail": r[3],
+                "created_at": r[4],
+            }
+            for r in rows
+        ]
+
+    def add_support_note(
+        self, student_id: str, admin_id: str, admin_username: str, body: str
+    ) -> Dict:
+        note_id = str(uuid.uuid4())
+        now = self._utc_now()
+        text = (body or "").strip()
+        if not text:
+            raise ValueError("Note cannot be empty.")
+        if len(text) > 2000:
+            raise ValueError("Note is too long (max 2000 characters).")
+        with self._lock:
+            self.conn.execute(
+                "INSERT INTO support_notes "
+                "(id, student_id, admin_id, admin_username, body, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (note_id, student_id, admin_id, admin_username, text, now),
+            )
+            self.conn.commit()
+        return {
+            "id": note_id,
+            "student_id": student_id,
+            "admin_id": admin_id,
+            "admin_username": admin_username,
+            "body": text,
+            "created_at": now,
+        }
+
+    def list_support_notes(self, student_id: str, *, limit: int = 50) -> List[Dict]:
+        limit = max(1, min(int(limit), 50))
+        with self._lock:
+            rows = self.conn.execute(
+                "SELECT id, admin_id, admin_username, body, created_at "
+                "FROM support_notes WHERE student_id = ? "
+                "ORDER BY created_at DESC LIMIT ?",
+                (student_id, limit),
+            ).fetchall()
+        return [
+            {
+                "id": r[0],
+                "admin_id": r[1],
+                "admin_username": r[2],
+                "body": r[3],
+                "created_at": r[4],
+            }
+            for r in rows
+        ]
+
+    def add_support_action(
+        self,
+        student_id: str,
+        admin_id: str,
+        admin_username: str,
+        action: str,
+        reason: str,
+        *,
+        old_value: str = "",
+        new_value: str = "",
+        ip: str = "",
+    ) -> Dict:
+        act_id = str(uuid.uuid4())
+        now = self._utc_now()
+        with self._lock:
+            self.conn.execute(
+                "INSERT INTO support_actions "
+                "(id, student_id, admin_id, admin_username, action, reason, "
+                "old_value, new_value, ip, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    act_id, student_id, admin_id, admin_username, action,
+                    (reason or "").strip(), old_value or "", new_value or "",
+                    ip or "", now,
+                ),
+            )
+            self.conn.commit()
+        return {
+            "id": act_id,
+            "action": action,
+            "reason": (reason or "").strip(),
+            "old_value": old_value or "",
+            "new_value": new_value or "",
+            "admin_username": admin_username,
+            "ip": ip or "",
+            "created_at": now,
+        }
+
+    def list_support_actions(self, student_id: str, *, limit: int = 50) -> List[Dict]:
+        limit = max(1, min(int(limit), 50))
+        with self._lock:
+            rows = self.conn.execute(
+                "SELECT id, admin_username, action, reason, old_value, new_value, ip, created_at "
+                "FROM support_actions WHERE student_id = ? "
+                "ORDER BY created_at DESC LIMIT ?",
+                (student_id, limit),
+            ).fetchall()
+        return [
+            {
+                "id": r[0],
+                "admin_username": r[1],
+                "action": r[2],
+                "reason": r[3],
+                "old_value": r[4],
+                "new_value": r[5],
+                "ip": r[6],
+                "created_at": r[7],
+            }
+            for r in rows
+        ]
+
+    def create_one_time_login(self, user_id: str, ttl_minutes: int = 15) -> Optional[str]:
+        user = self.get_by_id(user_id)
+        if not user or user.get("is_guest"):
+            return None
+        token = secrets.token_urlsafe(24)
+        token_hash = self._hash_reset_token(token)
+        now = self._utc_now()
+        expires = (
+            datetime.now(timezone.utc) + timedelta(minutes=ttl_minutes)
+        ).strftime("%Y-%m-%d %H:%M:%S")
+        with self._lock:
+            self.conn.execute(
+                "UPDATE one_time_logins SET used = 1 "
+                "WHERE user_id = ? AND used = 0",
+                (user_id,),
+            )
+            self.conn.execute(
+                "INSERT INTO one_time_logins "
+                "(token_hash, user_id, expires_at, used, created_at) "
+                "VALUES (?, ?, ?, 0, ?)",
+                (token_hash, user_id, expires, now),
+            )
+            self.conn.commit()
+        return token
+
+    def consume_one_time_login(self, token: str) -> Optional[Dict]:
+        if not token:
+            return None
+        token_hash = self._hash_reset_token(token.strip())
+        now = self._utc_now()
+        with self._lock:
+            row = self.conn.execute(
+                "SELECT user_id, expires_at, used FROM one_time_logins "
+                "WHERE token_hash = ?",
+                (token_hash,),
+            ).fetchone()
+            if not row or int(row[2] or 0) or str(row[1]) < now:
+                return None
+            self.conn.execute(
+                "UPDATE one_time_logins SET used = 1 WHERE token_hash = ?",
+                (token_hash,),
+            )
+            self.conn.commit()
+        return self.get_by_id(row[0])
 
     def delete_user(self, user_id: str) -> bool:
         """Delete a user account. Returns True if a row was removed."""
@@ -512,9 +1001,9 @@ class UserDatabase:
                 return False, "This reset code has expired. Request a new one."
             cur = self.conn.execute(
                 "UPDATE users SET hashed_password = ?, "
-                "token_version = token_version + 1 "
+                "token_version = token_version + 1, password_changed_at = ? "
                 "WHERE username = ? COLLATE NOCASE",
-                (new_hashed_password, uname),
+                (new_hashed_password, now, uname),
             )
             if cur.rowcount == 0:
                 return False, "Account not found."

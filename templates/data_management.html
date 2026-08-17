@@ -18,18 +18,18 @@
 <aside class="page-help card" id="page-help" hidden>
  <h2 class="page-help-title">About this page</h2>
  <div class="page-help-body">
-  <p class="info-text">Pick topics (and sources in Advanced), type a research question, then
-  <strong>Fetch Articles</strong>. Preparing for search runs automatically afterward. You can leave
-  the page open while progress runs.</p>
+  <p class="info-text">Narrow your lens (pick general areas), type a <strong>topic</strong>, then
+  <strong>Find articles on your topic</strong>. Save your actual research question for Search.
+  Preparing for search runs automatically afterward.</p>
   <p class="info-text">Sources are free public databases, not a college library package. Some may
   fail (rate limits) while others succeed — that is normal. Coverage map shows empty recommended
   sources after a fetch.</p>
   <p class="info-text page-help-advanced">Preparing creates embeddings (meaning fingerprints) for Search,
   Clusters, and duplicates. Re-prepare is optional if that step failed or you change the model.
   Guest demos load sample papers only (no multi-source fetch).</p>
-  <p class="info-text page-help-simple">After prepare finishes, tap <strong>Narrow it down</strong>
-  for a popup (Low / Medium / High), then Go to Search. Fetch is locked once this collection has papers —
-  use <strong>Start over or add papers</strong> if you really need another search, or
+  <p class="info-text page-help-simple">After prepare finishes, <strong>Narrow it down</strong> opens
+  before Search so you can type your real question (or skip). Fetch is locked once this collection
+  has papers — use <strong>Start over or add papers</strong> if you really need another search, or
   <strong>Re-prepare</strong> if you only need to get them ready again. Guest demos use sample
   papers only.</p>
  </div>
@@ -90,6 +90,6 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/simple_tools.js?v=20260814h"></script>
-<script src="/static/js/data_management.js?v=20260814d"></script>
+<script src="/static/js/simple_tools.js?v=20260817f"></script>
+<script src="/static/js/data_management.js?v=20260817g"></script>
 {% endblock %}

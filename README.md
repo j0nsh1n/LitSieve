@@ -1,4 +1,4 @@
-# LitSieve 📚 — v5.0.1
+# LitSieve 📚 — v5.0.3
 
 A multi-user web app for **students** to fetch, screen, and rank research papers
 across public academic databases as a **research starting point**. Semantic
@@ -24,9 +24,9 @@ Built with **FastAPI**, sentence-transformers, FAISS, and scikit-learn.
   bioRxiv, medRxiv, DBLP, OpenAIRE, PLOS, HAL)
   — replace or append; **background jobs** with progress, cancel, retries, and
   per-source error classes; **auto prepare-for-search** after a successful fetch
-- 🧭 **Simple / Advanced** UI mode (client preference): Simple is Get papers →
-  Search with an inline screening card; Advanced keeps Clean up, Clusters, and
-  full controls
+- 🧭 **Simple / Advanced** UI mode (client preference): Simple is one Search
+  page (fetch by **topic** → wait screen → required **Narrow it down** → rank);
+  Advanced keeps Clean up, Clusters, and full controls
 - 🧠 Semantic embeddings (only-new or full re-embed; topic-based model pick; GPU when
   available; background job) + **extractive key points** from abstracts
 - 🎯 Hybrid similarity search (meaning + exact words), **year range**, plain text /
@@ -108,9 +108,11 @@ Register/login for a private workspace, then:
 
 **Simple mode (default for new accounts)**
 
-1. **Search** (`/search`) — empty library: topics + **Fetch** (prepare runs next
-   automatically). After papers: rank, Show chips, export RIS. Optional
-   **Narrow it down**, **Re-prepare**, and **Start over** are popups.
+1. **Search** (`/search`) — empty library: pick topics, type a **topic** (not
+   your full question), **Fetch**. A wait screen covers fetch + prepare. Then
+   **Narrow it down** (required: apply or skip) before ranking. After that:
+   rank, Show chips, export RIS. **Re-prepare** and **Start over** stay on
+   the Search strip.
 
 **Advanced mode** (toggle in the nav)
 

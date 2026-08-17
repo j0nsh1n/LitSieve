@@ -264,7 +264,7 @@ Run against the live base URL (examples use `http://127.0.0.1:7860`).
 ```bash
 # 1. Process is up
 curl -sS -o /tmp/health.json -w "%{http_code}\n" http://127.0.0.1:7860/health
-# expect: 200 and {"status":"healthy","version":"5.0.1"}
+# expect: 200 and {"status":"healthy","version":"5.0.3"}
 
 # 2. Landing (no auth)
 curl -sS -o /dev/null -w "%{http_code}\n" http://127.0.0.1:7860/
@@ -306,6 +306,8 @@ stick (Secure cookies). Use HTTPS (tunnel or reverse proxy) for real logins.
   password change bumps `token_version` and signs out other sessions.
 - CSRF double-submit on mutating routes.
 - Do not commit `.env`, `user_data/`, `*.db`, or SMTP password files.
+- Operator console: set `ADMIN_USERNAMES=yourhandle` (comma-separated) and
+  restart, then open `/admin`. Guests cannot be admins.
 
 ---
 

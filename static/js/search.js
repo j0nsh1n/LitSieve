@@ -23,6 +23,7 @@ let _restoringSearch = false;
 document.addEventListener('DOMContentLoaded', () => {
  // Empty state + hide search UI until papers are prepared; only then restore.
  loadSearchEmptyState()
+  .then((stats) => waitIfPreparing(stats))
   .then((stats) => {
    const ready = !!(stats && (stats.articles_with_embeddings || 0) > 0);
    const collecting = typeof wantsSimpleCollectView === 'function'
@@ -37,7 +38,18 @@ document.addEventListener('DOMContentLoaded', () => {
      }
      return;
     }
-    if (ready) return restoreSearchSession();
+    if (ready) {
+     const afterScreen = () => {
+      if (typeof isSimpleScreenGatePending === 'function' && isSimpleScreenGatePending()) {
+       return;
+      }
+      return restoreSearchSession();
+     };
+     if (typeof refreshSimpleScreeningCard === 'function') {
+      return refreshSimpleScreeningCard().then(afterScreen);
+     }
+     return afterScreen();
+    }
    }).then(() => {
     refreshStarredCount(stats == null ? null : stats.starred);
    });
@@ -291,15 +303,23 @@ function parseOptionalYear(id) {
  return Number.isFinite(n) ? n : null;
 }
 
+function enabledSearchSourceBoxes() {
+ return Array.from(document.querySelectorAll('input[name="search-source"]'))
+  .filter((cb) => !cb.disabled);
+}
+
 function collectSearchFilters() {
  const topK = parseInt(document.getElementById('top-k').value, 10);
  const sortBy = document.getElementById('sort-by').value;
  const picoBoost = document.getElementById('pico-boost').checked;
  const lexicalEl = document.getElementById('lexical-boost');
  const lexicalBoost = lexicalEl ? lexicalEl.checked : true;
- const selectedSources = Array.from(
- document.querySelectorAll('input[name="search-source"]:checked')
- ).map(cb => cb.value);
+ const enabled = enabledSearchSourceBoxes();
+ // No enabled boxes (demo sample, or empty library): [] means every source.
+ // When boxes exist, only the checked ones are sent.
+ const selectedSources = enabled
+  .filter((cb) => cb.checked)
+  .map((cb) => cb.value);
  return {
  top_k: topK,
  sort_by: sortBy,
@@ -311,10 +331,22 @@ function collectSearchFilters() {
  };
 }
 
+function requireSelectedSources(filters, fromRestore) {
+ const enabled = enabledSearchSourceBoxes();
+ if (enabled.length === 0) return true;
+ if (filters.source_filter.length === 0) {
+  if (!fromRestore) showNotification('Please select at least one source.', 'error');
+  return false;
+ }
+ return true;
+}
+
 function updateSearchWorkVisibility(stats) {
  // Hide query/controls/export until papers are prepared (same gate as empty-state).
+ // Simple also waits until Narrow it down is applied or skipped.
  const emb = (stats && stats.articles_with_embeddings) || 0;
- const ready = emb > 0;
+ const gated = typeof isSimpleScreenGatePending === 'function' && isSimpleScreenGatePending();
+ const ready = emb > 0 && !gated;
  document.querySelectorAll('.search-work').forEach((el) => {
   // results + seed-banner stay hidden until a search runs (u-hidden / style).
   if (el.id === 'results-section' || el.id === 'seed-banner') {
@@ -390,6 +422,93 @@ async function loadSearchEmptyState() {
  }
 }
 
+async function waitIfPreparing(stats) {
+ const banner = document.getElementById('search-preparing');
+ const status = document.getElementById('search-preparing-status');
+ const simple = typeof isSimpleMode === 'function' && isSimpleMode();
+ const hide = () => {
+  if (typeof hideSimpleBuffering === 'function') hideSimpleBuffering();
+  else {
+   window._preparingCorpus = false;
+   if (banner) banner.hidden = true;
+  }
+ };
+ let progress = {};
+ try {
+  progress = await apiCall('/api/progress');
+ } catch (e) {
+  hide();
+  return stats;
+ }
+ const fetchJob = (progress && progress.fetch) || {};
+ const embed = (progress && progress.embed) || {};
+
+ if (simple && fetchJob.active && typeof showSimpleBuffering === 'function') {
+  showSimpleBuffering('fetch');
+  if (typeof syncSimpleOnePageState === 'function') syncSimpleOnePageState(stats || {});
+  if (typeof waitForJob === 'function') {
+   try {
+    await waitForJob(
+     'fetch',
+     'search-buffering-fill',
+     'search-buffering-label',
+     'search-buffering-progress',
+     (done, totalN, _pct, p) => {
+      const arts = (p && p.articles_so_far) || 0;
+      return `${done} of ${totalN} source(s) · ${arts} paper(s) so far`;
+     }
+    );
+   } catch (e) {
+    if (status) status.textContent = 'Fetch did not finish. Try again from Get papers.';
+    hide();
+    return stats;
+   }
+  }
+  // Client auto-chain may still be running on the original tab; this tab
+  // only waits if prepare has already started.
+  try {
+   progress = await apiCall('/api/progress');
+  } catch (e) { /* continue */ }
+ }
+
+ const embedNow = (progress && progress.embed) || embed;
+ if (!embedNow.active) {
+  hide();
+  return stats;
+ }
+ if (simple && typeof showSimpleBuffering === 'function') {
+  showSimpleBuffering('prepare');
+ } else {
+  window._preparingCorpus = true;
+  if (banner) banner.hidden = false;
+  if (status) status.textContent = 'Preparing papers for search…';
+ }
+ if (typeof syncSimpleOnePageState === 'function') {
+  syncSimpleOnePageState(stats || {});
+ }
+ if (typeof waitForJob === 'function') {
+  try {
+   await waitForJob(
+    'embed',
+    simple ? 'search-buffering-fill' : null,
+    simple ? 'search-buffering-label' : 'search-preparing-status',
+    simple ? 'search-buffering-progress' : null,
+    simple
+     ? (done, totalN, pct) => (
+      totalN > 0 ? `Getting papers ready… ${done} / ${totalN} (${pct}%)` : 'Getting your papers ready…'
+     )
+     : null
+   );
+  } catch (e) {
+   if (status) status.textContent = 'Could not finish preparing. Use Re-prepare.';
+   hide();
+   return stats;
+  }
+ }
+ hide();
+ return loadSearchEmptyState();
+}
+
 function refreshStarredCount(known) {
  const el = document.getElementById('starred-count');
  if (!el) return;
@@ -421,7 +540,7 @@ async function applyAvailableSources() {
  return;
  }
 
- let anyAvailable = false;
+ let anyAvailable = Object.values(sources).some((n) => Number(n) > 0);
  document.querySelectorAll('input[name="search-source"]').forEach(cb => {
  const count = sources[cb.value] || 0;
  const label = cb.closest('.radio-label');
@@ -587,10 +706,7 @@ async function doSearch(opts) {
  }
 
  const filters = collectSearchFilters();
- if (filters.source_filter.length === 0) {
- if (!fromRestore) showNotification('Please select at least one source.', 'error');
- return;
- }
+ if (!requireSelectedSources(filters, fromRestore)) return;
  const btn = document.getElementById('search-btn');
  setLoading(btn, true);
  const resultsSec = document.getElementById('results-section');
@@ -677,10 +793,7 @@ async function doStarredSearch(opts) {
   if (!scoped) return;
  }
  const filters = collectSearchFilters();
- if (filters.source_filter.length === 0) {
- if (!fromRestore) showNotification('Please select at least one source.', 'error');
- return;
- }
+ if (!requireSelectedSources(filters, fromRestore)) return;
  const btn = document.getElementById('starred-search-btn');
  setLoading(btn, true);
  const resultsSec = document.getElementById('results-section');

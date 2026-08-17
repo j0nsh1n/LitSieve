@@ -2128,6 +2128,46 @@ select option,
     flex: 1 1 8rem;
     font-weight: 600;
 }
+
+.admin-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+    gap: var(--space-3);
+    margin: var(--space-3) 0;
+}
+.admin-stats div { margin: 0; }
+.admin-stats dt {
+    font-size: var(--fs-xs);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-soft);
+}
+.admin-stats dd {
+    margin: 0;
+    font-family: var(--font-serif);
+    font-size: var(--fs-md);
+}
+.admin-user-btn {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: var(--space-3);
+    text-align: left;
+}
+.admin-user-btn.is-active {
+    border-color: var(--text);
+    color: var(--bg);
+    background: var(--text);
+}
+.admin-reset-code {
+    margin-top: var(--space-3);
+    padding: var(--space-3);
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    font-size: var(--fs-sm);
+    overflow-x: auto;
+    user-select: all;
+}
 .library-manage-badge {
     font-size: var(--fs-xs);
     color: var(--accent, #7eb8c4);
@@ -5191,22 +5231,25 @@ html[data-mode="simple"] .nav-links,
 html[data-mode="simple"] #nav-links-panel {
     display: flex !important;
 }
-/* Simple phones: brand + tools on row 1, full-width library on row 2.
-   The 3-column grid still reserved a center slot for the hidden stepper,
-   which jammed Library into a ~5rem chip next to Simple/Account. */
+/* Simple phones: three centered rows — brand+Search, tools, library chip.
+   Do not keep Library inside a flex-end tools cluster: that right-biases
+   the second row and stretches the bordered wrap across the bar. */
 @media (max-width: 900px) {
     html[data-mode="simple"] .navbar,
     html[data-mode="simple"] .app-shell {
         display: flex;
-        flex-wrap: wrap;
+        flex-direction: column;
+        flex-wrap: nowrap;
         align-items: center;
-        gap: var(--space-2) var(--space-3);
+        gap: var(--space-2);
     }
     html[data-mode="simple"] .shell-primary {
         display: flex;
-        flex: 0 1 auto;
+        flex: 0 0 auto;
+        justify-content: center;
         align-items: center;
         gap: var(--space-3);
+        width: 100%;
         min-width: 0;
     }
     html[data-mode="simple"] .nav-links,
@@ -5230,16 +5273,20 @@ html[data-mode="simple"] #nav-links-panel {
     html[data-mode="simple"] .shell-tools,
     html[data-mode="simple"] .nav-stats {
         display: flex;
-        flex: 1 1 auto;
+        flex: 0 0 auto;
         flex-wrap: wrap;
-        justify-content: flex-end;
+        justify-content: center;
         align-items: center;
         gap: var(--space-2) var(--space-3);
+        width: 100%;
         min-width: 0;
         max-width: none;
         border: none;
         background: transparent;
         padding: 0;
+    }
+    html[data-mode="simple"] .nav-library-label {
+        display: none;
     }
     html[data-mode="simple"] .nav-library-wrap {
         flex: 1 1 100%;
@@ -5247,17 +5294,23 @@ html[data-mode="simple"] #nav-links-panel {
         max-width: none;
         min-height: 2.75rem;
         margin: 0;
+        padding: 0;
         display: flex;
         justify-content: center;
-        justify-self: center;
+        border: none;
+        background: transparent;
     }
     html[data-mode="simple"] .nav-library-select {
-        width: min(100%, 18rem);
-        max-width: 18rem;
-        min-width: min(100%, 12rem);
+        width: auto;
+        max-width: min(18rem, 100%);
+        min-width: 8rem;
         min-height: 2.75rem;
-        margin-inline: auto;
+        margin-inline: 0;
+        padding: 0 var(--space-2);
+        border: 1px solid var(--rule);
+        border-radius: var(--radius-md);
         text-align: center;
+        text-align-last: center;
     }
     html[data-mode="simple"] .mode-toggle,
     html[data-mode="simple"] .theme-toggle,
@@ -5329,6 +5382,7 @@ html[data-mode="simple"] details.advanced-details:has(#embedding-model) {
    double-renders both headings (the glitch that stacked “2. Fetch” + “3. Fetch”). */
 .dm-step-simple,
 .dm-sub-simple,
+.dm-btn-simple,
 .prepare-heading-simple,
 .prepare-lead-simple,
 .search-sub-simple,
@@ -5337,6 +5391,7 @@ html[data-mode="simple"] details.advanced-details:has(#embedding-model) {
     display: none !important;
 }
 html[data-mode="simple"] .dm-step-advanced,
+html[data-mode="simple"] .dm-btn-advanced,
 html[data-mode="simple"] .dm-sub-advanced,
 html[data-mode="simple"] .prepare-heading-advanced,
 html[data-mode="simple"] .prepare-lead-advanced,
@@ -5352,6 +5407,9 @@ html[data-mode="simple"] .prepare-heading-simple,
 html[data-mode="simple"] .prepare-lead-simple,
 html[data-mode="simple"] .search-title-simple {
     display: block !important;
+}
+html[data-mode="simple"] .dm-btn-simple {
+    display: inline !important;
 }
 html[data-mode="simple"] .search-kicker-simple {
     display: block !important;
@@ -5670,6 +5728,59 @@ html[data-mode="simple"] body.simple-collecting .search-page-header,
 html[data-mode="simple"] body.simple-collecting #search-workbench {
     display: none !important;
 }
+html[data-mode="simple"] body.simple-buffering #search-collect,
+html[data-mode="simple"] body.simple-buffering .search-page-header,
+html[data-mode="simple"] body.simple-buffering #search-query-top,
+html[data-mode="simple"] body.simple-buffering #search-workbench {
+    display: none !important;
+}
+.search-buffering {
+    max-width: 36rem;
+    margin: var(--space-6) auto;
+    padding: var(--space-5) var(--space-5) var(--space-4);
+}
+.search-buffering h2 {
+    margin: 0 0 var(--space-2);
+}
+.search-buffering .info-text {
+    margin: 0 0 var(--space-4);
+    max-width: 32rem;
+}
+.search-buffering .status-indicator {
+    margin-top: var(--space-3);
+}
+.search-buffering #search-buffering-cancel {
+    margin-top: var(--space-4);
+}
+/* Hide Search chrome until Narrow it down is applied or skipped. */
+html[data-mode="simple"] .search-page-header {
+    display: none !important;
+}
+html[data-mode="simple"] body.simple-screen-ready .search-page-header {
+    display: block !important;
+}
+html[data-mode="simple"] body.simple-screen-pending .search-page-header,
+html[data-mode="simple"] body.simple-screen-pending #search-query-top,
+html[data-mode="simple"] body.simple-screen-pending #search-workbench {
+    display: none !important;
+}
+/* Gate is a page step — no gray wash over an empty page. */
+html[data-mode="simple"] body.simple-screen-pending .simple-screen-modal {
+    position: relative;
+    inset: auto;
+    z-index: auto;
+    display: block;
+    padding: var(--space-6) var(--space-4) var(--space-8);
+    max-height: none;
+}
+html[data-mode="simple"] body.simple-screen-pending .simple-screen-modal .lra-modal-backdrop {
+    display: none;
+}
+html[data-mode="simple"] body.simple-screen-pending .simple-screen-modal-card {
+    margin: 0 auto;
+    max-height: none;
+    box-shadow: none;
+}
 /* Step 5: leftover collect chrome after papers exist (not start-over). */
 html[data-mode="simple"] #search-collect.has-papers #collect-topics-card,
 html[data-mode="simple"] #search-collect.has-papers #collect-sources-card,
@@ -5700,6 +5811,19 @@ html[data-mode="simple"] body:has(#search-workbench) .simple-tools-search-only {
 }
 .simple-screen-modal-card .simple-screen-actions {
     flex-wrap: wrap;
+}
+@media (max-width: 640px) {
+    .simple-screen-modal-card {
+        max-height: min(92dvh, 100%);
+    }
+    .simple-screen-modal-card .simple-screen-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .simple-screen-modal-card .simple-screen-actions .btn {
+        width: 100%;
+        justify-content: center;
+    }
 }
 /* Confirm the research question after prepare — do not assume fetch text is final. */
 .simple-screen-confirm {
@@ -5785,15 +5909,20 @@ html[data-mode="simple"] body:has(#search-workbench) .simple-tools-search-only {
     flex-direction: column;
     gap: var(--space-2);
 }
-.simple-screen-outcome {
-    margin-top: var(--space-3);
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-3);
+/* Outcome + Undo sit in the same flex row as Re-prepare / Start over. */
+.simple-screen-outcome:not([hidden]) {
+    display: contents;
 }
-.simple-screen-outcome .info-text {
-    margin: 0;
+.simple-screen-outcome[hidden],
+.simple-screen-outcome.u-hidden {
+    display: none !important;
+}
+.simple-tools-count.simple-screen-outcome-msg {
+    text-decoration: none;
+    cursor: default;
+}
+html[data-mode="simple"] body:has(#search-workbench) #simple-screen-dock-hint {
+    display: none !important;
 }
 
 /* Quick screen preview (Clean up page) */

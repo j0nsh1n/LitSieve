@@ -8,6 +8,38 @@ and this project aims to follow Semantic Versioning for app version strings
 
 ## [Unreleased]
 
+## [5.0.3] - 2026-08-17
+
+### Added
+- **Helpdesk** at `/admin` (`ADMIN_USERNAMES`). Search one student, unlock,
+  revoke sessions, email a password reset or one-time sign-in link, add a
+  note, and download a per-student support packet. Actions are logged.
+  The console never lists the full roster or sets a password.
+
+### Changed
+- Failed sign-ins lock an account after 8 tries (15 minutes). Helpdesk
+  unlock clears that.
+- **Simple fetch** asks for a **topic** (not the full research question).
+  The question is entered in Narrow it down, then used to search the
+  collection.
+- **Narrow it down** opens as a required step before Search your
+  collection. Apply or skip to continue; closing the dialog does not
+  skip it.
+- **Simple fetch** shows a wait screen (fetch, then prepare) instead of
+  the collect form. Narrow it down opens after that finishes.
+- Simple collect: **Narrow your lens** (required general areas), no quick
+  packs, and **Find articles on your topic** instead of Fetch Articles.
+
+### Fixed
+- Narrow it down no longer sits on a gray empty overlay. It is a page
+  step (same background as the rest of Simple) until you apply or skip.
+- After Narrow it down, Search keeps **Set aside N papers** + **Undo**
+  in the same strip row and type as Re-prepare / Start over.
+- **Guest / demo Search:** sample papers are source `sample`, which is not
+  a Search checkbox. Ranking no longer requires a source chip when none
+  are available. `/guest` starts preparing the sample in the background
+  and Search waits on that job instead of showing an empty collect form.
+
 ## [5.0.1] - 2026-08-14
 
 ### Added

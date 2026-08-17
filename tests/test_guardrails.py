@@ -66,6 +66,8 @@ REQUIRED_ROUTES = {
     "/join",
     "/guest",
     "/account",
+    "/admin",
+    "/api/admin/search",
     "/data-management",
     "/statistics",
     "/search",

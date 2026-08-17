@@ -18,7 +18,7 @@
  {{ scope_search() }}
 </section>
 
-<div class="search-query-top search-work" id="search-query-top">
+<div class="search-query-top search-work" id="search-query-top" hidden>
  <div class="input-method-toggle" id="input-method-toggle">
   <label class="radio-label">
    <input type="radio" name="input_method" value="text" checked> Text Input
@@ -78,6 +78,19 @@
 {% include "partials/collect_ui.html" %}
 </div>
 
+<section class="card search-buffering" id="search-preparing" hidden>
+ <h2 id="search-buffering-title">Fetching papers…</h2>
+ <p class="info-text" id="search-buffering-lead">This can take a minute. Stay on this page —
+  next you will type the question you actually want to answer.</p>
+ <div id="search-buffering-progress">
+  <div class="progress-bar-track"><div class="progress-bar-fill" id="search-buffering-fill"></div></div>
+  <div class="progress-bar-label" id="search-buffering-label"></div>
+  <div id="search-buffering-sources" class="fetch-live-sources" aria-live="polite"></div>
+ </div>
+ <p class="status-indicator" id="search-preparing-status">Starting…</p>
+ <button type="button" class="btn btn-secondary" id="search-buffering-cancel" hidden>Cancel fetch</button>
+</section>
+
 <section class="card empty-state-card" id="search-empty-state" hidden>
  <h2>Nothing to search yet</h2>
  <p class="info-text" id="search-empty-msg">Fetch papers and prepare them for search on Data Management first.</p>
@@ -87,7 +100,7 @@
 </section>
 
 {# Phase 8: sticky query rail + results column (query and hits co-visible). #}
-<div class="search-workbench search-work" id="search-workbench">
+<div class="search-workbench search-work" id="search-workbench" hidden>
  <aside class="search-rail" id="search-rail" aria-label="Search query and options">
   <div class="search-rail-sticky">
    {# Scrollable controls; Save panel is pinned below so it cannot scroll away. #}
@@ -287,7 +300,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/simple_tools.js?v=20260814h"></script>
-<script src="/static/js/data_management.js?v=20260814d"></script>
-<script src="/static/js/search.js?v=20260815a"></script>
+<script src="/static/js/simple_tools.js?v=20260817f"></script>
+<script src="/static/js/data_management.js?v=20260817g"></script>
+<script src="/static/js/search.js?v=20260817c"></script>
 {% endblock %}

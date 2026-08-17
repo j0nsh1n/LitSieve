@@ -38,6 +38,9 @@ KillSignal=SIGINT
 TimeoutStopSec=30
 
 Environment=PYTHONUNBUFFERED=1
+# systemd user PATH is only /usr/local/bin:/usr/bin. Refine auto-starts
+# ollama from ~/.local/bin (official installer). Keep that on PATH.
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin
 SyslogIdentifier=litsieve
 
 # Light hardening

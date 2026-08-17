@@ -48,12 +48,15 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "light up based on those topics.",
             "In Simple mode the source grid is hidden but still auto-checks "
             "recommended databases; Advanced lets you tick sources by hand.",
-            "Type a normal research query (the kind you would type into a library site).",
+            "Simple: type a topic (the subject you want papers about — save your "
+            "actual research question for Narrow it down and Search). Advanced: "
+            "type a normal research query (the kind you would type into a library site).",
             "Set max results per source and choose Replace (start fresh) or Add "
             "(keep what you already have).",
             "Fetch runs sources in parallel in the background; when papers arrive, "
             "prepare-for-search (embeddings) starts automatically so you do not "
-            "need a second click.",
+            "need a second click. Simple shows a wait screen for fetch and prepare, "
+            "then opens Narrow it down.",
             "You get a ✓/✗ report per database when the fetch finishes. Papers "
             "without an abstract are skipped - later steps need text to work with.",
             "In Advanced, the coverage map shows papers per source and which "
@@ -98,8 +101,9 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "whole set so dimensions stay consistent.",
             "If you switch models in Advanced, everything is re-embedded so all "
             "vectors stay compatible with each other.",
-            "Embedding runs in the background with a progress bar - safe to leave "
-            "the page open while a large batch finishes.",
+            "Embedding runs in the background with a progress bar. Simple uses the "
+            "same wait screen as fetch; Advanced can leave Data Management open "
+            "while a large batch finishes.",
             "When available, work runs on your GPU (including ROCm on supported "
             "Linux setups); otherwise it uses the CPU.",
             "Optional Re-prepare on Data Management is only needed if prepare "
@@ -132,9 +136,10 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "if they look weak, prefer Quick screen."
         ),
         "how_it_works": [
-            "Simple path: after prepare, use Narrow it down on Search. Enter your "
-            "research question, pick how many least-related papers to set aside, "
-            "and confirm (or preview first). Undo once if needed.",
+            "Simple path: after prepare, Narrow it down opens before Search. Enter "
+            "your research question, pick how many least-related papers to set aside, "
+            "and confirm (or preview first). Skip if you want everything. Undo once "
+            "from the Search strip if needed.",
             "Advanced path: open Clusters after embeddings exist (prepare runs after "
             "fetch on Data Management).",
             "Density mode (recommended) finds natural topic groups and puts odd "
@@ -149,7 +154,7 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "show on the Clean up screening report for hand-ins.",
         ],
         "tips": [
-            "Students in Simple: Narrow it down on Search, then rank; use Not "
+            "Students in Simple: finish Narrow it down (or skip), then rank; use Not "
             "relevant on stragglers. Advanced: Quick screen on Clean up or Clusters.",
             "Teachers: ask for the Clean up screening report plus a short note on "
             "what was excluded and why.",
@@ -214,9 +219,9 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "This searches only your fetched library, not the whole web."
         ),
         "how_it_works": [
-            "Simple: Text or PICO, then Search. Use More like my starred after "
-            "bookmarking papers. Seed paper and advanced ranking options stay in "
-            "Advanced mode.",
+            "Simple: after Narrow it down, type the same question as Text (or PICO) "
+            "and Search. Use More like my starred after bookmarking papers. Seed "
+            "paper and advanced ranking options stay in Advanced mode.",
             "Optional (Advanced): source filter, Prefer PICO matches, Prefer exact "
             "words (hybrid), seed paper mode.",
             "Hybrid ranking blends embedding similarity with TF-IDF word overlap "
@@ -238,8 +243,8 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "Each result may show a study Type tag (plain-language guess from title "
             "and abstract - often wrong when confidence is low). It is not an evidence "
             "grade.",
-            "Screen with Clean up (Quick screen / duplicates) first so the ranking "
-            "pool is clean.",
+            "Simple: Narrow it down first so the ranking pool is clean. Advanced: "
+            "screen on Clean up (Quick screen / duplicates) before Search.",
             "Advanced: Seed mode is great when a teacher gives one starter paper.",
             "Star a handful of must-read papers, then use More like my starred to "
             "expand the set without rewriting the query.",

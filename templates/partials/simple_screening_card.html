@@ -14,10 +14,10 @@
    Start over
   </button>
   <span class="help-text" id="simple-tools-status"></span>
-  <p class="help-text" id="simple-screen-dock-hint">Set aside papers least related to your question, or skip.</p>
+  <p class="help-text" id="simple-screen-dock-hint" hidden>Set aside papers least related to your question, or skip.</p>
   <div id="simple-screen-outcome" class="simple-screen-outcome u-hidden" hidden>
-   <p class="info-text" id="simple-screen-outcome-msg"></p>
-   <button type="button" class="btn btn-secondary btn-sm" id="simple-screen-undo-btn" hidden>Undo</button>
+   <span class="simple-tools-count simple-screen-outcome-msg" id="simple-screen-outcome-msg"></span>
+   <button type="button" class="btn btn-secondary" id="simple-screen-undo-btn" hidden>Undo</button>
   </div>
   <div class="u-mt-md" id="simple-screen-goto" hidden>
    <a href="/search" class="btn btn-primary" id="simple-screen-goto-link">Go to Search →</a>
@@ -29,16 +29,17 @@
   <div class="lra-modal-card card simple-screen-modal-card" role="dialog" aria-modal="true"
    aria-labelledby="simple-screen-modal-title" data-site-modal-card>
    <h2 id="simple-screen-modal-title" class="lra-modal-title">Narrow it down</h2>
-   <p class="info-text">Set aside papers that are least related to your question. Low, Medium, and
-    High show how many papers would go before anything is excluded.</p>
+   <p class="info-text">Before you search, write the <strong>question you actually want to answer</strong>.
+    We can set aside papers that do not match it. Skip if you want to search everything you fetched.</p>
 
    <div class="simple-screen-confirm" id="simple-screen-confirm">
-    <p class="simple-screen-confirm-title">Confirm your research question</p>
-    <p class="help-text">We filled this from your last fetch. Check it, edit if needed, then choose how much to set aside.</p>
+    <p class="simple-screen-confirm-title">Your research question</p>
+    <p class="help-text">This is not the topic you fetched. Type the question you will use to search
+     the collection next.</p>
     <div class="form-group">
      <label for="simple-screen-query">Your question</label>
      <input type="text" id="simple-screen-query" name="simple-screen-query"
-      placeholder="e.g., climate change effects on ecosystems" autocomplete="off">
+      placeholder="e.g., How do later school start times affect adolescent sleep?" autocomplete="off">
     </div>
    </div>
 

@@ -8,6 +8,8 @@ import pytest
 # Provide a deterministic key so auth.py imports cleanly and tokens can be created.
 # Not a production secret — process-local only for the test suite.
 os.environ.setdefault("SECRET_KEY", "pytest-only-not-a-secret-32b-min!!")
+# Guest /guest starts a background embed in production; keep the suite off that path.
+os.environ.setdefault("GUEST_AUTO_PREPARE", "0")
 
 # Fixture credentials for HTTP / auth tests. Meet min length; not real secrets.
 # Import these instead of scattering password-looking string literals in tests.
