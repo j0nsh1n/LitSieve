@@ -78,6 +78,44 @@ def test_guest_start_loads_sample_and_blocks_fetch(tmp_path, monkeypatch):
     assert ok.status_code == 200, ok.text
 
 
+def test_search_js_searches_sample_without_source_checkboxes():
+    """Demo papers are source=sample, which is not a Search checkbox."""
+    js = _read("static", "js", "search.js")
+    assert "function enabledSearchSourceBoxes" in js
+    assert "function requireSelectedSources" in js
+    do = js[js.index("async function doSearch") : js.index("async function doStarredSearch")]
+    assert "requireSelectedSources" in do
+    assert "Please select at least one source." not in do
+    starred = js[js.index("async function doStarredSearch") :]
+    starred = starred[: starred.index("function clientSort")]
+    assert "requireSelectedSources" in starred
+
+
+def test_guest_start_kicks_off_prepare_when_enabled(tmp_path, monkeypatch):
+    from app import core
+    from app.storage.user_db import UserDatabase
+
+    db = UserDatabase(str(tmp_path / "users.db"))
+    monkeypatch.setattr(core, "user_db", db)
+    monkeypatch.setenv("USER_DATA_DIR", str(tmp_path / "user_data"))
+    monkeypatch.setenv("GUEST_AUTO_PREPARE", "1")
+    called = {}
+
+    def fake_start(uid, task, fn, /, **kwargs):
+        called["uid"] = uid
+        called["task"] = task
+        called["fn"] = getattr(fn, "__name__", str(fn))
+        return True
+
+    monkeypatch.setattr(core, "start_user_job", fake_start)
+    client = TestClient(app)
+    r = client.get("/guest", follow_redirects=False)
+    assert r.status_code in (302, 303), r.text
+    assert called.get("task") == "embed"
+    assert called.get("uid")
+    assert called.get("fn") == "_run_create_embeddings"
+
+
 def test_guest_end_demo_is_guarded_and_tappable():
     """End demo is a secondary 44px control, not an inline link next to Register."""
     base = _read("templates", "base.html")

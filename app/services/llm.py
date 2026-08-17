@@ -461,6 +461,7 @@ def ensure_builtin_service() -> Tuple[bool, str]:
                 )
             ok, msg = start_ollama()
             if not ok:
+                logger.warning("Built-in study aid failed to start: %s", msg)
                 friendly = msg
                 low = msg.lower()
                 if "not found" in low or "path" in low:
@@ -588,14 +589,51 @@ def ollama_env_for_serve() -> Dict[str, str]:
     return env
 
 
+def _ollama_binary() -> Optional[str]:
+    """Find the ollama executable even when systemd PATH is stripped.
+
+    User-unit PATH is often only /usr/local/bin:/usr/bin. Interactive shells
+    also have ~/.local/bin, which is where the official installer puts the
+    wrapper. Without this, Refine's ephemeral start 503s on the public host.
+    """
+    found = shutil.which("ollama")
+    if found:
+        return found
+    home = Path.home()
+    candidates = [
+        home / ".local" / "bin" / "ollama",
+        Path("/usr/local/bin/ollama"),
+        Path("/usr/bin/ollama"),
+    ]
+    models_dir = (
+        _env("OLLAMA_MODELS")
+        or str(load_ai_settings().get("ollama_models_dir") or "")
+    ).strip()
+    if models_dir:
+        candidates.append(
+            Path(models_dir).expanduser() / "ollama-dist" / "bin" / "ollama"
+        )
+    for path in candidates:
+        try:
+            if path.is_file() and os.access(path, os.X_OK):
+                return str(path)
+        except OSError:
+            continue
+    return None
+
+
 def start_ollama() -> Tuple[bool, str]:
     """Launch local Ollama server detached. Returns (ok, message)."""
     if not ollama_control_allowed():
         return False, "Ollama control is disabled (AI_ALLOW_OLLAMA_CONTROL=false)."
     if ollama_running(force=True):
         return True, "Ollama is already running."
-    binary = shutil.which("ollama")
+    binary = _ollama_binary()
     if not binary:
+        logger.warning(
+            "Refine auto-start: ollama not on PATH=%s (also checked ~/.local/bin)",
+            os.environ.get("PATH", ""),
+        )
         return False, "Ollama not found on PATH. Install from https://ollama.com/download"
     env = ollama_env_for_serve()
     try:

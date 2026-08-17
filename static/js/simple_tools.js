@@ -15,6 +15,7 @@ function _isPipelineBusy() {
 function wantsSimpleCollectView(stats) {
  if (typeof isSimpleMode !== 'function' || !isSimpleMode()) return false;
  if (_collectQueryOn()) return true;
+ if (window._preparingCorpus) return false;
  const ready = Number(stats && stats.articles_with_embeddings) || 0;
  return ready <= 0;
 }
@@ -44,6 +45,7 @@ function syncSimpleOnePageState(stats) {
  if (!collect) return;
  const simple = typeof isSimpleMode === 'function' && isSimpleMode();
  const ready = Number(stats && stats.articles_with_embeddings) || 0;
+ _lastReadyEmbeddings = ready;
  const total = Number(stats && stats.total_articles) || _lastTotalArticles || 0;
  const showCollect = simple && wantsSimpleCollectView(stats);
  const forceCollect = simple && _collectQueryOn();
@@ -61,11 +63,13 @@ function syncSimpleOnePageState(stats) {
  }
  const work = document.getElementById('search-workbench');
  if (work) {
-  work.hidden = !ready || showCollect;
+  const gated = typeof isSimpleScreenGatePending === 'function' && isSimpleScreenGatePending();
+  work.hidden = !ready || showCollect || gated;
  }
  if (showCollect) {
   const card = document.getElementById('simple-screening-card');
   if (card) card.hidden = true;
+  if (typeof setSimpleScreenGatePending === 'function') setSimpleScreenGatePending(false);
  }
  if (typeof updateSearchWorkVisibility === 'function' && !showCollect) {
   updateSearchWorkVisibility(stats || { articles_with_embeddings: ready });
@@ -73,6 +77,65 @@ function syncSimpleOnePageState(stats) {
  if (typeof updateSimpleToolsStrip === 'function') {
   updateSimpleToolsStrip(stats);
  }
+}
+
+function isSimpleBuffering() {
+ return !!(window._preparingCorpus || (document.body && document.body.classList.contains('simple-buffering')));
+}
+
+function showSimpleBuffering(phase) {
+ if (typeof isSimpleMode === 'function' && !isSimpleMode()) return;
+ const el = document.getElementById('search-preparing');
+ if (!el) return;
+ window._preparingCorpus = true;
+ window._simpleBufferingPhase = phase || 'fetch';
+ el.hidden = false;
+ if (document.body) {
+  document.body.classList.add('simple-buffering');
+  document.body.classList.remove('simple-collecting');
+ }
+ const title = document.getElementById('search-buffering-title');
+ const lead = document.getElementById('search-buffering-lead');
+ const status = document.getElementById('search-preparing-status');
+ const cancel = document.getElementById('search-buffering-cancel');
+ const wrap = document.getElementById('search-buffering-progress');
+ if (wrap) wrap.style.display = 'block';
+ if (phase === 'prepare') {
+  if (title) title.textContent = 'Preparing papers…';
+  if (lead) {
+   lead.textContent = 'Making them searchable. Stay on this page — next you will type your real question.';
+  }
+  if (status) status.textContent = 'Preparing…';
+  if (cancel) cancel.hidden = true;
+ } else {
+  if (title) title.textContent = 'Fetching papers…';
+  if (lead) {
+   lead.textContent = 'Looking through the sources you picked. Stay on this page.';
+  }
+  if (status) status.textContent = 'Starting fetch…';
+  if (cancel) cancel.hidden = false;
+ }
+ const collect = document.getElementById('search-collect');
+ if (collect) collect.hidden = true;
+ const card = document.getElementById('simple-screening-card');
+ if (card) {
+  const modal = document.getElementById('simple-screen-modal');
+  if (!modal || modal.hidden) card.hidden = true;
+ }
+}
+
+function hideSimpleBuffering() {
+ window._preparingCorpus = false;
+ window._simpleBufferingPhase = '';
+ const el = document.getElementById('search-preparing');
+ if (el) el.hidden = true;
+ if (document.body) document.body.classList.remove('simple-buffering');
+ const cancel = document.getElementById('search-buffering-cancel');
+ if (cancel) cancel.hidden = true;
+ const wrap = document.getElementById('search-buffering-progress');
+ if (wrap) wrap.style.display = '';
+ const live = document.getElementById('search-buffering-sources');
+ if (live) live.innerHTML = '';
 }
 
 function setNextStepVisible(visible) {
@@ -112,6 +175,73 @@ let _simpleScreenSkippedSession = false;
 // Last Narrow-it-down exclusion set (per library) so Undo survives a soft reload.
 // Corpus API is the source of truth after restart; this is a fast path.
 const SIMPLE_SCREEN_UNDO_KEY = 'lra_simple_screen_undo_v1';
+
+// Last known prepared-paper count (for revealing Search after Narrow it down).
+var _lastReadyEmbeddings = (typeof _lastReadyEmbeddings === 'number') ? _lastReadyEmbeddings : 0;
+// null = not computed yet. On Simple Search, treat unknown as pending so the
+// workbench cannot flash before Narrow it down opens.
+var _simpleScreenPending = (typeof _simpleScreenPending === 'undefined') ? null : _simpleScreenPending;
+
+function isSimpleScreenGatePending() {
+ if (typeof isSimpleMode !== 'function' || !isSimpleMode()) return false;
+ if (!_onSearchPage()) return false;
+ if (typeof _collectQueryOn === 'function' && _collectQueryOn()) return false;
+ if (_simpleScreenPending === null) return true;
+ return !!_simpleScreenPending;
+}
+
+function setSimpleScreenGatePending(pending) {
+ _simpleScreenPending = pending === null ? null : !!pending;
+ applySimpleScreenGateUi();
+}
+
+function applySimpleScreenGateUi() {
+ const gated = isSimpleScreenGatePending();
+ const collecting = typeof wantsSimpleCollectView === 'function'
+  && wantsSimpleCollectView({ articles_with_embeddings: _lastReadyEmbeddings });
+ const readySearch = !gated && !collecting && _lastReadyEmbeddings > 0;
+ if (document.body) {
+  document.body.classList.toggle('simple-screen-pending', gated);
+  document.body.classList.toggle('simple-screen-ready', readySearch);
+ }
+ const dock = document.getElementById('simple-screen-dock');
+ if (dock) dock.hidden = gated;
+ const closeBtn = document.getElementById('simple-screen-modal-close');
+ if (closeBtn) closeBtn.hidden = gated;
+ if (typeof updateSearchWorkVisibility === 'function') {
+  updateSearchWorkVisibility({ articles_with_embeddings: _lastReadyEmbeddings });
+ }
+ const work = document.getElementById('search-workbench');
+ if (work) work.hidden = !readySearch;
+}
+
+function copyScreenQuestionToSearch() {
+ const el = document.getElementById('simple-screen-query');
+ const q = el && el.value.trim();
+ const box = document.getElementById('query-text');
+ if (q && box && !String(box.value || '').trim()) box.value = q;
+}
+
+/** Restore question + levels + actions (needed after skip hid them). */
+function showSimpleScreenPendingUi() {
+ const decision = document.getElementById('simple-screen-levels');
+ const actions = document.getElementById('simple-screen-actions');
+ const preview = document.getElementById('simple-screen-preview');
+ const outcome = document.getElementById('simple-screen-outcome');
+ const undoBtn = document.getElementById('simple-screen-undo-btn');
+ if (decision) decision.hidden = false;
+ if (actions) actions.hidden = false;
+ setSimpleScreenConfirmVisible(true);
+ if (preview) {
+  preview.hidden = true;
+  preview.classList.add('u-hidden');
+ }
+ if (outcome) {
+  outcome.hidden = true;
+  outcome.classList.add('u-hidden');
+ }
+ if (undoBtn) undoBtn.hidden = true;
+}
 
 // Skip is remembered per library, not just per page view.
 //
@@ -273,18 +403,34 @@ function simpleScreenQuery() {
 function prefillSimpleScreenQuery() {
  const el = document.getElementById('simple-screen-query');
  if (!el) return;
- // Always surface a candidate so the confirm box is never empty when we know one,
- // but do not overwrite if the student already edited the field.
+ // Fetch is a topic, not the research question — do not copy it in.
+ // Keep whatever they already typed (or what re-prepare verified).
  if (el.value.trim()) return;
- try {
-  const prefs = JSON.parse(localStorage.getItem(FETCH_PREFS_KEY) || 'null');
-  if (prefs && prefs.query) {
-   el.value = prefs.query;
-   return;
+}
+
+function setSimpleScreenStripOutcome(msg, opts) {
+ const outcome = document.getElementById('simple-screen-outcome');
+ const outcomeMsg = document.getElementById('simple-screen-outcome-msg');
+ const undoBtn = document.getElementById('simple-screen-undo-btn');
+ const hint = document.getElementById('simple-screen-dock-hint');
+ if (hint) hint.hidden = true;
+ if (!msg) {
+  if (outcome) {
+   outcome.hidden = true;
+   outcome.classList.add('u-hidden');
   }
- } catch (e) { /* ignore */ }
- const fetchQ = document.getElementById('fetch-query');
- if (fetchQ && fetchQ.value.trim()) el.value = fetchQ.value.trim();
+  if (undoBtn) undoBtn.hidden = true;
+  return;
+ }
+ if (outcome) {
+  outcome.hidden = false;
+  outcome.classList.remove('u-hidden');
+ }
+ if (outcomeMsg) outcomeMsg.textContent = msg;
+ if (undoBtn) {
+  undoBtn.hidden = !(opts && opts.undo);
+  undoBtn.textContent = 'Undo';
+ }
 }
 
 function setSimpleScreenGotoVisible(visible) {
@@ -302,7 +448,10 @@ function isSimpleScreenModalOpen() {
  return !!(modal && !modal.hidden);
 }
 
-function closeSimpleScreenModal() {
+function closeSimpleScreenModal(opts) {
+ const force = !!(opts && opts.force);
+ // Pending gate: only Apply or Skip may close the popup.
+ if (isSimpleScreenGatePending() && !force) return;
  const modal = document.getElementById('simple-screen-modal');
  if (!modal || modal.hidden) return;
  modal.hidden = true;
@@ -334,11 +483,20 @@ function openSimpleScreenModal() {
  if (!modal) return;
  if (isSimpleScreenSkipped()) {
   setSimpleScreenSkipped(false);
+  setSimpleScreenGatePending(true);
+ }
+ if (isSimpleScreenGatePending()) {
+  showSimpleScreenPendingUi();
+ }
+ if (isSimpleScreenModalOpen()) {
+  applySimpleScreenGateUi();
+  return;
  }
  _simpleScreenModalOpener = document.activeElement instanceof HTMLElement
   ? document.activeElement
   : document.getElementById('simple-screen-open-btn');
- if (!document.body.classList.contains('lra-modal-open')) {
+ // Required gate is a page step (no Search behind it) — do not dim/lock the page.
+ if (!isSimpleScreenGatePending() && !document.body.classList.contains('lra-modal-open')) {
   const scrollY = window.scrollY || window.pageYOffset || 0;
   document.body.dataset.lraScrollY = String(scrollY);
   document.body.style.top = `-${scrollY}px`;
@@ -421,12 +579,14 @@ async function refreshSimpleScreeningCard() {
    fillSimpleRailStats(stats, report);
   }
   const ready = Number(stats.articles_with_embeddings) || 0;
+  _lastReadyEmbeddings = ready;
   const lowRel = Number(
    report && report.excluded && report.excluded.low_relevance
   ) || 0;
   const total = Number(stats.total_articles) || 0;
 
   if (ready <= 0) {
+   setSimpleScreenGatePending(false);
    if (total > 0 && _onSearchPage()) {
     card.hidden = false;
     wireSimpleToolsStrip();
@@ -466,24 +626,16 @@ async function refreshSimpleScreeningCard() {
     preview.hidden = true;
     preview.classList.add('u-hidden');
    }
-   if (outcome) {
-    outcome.hidden = false;
-    outcome.classList.remove('u-hidden');
-   }
-   if (outcomeMsg) {
-    outcomeMsg.textContent =
-     `Set aside ${lowRel} paper${lowRel === 1 ? '' : 's'} as less related to your question.`;
-   }
-   // Always offer a small Undo when low_relevance exclusions exist (corpus-backed).
-   if (undoBtn) {
-    undoBtn.hidden = false;
-    undoBtn.textContent = 'Undo';
-   }
+   setSimpleScreenStripOutcome(
+    `Set aside ${lowRel} paper${lowRel === 1 ? '' : 's'}`,
+    { undo: true }
+   );
    if (openBtn) openBtn.hidden = true;
    if (dockHint) dockHint.hidden = true;
    // Warm the undo cache in the background; the button stays visible either way.
    fetchLowRelevanceUndoItems();
    setSimpleScreenGotoVisible(true);
+   setSimpleScreenGatePending(false);
    return;
   }
 
@@ -491,28 +643,16 @@ async function refreshSimpleScreeningCard() {
    if (decision) decision.hidden = true;
    if (actions) actions.hidden = true;
    setSimpleScreenConfirmVisible(false);
-   if (outcome) {
-    outcome.hidden = false;
-    outcome.classList.remove('u-hidden');
-   }
-   if (outcomeMsg) {
-    outcomeMsg.textContent = 'Screening skipped — you can still search everything you fetched.';
-   }
-   if (undoBtn) undoBtn.hidden = true;
+   setSimpleScreenStripOutcome('');
    if (openBtn) openBtn.hidden = false;
    if (dockHint) dockHint.hidden = true;
    setSimpleScreenGotoVisible(true);
+   setSimpleScreenGatePending(false);
    return;
   }
 
   // Pending: confirm question + levels + actions; fetch counts once.
-  if (decision) decision.hidden = false;
-  if (actions) actions.hidden = false;
-  setSimpleScreenConfirmVisible(true);
-  if (outcome) {
-   outcome.hidden = true;
-   outcome.classList.add('u-hidden');
-  }
+  showSimpleScreenPendingUi();
   if (undoBtn) undoBtn.hidden = true;
   if (openBtn) openBtn.hidden = false;
   if (dockHint) dockHint.hidden = false;
@@ -523,10 +663,13 @@ async function refreshSimpleScreeningCard() {
    totalEl.textContent = `${ready} paper${ready === 1 ? '' : 's'} ready to rank`
     + (total > ready ? ` (${total} in collection).` : '.');
   }
+  setSimpleScreenGatePending(true);
+  if (_onSearchPage()) openSimpleScreenModal();
   await loadSimpleScreenCounts();
  } catch (e) {
   console.warn('refreshSimpleScreeningCard failed:', e);
   card.hidden = true;
+  setSimpleScreenGatePending(false);
  }
 }
 
@@ -742,21 +885,10 @@ async function doSimpleScreenApply() {
   if (decision) decision.hidden = true;
   if (actions) actions.hidden = true;
   setSimpleScreenConfirmVisible(false);
-  const outcome = document.getElementById('simple-screen-outcome');
-  const outcomeMsg = document.getElementById('simple-screen-outcome-msg');
-  const undoBtn = document.getElementById('simple-screen-undo-btn');
-  if (outcome) {
-   outcome.hidden = false;
-   outcome.classList.remove('u-hidden');
-  }
-  if (outcomeMsg) {
-   outcomeMsg.textContent = `Set aside ${n} paper${n === 1 ? '' : 's'}.`;
-  }
-  // Always offer a small Undo after Narrow it down completes (this tab session).
-  if (undoBtn) {
-   undoBtn.hidden = false;
-   undoBtn.textContent = 'Undo';
-  }
+  setSimpleScreenStripOutcome(
+   `Set aside ${n} paper${n === 1 ? '' : 's'}`,
+   { undo: true }
+  );
   const preview = document.getElementById('simple-screen-preview');
   if (preview) {
    preview.hidden = true;
@@ -766,7 +898,9 @@ async function doSimpleScreenApply() {
   showNotification(`Set aside ${n} paper(s).`, 'success');
   setSimpleScreenGotoVisible(true);
   updateNavStats();
-  closeSimpleScreenModal();
+  copyScreenQuestionToSearch();
+  setSimpleScreenGatePending(false);
+  closeSimpleScreenModal({ force: true });
   const openBtn = document.getElementById('simple-screen-open-btn');
   if (openBtn) openBtn.hidden = true;
  } catch (e) {
@@ -790,20 +924,12 @@ function doSimpleScreenSkip() {
   preview.hidden = true;
   preview.classList.add('u-hidden');
  }
- const outcome = document.getElementById('simple-screen-outcome');
- const outcomeMsg = document.getElementById('simple-screen-outcome-msg');
- const undoBtn = document.getElementById('simple-screen-undo-btn');
- if (outcome) {
-  outcome.hidden = false;
-  outcome.classList.remove('u-hidden');
- }
- if (outcomeMsg) {
-  outcomeMsg.textContent = 'Screening skipped — you can still search everything you fetched.';
- }
- if (undoBtn) undoBtn.hidden = true;
+ setSimpleScreenStripOutcome('');
  setStatus('simple-screen-status', '', 'info');
  setSimpleScreenGotoVisible(true);
- closeSimpleScreenModal();
+ copyScreenQuestionToSearch();
+ setSimpleScreenGatePending(false);
+ closeSimpleScreenModal({ force: true });
  const openBtn = document.getElementById('simple-screen-open-btn');
  if (openBtn) openBtn.hidden = false;
  const hint = document.getElementById('simple-screen-dock-hint');
@@ -1145,7 +1271,8 @@ async function simpleToolsStartOver() {
    title: 'Start over?',
    message:
     'Remove papers that are not starred and have no note. '
-    + 'Starred papers and papers with notes stay. You can search again after this.',
+    + 'Starred papers and papers with notes stay, still ready to search '
+    + 'if they were already prepared.',
    confirmLabel: 'Start over',
    cancelLabel: 'Cancel',
    danger: true,
@@ -1162,7 +1289,6 @@ async function simpleToolsStartOver() {
   const deleted = Number(result && result.deleted) || 0;
   _lastTotalArticles = kept;
   if (typeof updateNavStats === 'function') updateNavStats();
-  await resetSearchAndNarrowingForStartOver();
   if (status) {
    status.textContent = deleted
     ? `Kept ${kept} annotated paper${kept === 1 ? '' : 's'}; removed ${deleted}.`
@@ -1178,37 +1304,48 @@ async function simpleToolsStartOver() {
      : 'Collection cleared for a new search.'),
    'success'
   );
+  let stats = { total_articles: kept, articles_with_embeddings: 0 };
+  try {
+   stats = await apiCall('/api/statistics');
+   _lastTotalArticles = Number(stats.total_articles) || kept;
+  } catch (e) { /* use counts from the start-over response */ }
+  const ready = Number(stats.articles_with_embeddings) || 0;
+  // Kept papers that are already prepared stay on Search. Do not force
+  // ?collect=1 or undo Narrow it down — those steps already happened.
+  if (kept > 0 && ready > 0) {
+   if (typeof clearSearchWorkspace === 'function') clearSearchWorkspace();
+  } else {
+   await resetSearchAndNarrowingForStartOver();
+  }
   if (_onSearchPage()) {
-   setCollectQueryOnUrl();
-   if (typeof _simpleFetchUnlocked !== 'undefined') {
-    _simpleFetchUnlocked = true;
-    _simpleFetchModePicked = true;
+   if (kept <= 0 || ready <= 0) {
+    setCollectQueryOnUrl();
+    if (typeof _simpleFetchUnlocked !== 'undefined') {
+     _simpleFetchUnlocked = true;
+     _simpleFetchModePicked = true;
+    }
    }
    if (typeof updateSimpleFetchLock === 'function') updateSimpleFetchLock();
-   try {
-    const stats = await apiCall('/api/statistics');
-    _lastTotalArticles = Number(stats.total_articles) || kept;
-    syncSimpleOnePageState(stats);
-    if (typeof updateSimpleToolsStrip === 'function') updateSimpleToolsStrip(stats);
-    if (typeof updatePrepareSectionVisibility === 'function') {
-     updatePrepareSectionVisibility(_lastTotalArticles, {
-      readyArticles: Number(stats.articles_with_embeddings) || 0,
-     });
-    }
-   } catch (e) {
-    syncSimpleOnePageState({
-     total_articles: kept,
-     articles_with_embeddings: 0,
+   syncSimpleOnePageState(stats);
+   if (typeof updateSimpleToolsStrip === 'function') updateSimpleToolsStrip(stats);
+   if (typeof updatePrepareSectionVisibility === 'function') {
+    updatePrepareSectionVisibility(_lastTotalArticles, {
+     readyArticles: ready,
     });
    }
-   const q = document.getElementById('fetch-query');
-   if (q) {
-    q.focus();
-    if (typeof q.select === 'function') q.select();
+   if (kept > 0 && ready > 0) {
+    const q = document.getElementById('query-text');
+    if (q && typeof q.focus === 'function') q.focus();
+   } else {
+    const q = document.getElementById('fetch-query');
+    if (q) {
+     q.focus();
+     if (typeof q.select === 'function') q.select();
+    }
    }
    return;
   }
-  window.location.href = '/search?collect=1';
+  window.location.href = (kept > 0 && ready > 0) ? '/search' : '/search?collect=1';
  } catch (e) {
   if (status) status.textContent = '';
   showNotification(`Could not start over: ${e.message}`, 'error');

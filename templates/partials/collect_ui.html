@@ -2,8 +2,9 @@
    Data Management (Advanced) and Search (Simple empty / start-over). #}
 <section class="page-header collect-header-simple">
  <h1>Get papers</h1>
- <p class="subtitle">Pick topics and fetch papers. Preparing for search starts
-  automatically after a successful fetch.</p>
+ <p class="subtitle">Narrow your lens to the general areas that fit, then find
+  papers by <strong>topic</strong>. Save your actual research question for later,
+  when you search the collection.</p>
  {% from "macros/disclaimers.html" import scope_fetch %}
  {{ scope_fetch() }}
 </section>
@@ -15,9 +16,9 @@
  </div>
  <p class="info-text">Three quick steps. Preparing papers for search runs itself after the fetch.</p>
  <ol class="getting-started-list">
-  <li data-step="topics"><span class="gs-check" aria-hidden="true">○</span> Pick one or more topics below</li>
-  <li data-step="query"><span class="gs-check" aria-hidden="true">○</span> Type a research question in Fetch</li>
-  <li data-step="fetch"><span class="gs-check" aria-hidden="true">○</span> Press <strong>Fetch Articles</strong> (prepare for search runs next automatically)</li>
+  <li data-step="topics"><span class="gs-check" aria-hidden="true">○</span> Narrow your lens — pick at least one general area</li>
+  <li data-step="query"><span class="gs-check" aria-hidden="true">○</span> Type a <strong>topic</strong> (save your real question for Search later)</li>
+  <li data-step="fetch"><span class="gs-check" aria-hidden="true">○</span> Press <strong>Find articles on your topic</strong></li>
  </ol>
  <p class="info-text u-mt-lg">
   Prefer a dry run with no APIs?
@@ -26,14 +27,15 @@
  </p>
 </section>
 
-<!-- Step 1: Topics -->
+<!-- Step 1: Topics / general areas -->
 <section class="card" id="collect-topics-card">
- <h2>1. Select Topics</h2>
- <p class="info-text">Choose the academic areas you care about - we use them to recommend sources.</p>
+ <h2 class="dm-step-heading dm-step-advanced">1. Select Topics</h2>
+ <h2 class="dm-step-heading dm-step-simple">1. Narrow your lens</h2>
+ <p class="info-text dm-sub-advanced">Choose the academic areas you care about - we use them to recommend sources.</p>
+ <p class="info-text dm-sub-simple">Required. Pick the general areas your topic belongs in. That chooses
+  which journals and databases we search, so we do not pull papers from fields
+  that do not fit your topic.</p>
  <div class="topic-grid" id="topic-grid"></div>
- <h3 class="topic-packs-heading">Quick packs for common topics</h3>
- <p class="info-text">One click sets topics and checks common free sources for that area. You can still adjust checkboxes.</p>
- <div class="topic-pack-grid" id="topic-pack-grid" role="group" aria-label="Quick packs for common topics"></div>
 </section>
 
 <!-- Step 2: Sources -->
@@ -46,10 +48,14 @@
 <!-- Fetch: Advanced step 3 (sources is 2); Simple step 2 (sources hidden). -->
 <section class="card" id="collect-fetch-card">
  <h2 class="dm-step-heading dm-step-advanced">3. Fetch Articles</h2>
- <h2 class="dm-step-heading dm-step-simple">2. Fetch Articles</h2>
- <p class="info-text" id="fetch-lead">Searches every selected source at once, saves the papers to your private
- collection, then <strong>automatically prepares them for search</strong> (you can leave this page
- open while progress runs).</p>
+ <h2 class="dm-step-heading dm-step-simple">2. Find articles on your topic</h2>
+ <div id="fetch-lead">
+  <p class="info-text dm-sub-advanced">Searches every selected source at once and saves the papers
+   to your private collection. Preparing for search starts automatically after a successful fetch.</p>
+  <p class="info-text dm-sub-simple">Type the <strong>topic</strong> you want papers about — a subject,
+   not your full research question. Save the actual question for the next step, when you search
+   through the papers you collect. Preparing for search starts automatically after a successful fetch.</p>
+ </div>
  {% include "partials/guest_fetch_note.html" %}
  <div id="simple-fetch-locked" class="simple-fetch-locked" hidden>
   <p class="info-text" id="simple-fetch-locked-msg">This collection already has papers. Fetching again
@@ -60,8 +66,10 @@
  <form id="fetch-form" action="/data-management" method="get">
  <div class="form-row">
  <div class="form-group flex-2">
- <label for="fetch-query">Search Query</label>
- <input type="text" id="fetch-query" name="fetch-query" placeholder="e.g., climate change effects on ecosystems" autocomplete="off">
+ <label for="fetch-query" class="dm-step-advanced">Search Query</label>
+ <label for="fetch-query" class="dm-step-simple">Topic</label>
+ <input type="text" id="fetch-query" name="fetch-query"
+  placeholder="e.g., school start times and adolescent sleep" autocomplete="off">
  </div>
  <div class="form-group">
  <label for="fetch-max">Max Results per Source</label>
@@ -91,7 +99,10 @@
   </div>
  </details>
  <div class="form-row fetch-actions">
- <button type="submit" id="fetch-btn" class="btn btn-primary">Fetch Articles</button>
+ <button type="submit" id="fetch-btn" class="btn btn-primary">
+  <span class="dm-btn-advanced">Fetch Articles</span>
+  <span class="dm-btn-simple">Find articles on your topic</span>
+ </button>
  <button type="button" id="fetch-cancel-btn" class="btn btn-secondary" hidden>Cancel fetch</button>
  </div>
  </form>

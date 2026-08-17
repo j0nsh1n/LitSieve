@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Admin - LitSieve{% endblock %}
+{% block content %}
+<section class="page-header">
+ <h1>Admin</h1>
+ <p class="subtitle">Your operator console: host snapshot, look up an account, unblock it, leave a note.</p>
+</section>
+
+<div class="page-help-toolbar">
+ <button type="button" class="btn btn-secondary btn-sm page-help-toggle" id="page-help-toggle"
+  aria-expanded="false" aria-controls="page-help">Help</button>
+</div>
+<aside class="page-help card" id="page-help" hidden>
+ <h2 class="page-help-title">About this page</h2>
+ <div class="page-help-body">
+  <p class="info-text">The snapshot is counts only (no full roster). Search by username, email, or account id. Queues are short lists: locked, unverified, over quota, recent failed sign-ins.</p>
+  <p class="info-text">Password reset and one-time sign-in links are <strong>emailed</strong> to a verified address. This console never shows or sets a password, and it does not sign in as them.</p>
+  <p class="info-text">Destructive actions ask you to type the username and a reason. Every action is logged on that account’s timeline.</p>
+ </div>
+</aside>
+
+<section class="card" id="admin-overview">
+ <h2>This host</h2>
+ <dl class="admin-stats" id="admin-overview-stats">
+  <div><dt>Accounts</dt><dd id="ov-accounts">…</dd></div>
+  <div><dt>Guests</dt><dd id="ov-guests">…</dd></div>
+  <div><dt>Locked</dt><dd id="ov-locked">…</dd></div>
+  <div><dt>Unverified</dt><dd id="ov-unverified">…</dd></div>
+  <div><dt>Email</dt><dd id="ov-smtp">…</dd></div>
+  <div><dt>Refine AI</dt><dd id="ov-ai">…</dd></div>
+  <div><dt>Quota</dt><dd id="ov-quota">…</dd></div>
+ </dl>
+ <p class="help-text" id="admin-overview-status"></p>
+</section>
+
+<section class="card">
+ <h2>Accounts</h2>
+ <form id="helpdesk-search-form" class="library-create-row">
+  <div class="form-group flex-2">
+   <label for="helpdesk-q">Username, email, or account id</label>
+   <input type="search" id="helpdesk-q" autocomplete="off" placeholder="exact match first">
+  </div>
+  <button type="submit" class="btn btn-primary" id="helpdesk-search-btn">Search</button>
+ </form>
+ <p class="help-text">Queues:</p>
+ <div class="library-create-row">
+  <button type="button" class="btn btn-secondary btn-sm" data-queue="locked">Locked out</button>
+  <button type="button" class="btn btn-secondary btn-sm" data-queue="unverified">Unverified email</button>
+  <button type="button" class="btn btn-secondary btn-sm" data-queue="quota">Over quota</button>
+  <button type="button" class="btn btn-secondary btn-sm" data-queue="errors">Sign-in errors (1h)</button>
+ </div>
+ <ul class="library-manage-list" id="helpdesk-results">
+  <li class="info-text">Search to open one account.</li>
+ </ul>
+ <div id="helpdesk-list-status" class="status-indicator"></div>
+</section>
+
+<section class="card" id="helpdesk-detail" hidden>
+ <h2 id="helpdesk-title">Account</h2>
+ <p class="info-text" id="helpdesk-identity"></p>
+ <dl class="admin-stats" id="helpdesk-access"></dl>
+ <h3 class="ai-settings-subhead">Activity</h3>
+ <ul class="library-manage-list" id="helpdesk-activity"></ul>
+ <p class="help-text" id="helpdesk-last-error"></p>
+ <h3 class="ai-settings-subhead">Resources</h3>
+ <p class="info-text" id="helpdesk-resources"></p>
+ <h3 class="ai-settings-subhead">Actions</h3>
+ <div class="library-create-row">
+  <button type="button" class="btn btn-secondary" id="hd-unlock">Unlock account</button>
+  <button type="button" class="btn btn-secondary" id="hd-revoke">Revoke all sessions</button>
+  <button type="button" class="btn btn-secondary" id="hd-verify">Resend verification</button>
+  <button type="button" class="btn btn-secondary" id="hd-reset">Email password reset</button>
+  <button type="button" class="btn btn-secondary" id="hd-otl">Email one-time sign-in</button>
+  <button type="button" class="btn btn-secondary" id="hd-mfa">Reset MFA</button>
+  <a class="btn btn-secondary" id="hd-packet" href="#">Download support packet</a>
+ </div>
+ <div id="helpdesk-action-status" class="status-indicator"></div>
+ <h3 class="ai-settings-subhead">Notes</h3>
+ <div class="form-group">
+  <label for="helpdesk-note">Add a note</label>
+  <textarea id="helpdesk-note" rows="3" maxlength="2000" placeholder="What you checked and what you did…"></textarea>
+ </div>
+ <button type="button" class="btn btn-primary" id="hd-note">Save note</button>
+ <ul class="library-manage-list" id="helpdesk-notes"></ul>
+ <h3 class="ai-settings-subhead">Timeline</h3>
+ <ul class="library-manage-list" id="helpdesk-timeline"></ul>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/admin.js?v=20260817a"></script>
+{% endblock %}

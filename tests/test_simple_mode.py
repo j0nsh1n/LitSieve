@@ -163,6 +163,23 @@ def test_simple_nav_shows_unnumbered_search():
     assert "Get papers" in base
 
 
+def test_simple_mobile_nav_rows_are_centered():
+    """≤900px Simple: brand, tools, and library are centered rows — not flex-end."""
+    css = _read("static", "css", "style.css")
+    start = css.find("/* Simple phones:")
+    assert start != -1
+    end = css.find("/* Dual nav labels:", start)
+    block = css[start:end]
+    assert "flex-direction: column" in block
+    assert "justify-content: center" in block
+    assert "justify-content: flex-end" not in block
+    tools = block[block.find(".shell-tools") :]
+    assert "justify-content: center" in tools
+    lib = block[block.find(".nav-library-wrap") :]
+    assert "justify-content: center" in lib
+    assert "border: none" in lib
+
+
 def test_advanced_nav_keeps_clusters_and_four_steps():
     """Advanced must still list Clusters and Clean up; CSS only hides under simple."""
     base = _read("templates", "base.html")
@@ -243,8 +260,10 @@ def test_simple_mode_renumbers_fetch_not_advanced():
     html = _dm_markup()
     assert "dm-step-simple" in html
     assert "dm-step-advanced" in html
-    assert "2. Fetch Articles" in html
+    assert "2. Find articles on your topic" in html
     assert "3. Fetch Articles" in html
+    assert "1. Narrow your lens" in html
+    assert "topic-pack-grid" not in html
     assert "dm-sub-simple" in html
     assert "dm-sub-advanced" in html
     assert "Steps 1–3." in html  # Advanced page lead (prepare is optional after auto-embed)
@@ -897,9 +916,11 @@ def test_simple_screen_apply_and_undo_use_low_relevance():
     apply_fn = dm[dm.find("async function doSimpleScreenApply") : dm.find("function doSimpleScreenSkip")]
     assert 'action: "exclude"' in apply_fn or "action: 'exclude'" in apply_fn
     assert "low_relevance" in apply_fn
-    # After apply: small Undo is unhidden and last items are persisted for this tab.
+    # After apply: Undo is offered on the Search strip and last items are persisted.
     assert "saveSimpleScreenUndoItems" in apply_fn
-    assert "undoBtn.hidden = false" in apply_fn or "undoBtn.hidden=false" in apply_fn
+    assert "setSimpleScreenStripOutcome" in apply_fn
+    assert "undo: true" in apply_fn or "undo:true" in apply_fn
+    assert "Set aside" in apply_fn
     undo_fn = dm[dm.find("async function doSimpleScreenUndo") : dm.find("async function silentResolveDuplicatesAfterPrepare")]
     if "async function doSimpleScreenUndo" not in dm:
         undo_fn = dm[dm.find("async function doSimpleScreenUndo") :]
@@ -909,11 +930,11 @@ def test_simple_screen_apply_and_undo_use_low_relevance():
 
 
 def test_simple_screen_confirm_question_box_after_prepare():
-    """After prepare, Simple mode must not silently assume the fetch query is final."""
+    """After prepare, Simple mode must not silently assume the fetch topic is the question."""
     html = _read("templates", "partials", "simple_screening_card.html")
     assert 'id="simple-screen-confirm"' in html
-    assert "Confirm your research question" in html
-    assert "Check it, edit if needed" in html or "edit if needed" in html
+    assert "Your research question" in html
+    assert "not the topic you fetched" in html
     assert 'id="simple-screen-query"' in html
     css = _read("static", "css", "style.css")
     assert ".simple-screen-confirm" in css
@@ -925,7 +946,7 @@ def test_simple_screen_confirm_question_box_after_prepare():
             "async function loadSimpleScreenCounts"
         )
     ]
-    assert "setSimpleScreenConfirmVisible(true)" in refresh
+    assert "showSimpleScreenPendingUi" in refresh or "setSimpleScreenConfirmVisible(true)" in refresh
     assert "setSimpleScreenConfirmVisible(false)" in refresh
     # Re-prepare must refresh the card so the box appears without a full reload.
     assert "await refreshSimpleScreeningCard()" in dm
@@ -985,10 +1006,102 @@ def test_simple_screen_options_open_in_a_popup():
     dm = _simple_js()
     assert "function openSimpleScreenModal" in dm
     assert "function closeSimpleScreenModal" in dm
+    assert "function showSimpleScreenPendingUi" in dm
+    open_fn = dm[dm.find("function openSimpleScreenModal") : dm.find("async function refreshSimpleScreeningCard")]
+    assert "showSimpleScreenPendingUi" in open_fn
     apply_fn = dm[dm.find("async function doSimpleScreenApply") : dm.find("function doSimpleScreenSkip")]
     assert "closeSimpleScreenModal" in apply_fn
     skip_fn = dm[dm.find("function doSimpleScreenSkip") : dm.find("async function doSimpleScreenUndo")]
     assert "closeSimpleScreenModal" in skip_fn
+
+
+def test_simple_fetch_asks_for_topic_not_question():
+    """Fetch copy: topic now; the real question is for Search later."""
+    html = _read("templates", "partials", "collect_ui.html")
+    assert 'id="fetch-lead"' in html
+    assert "Type the" in html and "topic" in html
+    assert "not your full research question" in html
+    assert 'class="dm-step-simple">Topic</label>' in html
+    assert "Search Query" in html
+    assert "save your real question for Search later" in html
+    dm = _simple_js()
+    prefill = dm[
+        dm.find("function prefillSimpleScreenQuery") : dm.find("function setSimpleScreenGotoVisible")
+    ]
+    assert "do not copy" in prefill or "Fetch is a topic" in prefill
+    assert "el.value = prefs.query" not in prefill
+
+
+def test_simple_screen_is_required_popup_before_search():
+    """Narrow it down must open before Search; close/backdrop cannot skip the gate."""
+    dm = _simple_js()
+    assert "function isSimpleScreenGatePending" in dm
+    assert "function setSimpleScreenGatePending" in dm
+    refresh = dm[
+        dm.find("async function refreshSimpleScreeningCard") : dm.find(
+            "async function loadSimpleScreenCounts"
+        )
+    ]
+    assert "setSimpleScreenGatePending(true)" in refresh
+    assert "openSimpleScreenModal()" in refresh
+    close_fn = dm[
+        dm.find("function closeSimpleScreenModal") : dm.find("function openSimpleScreenModal")
+    ]
+    assert "isSimpleScreenGatePending()" in close_fn
+    assert "opts.force" in close_fn or "opts && opts.force" in close_fn
+    apply_fn = dm[dm.find("async function doSimpleScreenApply") : dm.find("function doSimpleScreenSkip")]
+    assert "closeSimpleScreenModal({ force: true })" in apply_fn
+    assert "setSimpleScreenGatePending(false)" in apply_fn
+    skip_fn = dm[dm.find("function doSimpleScreenSkip") : dm.find("async function doSimpleScreenUndo")]
+    assert "closeSimpleScreenModal({ force: true })" in skip_fn
+    search_js = _read("static", "js", "search.js")
+    vis = search_js[
+        search_js.find("function updateSearchWorkVisibility") : search_js.find(
+            "function fillSimpleRailStats"
+        )
+    ]
+    assert "isSimpleScreenGatePending" in vis
+    boot = search_js[
+        search_js.find("loadSearchEmptyState()") : search_js.find("refreshStarredCount")
+    ]
+    assert "refreshSimpleScreeningCard" in boot
+    assert "isSimpleScreenGatePending" in boot
+    css = _read("static", "css", "style.css")
+    assert "simple-screen-pending" in css
+    assert "simple-screen-ready" in css
+    assert "body.simple-screen-pending .simple-screen-modal .lra-modal-backdrop" in css
+    assert "display: none" in css.split("simple-screen-pending .simple-screen-modal .lra-modal-backdrop")[1][:80]
+
+
+def test_simple_fetch_shows_buffering_then_narrow():
+    """Simple fetch hides collect behind a wait screen; Narrow it down is after."""
+    html = _read("templates", "search.html")
+    assert 'id="search-preparing"' in html
+    assert 'id="search-buffering-title"' in html
+    assert 'id="search-buffering-progress"' in html
+    assert 'id="search-buffering-cancel"' in html
+    tools = _read("static", "js", "simple_tools.js")
+    assert "function showSimpleBuffering" in tools
+    assert "function hideSimpleBuffering" in tools
+    dm = _read("static", "js", "data_management.js")
+    fetch_fn = dm[dm.find("async function doFetch") : dm.find("async function silentResolveDuplicatesAfterPrepare")]
+    assert "showSimpleBuffering('fetch')" in fetch_fn
+    assert "showSimpleBuffering('prepare')" in fetch_fn
+    assert "hideSimpleBuffering" in fetch_fn
+    assert "search-buffering-fill" in fetch_fn
+    # Wait screen must finish before the screening popup refresh.
+    finally_fn = fetch_fn[fetch_fn.rfind("} finally {") :]
+    assert "hideSimpleBuffering" in finally_fn
+    assert finally_fn.find("hideSimpleBuffering") < finally_fn.find("refreshSimpleScreeningCard")
+    search_js = _read("static", "js", "search.js")
+    wait = search_js[
+        search_js.find("async function waitIfPreparing") : search_js.find("function refreshStarredCount")
+    ]
+    assert "showSimpleBuffering" in wait
+    assert "progress.fetch" in wait or "fetchJob" in wait
+    css = _read("static", "css", "style.css")
+    assert "body.simple-buffering #search-collect" in css
+    assert ".search-buffering" in css
 
 
 def test_go_to_search_not_clean_up_in_simple_next_step():

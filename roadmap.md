@@ -315,7 +315,7 @@ Presentation only — no flow or endpoint changes.
 - Complete when: mockup identity is on Search; public pages still render;
   Simple/guest/phase-8 tests pass unchanged; radii and dark parity tests
   hold
-- Status: [x] 2026-08-13 — shipped on `feat/phase6-guest-demo` as **v5.0.0**
+- Status: [x] 2026-08-13 — shipped on `feat/phase6-guest-demo` as **v5.0.0**. Final Simple nav is one unnumbered Search tab (no stepper; collect via Start over); that contract supersedes the original “Simple/guest tests pass unchanged” criterion.
 
 ## Backlog (unscheduled)
 - Make `pyright app` blocking in CI after clearing the current error backlog

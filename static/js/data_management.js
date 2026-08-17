@@ -194,6 +194,8 @@ document.addEventListener('DOMContentLoaded', () => {
  }
  const cancelBtn = document.getElementById('fetch-cancel-btn');
  if (cancelBtn) cancelBtn.addEventListener('click', cancelFetch);
+ const bufCancel = document.getElementById('search-buffering-cancel');
+ if (bufCancel) bufCancel.addEventListener('click', cancelFetch);
  const unlockBtn = document.getElementById('simple-fetch-unlock-btn');
  if (unlockBtn) {
   unlockBtn.addEventListener('click', unlockSimpleFetch);
@@ -606,7 +608,7 @@ function updateSimpleFetchLock() {
   }
  }
  if (heading) {
-  heading.textContent = lock ? '2. Your papers' : '2. Fetch Articles';
+  heading.textContent = lock ? '2. Your papers' : '2. Find articles on your topic';
  }
 }
 
@@ -785,14 +787,17 @@ async function loadSampleCorpus(clearFirst) {
 }
 
 async function cancelFetch() {
- const btn = document.getElementById('fetch-cancel-btn');
- if (btn) btn.disabled = true;
+ const btns = [
+  document.getElementById('fetch-cancel-btn'),
+  document.getElementById('search-buffering-cancel'),
+ ].filter(Boolean);
+ btns.forEach((btn) => { btn.disabled = true; });
  try {
  await apiCall('/api/jobs/fetch/cancel', { method: 'POST', body: {} });
  showNotification('Cancel requested — finishing the current source…', 'info');
  } catch (e) {
  showNotification(`Could not cancel: ${e.message}`, 'error');
- if (btn) btn.disabled = false;
+ btns.forEach((btn) => { btn.disabled = false; });
  }
 }
 
@@ -882,13 +887,15 @@ async function refreshCoverage() {
 // with {} and the auto-chain never starts prepare.
 /** Render live per-source fetch rows from progress payload only (no invented counts). */
 function renderFetchLiveSources(p) {
- const host = document.getElementById('fetch-live-sources');
- if (!host) return;
+ const hosts = ['search-buffering-sources', 'fetch-live-sources']
+  .map((id) => document.getElementById(id))
+  .filter(Boolean);
+ if (!hosts.length) return;
  const sources = Array.isArray(p && p.sources) ? p.sources : [];
  const by = (p && p.by_source) || {};
  const status = (p && p.source_status) || {};
  if (!sources.length) {
-  host.innerHTML = '';
+  hosts.forEach((host) => { host.innerHTML = ''; });
   return;
  }
  const rows = sources.map((src) => {
@@ -915,7 +922,8 @@ function renderFetchLiveSources(p) {
   return `<div class="${rowClass}"><span class="fetch-live-name">${escapeHtml(name)}</span>`
    + `<span class="fetch-live-detail">${escapeHtml(detail)}</span></div>`;
  });
- host.innerHTML = rows.join('');
+ const html = rows.join('');
+ hosts.forEach((host) => { host.innerHTML = html; });
 }
 
 function waitForJob(task, fillId, labelId, wrapId, formatLabel, timeoutMs = 600000) {
@@ -923,10 +931,12 @@ function waitForJob(task, fillId, labelId, wrapId, formatLabel, timeoutMs = 6000
  const fill = document.getElementById(fillId);
  const label = document.getElementById(labelId);
  const wrap = document.getElementById(wrapId);
- const live = document.getElementById('fetch-live-sources');
+ const liveHosts = ['search-buffering-sources', 'fetch-live-sources']
+  .map((id) => document.getElementById(id))
+  .filter(Boolean);
  if (wrap) wrap.style.display = 'block';
  if (fill) fill.style.width = '0%';
- if (task === 'fetch' && live) live.innerHTML = '';
+ if (task === 'fetch') liveHosts.forEach((live) => { live.innerHTML = ''; });
  const started = Date.now();
  let sawActive = false;
  let settled = false;
@@ -943,7 +953,7 @@ function waitForJob(task, fillId, labelId, wrapId, formatLabel, timeoutMs = 6000
    setTimeout(() => {
     wrap.style.display = 'none';
     if (fill) fill.style.width = '0%';
-    if (live && task === 'fetch') live.innerHTML = '';
+    if (task === 'fetch') liveHosts.forEach((live) => { live.innerHTML = ''; });
    }, 800);
   }
   if (err) reject(err);
@@ -1222,7 +1232,15 @@ async function doFetch() {
  const email = ((document.getElementById('fetch-email') || {}).value || '').trim();
 
  setNextStepVisible(false);
- if (!query) { showNotification('Please enter a search query.', 'error'); return; }
+ if (!query) {
+  const simpleEmpty = typeof isSimpleMode === 'function' && isSimpleMode();
+  showNotification(simpleEmpty ? 'Please enter a topic.' : 'Please enter a search query.', 'error');
+  return;
+ }
+ if (typeof isSimpleMode === 'function' && isSimpleMode() && selectedTopics.size === 0) {
+  showNotification('Pick at least one general area first. That chooses which sources we search.', 'error');
+  return;
+ }
  if (sources.length === 0) { showNotification('Please select at least one source.', 'error'); return; }
 
  // Simple: dialog (or skip when empty) must run BEFORE reading fetch-mode.
@@ -1265,6 +1283,11 @@ async function doFetch() {
  'info'
  );
 
+ const simple = typeof isSimpleMode === 'function' && isSimpleMode();
+ const useBuffer = simple && typeof showSimpleBuffering === 'function'
+  && document.getElementById('search-preparing');
+ if (useBuffer) showSimpleBuffering('fetch');
+
  let autoChainFailed = false;
  try {
  const started = await apiCall('/api/fetch-articles-multi', {
@@ -1281,7 +1304,10 @@ async function doFetch() {
  let data = started;
  if (started && started.status === 'started') {
  data = await waitForJob(
- 'fetch', 'fetch-progress-fill', 'fetch-progress-label', 'fetch-progress-wrap',
+ 'fetch',
+ useBuffer ? 'search-buffering-fill' : 'fetch-progress-fill',
+ useBuffer ? 'search-buffering-label' : 'fetch-progress-label',
+ useBuffer ? 'search-buffering-progress' : 'fetch-progress-wrap',
  (done, total, _pct, p) => {
  const arts = (p && p.articles_so_far) || 0;
  return `${done} of ${total} source(s) · ${arts} paper(s) so far`;
@@ -1300,9 +1326,12 @@ async function doFetch() {
  if (fetchedOk) {
  applyModelRecommendation();
  _lastTotalArticles = Math.max(_lastTotalArticles, totalFetched);
- // Still busy: keep prepare hidden; progress stays on the fetch bar.
+ // Still busy: keep prepare hidden; progress stays on the fetch / buffer bar.
  updatePrepareSectionVisibility(_lastTotalArticles);
  setNextStepVisible(false);
+ if (useBuffer && typeof showSimpleBuffering === 'function') {
+  showSimpleBuffering('prepare');
+ }
  setStatus(
  'fetch-status',
  `Fetched ${totalFetched} paper(s). Getting them ready for search…`,
@@ -1338,6 +1367,7 @@ async function doFetch() {
  _pipelineBusy = false;
  _simpleFetchUnlocked = false;
  _simpleFetchModePicked = false;
+ if (typeof hideSimpleBuffering === 'function') hideSimpleBuffering();
  // After a failed auto-prepare with papers in hand, force the re-prepare card open
  // so the student has a control (ready count may still be 0).
  if (autoChainFailed && _lastTotalArticles > 0) {
@@ -1394,11 +1424,14 @@ async function doCreateEmbeddings(opts) {
  const btn = document.getElementById('embeddings-btn');
  saveFetchPrefs();
  setLoading(btn, true);
- // Auto-chain: show progress on the fetch bar so Simple mode (prepare card
- // may still be opening) always has a visible progress track.
- const progressFill = fromAutoChain ? 'fetch-progress-fill' : 'embed-progress-fill';
- const progressLabel = fromAutoChain ? 'fetch-progress-label' : 'embed-progress-label';
- const progressWrap = fromAutoChain ? 'fetch-progress-wrap' : 'embed-progress-wrap';
+ // Auto-chain: Simple uses the buffering screen; Advanced stays on the fetch bar.
+ const useBuffer = simple && fromAutoChain && document.getElementById('search-buffering-fill');
+ const progressFill = useBuffer ? 'search-buffering-fill'
+  : fromAutoChain ? 'fetch-progress-fill' : 'embed-progress-fill';
+ const progressLabel = useBuffer ? 'search-buffering-label'
+  : fromAutoChain ? 'fetch-progress-label' : 'embed-progress-label';
+ const progressWrap = useBuffer ? 'search-buffering-progress'
+  : fromAutoChain ? 'fetch-progress-wrap' : 'embed-progress-wrap';
  setStatus(
  fromAutoChain ? 'fetch-status' : 'embeddings-status',
  (simple || fromAutoChain)

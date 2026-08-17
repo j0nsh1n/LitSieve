@@ -6,7 +6,7 @@
     <title>{% block title %}LitSieve{% endblock %}</title>
     <link rel="icon" href="/static/favicon.ico?v=20260803a" sizes="32x32">
     <link rel="apple-touch-icon" href="/static/favicon.png?v=20260803a">
-    <link rel="stylesheet" href="/static/css/style.css?v=20260814w">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260817g">
     <script src="/static/js/theme-init.js?v=20260814e"></script>
 </head>
 <body{% if user and user.is_guest %} data-guest="1"{% endif %}>
@@ -72,10 +72,6 @@
                    title="{{ tip }}"
                    data-step-advanced="{{ loop.index }}"
                    data-step-simple="{{ simple_step }}"
-                   {% if key == "data_management" %}
-                   data-href-advanced="/data-management"
-                   data-href-simple="/search?collect=1"
-                   {% endif %}
                    {% if active_page == key %}aria-current="page"{% endif %}>
                     <span class="nav-step-num">{{ loop.index }}</span>
                     <span class="nav-step-label nav-label-advanced">{{ label }}</span>
@@ -100,6 +96,11 @@
                 title="Switch to Simple mode"
                 aria-label="Switch to Simple mode" aria-pressed="false">Advanced</button>
             <button type="button" class="theme-toggle" id="theme-toggle" title="Toggle theme" aria-label="Toggle theme">🌙</button>
+            {% if user and user.is_admin %}
+            <a href="/admin"
+               class="nav-logout {% if active_page == 'admin' %}active{% endif %}"
+               title="Admin">Admin</a>
+            {% endif %}
             {% if user %}
             <a href="/account"
                class="nav-username {% if active_page == 'account' %}active{% endif %}"
@@ -121,7 +122,7 @@
 
     {% from "macros/disclaimers.html" import scope_footer %}
     <footer class="footer">
-        <p>LitSieve - v5.0.0</p>
+        <p>LitSieve - v5.0.3</p>
         {{ scope_footer() }}
     </footer>
 

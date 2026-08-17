@@ -1,7 +1,7 @@
 # context.md — LitSieve
 
 ## Current State
-- App version **5.0.0** (`app/main.py`, `GET /health`). Product name **LitSieve**.
+- App version **5.0.3** (`app/main.py`, `GET /health`). Product name **LitSieve**.
 - Example public deployment pattern: HTTPS at the edge (e.g. Cloudflare Tunnel)
   → `uvicorn` HTTP on `127.0.0.1:7860` only. Operator sets `PUBLIC_BASE_URL` and
   `DEBUG=false` with a real `SECRET_KEY` in gitignored `.env`.
@@ -13,10 +13,18 @@
   `./venv` for sqlcipher. Count drifts with the branch; re-run before release.
 - UI: Simple/Advanced via `localStorage.uiMode` + `data-mode` (theme-init pre-paint).
   Simple: one `/search` page (empty collect vs papers). `/data-management`
-  redirects in Simple. After papers exist, topics/fetch hide; Start over is a
-  popup. Advanced: full steps including Clean up + Clusters. Phase 10
+  redirects in Simple. Fetch asks for a topic; a wait screen covers fetch +
+  prepare; Narrow it down is a required popup (apply or skip) before Search.
+  After papers exist, topics/fetch hide;
+  Start over is a popup. Advanced: full steps including Clean up + Clusters. Phase 10
   broadsheet tokens: 2px/3px radii, warm-newsprint dark, masthead nav.
-- Guest: `/guest` → sample corpus, multi-source fetch 403, purge after 30 minutes.
+- Final Simple nav is one unnumbered Search tab (no stepper; collect via Start over); that contract supersedes the original Phase 10 “Simple/guest tests pass unchanged” criterion.
+- Guest: `/guest` → sample corpus, auto-prepare (set `GUEST_AUTO_PREPARE=0` in
+  tests), multi-source fetch 403, purge after 30 minutes. Search treats an
+  empty source filter as “all sources” when no source chips are enabled.
+- Admin: `ADMIN_USERNAMES` unlocks `/admin`. Host snapshot, one-account lookup, unlock,
+  session revoke, emailed reset / one-time login, notes, action log.
+  Restart after changing `.env`.
 - Ops: systemd user unit for uvicorn; optional backup + watchdog timers — see
   `docs/SELFHOST.md` and `docs/DEPLOY.md` (generic operator runbooks).
 - Dev isolation: `./run_dev.sh 7861` → throwaway DB/data/log paths.
@@ -28,7 +36,7 @@
 |------|------|
 | `app/main.py` | FastAPI app, lifespan UMAP warm-up, static mount |
 | `app/core.py` | Process state: user_db, pipeline cache, jobs, limiter, guest purge |
-| `app/routes/` | pages, auth (incl. guest), libraries, shares, corpus, search, exports, ai |
+| `app/routes/` | pages, auth (incl. guest), admin, libraries, shares, corpus, search, exports, ai |
 | `app/services/` | pipeline, embeddings, clustering, summarize, llm, citations, mailer |
 | `app/storage/` | database, libraries, shares, user_db, quota, dbconn |
 | `app/fetchers/` | 17 public sources + `base.py` |
@@ -79,8 +87,8 @@ Guest User (is_guest) → sample corpus only; purged by age
 - Host entry: `app.main:app` port 7860; Linux `./venv`
 
 ## Session Handoff
-- **Date:** 2026-08-14
+- **Date:** 2026-08-17
 - **Branch:** `fix/start-over-keep-annotated` — PR #57 vs `main`
-- **Done:** Start over option B (keep starred/noted), library rehydrate on
-  focus, fetch stall hint after 45s. Overlays folded into real modules.
+- **Done:** 5.0.3 — Simple topic fetch, wait screen, required Narrow it down,
+  helpdesk, guest Search/prepare, lockout.
 - **Next:** Human merges PR #57. `design_mockups/` stays untracked.

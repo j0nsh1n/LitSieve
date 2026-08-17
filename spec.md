@@ -56,12 +56,12 @@ a substitute for school library databases.
   Or: `DEBUG=true SECRET_KEY=… ./venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 7860 --reload`
   Dev isolation (preferred): `./run_dev.sh 7861` uses separate DB/data/log paths.
 - Example (Simple): register or **Try the demo** → Search (empty: topics →
-  Fetch → auto-prepare; then rank + export). Optional Narrow it down /
-  Re-prepare / Start over as popups.
+  fetch by **topic** → wait screen for fetch + prepare → required Narrow it
+  down → rank + export). Re-prepare / Start over stay on the Search strip.
 - Example (Advanced): log in → Data Management (topics/sources → Fetch →
   auto-prepare) → Clean up (dedup / Quick screen / report) → optional Clusters →
   Search → Download RIS
-- Health: `GET /health` → `{"status":"healthy","version":"5.0.0"}` (version as of
+- Health: `GET /health` → `{"status":"healthy","version":"5.0.3"}` (version as of
   this writing; bump when releasing)
 
 ## Architecture

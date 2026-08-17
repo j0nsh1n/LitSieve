@@ -49,7 +49,10 @@ def test_search_includes_collect_and_simple_tools():
     assert "/api/start-over" in start_over
     assert "openSiteConfirm" in start_over
     assert "resolveSimpleFetchModeBeforeRequest" not in start_over
-    assert "resetSearchAndNarrowingForStartOver" in start_over
+    assert "clearSearchWorkspace" in start_over
+    # Prepared leftover papers stay on Search — do not force collect=1.
+    assert "setCollectQueryOnUrl()" in start_over
+    assert "articles_with_embeddings" in start_over
     reset_fn = tools[
         tools.index("async function resetSearchAndNarrowingForStartOver") : tools.index(
             "async function simpleToolsStartOver"
@@ -231,7 +234,8 @@ def test_simple_collect_url_stays_on_search():
     tools = _read("static", "js", "simple_tools.js")
     assert "/search?collect=1" in tools
     base = _read("templates", "base.html")
-    assert 'data-href-simple="/search?collect=1"' in base
+    assert "data-href-simple" not in base
+    assert "data-href-advanced" not in base
 
 
 def test_simple_css_hides_leftover_collect():
@@ -306,3 +310,58 @@ def test_start_over_api_keeps_starred_and_drops_unmarked(tmp_path, monkeypatch):
         assert (c["article_id"], c["source"]) not in ids
     finally:
         release_pipeline(rec["id"])
+
+
+def test_start_over_api_rejects_guest_and_leaves_articles(tmp_path, monkeypatch):
+    """Guests get 403 on POST /api/start-over; their sample corpus is untouched."""
+    from app import core
+    from app.core import get_pipeline, release_pipeline
+    from app.storage.user_db import UserDatabase
+
+    db = UserDatabase(str(tmp_path / "users.db"))
+    monkeypatch.setattr(core, "user_db", db)
+    monkeypatch.setenv("USER_DATA_DIR", str(tmp_path / "user_data"))
+
+    client = TestClient(app)
+    r = client.get("/guest", follow_redirects=False)
+    assert r.status_code in (302, 303), r.text
+    assert r.headers.get("location") == "/search"
+    assert client.cookies.get("access_token")
+    csrf = client.cookies.get("csrf_token")
+    assert csrf
+
+    row = db.conn.execute(
+        "SELECT id FROM users WHERE username LIKE 'guest_%'"
+    ).fetchone()
+    assert row, "guest session did not create a guest user"
+    uid = row[0]
+
+    pipe = get_pipeline(uid)
+    try:
+        arts = pipe.db.get_all_articles()
+        assert len(arts) >= 3
+        before_ids = {(a["article_id"], a["source"]) for a in arts}
+        # Annotate so a missing guest guard would still mutate (keep 2, drop rest).
+        pipe.db.upsert_note(arts[0]["article_id"], arts[0]["source"], starred=True)
+        pipe.db.upsert_note(arts[1]["article_id"], arts[1]["source"], note="keep me")
+        before_count = pipe.db.get_statistics()["total_articles"]
+    finally:
+        release_pipeline(uid)
+
+    out = client.post(
+        "/api/start-over",
+        json={},
+        headers={"X-CSRF-Token": csrf or ""},
+    )
+    assert out.status_code == 403, out.text
+    body = out.json()
+    assert body.get("guest") is True
+
+    pipe = get_pipeline(uid)
+    try:
+        after = pipe.db.get_all_articles()
+        after_ids = {(a["article_id"], a["source"]) for a in after}
+        assert after_ids == before_ids
+        assert pipe.db.get_statistics()["total_articles"] == before_count
+    finally:
+        release_pipeline(uid)

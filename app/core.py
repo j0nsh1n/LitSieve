@@ -321,6 +321,12 @@ def current_user(request: Request) -> Optional[dict]:
         return None
     if int(payload.get("tv", 0) or 0) != int(record.get("token_version") or 0):
         return None
+    if user_db.is_locked(record):
+        return None
+    try:
+        user_db.touch_last_seen(record["id"])
+    except Exception:
+        logger.exception("touch_last_seen failed for %s", record.get("id"))
     # Guest demos expire after GUEST_MAX_AGE_MINUTES — drop the account and treat as logged out.
     if record.get("is_guest") and user_db.guest_is_expired(
         record["id"], GUEST_MAX_AGE_MINUTES
@@ -330,13 +336,44 @@ def current_user(request: Request) -> Optional[dict]:
         except Exception:
             logger.exception("Failed to expire guest %s", record["id"])
         return None
+    username = record["username"]
+    guest = bool(record.get("is_guest"))
     return {
         "user_id": record["id"],
-        "username": record["username"],
+        "username": username,
         "token_version": int(record.get("token_version") or 0),
-        "is_guest": bool(record.get("is_guest")),
+        "is_guest": guest,
+        "is_admin": (not guest) and is_admin_username(username),
         "created_at": record.get("created_at"),
     }
+
+
+def admin_usernames() -> set:
+    """Handles listed in ADMIN_USERNAMES (comma-separated, case-insensitive)."""
+    raw = (os.getenv("ADMIN_USERNAMES") or "").strip()
+    return {part.strip().lower() for part in raw.split(",") if part.strip()}
+
+
+def is_admin_username(username: str) -> bool:
+    return (username or "").strip().lower() in admin_usernames()
+
+
+def is_admin_user(user: Optional[dict]) -> bool:
+    """True for a non-guest session whose username is in ADMIN_USERNAMES."""
+    if not user or user.get("is_guest"):
+        return False
+    if "is_admin" in user:
+        return bool(user["is_admin"])
+    return is_admin_username(user.get("username") or "")
+
+
+def admin_forbidden_response():
+    from fastapi.responses import JSONResponse
+
+    return JSONResponse(
+        status_code=403,
+        content={"detail": "Admin only.", "admin": True},
+    )
 
 
 def is_guest_user(user: Optional[dict]) -> bool:

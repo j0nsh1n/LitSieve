@@ -39,6 +39,26 @@ from app.services import mailer
 
 logger = logging.getLogger(__name__)
 
+
+def _guest_auto_prepare_enabled() -> bool:
+    """Production default is on; tests set GUEST_AUTO_PREPARE=0 so they stay fast."""
+    raw = (os.getenv("GUEST_AUTO_PREPARE") or "1").strip().lower()
+    return raw not in ("0", "false", "no", "off")
+
+
+def _start_guest_prepare(uid: str) -> None:
+    """Kick off embeddings so /guest lands on Search, not an empty collect form."""
+    if not uid or not _guest_auto_prepare_enabled():
+        return
+    try:
+        from app.routes.corpus import _run_create_embeddings
+        core.start_user_job(
+            uid, "embed", _run_create_embeddings,
+            model="general", only_missing=True, uid=uid,
+        )
+    except Exception:
+        logger.exception("Guest auto-prepare failed to start for %s", uid)
+
 router = APIRouter()
 
 
@@ -78,7 +98,23 @@ async def login_submit(
     next_url = _safe_next_url(next or request.query_params.get("next"))
     username = username.strip().lower()
     user = core.user_db.get_by_username(username)
+    ip = core.client_bucket(request)
+    if user and core.user_db.is_locked(user):
+        core.user_db.record_auth_event(
+            user["id"], user["username"], "login_fail", ip, "locked"
+        )
+        return templates.TemplateResponse(
+            request, "login.html",
+            context={
+                "error": "This account is locked after too many failed sign-ins. "
+                         "Ask your teacher to unlock it, or wait 15 minutes.",
+                "info": "",
+                "next": next if next else "",
+            },
+            status_code=400,
+        )
     if not user or not await verify_password_async(password, user["hashed_password"]):
+        core.user_db.record_login_failure(username, ip)
         return templates.TemplateResponse(
             request, "login.html",
             context={
@@ -88,11 +124,49 @@ async def login_submit(
             },
             status_code=400,
         )
+    core.user_db.record_login_success(user["id"], ip)
     token = create_token(
         user["id"], user["username"], user.get("token_version", 0),
     )
     response = RedirectResponse(url=next_url, status_code=302)
     _set_auth_cookies(response, token)
+    return response
+
+
+@router.get("/login/once")
+@limiter.limit("10/minute")
+async def login_once(request: Request, token: str = ""):
+    """Consume a short-lived emailed one-time login link."""
+    rec = core.user_db.consume_one_time_login(token or "")
+    if not rec:
+        return templates.TemplateResponse(
+            request, "login.html",
+            context={
+                "error": "That sign-in link is invalid or has expired. Ask for a new one.",
+                "info": "",
+                "next": "",
+            },
+            status_code=400,
+        )
+    if core.user_db.is_locked(rec):
+        return templates.TemplateResponse(
+            request, "login.html",
+            context={
+                "error": "This account is locked. Ask your teacher to unlock it first.",
+                "info": "",
+                "next": "",
+            },
+            status_code=400,
+        )
+    core.user_db.record_login_success(rec["id"], core.client_bucket(request))
+    core.user_db.record_auth_event(
+        rec["id"], rec["username"], "otl_used", core.client_bucket(request), ""
+    )
+    jwt_token = create_token(
+        rec["id"], rec["username"], rec.get("token_version", 0),
+    )
+    response = RedirectResponse(url="/search", status_code=302)
+    _set_auth_cookies(response, jwt_token)
     return response
 
 
@@ -314,6 +388,8 @@ async def _start_guest_session(request: Request) -> RedirectResponse:
         # Still let them in; they can use "Load sample papers" on DM.
     finally:
         release_pipeline(uid)
+
+    _start_guest_prepare(uid)
 
     token = create_token(
         user["id"], user["username"], user.get("token_version", 0),
