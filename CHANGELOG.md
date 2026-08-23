@@ -39,9 +39,10 @@ and this project aims to follow Semantic Versioning for app version strings
 
 ### Changed
 - **Teal Soft** visual pass: accent `#0f766e` (dark `#5eead4`) on cool paper
-  `#f7f8f8` / `#ffffff`. Self-hosted Public Sans for titles and body/UI.
-  Page canvas is a flat fill (no grain or radial wash). Primary buttons are
-  teal-filled. Radii are 8 / 12 / 18px. Search similarity is a ring (same
+  `#f7f8f8` / `#ffffff`. Self-hosted Public Sans for titles; Source Sans 3
+  for body/UI (wider at small sizes). Page canvas is a flat fill (no grain
+  or radial wash). Primary buttons are teal-filled. Radii are 8 / 12 /
+  18px. Search similarity is a ring (same
   `--score-pct` as before). Star controls use an SVG icon, not a glyph.
   Amber caution is `#96640c` (AA on white). Theme toggle uses sun/moon
   icons and a circular wipe (color fade where View Transitions are

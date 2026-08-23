@@ -6,8 +6,8 @@
    Dark: bg #0d1012, surface #161a1d, text #e9eef0,
    muted #98a3aa, accent #5eead4, accent-hover #86f0dd,
    on-accent #062421, ok #6ee7a8.
-   Type: Public Sans for titles and body/UI, self-hosted WOFF2 under
-   /static/fonts (OFL). System sans as fallback.
+   Type: Public Sans for titles; Source Sans 3 for body/UI (wider at
+   small sizes). Self-hosted WOFF2 under /static/fonts (OFL).
    Signature: teal-filled primary, 8/12/18 radii, score ring, flat paper.
    Layout unchanged: hero, Simple/Advanced, eight guides.
    ============================================================ */
@@ -17,7 +17,7 @@
     font-style: normal;
     font-weight: 400 700;
     font-display: swap;
-    src: url("/static/fonts/public-sans-latin.woff2?v=20260823e") format("woff2");
+    src: url("/static/fonts/public-sans-latin.woff2?v=20260823f") format("woff2");
     unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
@@ -25,7 +25,23 @@
     font-style: italic;
     font-weight: 400 700;
     font-display: swap;
-    src: url("/static/fonts/public-sans-latin-italic.woff2?v=20260823e") format("woff2");
+    src: url("/static/fonts/public-sans-latin-italic.woff2?v=20260823f") format("woff2");
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+    font-family: "Source Sans 3";
+    font-style: normal;
+    font-weight: 400 700;
+    font-display: swap;
+    src: url("/static/fonts/source-sans-3-latin.woff2?v=20260823f") format("woff2");
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+    font-family: "Source Sans 3";
+    font-style: italic;
+    font-weight: 400 700;
+    font-display: swap;
+    src: url("/static/fonts/source-sans-3-latin-italic.woff2?v=20260823f") format("woff2");
     unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
@@ -55,8 +71,8 @@
     --warn: #96640c;          /* amber caution (AA on white) */
     --err: #a33b35;           /* distinct from accent (not same as links) */
     --on-accent: #fff;        /* text on teal-filled controls */
-    --font-sans: 'Public Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    --font-serif: var(--font-sans);
+    --font-sans: "Source Sans 3", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --font-serif: "Public Sans", "Source Sans 3", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     --kicker-track: 0.12em;
     --spine: 0px;
 
@@ -725,7 +741,7 @@ body {
 .stat-badge {
     font-size: var(--fs-sm);
     font-style: italic;
-    font-family: var(--font-serif);
+    font-family: var(--font-sans);
     font-weight: 400;
     letter-spacing: 0;
     text-transform: none;
@@ -838,7 +854,7 @@ html[data-theme="dark"] .theme-toggle .icon-moon { display: block; }
     text-align: center;
     padding: var(--space-4);
     color: var(--text-soft);
-    font-family: var(--font-serif);
+    font-family: var(--font-sans);
     font-style: italic;
     font-size: var(--fs-sm);
     border-top: 1px solid var(--rule);
@@ -878,7 +894,7 @@ html[data-theme="dark"] .theme-toggle .icon-moon { display: block; }
 }
 
 .subtitle {
-    font-family: var(--font-serif);
+    font-family: var(--font-sans);
     font-style: italic;
     color: var(--text-body);
     font-size: var(--fs-base);
@@ -1677,7 +1693,7 @@ input[type="range"]::-moz-range-thumb:hover {
     text-wrap: balance;
 }
 .result-byline {
-    font-family: var(--font-serif);
+    font-family: var(--font-sans);
     font-style: italic;
     font-size: var(--fs-sm);
     color: var(--text-soft);
@@ -1850,7 +1866,7 @@ input[type="range"]::-moz-range-thumb:hover {
     align-items: flex-start;
 }
 .result-row .article-meta.meta-authors {
-    font-family: var(--font-serif);
+    font-family: var(--font-sans);
     font-style: italic;
     font-size: var(--fs-sm);
     letter-spacing: 0;
@@ -1892,7 +1908,7 @@ input[type="range"]::-moz-range-thumb:hover {
 .article-meta.meta-authors { display: block; }
 
 .article-abstract {
-    font-family: var(--font-serif);
+    font-family: var(--font-sans);
     font-size: var(--fs-base);
     color: var(--text);
     line-height: var(--lh-relaxed);
@@ -1974,7 +1990,7 @@ body.lra-modal-open {
 .lra-modal-title {
     margin: 0 0 var(--space-2);
     font-size: var(--fs-lg);
-    font-family: var(--font-serif, Georgia, serif);
+    font-family: var(--font-serif);
     font-weight: 600;
     color: var(--text);
 }
@@ -2174,7 +2190,7 @@ body.lra-modal-open {
     max-width: 12rem;
     min-width: 6.5rem;
     min-height: 2.15rem;
-    font-family: var(--font-serif);
+    font-family: var(--font-sans);
     font-style: italic;
     font-size: var(--fs-sm);
     padding: var(--space-1) 0;
@@ -2226,7 +2242,7 @@ select option,
 }
 .admin-stats dd {
     margin: 0;
-    font-family: var(--font-serif);
+    font-family: var(--font-sans);
     font-size: var(--fs-md);
 }
 .admin-user-btn {
@@ -2456,7 +2472,7 @@ select option,
     border: none;
     padding: 0;
     margin: 0;
-    font-family: var(--font-serif);
+    font-family: var(--font-sans);
     font-style: italic;
     font-size: var(--fs-sm);
     color: var(--accent);
@@ -2516,7 +2532,7 @@ select option,
 .loading-text {
     color: var(--text-soft);
     font-style: italic;
-    font-family: var(--font-serif);
+    font-family: var(--font-sans);
     font-size: var(--fs-sm);
     padding: var(--space-2) 0;
     animation: pulseSoft 1.6s var(--ease-soft) infinite;
@@ -2982,7 +2998,7 @@ select option,
     margin-top: var(--space-3);
     font-size: var(--fs-sm);
     font-style: italic;
-    font-family: var(--font-serif);
+    font-family: var(--font-sans);
     min-height: 1.2em;
     transition: color var(--dur-fast) var(--ease-soft);
 }
@@ -3267,7 +3283,7 @@ select option,
 #query-text {
     font-size: var(--fs-xl);
     line-height: var(--lh-snug);
-    font-family: var(--font-serif);
+    font-family: var(--font-sans);
     min-height: 6.5rem;
 }
 
@@ -3552,7 +3568,7 @@ html[data-mode="simple"] body.simple-collecting #search-query-top {
 .progress-bar-label {
     font-size: var(--fs-xs);
     font-style: italic;
-    font-family: var(--font-serif);
+    font-family: var(--font-sans);
     color: var(--text-soft);
     margin-top: var(--space-1);
 }
@@ -3721,7 +3737,7 @@ html[data-mode="simple"] body.simple-collecting #search-query-top {
 .cluster-count {
     font-size: var(--fs-xs);
     font-style: italic;
-    font-family: var(--font-serif);
+    font-family: var(--font-sans);
     color: var(--text-soft);
     flex-shrink: 0;
     margin-left: auto;
@@ -4122,7 +4138,7 @@ a.feature-card:focus-visible {
 }
 
 .guide-prose {
-    font-family: var(--font-serif);
+    font-family: var(--font-sans);
     color: var(--text);
     line-height: var(--lh-relaxed);
     font-size: var(--fs-base);
@@ -4294,7 +4310,7 @@ mark.hl-demo {
 }
 .pico-quote {
     color: var(--text-soft);
-    font-family: var(--font-serif);
+    font-family: var(--font-sans);
     font-style: italic;
     line-height: 1.5;
 }
@@ -5692,7 +5708,7 @@ html[data-mode="simple"] .search-simple-panel:not([hidden]) {
     border-top: 1px solid var(--rule);
 }
 .rail-stat b {
-    font-family: var(--font-serif);
+    font-family: var(--font-sans);
     font-size: var(--fs-sm);
     font-weight: 700;
     letter-spacing: 0;

@@ -17,8 +17,8 @@
   prepare; Narrow it down is a required popup (apply or skip) before Search.
   After papers exist, topics/fetch hide;
   Start over is a popup. Advanced: full steps including Clean up + Clusters.
-  Teal Soft tokens: accent `#0f766e`, 8/12/18px radii, Public Sans
-  (self-hosted, titles and body), flat paper / near-black dark, score ring on Search.
+  Teal Soft tokens: accent `#0f766e`, 8/12/18px radii, Public Sans titles
+  and Source Sans 3 body (self-hosted), flat paper / near-black dark, score ring on Search.
 - Final Simple nav is one unnumbered Search tab (no stepper; collect via Start over); that contract supersedes the original Phase 10 “Simple/guest tests pass unchanged” criterion.
 - Guest: `/guest` → sample corpus, auto-prepare (set `GUEST_AUTO_PREPARE=0` in
   tests), multi-source fetch 403, purge after 30 minutes. Search treats an
@@ -107,6 +107,6 @@ Guest User (is_guest) → sample corpus only; purged by age
 - **Date:** 2026-08-22
 - **Branch:** `release/5.0.4` vs `main`
 - **Done:** 5.0.4 — extra admin/helpdesk tools, tickets, incident banner,
-  Ship `/ops`, Teal Soft (Public Sans self-hosted, flat paper).
+  Ship `/ops`, Teal Soft (Public Sans titles, Source Sans 3 body, flat paper).
 - **Next:** Leftovers in `notes.md`. Set `LITSIEVE_STAGING` / `LITSIEVE_LIVE`
   on the host. `design_mockups/` untracked unless asked.

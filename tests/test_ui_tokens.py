@@ -499,19 +499,21 @@ def test_teal_soft_light_tokens():
     assert tokens.get("--on-accent") == "#fff"
     # Amber was #a8700f = 4.21:1 on white, under AA. Darkened for contrast.
     assert tokens.get("--warn") == "#96640c"
-    assert "Public Sans" in tokens.get("--font-sans", "")
-    assert "var(--font-sans)" in tokens.get("--font-serif", "")
+    assert "Source Sans 3" in tokens.get("--font-sans", "")
+    assert "Public Sans" in tokens.get("--font-serif", "")
 
 
-def test_public_sans_is_self_hosted():
-    """CSP is font-src 'self' — no Google Fonts CDN. Titles share Public Sans."""
+def test_typefaces_are_self_hosted():
+    """CSP is font-src 'self' — no Google Fonts CDN."""
     css = CSS
     assert "/static/fonts/public-sans-latin.woff2" in css
+    assert "/static/fonts/source-sans-3-latin.woff2" in css
     assert "fraunces" not in css.lower()
     assert "fonts.googleapis.com" not in css
     assert "fonts.gstatic.com" not in css
     fonts = REPO / "static" / "fonts"
     assert (fonts / "public-sans-latin.woff2").is_file()
+    assert (fonts / "source-sans-3-latin.woff2").is_file()
     assert not (fonts / "fraunces-latin.woff2").exists()
 
 
