@@ -55,8 +55,8 @@ and this project aims to follow Semantic Versioning for app version strings
   Search on small screens).
 - Feature Guide renders one theme toggle (duplicate control dropped).
 - Simple Search score ring stays centered (grid overlay, not flex).
-- Score number sits inside the ring hole (3-decimal tabular figures no
-  longer clip the arc).
+- Score number sits inside the ring hole (larger concentric meter, small
+  tabular figures; 0.000–1.000 no longer clip the arc).
 
 ## [5.0.3] - 2026-08-17
 

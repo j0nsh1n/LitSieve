@@ -1702,9 +1702,10 @@ input[type="range"]::-moz-range-thumb:hover {
 .score-meter {
     display: grid;
     place-items: center;
-    width: 3.5rem;
-    height: 3.5rem;
-    min-width: 3.5rem;
+    position: relative;
+    width: 4.25rem;
+    height: 4.25rem;
+    min-width: 4.25rem;
     aspect-ratio: 1;
     box-sizing: border-box;
     flex-shrink: 0;
@@ -1714,20 +1715,29 @@ input[type="range"]::-moz-range-thumb:hover {
     background: conic-gradient(var(--accent) var(--score-pct, 0%),
                 color-mix(in srgb, var(--rule) 80%, var(--text-soft) 20%) 0);
 }
+/* Concentric hole as a % of the meter so it cannot drift off-center. */
+.score-meter::before {
+    content: "";
+    grid-area: 1 / 1;
+    width: 72%;
+    height: 72%;
+    border-radius: 50%;
+    background: var(--surface);
+    z-index: 0;
+    pointer-events: none;
+}
 .score-meter > * {
     grid-area: 1 / 1;
 }
 .score-meter-value {
-    /* Hole must clear 5 tabular chars (0.000–1.000). Source Sans 3 at
-       --fs-sm overflowed the old 2.6rem disc and clipped the ring. */
+    position: relative;
+    z-index: 1;
     display: grid;
     place-items: center;
-    z-index: 1;
-    box-sizing: border-box;
-    width: 2.7rem;
-    height: 2.7rem;
-    border-radius: 50%;
-    background: var(--surface);
+    background: transparent;
+    width: auto;
+    height: auto;
+    max-width: 70%;
     font-family: var(--font-sans);
     font-size: var(--fs-xs);
     font-weight: 700;
@@ -5169,9 +5179,9 @@ html, body {
         gap: var(--space-2);
     }
     .score-meter {
-        width: 3.5rem;
-        height: 3.5rem;
-        min-width: 3.5rem;
+        width: 4.25rem;
+        height: 4.25rem;
+        min-width: 4.25rem;
     }
     .result-row-title {
         flex: 1 1 100%;

@@ -559,6 +559,8 @@ def test_phase8_search_workbench_and_score_meter():
     meter = css[css.find(".score-meter {") : css.find(".score-meter-track")]
     assert "place-items: center" in meter
     assert "aspect-ratio: 1" in meter
+    assert ".score-meter::before" in meter
+    assert "width: 72%" in meter
     assert "var(--fs-xs)" in meter
     assert "white-space: nowrap" in meter
 
