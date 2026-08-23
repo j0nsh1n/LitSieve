@@ -53,6 +53,9 @@ and this project aims to follow Semantic Versioning for app version strings
   Search on small screens).
 - Feature Guide renders one theme toggle (duplicate control dropped).
 - Simple Search score ring stays centered (grid overlay, not flex).
+- Display Fraunces matches the R3 Quad preview: self-hosted files include
+  SOFT and WONK axes (titles use SOFT 40, WONK 1). Public Sans is Regular,
+  not Thin. Still `font-src 'self'` — no Google Fonts CDN.
 
 ## [5.0.3] - 2026-08-17
 

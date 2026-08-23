@@ -506,13 +506,18 @@ def test_teal_soft_light_tokens():
 def test_quad_notice_fonts_are_self_hosted():
     """CSP is font-src 'self' — no Google Fonts CDN."""
     css = CSS
-    assert "url(\"/static/fonts/fraunces-latin.woff2\")" in css
-    assert "url(\"/static/fonts/public-sans-latin.woff2\")" in css
+    assert "/static/fonts/fraunces-latin.woff2" in css
+    assert "/static/fonts/public-sans-latin.woff2" in css
     assert "fonts.googleapis.com" not in css
     assert "fonts.gstatic.com" not in css
     fonts = REPO / "static" / "fonts"
     assert (fonts / "fraunces-latin.woff2").is_file()
     assert (fonts / "public-sans-latin.woff2").is_file()
+    # R3 Quad titles set SOFT 40 / WONK 1; the old latin cut dropped those axes.
+    fraunces = (fonts / "fraunces-latin.woff2").read_bytes()
+    assert b"SOFT" in fraunces
+    assert b"WONK" in fraunces
+    assert '"SOFT" 40, "WONK" 1' in css or "'SOFT' 40, 'WONK' 1" in css
 
 
 def test_phase8_search_workbench_and_score_meter():
