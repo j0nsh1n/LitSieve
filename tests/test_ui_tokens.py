@@ -599,3 +599,33 @@ def test_phase8_workbench_shell_splits_workflow_and_tools():
     css = CSS
     assert ".shell-primary" in css
     assert ".shell-tools" in css
+
+
+# Variables the stylesheet reads but JS sets at runtime via
+# element.style.setProperty (CSP-safe: no inline style attributes).
+RUNTIME_SET_VARS = {
+    "--score-pct",       # search.js: score ring + fill
+    "--bar-pct",         # statistics.js: source / year bars
+    "--simple-panel-h",  # search.js: measured bottom-bar clearance
+    "--range-fill",      # range input progress
+    "--tx", "--ty", "--tr",  # view-transition offsets
+}
+
+
+def test_no_css_var_falls_back_to_a_hardcoded_colour():
+    """Every var(--x) is defined in CSS or set at runtime — no ghost tokens.
+
+    Undefined names silently fall back to their literal, which then ignores the
+    theme. This caught --danger (#a33, 2.69:1 in dark), --text-muted (#888,
+    3.54:1 on white) and --muted (fell through to `inherit`, so "muted" text
+    rendered at full strength).
+    """
+    css = _css_without_comments()
+    defined = set(re.findall(r"(--[\w-]+)\s*:", css))
+    used = set(re.findall(r"var\(\s*(--[\w-]+)", css))
+    orphans = sorted(used - defined - RUNTIME_SET_VARS)
+    assert not orphans, (
+        f"var() reads undefined token(s): {orphans}. "
+        "Define them in :root, use an existing token, or add to RUNTIME_SET_VARS "
+        "if JS sets them via setProperty."
+    )

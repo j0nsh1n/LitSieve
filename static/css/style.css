@@ -2235,7 +2235,7 @@ select option,
     align-items: center;
     gap: var(--space-2);
     padding: var(--space-2) 0;
-    border-bottom: 1px solid var(--border, rgba(128,128,128,0.25));
+    border-bottom: 1px solid var(--rule);
 }
 .library-manage-list li:last-child {
     border-bottom: none;
@@ -2279,7 +2279,7 @@ select option,
 }
 .admin-job-state.is-active { color: var(--accent); }
 .admin-job-state.is-stalled,
-.admin-job-state.is-failed { color: var(--danger, #a33); }
+.admin-job-state.is-failed { color: var(--err); }
 .site-notice {
     margin: 0;
     padding: var(--space-3) var(--space-4);
@@ -2338,7 +2338,7 @@ select option,
 .join-preview-card {
     margin-top: var(--space-3);
     padding: var(--space-3) var(--space-4);
-    border: 1px solid var(--border, rgba(128,128,128,0.3));
+    border: 1px solid var(--rule);
     border-radius: var(--radius-md);
     background: color-mix(in srgb, var(--accent, #0f766e) 8%, transparent);
 }
@@ -2350,7 +2350,7 @@ select option,
 .join-preview-stats {
     margin: var(--space-2) 0 0;
     padding-left: var(--space-4);
-    color: var(--text-muted, #888);
+    color: var(--text-soft);
     font-size: var(--fs-sm);
 }
 .join-preview-stats li {
@@ -5498,7 +5498,7 @@ html[data-mode="simple"] .form-row:has(input[name="fetch-mode"]) {
     display: none;
 }
 .fetch-source-report-summary-line {
-    color: var(--muted, var(--text-muted, inherit));
+    color: var(--text-soft);
     font-size: var(--fs-sm);
     margin-top: var(--space-1);
 }
@@ -5506,13 +5506,13 @@ html[data-mode="simple"] .form-row:has(input[name="fetch-mode"]) {
     margin-top: var(--space-2);
 }
 .fetch-source-report-muted {
-    color: var(--muted, var(--text-muted, inherit));
+    color: var(--text-soft);
     font-size: var(--fs-sm);
 }
 .fetch-source-tips {
     margin-top: var(--space-2);
     font-size: var(--fs-sm);
-    color: var(--muted, var(--text-muted, inherit));
+    color: var(--text-soft);
 }
 html[data-mode="simple"] details.advanced-details:has(#fetch-email),
 html[data-mode="simple"] details.advanced-details:has(#embedding-model) {
