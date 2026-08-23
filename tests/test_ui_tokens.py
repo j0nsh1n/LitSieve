@@ -499,25 +499,28 @@ def test_teal_soft_light_tokens():
     assert tokens.get("--on-accent") == "#fff"
     # Amber was #a8700f = 4.21:1 on white, under AA. Darkened for contrast.
     assert tokens.get("--warn") == "#96640c"
-    assert "Fraunces" in tokens.get("--font-serif", "")
     assert "Public Sans" in tokens.get("--font-sans", "")
+    assert "var(--font-sans)" in tokens.get("--font-serif", "")
 
 
-def test_quad_notice_fonts_are_self_hosted():
-    """CSP is font-src 'self' — no Google Fonts CDN."""
+def test_public_sans_is_self_hosted():
+    """CSP is font-src 'self' — no Google Fonts CDN. Titles share Public Sans."""
     css = CSS
-    assert "/static/fonts/fraunces-latin.woff2" in css
     assert "/static/fonts/public-sans-latin.woff2" in css
+    assert "fraunces" not in css.lower()
     assert "fonts.googleapis.com" not in css
     assert "fonts.gstatic.com" not in css
     fonts = REPO / "static" / "fonts"
-    assert (fonts / "fraunces-latin.woff2").is_file()
     assert (fonts / "public-sans-latin.woff2").is_file()
-    # R3 Quad titles set SOFT 40 / WONK 1; the old latin cut dropped those axes.
-    fraunces = (fonts / "fraunces-latin.woff2").read_bytes()
-    assert b"SOFT" in fraunces
-    assert b"WONK" in fraunces
-    assert '"SOFT" 40, "WONK" 1' in css or "'SOFT' 40, 'WONK' 1" in css
+    assert not (fonts / "fraunces-latin.woff2").exists()
+
+
+def test_body_background_is_flat():
+    """No paper grain or radial wash on the page canvas."""
+    assert "feTurbulence" not in CSS
+    body = CSS[CSS.find("\nbody {") : CSS.find("\n::selection")]
+    assert "background-image" not in body
+    assert "background: var(--bg)" in body
 
 
 def test_phase8_search_workbench_and_score_meter():
