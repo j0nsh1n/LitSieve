@@ -532,7 +532,7 @@ async def api_delete_account(req: DeleteAccountRequest, request: Request):
         # 3. Delete the account record.
         core.user_db.delete_user(uid)
     except Exception as e:
-        return server_error(e)
+        return server_error()
 
     # Clear auth cookies so the now-deleted session can't keep being used.
     response = JSONResponse(content={"status": "success"})

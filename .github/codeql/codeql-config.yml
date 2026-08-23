@@ -14,14 +14,10 @@ paths-ignore:
   - tests
 
 query-filters:
-  # py/stack-trace-exposure (31 alerts)
-  # False positive: every hit is `except Exception as e: return server_error(e)`.
-  # app/core.py:733 server_error() logs the exception server-side via
-  # logger.exception() and returns a fixed {"detail": "Internal server error"}.
-  # The exception object never reaches the response body. CodeQL follows the
-  # argument into the function and assumes it is rendered.
-  - exclude:
-      id: py/stack-trace-exposure
+  # py/stack-trace-exposure is deliberately NOT excluded. It used to fire 31
+  # times on `return server_error(e)`; server_error() now takes no argument
+  # (logger.exception() captures the live exception itself), so the dataflow
+  # edge is gone at source and the query stays active to catch a real leak.
 
   # py/cookie-injection (1 alert, app/routes/admin.py)
   # False positive: the cookie value is view["ui_mode"], guarded on the line

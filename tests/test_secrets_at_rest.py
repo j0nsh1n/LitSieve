@@ -139,3 +139,27 @@ def test_sanitize_plain_is_linear_on_pathological_input():
     # Pre-capped input finishes in milliseconds; the unbounded version took
     # seconds on the same string.
     assert elapsed < 1.0, f"sanitize_plain took {elapsed:.2f}s"
+
+
+def test_server_error_takes_no_exception_argument():
+    """Keeps py/stack-trace-exposure meaningful: no exception may flow into
+    the response helper. logger.exception() captures the live exception, so
+    passing it in only created a dataflow edge for the scanner to follow.
+    """
+    import inspect
+    import pathlib
+    import re
+
+    from app.core import server_error
+
+    assert not inspect.signature(server_error).parameters, (
+        "server_error() must take no argument — see the CodeQL config note."
+    )
+
+    app_dir = pathlib.Path(__file__).resolve().parent.parent / "app"
+    offenders = []
+    for path in app_dir.rglob("*.py"):
+        for i, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if re.search(r"server_error\(\s*[^)\s]", line):
+                offenders.append(f"{path.name}:{i}")
+    assert not offenders, f"server_error() called with an argument: {offenders}"

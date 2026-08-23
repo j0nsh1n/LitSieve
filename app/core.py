@@ -730,9 +730,15 @@ def csrf_failed(request: Request) -> bool:
     return not cookie_token or not header_token or not secrets.compare_digest(cookie_token, header_token)
 
 
-def server_error(e: Exception) -> JSONResponse:
-    """Log the real exception server-side, return a generic message to the client."""
-    logger.exception("Unhandled error in API handler: %s", e)
+def server_error() -> JSONResponse:
+    """Log the real exception server-side, return a generic message to the client.
+
+    Takes no argument on purpose. Call it only from inside an `except` block:
+    logger.exception() captures the active exception and its traceback by
+    itself. Passing the exception in added nothing to the log and created a
+    dataflow edge (py/stack-trace-exposure) suggesting it reached the client.
+    """
+    logger.exception("Unhandled error in API handler")
     return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 

@@ -51,6 +51,6 @@ async def api_start_over(request: Request):
             "notes": stats.get("notes", 0),
         }
     except Exception as e:
-        return server_error(e)
+        return server_error()
     finally:
         release_pipeline(uid)

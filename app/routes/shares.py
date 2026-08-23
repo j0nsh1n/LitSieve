@@ -82,7 +82,7 @@ async def api_create_share(req: ShareCreateRequest, request: Request):
     except ValueError as e:
         return JSONResponse(status_code=400, content={"detail": str(e)})
     except Exception as e:
-        return server_error(e)
+        return server_error()
 
 
 @router.get("/api/shares")
@@ -105,7 +105,7 @@ async def api_list_shares(request: Request):
             })
         return {"shares": out}
     except Exception as e:
-        return server_error(e)
+        return server_error()
 
 
 @router.delete("/api/shares/{share_id}")
@@ -125,7 +125,7 @@ async def api_revoke_share(share_id: str, request: Request):
             return JSONResponse(status_code=404, content={"detail": "Share not found."})
         return {"status": "success", "revoked": True}
     except Exception as e:
-        return server_error(e)
+        return server_error()
 
 
 @router.get("/api/shares/preview")
@@ -143,7 +143,7 @@ async def api_preview_share(request: Request):
     except ValueError as e:
         return JSONResponse(status_code=400, content={"detail": str(e)})
     except Exception as e:
-        return server_error(e)
+        return server_error()
 
 
 @router.post("/api/shares/join")
@@ -166,4 +166,4 @@ async def api_join_share(req: ShareJoinRequest, request: Request):
     except ValueError as e:
         return JSONResponse(status_code=400, content={"detail": str(e)})
     except Exception as e:
-        return server_error(e)
+        return server_error()

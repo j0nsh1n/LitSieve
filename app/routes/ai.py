@@ -215,7 +215,7 @@ async def api_ai_refine_article(req: AIArticleRequest, request: Request):
     except LLMError as e:
         return JSONResponse(status_code=400, content={"detail": str(e)})
     except Exception as e:
-        return server_error(e)
+        return server_error()
     finally:
         release_pipeline(uid)
 
@@ -254,7 +254,7 @@ async def api_ai_save_key_points(req: AISaveKeyPointsRequest, request: Request):
             "origin": "ai",
         }
     except Exception as e:
-        return server_error(e)
+        return server_error()
     finally:
         release_pipeline(uid)
 
@@ -310,6 +310,6 @@ async def api_ai_ask_article(req: AIAskRequest, request: Request):
     except LLMError as e:
         return JSONResponse(status_code=400, content={"detail": str(e)})
     except Exception as e:
-        return server_error(e)
+        return server_error()
     finally:
         release_pipeline(uid)

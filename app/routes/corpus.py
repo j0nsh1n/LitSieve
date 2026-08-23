@@ -219,7 +219,7 @@ async def api_fetch_multi(req: MultiFetchRequest, request: Request):
         return result
     except Exception as e:
         update_progress(uid, 'fetch', active=False, result=None, error=str(e))
-        return server_error(e)
+        return server_error()
     finally:
         update_progress(uid, 'fetch', active=False)
         release_pipeline(uid)
@@ -300,7 +300,7 @@ async def api_create_embeddings(req: EmbeddingsRequest, request: Request):
         return result
     except Exception as e:
         update_progress(uid, 'embed', active=False, result=None, error=str(e))
-        return server_error(e)
+        return server_error()
     finally:
         update_progress(uid, 'embed', active=False)
         release_pipeline(uid)
@@ -327,7 +327,7 @@ async def api_create_clusters(req: ClusterRequest, request: Request):
             "auto": req.n_clusters is None or req.n_clusters <= 0,
         }
     except Exception as e:
-        return server_error(e)
+        return server_error()
     finally:
         release_pipeline(uid)
 
@@ -347,7 +347,7 @@ async def api_get_clusters(request: Request):
             c["briefing"] = by_id.get(c["cluster_id"])
         return {"clusters": clusters}
     except Exception as e:
-        return server_error(e)
+        return server_error()
     finally:
         release_pipeline(uid)
 
@@ -367,7 +367,7 @@ async def api_get_cluster_articles(cluster_id: int, request: Request):
             a.pop('abstract', None)
         return {"cluster_id": cluster_id, "cluster_label": label, "articles": articles}
     except Exception as e:
-        return server_error(e)
+        return server_error()
     finally:
         release_pipeline(uid)
 
@@ -386,7 +386,7 @@ async def api_statistics(request: Request):
         stats["storage"] = quota.usage_report(uid)
         return stats
     except Exception as e:
-        return server_error(e)
+        return server_error()
     finally:
         release_pipeline(uid)
 
@@ -424,7 +424,7 @@ async def api_detect_duplicates(req: DuplicateRequest, request: Request):
                 })
         return {"duplicates": result, "total": len(duplicates)}
     except Exception as e:
-        return server_error(e)
+        return server_error()
     finally:
         release_pipeline(uid)
 
@@ -455,7 +455,7 @@ async def api_screening(req: ScreeningRequest, request: Request):
             "reason": reason,
         }
     except Exception as e:
-        return server_error(e)
+        return server_error()
     finally:
         release_pipeline(uid)
 
@@ -478,7 +478,7 @@ async def api_screening_excluded(request: Request, reason: str = "low_relevance"
             "items": items,
         }
     except Exception as e:
-        return server_error(e)
+        return server_error()
     finally:
         release_pipeline(uid)
 
@@ -506,7 +506,7 @@ async def api_screening_quick_preview(req: QuickScreenPreviewRequest, request: R
     except ValueError as e:
         return JSONResponse(status_code=400, content={"detail": str(e)})
     except Exception as e:
-        return server_error(e)
+        return server_error()
     finally:
         release_pipeline(uid)
 
@@ -540,7 +540,7 @@ async def api_cluster_screening(cluster_id: int, req: ClusterScreeningRequest, r
             "reason": reason,
         }
     except Exception as e:
-        return server_error(e)
+        return server_error()
     finally:
         release_pipeline(uid)
 
@@ -585,7 +585,7 @@ async def api_load_sample_corpus(req: SampleCorpusRequest, request: Request):
             "hint": "Prepare papers for search next (or it auto-runs after a normal fetch).",
         }
     except Exception as e:
-        return server_error(e)
+        return server_error()
     finally:
         release_pipeline(uid)
 
@@ -604,7 +604,7 @@ async def api_resolve_duplicates(req: ResolveDuplicatesRequest, request: Request
         result = await run_in_thread(p.resolve_duplicates, threshold=req.threshold)
         return {"status": "success", **result}
     except Exception as e:
-        return server_error(e)
+        return server_error()
     finally:
         release_pipeline(uid)
 
@@ -629,6 +629,6 @@ async def api_coverage(req: CoverageRequest, request: Request):
             "missing_embeddings": stats.get("missing_embeddings"),
         }
     except Exception as e:
-        return server_error(e)
+        return server_error()
     finally:
         release_pipeline(uid)
