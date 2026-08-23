@@ -556,6 +556,11 @@ def test_phase8_search_workbench_and_score_meter():
     assert ".score-meter-fill" in css
     assert "var(--score-pct" in css
     assert "cursor: help" in css
+    meter = css[css.find(".score-meter {") : css.find(".score-meter-track")]
+    assert "place-items: center" in meter
+    assert "aspect-ratio: 1" in meter
+    assert "var(--fs-xs)" in meter
+    assert "white-space: nowrap" in meter
 
 
 def test_phase8_page_help_on_app_shell_pages():

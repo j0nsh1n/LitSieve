@@ -1702,9 +1702,11 @@ input[type="range"]::-moz-range-thumb:hover {
 .score-meter {
     display: grid;
     place-items: center;
-    width: 3.25rem;
-    height: 3.25rem;
-    min-width: 3.25rem;
+    width: 3.5rem;
+    height: 3.5rem;
+    min-width: 3.5rem;
+    aspect-ratio: 1;
+    box-sizing: border-box;
     flex-shrink: 0;
     cursor: help;
     border-radius: 50%;
@@ -1716,20 +1718,26 @@ input[type="range"]::-moz-range-thumb:hover {
     grid-area: 1 / 1;
 }
 .score-meter-value {
+    /* Hole must clear 5 tabular chars (0.000–1.000). Source Sans 3 at
+       --fs-sm overflowed the old 2.6rem disc and clipped the ring. */
     display: grid;
     place-items: center;
-    width: 2.6rem;
-    height: 2.6rem;
+    z-index: 1;
+    box-sizing: border-box;
+    width: 2.7rem;
+    height: 2.7rem;
     border-radius: 50%;
     background: var(--surface);
     font-family: var(--font-sans);
-    font-size: var(--fs-sm);
+    font-size: var(--fs-xs);
     font-weight: 700;
     font-variant-numeric: tabular-nums;
     color: var(--accent);
     text-align: center;
-    letter-spacing: 0;
+    letter-spacing: -0.02em;
     line-height: 1;
+    white-space: nowrap;
+    padding: 0;
 }
 .score-meter-track {
     /* The ring is painted by .score-meter; the track is the width carrier. */
@@ -5161,7 +5169,9 @@ html, body {
         gap: var(--space-2);
     }
     .score-meter {
-        width: 3.25rem;
+        width: 3.5rem;
+        height: 3.5rem;
+        min-width: 3.5rem;
     }
     .result-row-title {
         flex: 1 1 100%;
