@@ -162,6 +162,10 @@ class UserDatabase:
             self.conn.execute(
                 "ALTER TABLE users ADD COLUMN storage_bytes INTEGER NOT NULL DEFAULT 0"
             )
+        if "quota_limit_mb" not in extra:
+            self.conn.execute("ALTER TABLE users ADD COLUMN quota_limit_mb INTEGER")
+        if "quota_limit_until" not in extra:
+            self.conn.execute("ALTER TABLE users ADD COLUMN quota_limit_until TEXT")
         self.conn.execute("""
             CREATE TABLE IF NOT EXISTS support_notes (
                 id              TEXT PRIMARY KEY,
@@ -222,6 +226,10 @@ class UserDatabase:
                 created_at  TEXT NOT NULL
             )
         """)
+        from app.storage.helpdesk import ensure_tables
+        from app.storage.ops_audit import ensure_tables as ensure_ops_tables
+        ensure_tables(self)
+        ensure_ops_tables(self)
         self.conn.commit()
 
     def create_user(
@@ -259,7 +267,9 @@ class UserDatabase:
         "id, username, hashed_password, token_version, email, email_verified, "
         "COALESCE(is_guest, 0), created_at, locked_until, "
         "COALESCE(failed_logins, 0), last_login_at, last_seen_at, "
-        "password_changed_at, COALESCE(storage_bytes, 0)"
+        "password_changed_at, COALESCE(storage_bytes, 0), "
+        "quota_limit_mb, quota_limit_until, "
+        "disabled_until, disabled_message, disabled_at"
     )
 
     @staticmethod
@@ -284,6 +294,11 @@ class UserDatabase:
             "last_seen_at": row[11],
             "password_changed_at": row[12],
             "storage_bytes": int(row[13] or 0),
+            "quota_limit_mb": int(row[14]) if row[14] is not None else None,
+            "quota_limit_until": row[15],
+            "disabled_until": row[16],
+            "disabled_message": row[17],
+            "disabled_at": row[18],
         }
 
     def get_by_username(self, username: str) -> Optional[Dict]:
@@ -411,6 +426,13 @@ class UserDatabase:
                     "ORDER BY storage_bytes DESC LIMIT ?",
                     (limit,),
                 ).fetchall()
+            elif kind == "disabled":
+                rows = self.conn.execute(
+                    f"SELECT {self._USER_COLS} FROM users "
+                    "WHERE disabled_until IS NOT NULL AND disabled_until > ? "
+                    "ORDER BY disabled_until DESC LIMIT ?",
+                    (now, limit),
+                ).fetchall()
             elif kind == "errors":
                 hour_ago = (
                     datetime.now(timezone.utc) - timedelta(hours=1)
@@ -482,6 +504,10 @@ class UserDatabase:
         if not until:
             return False
         return str(until) > self._utc_now()
+
+    def is_disabled(self, user: Optional[Dict]) -> bool:
+        from app.storage.helpdesk import is_disabled
+        return is_disabled(user, now=self._utc_now())
 
     def record_login_failure(self, username: str, ip: str = "") -> Dict:
         """Increment fail count; lock after LOCKOUT_AFTER. Returns {locked, user_id}."""
@@ -575,6 +601,29 @@ class UserDatabase:
                 (int(used or 0), user_id),
             )
             self.conn.commit()
+
+    def set_quota_override(
+        self, user_id: str, limit_mb: int, until: str
+    ) -> bool:
+        """Time-boxed per-account cap. ``until`` is UTC ``YYYY-MM-DD HH:MM:SS``."""
+        with self._lock:
+            cur = self.conn.execute(
+                "UPDATE users SET quota_limit_mb = ?, quota_limit_until = ? "
+                "WHERE id = ?",
+                (int(limit_mb), until, user_id),
+            )
+            self.conn.commit()
+            return cur.rowcount > 0
+
+    def clear_quota_override(self, user_id: str) -> bool:
+        with self._lock:
+            cur = self.conn.execute(
+                "UPDATE users SET quota_limit_mb = NULL, quota_limit_until = NULL "
+                "WHERE id = ?",
+                (user_id,),
+            )
+            self.conn.commit()
+            return cur.rowcount > 0
 
     def record_auth_event(
         self,

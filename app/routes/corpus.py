@@ -201,6 +201,12 @@ async def api_fetch_multi(req: MultiFetchRequest, request: Request):
         sources=list(req.sources),
         by_source={},
         source_status={},
+        last_fetch={
+            "query": req.query,
+            "sources": list(req.sources),
+            "max_results": req.max_results,
+            "clear_first": bool(req.clear_first),
+        },
     ):
         return JSONResponse(
             status_code=409,

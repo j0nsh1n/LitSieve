@@ -69,6 +69,20 @@ def test_ci_installs_the_js_parser():
     assert "esprima" in ci, "add esprima to the CI install step or these tests skip"
 
 
+def test_ops_python_highlighter_is_wired():
+    root = pathlib.Path(__file__).resolve().parent.parent
+    js = (JS_DIR / "ops.js").read_text(encoding="utf-8")
+    # Ops chrome lives in its own stylesheet (operator-only, outside the
+    # design-system token scale enforced on style.css).
+    css = (root / "static" / "css" / "ops.css").read_text(encoding="utf-8")
+    html = (root / "templates" / "ops.html").read_text(encoding="utf-8")
+    assert "function highlightPython" in js
+    assert "function paintHighlight" in js
+    assert 'id="ops-hl"' in html
+    assert ".ops-hl .tok-kw" in css
+    assert ".ops-editor-wrap.is-py .ops-editor" in css
+
+
 def test_shared_assets_use_one_cache_bust_version():
     """Every template must request the same build of a shared asset.
 
@@ -102,7 +116,16 @@ def test_public_pages_have_theme_toggle_without_common_js():
 
     for name in ("landing.html", "feature_guide.html"):
         html = (root / "templates" / name).read_text(encoding="utf-8")
-        assert 'id="theme-toggle"' in html, f"{name} missing theme toggle"
+        # The button lives in a shared partial, so accept either the literal
+        # markup or the include that pulls it in.
+        has_toggle = (
+            'id="theme-toggle"' in html
+            or 'partials/theme_toggle.html' in html
+        )
+        assert has_toggle, f"{name} missing theme toggle"
+        assert html.count('partials/theme_toggle.html') <= 1, (
+            f"{name} includes the theme toggle more than once"
+        )
         assert 'src="/static/js/common.js' not in html, f"{name} must not load common.js"
 
 

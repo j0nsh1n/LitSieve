@@ -922,6 +922,15 @@ function renderStudyTypeBadge(article) {
  + `</span>`;
 }
 
+/** Star control label: inline SVG (never an emoji glyph) + text. */
+function starLabelHtml(on) {
+ const fill = on ? 'currentColor' : 'none';
+ return '<svg class="ico star-ico" viewBox="0 0 24 24" aria-hidden="true" fill="' + fill + '"'
+  + ' stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">'
+  + '<path d="M12 2l3 6.5 7 .9-5 4.9 1.2 7L12 18l-6.2 3.3L7 14.3 2 9.4l7-.9z"/></svg>'
+  + '<span>' + (on ? 'Starred' : 'Star') + '</span>';
+}
+
 function buildResultCard(article, idx) {
  // Phase 8: scannable row with numeric 0–1 score meter (not Low/Medium/High details).
  const card = document.createElement('article');
@@ -941,6 +950,11 @@ function buildResultCard(article, idx) {
  const idLink = url
  ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" class="article-link">${idText}</a>`
  : idText;
+ // Simple mode hides the raw-ID row, so the actions row carries the real link.
+ const openLink = url
+ ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" class="result-open-link"
+  title="Open this paper at its source (new tab)">View paper \u2197</a>`
+ : '';
 
  const authors = (article.authors || []).join('; ');
  const abstractHtml = highlightText(article.abstract || '', lastQueryTokens);
@@ -992,7 +1006,8 @@ function buildResultCard(article, idx) {
  <div class="article-abstract">${abstractHtml}</div>
  ${picoHtml}
  <div class="article-actions-row">
- <button type="button" class="star-btn ${starred ? 'is-starred' : ''}" title="Bookmark" aria-label="Star article" aria-pressed="${starred ? 'true' : 'false'}">${starred ? '★ Starred' : '☆ Star'}</button>
+ ${openLink}
+ <button type="button" class="star-btn ${starred ? 'is-starred' : ''}" title="Bookmark" aria-label="Star article" aria-pressed="${starred ? 'true' : 'false'}">${starLabelHtml(starred)}</button>
  <button type="button" class="note-toggle" ${noteVal ? 'hidden' : ''}>Add note</button>
  <button type="button" class="not-relevant-btn"
   title="Screen this paper out as not about your topic">Not relevant</button>
@@ -1005,9 +1020,12 @@ function buildResultCard(article, idx) {
  </div>
  `;
 
- // CSP: no style= attributes — set bar width via CSS variable on the fill.
+ // CSP: no style= attributes — set the score via a CSS variable.
+ // The ring (.score-meter) and the fill both read --score-pct.
  const fill = card.querySelector('.score-meter-fill');
  if (fill) fill.style.setProperty('--score-pct', `${simPct}%`);
+ const meter = card.querySelector('.score-meter');
+ if (meter) meter.style.setProperty('--score-pct', `${simPct}%`);
 
  const noteField = card.querySelector('.note-field');
  noteField.value = noteVal;
@@ -1032,7 +1050,7 @@ function buildResultCard(article, idx) {
  const next = !starBtn.classList.contains('is-starred');
  // Optimistic: flip immediately; roll back on failure.
  starBtn.classList.toggle('is-starred', next);
- starBtn.textContent = next ? '★ Starred' : '☆ Star';
+ starBtn.innerHTML = starLabelHtml(next);
  starBtn.setAttribute('aria-pressed', next ? 'true' : 'false');
  try {
  await apiCall('/api/notes', {
@@ -1048,7 +1066,7 @@ function buildResultCard(article, idx) {
  if (displayFilterState.starred) showSearchResults();
  } catch (err) {
  starBtn.classList.toggle('is-starred', !next);
- starBtn.textContent = next ? '☆ Star' : '★ Starred';
+ starBtn.innerHTML = starLabelHtml(!next);
  starBtn.setAttribute('aria-pressed', next ? 'false' : 'true');
  showNotification(`Could not save star: ${err.message}`, 'error');
  }

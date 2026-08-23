@@ -1069,6 +1069,12 @@ def test_simple_screen_is_required_popup_before_search():
     css = _read("static", "css", "style.css")
     assert "simple-screen-pending" in css
     assert "simple-screen-ready" in css
+    assert "body.simple-screen-ready #search-query-top" in css
+    gate = dm[
+        dm.find("function isSimpleScreenGatePending") : dm.find("function setSimpleScreenGatePending")
+    ]
+    assert "_simpleScreenPending === null" in gate
+    assert "return false" in gate
     assert "body.simple-screen-pending .simple-screen-modal .lra-modal-backdrop" in css
     assert "display: none" in css.split("simple-screen-pending .simple-screen-modal .lra-modal-backdrop")[1][:80]
 

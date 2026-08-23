@@ -8,6 +8,52 @@ and this project aims to follow Semantic Versioning for app version strings
 
 ## [Unreleased]
 
+## [5.0.4] - 2026-08-22
+
+### Added
+- **Admin student-stuck tools:** stuck fetch/prepare job queue; clear a
+  dead job slot or retry prepare on that account’s current library;
+  set/replace email and send verification (never auto-verifies); time-boxed
+  per-account quota bump; delete one named library. Reason + timeline on
+  every action.
+- **Read-only student view** from a selected account (password re-auth,
+  15-minute cookie, persistent banner, mutating routes blocked).
+- **Service snapshot** on Admin (version, uptime, SMTP/AI/quota, job
+  counts, bounded source-error counts). Retry last fetch.
+- **Soft-disable / re-enable** with student-facing explanation and optional
+  expiry.
+- **Ask for help** tickets (safe diagnostics only) with admin status and
+  replies (timeline + email if SMTP is on).
+- **Incident banner** (draft / publish / expire / disable / rollback) and a
+  versioned editor for support links, help text, topic-preset labels, and
+  known-issue notices (plain text / JSON, no HTML).
+- **Ship** (`/ops`, operator only): edit files in a staging worktree, review
+  the diff, validate, commit (`remote-edit:`), deploy with health-check
+  rollback, and redeploy a previous SHA. Named actions only; no shell
+  interpolation. Re-auth required before save/deploy. Workbench UI; optional
+  Grok Build CLI against staging (no shell tools). Unlock duration is
+  configurable (5 min–8 hours) with a manual Lock. The timer pauses while
+  Ask Grok is running so the console does not lock mid-run. `/ops` is a
+  VS Code-like workbench (activity bar, file tabs, panel, status bar).
+  Python files in the editor use Dark+/Light+ token colors.
+
+### Changed
+- **Teal Soft** visual pass: accent `#0f766e` (dark `#5eead4`) on cool paper
+  `#f7f8f8` / `#ffffff`. Self-hosted Fraunces (titles) and Public Sans
+  (body/UI). Primary buttons are teal-filled. Radii are 8 / 12 / 18px.
+  Search similarity is a ring (same `--score-pct` as before). Star controls
+  use an SVG icon, not a glyph. Amber caution is `#96640c` (AA on white).
+  Theme toggle uses sun/moon icons and a circular wipe (color fade where
+  View Transitions are unavailable; off when reduced-motion is set). Hero,
+  Simple/Advanced, and the eight guides stay in place.
+
+### Fixed
+- Simple Search field stays visible on phones after Narrow it down
+  (no longer hidden while screening state is unknown; stacked query +
+  Search on small screens).
+- Feature Guide renders one theme toggle (duplicate control dropped).
+- Simple Search score ring stays centered (grid overlay, not flex).
+
 ## [5.0.3] - 2026-08-17
 
 ### Added

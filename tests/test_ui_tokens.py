@@ -140,32 +140,36 @@ def test_font_size_scale_discipline():
 
 
 def test_border_radius_scale_discipline():
-    """At most 3 radius steps — only --radius-* tokens (plus 0)."""
-    allowed = {"--radius-sm", "--radius-md", "--radius-full"}
+    """At most 4 radius steps — only --radius-* tokens (plus 0).
+
+    Teal Soft adds --radius-lg (18px cards) on top of sm/md/full.
+    """
+    allowed = {"--radius-sm", "--radius-md", "--radius-lg", "--radius-full"}
     used = set()
     for v in _decl_values("border-radius"):
         v_clean = v.replace("!important", "").strip()
         lits = _literal_lengths(v_clean)
-        # 0 is fine; no raw 6px/12px etc.
+        # 0 is fine; no raw 8px/12px/18px etc.
         assert not lits, f"literal border-radius {v_clean!r}"
         for tok in re.findall(r"var\((--radius-[\w]+)\)", v_clean):
             used.add(tok)
             assert tok in allowed, tok
-    assert len(used) <= 3, sorted(used)
+    assert len(used) <= 4, sorted(used)
     assert used
 
 
-def test_phase10_radius_tokens_are_two_and_three_px():
-    """Phase 10 broadsheet: --radius-sm/md are 2px/3px (was 4/8)."""
+def test_teal_soft_radius_tokens():
+    """Teal Soft: --radius-sm/md/lg are 8/12/18px (was quad-notice 6/10).
+
+    --radius-lg is now a real token (cards, dialogs, rails), not a fallback.
+    """
     root = _root_block()
-    sm = re.search(r"--radius-sm\s*:\s*([^;]+);", root)
-    md = re.search(r"--radius-md\s*:\s*([^;]+);", root)
-    assert sm, "missing --radius-sm in :root"
-    assert md, "missing --radius-md in :root"
-    assert sm.group(1).strip() == "2px", sm.group(1)
-    assert md.group(1).strip() == "3px", md.group(1)
-    # The undefined --radius-lg fallback is gone; bottom sheets use --radius-md.
-    assert "radius-lg" not in _css_without_comments()
+    for name, want in (("--radius-sm", "8px"), ("--radius-md", "12px"), ("--radius-lg", "18px")):
+        m = re.search(rf"{name}\s*:\s*([^;]+);", root)
+        assert m, f"missing {name} in :root"
+        assert m.group(1).strip() == want, f"{name}={m.group(1)!r}, want {want}"
+    # No bare fallbacks left now that --radius-lg is defined.
+    assert "var(--radius-lg, " not in _css_without_comments()
 
 
 def test_padding_uses_spacing_scale_only():
@@ -434,9 +438,9 @@ def test_phase8_info_text_is_body_scale():
     m2 = re.search(r"\.help-text\s*\{[^}]+\}", css)
     assert m2, ".help-text rule missing"
     assert "var(--fs-sm)" in m2.group(0)
-    # Dark grounds warm newsprint (Phase 10; was graphite #16181a / #1e2124).
-    assert "--bg: #1c1a15" in css or "--bg:#1c1a15" in css
-    assert "--surface: #242118" in css or "--surface:#242118" in css
+    # Dark grounds are Teal Soft (was newsprint #1c1a15 / #242118).
+    assert "--bg: #0d1012" in css or "--bg:#0d1012" in css
+    assert "--surface: #161a1d" in css or "--surface:#161a1d" in css
 
 
 def _css_block_tokens(block: str) -> dict[str, str]:
@@ -470,13 +474,45 @@ def test_phase10_dark_blocks_stay_in_parity():
     assert shared, "dark blocks share no tokens"
     drifted = {k: (a[k], b[k]) for k in sorted(shared) if a[k] != b[k]}
     assert not drifted, f"dark blocks drifted: {drifted}"
-    # Phase 10 newsprint ink (both blocks).
+    # Teal Soft dark grounds (both blocks).
     for tokens in (a, b):
-        assert tokens.get("--bg") == "#1c1a15"
-        assert tokens.get("--surface") == "#242118"
-        assert tokens.get("--text") == "#eae4d4"
-        assert tokens.get("--text-soft") == "#a59d8c"
-        assert tokens.get("--rule") == "#3b372c"
+        assert tokens.get("--bg") == "#0d1012"
+        assert tokens.get("--surface") == "#161a1d"
+        assert tokens.get("--text") == "#e9eef0"
+        assert tokens.get("--text-soft") == "#98a3aa"
+        assert tokens.get("--rule") == "#232a2e"
+        assert tokens.get("--accent") == "#5eead4"
+        assert tokens.get("--ok") == "#6ee7a8"
+        assert tokens.get("--on-accent") == "#062421"
+
+
+def test_teal_soft_light_tokens():
+    """Live accent is Teal Soft; success green must not collide with it."""
+    root = _root_block()
+    tokens = _css_block_tokens(root)
+    assert tokens.get("--bg") == "#f7f8f8"
+    assert tokens.get("--surface") == "#ffffff"
+    assert tokens.get("--accent") == "#0f766e"
+    assert tokens.get("--accent-hover") == "#0b5c56"
+    assert tokens.get("--ok") == "#15803d"
+    assert tokens.get("--ok") != tokens.get("--accent")
+    assert tokens.get("--on-accent") == "#fff"
+    # Amber was #a8700f = 4.21:1 on white, under AA. Darkened for contrast.
+    assert tokens.get("--warn") == "#96640c"
+    assert "Fraunces" in tokens.get("--font-serif", "")
+    assert "Public Sans" in tokens.get("--font-sans", "")
+
+
+def test_quad_notice_fonts_are_self_hosted():
+    """CSP is font-src 'self' — no Google Fonts CDN."""
+    css = CSS
+    assert "url(\"/static/fonts/fraunces-latin.woff2\")" in css
+    assert "url(\"/static/fonts/public-sans-latin.woff2\")" in css
+    assert "fonts.googleapis.com" not in css
+    assert "fonts.gstatic.com" not in css
+    fonts = REPO / "static" / "fonts"
+    assert (fonts / "fraunces-latin.woff2").is_file()
+    assert (fonts / "public-sans-latin.woff2").is_file()
 
 
 def test_phase8_search_workbench_and_score_meter():

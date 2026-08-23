@@ -26,7 +26,7 @@ async def health():
         _core.purge_expired_guests()
     except Exception:
         logger.exception("purge_expired_guests from /health failed")
-    return {"status": "healthy", "version": "5.0.3"}
+    return {"status": "healthy", "version": "5.0.4"}
 
 
 # Browsers and crawlers request these at the site root, where the /static mount
@@ -61,6 +61,7 @@ async def robots():
         "Disallow: /search\n"
         "Disallow: /account\n"
         "Disallow: /admin\n"
+        "Disallow: /ops\n"
     )
     return PlainTextResponse(body, media_type="text/plain")
 
@@ -83,8 +84,14 @@ async def api_sources():
     Single source of truth is source_catalog.py so Data Management, coverage,
     and duplicate priority stay aligned.
     """
+    from app import core
     from app.content.source_catalog import public_catalog
-    return public_catalog()
+    from app.storage import helpdesk
+    catalog = public_catalog()
+    extras = helpdesk.public_site_content(core.user_db)
+    catalog["preset_notes"] = extras.get("topic_presets") or []
+    catalog["help_text"] = extras.get("help_text") or ""
+    return catalog
 
 
 @router.get("/")

@@ -63,9 +63,29 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function updateButton(theme) {
-        btn.textContent = theme === 'dark' ? '🌙' : '☀';
         btn.title = theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
         btn.setAttribute('aria-label', btn.title);
+    }
+
+    function applyTheme(next) {
+        try {
+            localStorage.setItem('theme', next);
+        } catch (e2) { /* ignore */ }
+        root.setAttribute('data-theme', next);
+        updateButton(next);
+    }
+
+    function setWipeOrigin(el) {
+        var r = el.getBoundingClientRect();
+        var x = r.left + r.width / 2;
+        var y = r.top + r.height / 2;
+        var reach = Math.hypot(
+            Math.max(x, window.innerWidth - x),
+            Math.max(y, window.innerHeight - y)
+        );
+        root.style.setProperty('--tx', x + 'px');
+        root.style.setProperty('--ty', y + 'px');
+        root.style.setProperty('--tr', reach + 'px');
     }
 
     updateButton(getEffectiveTheme());
@@ -73,16 +93,21 @@ document.addEventListener('DOMContentLoaded', function () {
     btn.addEventListener('click', function () {
         var next = getEffectiveTheme() === 'dark' ? 'light' : 'dark';
         var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        if (!reduce) {
-            root.classList.add('theme-animating');
-            setTimeout(function () {
-                root.classList.remove('theme-animating');
-            }, 180);
+        if (reduce) {
+            applyTheme(next);
+            return;
         }
-        try {
-            localStorage.setItem('theme', next);
-        } catch (e2) { /* ignore */ }
-        root.setAttribute('data-theme', next);
-        updateButton(next);
+        if (typeof document.startViewTransition === 'function') {
+            setWipeOrigin(btn);
+            document.startViewTransition(function () {
+                applyTheme(next);
+            });
+            return;
+        }
+        root.classList.add('theme-animating');
+        applyTheme(next);
+        setTimeout(function () {
+            root.classList.remove('theme-animating');
+        }, 450);
     });
 });

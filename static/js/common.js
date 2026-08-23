@@ -1428,6 +1428,38 @@ document.addEventListener('DOMContentLoaded', function() {
     requestAnimationFrame(function() {
         requestAnimationFrame(markPageEntered);
     });
+    const helpBtn = document.getElementById('ask-help-btn');
+    if (helpBtn) {
+        helpBtn.addEventListener('click', async () => {
+            if (typeof openSiteForm !== 'function') return;
+            const vals = await openSiteForm({
+                title: 'Ask for help',
+                message: 'Describe what is stuck. We attach only safe diagnostics (page, mode, counts) — not paper titles or passwords.',
+                confirmLabel: 'Send',
+                fields: [
+                    { id: 'body', label: 'What happened?', type: 'text', value: '', placeholder: 'I cannot prepare papers…' },
+                ],
+                validate: (v) => (String(v.body || '').trim().length >= 3 ? null : 'Write a short message.'),
+            });
+            if (!vals) return;
+            try {
+                await apiCall('/api/tickets', {
+                    method: 'POST',
+                    body: {
+                        body: vals.body,
+                        context: {
+                            route: location.pathname,
+                            ui_mode: document.body.getAttribute('data-mode') || localStorage.getItem('uiMode') || '',
+                            user_agent: (navigator.userAgent || '').slice(0, 160),
+                        },
+                    },
+                });
+                showNotification('Help request sent.', 'success');
+            } catch (e) {
+                showNotification(e.message || 'Could not send help request', 'error');
+            }
+        });
+    }
 });
 
 // bfcache restore: clear any stuck exit state from a prior navigation.

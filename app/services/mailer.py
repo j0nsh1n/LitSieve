@@ -139,6 +139,19 @@ def send_one_time_login(to: str, username: str, link: str) -> None:
     )
 
 
+def send_support_reply(to: str, username: str, body: str) -> None:
+    send(
+        to,
+        "A reply on your LitSieve help request",
+        (
+            f"Hi {username},\n\n"
+            "A teacher replied to your help request:\n\n"
+            f"{body}\n\n"
+            "Sign in to LitSieve to read the full thread.\n"
+        ),
+    )
+
+
 def send_password_reset(to: str, username: str, code: str) -> None:
     link = f"{public_base_url()}/reset-password"
     send(

@@ -17,7 +17,9 @@ from __future__ import annotations
 import logging
 import math
 import os
+from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
 from app.storage.libraries import user_dir
 
@@ -44,11 +46,12 @@ def mb(num_bytes: int) -> float:
 
 
 def limit_bytes() -> int:
-    """Configured ceiling in bytes; 0 means unlimited.
+    """Host-wide ceiling in bytes; 0 means unlimited.
 
     Only finite, non-negative numbers are accepted. ``inf`` / NaN / negatives
     fall back to the default (negatives used to become 0 and silently disable
-    the cap). Explicit ``0`` still means unlimited.
+    the cap). Explicit ``0`` still means unlimited. Per-account time-boxed
+    bumps use :func:`account_limit_bytes`.
     """
     raw = (os.getenv(ENV_KEY) or "").strip()
     if not raw:
@@ -62,6 +65,50 @@ def limit_bytes() -> int:
         logger.warning("%s=%r is invalid; using default %d MB", ENV_KEY, raw, DEFAULT_MAX_MB)
         return DEFAULT_MAX_MB * 1024 * 1024
     return int(value) * 1024 * 1024
+
+
+def _utc_now_sql() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _lookup_account(user_id: str) -> Optional[dict]:
+    if not user_id:
+        return None
+    try:
+        from app import core
+        db = getattr(core, "user_db", None)
+        if db is None:
+            return None
+        return db.get_by_id(user_id)
+    except Exception:
+        logger.exception("Could not load quota override for %s", user_id)
+        return None
+
+
+def override_is_active(rec: Optional[dict], *, now: Optional[str] = None) -> bool:
+    if not rec:
+        return False
+    raw_mb = rec.get("quota_limit_mb")
+    until = rec.get("quota_limit_until")
+    if raw_mb is None or not until:
+        return False
+    try:
+        mb_val = int(raw_mb)
+    except (TypeError, ValueError):
+        return False
+    if mb_val < 1:
+        return False
+    stamp = now or _utc_now_sql()
+    return str(until) > stamp
+
+
+def account_limit_bytes(user_id: str, rec: Optional[dict] = None) -> int:
+    """Effective ceiling for one account (live bump, else host default)."""
+    base = limit_bytes()
+    data = rec if rec is not None else _lookup_account(user_id)
+    if not override_is_active(data):
+        return base
+    return int(data["quota_limit_mb"]) * 1024 * 1024
 
 
 def usage_bytes(user_id: str) -> int:
@@ -83,18 +130,25 @@ def usage_bytes(user_id: str) -> int:
 def usage_report(user_id: str) -> dict:
     """Usage numbers for the UI. ``limit_mb`` is 0 when the cap is disabled."""
     used = usage_bytes(user_id)
-    cap = limit_bytes()
+    rec = _lookup_account(user_id)
+    cap = account_limit_bytes(user_id, rec=rec)
+    default_cap = limit_bytes()
+    active = override_is_active(rec)
     return {
         "used_mb": mb(used),
         "limit_mb": mb(cap) if cap else 0,
+        "default_limit_mb": mb(default_cap) if default_cap else 0,
         "percent": round(used / cap * 100, 1) if cap else 0.0,
         "over_limit": bool(cap) and used >= cap,
+        "quota_override_mb": int(rec["quota_limit_mb"]) if active and rec else None,
+        "quota_override_until": (rec.get("quota_limit_until") if rec else None) if active else None,
+        "quota_override_active": active,
     }
 
 
 def check_quota(user_id: str) -> None:
     """Raise :class:`QuotaExceeded` when the account is at/over its ceiling."""
-    cap = limit_bytes()
+    cap = account_limit_bytes(user_id)
     if not cap:
         return
     used = usage_bytes(user_id)
@@ -122,7 +176,7 @@ def is_over_quota(user_id: str, *, reclaimable: int = 0) -> bool:
     library will be dropped if the fetch produces papers).
     """
     try:
-        cap = limit_bytes()
+        cap = account_limit_bytes(user_id)
         if not cap:
             return False
         used = usage_bytes(user_id)

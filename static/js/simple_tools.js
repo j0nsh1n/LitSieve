@@ -186,7 +186,9 @@ function isSimpleScreenGatePending() {
  if (typeof isSimpleMode !== 'function' || !isSimpleMode()) return false;
  if (!_onSearchPage()) return false;
  if (typeof _collectQueryOn === 'function' && _collectQueryOn()) return false;
- if (_simpleScreenPending === null) return true;
+ // Unknown (null) must not hide the Search field — refresh will set true
+ // and open Narrow it down when it is actually required.
+ if (_simpleScreenPending === null) return false;
  return !!_simpleScreenPending;
 }
 
@@ -213,6 +215,8 @@ function applySimpleScreenGateUi() {
  }
  const work = document.getElementById('search-workbench');
  if (work) work.hidden = !readySearch;
+ const qtop = document.getElementById('search-query-top');
+ if (qtop) qtop.hidden = !readySearch;
 }
 
 function copyScreenQuestionToSearch() {

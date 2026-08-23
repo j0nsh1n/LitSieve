@@ -6,10 +6,23 @@
     <title>{% block title %}LitSieve{% endblock %}</title>
     <link rel="icon" href="/static/favicon.ico?v=20260803a" sizes="32x32">
     <link rel="apple-touch-icon" href="/static/favicon.png?v=20260803a">
-    <link rel="stylesheet" href="/static/css/style.css?v=20260817g">
-    <script src="/static/js/theme-init.js?v=20260814e"></script>
+    <link rel="stylesheet" href="/static/css/style.css?v=20260823b">
+    <script src="/static/js/theme-init.js?v=20260823a"></script>
+    {% block head_extra %}{% endblock %}
 </head>
-<body{% if user and user.is_guest %} data-guest="1"{% endif %}>
+<body class="{% block body_class %}{% endblock %}"{% if user and user.is_guest %} data-guest="1"{% endif %}{% if support_view %} data-support-view="1"{% endif %}>
+    {% include "partials/site_notice.html" %}
+    {% if support_view %}
+    <div class="support-view-banner" role="alert">
+     <p class="support-view-banner-text">
+      <strong>Read-only student view</strong>
+      of {{ support_view.student_username }}.
+      You cannot change their account, fetch, delete, export, or share.
+      Expires {{ support_view.expires_at }} UTC.
+     </p>
+     <a href="/support-view/exit" class="btn btn-primary btn-sm" data-no-transition="1" id="support-view-exit">Exit student view</a>
+    </div>
+    {% endif %}
     {% if user and user.is_guest %}
     <div class="guest-banner" role="status">
      <p class="guest-banner-text">
@@ -95,11 +108,17 @@
             <button type="button" class="mode-toggle" id="mode-toggle"
                 title="Switch to Simple mode"
                 aria-label="Switch to Simple mode" aria-pressed="false">Advanced</button>
-            <button type="button" class="theme-toggle" id="theme-toggle" title="Toggle theme" aria-label="Toggle theme">🌙</button>
-            {% if user and user.is_admin %}
+            {% include "partials/theme_toggle.html" %}
+            {% if user and user.is_admin and not support_view %}
             <a href="/admin"
                class="nav-logout {% if active_page == 'admin' %}active{% endif %}"
                title="Admin">Admin</a>
+            <a href="/ops"
+               class="nav-logout {% if active_page == 'ops' %}active{% endif %}"
+               title="Ship">Ship</a>
+            {% endif %}
+            {% if user and not user.is_guest and not support_view %}
+            <button type="button" class="nav-logout" id="ask-help-btn">Ask for help</button>
             {% endif %}
             {% if user %}
             <a href="/account"
@@ -122,11 +141,14 @@
 
     {% from "macros/disclaimers.html" import scope_footer %}
     <footer class="footer">
-        <p>LitSieve - v5.0.3</p>
+        <p>LitSieve - v5.0.4</p>
+        {% if support_links %}
+        <p class="help-text">{% for link in support_links %}<a href="{{ link.url }}">{{ link.label }}</a>{% if not loop.last %} · {% endif %}{% endfor %}</p>
+        {% endif %}
         {{ scope_footer() }}
     </footer>
 
-    <script src="/static/js/common.js?v=20260814i"></script>
+    <script src="/static/js/common.js?v=20260817j"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>
