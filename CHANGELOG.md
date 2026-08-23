@@ -8,7 +8,7 @@ and this project aims to follow Semantic Versioning for app version strings
 
 ## [Unreleased]
 
-## [5.0.4] - 2026-08-22
+## [5.1.0] - 2026-08-22
 
 ### Added
 - **Admin student-stuck tools:** stuck fetch/prepare job queue; clear a

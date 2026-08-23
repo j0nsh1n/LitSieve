@@ -1,7 +1,7 @@
 # context.md — LitSieve
 
 ## Current State
-- App version **5.0.4** (`app/main.py`, `GET /health`). Product name **LitSieve**.
+- App version **5.1.0** (`app/main.py`, `GET /health`). Product name **LitSieve**.
 - Example public deployment pattern: HTTPS at the edge (e.g. Cloudflare Tunnel)
   → `uvicorn` HTTP on `127.0.0.1:7860` only. Operator sets `PUBLIC_BASE_URL` and
   `DEBUG=false` with a real `SECRET_KEY` in gitignored `.env`.
@@ -105,8 +105,8 @@ Guest User (is_guest) → sample corpus only; purged by age
 
 ## Session Handoff
 - **Date:** 2026-08-22
-- **Branch:** `release/5.0.4` vs `main`
-- **Done:** 5.0.4 — extra admin/helpdesk tools, tickets, incident banner,
+- **Branch:** `release/5.1.0` (local; do not push until asked)
+- **Done:** 5.1.0 — extra admin/helpdesk tools, tickets, incident banner,
   Ship `/ops`, Teal Soft (Public Sans titles, Source Sans 3 body, flat paper).
 - **Next:** Leftovers in `notes.md`. Set `LITSIEVE_STAGING` / `LITSIEVE_LIVE`
   on the host. `design_mockups/` untracked unless asked.
