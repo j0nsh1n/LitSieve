@@ -524,7 +524,11 @@ _TAG_RE = re.compile(r"<[^>]*>")
 
 
 def sanitize_plain(text: str, *, limit: int = _NOTICE_MAX) -> str:
-    cleaned = _TAG_RE.sub("", text or "")
+    # Bound the input before the regex: <[^>]*> is quadratic on a long run of
+    # unclosed '<'. The result is truncated to `limit` anyway, so capping the
+    # input at a multiple of it changes no accepted output.
+    raw = (text or "")[: max(limit, 1) * 4]
+    cleaned = _TAG_RE.sub("", raw)
     cleaned = cleaned.replace("\x00", "").strip()
     if len(cleaned) > limit:
         cleaned = cleaned[:limit]
