@@ -1703,9 +1703,9 @@ input[type="range"]::-moz-range-thumb:hover {
     display: grid;
     place-items: center;
     position: relative;
-    width: 4.25rem;
-    height: 4.25rem;
-    min-width: 4.25rem;
+    width: 3.75rem;
+    height: 3.75rem;
+    min-width: 3.75rem;
     aspect-ratio: 1;
     box-sizing: border-box;
     flex-shrink: 0;
@@ -5179,9 +5179,9 @@ html, body {
         gap: var(--space-2);
     }
     .score-meter {
-        width: 4.25rem;
-        height: 4.25rem;
-        min-width: 4.25rem;
+        width: 3.75rem;
+        height: 3.75rem;
+        min-width: 3.75rem;
     }
     .result-row-title {
         flex: 1 1 100%;
