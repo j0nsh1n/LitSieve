@@ -21,6 +21,8 @@ jobs:
       - uses: github/codeql-action/init@v3
         with:
           languages: python, javascript-typescript
+          # Exclusions are documented and evidence-backed — see the file.
+          config-file: ./.github/codeql/codeql-config.yml
 
       - uses: github/codeql-action/autobuild@v3
 

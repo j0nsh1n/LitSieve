@@ -113,7 +113,7 @@ async def api_export_selection(req: ExportSelectionRequest, request: Request):
             headers={"Content-Disposition": f"attachment; filename={filename}"},
         )
     except Exception as e:
-        return server_error(e)
+        return server_error()
     finally:
         release_pipeline(uid)
 
@@ -207,7 +207,7 @@ async def api_export_library(
             headers={"Content-Disposition": f"attachment; filename={filename}"},
         )
     except Exception as e:
-        return server_error(e)
+        return server_error()
     finally:
         release_pipeline(uid)
 
@@ -236,6 +236,6 @@ async def api_screening_report(request: Request, format: str = "json"):
             )
         return report
     except Exception as e:
-        return server_error(e)
+        return server_error()
     finally:
         release_pipeline(uid)

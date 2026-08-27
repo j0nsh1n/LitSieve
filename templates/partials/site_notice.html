@@ -1,0 +1,8 @@
+{% if site_notice and site_notice.body %}
+<div class="site-notice" role="status">
+ <p class="site-notice-text">{{ site_notice.body }}</p>
+</div>
+{% endif %}
+{% if known_issues %}
+<p class="known-issues help-text">{{ known_issues }}</p>
+{% endif %}

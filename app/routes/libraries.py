@@ -39,7 +39,7 @@ async def api_list_libraries(request: Request):
     try:
         return list_libraries(user["user_id"])
     except Exception as e:
-        return server_error(e)
+        return server_error()
 
 
 @router.post("/api/libraries")
@@ -58,7 +58,7 @@ async def api_create_library(req: LibraryCreateRequest, request: Request):
     except ValueError as e:
         return JSONResponse(status_code=400, content={"detail": str(e)})
     except Exception as e:
-        return server_error(e)
+        return server_error()
 
 
 @router.post("/api/libraries/switch")
@@ -75,7 +75,7 @@ async def api_switch_library(req: LibrarySwitchRequest, request: Request):
     except ValueError as e:
         return JSONResponse(status_code=400, content={"detail": str(e)})
     except Exception as e:
-        return server_error(e)
+        return server_error()
 
 
 @router.patch("/api/libraries/{library_id}")
@@ -92,7 +92,7 @@ async def api_rename_library(library_id: str, req: LibraryRenameRequest, request
     except ValueError as e:
         return JSONResponse(status_code=400, content={"detail": str(e)})
     except Exception as e:
-        return server_error(e)
+        return server_error()
 
 
 @router.delete("/api/libraries/{library_id}")
@@ -132,4 +132,4 @@ async def api_delete_library(library_id: str, request: Request):
     except ValueError as e:
         return JSONResponse(status_code=400, content={"detail": str(e)})
     except Exception as e:
-        return server_error(e)
+        return server_error()

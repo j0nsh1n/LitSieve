@@ -72,3 +72,7 @@ htmlcov/
 dev_users.db
 dev_users.db-*
 dev_data/
+
+# Scratch: throwaway design mockups and working notes (not product docs)
+design_mockups/
+notes.md

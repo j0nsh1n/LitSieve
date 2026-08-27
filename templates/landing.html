@@ -6,13 +6,14 @@
  <title>LitSieve</title>
     <link rel="icon" href="/static/favicon.ico?v=20260803a" sizes="32x32">
     <link rel="apple-touch-icon" href="/static/favicon.png?v=20260803a">
- <link rel="stylesheet" href="/static/css/style.css?v=20260817g">
- <script src="/static/js/theme-init.js?v=20260814e"></script>
+ <link rel="stylesheet" href="/static/css/style.css?v=20260823j">
+ <script src="/static/js/theme-init.js?v=20260823a"></script>
 </head>
 <body class="public-body">
+ {% include "partials/site_notice.html" %}
  <nav class="public-nav" aria-label="Site">
   <a href="/" class="nav-brand" aria-current="page">LitSieve</a>
-  <button type="button" class="theme-toggle" id="theme-toggle" title="Toggle theme" aria-label="Toggle theme">🌙</button>
+  {% include "partials/theme_toggle.html" %}
  </nav>
  <main class="landing">
  <header class="landing-header">
@@ -112,7 +113,7 @@
  </section>
 
  <footer class="public-footer">
- <p class="public-folio">LitSieve · v5.0.3</p>
+ <p class="public-folio">LitSieve · v5.1.0</p>
  {{ scope_footer(compact=true) }}
  </footer>
  </main>

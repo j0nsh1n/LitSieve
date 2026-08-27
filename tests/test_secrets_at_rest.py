@@ -110,3 +110,56 @@ def test_public_settings_never_expose_the_key(settings_file):
     public = llm.public_ai_settings()
     assert "sk-super-secret" not in json.dumps(public)
     assert public["openai_api_key_set"] is True
+
+
+def test_delete_library_rejects_traversal_ids():
+    """rmtree path must be sanitised, not trusted from libraries.json."""
+    import pytest
+
+    from app.storage import libraries
+
+    for bad in ("../../etc", "a/b", "..", ".", "", "x\x00y"):
+        with pytest.raises(ValueError):
+            libraries._safe_fs_id(bad, label="library id")
+    # A real uuid still passes.
+    assert libraries._safe_fs_id("0f8f0f1e-2b3c-4d5e-8f90-1a2b3c4d5e6f")
+
+
+def test_sanitize_plain_is_linear_on_pathological_input():
+    """<[^>]*> is quadratic on a long run of '<'; input must be pre-capped."""
+    import time
+
+    from app.storage import helpdesk
+
+    payload = "<" * 200_000
+    start = time.perf_counter()
+    out = helpdesk.sanitize_plain(payload, limit=800)
+    elapsed = time.perf_counter() - start
+    assert len(out) <= 800
+    # Pre-capped input finishes in milliseconds; the unbounded version took
+    # seconds on the same string.
+    assert elapsed < 1.0, f"sanitize_plain took {elapsed:.2f}s"
+
+
+def test_server_error_takes_no_exception_argument():
+    """Keeps py/stack-trace-exposure meaningful: no exception may flow into
+    the response helper. logger.exception() captures the live exception, so
+    passing it in only created a dataflow edge for the scanner to follow.
+    """
+    import inspect
+    import pathlib
+    import re
+
+    from app.core import server_error
+
+    assert not inspect.signature(server_error).parameters, (
+        "server_error() must take no argument — see the CodeQL config note."
+    )
+
+    app_dir = pathlib.Path(__file__).resolve().parent.parent / "app"
+    offenders = []
+    for path in app_dir.rglob("*.py"):
+        for i, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if re.search(r"server_error\(\s*[^)\s]", line):
+                offenders.append(f"{path.name}:{i}")
+    assert not offenders, f"server_error() called with an argument: {offenders}"

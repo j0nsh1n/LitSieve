@@ -57,7 +57,7 @@ async def api_search(req: SearchRequest, request: Request):
     except ValueError as e:
         return JSONResponse(status_code=400, content={"detail": str(e)})
     except Exception as e:
-        return server_error(e)
+        return server_error()
     finally:
         release_pipeline(uid)
 
@@ -88,7 +88,7 @@ async def api_search_seed(req: SeedSearchRequest, request: Request):
     except ValueError as e:
         return JSONResponse(status_code=400, content={"detail": str(e)})
     except Exception as e:
-        return server_error(e)
+        return server_error()
     finally:
         release_pipeline(uid)
 
@@ -122,7 +122,7 @@ async def api_search_starred(req: StarredSearchRequest, request: Request):
     except ValueError as e:
         return JSONResponse(status_code=400, content={"detail": str(e)})
     except Exception as e:
-        return server_error(e)
+        return server_error()
     finally:
         release_pipeline(uid)
 
@@ -152,7 +152,7 @@ async def api_upsert_note(req: NoteRequest, request: Request):
                                 "Refresh your results and try again."},
         )
     except Exception as e:
-        return server_error(e)
+        return server_error()
     finally:
         release_pipeline(uid)
 
@@ -169,6 +169,6 @@ async def api_get_note(request: Request, article_id: str = "", source: str = "")
     try:
         return p.db.get_note(article_id, source)
     except Exception as e:
-        return server_error(e)
+        return server_error()
     finally:
         release_pipeline(uid)

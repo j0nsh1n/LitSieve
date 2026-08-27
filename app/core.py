@@ -15,9 +15,12 @@ import contextvars
 import ipaddress
 import logging
 import os
+import re
 import secrets
 import threading
+import time
 from collections import OrderedDict
+from datetime import datetime, timezone
 from functools import partial
 from typing import Optional
 
@@ -41,8 +44,35 @@ logger = logging.getLogger(__name__)
 
 COOKIE_SECURE = os.getenv("DEBUG", "").strip().lower() not in ("1", "true", "yes")
 MAX_CACHED_USERS = 50
+PROCESS_STARTED = time.time()
+SUPPORT_VIEW_COOKIE = "support_view"
+_SAFE_ERR_PATH = re.compile(r"(?:/[A-Za-z0-9._-]+){2,}")
+_MISSING = object()
 
-templates = Jinja2Templates(directory="templates")
+
+def _template_context(request: Request) -> dict:
+    user = current_user(request)
+    notice = None
+    site = {}
+    try:
+        from app.storage import helpdesk
+        notice = helpdesk.published_banner(user_db)
+        site = helpdesk.public_site_content(user_db)
+    except Exception:
+        logger.exception("Could not load site notice/content")
+    return {
+        "support_view": (user or {}).get("support_view"),
+        "site_notice": notice,
+        "site_content": site,
+        "known_issues": site.get("known_issues") or "",
+        "support_links": site.get("support_links") or [],
+    }
+
+
+templates = Jinja2Templates(
+    directory="templates",
+    context_processors=[_template_context],
+)
 
 
 def client_bucket(request: Request) -> str:
@@ -108,6 +138,11 @@ _pipeline_lib_ctx: contextvars.ContextVar[Optional[str]] = contextvars.ContextVa
 # --- Per-user progress tracking (LRU-bounded; one job type at a time per user) ---
 _all_progress: "OrderedDict[str, dict]" = OrderedDict()
 _progress_lock = threading.Lock()
+# Live workers for helpdesk stall detection. Keyed (user_id, task).
+_job_futures: dict = {}
+_job_sync: dict = {}
+JOB_STALE_SECONDS = 300
+JOB_QUEUE_CAP = 25
 
 
 def get_pipeline(
@@ -196,38 +231,49 @@ def _evict_pipeline(user_id: str) -> None:
                         )
     with _progress_lock:
         _all_progress.pop(user_id, None)
+        for task in ('fetch', 'embed'):
+            _release_job_markers(user_id, task)
+
+
+def _utc_stamp() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _empty_job_slot(task: str) -> dict:
+    slot = {
+        'active': False, 'done': 0, 'total': 0, 'result': None, 'error': None,
+        'cancel': False, 'articles_so_far': 0, 'message': '',
+        'started_at': None, 'updated_at': None, 'library_id': None,
+    }
+    if task == 'fetch':
+        slot.update(sources=[], by_source={}, source_status={})
+    return slot
 
 
 def _ensure_progress(user_id: str) -> dict:
     """Return progress dict for user, creating it if needed. Must be called under _progress_lock."""
     if user_id not in _all_progress:
         _all_progress[user_id] = {
-            'fetch': {
-                'active': False, 'done': 0, 'total': 0, 'result': None, 'error': None,
-                'cancel': False, 'articles_so_far': 0, 'message': '',
-                'sources': [], 'by_source': {}, 'source_status': {},
-            },
-            'embed': {
-                'active': False, 'done': 0, 'total': 0, 'result': None, 'error': None,
-                'cancel': False, 'articles_so_far': 0, 'message': '',
-            },
+            'fetch': _empty_job_slot('fetch'),
+            'embed': _empty_job_slot('embed'),
         }
         while len(_all_progress) > MAX_CACHED_USERS:
-            _all_progress.popitem(last=False)
+            evicted, _ = _all_progress.popitem(last=False)
+            for task in ('fetch', 'embed'):
+                _job_futures.pop((evicted, task), None)
+                _job_sync.pop((evicted, task), None)
     _all_progress.move_to_end(user_id)
     # Backfill keys if an older in-memory entry lacks them.
     for task in ('fetch', 'embed'):
-        slot = _all_progress[user_id].setdefault(
-            task, {
-                'active': False, 'done': 0, 'total': 0, 'result': None, 'error': None,
-                'cancel': False, 'articles_so_far': 0, 'message': '',
-            }
-        )
+        slot = _all_progress[user_id].setdefault(task, _empty_job_slot(task))
         slot.setdefault('result', None)
         slot.setdefault('error', None)
         slot.setdefault('cancel', False)
         slot.setdefault('articles_so_far', 0)
         slot.setdefault('message', '')
+        slot.setdefault('started_at', None)
+        slot.setdefault('updated_at', None)
+        slot.setdefault('library_id', None)
         if task == 'fetch':
             slot.setdefault('sources', [])
             slot.setdefault('by_source', {})
@@ -235,9 +281,20 @@ def _ensure_progress(user_id: str) -> dict:
     return _all_progress[user_id]
 
 
+def _release_job_markers(user_id: str, task: str) -> None:
+    _job_futures.pop((user_id, task), None)
+    _job_sync.pop((user_id, task), None)
+
+
 def update_progress(user_id: str, task: str, **kwargs):
     with _progress_lock:
-        _ensure_progress(user_id)[task].update(kwargs)
+        slot = _ensure_progress(user_id)[task]
+        slot.update(kwargs)
+        slot['updated_at'] = _utc_stamp()
+        if kwargs.get('active') is False:
+            fut = _job_futures.get((user_id, task))
+            if fut is None or fut.done():
+                _release_job_markers(user_id, task)
 
 
 def is_job_cancelled(user_id: str, task: str) -> bool:
@@ -253,7 +310,164 @@ def request_job_cancel(user_id: str, task: str) -> bool:
             return False
         slot['cancel'] = True
         slot['message'] = 'Cancelling…'
+        slot['updated_at'] = _utc_stamp()
         return True
+
+
+def job_worker_alive(user_id: str, task: str) -> bool:
+    """True when a thread/request is still attached to this slot."""
+    with _progress_lock:
+        fut = _job_futures.get((user_id, task))
+        if fut is not None and not fut.done():
+            return True
+        return bool(_job_sync.get((user_id, task)))
+
+
+def _stamp_age_seconds(stamp) -> Optional[float]:
+    if not stamp:
+        return None
+    try:
+        dt = datetime.strptime(str(stamp)[:19], "%Y-%m-%d %H:%M:%S").replace(
+            tzinfo=timezone.utc
+        )
+    except (TypeError, ValueError):
+        return None
+    return (datetime.now(timezone.utc) - dt).total_seconds()
+
+
+def classify_job_slot(user_id: str, task: str, slot: dict) -> str:
+    """active | stalled | failed | idle. Does not create progress rows."""
+    _res = slot.get('result')
+    result = _res if isinstance(_res, dict) else {}
+    status = result.get('status') if result else None
+    active = bool(slot.get('active'))
+    error = slot.get('error')
+    alive = job_worker_alive(user_id, task)
+    age = _stamp_age_seconds(slot.get('updated_at'))
+    stale = age is None or age >= JOB_STALE_SECONDS
+    if active and (not alive or stale):
+        return 'stalled'
+    if active:
+        return 'active'
+    if error or result.get('quota_stopped') or status == 'quota_stopped':
+        return 'failed'
+    if status and status not in ('success', 'cancelled'):
+        return 'failed'
+    return 'idle'
+
+
+def safe_error_text(raw, *, limit: int = 240) -> str:
+    """One-line error for helpdesk. No filesystem paths or stack frames."""
+    if not raw:
+        return ""
+    text = str(raw).split("\n")[0]
+    text = _SAFE_ERR_PATH.sub("[path]", text)
+    return text[:limit]
+
+
+def job_view(user_id: str, task: str, slot: dict) -> dict:
+    """Helpdesk-safe snapshot of one fetch/embed slot."""
+    _res = slot.get('result')
+    result = _res if isinstance(_res, dict) else {}
+    status = result.get('status') if result else None
+    state = classify_job_slot(user_id, task, slot)
+    alive = job_worker_alive(user_id, task)
+    active = bool(slot.get('active'))
+    quota_stopped = bool(result.get('quota_stopped')) or status == 'quota_stopped'
+    _lf = slot.get('last_fetch')
+    last_fetch = _lf if isinstance(_lf, dict) else {}
+    _kinds = result.get('error_kinds')
+    kinds = _kinds if isinstance(_kinds, dict) else {}
+    return {
+        'task': task,
+        'state': state,
+        'active': active,
+        'worker_alive': alive,
+        'started_at': slot.get('started_at'),
+        'updated_at': slot.get('updated_at'),
+        'error': safe_error_text(slot.get('error')),
+        'message': slot.get('message') or '',
+        'done': slot.get('done') or 0,
+        'total': slot.get('total') or 0,
+        'articles_so_far': slot.get('articles_so_far') or 0,
+        'library_id': slot.get('library_id'),
+        'result_status': status,
+        'quota_stopped': quota_stopped,
+        'source_status': slot.get('source_status') or {},
+        'by_source': slot.get('by_source') or {},
+        'error_kinds': kinds,
+        'last_fetch': {
+            'query': (last_fetch.get('query') or '')[:200],
+            'sources': list(last_fetch.get('sources') or [])[:20],
+            'max_results': last_fetch.get('max_results'),
+            'clear_first': bool(last_fetch.get('clear_first')),
+        } if last_fetch else None,
+        'can_cancel': active and alive,
+        'can_clear': active and not alive,
+        'can_retry': task == 'embed' and not active,
+        'can_retry_fetch': (
+            task == 'fetch' and not active
+            and bool(last_fetch.get('query'))
+            and bool(last_fetch.get('sources'))
+        ),
+    }
+
+
+def snapshot_jobs(user_id: str) -> dict:
+    """Copy of this account's job slots (creates the LRU entry if missing)."""
+    with _progress_lock:
+        raw = {k: dict(v) for k, v in _ensure_progress(user_id).items()}
+    return {task: job_view(user_id, task, slot) for task, slot in raw.items()}
+
+
+def list_job_queue(limit: int = JOB_QUEUE_CAP, *, state: Optional[str] = None) -> list:
+    """Active / stalled / failed jobs from the in-memory map only. Capped.
+
+    Does not walk the accounts table.
+    """
+    cap = max(1, min(int(limit or JOB_QUEUE_CAP), JOB_QUEUE_CAP))
+    wanted = state if state in ('active', 'stalled', 'failed') else None
+    with _progress_lock:
+        items = list(_all_progress.items())
+    out = []
+    for uid, tasks in reversed(items):
+        if not isinstance(tasks, dict):
+            continue
+        for task in ('fetch', 'embed'):
+            slot = tasks.get(task)
+            if not isinstance(slot, dict):
+                continue
+            view = job_view(uid, task, slot)
+            if view['state'] not in ('active', 'stalled', 'failed'):
+                continue
+            if wanted and view['state'] != wanted:
+                continue
+            view['user_id'] = uid
+            out.append(view)
+            if len(out) >= cap:
+                return out
+    return out
+
+
+def clear_stale_job(user_id: str, task: str) -> tuple:
+    """Reset a slot that says running when no worker is attached.
+
+    Returns (ok, detail).
+    """
+    if task not in ('fetch', 'embed'):
+        return False, "task must be fetch or embed"
+    if job_worker_alive(user_id, task):
+        return False, "That job is still running. Cancel it instead of clearing."
+    with _progress_lock:
+        slot = _ensure_progress(user_id)[task]
+        if not slot.get('active'):
+            return False, f"No stale {task} slot to clear"
+        slot['active'] = False
+        slot['cancel'] = False
+        slot['message'] = 'Cleared stale progress'
+        slot['updated_at'] = _utc_stamp()
+        _release_job_markers(user_id, task)
+    return True, "cleared"
 
 
 def try_begin_user_job(uid: str, task: str, **extra) -> bool:
@@ -261,6 +475,7 @@ def try_begin_user_job(uid: str, task: str, **extra) -> bool:
 
     Covers wait=True and wait=False so two fetches cannot share staging.
     """
+    now = _utc_stamp()
     with _progress_lock:
         p = _ensure_progress(uid)
         if p[task].get('active'):
@@ -268,9 +483,13 @@ def try_begin_user_job(uid: str, task: str, **extra) -> bool:
         slot = {
             'active': True, 'done': 0, 'total': 0, 'result': None, 'error': None,
             'cancel': False, 'articles_so_far': 0, 'message': '',
+            'started_at': now, 'updated_at': now, 'library_id': extra.get('library_id'),
         }
         slot.update(extra)
+        slot['started_at'] = extra.get('started_at') or now
+        slot['updated_at'] = now
         p[task].update(slot)
+        _job_sync[(uid, task)] = True
         return True
 
 
@@ -281,10 +500,18 @@ def start_user_job(uid: str, task: str, fn, /, **kwargs) -> bool:
     The worker holds the pipeline ref until completion (release in done callback).
     Jobs bind to the library that was active when the job started.
     """
-    if not try_begin_user_job(uid, task):
+    lib_id = get_active_library_id(uid)
+    extra = {"library_id": lib_id}
+    if task == "fetch":
+        extra["last_fetch"] = {
+            "query": kwargs.get("query") or "",
+            "sources": list(kwargs.get("sources") or []),
+            "max_results": kwargs.get("max_results"),
+            "clear_first": bool(kwargs.get("clear_first")),
+        }
+    if not try_begin_user_job(uid, task, **extra):
         return False
 
-    lib_id = get_active_library_id(uid)
     pipe = get_pipeline(uid, lib_id)
     loop = asyncio.get_running_loop()
 
@@ -292,6 +519,8 @@ def start_user_job(uid: str, task: str, fn, /, **kwargs) -> bool:
         return fn(pipe, **kwargs)
 
     future = loop.run_in_executor(None, worker)
+    with _progress_lock:
+        _job_futures[(uid, task)] = future
 
     def _on_done(fut):
         try:
@@ -299,8 +528,10 @@ def start_user_job(uid: str, task: str, fn, /, **kwargs) -> bool:
             update_progress(uid, task, active=False, result=result, error=None, cancel=False)
         except Exception as exc:
             logger.exception("Background %s job failed for %s", task, uid)
-            update_progress(uid, task, active=False, result=None, error=str(exc), cancel=False)
+            update_progress(uid, task, active=False, result=None, error=safe_error_text(exc), cancel=False)
         finally:
+            with _progress_lock:
+                _release_job_markers(uid, task)
             release_pipeline(uid, lib_id)
 
     future.add_done_callback(_on_done)
@@ -312,16 +543,33 @@ GUEST_MAX_AGE_MINUTES = 30
 
 
 def current_user(request: Request) -> Optional[dict]:
-    """JWT + live account check (token_version) so password change revokes old sessions."""
+    """JWT + live account check (token_version) so password change revokes old sessions.
+
+    A live support-view cookie overrides the JWT identity (read-only student
+    context). The admin JWT stays in access_token so Exit can restore it.
+    """
+    cached = getattr(request.state, "_current_user", _MISSING)
+    if cached is not _MISSING:
+        return cached
+
+    view_user = _support_view_user(request)
+    if view_user is not None:
+        request.state._current_user = view_user
+        return view_user
+
     payload = get_current_user(request)
     if not payload or not payload.get("user_id"):
+        request.state._current_user = None
         return None
     record = user_db.get_by_id(payload["user_id"])
     if not record:
+        request.state._current_user = None
         return None
     if int(payload.get("tv", 0) or 0) != int(record.get("token_version") or 0):
+        request.state._current_user = None
         return None
-    if user_db.is_locked(record):
+    if user_db.is_locked(record) or user_db.is_disabled(record):
+        request.state._current_user = None
         return None
     try:
         user_db.touch_last_seen(record["id"])
@@ -335,16 +583,50 @@ def current_user(request: Request) -> Optional[dict]:
             destroy_guest_account(record["id"])
         except Exception:
             logger.exception("Failed to expire guest %s", record["id"])
+        request.state._current_user = None
         return None
     username = record["username"]
     guest = bool(record.get("is_guest"))
-    return {
+    result = {
         "user_id": record["id"],
         "username": username,
         "token_version": int(record.get("token_version") or 0),
         "is_guest": guest,
         "is_admin": (not guest) and is_admin_username(username),
         "created_at": record.get("created_at"),
+    }
+    request.state._current_user = result
+    return result
+
+
+def _support_view_user(request: Request) -> Optional[dict]:
+    token = request.cookies.get(SUPPORT_VIEW_COOKIE)
+    if not token:
+        return None
+    from app.storage import helpdesk
+    view = helpdesk.get_support_view_by_token(user_db, token)
+    if not view:
+        return None
+    record = user_db.get_by_id(view["student_id"])
+    if not record:
+        return None
+    guest = bool(record.get("is_guest"))
+    return {
+        "user_id": record["id"],
+        "username": record["username"],
+        "token_version": int(record.get("token_version") or 0),
+        "is_guest": guest,
+        "is_admin": False,
+        "created_at": record.get("created_at"),
+        "support_view": {
+            "id": view["id"],
+            "admin_username": view["admin_username"],
+            "student_username": view["student_username"],
+            "reason": view["reason"],
+            "started_at": view["started_at"],
+            "expires_at": view["expires_at"],
+            "ui_mode": view.get("ui_mode") or "simple",
+        },
     }
 
 
@@ -360,7 +642,7 @@ def is_admin_username(username: str) -> bool:
 
 def is_admin_user(user: Optional[dict]) -> bool:
     """True for a non-guest session whose username is in ADMIN_USERNAMES."""
-    if not user or user.get("is_guest"):
+    if not user or user.get("is_guest") or user.get("support_view"):
         return False
     if "is_admin" in user:
         return bool(user["is_admin"])
@@ -448,9 +730,15 @@ def csrf_failed(request: Request) -> bool:
     return not cookie_token or not header_token or not secrets.compare_digest(cookie_token, header_token)
 
 
-def server_error(e: Exception) -> JSONResponse:
-    """Log the real exception server-side, return a generic message to the client."""
-    logger.exception("Unhandled error in API handler: %s", e)
+def server_error() -> JSONResponse:
+    """Log the real exception server-side, return a generic message to the client.
+
+    Takes no argument on purpose. Call it only from inside an `except` block:
+    logger.exception() captures the active exception and its traceback by
+    itself. Passing the exception in added nothing to the log and created a
+    dataflow edge (py/stack-trace-exposure) suggesting it reached the client.
+    """
+    logger.exception("Unhandled error in API handler")
     return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 

@@ -99,6 +99,18 @@ async def login_submit(
     username = username.strip().lower()
     user = core.user_db.get_by_username(username)
     ip = core.client_bucket(request)
+    if user and core.user_db.is_disabled(user):
+        msg = (user.get("disabled_message") or "").strip() or (
+            "This account is temporarily disabled. Ask your teacher if you need it turned back on."
+        )
+        core.user_db.record_auth_event(
+            user["id"], user["username"], "login_fail", ip, "disabled"
+        )
+        return templates.TemplateResponse(
+            request, "login.html",
+            context={"error": msg, "info": "", "next": next if next else ""},
+            status_code=400,
+        )
     if user and core.user_db.is_locked(user):
         core.user_db.record_auth_event(
             user["id"], user["username"], "login_fail", ip, "locked"
@@ -143,6 +155,17 @@ async def login_once(request: Request, token: str = ""):
             request, "login.html",
             context={
                 "error": "That sign-in link is invalid or has expired. Ask for a new one.",
+                "info": "",
+                "next": "",
+            },
+            status_code=400,
+        )
+    if core.user_db.is_disabled(rec):
+        return templates.TemplateResponse(
+            request, "login.html",
+            context={
+                "error": (rec.get("disabled_message") or "").strip()
+                or "This account is temporarily disabled.",
                 "info": "",
                 "next": "",
             },
@@ -470,6 +493,8 @@ async def api_change_password(req: ChangePasswordRequest, request: Request):
         return JSONResponse(status_code=400, content={"detail": "Could not update password"})
 
     fresh = core.user_db.get_by_id(user["user_id"])
+    if not fresh:
+        return JSONResponse(status_code=400, content={"detail": "Could not update password"})
     token = create_token(
         fresh["id"], fresh["username"], fresh.get("token_version", 0),
     )
@@ -507,7 +532,7 @@ async def api_delete_account(req: DeleteAccountRequest, request: Request):
         # 3. Delete the account record.
         core.user_db.delete_user(uid)
     except Exception as e:
-        return server_error(e)
+        return server_error()
 
     # Clear auth cookies so the now-deleted session can't keep being used.
     response = JSONResponse(content={"status": "success"})
@@ -607,7 +632,7 @@ async def api_resend_verification(request: Request):
 
     row = core.user_db.get_by_id(user["user_id"])
     email = (row or {}).get("email")
-    if not email:
+    if not row or not email:
         return JSONResponse(status_code=400, content={"detail": "No email on this account yet."})
     if row.get("email_verified"):
         return {"status": "already_verified", **_email_state(row)}

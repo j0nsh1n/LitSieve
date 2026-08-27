@@ -308,7 +308,9 @@ def delete_library(user_id: str, library_id: str) -> Dict:
         # Remove on-disk data first: if this fails the metadata is untouched,
         # the library stays listed, and the delete can be retried. Never
         # report success while private data is still on disk.
-        lib_path = libraries_dir(user_id) / library_id
+        # rmtree on a raw id would trust libraries.json; library_db_path()
+        # already sanitises, so this destructive path must too.
+        lib_path = libraries_dir(user_id) / _safe_fs_id(library_id, label="library id")
         if lib_path.is_dir():
             shutil.rmtree(lib_path)
         libs = [L for L in libs if L.get("id") != library_id]

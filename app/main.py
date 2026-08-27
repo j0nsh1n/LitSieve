@@ -1,5 +1,5 @@
 """
-FastAPI Application — LitSieve v5.0.3
+FastAPI Application — LitSieve v5.1.0
 Multi-user web interface for literature search and analysis.
 
 This module only wires the app together: configuration, static files, the
@@ -30,12 +30,15 @@ from app.routes import (  # noqa: E402
     corpus,
     exports,
     libraries,
+    ops,
     pages,
     search,
     shares,
     start_over,
+    support,
 )
 from app.security import SecurityHeadersMiddleware  # noqa: E402
+from app.support_gate import SupportViewMiddleware  # noqa: E402
 
 configure_logging()
 logger = logging.getLogger(__name__)
@@ -55,17 +58,18 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(
     title="LitSieve",
-    version="5.0.3",
+    version="5.1.0",
     lifespan=lifespan,
 )
 app.state.limiter = core.limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(SupportViewMiddleware)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Route modules, in workflow order (pages first so "/" resolves predictably).
-for _module in (pages, auth, admin, libraries, shares, corpus, start_over, search, exports, ai):
+for _module in (pages, auth, admin, support, ops, libraries, shares, corpus, start_over, search, exports, ai):
     app.include_router(_module.router)
 
 
