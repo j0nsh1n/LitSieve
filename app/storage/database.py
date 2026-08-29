@@ -1142,8 +1142,8 @@ class ArticleDatabase:
         ON CONFLICT DO UPDATE (not INSERT OR REPLACE) keeps the FK alive.
         content/verification are stored as JSON text; the abstract is not.
         """
-        cursor = self.conn.cursor()
         with self._lock:
+            cursor = self.conn.cursor()
             cursor.execute(
                 """
                 INSERT INTO reader_explanations (
