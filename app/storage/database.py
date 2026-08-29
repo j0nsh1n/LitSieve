@@ -134,6 +134,30 @@ class ArticleDatabase:
             )
         """)
 
+        # Reader Mode explanations (per audience): derived, regenerable AI
+        # artifacts keyed like key_points. Content and verification are JSON
+        # text; the abstract itself is never stored (abstract_hash only).
+        # Not preserved across replace-fetch — regenerated on demand.
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS reader_explanations (
+                article_id        TEXT NOT NULL,
+                source            TEXT NOT NULL DEFAULT 'pubmed',
+                audience          TEXT NOT NULL,
+                abstract_hash     TEXT NOT NULL,
+                prompt_version    TEXT NOT NULL,
+                verifier_version  TEXT NOT NULL DEFAULT 'v1',
+                content_json      TEXT NOT NULL,
+                verification_json TEXT NOT NULL,
+                provider          TEXT,
+                model             TEXT,
+                created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (article_id, source, audience),
+                FOREIGN KEY (article_id, source)
+                    REFERENCES articles (article_id, source)
+                    ON DELETE CASCADE
+            )
+        """)
+
         self.conn.commit()
 
     def migrate_schema(self):
@@ -164,6 +188,29 @@ class ArticleDatabase:
             cursor.execute(
                 "ALTER TABLE key_points ADD COLUMN origin TEXT NOT NULL DEFAULT 'extractive'"
             )
+
+        # Defensive re-create: create_tables() normally makes this table, but
+        # a connection opened by older code (or mid-migration) may not have
+        # run the newest init block. IF NOT EXISTS keeps this idempotent.
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS reader_explanations (
+                article_id        TEXT NOT NULL,
+                source            TEXT NOT NULL DEFAULT 'pubmed',
+                audience          TEXT NOT NULL,
+                abstract_hash     TEXT NOT NULL,
+                prompt_version    TEXT NOT NULL,
+                verifier_version  TEXT NOT NULL DEFAULT 'v1',
+                content_json      TEXT NOT NULL,
+                verification_json TEXT NOT NULL,
+                provider          TEXT,
+                model             TEXT,
+                created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (article_id, source, audience),
+                FOREIGN KEY (article_id, source)
+                    REFERENCES articles (article_id, source)
+                    ON DELETE CASCADE
+            )
+        """)
 
         self.conn.commit()
 
@@ -1031,6 +1078,104 @@ class ArticleDatabase:
                 "SELECT article_id, source FROM key_points WHERE origin = 'ai'"
             )
             return {(row[0], row[1]) for row in cursor.fetchall()}
+
+    def get_reader_explanation(
+        self, article_id: str, source: str, audience: str
+    ) -> Optional[Dict]:
+        """Fetch one Reader Mode explanation, JSON parsed.
+
+        Returns None on a missing row or unparsable JSON (treated as a cache
+        miss so the caller regenerates instead of surfacing corrupt rows).
+        """
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                """
+                SELECT article_id, source, audience, abstract_hash, prompt_version,
+                       verifier_version, content_json, verification_json,
+                       provider, model, created_at
+                FROM reader_explanations
+                WHERE article_id = ? AND source = ? AND audience = ?
+                """,
+                (article_id, source, audience),
+            )
+            row = cursor.fetchone()
+        if not row:
+            return None
+        try:
+            content = json.loads(row[6]) if row[6] else None
+            verification = json.loads(row[7]) if row[7] else None
+        except (TypeError, json.JSONDecodeError):
+            return None
+        if not isinstance(content, dict) or not isinstance(verification, dict):
+            return None
+        return {
+            "article_id": row[0],
+            "source": row[1],
+            "audience": row[2],
+            "abstract_hash": row[3],
+            "prompt_version": row[4],
+            "verifier_version": row[5],
+            "content": content,
+            "verification": verification,
+            "provider": row[8],
+            "model": row[9],
+            "created_at": row[10],
+        }
+
+    def upsert_reader_explanation(
+        self,
+        article_id: str,
+        source: str,
+        audience: str,
+        abstract_hash: str,
+        prompt_version: str,
+        content: Dict,
+        verification: Dict,
+        *,
+        provider: Optional[str] = None,
+        model: Optional[str] = None,
+        verifier_version: str = "v1",
+    ) -> None:
+        """Insert or refresh one Reader Mode explanation row.
+
+        ON CONFLICT DO UPDATE (not INSERT OR REPLACE) keeps the FK alive.
+        content/verification are stored as JSON text; the abstract is not.
+        """
+        cursor = self.conn.cursor()
+        with self._lock:
+            cursor.execute(
+                """
+                INSERT INTO reader_explanations (
+                    article_id, source, audience, abstract_hash, prompt_version,
+                    verifier_version, content_json, verification_json,
+                    provider, model, created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(article_id, source, audience) DO UPDATE SET
+                    abstract_hash = excluded.abstract_hash,
+                    prompt_version = excluded.prompt_version,
+                    verifier_version = excluded.verifier_version,
+                    content_json = excluded.content_json,
+                    verification_json = excluded.verification_json,
+                    provider = excluded.provider,
+                    model = excluded.model,
+                    created_at = CURRENT_TIMESTAMP
+                """,
+                (
+                    article_id,
+                    source,
+                    audience,
+                    abstract_hash,
+                    prompt_version,
+                    verifier_version,
+                    json.dumps(content),
+                    json.dumps(verification),
+                    provider,
+                    model,
+                ),
+            )
+            self.conn.commit()
 
     def exclude_articles(self, keys: List[Tuple[str, str]], reason: str = 'manual') -> int:
         """Mark articles as screened out (excluded from search/dedup).
