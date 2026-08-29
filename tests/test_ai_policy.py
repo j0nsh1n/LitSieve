@@ -26,11 +26,15 @@ def test_no_bulk_ai_library_routes():
         "/api/ai/evidence-grade",
         "/api/ai/rewrite-all",
         "/api/ai/grade-evidence",
+        "/api/reader/explain-library",
+        "/api/reader/bulk-explain",
     }
     assert not (paths & forbidden)
     # The per-article endpoints must exist (guards against a vacuous pass).
     assert "/api/ai/refine-article" in paths
     assert "/api/ai/ask-article" in paths
+    assert "/api/reader/explain" in paths
+    assert "/api/reader/explanation" in paths
     # Long-lived "keep the model warm" sessions were removed on purpose:
     # the built-in service starts and stops around each single request.
     assert "/api/ai/session/begin" not in paths

@@ -32,6 +32,7 @@ from app.routes import (  # noqa: E402
     libraries,
     ops,
     pages,
+    reader,
     search,
     shares,
     start_over,
@@ -69,7 +70,7 @@ app.add_middleware(SupportViewMiddleware)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Route modules, in workflow order (pages first so "/" resolves predictably).
-for _module in (pages, auth, admin, support, ops, libraries, shares, corpus, start_over, search, exports, ai):
+for _module in (pages, auth, admin, support, ops, libraries, shares, corpus, start_over, search, exports, ai, reader):
     app.include_router(_module.router)
 
 

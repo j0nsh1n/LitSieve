@@ -1,6 +1,6 @@
 """Pydantic request models for the HTTP API."""
 
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -117,6 +117,15 @@ class AIAskRequest(BaseModel):
     article_id: str
     source: str
     question: str
+
+
+class ReaderExplainRequest(BaseModel):
+    """One paper in the active library, for a plain-language explanation."""
+
+    article_id: str = Field(min_length=1, max_length=256)
+    source: str = Field(min_length=1, max_length=64)
+    audience: Literal["high_school", "general_reader"] = "general_reader"
+    force_regenerate: bool = False
 
 
 class AISettingsUpdate(BaseModel):

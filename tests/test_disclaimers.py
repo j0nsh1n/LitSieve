@@ -41,8 +41,20 @@ def _plain(html: str) -> str:
 def test_macros_export_all_variants():
     env = _env()
     macros = env.get_template("macros/disclaimers.html").module
-    for name in ("scope_banner", "scope_auth", "scope_footer", "scope_fetch", "scope_search"):
+    for name in ("scope_banner", "scope_auth", "scope_footer", "scope_fetch", "scope_search", "scope_reader"):
         assert hasattr(macros, name), f"missing macro {name}"
+
+
+def test_reader_disclaimer_is_educational_not_clinical():
+    env = _env()
+    macros = env.get_template("macros/disclaimers.html").module
+    text = macros.scope_reader()
+    assert "educational reading aid" in text.lower()
+    assert "medical, legal, or professional advice" in text.lower()
+    js = (TEMPLATES.parent / "static" / "js" / "reader.js").read_text(encoding="utf-8")
+    low = js.lower()
+    for banned in ("clinically verified", "medically accurate", "guaranteed"):
+        assert banned not in low
 
 
 def test_banner_contains_canonical_phrases():

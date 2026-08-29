@@ -352,11 +352,17 @@ function renderKeyPointsHtml(bullets, options) {
     const aid = options.articleId ? escapeHtml(String(options.articleId)) : '';
     const src = options.source ? escapeHtml(String(options.source)) : '';
     const showAi = typeof uiFlag === 'function' ? uiFlag('show_ai_buttons', true) : true;
+    const abstractLen = Number(options.abstractLen);
+    const abstractOk = !Number.isFinite(abstractLen) || abstractLen >= 40;
+    const readerBtn = (aid && src && showAi && abstractOk)
+        ? `<button type="button" class="btn btn-secondary btn-sm reader-mode-btn" title="Plain-language explanation of this abstract">Explain this study</button>`
+        : '';
     const actions = (aid && src && showAi)
         ? `<div class="ai-actions" data-article-id="${aid}" data-source="${src}">
             <button type="button" class="btn btn-secondary btn-sm ai-refine-btn" title="Optional AI rewrite of summary and bullets from this abstract only">Refine with AI</button>
             <button type="button" class="btn btn-secondary btn-sm ai-ask-btn" title="Ask a question answered only from this abstract">Ask about this paper</button>
-            <span class="ai-status-line help-text" hidden></span>
+            ${readerBtn}
+            <span class="ai-status-line help-text" hidden role="status" aria-live="polite"></span>
            </div>
            <div class="ai-panel" hidden></div>`
         : '';
@@ -760,7 +766,7 @@ function openAiAskModal(paperTitle) {
 }
 
 /**
- * Wire Refine + Ask on a result card.
+ * Wire Refine, Ask, and Explain this study on a result card.
  * Built-in mode (both): start study aid → work on selected paper → stop when done.
  */
 function bindAiArticleActions(rootEl, article) {
@@ -927,6 +933,14 @@ function bindAiArticleActions(rootEl, article) {
                 askBtn.disabled = false;
             }
         });
+    }
+
+    const readerBtn = wrap.querySelector('.reader-mode-btn');
+    if (readerBtn && String(article.abstract || '').trim().length < 40) {
+        readerBtn.remove();
+    }
+    if (typeof bindReaderModeActions === 'function') {
+        bindReaderModeActions({ wrap, panel, article, setStatus, showPanel, softAiError });
     }
 }
 

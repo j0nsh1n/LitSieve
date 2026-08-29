@@ -1,6 +1,19 @@
 # Plan — Reader Mode / Explain this study
 
-**Status:** Planning only, 2026-08-29. Nothing implemented. No branch, no code.
+**Status:** Implementation on `feat/5.3-reader-mode` (2026-08-29). Schema,
+verifier, generation, API and UI landed. Locked decisions below override the
+original “must be decided” section.
+
+**Locked before implementation**
+- Rate limit: `@limiter.limit("6/minute")` on POST, per signed-in user. No daily cap.
+- Do not preserve explanations across replace-fetch.
+- `generate_reader_explanation()` stays in `llm.py`.
+- Fallback sentence is app copy, app-injected when `what_it_does_not_show` is
+  empty or “Not reported in the abstract.”
+- Status ids: `no_automatic_issues` / `needs_review` / `verification_incomplete`
+  (never `verified*`).
+- PICO keywords copied into `reader_facts.py` — do not import `embeddings.py`.
+- GET `/api/reader/explanation` is cache-only and is not called on card render.
 
 Build note for a paper-specific plain-language explainer with a deterministic
 self-check. Verified against `main` — every path, symbol and table below was

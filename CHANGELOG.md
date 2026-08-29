@@ -8,6 +8,14 @@ and this project aims to follow Semantic Versioning for app version strings
 
 ## [Unreleased]
 
+### Added
+- **Explain this study** (Reader Mode): on a paper in Search or Clean up, students
+  can ask for a structured plain-language reading of that abstract (high school
+  or general reader). Automatic checks flag dropped numbers, lost hedging, and
+  similar issues as warnings — they never claim the explanation is “verified”.
+  Generated text stays visually distinct from the abstract. Hidden with
+  `HIDE_AI_BUTTONS`.
+
 ## [5.2.0] - 2026-08-28
 
 ### Added

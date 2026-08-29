@@ -2144,6 +2144,110 @@ body.lra-modal-open {
     font-size: var(--fs-sm);
 }
 
+/* Reader Mode — generated explanation, visually distinct from the abstract. */
+.reader-mode-panel {
+    border-left: 3px solid var(--accent);
+    padding-left: var(--space-3);
+}
+.reader-mode-heading {
+    font-family: var(--font-serif);
+    font-size: var(--fs-md);
+    font-weight: 600;
+    margin: 0 0 var(--space-2);
+    color: var(--text);
+}
+.reader-section {
+    margin: var(--space-3) 0;
+}
+.reader-section-heading {
+    font-family: var(--font-serif);
+    font-size: var(--fs-base);
+    font-weight: 600;
+    margin: 0 0 var(--space-1);
+}
+.reader-section-body {
+    font-family: var(--font-sans);
+    margin: 0;
+    line-height: 1.45;
+    color: var(--text-body, var(--text));
+}
+.reader-status-chip {
+    display: inline-block;
+    margin: var(--space-2) 0;
+    padding: 0.15em 0.55em;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-sm, 8px);
+    font-size: var(--fs-sm);
+    font-weight: 600;
+}
+.reader-status-chip.is-ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, var(--rule)); }
+.reader-status-chip.is-warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 45%, var(--rule)); }
+.reader-status-chip.is-incomplete { color: var(--text-soft); }
+.reader-warnings {
+    margin: var(--space-2) 0 var(--space-3);
+    padding-left: 1.2em;
+    font-size: var(--fs-sm);
+    color: var(--text);
+}
+.reader-glossary {
+    margin: var(--space-3) 0;
+    padding: var(--space-2) var(--space-3);
+    background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+    border-radius: var(--radius-sm, 8px);
+}
+.reader-glossary summary {
+    font-family: var(--font-serif);
+    font-weight: 600;
+    cursor: pointer;
+}
+.reader-glossary dl {
+    margin: var(--space-2) 0 0;
+}
+.reader-glossary-row {
+    display: grid;
+    grid-template-columns: minmax(6rem, 30%) 1fr;
+    gap: var(--space-2);
+    margin: var(--space-1) 0;
+}
+.reader-glossary dt {
+    font-weight: 600;
+}
+.reader-glossary dd {
+    margin: 0;
+}
+.reader-disclaimer {
+    margin-top: var(--space-3);
+    font-size: var(--fs-sm);
+    color: var(--text-soft);
+}
+.reader-audience {
+    border: 0;
+    margin: 0 0 var(--space-2);
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+}
+.reader-audience legend {
+    font-weight: 600;
+    margin-bottom: var(--space-1);
+}
+.btn-link {
+    background: none;
+    border: 0;
+    padding: 0;
+    color: var(--accent);
+    font: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+}
+@media (max-width: 360px) {
+    .reader-mode-heading { font-size: var(--fs-base); }
+    .reader-section-heading { font-size: var(--fs-sm); }
+    .reader-glossary-row { grid-template-columns: 1fr; }
+}
+}
+
 .key-points {
     margin: var(--space-2) 0 var(--space-3);
     padding: var(--space-2) var(--space-3);
