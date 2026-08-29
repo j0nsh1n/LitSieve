@@ -4,9 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}LitSieve{% endblock %}</title>
+    <link rel="icon" href="/static/favicon.svg?v=20260828a" type="image/svg+xml">
     <link rel="icon" href="/static/favicon.ico?v=20260803a" sizes="32x32">
     <link rel="apple-touch-icon" href="/static/favicon.png?v=20260803a">
-    <link rel="stylesheet" href="/static/css/style.css?v=20260823j">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260823q">
     <script src="/static/js/theme-init.js?v=20260823a"></script>
     {% block head_extra %}{% endblock %}
 </head>
@@ -56,7 +57,15 @@
     {# Phase 8 B — Workbench shell: workflow steps as the instrument; tools separate. #}
     <nav class="navbar app-shell" id="site-navbar" role="navigation" aria-label="Main">
         <div class="shell-primary">
-            <a href="/" class="nav-brand">LitSieve</a>
+            <a href="/" class="nav-brand">
+                <svg class="nav-brand-mark" viewBox="2.6 13.6 26.8 11.5" aria-hidden="true" focusable="false"
+                     fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M6 15 L26 15 L21.5 24 L10.5 24 Z" stroke-width="2.2"/>
+                    <path d="M8.5 19.5 H23.5" stroke-width="1.4"/>
+                    <path d="M4 15 H28" stroke-width="2.8"/>
+                </svg>
+                <span>LitSieve</span>
+            </a>
             <button type="button"
                     class="nav-menu-toggle"
                     id="nav-menu-toggle"

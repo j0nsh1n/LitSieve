@@ -74,7 +74,7 @@ async function doQuickScreenApplyNow() {
  setLoading(applyNowBtn, true);
  if (applyBtn) applyBtn.hidden = true;
  _quickScreenCandidates = [];
- setStatus('quick-screen-status', 'Ranking papers and screening out the least related…', 'info');
+ setStatus('quick-screen-status', 'Weighing every paper against your question, then washing out the least related…', 'info');
  if (panel) {
  panel.classList.add('u-hidden');
  panel.innerHTML = '';
@@ -108,10 +108,10 @@ async function doQuickScreenApplyNow() {
  _quickScreenCandidates = [];
  setStatus(
  'quick-screen-status',
- `Screened out ${applied.count || items.length} of ${data.total_ranked} paper(s) as low relevance. Undo is available once.`,
+ `Set aside ${applied.count || items.length} of ${data.total_ranked} paper(s) as low relevance. You can undo once.`,
  'success'
  );
- showNotification(`Screened out ${applied.count || items.length} paper(s).`, 'success');
+ showNotification(`Set aside ${applied.count || items.length} paper(s).`, 'success');
  if (undoBtn) undoBtn.hidden = false;
  // Show what was removed (read-only list for transparency).
  if (panel) {
@@ -124,7 +124,7 @@ async function doQuickScreenApplyNow() {
  row.innerHTML =
  `<span class="qs-title">${escapeHtml(c.title || '(no title)')}</span>`
  + `<span class="qs-meta help-text">${escapeHtml(String(c.year || ''))}`
- + ` · ${escapeHtml(getSourceName(c.source))} · screened out</span>`;
+ + ` · ${escapeHtml(getSourceName(c.source))} · set aside</span>`;
  list.appendChild(row);
  });
  panel.appendChild(list);
@@ -154,7 +154,7 @@ async function doQuickScreenPreview() {
  setLoading(previewBtn, true);
  if (applyBtn) applyBtn.hidden = true;
  _quickScreenCandidates = [];
- setStatus('quick-screen-status', 'Ranking papers against your question…', 'info');
+ setStatus('quick-screen-status', 'Weighing every paper against your question…', 'info');
  if (panel) {
  panel.classList.add('u-hidden');
  panel.innerHTML = '';
@@ -179,7 +179,7 @@ async function doQuickScreenPreview() {
  }
  setStatus(
  'quick-screen-status',
- `Preview: ${candidates.length} of ${data.total_ranked} paper(s) least related. Uncheck any to keep, then Screen out selected.`,
+ `Preview: ${candidates.length} of ${data.total_ranked} paper(s) least related to your question. Uncheck any to keep, then use "Screen out selected".`,
  'success'
  );
  renderQuickScreenPreview(candidates);
@@ -242,10 +242,10 @@ async function doQuickScreenApply() {
  _quickScreenLastItems = items;
  setStatus(
  'quick-screen-status',
- `Screened out ${data.count || items.length} paper(s) as low relevance. Undo is available once.`,
+ `Set aside ${data.count || items.length} paper(s) as low relevance. You can undo once.`,
  'success'
  );
- showNotification(`Screened out ${data.count || items.length} paper(s).`, 'success');
+ showNotification(`Set aside ${data.count || items.length} paper(s).`, 'success');
  if (undoBtn) undoBtn.hidden = false;
  if (applyBtn) applyBtn.hidden = true;
  const panel = document.getElementById('quick-screen-preview');
@@ -257,7 +257,7 @@ async function doQuickScreenApply() {
  loadStatistics();
  } catch (e) {
  setStatus('quick-screen-status', `Apply failed: ${e.message}`, 'error');
- showNotification(`Could not screen out papers: ${e.message}`, 'error');
+ showNotification(`Could not set those papers aside: ${e.message}`, 'error');
  } finally {
  setLoading(applyBtn, false);
  }
@@ -461,7 +461,7 @@ async function doDetectDuplicates() {
  const threshold = parseFloat(document.getElementById('threshold').value);
  const btn = document.getElementById('detect-btn');
  setLoading(btn, true);
- setStatus('duplicates-status', 'Analyzing similarity matrix...', 'info');
+ setStatus('duplicates-status', 'Looking for papers that landed twice…', 'info');
  const list = document.getElementById('duplicates-list');
  if (list) {
   list.innerHTML =
@@ -485,12 +485,12 @@ async function doDetectDuplicates() {
  } else {
  const groups = groupDuplicates(data.duplicates);
  setStatus('duplicates-status',
- `Found ${data.total} duplicate pair(s) across ${groups.length} group(s). Showing top 50 pairs.`, 'success');
+ `Found ${data.total} duplicate pair(s) across ${groups.length} group(s) — showing the top 50.`, 'success');
  renderDuplicates(groups);
  }
  } catch (e) {
  setStatus('duplicates-status', `Error: ${e.message}`, 'error');
- showNotification(`Detection failed: ${e.message}`, 'error');
+ showNotification(`Duplicate detection failed: ${e.message}`, 'error');
  } finally {
  setLoading(btn, false);
  }
@@ -501,7 +501,7 @@ async function doResolveAll() {
  const threshold = parseFloat(document.getElementById('threshold').value);
  const btn = document.getElementById('resolve-btn');
  setLoading(btn, true);
- setStatus('duplicates-status', 'Resolving duplicate groups…', 'info');
+ setStatus('duplicates-status', 'Washing out the repeats — keeping the best copy of each…', 'info');
 
  try {
  const data = await apiCall('/api/resolve-duplicates', {
@@ -512,15 +512,15 @@ async function doResolveAll() {
  setStatus('duplicates-status', 'No duplicate groups to resolve at this threshold.', 'success');
  } else {
  setStatus('duplicates-status',
- `Resolved ${data.groups} group(s): kept the best copy of each, screened out ${data.excluded} redundant article(s).`,
+ `Kept the best copy in ${data.groups} group(s); set aside ${data.excluded} redundant article(s).`,
  'success');
- showNotification(`Screened out ${data.excluded} duplicate article(s).`, 'success');
+ showNotification(`Set aside ${data.excluded} redundant article(s).`, 'success');
  }
  document.getElementById('duplicates-list').innerHTML = '';
  loadStatistics(); // refresh the Screened Out counter
  } catch (e) {
  setStatus('duplicates-status', `Error: ${e.message}`, 'error');
- showNotification(`Resolve failed: ${e.message}`, 'error');
+ showNotification(`Auto-resolve failed: ${e.message}`, 'error');
  } finally {
  setLoading(btn, false);
  }
@@ -540,7 +540,7 @@ async function keepArticle(group, keeper, cardEl) {
  });
  cardEl.classList.add('dup-resolved');
  cardEl.querySelectorAll('.keep-btn').forEach(b => b.remove());
- showNotification(`Kept ${getSourceName(keeper.source)} copy; screened out ${losers.length} other(s).`, 'success');
+ showNotification(`Kept the ${getSourceName(keeper.source)} copy; set aside ${losers.length} other(s).`, 'success');
  loadStatistics();
  } catch (e) {
  showNotification(`Failed to resolve group: ${e.message}`, 'error');

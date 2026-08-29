@@ -78,22 +78,74 @@
 {% include "partials/collect_ui.html" %}
 </div>
 
-<section class="card search-buffering" id="search-preparing" hidden>
- <h2 id="search-buffering-title">Fetching papers…</h2>
- <p class="info-text" id="search-buffering-lead">This can take a minute. Stay on this page —
-  next you will type the question you actually want to answer.</p>
- <div id="search-buffering-progress">
-  <div class="progress-bar-track"><div class="progress-bar-fill" id="search-buffering-fill"></div></div>
-  <div class="progress-bar-label" id="search-buffering-label"></div>
-  <div id="search-buffering-sources" class="fetch-live-sources" aria-live="polite"></div>
+<section class="search-buffering" id="search-preparing" hidden>
+ <h2 id="search-buffering-title">Sieving your papers</h2>
+ {# Decorative sieve: raw grains fall in, the pan rocks, fine grains sift out.
+    aria-hidden — the progressbar and the status line carry the real meaning. #}
+ <div class="sieve-anim" aria-hidden="true">
+  <svg class="sieve-svg" viewBox="0 0 120 100" focusable="false">
+   <g class="sieve-feed">
+    <circle class="grain" cx="44" cy="8" r="2.2"/>
+    <circle class="grain" cx="58" cy="4" r="2.6"/>
+    <circle class="grain" cx="70" cy="10" r="1.8"/>
+    <circle class="grain" cx="50" cy="2" r="1.6"/>
+    <circle class="grain" cx="64" cy="13" r="2.4"/>
+    <circle class="grain" cx="38" cy="6" r="1.9"/>
+    <circle class="grain" cx="76" cy="3" r="2.1"/>
+    <circle class="grain" cx="54" cy="14" r="1.5"/>
+    <circle class="grain" cx="68" cy="7" r="2"/>
+   </g>
+   <g class="sieve-body">
+    <path class="sieve-pan" d="M26 44 L94 44 L82 62 L38 62 Z"/>
+    <g class="sieve-mesh">
+     <path d="M32 50 H88"/>
+     <path d="M36 56 H84"/>
+     <path d="M37 44 L45 62"/>
+     <path d="M48 44 L52 62"/>
+     <path d="M60 44 L60 62"/>
+     <path d="M72 44 L68 62"/>
+     <path d="M83 44 L75 62"/>
+    </g>
+    <path class="sieve-rim" d="M22 44 H98"/>
+   </g>
+   <g class="sieve-through">
+    <circle class="grain" cx="52" cy="66" r="1.5"/>
+    <circle class="grain" cx="62" cy="68" r="1.7"/>
+    <circle class="grain" cx="72" cy="66" r="1.4"/>
+   </g>
+  </svg>
  </div>
- <p class="status-indicator" id="search-preparing-status">Starting…</p>
- <button type="button" class="btn btn-secondary" id="search-buffering-cancel" hidden>Cancel fetch</button>
+ <div id="search-buffering-progress" class="wait-bar-row">
+  <div class="wait-track" id="search-wait-bar" role="progressbar"
+   aria-label="Sieving your papers" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+   <div class="wait-fill" id="search-buffering-fill"></div>
+  </div>
+ </div>
+ <p class="wait-status" id="search-preparing-status" role="status" aria-live="polite">Scooping up your first batch</p>
+ <p class="wait-stay" id="search-buffering-lead">Stay on this page</p>
+ <button type="button" class="wait-cancel" id="search-buffering-cancel" hidden>Cancel fetch</button>
 </section>
 
 <section class="card empty-state-card" id="search-empty-state" hidden>
+ <div class="sieve-anim sieve-still" aria-hidden="true">
+  <svg class="sieve-svg" viewBox="0 0 120 100" focusable="false">
+   <g class="sieve-body">
+    <path class="sieve-pan" d="M26 44 L94 44 L82 62 L38 62 Z"/>
+    <g class="sieve-mesh">
+     <path d="M32 50 H88"/>
+     <path d="M36 56 H84"/>
+     <path d="M37 44 L45 62"/>
+     <path d="M48 44 L52 62"/>
+     <path d="M60 44 L60 62"/>
+     <path d="M72 44 L68 62"/>
+     <path d="M83 44 L75 62"/>
+    </g>
+    <path class="sieve-rim" d="M22 44 H98"/>
+   </g>
+  </svg>
+ </div>
  <h2>Nothing to search yet</h2>
- <p class="info-text" id="search-empty-msg">Fetch papers and prepare them for search on Data Management first.</p>
+ <p class="info-text" id="search-empty-msg">Your collection is empty. Head to Data Management to scoop up papers.</p>
  <p class="empty-state-actions">
   <a class="btn btn-primary btn-sm" href="/data-management">Get papers</a>
  </p>
@@ -300,7 +352,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/simple_tools.js?v=20260817h"></script>
-<script src="/static/js/data_management.js?v=20260817g"></script>
-<script src="/static/js/search.js?v=20260822a"></script>
+<script src="/static/js/simple_tools.js?v=20260828b"></script>
+<script src="/static/js/data_management.js?v=20260828a"></script>
+<script src="/static/js/search.js?v=20260828a"></script>
 {% endblock %}

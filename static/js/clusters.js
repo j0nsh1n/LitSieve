@@ -61,7 +61,7 @@ async function loadClusterEmptyState() {
  body: { clear_first: true },
  });
  showNotification(
- 'Sample papers loaded. Open Data Management and press Prepare Papers when ready.',
+ 'Sample papers loaded. Open Data Management and press Re-prepare Papers when ready.',
  'success'
  );
  window.location.href = '/data-management';
@@ -98,11 +98,11 @@ async function doGenerateClusters() {
  const btn = document.getElementById('cluster-btn');
 
  setLoading(btn, true);
- let statusMsg = 'Clustering articles… this can take a moment.';
+ let statusMsg = 'Swirling papers into topic groups… this can take a moment.';
  if (isDensity) {
- statusMsg = 'Density clustering - finding natural topics and outliers…';
+ statusMsg = 'Letting the groups settle — finding natural topics and outliers…';
  } else if (auto) {
- statusMsg = 'Finding the best number of clusters… this can take a moment.';
+ statusMsg = 'Testing group counts to find the cleanest split… this can take a moment.';
  }
  setStatus('cluster-status', statusMsg, 'info');
 
@@ -124,7 +124,7 @@ async function doGenerateClusters() {
  msg = `Created ${clusters.length} cluster(s).`;
  }
  setStatus('cluster-status', msg, 'success');
- showNotification('Clusters generated successfully!', 'success');
+ showNotification('Your topic groups are ready.', 'success');
  } catch (e) {
  setStatus('cluster-status', `Error: ${e.message}`, 'error');
  showNotification(`Clustering failed: ${e.message}`, 'error');
@@ -139,7 +139,7 @@ function renderClusters(clusters) {
  container.innerHTML = '';
 
  if (clusters.length === 0) {
- container.innerHTML = '<p class="info-text">No clusters yet. Generate them above to see them here.</p>';
+ container.innerHTML = '<p class="info-text">No groups yet — press Generate Clusters above to sort your papers into topics.</p>';
  return;
  }
 
@@ -200,7 +200,7 @@ function renderClusters(clusters) {
  <div class="article-body">
  ${briefingHtml}
  <div class="cluster-articles-slot">
- <p class="loading-text">Loading articles…</p>
+ <p class="loading-text">Scooping up this group's papers…</p>
  </div>
  </div>
  `;
@@ -222,13 +222,13 @@ function renderClusters(clusters) {
  });
  showNotification(
  action === 'exclude'
- ? `Excluded ${res.count} article(s) - they no longer appear in search results.`
+ ? `Set aside ${res.count} article(s) — they no longer appear in search results.`
  : `Restored ${res.count} article(s) to the search pool.`,
  'success'
  );
  loadClusters(); // refresh counts + button states
  } catch (err) {
- showNotification(`Screening failed: ${err.message}`, 'error');
+ showNotification(`Exclude failed: ${err.message}`, 'error');
  setLoading(btn, false);
  }
  });
@@ -323,7 +323,7 @@ function buildClusterArticleItem(article) {
  btn.classList.toggle('btn-danger', !excluding);
  btn.classList.toggle('btn-secondary', excluding);
  } catch (err) {
- showNotification(`Screening failed: ${err.message}`, 'error');
+ showNotification(`Exclude failed: ${err.message}`, 'error');
  } finally {
  btn.disabled = false;
  }

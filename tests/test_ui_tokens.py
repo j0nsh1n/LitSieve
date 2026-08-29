@@ -500,19 +500,22 @@ def test_teal_soft_light_tokens():
     # Amber was #a8700f = 4.21:1 on white, under AA. Darkened for contrast.
     assert tokens.get("--warn") == "#96640c"
     assert "Source Sans 3" in tokens.get("--font-sans", "")
-    assert "Public Sans" in tokens.get("--font-serif", "")
+    # --font-serif now names an actual serif (it used to hold Public Sans, a sans).
+    assert "Source Serif 4" in tokens.get("--font-serif", "")
 
 
 def test_typefaces_are_self_hosted():
     """CSP is font-src 'self' — no Google Fonts CDN."""
     css = CSS
-    assert "/static/fonts/public-sans-latin.woff2" in css
+    assert "/static/fonts/source-serif-4-latin.woff2" in css
     assert "/static/fonts/source-sans-3-latin.woff2" in css
     assert "fraunces" not in css.lower()
     assert "fonts.googleapis.com" not in css
     assert "fonts.gstatic.com" not in css
     fonts = REPO / "static" / "fonts"
-    assert (fonts / "public-sans-latin.woff2").is_file()
+    assert (fonts / "source-serif-4-latin.woff2").is_file()
+    # Public Sans was dropped when headings moved to a real serif.
+    assert not (fonts / "public-sans-latin.woff2").exists()
     assert (fonts / "source-sans-3-latin.woff2").is_file()
     assert not (fonts / "fraunces-latin.woff2").exists()
 
@@ -608,6 +611,7 @@ RUNTIME_SET_VARS = {
     "--bar-pct",         # statistics.js: source / year bars
     "--simple-panel-h",  # search.js: measured bottom-bar clearance
     "--range-fill",      # range input progress
+    "--wait-pct",        # simple wait bar fill
     "--tx", "--ty", "--tr",  # view-transition offsets
 }
 

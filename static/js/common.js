@@ -271,7 +271,7 @@ function applyEmptyState(cardId, stats, need, msgId) {
         msg = 'No papers yet. Fetch on Data Management first; preparing for search runs automatically afterward.';
     } else if (need === 'embeddings' && emb === 0) {
         show = true;
-        msg = `You have ${total} paper(s), but none are prepared for search yet. Open Data Management and press “Prepare papers for search” (or wait if a job is still running).`;
+        msg = `You have ${total} paper(s), but none are ready for search yet. Open Data Management and press "Re-prepare Papers" (or wait for a running job to finish).`;
     }
     card.hidden = !show;
     const msgEl = msgId ? document.getElementById(msgId) : null;
