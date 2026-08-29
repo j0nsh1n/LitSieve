@@ -42,8 +42,25 @@
 </section>
 
 <section class="card empty-state-card" id="dup-empty-state" hidden>
- <h2>No papers to check yet</h2>
- <p class="info-text" id="dup-empty-msg">Fetch papers on Data Management, then prepare them for search so duplicates can be detected.</p>
+ <div class="sieve-anim sieve-still" aria-hidden="true">
+  <svg class="sieve-svg" viewBox="0 0 120 100" focusable="false">
+   <g class="sieve-body">
+    <path class="sieve-pan" d="M26 44 L94 44 L82 62 L38 62 Z"/>
+    <g class="sieve-mesh">
+     <path d="M32 50 H88"/>
+     <path d="M36 56 H84"/>
+     <path d="M37 44 L45 62"/>
+     <path d="M48 44 L52 62"/>
+     <path d="M60 44 L60 62"/>
+     <path d="M72 44 L68 62"/>
+     <path d="M83 44 L75 62"/>
+    </g>
+    <path class="sieve-rim" d="M22 44 H98"/>
+   </g>
+  </svg>
+ </div>
+ <h2>Nothing to sift yet</h2>
+ <p class="info-text" id="dup-empty-msg">No papers to compare yet. Fetch and prepare on Data Management, then come back to wash out the repeats.</p>
  <p class="empty-state-actions">
   <a class="btn btn-primary btn-sm" href="/data-management">Go to Data Management</a>
  </p>

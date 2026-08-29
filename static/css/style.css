@@ -6,26 +6,19 @@
    Dark: bg #0d1012, surface #161a1d, text #e9eef0,
    muted #98a3aa, accent #5eead4, accent-hover #86f0dd,
    on-accent #062421, ok #6ee7a8.
-   Type: Public Sans for titles; Source Sans 3 for body/UI (wider at
-   small sizes). Self-hosted WOFF2 under /static/fonts (OFL).
+   Type: Source Serif 4 for titles; Source Sans 3 for body/UI. Same
+   superfamily, so the two harmonise by design. --font-serif finally
+   names a real serif. Self-hosted WOFF2 under /static/fonts (OFL).
    Signature: teal-filled primary, 8/12/18 radii, score ring, flat paper.
    Layout unchanged: hero, Simple/Advanced, eight guides.
    ============================================================ */
 
 @font-face {
-    font-family: "Public Sans";
+    font-family: "Source Serif 4";
     font-style: normal;
     font-weight: 400 700;
     font-display: swap;
-    src: url("/static/fonts/public-sans-latin.woff2?v=20260823f") format("woff2");
-    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-@font-face {
-    font-family: "Public Sans";
-    font-style: italic;
-    font-weight: 400 700;
-    font-display: swap;
-    src: url("/static/fonts/public-sans-latin-italic.woff2?v=20260823f") format("woff2");
+    src: url("/static/fonts/source-serif-4-latin.woff2?v=20260828a") format("woff2");
     unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
@@ -72,9 +65,10 @@
     --err: #a33b35;           /* distinct from accent (not same as links) */
     --on-accent: #fff;        /* text on teal-filled controls */
     --font-sans: "Source Sans 3", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    --font-serif: "Public Sans", "Source Sans 3", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-serif: "Source Serif 4", Georgia, "Times New Roman", serif;
     --kicker-track: 0.12em;
     --spine: 0px;
+    --wait-pct: 0%;
 
     /* Motion */
     --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
@@ -150,6 +144,7 @@
         --nav-blur: color-mix(in srgb, var(--bg) 84%, transparent);
         --wash-accent: color-mix(in srgb, var(--accent) 7%, transparent);
         --wash-ink: color-mix(in srgb, var(--accent) 3%, transparent);
+        --wait-pct: 0%;
     }
 }
 
@@ -175,6 +170,7 @@
     --nav-blur: color-mix(in srgb, var(--bg) 84%, transparent);
     --wash-accent: color-mix(in srgb, var(--accent) 7%, transparent);
     --wash-ink: color-mix(in srgb, var(--accent) 3%, transparent);
+    --wait-pct: 0%;
 }
 
 /* Light mode — explicit toggle */
@@ -198,6 +194,7 @@
     --nav-blur: color-mix(in srgb, var(--bg) 88%, transparent);
     --wash-accent: color-mix(in srgb, var(--accent) 5.5%, transparent);
     --wash-ink: color-mix(in srgb, var(--text) 2.5%, transparent);
+    --wait-pct: 0%;
 }
 
 /* Theme toggle: View Transitions circular wipe when the API exists.
@@ -3491,9 +3488,9 @@ html[data-mode="simple"] body.simple-collecting #search-query-top {
 /* === Progress bar (pill track, compact height, full width) === */
 .progress-bar-track {
     width: 100%;
-    height: 6px;
+    height: 13px;
     border: none;
-    background: color-mix(in srgb, var(--rule) 70%, transparent);
+    background: color-mix(in srgb, var(--rule) 70%, var(--bg));
     border-radius: var(--radius-full);
     margin-top: var(--space-3);
     overflow: hidden;
@@ -3503,16 +3500,9 @@ html[data-mode="simple"] body.simple-collecting #search-query-top {
 .progress-bar-fill {
     height: 100%;
     border-radius: var(--radius-full);
-    background: linear-gradient(
-        90deg,
-        var(--accent) 0%,
-        color-mix(in srgb, var(--accent) 70%, #fff) 45%,
-        var(--accent) 90%
-    );
-    background-size: 200% 100%;
+    background: var(--accent);
     width: 0%;
     transition: width 0.45s var(--ease-out);
-    animation: shimmer 2.2s linear infinite;
     transform-origin: left center;
 }
 
@@ -3584,9 +3574,14 @@ html[data-mode="simple"] body.simple-collecting #search-query-top {
 .skeleton-line-body { width: 92%; }
 
 .progress-bar-label {
-    font-size: var(--fs-xs);
-    font-style: italic;
+    font-size: var(--fs-sm);
     font-family: var(--font-sans);
+    color: var(--text-soft);
+    margin-top: var(--space-2);
+}
+
+.progress-bar-detail {
+    font-size: var(--fs-xs);
     color: var(--text-soft);
     margin-top: var(--space-1);
 }
@@ -5896,26 +5891,176 @@ html[data-mode="simple"] body.simple-collecting #search-workbench {
 html[data-mode="simple"] body.simple-buffering #search-collect,
 html[data-mode="simple"] body.simple-buffering .search-page-header,
 html[data-mode="simple"] body.simple-buffering #search-query-top,
-html[data-mode="simple"] body.simple-buffering #search-workbench {
+html[data-mode="simple"] body.simple-buffering #search-workbench,
+html[data-mode="simple"] body.simple-buffering .simple-screen-dock {
     display: none !important;
 }
 .search-buffering {
-    max-width: 36rem;
-    margin: var(--space-6) auto;
-    padding: var(--space-5) var(--space-5) var(--space-4);
+    max-width: 50rem;
+    margin: var(--space-8) auto 0;
+    padding: var(--space-8) var(--space-6) var(--space-5);
+    text-align: center;
+    background: transparent;
+    border: none;
+    box-shadow: none;
 }
 .search-buffering h2 {
-    margin: 0 0 var(--space-2);
+    font-family: var(--font-serif);
+    font-weight: 700;
+    /* Was unset, so it fell to the browser's 1.5em default. Pinned one step up
+       the scale, which is exactly the 1.25x this screen was scaled by. */
+    font-size: var(--fs-2xl);
+    margin: 0 0 var(--space-6);
 }
-.search-buffering .info-text {
-    margin: 0 0 var(--space-4);
-    max-width: 32rem;
+.wait-bar-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-4);
+    margin: 0 auto;
+    max-width: 35rem;
 }
-.search-buffering .status-indicator {
-    margin-top: var(--space-3);
+/* Sieve animation. Replaces the old pulsing disc: with the pan above the bar a
+   second abstract loading dot was just noise. Purely decorative (aria-hidden). */
+/* Brand mark: the sieve pan promoted from decoration to identity. currentColor
+   so it tracks the theme; the wordmark carries the accessible name. */
+.nav-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
 }
-.search-buffering #search-buffering-cancel {
-    margin-top: var(--space-4);
+.nav-brand-mark {
+    /* viewBox is cropped to the pan's stroke bounds (2.33:1), so the glyph fills
+       its box instead of floating in the empty upper half of a square. */
+    width: 1.85em;
+    height: 0.8em;
+    flex: none;
+}
+.sieve-anim {
+    display: flex;
+    justify-content: center;
+    margin: 0 0 var(--space-6);
+}
+.sieve-svg {
+    width: 150px;
+    height: 125px;
+}
+.sieve-still .sieve-body { animation: none; }
+.empty-state-card .sieve-svg { width: 96px; height: 80px; }
+.sieve-body {
+    /* view-box so the rocking pivots on the rim, not the element's bounding box. */
+    transform-box: view-box;
+    transform-origin: 60px 44px;
+    animation: sieveShake 1.6s var(--ease-soft) infinite;
+}
+.sieve-pan {
+    fill: color-mix(in srgb, var(--accent) 12%, transparent);
+    stroke: var(--accent);
+    stroke-width: 2;
+    stroke-linejoin: round;
+}
+.sieve-mesh path {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 0.9;
+    opacity: 0.45;
+}
+.sieve-rim {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 3.5;
+    stroke-linecap: round;
+}
+/* Raw grains going in read as muted; what makes it through picks up the accent. */
+.sieve-feed .grain {
+    fill: var(--text-soft);
+    animation: sieveFeed 1.6s linear infinite;
+}
+.sieve-through .grain {
+    fill: var(--accent);
+    animation: sieveThrough 1.6s linear infinite;
+}
+/* Nine grains in on a tight 0.18s stagger read as a steady pour; three out on a
+   0.6s stagger read as a trickle. The density gap IS the sieve doing its job. */
+.sieve-feed .grain:nth-child(2) { animation-delay: 0.18s; }
+.sieve-feed .grain:nth-child(3) { animation-delay: 0.36s; }
+.sieve-feed .grain:nth-child(4) { animation-delay: 0.54s; }
+.sieve-feed .grain:nth-child(5) { animation-delay: 0.72s; }
+.sieve-feed .grain:nth-child(6) { animation-delay: 0.90s; }
+.sieve-feed .grain:nth-child(7) { animation-delay: 1.08s; }
+.sieve-feed .grain:nth-child(8) { animation-delay: 1.26s; }
+.sieve-feed .grain:nth-child(9) { animation-delay: 1.44s; }
+.sieve-through .grain:nth-child(1) { animation-delay: 0.25s; }
+.sieve-through .grain:nth-child(2) { animation-delay: 0.85s; }
+.sieve-through .grain:nth-child(3) { animation-delay: 1.45s; }
+@keyframes sieveShake {
+    0%, 100% { transform: rotate(-2.5deg); }
+    50% { transform: rotate(2.5deg); }
+}
+@keyframes sieveFeed {
+    0% { transform: translateY(-16px); opacity: 0; }
+    20% { opacity: 1; }
+    82% { opacity: 1; }
+    100% { transform: translateY(36px); opacity: 0; }
+}
+@keyframes sieveThrough {
+    0% { transform: translateY(0); opacity: 0; }
+    15% { opacity: 0.95; }
+    70% { opacity: 0.95; }
+    100% { transform: translateY(30px); opacity: 0; }
+}
+/* Holding at 90% while the search runs: still working, so keep sifting — just
+   calmer, matching the paused-disc intent this replaces. */
+.search-buffering.is-holding .sieve-body,
+.search-buffering.is-holding .grain {
+    animation-duration: 3.2s;
+}
+.wait-track {
+    flex: 1;
+    height: 13px;
+    border-radius: var(--radius-full);
+    background: color-mix(in srgb, var(--rule) 70%, var(--bg));
+    overflow: hidden;
+}
+.wait-fill {
+    width: var(--wait-pct, 0%);
+    height: 100%;
+    border-radius: var(--radius-full);
+    background: var(--accent);
+    transition: width var(--dur-med) linear;
+    transform-origin: left center;
+}
+.wait-status {
+    margin: var(--space-5) 0 0;
+    color: var(--text-soft);
+    font-size: var(--fs-base);
+    min-height: 1.6em;
+}
+.wait-stay {
+    margin: var(--space-2) 0 0;
+    color: var(--text-soft);
+    font-size: var(--fs-sm);
+}
+.wait-cancel {
+    display: inline-block;
+    margin-top: var(--space-5);
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--text-soft);
+    font-family: inherit;
+    font-size: var(--fs-sm);
+    text-decoration: underline;
+    cursor: pointer;
+}
+.wait-cancel:hover { color: var(--accent); }
+@media (prefers-reduced-motion: reduce) {
+    /* No motion: the grains rest above and below the pan as a static drawing. */
+    .sieve-body,
+    .sieve-feed .grain,
+    .sieve-through .grain { animation: none; }
+    .sieve-through .grain { opacity: 0.95; }
+    .wait-fill { transition: none; }
 }
 /* Hide Search chrome until Narrow it down is applied or skipped. */
 html[data-mode="simple"] .search-page-header {

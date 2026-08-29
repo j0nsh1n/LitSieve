@@ -1,7 +1,7 @@
 # context.md — LitSieve
 
 ## Current State
-- App version **5.1.0** (`app/main.py`, `GET /health`). Product name **LitSieve**.
+- App version **5.2.0** (`app/main.py`, `GET /health`). Product name **LitSieve**.
 - Example public deployment pattern: HTTPS at the edge (e.g. Cloudflare Tunnel)
   → `uvicorn` HTTP on `127.0.0.1:7860` only. Operator sets `PUBLIC_BASE_URL` and
   `DEBUG=false` with a real `SECRET_KEY` in gitignored `.env`.
@@ -13,12 +13,16 @@
   `./venv` for sqlcipher. Count drifts with the branch; re-run before release.
 - UI: Simple/Advanced via `localStorage.uiMode` + `data-mode` (theme-init pre-paint).
   Simple: one `/search` page (empty collect vs papers). `/data-management`
-  redirects in Simple. Fetch asks for a topic; a wait screen covers fetch +
-  prepare; Narrow it down is a required popup (apply or skip) before Search.
-  After papers exist, topics/fetch hide;
-  Start over is a popup. Advanced: full steps including Clean up + Clusters.
-  Teal Soft tokens: accent `#0f766e`, 8/12/18px radii, Public Sans titles
-  and Source Sans 3 body (self-hosted), flat paper / near-black dark, score ring on Search.
+  redirects in Simple. Fetch asks for a topic; wait screen covers fetch +
+  prepare (animated sieve, rotating copy, no live source rows). Bar maps
+  fetch 0–60 and prepare 60–90; Narrow it down holds at 90% (apply or skip),
+  then a short finish leg into Search. After papers exist, topics/fetch hide;
+  Start over is a popup. Advanced: full steps including Clean up + Clusters;
+  its progress bars share Simple height/tokens, with counts on a detail line.
+  Teal Soft tokens: accent `#0f766e`, 8/12/18px radii. Headings Source Serif 4,
+  body/UI Source Sans 3 (self-hosted). Flat paper / near-black dark, score
+  ring on Search. Sieve pan as favicon, nav mark, and empty-state illustration
+  (Search / Clean up / Clusters).
 - Final Simple nav is one unnumbered Search tab (no stepper; collect via Start over); that contract supersedes the original Phase 10 “Simple/guest tests pass unchanged” criterion.
 - Guest: `/guest` → sample corpus, auto-prepare (set `GUEST_AUTO_PREPARE=0` in
   tests), multi-source fetch 403, purge after 30 minutes. Search treats an
@@ -104,9 +108,8 @@ Guest User (is_guest) → sample corpus only; purged by age
 - Host entry: `app.main:app` port 7860; Linux `./venv`
 
 ## Session Handoff
-- **Date:** 2026-08-22
-- **Branch:** `release/5.1.0` (local; do not push until asked)
-- **Done:** 5.1.0 — extra admin/helpdesk tools, tickets, incident banner,
-  Ship `/ops`, Teal Soft (Public Sans titles, Source Sans 3 body, flat paper).
-- **Next:** Leftovers in `notes.md`. Set `LITSIEVE_STAGING` / `LITSIEVE_LIVE`
-  on the host. `design_mockups/` untracked unless asked.
+- **Date:** 2026-08-28
+- **Branch:** `design/5.2.0` (local; do not push until asked)
+- **Done:** 5.2.0 design — sieve wait/brand/empty states, Source Serif 4
+  headings, Advanced bar/copy parity, Re-prepare empty-state copy.
+- **Next:** Leftovers in `notes.md`. `design_mockups/` untracked unless asked.

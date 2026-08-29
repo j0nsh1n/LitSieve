@@ -265,7 +265,7 @@ async def api_admin_overview(request: Request):
         "ai": llm_svc.is_configured(),
         "quota_mb": round(cap / (1024 * 1024)) if cap else 0,
         "guest_auto_prepare": guest_prep not in ("0", "false", "no", "off"),
-        "version": "5.1.0",
+        "version": "5.2.0",
         "uptime_seconds": int(max(0, __import__("time").time() - core.PROCESS_STARTED)),
         "jobs": job_counts,
         "auth_events_1h": {str(k): int(v) for k, v in auth_hour},

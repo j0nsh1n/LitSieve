@@ -926,7 +926,25 @@ function renderFetchLiveSources(p) {
  hosts.forEach((host) => { host.innerHTML = html; });
 }
 
-function waitForJob(task, fillId, labelId, wrapId, formatLabel, timeoutMs = 600000) {
+function simpleWaitMapOpts(min, max) {
+ return {
+  mapMin: min,
+  mapMax: max,
+  cssVar: '--wait-pct',
+  skipLive: true,
+  skipLabel: true,
+  skipFinishReset: true,
+  easeUntilProgress: true,
+ };
+}
+
+function waitForJob(task, fillId, labelId, wrapId, formatLabel, timeoutMs, opts) {
+ if (timeoutMs && typeof timeoutMs === 'object') {
+  opts = timeoutMs;
+  timeoutMs = 600000;
+ }
+ if (timeoutMs == null) timeoutMs = 600000;
+ opts = opts || {};
  return new Promise((resolve, reject) => {
  const fill = document.getElementById(fillId);
  const label = document.getElementById(labelId);
@@ -934,26 +952,63 @@ function waitForJob(task, fillId, labelId, wrapId, formatLabel, timeoutMs = 6000
  const liveHosts = ['search-buffering-sources', 'fetch-live-sources']
   .map((id) => document.getElementById(id))
   .filter(Boolean);
- if (wrap) wrap.style.display = 'block';
- if (fill) fill.style.width = '0%';
- if (task === 'fetch') liveHosts.forEach((live) => { live.innerHTML = ''; });
+ const mapMin = Number(opts.mapMin);
+ const mapMax = Number(opts.mapMax);
+ const hasMap = Number.isFinite(mapMin) && Number.isFinite(mapMax);
+ if (!opts.skipFinishReset && wrap) wrap.style.display = 'block';
+ if (!opts.skipFinishReset && fill && !opts.cssVar) fill.style.width = '0%';
+ if (task === 'fetch' && !opts.skipLive) liveHosts.forEach((live) => { live.innerHTML = ''; });
  const started = Date.now();
  let sawActive = false;
  let settled = false;
  let lastSig = '';
  let lastChangeAt = Date.now();
  let stallHintShown = false;
+ let gotProgress = false;
+
+ const writePct = (pct) => {
+  const clamped = Math.max(0, Math.min(100, pct));
+  if (opts.cssVar && fill) {
+   fill.style.setProperty(opts.cssVar, clamped + '%');
+   const bar = document.getElementById('search-wait-bar');
+   if (bar) bar.setAttribute('aria-valuenow', String(Math.round(clamped)));
+  } else if (fill) {
+   fill.style.width = clamped + '%';
+  }
+ };
+
+ let easeIv = null;
+ if (opts.easeUntilProgress && hasMap) {
+  const ceiling = mapMin + (mapMax - mapMin) * 0.12;
+  easeIv = setInterval(() => {
+   if (gotProgress || settled) {
+    clearInterval(easeIv);
+    easeIv = null;
+    return;
+   }
+   const t = Math.min(1, (Date.now() - started) / 4000);
+   writePct(mapMin + (ceiling - mapMin) * (1 - Math.pow(1 - t, 1.25)));
+  }, 200);
+ }
 
  const finish = (err, result) => {
   if (settled) return;
   settled = true;
   clearInterval(interval);
-  if (fill) fill.style.width = err ? '0%' : '100%';
-  if (wrap) {
+  if (easeIv) {
+   clearInterval(easeIv);
+   easeIv = null;
+  }
+  if (opts.skipFinishReset) {
+   if (!err && hasMap) writePct(mapMax);
+  } else if (fill && !opts.cssVar) {
+   fill.style.width = err ? '0%' : '100%';
+  }
+  if (!opts.skipFinishReset && wrap) {
    setTimeout(() => {
     wrap.style.display = 'none';
-    if (fill) fill.style.width = '0%';
-    if (task === 'fetch') liveHosts.forEach((live) => { live.innerHTML = ''; });
+    if (fill && !opts.cssVar) fill.style.width = '0%';
+    if (task === 'fetch' && !opts.skipLive) liveHosts.forEach((live) => { live.innerHTML = ''; });
    }, 800);
   }
   if (err) reject(err);
@@ -971,26 +1026,41 @@ function waitForJob(task, fillId, labelId, wrapId, formatLabel, timeoutMs = 6000
    if (!p) return;
    if (p.active) {
     sawActive = true;
-    const pct = p.total > 0 ? Math.round((p.done / p.total) * 100) : 0;
+    const rawPct = p.total > 0 ? (p.done / p.total) * 100 : 0;
     const sig = `${p.done}|${p.total}|${p.articles_so_far || 0}|${p.message || ''}`;
     if (sig !== lastSig) {
      lastSig = sig;
      lastChangeAt = Date.now();
      stallHintShown = false;
     }
-    if (fill) fill.style.width = pct + '%';
-    if (label) {
-     let text = p.message
-      ? p.message
-      : (typeof formatLabel === 'function' ? formatLabel(p.done, p.total, pct, p) : '');
+    if (p.total > 0) {
+     gotProgress = true;
+     if (hasMap) writePct(mapMin + (rawPct / 100) * (mapMax - mapMin));
+     else if (fill && !opts.cssVar) fill.style.width = Math.round(rawPct) + '%';
+    }
+    if (!opts.skipLabel && label) {
+     const formatted = typeof formatLabel === 'function'
+      ? formatLabel(p.done, p.total, Math.round(rawPct), p)
+      : '';
+     const detailEl = labelId ? document.getElementById(labelId + '-detail') : null;
+     let narrative = '';
+     let counts = '';
+     if (formatted && typeof formatted === 'object') {
+      narrative = formatted.label || '';
+      counts = formatted.detail || '';
+     } else {
+      narrative = formatted || '';
+     }
+     if (p.message) narrative = p.message;
      if (!stallHintShown && Date.now() - lastChangeAt > 45000) {
       stallHintShown = true;
-      text = (text ? text + ' · ' : '')
+      narrative = (narrative ? narrative + ' · ' : '')
        + 'Still working — large sources can take a minute with no new progress.';
      }
-     label.textContent = text;
+     label.textContent = narrative;
+     if (detailEl) detailEl.textContent = counts;
     }
-    if (task === 'fetch') renderFetchLiveSources(p);
+    if (task === 'fetch' && !opts.skipLive) renderFetchLiveSources(p);
     return;
    }
    // Idle: only finish after we observed this job running, or after a short
@@ -1275,15 +1345,18 @@ async function doFetch() {
  }
  const hideReport = document.getElementById('fetch-source-report');
  if (hideReport) hideReport.style.display = 'none';
+ const simple = typeof isSimpleMode === 'function' && isSimpleMode();
  setStatus(
  'fetch-status',
- clearFirst
- ? `Starting fresh: clearing collection, then fetching from ${sources.length} source(s)…`
- : `Adding to collection from ${sources.length} source(s)…`,
+ simple
+ ? (clearFirst
+  ? `Starting fresh: clearing collection, then fetching from ${sources.length} source(s)…`
+  : `Adding to collection from ${sources.length} source(s)…`)
+ : (clearFirst
+  ? `Starting fresh — scooping from ${sources.length} source(s)…`
+  : `Adding to your collection from ${sources.length} source(s)…`),
  'info'
  );
-
- const simple = typeof isSimpleMode === 'function' && isSimpleMode();
  const useBuffer = simple && typeof showSimpleBuffering === 'function'
   && document.getElementById('search-preparing');
  if (useBuffer) showSimpleBuffering('fetch');
@@ -1310,8 +1383,15 @@ async function doFetch() {
  useBuffer ? 'search-buffering-progress' : 'fetch-progress-wrap',
  (done, total, _pct, p) => {
  const arts = (p && p.articles_so_far) || 0;
- return `${done} of ${total} source(s) · ${arts} paper(s) so far`;
+ if (useBuffer) {
+  return `${done} of ${total} source(s) · ${arts} paper(s) so far`;
  }
+ return {
+  label: `Scooping up your first batch`,
+  detail: `${done} of ${total} source(s) · ${arts} paper(s) so far`,
+ };
+ },
+ useBuffer ? simpleWaitMapOpts(0, 60) : undefined
  );
  }
  applyFetchResult(data, sources);
@@ -1334,10 +1414,16 @@ async function doFetch() {
  }
  setStatus(
  'fetch-status',
- `Fetched ${totalFetched} paper(s). Getting them ready for search…`,
+ simple
+  ? `Fetched ${totalFetched} paper(s). Getting them ready for search…`
+  : `Scooped ${totalFetched} paper(s). Down to the fine grains…`,
  'info'
  );
- setStatus('embeddings-status', 'Getting your papers ready…', 'info');
+ setStatus(
+  'embeddings-status',
+  simple ? 'Getting your papers ready…' : 'Down to the fine grains',
+  'info'
+ );
  try {
  await doCreateEmbeddings({ fromAutoChain: true });
  } catch (chainErr) {
@@ -1346,7 +1432,9 @@ async function doFetch() {
  console.warn('Auto-prepare after fetch failed:', chainErr);
  setStatus(
  'fetch-status',
- `Fetched ${totalFetched} paper(s), but prepare did not finish. Use Re-prepare if needed.`,
+ simple
+  ? `Fetched ${totalFetched} paper(s), but prepare did not finish. Use Re-prepare if needed.`
+  : `Scooped ${totalFetched} paper(s), but prepare did not finish. Use Re-prepare if needed.`,
  'warning'
  );
  }
@@ -1367,7 +1455,9 @@ async function doFetch() {
  _pipelineBusy = false;
  _simpleFetchUnlocked = false;
  _simpleFetchModePicked = false;
- if (typeof hideSimpleBuffering === 'function') hideSimpleBuffering();
+ if (!window._simpleWaitHolding && typeof hideSimpleBuffering === 'function') {
+  hideSimpleBuffering();
+ }
  // After a failed auto-prepare with papers in hand, force the re-prepare card open
  // so the student has a control (ready count may still be 0).
  if (autoChainFailed && _lastTotalArticles > 0) {
@@ -1434,9 +1524,9 @@ async function doCreateEmbeddings(opts) {
   : fromAutoChain ? 'fetch-progress-wrap' : 'embed-progress-wrap';
  setStatus(
  fromAutoChain ? 'fetch-status' : 'embeddings-status',
- (simple || fromAutoChain)
+ simple
   ? 'Getting your papers ready… this may take a few minutes on large collections.'
-  : 'Preparing papers for search (embeddings)… this may take a few minutes on large collections.',
+  : 'Down to the fine grains — this can take a few minutes on large collections.',
  'info'
  );
  setStatus(
@@ -1462,8 +1552,11 @@ async function doCreateEmbeddings(opts) {
   ? `Getting papers ready… ${done} / ${total} (${pct}%)`
   : 'Getting your papers ready…';
  }
- return total > 0 ? `${done} / ${total} articles (${pct}%)` : 'Loading model…';
- }
+ return total > 0
+  ? { label: `Down to the fine grains`, detail: `${done} / ${total} articles (${pct}%)` }
+  : { label: `Down to the fine grains`, detail: 'Loading model…' };
+ },
+ useBuffer ? simpleWaitMapOpts(60, 90) : undefined
  );
  }
  // If the 202 body already had a final payload (wait=true legacy), use it.
@@ -1503,14 +1596,13 @@ async function doCreateEmbeddings(opts) {
   setNextStepVisible(false);
  }
  } else {
+ const n = data.articles_processed;
  setStatus(
  'embeddings-status',
- `Done: ${created} prepared, ${skipped} skipped (already prepared). ` +
- `Model ${data.model || model} on ${device} in ${secs}. ` +
- `Total ready for search: ${data.articles_processed}.`,
+ `Done. ${created} prepared, ${skipped} already ready. Model ${model} on ${device} in ${secs}. Ready for search: ${n}.`,
  'success'
  );
- showNotification('Papers prepared for search!', 'success');
+ showNotification('Your papers are ready.', 'success');
  }
  // Manual Simple re-prepare: clear low_relevance exclusions so screening
  // returns to *pending* via corpus state (not a JS flag) and survives reload.
@@ -1541,6 +1633,9 @@ async function doCreateEmbeddings(opts) {
   _resetAfterStartOver = false;
  }
  await loadPageData();
+ if (simple && fromAutoChain && typeof holdSimpleWait === 'function') {
+  holdSimpleWait();
+ }
  // Manual re-prepare (and auto-chain) must refresh Narrow it down so the
  // confirm-your-question box appears without a full page reload.
  await refreshSimpleScreeningCard();

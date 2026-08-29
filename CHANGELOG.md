@@ -8,6 +8,39 @@ and this project aims to follow Semantic Versioning for app version strings
 
 ## [Unreleased]
 
+## [5.2.0] - 2026-08-28
+
+### Added
+- **Sieve wait screen:** the Simple-mode fetch/prepare screen now shows an
+  animated sieve - grains pour in, the pan rocks, a few fall through - with
+  status lines in a panning voice ("Scooping up your first batch", "Washing out
+  the repeats"). Screen scaled up for legibility.
+- **Sieve brand mark:** SVG favicon and a nav wordmark mark drawn from the same
+  pan. The previous favicon predated two redesigns.
+- **Empty states** on Search, Clean up and Clusters now show an empty pan
+  instead of text alone.
+
+### Changed
+- **Source Serif 4 for headings**, replacing Public Sans. Body and UI stay on
+  Source Sans 3 - same superfamily, so the two harmonise. Self-hosted WOFF2,
+  net payload change +4.6 KB.
+- **Advanced mode matches Simple:** progress bars share the Simple bar's height
+  and tokens; progress copy rewritten in the same voice, with counts kept as a
+  secondary detail line rather than dropped.
+- Copy swept across Clean up and Clusters: "screened out" is now "set aside",
+  matching what Simple mode already said.
+
+### Fixed
+- Empty-state guidance told students to press "Prepare papers for search"; no
+  such control exists. It now names "Re-prepare Papers" (also fixed in the
+  sample-corpus toast).
+- Progress bar gradient hardcoded #fff, which broke in dark mode.
+- Removed a shimmer animation that ran forever against a flat colour after the
+  gradient was dropped - it animated background-position with no gradient to move.
+
+### Removed
+- Public Sans (both WOFF2s and its licence), unused once headings moved to a serif.
+
 ## [5.1.0] - 2026-08-22
 
 ### Added

@@ -83,6 +83,52 @@ function isSimpleBuffering() {
  return !!(window._preparingCorpus || (document.body && document.body.classList.contains('simple-buffering')));
 }
 
+// LitSieve, so the wait reads as panning: scoop, swirl, wash, fine grains.
+// Order tracks the real phases (fetch, read, dedup, embed) and the LAST line is
+// what holdSimpleWait() parks on at 90%, so it must sit comfortably for a while.
+var WAIT_STATUS_LINES = [
+ 'Scooping up your first batch',
+ 'Swirling through titles and abstracts',
+ 'Washing out the repeats',
+ 'Down to the fine grains',
+ 'Almost got it',
+];
+var _waitMsgTimer = null;
+var _waitMsgIndex = 0;
+
+function _setWaitPct(pct) {
+ const clamped = Math.max(0, Math.min(100, Number(pct) || 0));
+ const fill = document.getElementById('search-buffering-fill');
+ if (fill) fill.style.setProperty('--wait-pct', clamped + '%');
+ const bar = document.getElementById('search-wait-bar');
+ if (bar) bar.setAttribute('aria-valuenow', String(Math.round(clamped)));
+}
+
+function _stopWaitMessages() {
+ if (_waitMsgTimer) {
+  clearInterval(_waitMsgTimer);
+  _waitMsgTimer = null;
+ }
+}
+
+function _startWaitMessages() {
+ if (_waitMsgTimer) return;
+ const status = document.getElementById('search-preparing-status');
+ if (status && !status.textContent) {
+  status.textContent = WAIT_STATUS_LINES[0];
+ }
+ if (!_waitMsgIndex) {
+  _waitMsgIndex = 0;
+  if (status) status.textContent = WAIT_STATUS_LINES[0];
+ }
+ _waitMsgTimer = setInterval(() => {
+  if (window._simpleWaitHolding) return;
+  _waitMsgIndex = (_waitMsgIndex + 1) % WAIT_STATUS_LINES.length;
+  const el = document.getElementById('search-preparing-status');
+  if (el) el.textContent = WAIT_STATUS_LINES[_waitMsgIndex];
+ }, 2500);
+}
+
 function showSimpleBuffering(phase) {
  if (typeof isSimpleMode === 'function' && !isSimpleMode()) return;
  const el = document.getElementById('search-preparing');
@@ -90,31 +136,18 @@ function showSimpleBuffering(phase) {
  window._preparingCorpus = true;
  window._simpleBufferingPhase = phase || 'fetch';
  el.hidden = false;
+ el.setAttribute('aria-busy', 'true');
  if (document.body) {
   document.body.classList.add('simple-buffering');
   document.body.classList.remove('simple-collecting');
  }
  const title = document.getElementById('search-buffering-title');
  const lead = document.getElementById('search-buffering-lead');
- const status = document.getElementById('search-preparing-status');
  const cancel = document.getElementById('search-buffering-cancel');
- const wrap = document.getElementById('search-buffering-progress');
- if (wrap) wrap.style.display = 'block';
- if (phase === 'prepare') {
-  if (title) title.textContent = 'Preparing papers…';
-  if (lead) {
-   lead.textContent = 'Making them searchable. Stay on this page — next you will type your real question.';
-  }
-  if (status) status.textContent = 'Preparing…';
-  if (cancel) cancel.hidden = true;
- } else {
-  if (title) title.textContent = 'Fetching papers…';
-  if (lead) {
-   lead.textContent = 'Looking through the sources you picked. Stay on this page.';
-  }
-  if (status) status.textContent = 'Starting fetch…';
-  if (cancel) cancel.hidden = false;
- }
+ if (title) title.textContent = 'Sieving your papers';
+ if (lead) lead.textContent = 'Stay on this page';
+ if (cancel) cancel.hidden = (phase === 'prepare') || !!window._simpleWaitHolding;
+ _startWaitMessages();
  const collect = document.getElementById('search-collect');
  if (collect) collect.hidden = true;
  const card = document.getElementById('simple-screening-card');
@@ -127,15 +160,74 @@ function showSimpleBuffering(phase) {
 function hideSimpleBuffering() {
  window._preparingCorpus = false;
  window._simpleBufferingPhase = '';
+ window._simpleWaitHolding = false;
+ _stopWaitMessages();
+ _waitMsgIndex = 0;
  const el = document.getElementById('search-preparing');
- if (el) el.hidden = true;
+ if (el) {
+  el.hidden = true;
+  el.classList.remove('is-holding');
+  el.setAttribute('aria-busy', 'false');
+ }
  if (document.body) document.body.classList.remove('simple-buffering');
  const cancel = document.getElementById('search-buffering-cancel');
  if (cancel) cancel.hidden = true;
- const wrap = document.getElementById('search-buffering-progress');
- if (wrap) wrap.style.display = '';
- const live = document.getElementById('search-buffering-sources');
- if (live) live.innerHTML = '';
+ _setWaitPct(0);
+}
+
+function holdSimpleWait() {
+ window._simpleWaitHolding = true;
+ window._preparingCorpus = true;
+ const el = document.getElementById('search-preparing');
+ if (el) {
+  el.hidden = false;
+  el.classList.add('is-holding');
+  el.setAttribute('aria-busy', 'true');
+ }
+ if (document.body) document.body.classList.add('simple-buffering');
+ _setWaitPct(90);
+ const cancel = document.getElementById('search-buffering-cancel');
+ if (cancel) cancel.hidden = true;
+ const status = document.getElementById('search-preparing-status');
+ if (status) status.textContent = WAIT_STATUS_LINES[WAIT_STATUS_LINES.length - 1];
+}
+
+function finishSimpleWaitThenSearch() {
+ if (!window._simpleWaitHolding && !(document.body && document.body.classList.contains('simple-buffering'))) {
+  return Promise.resolve();
+ }
+ window._simpleWaitHolding = false;
+ const el = document.getElementById('search-preparing');
+ if (el) el.classList.remove('is-holding');
+ _stopWaitMessages();
+ const status = document.getElementById('search-preparing-status');
+ if (status) status.textContent = 'Opening Search';
+ const reduce = typeof matchMedia === 'function'
+  && matchMedia('(prefers-reduced-motion: reduce)').matches;
+ const dur = reduce ? 0 : 2000;
+ const t0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+ return new Promise((resolve) => {
+  const tick = (now) => {
+   const t = dur ? Math.min(1, ((now || Date.now()) - t0) / dur) : 1;
+   _setWaitPct(90 + 10 * t);
+   if (t < 1) {
+    requestAnimationFrame(tick);
+    return;
+   }
+   hideSimpleBuffering();
+   const go = (stats) => {
+    if (typeof syncSimpleOnePageState === 'function') syncSimpleOnePageState(stats);
+    resolve();
+   };
+   if (typeof apiCall === 'function') {
+    apiCall('/api/statistics').then(go).catch(() => go({ articles_with_embeddings: 1 }));
+   } else {
+    go({ articles_with_embeddings: 1 });
+   }
+  };
+  if (dur && typeof requestAnimationFrame === 'function') requestAnimationFrame(tick);
+  else tick(t0 + dur);
+ });
 }
 
 function setNextStepVisible(visible) {
@@ -510,6 +602,9 @@ function openSimpleScreenModal() {
  modal.hidden = false;
  prefillSimpleScreenQuery();
  loadSimpleScreenCounts();
+ const applyOnOpen = document.getElementById('simple-screen-apply-btn');
+ const qOnOpen = document.getElementById('simple-screen-query');
+ if (applyOnOpen && qOnOpen) applyOnOpen.disabled = !qOnOpen.value.trim();
 
  const focusableSelector = [
   'button:not([disabled])',
@@ -763,11 +858,18 @@ function wireSimpleScreeningCard() {
  });
  if (queryEl) {
   let t = null;
+  const syncApply = () => {
+   const apply = document.getElementById('simple-screen-apply-btn');
+   if (apply) apply.disabled = !queryEl.value.trim();
+  };
+  syncApply();
   queryEl.addEventListener('change', () => {
    _simpleScreenCounts = { low: null, medium: null, high: null };
    loadSimpleScreenCounts();
+   syncApply();
   });
   queryEl.addEventListener('input', () => {
+   syncApply();
    clearTimeout(t);
    t = setTimeout(() => {
     _simpleScreenCounts = { low: null, medium: null, high: null };
@@ -907,6 +1009,9 @@ async function doSimpleScreenApply() {
   closeSimpleScreenModal({ force: true });
   const openBtn = document.getElementById('simple-screen-open-btn');
   if (openBtn) openBtn.hidden = true;
+  if (typeof finishSimpleWaitThenSearch === 'function') {
+   finishSimpleWaitThenSearch();
+  }
  } catch (e) {
   setStatus('simple-screen-status', `Could not set papers aside: ${e.message}`, 'error');
   showNotification(`Could not set papers aside: ${e.message}`, 'error');
@@ -936,6 +1041,9 @@ function doSimpleScreenSkip() {
  closeSimpleScreenModal({ force: true });
  const openBtn = document.getElementById('simple-screen-open-btn');
  if (openBtn) openBtn.hidden = false;
+ if (typeof finishSimpleWaitThenSearch === 'function') {
+  finishSimpleWaitThenSearch();
+ }
  const hint = document.getElementById('simple-screen-dock-hint');
  if (hint) hint.hidden = true;
 }

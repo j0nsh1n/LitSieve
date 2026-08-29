@@ -1086,9 +1086,16 @@ def test_simple_fetch_shows_buffering_then_narrow():
     assert 'id="search-buffering-title"' in html
     assert 'id="search-buffering-progress"' in html
     assert 'id="search-buffering-cancel"' in html
+    assert "Sieving your papers" in html
+    assert 'id="search-buffering-sources"' not in html
+    assert "Scooping up your first batch" in html
     tools = _read("static", "js", "simple_tools.js")
     assert "function showSimpleBuffering" in tools
     assert "function hideSimpleBuffering" in tools
+    assert "function holdSimpleWait" in tools
+    assert "function finishSimpleWaitThenSearch" in tools
+    assert "Scooping up your first batch" in tools
+    assert "Almost got it" in tools
     dm = _read("static", "js", "data_management.js")
     fetch_fn = dm[dm.find("async function doFetch") : dm.find("async function silentResolveDuplicatesAfterPrepare")]
     assert "showSimpleBuffering('fetch')" in fetch_fn

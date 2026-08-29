@@ -28,9 +28,12 @@ a substitute for school library databases.
   `data-mode` on `<html>`, applied pre-paint). Simple does not remove Advanced
   capability; Advanced keeps every control
   - **Simple nav:** one page (`/search`) with an empty collect state (topics +
-    fetch + progress) and a papers-present search state (rank, Show chips,
-    export). Screening, re-prepare, start over, and the source report are
-    popups. `/data-management` in Simple redirects to `/search`.
+    fetch) and a papers-present search state (rank, Show chips, export).
+    Fetch + prepare use one wait screen (animated sieve, rotating status;
+    no live source rows). The bar maps fetch to 0–60 and prepare to 60–90;
+    **Narrow it down** holds at 90% (apply or skip), then a short finish
+    leg opens Search. Screening, re-prepare, start over, and the source
+    report are popups. `/data-management` in Simple redirects to `/search`.
   - **Advanced nav:** Data Management → Clean up → Clusters → Search (plus Account)
 - **Screening / triage** (exclude/restore with reason codes), not only on Clusters:
   - Clean up (`/statistics`): near-duplicates, preferred-source auto-resolve,
@@ -56,12 +59,16 @@ a substitute for school library databases.
   Or: `DEBUG=true SECRET_KEY=… ./venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 7860 --reload`
   Dev isolation (preferred): `./run_dev.sh 7861` uses separate DB/data/log paths.
 - Example (Simple): register or **Try the demo** → Search (empty: topics →
-  fetch by **topic** → wait screen for fetch + prepare → required Narrow it
-  down → rank + export). Re-prepare / Start over stay on the Search strip.
+  fetch by **topic** → wait screen for fetch + prepare, sieve + rotating
+  copy, hold at 90% → required Narrow it down apply or skip → finish leg →
+  rank + export). Re-prepare / Start over stay on the Search strip.
+- Type: Source Serif 4 headings, Source Sans 3 body/UI, self-hosted WOFF2
+  (CSP `font-src 'self'`). Empty Search / Clean up / Clusters states show a
+  static empty pan, not text alone.
 - Example (Advanced): log in → Data Management (topics/sources → Fetch →
   auto-prepare) → Clean up (dedup / Quick screen / report) → optional Clusters →
   Search → Download RIS
-- Health: `GET /health` → `{"status":"healthy","version":"5.0.3"}` (version as of
+- Health: `GET /health` → `{"status":"healthy","version":"5.2.0"}` (version as of
   this writing; bump when releasing)
 
 ## Architecture
@@ -136,7 +143,7 @@ a substitute for school library databases.
 
 ## Acceptance Criteria
 - [ ] Student can complete a literature pass on public sources only:
-      Simple: topics → fetch → auto-prepare → optional screen → search → export RIS;
+      Simple: topics → fetch → auto-prepare wait → required Narrow it down → search → export RIS;
       Advanced: same plus Clean up (dedup / Quick screen) and optional Clusters
 - [ ] Guest demo loads sample papers without multi-source fetch and does not
       hijack an existing signed-in session

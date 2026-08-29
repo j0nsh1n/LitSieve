@@ -456,7 +456,8 @@ async function waitIfPreparing(stats) {
      (done, totalN, _pct, p) => {
       const arts = (p && p.articles_so_far) || 0;
       return `${done} of ${totalN} source(s) · ${arts} paper(s) so far`;
-     }
+     },
+     typeof simpleWaitMapOpts === 'function' ? simpleWaitMapOpts(0, 60) : undefined
     );
    } catch (e) {
     if (status) status.textContent = 'Fetch did not finish. Try again from Get papers.';
@@ -497,13 +498,21 @@ async function waitIfPreparing(stats) {
      ? (done, totalN, pct) => (
       totalN > 0 ? `Getting papers ready… ${done} / ${totalN} (${pct}%)` : 'Getting your papers ready…'
      )
-     : null
+     : null,
+    simple && typeof simpleWaitMapOpts === 'function' ? simpleWaitMapOpts(60, 90) : undefined
    );
   } catch (e) {
    if (status) status.textContent = 'Could not finish preparing. Use Re-prepare.';
    hide();
    return stats;
   }
+ }
+ if (simple && typeof holdSimpleWait === 'function') {
+  holdSimpleWait();
+  if (typeof refreshSimpleScreeningCard === 'function') {
+   await refreshSimpleScreeningCard();
+  }
+  return stats;
  }
  hide();
  return loadSearchEmptyState();
