@@ -1,0 +1,46 @@
+{
+  "id": "dsst_meta_faithful",
+  "provenance": {
+    "source": "pubmed",
+    "pmid": "42449039",
+    "title": "Delayed school start times to improve sleep duration and mitigate depression in adolescents: a systematic review and meta-analysis.",
+    "journal": "Journal of clinical sleep medicine : JCSM : official publication of the American Academy of Sleep Medicine",
+    "year": "2026",
+    "note": "Title/abstract fetched from the NCBI E-utilities public API."
+  },
+  "audience": "general_reader",
+  "variant": "faithful",
+  "abstract": "BACKGROUND AND OBJECTIVES: Delayed school start time (DSST) has been associated with prolonged sleep duration and reduced depressive symptoms. However, the overall magnitude of these effects remains unclear. We therefore conducted a systematic review and meta-analysis to assess the impact of DSST on sleep duration and depressive symptoms among middle and high school students. METHODS: We systematically searched Medline, Google Scholar, and Science Direct for studies examining the relationship between DSST and both sleep duration and depression. Four independent reviewers conducted risk-of-bias and quality assessments for each study. For quantitative synthesis, we calculated the standardized mean difference (SMD) using Hedges's g to evaluate changes in sleep duration and depression. RESULTS: A total of six studies were included in the final meta-analysis. The pooled analysis indicated that DSST was associated with an average increase in sleep duration of 69 min, with an SMD of 0.63, suggesting a moderate effect size. In contrast, analysis of depressive symptoms, based on five studies, produced a pooled SMD of - 0.20, indicating a smaller effect. Both analyses demonstrated high inter-study heterogeneity. CONCLUSIONS: Our findings suggest that DSST is associated with a moderate improvement in sleep duration among middle and high school students, with minimal evidence of publication bias and small-studies effect, while depressive symptoms showed a small reduction. Further research with larger sample sizes and standardized outcome measures is warranted to clarify these associations.",
+  "generated": {
+    "plain_summary": "Researchers pooled six studies of delayed school start time (DSST) in middle and high school students. Across those six studies, a later start was associated with an average increase in sleep duration of 69 min, with a standardized mean difference (SMD) of 0.63. Depressive symptoms, based on five studies, showed a smaller pooled SMD of - 0.20.",
+    "question_asked": "Does delaying school start time change how long middle and high school students sleep, and does it change depressive symptoms?",
+    "who_was_studied": "Middle and high school students, as reported across six studies included in the meta-analysis; depression was analysed across five studies.",
+    "what_was_found": "DSST was associated with an average increase in sleep duration of 69 min (SMD 0.63, a moderate effect). Depressive symptoms showed a smaller pooled SMD of - 0.20. Both analyses demonstrated high inter-study heterogeneity.",
+    "what_it_does_not_show": "The abstract reports an association, not proof that a later start causes the change. High heterogeneity between studies means the pooled numbers may not describe any single school.",
+    "stated_limitations": "The abstract states that both analyses demonstrated high inter-study heterogeneity, and that further research is needed.",
+    "glossary": [
+      {
+        "term": "meta-analysis",
+        "definition": "A study that combines the results of several earlier studies to get a single overall estimate."
+      },
+      {
+        "term": "standardized mean difference (SMD)",
+        "definition": "A way of expressing how big a difference is, so results measured on different scales can be compared."
+      },
+      {
+        "term": "heterogeneity",
+        "definition": "How much the individual studies disagreed with each other."
+      }
+    ],
+    "not_reported_fields": []
+  },
+  "expected": {
+    "numeric_detail": "pass",
+    "study_design": "pass",
+    "negation": "pass",
+    "uncertainty_language": "pass",
+    "entity_retention": "skipped"
+  },
+  "note": "Faithful: keeps 69 min, SMD 0.63, SMD -0.20, six/five studies, 'associated with', heterogeneity, 'further research'. Expect a clean report.",
+  "expected_status": "no_automatic_issues"
+}

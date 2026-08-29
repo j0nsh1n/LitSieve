@@ -36,6 +36,21 @@ CAUSAL_UPGRADES = (
     "will make",
 )
 
+# Hedging as a plain-language writer actually produces it. Used ONLY on the
+# generated side of the uncertainty "loss" test: the narrow UNCERTAINTY_CUES
+# list above is for spotting caution in the source, and requiring the same
+# vocabulary back out warned on well-hedged explanations that simply chose
+# different words ("cannot establish" instead of "may").
+HEDGE_MARKERS = (
+    "cannot establish", "cannot show", "does not prove", "do not prove",
+    "does not show", "did not find", "not prove", "no clear", "not clear",
+    "tended to", "tend to", "seems", "seemed", "roughly", "about",
+    "estimate", "estimated", "not enough", "cannot tell", "cannot say",
+    "rather than proof", "not proof", "only shows", "on average",
+    "non-significant", "not significant", "smaller effect", "may not",
+    "might not", "unable to say", "does not mean", "not by itself",
+)
+
 # Copied from PICOExtractor (app/services/embeddings.py) on purpose — see the
 # module docstring. Keep in sync by hand; duplicate is intentional.
 POPULATION_KEYWORDS = [
@@ -63,8 +78,8 @@ OUTCOME_KEYWORDS = [
 _NUMBER_TOKEN_RE = re.compile(
     r"""
     (?P<p_value>[Pp]\s*[=<>≤≥]\s*0?\.\d+)
-    | (?P<ci>\d+\s*%\s*CI[^)\n;]{0,60}|\[\s*-?\d+\.?\d*\s*,\s*-?\d+\.?\d*\s*\])
-    | (?P<duration>\d+(?:\.\d+)?\s*-?\s*(?P<dunit>seconds?|minutes?|hours?|days?|weeks?|months?|years?))
+    | (?P<ci>\d+\s*%\s*CI:?\s*-?\d+(?:\.\d+)?\s*(?:to|[-–,])\s*-?\d+(?:\.\d+)?|\[\s*-?\d+\.?\d*\s*,\s*-?\d+\.?\d*\s*\])
+    | (?P<duration>\d+(?:\.\d+)?\s*-?\s*(?P<dunit>seconds?|secs?|minutes?|mins?|hours?|hrs?|days?|weeks?|wks?|months?|mos?|years?|yrs?)\b)
     | (?P<sample_size>[nN]\s*=\s*\d[\d,]*)
     | (?P<dose>\d+(?:\.\d+)?\s*-?\s*(?P<dosunit>mg|kg|mcg|µg|μg|ml|mmHg|IU|g)\b)
     | (?P<percent>\d+(?:\.\d+)?\s*%)
@@ -76,9 +91,6 @@ _NUMBER_TOKEN_RE = re.compile(
 
 _P_VALUE_TAIL_RE = re.compile(r"(0?\.\d+)\s*$")
 _CAP_SPAN_RE = re.compile(r"\b[A-Z][A-Za-z0-9-]+(?:\s+[A-Z][A-Za-z0-9-]+)+\b")
-_WORD_RE = re.compile(r"[A-Za-z][A-Za-z-]*")
-
-_ENTITY_KEYWORDS = tuple(POPULATION_KEYWORDS + INTERVENTION_KEYWORDS)
 
 
 def normalise(text: str) -> str:
@@ -139,9 +151,9 @@ def extract_numbers(text: str) -> List[Dict]:
             unit = "ci"
         elif kind == "duration":
             value = _first_number(surface)
-            unit = m.group("dunit").lower()
-            if unit.endswith("s"):
-                unit = unit[:-1]
+            unit = _DURATION_UNITS.get(
+                m.group("dunit").lower().rstrip("s"), m.group("dunit").lower().rstrip("s")
+            )
         elif kind == "sample_size":
             digits = surface.split("=", 1)[1].strip().replace(",", "")
             value = float(int(digits)) if digits else None
@@ -213,8 +225,8 @@ def extract_pico_candidates(abstract: str) -> List[str]:
     """Candidate entities (max 8) for the retention check.
 
     Per non-empty PICO bucket take the first matching sentence; from those
-    sentences keep capitalised multi-word spans plus tokens matching the
-    population/intervention keyword lists. Deduplicated (casefold), cap 8.
+    sentences keep capitalised multi-word named spans (leading "The"/"A"
+    stripped). Deduplicated (casefold), cap 8.
     """
     sentences = split_sentences(abstract or "")
     chosen: List[str] = []
@@ -231,19 +243,85 @@ def extract_pico_candidates(abstract: str) -> List[str]:
     seen: set = set()
     for sent in chosen:
         for span in _CAP_SPAN_RE.findall(sent):
-            key = span.casefold()
+            # Drop leading "The"/"A"/… so "The Sleep Education Program" is a
+            # usable name, not junk. Keep multi-word proper spans only.
+            words = span.split()
+            while words and words[0].casefold() in _STOP_STARTERS:
+                words.pop(0)
+            if len(words) < 2:
+                continue
+            cleaned = " ".join(words)
+            if _is_junk_candidate(cleaned):
+                continue
+            key = cleaned.casefold()
             if key not in seen:
                 seen.add(key)
-                candidates.append(span)
-        for word in _WORD_RE.findall(sent):
-            low = word.lower()
-            if len(low) < 3:
-                continue
-            if any(low == kw or low.startswith(kw) for kw in _ENTITY_KEYWORDS):
-                key = low
-                if key not in seen:
-                    seen.add(key)
-                    candidates.append(word)
+                candidates.append(cleaned)
         if len(candidates) >= 8:
             break
     return candidates[:8]
+
+
+# Abbreviated duration units map onto their spelled-out form so "69 min" in an
+# abstract matches "69 minutes" in an explanation.
+_DURATION_UNITS = {
+    "sec": "second", "second": "second",
+    "min": "minute", "minute": "minute",
+    "hr": "hour", "hour": "hour",
+    "day": "day",
+    "wk": "week", "week": "week",
+    "mo": "month", "month": "month",
+    "yr": "year", "year": "year",
+}
+
+
+def has_hedging(text: str) -> bool:
+    """True when text hedges at all, by either vocabulary.
+
+    Deliberately generous: this backs a *warning* about lost caution, so a
+    false negative (staying quiet) is cheaper than nagging a careful writer.
+    """
+    low = normalise(text or "")
+    if not low:
+        return False
+    for _, pattern in _CUE_PATTERNS["uncertainty"]:
+        if pattern.search(low):
+            return True
+    return any(marker in low for marker in HEDGE_MARKERS)
+
+
+# Structured-abstract headers and sentence-initial fragments are not entities.
+# Before this filter the corpus produced candidates like "MATERIALS AND METHODS",
+# "Between T0" and "The GLM", which no plain-language explanation would repeat,
+# so entity_retention warned on faithful explanations.
+_SECTION_HEADERS = frozenset({
+    "background", "objective", "objectives", "aim", "aims", "purpose",
+    "methods", "method", "materials and methods", "results", "result",
+    "conclusion", "conclusions", "findings", "design", "setting",
+    "participants", "interventions", "intervention", "measurements",
+    "background and objectives", "main outcome measures", "importance",
+})
+_STOP_STARTERS = frozenset({
+    "the", "this", "these", "those", "a", "an", "we", "our", "their", "there",
+    "between", "after", "before", "across", "during", "when", "while", "both",
+    "for", "of", "in", "at", "on", "from", "given", "however", "although",
+})
+
+
+def _is_junk_candidate(span: str) -> bool:
+    """True for section headers, stop-word-led fragments and bare short words."""
+    text = " ".join((span or "").split())
+    if not text:
+        return True
+    low = text.casefold()
+    if low in _SECTION_HEADERS:
+        return True
+    # ALL-CAPS runs are structured-abstract headers, not named entities.
+    if text.isupper() and len(text) > 3:
+        return True
+    words = low.split()
+    if words and words[0] in _STOP_STARTERS:
+        return True
+    if len(words) == 1 and len(low) < 5:
+        return True
+    return False

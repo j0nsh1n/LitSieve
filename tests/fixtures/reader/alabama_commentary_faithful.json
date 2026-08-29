@@ -1,0 +1,42 @@
+{
+  "id": "alabama_commentary_faithful",
+  "provenance": {
+    "source": "pubmed",
+    "pmid": "41922927",
+    "title": "School Start Times in Alabama.",
+    "journal": "The Journal of school health",
+    "year": "2026",
+    "note": "Title/abstract fetched from the NCBI E-utilities public API."
+  },
+  "audience": "general_reader",
+  "variant": "faithful",
+  "abstract": "This commentary summarizes the evidence base, equity implications, and implementation considerations for later school start times (SSTs) in Alabama. In Alabama, almost half of children report sleep durations below age-based recommendations. Of the 138 school districts in Alabama, few have middle and high schools adhering to the 8:30 am or later SSTs recommended by the American Academy of Sleep Medicine and the National Sleep Foundation. Historically designed to meet Industrial Revolution-era schooling needs, current SSTs are largely dictated by tradition and fail to promote the health and well-being of modern-day students. Adolescent chronotype shifts later, producing later sleep onset and wake time. Given their naturally delayed chronotype, early SSTs often lead to poor sleep quality and shorter total sleep duration in adolescents, which can negatively impact metabolic and cardiovascular health. Earlier SSTs negatively impact social development as well. Earlier SSTs can result in shorter sleep duration, which has been associated with adolescent suicidal behavior and substance use. Early SSTs are also correlated with poorer academic achievement. The literature provides substantial evidence supporting a relation between later SSTs and improved adolescent physical and mental health, social development, academic outcomes, and decreased motor vehicle accident incidence. Given prolific racial/ethnic and socioeconomic disparities in Alabama, later SSTs may offer a practical and sustainable pathway for addressing health inequities in Alabama. The prioritization of the health, well-being, and development of students warrants legislative discussion in Alabama regarding later start times for middle and high schools, along with strategic planning to overcome logistical challenges.",
+  "generated": {
+    "plain_summary": "This commentary summarises the evidence, equity implications and practical considerations for later school start times in Alabama. Almost half of children in Alabama report sleep durations below age-based recommendations, and of the 138 school districts, few meet the 8:30 am or later start recommended by the American Academy of Sleep Medicine and the National Sleep Foundation.",
+    "question_asked": "What does the existing evidence say about moving school start times later in Alabama?",
+    "who_was_studied": "Students and the 138 school districts in Alabama. This is a commentary summarising other work, not a new study of its own.",
+    "what_was_found": "Adolescents' chronotype shifts later, so early start times often lead to poor sleep quality and shorter total sleep duration, which can negatively affect metabolic and cardiovascular health. Shorter sleep duration has been associated with adolescent suicidal behavior and substance use, and early starts are correlated with poorer academic achievement. The authors say later start times may offer a practical approach given racial/ethnic and socioeconomic disparities in Alabama.",
+    "what_it_does_not_show": "This is a commentary, not a trial. It describes associations and correlations reported elsewhere, so it cannot establish that earlier start times are the cause of the outcomes listed.",
+    "stated_limitations": "The abstract does not state limitations of its own; it summarises other literature.",
+    "glossary": [
+      {
+        "term": "chronotype",
+        "definition": "Whether your body naturally prefers to sleep and wake earlier or later."
+      },
+      {
+        "term": "correlated",
+        "definition": "Two things tend to occur together, which does not by itself mean one caused the other."
+      }
+    ],
+    "not_reported_fields": []
+  },
+  "expected": {
+    "numeric_detail": "pass",
+    "study_design": "pass",
+    "negation": "pass",
+    "uncertainty_language": "pass",
+    "entity_retention": "skipped"
+  },
+  "note": "Faithful pair for the causal-upgrade fixture: same abstract, hedging preserved ('associated with', 'can', 'may offer').",
+  "expected_status": "no_automatic_issues"
+}

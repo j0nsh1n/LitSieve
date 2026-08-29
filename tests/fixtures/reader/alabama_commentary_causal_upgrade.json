@@ -1,0 +1,41 @@
+{
+  "id": "alabama_commentary_causal_upgrade",
+  "provenance": {
+    "source": "pubmed",
+    "pmid": "41922927",
+    "title": "School Start Times in Alabama.",
+    "journal": "The Journal of school health",
+    "year": "2026",
+    "note": "Title/abstract fetched from the NCBI E-utilities public API."
+  },
+  "audience": "general_reader",
+  "variant": "degraded",
+  "abstract": "This commentary summarizes the evidence base, equity implications, and implementation considerations for later school start times (SSTs) in Alabama. In Alabama, almost half of children report sleep durations below age-based recommendations. Of the 138 school districts in Alabama, few have middle and high schools adhering to the 8:30 am or later SSTs recommended by the American Academy of Sleep Medicine and the National Sleep Foundation. Historically designed to meet Industrial Revolution-era schooling needs, current SSTs are largely dictated by tradition and fail to promote the health and well-being of modern-day students. Adolescent chronotype shifts later, producing later sleep onset and wake time. Given their naturally delayed chronotype, early SSTs often lead to poor sleep quality and shorter total sleep duration in adolescents, which can negatively impact metabolic and cardiovascular health. Earlier SSTs negatively impact social development as well. Earlier SSTs can result in shorter sleep duration, which has been associated with adolescent suicidal behavior and substance use. Early SSTs are also correlated with poorer academic achievement. The literature provides substantial evidence supporting a relation between later SSTs and improved adolescent physical and mental health, social development, academic outcomes, and decreased motor vehicle accident incidence. Given prolific racial/ethnic and socioeconomic disparities in Alabama, later SSTs may offer a practical and sustainable pathway for addressing health inequities in Alabama. The prioritization of the health, well-being, and development of students warrants legislative discussion in Alabama regarding later start times for middle and high schools, along with strategic planning to overcome logistical challenges.",
+  "generated": {
+    "plain_summary": "This commentary argues that later school start times in Alabama would improve student health. Almost half of children in Alabama report sleep durations below age-based recommendations, and few of the 138 school districts follow the 8:30 am or later start recommended by the American Academy of Sleep Medicine.",
+    "question_asked": "Should schools in Alabama start later?",
+    "who_was_studied": "School districts and students in Alabama; this is a commentary summarising existing evidence rather than new data collection.",
+    "what_was_found": "Early start times cause shorter sleep duration in adolescents, which causes poorer metabolic and cardiovascular health, suicidal behavior and substance use. Later start times will improve academic outcomes and reduce motor vehicle accidents.",
+    "what_it_does_not_show": "The abstract alone cannot establish whether these findings apply to everyone.",
+    "stated_limitations": "Not reported in the abstract.",
+    "glossary": [
+      {
+        "term": "chronotype",
+        "definition": "Whether your body naturally prefers to sleep and wake earlier or later."
+      }
+    ],
+    "not_reported_fields": [
+      "stated_limitations"
+    ]
+  },
+  "expected": {
+    "numeric_detail": "pass",
+    "study_design": "pass",
+    "negation": "pass",
+    "uncertainty_language": "warn",
+    "entity_retention": "skipped"
+  },
+  "note": "Degraded: the abstract says 'has been associated with', 'can result in', 'may offer'. This explanation converts those into 'cause' and 'will'. Only uncertainty_language should warn.",
+  "seeded_defect": "uncertainty_language",
+  "expected_status": "needs_review"
+}

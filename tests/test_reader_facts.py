@@ -108,11 +108,9 @@ def test_extract_pico_candidates_prefers_first_sentence_per_bucket():
     )
     cands = facts.extract_pico_candidates(abstract)
     joined = " ".join(cands).lower()
-    # first matching sentence per bucket contributes; later matches do not
-    assert "patients" in joined
-    assert "Sleep Education Program" in joined or any(
-        "sleep education program" in c for c in joined.split(", ")
-    )
+    # first matching sentence per bucket contributes; later matches do not.
+    # Generic single nouns ("patients") are not candidates — only named spans.
+    assert "sleep education program" in joined
     # the second population / programme sentences must not add entities
     assert "arrived" not in joined
     assert "second" not in joined

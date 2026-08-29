@@ -1,0 +1,46 @@
+{
+  "id": "sst_rct_faithful",
+  "provenance": {
+    "source": "pubmed",
+    "pmid": "42141042",
+    "title": "A one-hour delayed school start improves sleep, sleepiness and inhibitory control in early adolescents in a randomized controlled trial.",
+    "journal": "Scientific reports",
+    "year": "2026",
+    "note": "Title/abstract fetched from the NCBI E-utilities public API."
+  },
+  "audience": "general_reader",
+  "variant": "faithful",
+  "abstract": "Early school start times (SST) force adolescents to wake earlier than biologically preferred, creating chronic sleep debt. While evidence supports delaying SSTs, few controlled studies have used objective measures to assess their impact. We conducted a controlled intervention in a French boarding school to evaluate the effects of a one-hour delay in SST on sleep (N = 50) and cognitive functioning (N = 73) in early adolescents (age 12.8 years [11.7-14.2], 66% girls). After a baseline period with 8 a.m. starts (T0), four classes were randomized: half remained at the early schedule (Control-SST), half switched to 9 a.m. (Delayed-SST). Sleep measured by actigraphy, cognitive performance and mental health were assessed at baseline (T0) and 6 months later (T1). Between T0 and T1, total sleep time decreased in the Control-SST group, whereas the Delayed-SST group showed a modest, non-significant increase. This resulted at T1 in a 26-min between-group difference (Cohen's d = 0.93, p = 0.007). Sleep onset time did not differ between groups. Sleepiness decreased in Delayed-SST but increased in Control-SST (d = -0.52, p = 0.042). Inhibitory control improved in Delayed-SST compared to Control-SST (d = -0.79, p = 0.001), with trends toward better sustained attention (d = -0.40, p = 0.051). Delaying SST by one hour appears to mitigate the progressive reduction in sleep duration commonly observed during adolescence, and benefits both cognitive functioning and sleepiness outcomes in early adolescence.",
+  "generated": {
+    "plain_summary": "In a randomized controlled trial at a French boarding school, four classes were split so that half kept an 8 a.m. start and half moved to 9 a.m. Sleep was measured by actigraphy in 50 early adolescents and cognitive functioning in 73, at baseline and 6 months later.",
+    "question_asked": "Does delaying the school start time by one hour change sleep, sleepiness and cognitive functioning in early adolescents?",
+    "who_was_studied": "Early adolescents at a French boarding school, average age 12.8 years, 66% girls. Sleep N = 50, cognitive functioning N = 73.",
+    "what_was_found": "Total sleep time decreased in the Control-SST group, while the Delayed-SST group showed a modest, non-significant increase, producing a 26-min between-group difference at 6 months (d = 0.93, p = 0.007). Sleep onset time did not differ between groups. Sleepiness decreased in Delayed-SST but increased in Control-SST (d = -0.52, p = 0.042), and inhibitory control improved (d = -0.79, p = 0.001), with trends toward better sustained attention (d = -0.40, p = 0.051).",
+    "what_it_does_not_show": "This was one boarding school, so the abstract cannot establish that the same effect would appear elsewhere. The increase in sleep within the delayed group was itself non-significant; the difference was between groups.",
+    "stated_limitations": "The abstract notes that few controlled studies have used objective measures, and that the within-group increase in the Delayed-SST arm was non-significant.",
+    "glossary": [
+      {
+        "term": "randomized controlled trial",
+        "definition": "A study where people are put into groups by chance, so the groups can be fairly compared."
+      },
+      {
+        "term": "actigraphy",
+        "definition": "Measuring sleep with a small movement sensor worn on the wrist."
+      },
+      {
+        "term": "inhibitory control",
+        "definition": "The ability to stop yourself from acting on an impulse."
+      }
+    ],
+    "not_reported_fields": []
+  },
+  "expected": {
+    "numeric_detail": "pass",
+    "study_design": "pass",
+    "negation": "pass",
+    "uncertainty_language": "pass",
+    "entity_retention": "skipped"
+  },
+  "note": "Faithful: keeps N = 50 / N = 73, 26-min, every p-value, 'non-significant', 'did not differ', and names the randomized controlled trial design.",
+  "expected_status": "no_automatic_issues"
+}

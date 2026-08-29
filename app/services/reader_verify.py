@@ -42,9 +42,32 @@ PROSE_FIELDS = (
 )
 FINDINGS_FIELDS = ("what_was_found", "plain_summary")
 
+# Sections the MODEL authored. what_it_does_not_show is excluded on purpose: it
+# is app copy (reader_mode._inject_app_copy supplies the fallback sentence, which
+# itself contains "cannot establish"). Counting it as hedging made the
+# uncertainty-loss rule vacuous — every explanation looked hedged because the app
+# had hedged for it.
+HEDGE_SCAN_FIELDS = (
+    "plain_summary",
+    "question_asked",
+    "who_was_studied",
+    "what_was_found",
+    "stated_limitations",
+)
+
 # Always required in the explanation; percent/duration are salience-filtered
 # to the abstract's findings/conclusion sentences.
-ALWAYS_REQUIRED_KINDS = ("sample_size", "p_value", "ci", "dose")
+# Sample sizes and doses are few per abstract and define what was studied, so
+# every one is required. p-values and confidence intervals come in bunches — an
+# abstract with six p-values would otherwise force a plain-language explanation
+# to recite all six, which warned on faithful explanations in the evaluation
+# corpus. Only the first few are required; the rest are reported, not demanded.
+ALWAYS_REQUIRED_KINDS = ("sample_size", "dose")
+CAPPED_REQUIRED_KINDS = ("p_value", "ci")
+# One. A results section routinely carries a headline statistic plus heterogeneity,
+# subgroup and publication-bias diagnostics; demanding even two of them warned on
+# explanations that correctly reported the headline and dropped the diagnostics.
+CAPPED_REQUIRED_MAX = 1
 SALIENT_MAX = 3
 
 CHECK_ORDER = (
@@ -124,10 +147,18 @@ def _check_numeric_detail(ctx: Dict) -> Dict:
     src_tokens = reader_facts.extract_numbers(abstract)
 
     required = [t for t in src_tokens if t["kind"] in ALWAYS_REQUIRED_KINDS]
+    # p-values and CIs are drawn from the findings/conclusion, not the whole
+    # abstract: taking the first few in document order demanded heterogeneity and
+    # publication-bias diagnostics that no plain-language explanation reports.
+    conclusion_tokens = reader_facts.extract_numbers(ctx["conclusion_text"])
+    for kind in CAPPED_REQUIRED_KINDS:
+        required += [t for t in conclusion_tokens if t["kind"] == kind][:CAPPED_REQUIRED_MAX]
     salient = [
         t
-        for t in reader_facts.extract_numbers(ctx["conclusion_text"])
+        for t in conclusion_tokens
         if t["kind"] in ("percent", "duration")
+        # 95% / 99% here are the confidence convention, not a finding.
+        and not (t["kind"] == "percent" and t["value"] in (90.0, 95.0, 99.0))
     ][:SALIENT_MAX]
 
     seen: set = set()
@@ -166,6 +197,41 @@ def _check_numeric_detail(ctx: Dict) -> Dict:
     )
 
 
+# How a plain-language explanation actually names each design. Regex fragments,
+# matched word-boundary against the generated prose. Keyed by study_type id from
+# app/services/study_type.py.
+DESIGN_SYNONYMS = {
+    "synthesis": (
+        r"meta[-\s]?analys[ie]s", r"systematic review", r"scoping review",
+        r"umbrella review", r"pooled (?:analysis|studies|results)",
+        r"combin\w+[^.]{0,40}stud(?:y|ies)", r"review of (?:the )?studies",
+        r"pooled", r"earlier studies",
+    ),
+    "trial": (
+        r"randomi[sz]ed", r"\brct\b", r"controlled trial", r"clinical trial",
+        r"placebo", r"double[-\s]?blind", r"quasi[-\s]?experimental",
+        r"put into groups by chance", r"assigned (?:at random|by chance)",
+        r"control group", r"intervention (?:study|trial)", r"experiment",
+    ),
+    "observational": (
+        r"observational", r"cohort", r"longitudinal", r"case[-\s]?control",
+        r"followed (?:them )?over time", r"prospective", r"retrospective",
+        r"pre[-\s]?post", r"single[-\s]?arm",
+    ),
+    "survey": (
+        r"cross[-\s]?sectional", r"survey", r"questionnaire", r"snapshot",
+        r"at one point in time", r"measured everyone once", r"comparative study",
+    ),
+    "qualitative": (
+        r"qualitative", r"interview", r"focus group", r"open[-\s]?ended",
+        r"content analysis", r"thematic",
+    ),
+    "methods": (r"protocol", r"study design paper", r"methods paper", r"pilot"),
+    "narrative_review": (r"review", r"overview", r"summar[iy]", r"commentary"),
+    "opinion": (r"commentary", r"editorial", r"opinion", r"perspective", r"argues"),
+}
+
+
 def _check_study_design(ctx: Dict) -> Dict:
     st = classify_study_type(ctx["title"], ctx["source_abstract"])
     band = st.get("confidence_band")
@@ -179,7 +245,14 @@ def _check_study_design(ctx: Dict) -> Dict:
     label = str(st.get("study_type_label") or "")
     formal = str(st.get("study_type_label_formal") or "")
     haystack = ctx["prose"].casefold()
-    if (label and label.casefold() in haystack) or (formal and formal.casefold() in haystack):
+    # Match on how a person would actually name the design, not on the app's
+    # display labels. Matching "Likely a review paper" / "Review / synthesis"
+    # verbatim warned on essentially every explanation, because no plain-language
+    # writer produces those strings — the evaluation corpus warned 10/12 on this
+    # check alone before the synonym sets were added.
+    synonyms = DESIGN_SYNONYMS.get(str(st.get("study_type") or ""), ())
+    named = any(re.search(r"\b" + syn + r"\b", haystack) for syn in synonyms)
+    if named or (label and label.casefold() in haystack) or (formal and formal.casefold() in haystack):
         return _check_outcome(
             "study_design",
             "pass",
@@ -196,8 +269,11 @@ def _check_study_design(ctx: Dict) -> Dict:
 
 
 def _check_negation(ctx: Dict) -> Dict:
-    src_cues = reader_facts.extract_cues(ctx["conclusion_text"])["negation"]
-    gen_cues = reader_facts.extract_cues(ctx["findings_text"])["negation"]
+    # A negative result is stated wherever the result is stated. Scanning only
+    # the conclusion missed "did not differ" and "non-significant" sitting in the
+    # results of an unstructured abstract, so a lossy explanation passed.
+    src_cues = reader_facts.extract_cues(ctx["source_abstract"])["negation"]
+    gen_cues = reader_facts.extract_cues(ctx["prose"])["negation"]
     details = {"source_cues": src_cues, "generated_cues": gen_cues}
     if not src_cues:
         return _check_outcome(
@@ -206,7 +282,7 @@ def _check_negation(ctx: Dict) -> Dict:
             "No negative findings wording in the abstract's conclusion.",
             details,
         )
-    if reader_facts.count_cues(ctx["findings_text"], "negation") == 0:
+    if reader_facts.count_cues(ctx["prose"], "negation") == 0:
         return _check_outcome(
             "negation",
             "warn",
@@ -233,7 +309,11 @@ def _check_uncertainty_language(ctx: Dict) -> Dict:
         )
     reasons: List[str] = []
     term: Optional[str] = None
-    if not gen_cues:
+    # Hedging anywhere in the explanation counts, not just in the findings
+    # section, and any recognised hedge counts — not only the narrow source
+    # vocabulary. Before this the check warned on explanations that hedged
+    # correctly using different words.
+    if not reader_facts.has_hedging(ctx["hedge_prose"]):
         reasons.append("lost")
     causal = reader_facts.extract_cues(ctx["findings_text"])["causal"]
     if causal:
@@ -267,7 +347,10 @@ def _check_uncertainty_language(ctx: Dict) -> Dict:
 
 def _check_entity_retention(ctx: Dict) -> Dict:
     candidates = reader_facts.extract_pico_candidates(ctx["source_abstract"])
-    if len(candidates) < 2:
+    # Three is the floor for a meaningful signal. With one or two named spans,
+    # "most are missing" is noise — an explanation may legitimately not repeat
+    # an instrument name or a database it was found in.
+    if len(candidates) < 3:
         return _check_outcome(
             "entity_retention",
             "skipped",
@@ -277,17 +360,20 @@ def _check_entity_retention(ctx: Dict) -> Dict:
     haystack = ctx["prose"].casefold()
     missing = [c for c in candidates if c.casefold() not in haystack]
     details = {"missing": missing, "candidates": len(candidates)}
-    if len(missing) * 2 > len(candidates):
+    # Warn only when NOTHING named in the abstract survived. A plain-language
+    # explanation drops instrument and database names on purpose; dropping every
+    # one is the signal that it may not be about this paper at all.
+    if len(missing) < len(candidates):
         return _check_outcome(
             "entity_retention",
-            "warn",
-            "The explanation leaves out most of the study details from the abstract.",
+            "pass",
+            "The key study details from the abstract appear in the explanation.",
             details,
         )
     return _check_outcome(
         "entity_retention",
-        "pass",
-        "The key study details from the abstract appear in the explanation.",
+        "warn",
+        "None of the specific names from the abstract appear in the explanation.",
         details,
     )
 
@@ -356,8 +442,12 @@ def _check_readability(ctx: Dict) -> Dict:
 def _derive_status(checks: List[Dict]) -> str:
     if any(c["outcome"] == "warn" for c in checks):
         return STATUS_NEEDS_REVIEW
+    # readability and entity_retention skip routinely on short or name-free
+    # abstracts. Only a check that actually failed should downgrade the report,
+    # or every clean explanation reads as "checks could not run fully".
     if any(
-        c["outcome"] == "skipped" and c["check_id"] != "readability"
+        c["outcome"] == "skipped"
+        and c["check_id"] not in ("readability", "entity_retention")
         for c in checks
     ):
         return STATUS_INCOMPLETE
@@ -372,6 +462,7 @@ def _context(source_abstract: str, title: str, generated: Dict) -> Dict:
         "title": title or "",
         "prose": prose,
         "readability_prose": prose,
+        "hedge_prose": _prose(generated, HEDGE_SCAN_FIELDS),
         "findings_text": _prose(generated, FINDINGS_FIELDS),
         "conclusion_text": _conclusion_text(source_abstract or ""),
     }

@@ -46,7 +46,8 @@ def test_full_clean_run_has_no_automatic_issues():
     )
     report = verify(abstract, "Sleep education trial", generated)
     assert report["status"] == "no_automatic_issues"
-    assert all(c["outcome"] == "pass" for c in report["checks"])
+    # entity_retention / readability may skip; that must not count as a warning.
+    assert all(c["outcome"] != "warn" for c in report["checks"])
     assert "checked_at" not in report
 
 
@@ -232,8 +233,8 @@ def test_study_type_low_confidence_skipped():
 
 def test_entity_retention_uses_pico():
     abstract = (
-        "Patients in the Sleep Education Program improved versus usual care. "
-        "The change lasted all year."
+        "The Sleep Education Program at Riverview High School compared the "
+        "Morning Light Protocol with Usual Care Control. Outcomes improved."
     )
     generated = _generated(
         plain_summary="Students improved after the scheme.",
@@ -241,7 +242,20 @@ def test_entity_retention_uses_pico():
     )
     chk = _check(verify(abstract, "Sleep", generated), "entity_retention")
     assert chk["outcome"] == "warn"
-    assert chk["details"]["missing"] == ["Sleep Education Program", "Patients"]
+    assert "Sleep Education Program" in chk["details"]["missing"]
+
+
+def test_entity_retention_passes_if_any_name_survives():
+    abstract = (
+        "The Sleep Education Program at Riverview High School compared the "
+        "Morning Light Protocol with Usual Care Control. Outcomes improved."
+    )
+    generated = _generated(
+        plain_summary="The Sleep Education Program helped students sleep.",
+        what_was_found="The change lasted all year.",
+    )
+    chk = _check(verify(abstract, "Sleep", generated), "entity_retention")
+    assert chk["outcome"] == "pass"
 
 
 def test_entity_retention_few_candidates_skipped():

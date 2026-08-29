@@ -1,0 +1,41 @@
+{
+  "id": "gamers_design_omitted",
+  "provenance": {
+    "source": "pubmed",
+    "pmid": "42626415",
+    "title": "Analysis of psychomotor latency, spatial reasoning, and metabolic health markers in adolescent gamers: A comparative study of the impact of the confounding triad of sleep, diet, and screen modality.",
+    "journal": "Journal of education and health promotion",
+    "year": "2026",
+    "note": "Title/abstract fetched from the NCBI E-utilities public API."
+  },
+  "audience": "general_reader",
+  "variant": "degraded",
+  "abstract": "BACKGROUND: The purpose of this research is to understand the complex relationships of the intensity of electronic gaming and the neurocognitive (Reaction Time, IQ, Spatial IQ) and bodily (BMI, Skinfolds, Visual Acuity) components. Of particular interest was stating for the first time the novelty of the 'Confounding Triad' of sleep, food (caloric) gaming, and the specific screen type of the gaming interface. MATERIALS AND METHODS: A comparative cross-sectional study was carried out on a stratified random sample of 200 male adolescents (ages 13 to 21) from northern India. Participants were stratified into gamers (≥5 hours/week, n = 122) and non-gamers (<5 hours/week, n = 78). The psychomotor speed was measured using a digital Audio-Visual Reaction Timer, IQ was measured using the Stanford-Binet Intelligence Scale, and Spatial Quotient via online standardized battery, while subcutaneous adiposity was measured using Harpenden skinfold calipers. The confounders were measured using the Pittsburgh Sleep Quality Index (PSQI), a 24-hour dietary recall, and Non-Gaming Screen Time (NGST) logs. Mann-Whitney U tests were used for group comparisons, and Generalized Linear Models (GLM) and Analysis of Covariance (ANCOVA) were used to determine independent effects. RESULTS: Compared to non-gamers, gamers displayed faster rates across Auditory, Visual, and Aim Reaction Times (P < 0.001) and better Spatial Quotient (P = 0.001). The GLM for Visual Reaction Time demonstrated a dose-dependent improvement for hours spent playing games (β = -2.15, P < 0.001) that was present even when considering the negative effect on performance from poor sleep (β = +4.35 per unit increase in PSQI, P < 0.001). Gaming status was significant for the ANCOVA for skinfold thickness (P = 0.035), but dietary caloric intake was the more important variable (η 2 = 0.19, P < 0.001). No significant difference was found in IQ (P = 0.36) or in visual acuity. CONCLUSION: The findings indicate that regular practice of interactive gaming provides players with better cognitive and psychomotor skills, even when sleep deprivation is considered. With that said, dietary surplus imposes greater metabolic hazards than gaming behaviors. Therefore, health interventions are encouraged not only to regulate gaming hours but to prioritize the teaching of digital hygiene.",
+  "generated": {
+    "plain_summary": "Researchers looked at 200 male adolescents aged 13 to 21 from northern India, comparing those who gamed at least 5 hours a week (n = 122) with those who gamed less (n = 78). They measured reaction time, IQ, spatial reasoning, body measurements and visual acuity.",
+    "question_asked": "Is the amount of electronic gaming related to reaction time, IQ, spatial reasoning and body measures in adolescents?",
+    "who_was_studied": "200 male adolescents aged 13 to 21 from northern India: 122 gamers and 78 non-gamers.",
+    "what_was_found": "Compared with non-gamers, gamers had faster Auditory, Visual and Aim Reaction Times (P < 0.001) and a better Spatial Quotient (P = 0.001). Gaming status mattered for skinfold thickness (P = 0.035), but dietary caloric intake was the more important variable. No significant difference was found in IQ (P = 0.36) or in visual acuity.",
+    "what_it_does_not_show": "The abstract alone cannot establish whether these findings apply to everyone, and it found no significant difference in IQ or visual acuity.",
+    "stated_limitations": "Not reported in the abstract.",
+    "glossary": [
+      {
+        "term": "confounder",
+        "definition": "Something else that could explain a result, which researchers try to account for."
+      }
+    ],
+    "not_reported_fields": [
+      "stated_limitations"
+    ]
+  },
+  "expected": {
+    "numeric_detail": "pass",
+    "study_design": "warn",
+    "negation": "pass",
+    "uncertainty_language": "pass",
+    "entity_retention": "pass"
+  },
+  "note": "Degraded pair for gamers_cross_sectional_faithful: results, numbers and null findings are all preserved; the only thing removed is any statement of the study design. A cross-sectional study cannot show direction, so a reader who is not told the design is missing the main caveat. Only study_design should warn.",
+  "seeded_defect": "study_design",
+  "expected_status": "needs_review"
+}

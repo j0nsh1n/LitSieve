@@ -1,0 +1,42 @@
+{
+  "id": "exercise_prepost_faithful",
+  "provenance": {
+    "source": "pubmed",
+    "pmid": "42650319",
+    "title": "Preliminary Impacts of a 3-Month School-Based Exercise and Data Recording Intervention on Lifestyle Habits, Psychological Health, and Physical Health in Japanese Adolescents.",
+    "journal": "Children (Basel, Switzerland)",
+    "year": "2026",
+    "note": "Title/abstract fetched from the NCBI E-utilities public API."
+  },
+  "audience": "general_reader",
+  "variant": "faithful",
+  "abstract": "Background/Objectives: This study evaluated the impact of short-duration physical exercise sessions and daily exercise recordings on the physical health and psychological health of junior high school students in Japan. Methods: A 3-month longitudinal school-based intervention initially enrolled 235 students, and the final analysis included 127 students who completed the program. The study was conducted using a single-arm pre-post design without a control group. The intervention included biweekly group exercise sessions and daily activity recordings. Students were separated into two groups based on their screen time (≥4 h per day or <4 h per day). Results: After the intervention, a significant decrease in screen time was observed in the group with baseline screen time of 4 h or more, whereas the group with baseline screen time of less than 4 h showed an increase in daily screen time. The results indicated a significant increase in body mass index and trunk muscle mass in both groups. For psychological measures, including the General Self-Efficacy Scale and Communicative and Critical Health Literacy scale, no significant changes over time or group × time interactions were observed, although post-intervention scores were significantly higher in the lower screen time group compared to the higher screen time group. However, significant changes in skeletal muscle index, eHealth literacy, and sleep duration were not observed. Conclusions: Due to the lack of a control group, these findings remain preliminary, and observed changes cannot be definitively attributed solely to the intervention. However, the program showed potential in reducing excessive screen time and increasing trunk muscle mass. Future randomized controlled trials are required to confirm the true efficacy of the intervention.",
+  "generated": {
+    "plain_summary": "This was a 3-month school-based intervention with junior high school students in Japan, using a single-arm pre-post design without a control group. It initially enrolled 235 students and the final analysis included 127 students who completed the program.",
+    "question_asked": "Did short exercise sessions plus daily activity recording change lifestyle habits, psychological health and physical health?",
+    "who_was_studied": "Japanese junior high school students; 235 enrolled, 127 analysed. Students were separated into two groups by screen time (4 h or more per day, or less than 4 h per day).",
+    "what_was_found": "Screen time decreased significantly in the group starting at 4 h or more per day, while the group under 4 h showed an increase. Body mass index and trunk muscle mass increased significantly in both groups. For the General Self-Efficacy Scale and the Communicative and Critical Health Literacy scale, no significant changes over time or group x time interactions were observed.",
+    "what_it_does_not_show": "There was no control group, so the abstract cannot establish that the intervention rather than ordinary change over 3 months produced these results.",
+    "stated_limitations": "The abstract calls the findings preliminary because there was no control group, and notes that fewer than half the enrolled students were in the final analysis. It says the programme showed potential but that a randomised trial is needed.",
+    "glossary": [
+      {
+        "term": "single-arm pre-post design",
+        "definition": "Everyone gets the same programme and is measured before and after, with no comparison group."
+      },
+      {
+        "term": "body mass index",
+        "definition": "A number calculated from height and weight, used as a rough measure of body size."
+      }
+    ],
+    "not_reported_fields": []
+  },
+  "expected": {
+    "numeric_detail": "pass",
+    "study_design": "pass",
+    "negation": "pass",
+    "uncertainty_language": "pass",
+    "entity_retention": "skipped"
+  },
+  "note": "Faithful: keeps 235/127, 3-month, the 4 h cut-off, and the 'no significant changes' null result. Tests that a genuine null finding survives.",
+  "expected_status": "no_automatic_issues"
+}
