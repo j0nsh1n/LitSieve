@@ -75,7 +75,7 @@
             : '';
         return `<div class="reader-mode-panel" role="region" aria-labelledby="${hid}">`
             + `<h3 class="reader-mode-heading" id="${hid}" tabindex="-1">AI explanation — generated from this abstract</h3>`
-            + `<p class="ai-label help-text">${escapeHtml(data.label || 'AI explanation (from this abstract only — not medical advice)')}</p>`
+            + `<p class="ai-label help-text">${escapeHtml(data.label || 'AI explanation (from this abstract only)')}</p>`
             + cachedBit
             + `<p class="reader-status-chip ${statusClass(status)}">${escapeHtml(chipText)}</p>`
             + renderWarnings(verification)

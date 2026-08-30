@@ -50,11 +50,24 @@ def test_reader_disclaimer_is_educational_not_clinical():
     macros = env.get_template("macros/disclaimers.html").module
     text = macros.scope_reader()
     assert "educational reading aid" in text.lower()
-    assert "medical, legal, or professional advice" in text.lower()
+    assert "not professional advice" in text.lower()
     js = (TEMPLATES.parent / "static" / "js" / "reader.js").read_text(encoding="utf-8")
     low = js.lower()
     for banned in ("clinically verified", "medically accurate", "guaranteed"):
         assert banned not in low
+
+
+def test_reader_health_sources_keep_medical_line():
+    """Neutral wording is the default; biomedical sources keep the explicit
+    medical line, chosen server-side per paper (the macro cannot know the
+    source)."""
+    from app.services.reader_mode import DISCLAIMER, DISCLAIMER_HEALTH, HEALTH_SOURCES
+
+    assert DISCLAIMER_HEALTH.startswith(DISCLAIMER)
+    assert "not medical advice" in DISCLAIMER_HEALTH.lower()
+    assert {"pubmed", "europepmc", "clinicaltrials", "biorxiv", "medrxiv"} <= HEALTH_SOURCES
+    assert "crossref" not in HEALTH_SOURCES
+    assert "openalex" not in HEALTH_SOURCES
 
 
 def test_reader_disclaimer_macro_and_api_string_match():

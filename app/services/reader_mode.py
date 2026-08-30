@@ -29,11 +29,19 @@ NOT_REPORTED = "Not reported in the abstract."
 FALLBACK_WHAT_IT_DOES_NOT_SHOW = (
     "The abstract alone cannot establish whether these findings apply to everyone."
 )
-LABEL = "AI explanation (from this abstract only — not medical advice)"
+LABEL = "AI explanation (from this abstract only)"
 DISCLAIMER = (
-    "This is an educational reading aid, not medical, legal, or professional "
-    "advice. Always check the original paper."
+    "This is an educational reading aid, not professional advice. "
+    "Always check the original paper."
 )
+# Health sources keep an explicit medical line; every other topic gets the
+# neutral wording (the tool spans far more than medicine).
+DISCLAIMER_HEALTH = (
+    DISCLAIMER
+    + " For health topics this is not medical advice; talk to a qualified "
+    "professional before making health decisions."
+)
+HEALTH_SOURCES = {"pubmed", "europepmc", "clinicaltrials", "biorxiv", "medrxiv"}
 PROSE_FIELDS = (
     "plain_summary",
     "question_asked",
@@ -142,7 +150,11 @@ def _pack(
         "content": content,
         "verification": verification,
         "label": LABEL,
-        "disclaimer": DISCLAIMER,
+        "disclaimer": (
+            DISCLAIMER_HEALTH
+            if str(source or "").lower() in HEALTH_SOURCES
+            else DISCLAIMER
+        ),
         "provider": provider,
         "prompt_version": READER_PROMPT_VERSION,
     }
