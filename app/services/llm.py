@@ -62,6 +62,14 @@ class LLMError(RuntimeError):
     """Provider call failed or returned unusable output."""
 
 
+class LLMBadInput(LLMError):
+    """App-authored input guidance raised only with static literal messages.
+
+    Routes may show str() of this exception verbatim; it must never be raised
+    with text derived from another exception or a runtime value.
+    """
+
+
 class RefinedArticle(BaseModel):
     summary: str = Field(
         description="2-4 sentence plain-language summary of what the paper did and found."
@@ -997,9 +1005,9 @@ def generate_reader_explanation(
     """
     abstract = (abstract or "").strip()
     if not abstract:
-        raise LLMError("This abstract is empty, so it cannot be explained.")
+        raise LLMBadInput("This abstract is empty, so it cannot be explained.")
     if len(abstract) < 40:
-        raise LLMError(
+        raise LLMBadInput(
             "This abstract is too short to explain (a few sentences are needed)."
         )
     audience = "high_school" if audience == "high_school" else "general_reader"

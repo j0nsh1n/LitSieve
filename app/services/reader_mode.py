@@ -9,7 +9,7 @@ from typing import Any, Dict, Optional
 
 from app.services import reader_facts
 from app.services.llm import (
-    LLMError,
+    LLMBadInput,
     LLMUnavailable,
     generate_reader_explanation,
     is_configured,
@@ -190,9 +190,9 @@ def explain_article(
     title = article.get("title") or ""
     abstract = (article.get("abstract") or "").strip()
     if not abstract:
-        raise LLMError("This abstract is empty, so it cannot be explained.")
+        raise LLMBadInput("This abstract is empty, so it cannot be explained.")
     if len(abstract) < MIN_ABSTRACT_LEN:
-        raise LLMError(
+        raise LLMBadInput(
             "This abstract is too short to explain (a few sentences are needed)."
         )
 

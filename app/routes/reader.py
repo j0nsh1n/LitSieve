@@ -20,22 +20,18 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-
-def _ai_unconfigured_detail() -> str:
-    return (
-        "AI is unavailable (not configured). Open Account → AI study aid and choose "
-        "Built-in study aid or Cloud API key. Extractive key points still work."
-    )
-
-
-def _friendly_ai_unavailable(detail: str) -> str:
-    low = (detail or "").lower()
-    if "ollama" in low or "not running" in low or "not reachable" in low:
-        return (
-            "Built-in study aid is not ready (503). Try again in a moment, or switch "
-            "to Cloud API key on Account. Extractive key points still work without AI."
-        )
-    return detail or "AI study aid unavailable."
+# Static client-facing copy. Real error text is logged, never returned —
+# keeps the py/stack-trace-exposure dataflow edge cut (codeql-config policy:
+# fix the code, keep the query active).
+_AI_UNAVAILABLE_DETAIL = (
+    "AI study aid is not available right now. Open Account → AI study aid to "
+    "choose Built-in study aid or Cloud API key. Extractive key points still "
+    "work without AI."
+)
+_EXPLAIN_FAILED_DETAIL = (
+    "The study aid could not explain this abstract. Try again in a moment, "
+    "or check the original paper."
+)
 
 
 def _normalise_audience(value: str) -> str:
@@ -58,7 +54,7 @@ async def api_reader_explain(req: ReaderExplainRequest, request: Request):
     uid = user["user_id"]
     p = get_pipeline(uid)
     try:
-        from app.services.llm import LLMError, LLMUnavailable
+        from app.services.llm import LLMBadInput, LLMError, LLMUnavailable
         from app.services.reader_mode import explain_article
 
         article = p.db.get_article_by_id(req.article_id, req.source)
@@ -75,9 +71,14 @@ async def api_reader_explain(req: ReaderExplainRequest, request: Request):
 
         return await run_in_thread(_work)
     except LLMUnavailable as e:
-        return JSONResponse(status_code=503, content={"detail": _friendly_ai_unavailable(str(e))})
-    except LLMError as e:
+        logger.info("Reader explain unavailable: %s", e)
+        return JSONResponse(status_code=503, content={"detail": _AI_UNAVAILABLE_DETAIL})
+    except LLMBadInput as e:
+        # Raised only with static, app-authored guidance — safe verbatim.
         return JSONResponse(status_code=400, content={"detail": str(e)})
+    except LLMError as e:
+        logger.info("Reader explain failed: %s", e)
+        return JSONResponse(status_code=400, content={"detail": _EXPLAIN_FAILED_DETAIL})
     except Exception:
         return server_error()
     finally:
