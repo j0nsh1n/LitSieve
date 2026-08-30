@@ -1,4 +1,4 @@
-# LitSieve 📚 — v5.2.0
+# LitSieve 📚 — v5.3.0
 
 A multi-user web app for **students** to fetch, screen, and rank research papers
 across public academic databases as a **research starting point**. Semantic
@@ -29,6 +29,10 @@ Built with **FastAPI**, sentence-transformers, FAISS, and scikit-learn.
   Advanced keeps Clean up, Clusters, and full controls
 - 🧠 Semantic embeddings (only-new or full re-embed; topic-based model pick; GPU when
   available; background job) + **extractive key points** from abstracts
+- 📖 **Explain this study** (opt-in AI on a paper you already have): a structured
+  plain-language reading of **that abstract only**, high-school or general-reader
+  level. Automatic checks can warn; they do not claim the explanation is
+  medically verified. Hidden with `HIDE_AI_BUTTONS`. Not a bulk rewrite.
 - 🎯 Hybrid similarity search (meaning + exact words), **year range**, plain text /
   PICO / **seed paper** / **more like my starred**, highlights & private notes;
   paginated result lists; Simple sticky export / screening-report panel
@@ -55,7 +59,7 @@ Built with **FastAPI**, sentence-transformers, FAISS, and scikit-learn.
 │   ├── auth.py             # JWT + bcrypt password hashing
 │   ├── utils.py            # Year sort, source priority, coverage, screening report
 │   ├── fetchers/           # One module per source + base.py (HttpClient, retry/backoff)
-│   ├── services/           # pipeline, embeddings, clustering, summarize, study_type, llm, citations
+│   ├── services/           # pipeline, embeddings, clustering, summarize, study_type, llm, reader_mode, citations
 │   ├── storage/            # database, user_db, libraries, shares (SQLite)
 │   └── content/            # feature guides, sample corpus, source catalog, UI flags
 ├── templates/              # Jinja2 HTML pages

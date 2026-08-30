@@ -45,7 +45,12 @@ a substitute for school library databases.
 - Search: hybrid rank (semantic + optional lexical), year/source filters, seed
   paper, **more like starred** (starred papers **remain** in the result list),
   notes/stars, export on-screen results as RIS
-- Optional AI Refine / Ask: one abstract at a time; never silent bulk rewrite
+- Optional AI Refine / Ask / **Explain this study**: one abstract at a time;
+  never silent bulk rewrite. Explain this study is a structured plain-language
+  reading (audiences `high_school` | `general_reader`) of an abstract already
+  in the student's library. Automatic checks are **warnings only** (never
+  "verified"). Hidden with `HIDE_AI_BUTTONS`. No `/api/reader/explain-library`
+  or bulk-explain route.
 - Optional library **clone codes** (copy, not live share)
 - Optional recovery email (SMTP-gated; verified before trusted) on current product
   path when SMTP is configured
@@ -68,7 +73,10 @@ a substitute for school library databases.
 - Example (Advanced): log in → Data Management (topics/sources → Fetch →
   auto-prepare) → Clean up (dedup / Quick screen / report) → optional Clusters →
   Search → Download RIS
-- Health: `GET /health` → `{"status":"healthy","version":"5.2.0"}` (version as of
+- **Explain this study** sits in the shared AI row on Search and Clean up cards
+  (`renderKeyPointsHtml`). The panel does not replace the abstract. Hidden when
+  the abstract is under 40 characters.
+- Health: `GET /health` → `{"status":"healthy","version":"5.3.0"}` (version as of
   this writing; bump when releasing)
 
 ## Architecture
@@ -153,3 +161,5 @@ a substitute for school library databases.
 - [ ] `ruff check .` and full pytest (with SECRET_KEY) exit 0
 - [ ] CHANGELOG.md updated for user-visible releases
 - [ ] Version string in `app/main.py` / `/health` matches release
+- [ ] Explain this study is one paper at a time, abstract-only, warning-only
+      checks, hidden by `HIDE_AI_BUTTONS`, and there is no bulk-explain route

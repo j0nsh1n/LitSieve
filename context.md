@@ -1,7 +1,7 @@
 # context.md — LitSieve
 
 ## Current State
-- App version **5.2.0** (`app/main.py`, `GET /health`). Product name **LitSieve**.
+- App version **5.3.0** (`app/main.py`, `GET /health`). Product name **LitSieve**.
 - Example public deployment pattern: HTTPS at the edge (e.g. Cloudflare Tunnel)
   → `uvicorn` HTTP on `127.0.0.1:7860` only. Operator sets `PUBLIC_BASE_URL` and
   `DEBUG=false` with a real `SECRET_KEY` in gitignored `.env`.
@@ -23,8 +23,8 @@
   body/UI Source Sans 3 (self-hosted). Flat paper / near-black dark, score
   ring on Search. Sieve pan as favicon, nav mark, and empty-state illustration
   (Search / Clean up / Clusters).
-- Reader Mode (5.3, this branch): **Explain this study** on Search/Clean up
-  cards — structured plain-language reading of one abstract, cached per
+- Reader Mode: **Explain this study** on Search/Clean up cards — structured
+  plain-language reading of one abstract, cached per
   `(article_id, source, audience)` in the library DB, warnings-only verifier.
 - Final Simple nav is one unnumbered Search tab (no stepper; collect via Start over); that contract supersedes the original Phase 10 “Simple/guest tests pass unchanged” criterion.
 - Guest: `/guest` → sample corpus, auto-prepare (set `GUEST_AUTO_PREPARE=0` in

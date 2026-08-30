@@ -8,6 +8,8 @@ and this project aims to follow Semantic Versioning for app version strings
 
 ## [Unreleased]
 
+## [5.3.0] - 2026-08-29
+
 ### Added
 - **Explain this study** (Reader Mode): on a paper in Search or Clean up, students
   can ask for a structured plain-language reading of that abstract (high school

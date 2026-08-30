@@ -264,7 +264,7 @@ Run against the live base URL (examples use `http://127.0.0.1:7860`).
 ```bash
 # 1. Process is up
 curl -sS -o /tmp/health.json -w "%{http_code}\n" http://127.0.0.1:7860/health
-# expect: 200 and {"status":"healthy","version":"5.2.0"}
+# expect: 200 and {"status":"healthy","version":"5.3.0"}
 
 # 2. Landing (no auth)
 curl -sS -o /dev/null -w "%{http_code}\n" http://127.0.0.1:7860/
