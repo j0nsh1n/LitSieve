@@ -74,8 +74,14 @@ async def api_reader_explain(req: ReaderExplainRequest, request: Request):
         logger.info("Reader explain unavailable: %s", e)
         return JSONResponse(status_code=503, content={"detail": _AI_UNAVAILABLE_DETAIL})
     except LLMBadInput as e:
-        # Raised only with static, app-authored guidance — safe verbatim.
-        return JSONResponse(status_code=400, content={"detail": str(e)})
+        # Resolve the code against the static table rather than returning str(e):
+        # nothing derived from the exception reaches the client.
+        from app.services.llm import BAD_INPUT_MESSAGES
+
+        return JSONResponse(
+            status_code=400,
+            content={"detail": BAD_INPUT_MESSAGES.get(e.code, _EXPLAIN_FAILED_DETAIL)},
+        )
     except LLMError as e:
         logger.info("Reader explain failed: %s", e)
         return JSONResponse(status_code=400, content={"detail": _EXPLAIN_FAILED_DETAIL})

@@ -190,11 +190,9 @@ def explain_article(
     title = article.get("title") or ""
     abstract = (article.get("abstract") or "").strip()
     if not abstract:
-        raise LLMBadInput("This abstract is empty, so it cannot be explained.")
+        raise LLMBadInput("abstract_empty")
     if len(abstract) < MIN_ABSTRACT_LEN:
-        raise LLMBadInput(
-            "This abstract is too short to explain (a few sentences are needed)."
-        )
+        raise LLMBadInput("abstract_too_short")
 
     digest = reader_facts.abstract_hash(abstract)
     if not force_regenerate:

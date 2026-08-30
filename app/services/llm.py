@@ -62,12 +62,29 @@ class LLMError(RuntimeError):
     """Provider call failed or returned unusable output."""
 
 
-class LLMBadInput(LLMError):
-    """App-authored input guidance raised only with static literal messages.
+# Every message a route may show verbatim for bad input. Keyed by code so the
+# response string is looked up here, never taken from the exception object: a
+# comment saying "only static literals" was not enforceable, and CodeQL could
+# not see it either (py/stack-trace-exposure on the str(e) return).
+BAD_INPUT_MESSAGES = {
+    "abstract_empty": "This abstract is empty, so it cannot be explained.",
+    "abstract_too_short": (
+        "This abstract is too short to explain (a few sentences are needed)."
+    ),
+}
 
-    Routes may show str() of this exception verbatim; it must never be raised
-    with text derived from another exception or a runtime value.
+
+class LLMBadInput(LLMError):
+    """App-authored input guidance, selected by code from BAD_INPUT_MESSAGES.
+
+    Construct with a code, not a message. Routes resolve the code against
+    BAD_INPUT_MESSAGES, so no exception-derived text can reach a response even
+    if someone later raises this with a provider string by mistake.
     """
+
+    def __init__(self, code: str) -> None:
+        self.code = code
+        super().__init__(BAD_INPUT_MESSAGES.get(code, "This abstract cannot be explained."))
 
 
 class RefinedArticle(BaseModel):
@@ -1005,11 +1022,9 @@ def generate_reader_explanation(
     """
     abstract = (abstract or "").strip()
     if not abstract:
-        raise LLMBadInput("This abstract is empty, so it cannot be explained.")
+        raise LLMBadInput("abstract_empty")
     if len(abstract) < 40:
-        raise LLMBadInput(
-            "This abstract is too short to explain (a few sentences are needed)."
-        )
+        raise LLMBadInput("abstract_too_short")
     audience = "high_school" if audience == "high_school" else "general_reader"
     system = _READER_HIGH_SCHOOL if audience == "high_school" else _READER_GENERAL
     loc = ""

@@ -151,3 +151,44 @@ def test_short_abstract_raises_friendly_error():
         assert False, "expected LLMError"
     except LLMError as exc:
         assert "too short to explain" in str(exc)
+
+
+def test_bad_input_messages_are_static_and_code_selected():
+    """No exception-derived text may reach a Reader Mode response.
+
+    CodeQL flagged `return JSONResponse(400, {"detail": str(e)})`
+    (py/stack-trace-exposure, alerts 80/82). Every raise site did use a static
+    literal, but nothing enforced that — a later `raise LLMBadInput(str(err))`
+    would have leaked a provider message with no test objecting. The code table
+    makes the rule checkable.
+    """
+    import re
+    from pathlib import Path
+
+    from app.services.llm import BAD_INPUT_MESSAGES, LLMBadInput
+
+    root = Path(__file__).resolve().parent.parent
+
+    # Every raise passes a bare string literal that is a known code.
+    raises = []
+    for rel in ("app/services/llm.py", "app/services/reader_mode.py", "app/routes/reader.py"):
+        text = (root / rel).read_text(encoding="utf-8")
+        raises += re.findall(r"raise LLMBadInput\((.*?)\)", text, re.S)
+    assert raises, "no LLMBadInput raise sites found — did the class get renamed?"
+    for arg in raises:
+        arg = arg.strip()
+        assert re.fullmatch(r'"[a-z_]+"', arg), f"LLMBadInput raised with non-literal: {arg!r}"
+        assert arg.strip('"') in BAD_INPUT_MESSAGES, f"unknown code {arg}"
+
+    # The route must not hand str(exception) back to the client. Comments are
+    # stripped first so the rule can be described in prose next to the code.
+    route = (root / "app" / "routes" / "reader.py").read_text(encoding="utf-8")
+    code_only = "\n".join(
+        line.split("#", 1)[0] for line in route.splitlines()
+    )
+    assert "str(e)" not in code_only, "reader route returns exception text to the client"
+    assert 'content={"detail": str(' not in code_only
+
+    # And the code still resolves to the app-authored sentence.
+    assert LLMBadInput("abstract_empty").code == "abstract_empty"
+    assert "empty" in BAD_INPUT_MESSAGES["abstract_empty"]
