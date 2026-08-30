@@ -62,6 +62,31 @@ class LLMError(RuntimeError):
     """Provider call failed or returned unusable output."""
 
 
+# Every message a route may show verbatim for bad input. Keyed by code so the
+# response string is looked up here, never taken from the exception object: a
+# comment saying "only static literals" was not enforceable, and CodeQL could
+# not see it either (py/stack-trace-exposure on the str(e) return).
+BAD_INPUT_MESSAGES = {
+    "abstract_empty": "This abstract is empty, so it cannot be explained.",
+    "abstract_too_short": (
+        "This abstract is too short to explain (a few sentences are needed)."
+    ),
+}
+
+
+class LLMBadInput(LLMError):
+    """App-authored input guidance, selected by code from BAD_INPUT_MESSAGES.
+
+    Construct with a code, not a message. Routes resolve the code against
+    BAD_INPUT_MESSAGES, so no exception-derived text can reach a response even
+    if someone later raises this with a provider string by mistake.
+    """
+
+    def __init__(self, code: str) -> None:
+        self.code = code
+        super().__init__(BAD_INPUT_MESSAGES.get(code, "This abstract cannot be explained."))
+
+
 class RefinedArticle(BaseModel):
     summary: str = Field(
         description="2-4 sentence plain-language summary of what the paper did and found."
@@ -81,6 +106,24 @@ class ArticleAnswer(BaseModel):
         default_factory=list,
         description="1-3 short verbatim supporting snippets from the abstract.",
     )
+
+
+class GlossaryEntry(BaseModel):
+    term: str = Field(max_length=80, description="Specialist term as used in the explanation.")
+    definition: str = Field(max_length=400, description="One-sentence plain-language definition.")
+
+
+class ReaderExplanation(BaseModel):
+    """Structured plain-language explanation of one abstract (Reader Mode)."""
+
+    plain_summary: str = Field(max_length=1500)
+    question_asked: str = Field(max_length=800)
+    who_was_studied: str = Field(max_length=800)
+    what_was_found: str = Field(max_length=1500)
+    what_it_does_not_show: str = Field(max_length=1000)
+    stated_limitations: str = Field(max_length=1000)
+    glossary: List[GlossaryEntry] = Field(default_factory=list, max_length=12)
+    not_reported_fields: List[str] = Field(default_factory=list)
 
 
 def _env(name: str, default: str = "") -> str:
@@ -825,6 +868,61 @@ _ASK_SYSTEM = (
 )
 
 
+_READER_CORE = (
+    "You are a careful reading aid inside a student literature-research app.\n\n"
+    "CONTEXT / ROLE:\n"
+    "- The student selected ONE paper from their personal library and asked for a "
+    "plain-language explanation.\n"
+    "- You are given that paper's title and abstract only (not the full PDF or any "
+    "paywalled text). Treat the supplied text as your entire knowledge of the paper.\n"
+    "- You are also given structured facts the app extracted deterministically from "
+    "that same abstract. Treat them as trusted; do not contradict them.\n\n"
+    "RULES:\n"
+    "- Use ONLY the supplied title, abstract, and extracted facts. Never invent "
+    "results, numbers, populations, methods, or claims.\n"
+    "- PRESERVE every quantity, named intervention, and study design that appears in "
+    "the abstract. Do not round, drop, or generalise numbers.\n"
+    "- PRESERVE the strength of the original claims exactly. If the abstract says "
+    '"associated with", "may", "might", "suggests", "limited evidence", '
+    '"no significant difference", or "further research is needed", your explanation '
+    "must carry the same caution. Never upgrade a correlation into a cause.\n"
+    '  PROHIBITED EXAMPLE — abstract: "Later start times were associated with longer '
+    'sleep duration." Wrong: "Later start times cause teenagers to sleep longer." '
+    'Right: "Students with later start times tended to sleep longer, though the '
+    'study cannot show that the later start is what caused it."\n'
+    "- Distinguish two different things:\n"
+    "    stated_limitations    = limits the ABSTRACT ITSELF states. If the abstract "
+    "states none, write exactly:\n"
+    '                            "Not reported in the abstract."\n'
+    "    what_it_does_not_show = a general boundary of what any single abstract can "
+    "establish. This is YOUR interpretation, not the paper's claim. Never attribute "
+    "it to the authors. If you have nothing specific, write exactly:\n"
+    '                            "The abstract alone cannot establish whether these '
+    'findings apply to everyone."\n'
+    '- If information for a section is absent, write "Not reported in the abstract." '
+    "and add that field name to not_reported_fields. Never leave a field empty.\n"
+    "- Do NOT give medical, legal, or professional advice. Do not suggest what anyone "
+    "should do about their health.\n"
+    "- Do NOT invent an evidence grade (A-D), quality score, or confidence level.\n"
+    "- Respond with JSON matching the requested schema only (no markdown fences)."
+)
+
+_READER_HIGH_SCHOOL = (
+    _READER_CORE
+    + "\n\nAUDIENCE:\nWrite for roughly grades 8-10. Short sentences, one idea per "
+    "sentence, everyday vocabulary. Every unavoidable scientific or medical term "
+    "must appear in the glossary with a one-sentence plain definition. Do not "
+    "simplify by deleting a number or a caution."
+)
+
+_READER_GENERAL = (
+    _READER_CORE
+    + "\n\nAUDIENCE:\nWrite for an informed non-specialist adult. Plain but not "
+    "childish; keep meaningful scientific context. Glossary only for genuinely "
+    "specialist terms."
+)
+
+
 def refine_article(
     title: str,
     abstract: str,
@@ -906,6 +1004,54 @@ def ask_article(
         "method": "rules+llm",
         "provider": provider(),
     }
+
+
+def generate_reader_explanation(
+    title: str,
+    abstract: str,
+    *,
+    audience: str = "general_reader",
+    source: str = "",
+    article_id: str = "",
+    facts_block: str = "",
+) -> Dict[str, Any]:
+    """Structured plain-language explanation of one abstract.
+
+    Provider contact only — orchestration, caching and verification live in
+    ``app.services.reader_mode``. The prompt must not include user identity.
+    """
+    abstract = (abstract or "").strip()
+    if not abstract:
+        raise LLMBadInput("abstract_empty")
+    if len(abstract) < 40:
+        raise LLMBadInput("abstract_too_short")
+    audience = "high_school" if audience == "high_school" else "general_reader"
+    system = _READER_HIGH_SCHOOL if audience == "high_school" else _READER_GENERAL
+    loc = ""
+    if source or article_id:
+        loc = f"Library record: source={source or 'unknown'}, id={article_id or 'unknown'}\n"
+    facts = (facts_block or "").strip()
+    facts_section = (
+        f"\nEXTRACTED FACTS (deterministic, from this abstract — do not contradict):\n{facts}\n"
+        if facts
+        else ""
+    )
+    prompt = (
+        "TASK: The student clicked “Explain this study” on the paper below. "
+        f"Write a structured plain-language explanation for audience={audience}.\n\n"
+        f"{loc}"
+        f"SELECTED PAPER TITLE:\n{title or 'Untitled'}\n\n"
+        "SELECTED PAPER ABSTRACT (sole evidence — do not go beyond this text):\n"
+        f"{abstract}\n"
+        f"{facts_section}\n"
+        "OUTPUT: JSON matching the schema. Every prose field is required; use "
+        '"Not reported in the abstract." rather than omitting a key.'
+    )
+    parsed: ReaderExplanation = _structured_call(system, prompt, ReaderExplanation)
+    payload = parsed.model_dump()
+    payload["method"] = "rules+llm"
+    payload["provider"] = provider()
+    return payload
 
 
 def _structured_call(system: str, prompt: str, schema_model: Type[BaseModel]):

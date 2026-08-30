@@ -1,0 +1,38 @@
+{
+  "id": "later_start_qualitative",
+  "provenance": {
+    "source": "pubmed",
+    "pmid": "42191507",
+    "title": "Starting an hour later: Adolescents' concerns and positive expectations regarding introducing later school start times-A qualitative study.",
+    "journal": "Sleep health",
+    "year": "2026",
+    "note": "Title/abstract fetched from the NCBI E-utilities public API."
+  },
+  "audience": "high_school",
+  "variant": "faithful",
+  "abstract": "OBJECTIVES: Adequate sleep and a schedule aligned with circadian rhythms are essential for healthy development in adolescents. One strategy to improve sleep, mental health, and academic performance is to delay school start times. A few Swedish schools have implemented later school start times, but these changes or the perceptions of these changes have not been formally studied. The present study aimed to illuminate adolescents' concerns and positive expectations regarding later school start times. METHODS: The study included 314 adolescents aged 13-15 years (52% self-identified as girls) at 2 secondary schools in Sweden. Adolescents were to start their school days an hour later, from 8:00-9:00 am, beginning in August 2024. Data were collected from June 2024-August 2024 through 28 individual interviews and one open-ended survey question answered by 286 adolescents. These data were analyzed using inductive qualitative content analysis. RESULTS: Adolescents' concerns and positive expectations were summarized into 4 categories. They expected the change to result in altered morning routines, as well as improved well-being and performance during the school day. They also anticipated changes in leisure time, with more energy but less free time, and both improvements (longer sleep duration and easier sleep onset) and potential drawbacks (later bedtimes) regarding sleep. Their views reflected both enthusiasm and apprehension, thereby highlighting ambivalence toward the upcoming change. CONCLUSION: The impending shift to later school start times was largely viewed positively, offering hopes of better sleep and well-being, including longer sleep duration and an easier time falling asleep due to reduced pressure to go to bed early. However, the impending shift also raised concerns regarding longer school days and less leisure time. These findings indicate a predominantly positive perspective, although some ambivalence remains about both opportunities and challenges. Follow-up research should further clarify adolescents' experiences.",
+  "generated": {
+    "plain_summary": "Researchers in Sweden interviewed 314 adolescents aged 13-15 years at 2 secondary schools before their school day moved an hour later, from 8:00-9:00 am. They collected 28 individual interviews and one open-ended survey question answered by 286 adolescents.",
+    "question_asked": "What did adolescents expect, and what worried them, about starting school an hour later?",
+    "who_was_studied": "314 adolescents aged 13-15 years (52% self-identified as girls) at 2 secondary schools in Sweden.",
+    "what_was_found": "Their answers fell into 4 categories. They expected altered morning routines, improved well-being and performance during the school day, changes in leisure time with more energy but less free time, and both improvements (longer sleep duration and easier sleep onset) and potential drawbacks (later bedtimes). Their views reflected both enthusiasm and apprehension.",
+    "what_it_does_not_show": "This study recorded what students expected before the change, not what actually happened afterwards. It cannot show whether the later start improved sleep.",
+    "stated_limitations": "The abstract notes that these changes and the perceptions of them had not been formally studied before.",
+    "glossary": [
+      {
+        "term": "qualitative content analysis",
+        "definition": "A way of grouping what people said in interviews into themes, instead of counting numbers."
+      }
+    ],
+    "not_reported_fields": []
+  },
+  "expected": {
+    "numeric_detail": "pass",
+    "study_design": "pass",
+    "negation": "pass",
+    "uncertainty_language": "pass",
+    "entity_retention": "skipped"
+  },
+  "note": "Faithful qualitative study: keeps 314, 13-15, 52%, 2 schools, 28 interviews, 286 responses, 4 categories, and the expectation-not-outcome boundary.",
+  "expected_status": "no_automatic_issues"
+}

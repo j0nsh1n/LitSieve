@@ -1,0 +1,42 @@
+{
+  "id": "caffeine_sleep_null_faithful",
+  "provenance": {
+    "source": "pubmed",
+    "pmid": "42656491",
+    "title": "Limited change in adolescent value-based risk choices following acute sleep restriction and caffeine.",
+    "journal": "Frontiers in psychology",
+    "year": "2026",
+    "note": "Title/abstract fetched from the NCBI E-utilities public API."
+  },
+  "audience": "high_school",
+  "variant": "faithful",
+  "abstract": "PURPOSE: Adolescence is marked by changes in brain connectivity linked to risk decision-making, indexed by risk-taking propensity, optimal choices (safe, higher expected value), and irrational choices (risky, lower expected value). Insufficient sleep and caffeine consumption, common during adolescence, may independently and jointly influence risk decision-making in adolescents already predisposed to risk-taking. This study investigated whether sleep-restriction impairs risk decision-making, whether caffeine increases risk-taking propensity and optimal choices while decreasing irrational choices, and whether caffeine effects are enhanced under sleep-restriction. METHODS: Forty-one adolescents aged 14-17 years completed a between-subject, two-night sleep manipulation (sleep-restriction: 6 h time in bed, sleep-extension: 9.5 h time in bed), followed by a within-subject, double-blind, placebo-controlled caffeine manipulation. Risk decision-making was assessed using a modified Wheel of Fortune task, and Bayesian inference quantified sleep and caffeine effects. RESULTS: Across all outcomes, posterior estimates for sleep condition, caffeine, and their interaction were small, with 95% highest density intervals spanning zero; region of practical equivalence overlap varied across predictors, indicating limited evidence for practically meaningful effects. Caffeine effects and sleep-caffeine interactions remained uncertain across outcomes. DISCUSSION: Adolescent risk decision-making on the modified Wheel of Fortune task showed no clear evidence of practically meaningful average changes after two nights of sleep-restriction or acute caffeine. These results suggest limited sensitivity of this task to the present manipulations rather than evidence that sleep or caffeine is inconsequential. Findings provide quantitative effect size and uncertainty benchmarks for future experimental work. CLINICAL TRIAL REGISTRATION: https://www.humanforschung-schweiz.ch/en/trial-search/study-detail/58864/translate/en/, identifier SNCTP000004988.",
+  "generated": {
+    "plain_summary": "Forty-one adolescents aged 14-17 years spent two nights on either a shorter sleep schedule (6 h time in bed) or a longer one (9.5 h time in bed). They then took caffeine or a placebo in a double-blind test, and played a gambling-style task that measures risk-taking.",
+    "question_asked": "Does short sleep change how adolescents make risky choices, does caffeine change it, and do the two together make a bigger difference?",
+    "who_was_studied": "Forty-one adolescents aged 14-17 years.",
+    "what_was_found": "Across all outcomes, the estimated effects of sleep condition, caffeine, and the two combined were small, and the 95% highest density intervals spanned zero. In plain terms, the study did not find a clear effect.",
+    "what_it_does_not_show": "A result this small in 41 adolescents does not prove that sleep and caffeine have no effect on risk-taking; it means this study did not detect one.",
+    "stated_limitations": "The abstract reports that all the estimates were small with intervals spanning zero, which is a limited result rather than a clear finding.",
+    "glossary": [
+      {
+        "term": "placebo",
+        "definition": "A dummy treatment with no active ingredient, used for comparison."
+      },
+      {
+        "term": "double-blind",
+        "definition": "Neither the participants nor the researchers know who got the real treatment until afterwards."
+      }
+    ],
+    "not_reported_fields": []
+  },
+  "expected": {
+    "numeric_detail": "pass",
+    "study_design": "pass",
+    "negation": "pass",
+    "uncertainty_language": "pass",
+    "entity_retention": "skipped"
+  },
+  "note": "Faithful null result: keeps 41, 14-17, 6 h, 9.5 h, and the 'spanning zero' non-finding. A verifier that punished honest null reporting would show up here.",
+  "expected_status": "no_automatic_issues"
+}

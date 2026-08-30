@@ -973,6 +973,7 @@ function buildResultCard(article, idx) {
  articleId: article.article_id,
  source: article.source,
  origin: article.key_points_origin || 'extractive',
+ abstractLen: String(article.abstract || '').length,
  })
  : '';
  const studyTypeHtml = renderStudyTypeBadge(article);

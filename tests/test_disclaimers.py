@@ -41,8 +41,51 @@ def _plain(html: str) -> str:
 def test_macros_export_all_variants():
     env = _env()
     macros = env.get_template("macros/disclaimers.html").module
-    for name in ("scope_banner", "scope_auth", "scope_footer", "scope_fetch", "scope_search"):
+    for name in ("scope_banner", "scope_auth", "scope_footer", "scope_fetch", "scope_search", "scope_reader"):
         assert hasattr(macros, name), f"missing macro {name}"
+
+
+def test_reader_disclaimer_is_educational_not_clinical():
+    env = _env()
+    macros = env.get_template("macros/disclaimers.html").module
+    text = macros.scope_reader()
+    assert "educational reading aid" in text.lower()
+    assert "not professional advice" in text.lower()
+    js = (TEMPLATES.parent / "static" / "js" / "reader.js").read_text(encoding="utf-8")
+    low = js.lower()
+    for banned in ("clinically verified", "medically accurate", "guaranteed"):
+        assert banned not in low
+
+
+def test_reader_health_sources_keep_medical_line():
+    """Neutral wording is the default; biomedical sources keep the explicit
+    medical line, chosen server-side per paper (the macro cannot know the
+    source)."""
+    from app.services.reader_mode import DISCLAIMER, DISCLAIMER_HEALTH, HEALTH_SOURCES
+
+    assert DISCLAIMER_HEALTH.startswith(DISCLAIMER)
+    assert "not medical advice" in DISCLAIMER_HEALTH.lower()
+    assert {"pubmed", "europepmc", "clinicaltrials", "biorxiv", "medrxiv"} <= HEALTH_SOURCES
+    assert "crossref" not in HEALTH_SOURCES
+    assert "openalex" not in HEALTH_SOURCES
+
+
+def test_reader_disclaimer_macro_and_api_string_match():
+    """The reader disclaimer exists twice: the Jinja macro and the Python
+    constant the API sends as JSON. Nothing rendered them from one source, so
+    editing the macro alone would silently leave the API sending stale wording.
+    Both still pass the phrase checks above, which is why equality is asserted.
+    """
+    from app.services.reader_mode import DISCLAIMER
+
+    env = _env()
+    macro_text = " ".join(
+        env.get_template("macros/disclaimers.html").module.scope_reader().split()
+    )
+    assert macro_text == DISCLAIMER, (
+        "reader disclaimer drifted between macros/disclaimers.html scope_reader() "
+        "and app/services/reader_mode.DISCLAIMER"
+    )
 
 
 def test_banner_contains_canonical_phrases():

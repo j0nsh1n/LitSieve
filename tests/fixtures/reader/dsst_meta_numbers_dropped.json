@@ -1,0 +1,39 @@
+{
+  "id": "dsst_meta_numbers_dropped",
+  "provenance": {
+    "source": "pubmed",
+    "pmid": "42449039",
+    "title": "Delayed school start times to improve sleep duration and mitigate depression in adolescents: a systematic review and meta-analysis.",
+    "journal": "Journal of clinical sleep medicine : JCSM : official publication of the American Academy of Sleep Medicine",
+    "year": "2026",
+    "note": "Title/abstract fetched from the NCBI E-utilities public API."
+  },
+  "audience": "high_school",
+  "variant": "degraded",
+  "abstract": "BACKGROUND AND OBJECTIVES: Delayed school start time (DSST) has been associated with prolonged sleep duration and reduced depressive symptoms. However, the overall magnitude of these effects remains unclear. We therefore conducted a systematic review and meta-analysis to assess the impact of DSST on sleep duration and depressive symptoms among middle and high school students. METHODS: We systematically searched Medline, Google Scholar, and Science Direct for studies examining the relationship between DSST and both sleep duration and depression. Four independent reviewers conducted risk-of-bias and quality assessments for each study. For quantitative synthesis, we calculated the standardized mean difference (SMD) using Hedges's g to evaluate changes in sleep duration and depression. RESULTS: A total of six studies were included in the final meta-analysis. The pooled analysis indicated that DSST was associated with an average increase in sleep duration of 69 min, with an SMD of 0.63, suggesting a moderate effect size. In contrast, analysis of depressive symptoms, based on five studies, produced a pooled SMD of - 0.20, indicating a smaller effect. Both analyses demonstrated high inter-study heterogeneity. CONCLUSIONS: Our findings suggest that DSST is associated with a moderate improvement in sleep duration among middle and high school students, with minimal evidence of publication bias and small-studies effect, while depressive symptoms showed a small reduction. Further research with larger sample sizes and standardized outcome measures is warranted to clarify these associations.",
+  "generated": {
+    "plain_summary": "Researchers combined several earlier studies about starting school later. They found that students slept longer when school started later, and felt slightly less depressed.",
+    "question_asked": "Does starting school later help students sleep more and feel less depressed?",
+    "who_was_studied": "Middle and high school students from the studies that were combined.",
+    "what_was_found": "Students slept longer when school started later. The effect on depression was smaller.",
+    "what_it_does_not_show": "The abstract alone cannot establish whether these findings apply to everyone.",
+    "stated_limitations": "The studies disagreed with each other quite a lot, and more research is needed.",
+    "glossary": [
+      {
+        "term": "depression",
+        "definition": "A medical condition involving long-lasting low mood."
+      }
+    ],
+    "not_reported_fields": []
+  },
+  "expected": {
+    "numeric_detail": "warn",
+    "study_design": "pass",
+    "negation": "pass",
+    "uncertainty_language": "pass",
+    "entity_retention": "skipped"
+  },
+  "note": "Degraded pair for dsst_meta_faithful: every quantity removed (69 min, both SMDs, study counts). Only numeric_detail should warn — hedging and heterogeneity are still present.",
+  "seeded_defect": "numeric_detail",
+  "expected_status": "needs_review"
+}

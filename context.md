@@ -1,7 +1,7 @@
 # context.md — LitSieve
 
 ## Current State
-- App version **5.2.0** (`app/main.py`, `GET /health`). Product name **LitSieve**.
+- App version **5.3.0** (`app/main.py`, `GET /health`). Product name **LitSieve**.
 - Example public deployment pattern: HTTPS at the edge (e.g. Cloudflare Tunnel)
   → `uvicorn` HTTP on `127.0.0.1:7860` only. Operator sets `PUBLIC_BASE_URL` and
   `DEBUG=false` with a real `SECRET_KEY` in gitignored `.env`.
@@ -23,6 +23,9 @@
   body/UI Source Sans 3 (self-hosted). Flat paper / near-black dark, score
   ring on Search. Sieve pan as favicon, nav mark, and empty-state illustration
   (Search / Clean up / Clusters).
+- Reader Mode: **Explain this study** on Search/Clean up cards — structured
+  plain-language reading of one abstract, cached per
+  `(article_id, source, audience)` in the library DB, warnings-only verifier.
 - Final Simple nav is one unnumbered Search tab (no stepper; collect via Start over); that contract supersedes the original Phase 10 “Simple/guest tests pass unchanged” criterion.
 - Guest: `/guest` → sample corpus, auto-prepare (set `GUEST_AUTO_PREPARE=0` in
   tests), multi-source fetch 403, purge after 30 minutes. Search treats an
@@ -49,9 +52,9 @@
 |------|------|
 | `app/main.py` | FastAPI app, lifespan UMAP warm-up, static mount |
 | `app/core.py` | Process state: user_db, pipeline cache, jobs, limiter, guest purge |
-| `app/routes/` | pages, auth (incl. guest), admin, ops, support, libraries, shares, corpus, search, exports, ai |
+| `app/routes/` | pages, auth (incl. guest), admin, ops, support, libraries, shares, corpus, search, exports, ai, reader |
 | `app/operator/` | named Ship actions (staging worktree, no shell interpolation) |
-| `app/services/` | pipeline, embeddings, clustering, summarize, llm, citations, mailer |
+| `app/services/` | pipeline, embeddings, clustering, summarize, llm, reader_mode / facts / verify, citations, mailer |
 | `app/storage/` | database, libraries, shares, user_db, quota, dbconn, helpdesk, ops_audit |
 | `app/fetchers/` | 17 public sources + `base.py` |
 | `app/content/` | source_catalog, feature_guides, sample_corpus, ui_flags |
@@ -67,7 +70,7 @@
 - **Library**: named collection; meta in `libraries.json`; SQLite
   `user_data/<uid>/libraries/<lib_id>/articles.db`
 - **Article** key `(article_id, source)`: title, abstract, year, authors, journal
-- **Embeddings / clusters / screening / notes / key_points**: per library DB
+- **Embeddings / clusters / screening / notes / key_points / reader_explanations**: per library DB
 - **Share / clone code**: registry in users.db; join copies library (not live)
 - **Jobs**: fetch / embed progress per user; bind to active library at start
 - **AI settings**: server-wide `user_data/ai_settings.json` (keys encrypted)

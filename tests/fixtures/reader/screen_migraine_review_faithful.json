@@ -1,0 +1,46 @@
+{
+  "id": "screen_migraine_review_faithful",
+  "provenance": {
+    "source": "pubmed",
+    "pmid": "42603831",
+    "title": "Digital screen exposure and migraine burden: a systematic review and meta-analysis.",
+    "journal": "Journal of neurology",
+    "year": "2026",
+    "note": "Title/abstract fetched from the NCBI E-utilities public API."
+  },
+  "audience": "general_reader",
+  "variant": "faithful",
+  "abstract": "BACKGROUND: Digital screen exposure has risen sharply across paediatric, adolescent, and adult populations, and many individuals with migraine report that screen use triggers or worsens attacks. OBJECTIVE: To systematically review and meta-analyse the association between digital screen exposure and migraine/headache burden, including frequency, severity, disability, and related secondary outcomes, and to summarise the proposed neurobiological mechanisms. METHODS: This review was prospectively registered on PROSPERO (CRD420261404162) and conducted in accordance with PRISMA 2020 guidance. Embase, MEDLINE, PubMed, Scopus, and Google Scholar were searched without date restrictions for English-language observational and interventional studies of adolescents or adults with migraine or primary headache and a quantifiable measure of digital screen exposure. Two reviewers independently screened records, extracted data, and assessed risk of bias using a modified Joanna Briggs Institute (JBI)/AHRQ checklist for cross-sectional and observational studies. When ten or more studies reported an odds ratio (OR) with a 95% confidence interval (CI) for migraine or headache risk associated with higher versus lower screen exposure, a random-effects (DerSimonian-Laird) meta-analysis was performed. Heterogeneity was quantified with I2 and Cochran's Q; small-study effects were assessed with Egger's regression; and robustness was evaluated with a leave-one-out sensitivity analysis. Outcomes not amenable to pooling were synthesised narratively. Certainty of evidence was rated using GRADE. RESULTS: Twenty-two studies (k = 22; total N = 14,763) met eligibility criteria. Ten studies (k = 10; N = 11,218) reporting OR data were pooled: higher screen exposure was associated with significantly greater odds of migraine/headache (pooled OR 1.60, 95% CI 1.38-1.86, p < 0.001), with moderate heterogeneity (I2 = 60%, Cochran's Q = 22.3, df = 9, p = 0.008) and a 95% prediction interval of 1.03-2.48. Associations were directionally consistent in adult (OR 1.87, 95% CI 1.43-2.44) and paediatric/adolescent (OR 1.46, 95% CI 1.24-1.72) subgroups, and were robust to sequential exclusion of any single study (range of pooled OR 1.52-1.67). Egger's test suggested possible small-study effects (intercept 3.71, p = 0.002). The remaining twelve studies, reporting correlation coefficients, regression betas, or between-group comparisons, narratively corroborated the association, although two clinic-based comparative studies found no significant difference in headache frequency or severity by smartphone-use status. Screen exposure was consistently associated with sleep disturbance (18/22 studies) and less consistently with visual/ocular discomfort (14/22), reduced quality of life (20/22), musculoskeletal symptoms (11/22), and psychiatric comorbidity (13/22). Mechanistic discussion across all 22 studies converged on blue light-mediated retinal ganglion cell activation, melatonin suppression and circadian disruption, and trigeminovascular/cortical hyperexcitability as the principal proposed pathways. Certainty of evidence for the primary outcome was rated low, reflecting risk of bias from self-reported, cross-sectional exposure measurement, residual confounding, and possible publication bias. CONCLUSION: Digital screen exposure is associated with approximately 60% greater odds of migraine or headache, with biologically plausible mechanisms but low-certainty evidence drawn almost entirely from cross-sectional studies. Screen exposure should be regarded as a modifiable, clinically assessable factor in migraine care, while prospective, objectively measured, and interventional research is needed to establish causality and to test targeted mitigation strategies. PROSPERO REGISTRATION: PROSPERO registration: CRD420261404162.",
+  "generated": {
+    "plain_summary": "This was a systematic review and meta-analysis of how digital screen exposure relates to migraine and headache burden. It was prospectively registered on PROSPERO (CRD420261404162) and followed PRISMA 2020 guidance, searching Embase, MEDLINE, PubMed, Scopus and Google Scholar without date restrictions.",
+    "question_asked": "Is digital screen exposure associated with migraine or headache frequency, severity and disability?",
+    "who_was_studied": "Adolescents or adults with migraine or primary headache, in English-language observational and interventional studies with a quantifiable measure of digital screen exposure.",
+    "what_was_found": "Twenty-two studies (total N = 14,763) met the criteria, and ten of them (N = 11,218) reporting odds ratios were pooled. Higher screen exposure was associated with greater odds of migraine or headache (pooled OR 1.60, 95% CI 1.38-1.86, p < 0.001), with moderate heterogeneity (I2 = 60%). The association held in adult and in paediatric/adolescent subgroups. Two clinic-based comparative studies found no significant difference in headache frequency or severity by smartphone-use status.",
+    "what_it_does_not_show": "The included studies were largely observational, so the review describes an association and cannot establish that screen use causes attacks. Egger's test suggested possible small-study effects, and two of the included studies found no significant difference at all.",
+    "stated_limitations": "The abstract notes the review was restricted to English-language studies and relied on observational designs assessed with a modified risk-of-bias checklist.",
+    "glossary": [
+      {
+        "term": "systematic review",
+        "definition": "A careful search for all the studies on a question, using rules set in advance."
+      },
+      {
+        "term": "odds ratio",
+        "definition": "A number comparing how likely an outcome is in one group versus another."
+      },
+      {
+        "term": "confidence interval",
+        "definition": "A range that shows how precise an estimate is."
+      }
+    ],
+    "not_reported_fields": []
+  },
+  "expected": {
+    "numeric_detail": "pass",
+    "study_design": "pass",
+    "negation": "pass",
+    "uncertainty_language": "pass",
+    "entity_retention": "skipped"
+  },
+  "note": "Faithful: keeps 22 studies, N = 14,763, N = 11,218, pooled OR 1.60 with its 95% CI and p-value, I2 = 60%, and the two dissenting no-difference studies.",
+  "expected_status": "no_automatic_issues"
+}
