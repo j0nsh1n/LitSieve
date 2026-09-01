@@ -38,8 +38,7 @@
     "numeric_detail": "pass",
     "study_design": "pass",
     "negation": "warn",
-    "uncertainty_language": "pass",
-    "entity_retention": "skipped"
+    "uncertainty_language": "pass"
   },
   "note": "Pins audit 1.2. The abstract's negatives (sleep onset 'did not differ', the delayed group's 'non-significant' increase) are dropped from every claim section, but what_it_does_not_show says 'does not show'. Scanning the full prose counted that as preserved negation and passed. Only negation may warn.",
   "expected_status": "needs_review",

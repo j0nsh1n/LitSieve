@@ -34,8 +34,7 @@
     "numeric_detail": "pass",
     "study_design": "pass",
     "negation": "pass",
-    "uncertainty_language": "pass",
-    "entity_retention": "skipped"
+    "uncertainty_language": "pass"
   },
   "note": "Faithful pair for the causal-upgrade fixture: same abstract, hedging preserved ('associated with', 'can', 'may offer').",
   "expected_status": "no_automatic_issues"

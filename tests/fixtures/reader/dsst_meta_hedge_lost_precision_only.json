@@ -38,8 +38,7 @@
     "numeric_detail": "pass",
     "study_design": "pass",
     "negation": "pass",
-    "uncertainty_language": "warn",
-    "entity_retention": "skipped"
+    "uncertainty_language": "warn"
   },
   "note": "Pins audit 1.3. The abstract's conclusion hedges ('suggest', 'associated with', 'further research'); this explanation states flat results instead. The only hedge-ish words left are precision qualifiers ('on average', 'roughly'), which describe a number's exactness rather than confidence in a claim, and which used to satisfy has_hedging. No causal-upgrade word is used, so this isolates the 'lost' half of the rule. Only uncertainty_language may warn.",
   "expected_status": "needs_review",

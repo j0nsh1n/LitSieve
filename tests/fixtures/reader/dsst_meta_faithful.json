@@ -38,8 +38,7 @@
     "numeric_detail": "pass",
     "study_design": "pass",
     "negation": "pass",
-    "uncertainty_language": "pass",
-    "entity_retention": "skipped"
+    "uncertainty_language": "pass"
   },
   "note": "Faithful: keeps 69 min, SMD 0.63, SMD -0.20, six/five studies, 'associated with', heterogeneity, 'further research'. Expect a clean report.",
   "expected_status": "no_automatic_issues"

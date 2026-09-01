@@ -30,8 +30,7 @@
     "numeric_detail": "pass",
     "study_design": "pass",
     "negation": "pass",
-    "uncertainty_language": "pass",
-    "entity_retention": "skipped"
+    "uncertainty_language": "pass"
   },
   "note": "Faithful qualitative study: keeps 314, 13-15, 52%, 2 schools, 28 interviews, 286 responses, 4 categories, and the expectation-not-outcome boundary.",
   "expected_status": "no_automatic_issues"

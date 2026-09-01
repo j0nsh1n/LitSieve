@@ -34,8 +34,7 @@
     "numeric_detail": "pass",
     "study_design": "pass",
     "negation": "pass",
-    "uncertainty_language": "pass",
-    "entity_retention": "skipped"
+    "uncertainty_language": "pass"
   },
   "note": "Faithful: keeps 235/127, 3-month, the 4 h cut-off, and the 'no significant changes' null result. Tests that a genuine null finding survives.",
   "expected_status": "no_automatic_issues"

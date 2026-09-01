@@ -34,8 +34,7 @@
     "numeric_detail": "pass",
     "study_design": "pass",
     "negation": "pass",
-    "uncertainty_language": "pass",
-    "entity_retention": "skipped"
+    "uncertainty_language": "pass"
   },
   "note": "Faithful null result: keeps 41, 14-17, 6 h, 9.5 h, and the 'spanning zero' non-finding. A verifier that punished honest null reporting would show up here.",
   "expected_status": "no_automatic_issues"

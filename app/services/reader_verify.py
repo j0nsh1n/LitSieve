@@ -92,7 +92,6 @@ CHECK_ORDER = (
     "study_design",
     "negation",
     "uncertainty_language",
-    "entity_retention",
     "readability",
 )
 
@@ -396,38 +395,6 @@ def _check_uncertainty_language(ctx: Dict) -> Dict:
     return _check_outcome("uncertainty_language", "warn", message, details)
 
 
-def _check_entity_retention(ctx: Dict) -> Dict:
-    candidates = reader_facts.extract_pico_candidates(ctx["source_abstract"])
-    # Three is the floor for a meaningful signal. With one or two named spans,
-    # "most are missing" is noise — an explanation may legitimately not repeat
-    # an instrument name or a database it was found in.
-    if len(candidates) < 3:
-        return _check_outcome(
-            "entity_retention",
-            "skipped",
-            "Not enough distinct study details to check.",
-            {"candidates": candidates},
-        )
-    haystack = ctx["prose"].casefold()
-    missing = [c for c in candidates if c.casefold() not in haystack]
-    details = {"missing": missing, "candidates": len(candidates)}
-    # Warn only when NOTHING named in the abstract survived. A plain-language
-    # explanation drops instrument and database names on purpose; dropping every
-    # one is the signal that it may not be about this paper at all.
-    if len(missing) < len(candidates):
-        return _check_outcome(
-            "entity_retention",
-            "pass",
-            "The key study details from the abstract appear in the explanation.",
-            details,
-        )
-    return _check_outcome(
-        "entity_retention",
-        "warn",
-        "None of the specific names from the abstract appear in the explanation.",
-        details,
-    )
-
 
 def _count_syllables(word: str) -> int:
     """Vowel-group heuristic with silent trailing e, "le" endings, minimum 1."""
@@ -493,12 +460,11 @@ def _check_readability(ctx: Dict) -> Dict:
 def _derive_status(checks: List[Dict]) -> str:
     if any(c["outcome"] == "warn" for c in checks):
         return STATUS_NEEDS_REVIEW
-    # readability and entity_retention skip routinely on short or name-free
-    # abstracts. Only a check that actually failed should downgrade the report,
-    # or every clean explanation reads as "checks could not run fully".
+    # readability skips routinely on very short prose. Only a check that actually
+    # failed should downgrade the report, or every clean explanation reads as
+    # "checks could not run fully".
     if any(
-        c["outcome"] == "skipped"
-        and c["check_id"] not in ("readability", "entity_retention")
+        c["outcome"] == "skipped" and c["check_id"] != "readability"
         for c in checks
     ):
         return STATUS_INCOMPLETE
@@ -542,7 +508,6 @@ def verify(source_abstract: str, title: str, generated: dict) -> Dict:
             _run_check("study_design", _check_study_design, ctx),
             _run_check("negation", _check_negation, ctx),
             _run_check("uncertainty_language", _check_uncertainty_language, ctx),
-            _run_check("entity_retention", _check_entity_retention, ctx),
             _run_check("readability", _check_readability, ctx),
         ]
         return {

@@ -32,8 +32,7 @@
     "numeric_detail": "pass",
     "study_design": "pass",
     "negation": "warn",
-    "uncertainty_language": "pass",
-    "entity_retention": "skipped"
+    "uncertainty_language": "pass"
   },
   "note": "Degraded pair for sst_rct_faithful: 'non-significant' and 'did not differ' both dropped, so the reader is told sleep improved without the caveats. Numbers and design are intact, so only negation should warn.",
   "seeded_defect": "negation",

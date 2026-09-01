@@ -46,7 +46,7 @@ def test_full_clean_run_has_no_automatic_issues():
     )
     report = verify(abstract, "Sleep education trial", generated)
     assert report["status"] == "no_automatic_issues"
-    # entity_retention / readability may skip; that must not count as a warning.
+    # readability may skip; that must not count as a warning.
     assert all(c["outcome"] != "warn" for c in report["checks"])
     assert "checked_at" not in report
 
@@ -231,39 +231,6 @@ def test_study_type_low_confidence_skipped():
     assert chk["outcome"] == "skipped"
 
 
-def test_entity_retention_uses_pico():
-    abstract = (
-        "The Sleep Education Program at Riverview High School compared the "
-        "Morning Light Protocol with Usual Care Control. Outcomes improved."
-    )
-    generated = _generated(
-        plain_summary="Students improved after the scheme.",
-        what_was_found="The change lasted all year.",
-    )
-    chk = _check(verify(abstract, "Sleep", generated), "entity_retention")
-    assert chk["outcome"] == "warn"
-    assert "Sleep Education Program" in chk["details"]["missing"]
-
-
-def test_entity_retention_passes_if_any_name_survives():
-    abstract = (
-        "The Sleep Education Program at Riverview High School compared the "
-        "Morning Light Protocol with Usual Care Control. Outcomes improved."
-    )
-    generated = _generated(
-        plain_summary="The Sleep Education Program helped students sleep.",
-        what_was_found="The change lasted all year.",
-    )
-    chk = _check(verify(abstract, "Sleep", generated), "entity_retention")
-    assert chk["outcome"] == "pass"
-
-
-def test_entity_retention_few_candidates_skipped():
-    abstract = "The study looked at sleep quality. Measures were standard."
-    chk = _check(verify(abstract, "Sleep", _generated()), "entity_retention")
-    assert chk["outcome"] == "skipped"
-
-
 def test_readability_fk_grade_reasonable():
     generated = _generated(
         plain_summary=(
@@ -359,6 +326,6 @@ def test_verifier_exception_in_one_check_skips_that_check(monkeypatch):
     chk = _check(report, "numeric_detail")
     assert chk["outcome"] == "skipped"
     assert chk["severity"] == "info"
-    assert len(report["checks"]) == 6
+    assert len(report["checks"]) == len(reader_verify.CHECK_ORDER)
     # a skipped non-optional check holds the status back from clean
     assert report["status"] == "verification_incomplete"

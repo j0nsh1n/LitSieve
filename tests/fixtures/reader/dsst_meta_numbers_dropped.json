@@ -30,8 +30,7 @@
     "numeric_detail": "warn",
     "study_design": "pass",
     "negation": "pass",
-    "uncertainty_language": "pass",
-    "entity_retention": "skipped"
+    "uncertainty_language": "pass"
   },
   "note": "Degraded pair for dsst_meta_faithful: every quantity removed (69 min, both SMDs, study counts). Only numeric_detail should warn — hedging and heterogeneity are still present.",
   "seeded_defect": "numeric_detail",

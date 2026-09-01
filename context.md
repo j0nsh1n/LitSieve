@@ -111,8 +111,10 @@ Guest User (is_guest) → sample corpus only; purged by age
 - Host entry: `app.main:app` port 7860; Linux `./venv`
 
 ## Session Handoff
-- **Date:** 2026-08-28
-- **Branch:** `design/5.2.0` (local; do not push until asked)
-- **Done:** 5.2.0 design — sieve wait/brand/empty states, Source Serif 4
-  headings, Advanced bar/copy parity, Re-prepare empty-state copy.
-- **Next:** Leftovers in `notes.md`. `design_mockups/` untracked unless asked.
+- **Date:** 2026-08-31
+- **Branch:** `feat/5.3-reader-mode` (local; do not push until asked)
+- **Done:** 5.3.0 Reader Mode — Explain this study, deterministic verifier,
+  14-fixture evaluation corpus. Audit findings 1.1/1.2/1.3/3.1 fixed:
+  verifier version bumped to v2 so pre-rewrite cached verdicts regenerate.
+- **Next:** Audit finding 1.5 (drop the near-inert `entity_retention` check).
+  Audit log in `docs/READER_MODE_AUDIT.md` (untracked).

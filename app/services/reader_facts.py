@@ -14,8 +14,6 @@ import re
 import unicodedata
 from typing import Dict, List, Optional
 
-from app.services.summarize import split_sentences
-
 # Tightened cue lists (vs the plan): bare "not"/"without"/"could"/"limited",
 # "shows that", "demonstrates that", "confirms", "leads to" and bare "will"
 # are deliberately absent — they warn on almost every abstract.
@@ -59,7 +57,7 @@ HEDGE_MARKERS = (
     "might not", "unable to say", "does not mean", "not by itself",
 )
 
-# Copied from PICOExtractor (app/services/embeddings.py) on purpose — see the
+
 # module docstring. Keep in sync by hand; duplicate is intentional.
 POPULATION_KEYWORDS = [
     'patients', 'participants', 'subjects', 'adults', 'children',
@@ -98,7 +96,6 @@ _NUMBER_TOKEN_RE = re.compile(
 )
 
 _P_VALUE_TAIL_RE = re.compile(r"(0?\.\d+)\s*$")
-_CAP_SPAN_RE = re.compile(r"\b[A-Z][A-Za-z0-9-]+(?:\s+[A-Z][A-Za-z0-9-]+)+\b")
 
 
 def normalise(text: str) -> str:
@@ -229,47 +226,6 @@ def count_cues(text: str, kind: str) -> int:
     )
 
 
-def extract_pico_candidates(abstract: str) -> List[str]:
-    """Candidate entities (max 8) for the retention check.
-
-    Per non-empty PICO bucket take the first matching sentence; from those
-    sentences keep capitalised multi-word named spans (leading "The"/"A"
-    stripped). Deduplicated (casefold), cap 8.
-    """
-    sentences = split_sentences(abstract or "")
-    chosen: List[str] = []
-    for keywords in (POPULATION_KEYWORDS, INTERVENTION_KEYWORDS,
-                     COMPARISON_KEYWORDS, OUTCOME_KEYWORDS):
-        for sent in sentences:
-            low = (sent or "").lower()
-            if any(kw in low for kw in keywords):
-                if sent not in chosen:
-                    chosen.append(sent)
-                break
-
-    candidates: List[str] = []
-    seen: set = set()
-    for sent in chosen:
-        for span in _CAP_SPAN_RE.findall(sent):
-            # Drop leading "The"/"A"/… so "The Sleep Education Program" is a
-            # usable name, not junk. Keep multi-word proper spans only.
-            words = span.split()
-            while words and words[0].casefold() in _STOP_STARTERS:
-                words.pop(0)
-            if len(words) < 2:
-                continue
-            cleaned = " ".join(words)
-            if _is_junk_candidate(cleaned):
-                continue
-            key = cleaned.casefold()
-            if key not in seen:
-                seen.add(key)
-                candidates.append(cleaned)
-        if len(candidates) >= 8:
-            break
-    return candidates[:8]
-
-
 # Abbreviated duration units map onto their spelled-out form so "69 min" in an
 # abstract matches "69 minutes" in an explanation.
 _DURATION_UNITS = {
@@ -298,38 +254,3 @@ def has_hedging(text: str) -> bool:
     return any(marker in low for marker in HEDGE_MARKERS)
 
 
-# Structured-abstract headers and sentence-initial fragments are not entities.
-# Before this filter the corpus produced candidates like "MATERIALS AND METHODS",
-# "Between T0" and "The GLM", which no plain-language explanation would repeat,
-# so entity_retention warned on faithful explanations.
-_SECTION_HEADERS = frozenset({
-    "background", "objective", "objectives", "aim", "aims", "purpose",
-    "methods", "method", "materials and methods", "results", "result",
-    "conclusion", "conclusions", "findings", "design", "setting",
-    "participants", "interventions", "intervention", "measurements",
-    "background and objectives", "main outcome measures", "importance",
-})
-_STOP_STARTERS = frozenset({
-    "the", "this", "these", "those", "a", "an", "we", "our", "their", "there",
-    "between", "after", "before", "across", "during", "when", "while", "both",
-    "for", "of", "in", "at", "on", "from", "given", "however", "although",
-})
-
-
-def _is_junk_candidate(span: str) -> bool:
-    """True for section headers, stop-word-led fragments and bare short words."""
-    text = " ".join((span or "").split())
-    if not text:
-        return True
-    low = text.casefold()
-    if low in _SECTION_HEADERS:
-        return True
-    # ALL-CAPS runs are structured-abstract headers, not named entities.
-    if text.isupper() and len(text) > 3:
-        return True
-    words = low.split()
-    if words and words[0] in _STOP_STARTERS:
-        return True
-    if len(words) == 1 and len(low) < 5:
-        return True
-    return False

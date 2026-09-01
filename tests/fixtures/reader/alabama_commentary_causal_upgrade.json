@@ -32,8 +32,7 @@
     "numeric_detail": "pass",
     "study_design": "pass",
     "negation": "pass",
-    "uncertainty_language": "warn",
-    "entity_retention": "skipped"
+    "uncertainty_language": "warn"
   },
   "note": "Degraded: the abstract says 'has been associated with', 'can result in', 'may offer'. This explanation converts those into 'cause' and 'will'. Only uncertainty_language should warn.",
   "seeded_defect": "uncertainty_language",

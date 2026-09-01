@@ -38,8 +38,7 @@
     "numeric_detail": "pass",
     "study_design": "pass",
     "negation": "pass",
-    "uncertainty_language": "pass",
-    "entity_retention": "skipped"
+    "uncertainty_language": "pass"
   },
   "note": "Faithful: keeps N = 50 / N = 73, 26-min, every p-value, 'non-significant', 'did not differ', and names the randomized controlled trial design.",
   "expected_status": "no_automatic_issues"
