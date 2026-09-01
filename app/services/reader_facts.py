@@ -36,7 +36,11 @@ CAUSAL_UPGRADES = (
     "will make",
 )
 
-# Hedging as a plain-language writer actually produces it. Used ONLY on the
+# Hedging as a plain-language writer actually produces it. Precision qualifiers
+# ("about", "roughly", "on average", "estimated") are deliberately NOT here: they
+# describe a number's exactness, not confidence in a claim, and including them
+# meant any explanation quoting "about 43 minutes" satisfied the hedge-loss rule
+# while flatly asserting a causal claim (audit 1.3). Used ONLY on the
 # generated side of the uncertainty "loss" test: the narrow UNCERTAINTY_CUES
 # list above is for spotting caution in the source, and requiring the same
 # vocabulary back out warned on well-hedged explanations that simply chose
@@ -44,9 +48,13 @@ CAUSAL_UPGRADES = (
 HEDGE_MARKERS = (
     "cannot establish", "cannot show", "does not prove", "do not prove",
     "does not show", "did not find", "not prove", "no clear", "not clear",
-    "tended to", "tend to", "seems", "seemed", "roughly", "about",
-    "estimate", "estimated", "not enough", "cannot tell", "cannot say",
-    "rather than proof", "not proof", "only shows", "on average",
+    "tended to", "tend to", "seems", "seemed",
+    "not enough", "cannot tell", "cannot say",
+    # Real epistemic hedges a plain-language writer reaches for. UNCERTAINTY_CUES
+    # only knows "further research"/"further study"; a writer is as likely to say
+    # "more research is needed".
+    "more research", "more study", "further work", "not certain", "hard to say",
+    "rather than proof", "not proof", "only shows",
     "non-significant", "not significant", "smaller effect", "may not",
     "might not", "unable to say", "does not mean", "not by itself",
 )

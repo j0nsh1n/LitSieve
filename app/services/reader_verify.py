@@ -21,7 +21,11 @@ from app.services import reader_facts
 from app.services.study_type import classify_study_type
 from app.services.summarize import parse_structured_abstract, split_sentences
 
-CURRENT_VERIFIER_VERSION = "v1"
+# Bump whenever check behaviour changes. Stale rows are served as current
+# otherwise: v1 verdicts came from rules that warned on 8/8 faithful
+# explanations, and a cached "Some details may need checking" chip would
+# outlive the rules that produced it (audit 3.1).
+CURRENT_VERIFIER_VERSION = "v2"
 
 STATUS_NO_ISSUES = "no_automatic_issues"
 STATUS_NEEDS_REVIEW = "needs_review"
@@ -47,6 +51,17 @@ FINDINGS_FIELDS = ("what_was_found", "plain_summary")
 # itself contains "cannot establish"). Counting it as hedging made the
 # uncertainty-loss rule vacuous — every explanation looked hedged because the app
 # had hedged for it.
+# Sections where the model makes claims about the paper. what_it_does_not_show is
+# excluded from both the hedge and negation scans: the app injects its fallback
+# there, and even model-authored boundary text is negative and hedged by
+# definition, so counting it made both rules satisfiable for free.
+CLAIM_FIELDS = (
+    "plain_summary",
+    "question_asked",
+    "who_was_studied",
+    "what_was_found",
+    "stated_limitations",
+)
 HEDGE_SCAN_FIELDS = (
     "plain_summary",
     "question_asked",
@@ -68,6 +83,8 @@ CAPPED_REQUIRED_KINDS = ("p_value", "ci")
 # subgroup and publication-bias diagnostics; demanding even two of them warned on
 # explanations that correctly reported the headline and dropped the diagnostics.
 CAPPED_REQUIRED_MAX = 1
+# Quantities required from the conclusion sentence(s).
+HEADLINE_MAX = 4
 SALIENT_MAX = 3
 
 CHECK_ORDER = (
@@ -89,6 +106,22 @@ def _field(generated: Dict, name: str) -> str:
 
 def _prose(generated: Dict, fields: tuple) -> str:
     return " ".join(_field(generated, name) for name in fields).strip()
+
+
+def _headline_text(abstract: str) -> str:
+    """The abstract's conclusion only — where the paper states its headline.
+
+    Separate from _conclusion_text (findings + conclusion) because salience by
+    document order picked diagnostic statistics out of the results section and
+    let the actual effect size be dropped without a warning (audit 1.1).
+    """
+    sections = parse_structured_abstract(abstract or "")
+    if sections and (sections.get("conclusion") or "").strip():
+        return sections["conclusion"]
+    sentences = split_sentences(abstract or "")
+    if sentences:
+        return " ".join(sentences[-2:])
+    return abstract or ""
 
 
 def _conclusion_text(abstract: str) -> str:
@@ -147,10 +180,24 @@ def _check_numeric_detail(ctx: Dict) -> Dict:
     src_tokens = reader_facts.extract_numbers(abstract)
 
     required = [t for t in src_tokens if t["kind"] in ALWAYS_REQUIRED_KINDS]
-    # p-values and CIs are drawn from the findings/conclusion, not the whole
-    # abstract: taking the first few in document order demanded heterogeneity and
-    # publication-bias diagnostics that no plain-language explanation reports.
     conclusion_tokens = reader_facts.extract_numbers(ctx["conclusion_text"])
+    # Every quantity the conclusion states is required, including bare numbers
+    # ("fell by 2.3 points"), which no required set covered before. A conclusion
+    # carries one or two figures, so this is a short list — unlike the results
+    # section, which is why the pool is the conclusion and not findings.
+    # bare_number and year are excluded on purpose. A conclusion's bare digits are
+    # as often a trial-registration id or a URL fragment as an effect size — the
+    # caffeine fixture's conclusion carries "58864" from a registration link — and
+    # _same_measure cannot match a unitless token anyway, so requiring them would
+    # warn unconditionally. Consequence, stated rather than hidden: a headline
+    # expressed as a bare number ("fell by 2.3 points") is still not required.
+    headline_tokens = [
+        t
+        for t in reader_facts.extract_numbers(ctx["headline_text"])
+        if t["kind"] not in ("bare_number", "year")
+        and not (t["kind"] == "percent" and t["value"] in (90.0, 95.0, 99.0))
+    ][:HEADLINE_MAX]
+    required += headline_tokens
     for kind in CAPPED_REQUIRED_KINDS:
         required += [t for t in conclusion_tokens if t["kind"] == kind][:CAPPED_REQUIRED_MAX]
     salient = [
@@ -273,7 +320,7 @@ def _check_negation(ctx: Dict) -> Dict:
     # the conclusion missed "did not differ" and "non-significant" sitting in the
     # results of an unstructured abstract, so a lossy explanation passed.
     src_cues = reader_facts.extract_cues(ctx["source_abstract"])["negation"]
-    gen_cues = reader_facts.extract_cues(ctx["prose"])["negation"]
+    gen_cues = reader_facts.extract_cues(ctx["claim_prose"])["negation"]
     details = {"source_cues": src_cues, "generated_cues": gen_cues}
     if not src_cues:
         return _check_outcome(
@@ -282,7 +329,11 @@ def _check_negation(ctx: Dict) -> Dict:
             "No negative findings wording in the abstract's conclusion.",
             details,
         )
-    if reader_facts.count_cues(ctx["prose"], "negation") == 0:
+    # Not ctx["prose"]: that includes what_it_does_not_show, which is a boundary
+    # statement and therefore always phrased negatively ("does not show ..."), so
+    # any explanation satisfied this rule for free while silently dropping the
+    # abstract's actual negative finding (audit 1.2).
+    if reader_facts.count_cues(ctx["claim_prose"], "negation") == 0:
         return _check_outcome(
             "negation",
             "warn",
@@ -462,7 +513,9 @@ def _context(source_abstract: str, title: str, generated: Dict) -> Dict:
         "title": title or "",
         "prose": prose,
         "readability_prose": prose,
+        "headline_text": _headline_text(source_abstract or ""),
         "hedge_prose": _prose(generated, HEDGE_SCAN_FIELDS),
+        "claim_prose": _prose(generated, CLAIM_FIELDS),
         "findings_text": _prose(generated, FINDINGS_FIELDS),
         "conclusion_text": _conclusion_text(source_abstract or ""),
     }

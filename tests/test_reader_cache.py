@@ -132,7 +132,12 @@ def test_verifier_version_bump_invalidates(tmp_path, monkeypatch):
     db = _db(tmp_path)
     try:
         reader_mode.explain_article(db, PAPER, "general_reader")
-        monkeypatch.setattr(reader_mode, "CURRENT_VERIFIER_VERSION", "v2")
+        # Derive the "next" version instead of hardcoding one: this test asserted
+        # a bump to "v2" and silently stopped testing anything the day the real
+        # constant reached v2.
+        bumped = reader_mode.CURRENT_VERIFIER_VERSION + "-next"
+        assert bumped != reader_mode.CURRENT_VERIFIER_VERSION
+        monkeypatch.setattr(reader_mode, "CURRENT_VERIFIER_VERSION", bumped)
         reader_mode.explain_article(db, PAPER, "general_reader")
         assert calls["n"] == 2
     finally:

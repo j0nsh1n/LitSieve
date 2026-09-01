@@ -1,0 +1,47 @@
+{
+  "id": "dsst_meta_hedge_lost_precision_only",
+  "provenance": {
+    "source": "pubmed",
+    "pmid": "42449039",
+    "title": "Delayed school start times to improve sleep duration and mitigate depression in adolescents: a systematic review and meta-analysis.",
+    "journal": "Journal of clinical sleep medicine : JCSM : official publication of the American Academy of Sleep Medicine",
+    "year": "2026",
+    "note": "Title/abstract fetched from the NCBI E-utilities public API."
+  },
+  "audience": "general_reader",
+  "variant": "degraded",
+  "abstract": "BACKGROUND AND OBJECTIVES: Delayed school start time (DSST) has been associated with prolonged sleep duration and reduced depressive symptoms. However, the overall magnitude of these effects remains unclear. We therefore conducted a systematic review and meta-analysis to assess the impact of DSST on sleep duration and depressive symptoms among middle and high school students. METHODS: We systematically searched Medline, Google Scholar, and Science Direct for studies examining the relationship between DSST and both sleep duration and depression. Four independent reviewers conducted risk-of-bias and quality assessments for each study. For quantitative synthesis, we calculated the standardized mean difference (SMD) using Hedges's g to evaluate changes in sleep duration and depression. RESULTS: A total of six studies were included in the final meta-analysis. The pooled analysis indicated that DSST was associated with an average increase in sleep duration of 69 min, with an SMD of 0.63, suggesting a moderate effect size. In contrast, analysis of depressive symptoms, based on five studies, produced a pooled SMD of - 0.20, indicating a smaller effect. Both analyses demonstrated high inter-study heterogeneity. CONCLUSIONS: Our findings suggest that DSST is associated with a moderate improvement in sleep duration among middle and high school students, with minimal evidence of publication bias and small-studies effect, while depressive symptoms showed a small reduction. Further research with larger sample sizes and standardized outcome measures is warranted to clarify these associations.",
+  "generated": {
+    "plain_summary": "Researchers pooled six studies of delayed school start time (DSST) in middle and high school students. A later start gave an average increase in sleep duration of 69 min, with a standardized mean difference (SMD) of 0.63. Depressive symptoms, across five studies, gave a pooled SMD of - 0.20.",
+    "question_asked": "Does delaying school start time change how long middle and high school students sleep, and does it change depressive symptoms?",
+    "who_was_studied": "Middle and high school students across the six pooled studies; depression across five.",
+    "what_was_found": "A later start gave an average increase of 69 min in sleep duration (SMD 0.63, a moderate effect). Depressive symptoms gave a pooled SMD of - 0.20. Both analyses showed high inter-study heterogeneity. On average that is roughly an hour more sleep a night.",
+    "what_it_does_not_show": "The abstract alone cannot establish whether these findings apply to everyone.",
+    "stated_limitations": "Both analyses showed high inter-study heterogeneity.",
+    "glossary": [
+      {
+        "term": "meta-analysis",
+        "definition": "A study that combines the results of several earlier studies to get a single overall estimate."
+      },
+      {
+        "term": "standardized mean difference (SMD)",
+        "definition": "A way of expressing how big a difference is, so results measured on different scales can be compared."
+      },
+      {
+        "term": "heterogeneity",
+        "definition": "How much the individual studies disagreed with each other."
+      }
+    ],
+    "not_reported_fields": []
+  },
+  "expected": {
+    "numeric_detail": "pass",
+    "study_design": "pass",
+    "negation": "pass",
+    "uncertainty_language": "warn",
+    "entity_retention": "skipped"
+  },
+  "note": "Pins audit 1.3. The abstract's conclusion hedges ('suggest', 'associated with', 'further research'); this explanation states flat results instead. The only hedge-ish words left are precision qualifiers ('on average', 'roughly'), which describe a number's exactness rather than confidence in a claim, and which used to satisfy has_hedging. No causal-upgrade word is used, so this isolates the 'lost' half of the rule. Only uncertainty_language may warn.",
+  "expected_status": "needs_review",
+  "seeded_defect": "uncertainty_language"
+}
