@@ -4,6 +4,13 @@
 verifier, generation, API and UI landed. Locked decisions below override the
 original “must be decided” section.
 
+**Changed after implementation (2026-08-31)**
+- `entity_retention` was removed from the verifier. Audit finding 1.5: it skipped
+  on 10/12 corpus abstracts and could only fire in a scenario the
+  `(article_id, source, audience)` key plus `abstract_hash` already prevents.
+  Sections below that list six checks describe the original plan, not the
+  shipped code, which has five. See `docs/READER_MODE_AUDIT.md`.
+
 **Locked before implementation**
 - Rate limit: `@limiter.limit("6/minute")` on POST, per signed-in user. No daily cap.
 - Do not preserve explanations across replace-fetch.

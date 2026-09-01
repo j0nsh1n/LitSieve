@@ -26,7 +26,7 @@ async def health():
         _core.purge_expired_guests()
     except Exception:
         logger.exception("purge_expired_guests from /health failed")
-    return {"status": "healthy", "version": "5.3.0"}
+    return {"status": "healthy", "version": "5.3.1"}
 
 
 # Browsers and crawlers request these at the site root, where the /static mount

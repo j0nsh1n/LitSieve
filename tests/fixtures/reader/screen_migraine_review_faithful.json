@@ -38,8 +38,7 @@
     "numeric_detail": "pass",
     "study_design": "pass",
     "negation": "pass",
-    "uncertainty_language": "pass",
-    "entity_retention": "skipped"
+    "uncertainty_language": "pass"
   },
   "note": "Faithful: keeps 22 studies, N = 14,763, N = 11,218, pooled OR 1.60 with its 95% CI and p-value, I2 = 60%, and the two dissenting no-difference studies.",
   "expected_status": "no_automatic_issues"

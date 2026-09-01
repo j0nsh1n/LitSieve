@@ -100,27 +100,3 @@ def test_causal_upgrades_match():
     assert set(cues["causal"]) == {"proves", "causes"}
 
 
-def test_extract_pico_candidates_prefers_first_sentence_per_bucket():
-    abstract = (
-        "Patients were recruited first. Participants arrived later. "
-        "The Sleep Education Program ran weekly. A second programme came later. "
-        "Outcomes improved versus usual care."
-    )
-    cands = facts.extract_pico_candidates(abstract)
-    joined = " ".join(cands).lower()
-    # first matching sentence per bucket contributes; later matches do not.
-    # Generic single nouns ("patients") are not candidates — only named spans.
-    assert "sleep education program" in joined
-    # the second population / programme sentences must not add entities
-    assert "arrived" not in joined
-    assert "second" not in joined
-
-
-def test_extract_pico_candidates_cap_at_8():
-    names = ", ".join(f"Product {chr(65 + i)}x" for i in range(10))
-    abstract = f"Patients received {names} in the treatment arm and improved."
-    assert len(facts.extract_pico_candidates(abstract)) == 8
-
-
-def test_extract_pico_candidates_empty():
-    assert facts.extract_pico_candidates("The study looked at sleep.") == []

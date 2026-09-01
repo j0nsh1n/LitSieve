@@ -32,8 +32,7 @@
     "numeric_detail": "pass",
     "study_design": "warn",
     "negation": "pass",
-    "uncertainty_language": "pass",
-    "entity_retention": "pass"
+    "uncertainty_language": "pass"
   },
   "note": "Degraded pair for gamers_cross_sectional_faithful: results, numbers and null findings are all preserved; the only thing removed is any statement of the study design. A cross-sectional study cannot show direction, so a reader who is not told the design is missing the main caveat. Only study_design should warn.",
   "seeded_defect": "study_design",

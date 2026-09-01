@@ -1,5 +1,5 @@
 """
-FastAPI Application — LitSieve v5.3.0
+FastAPI Application — LitSieve v5.3.1
 Multi-user web interface for literature search and analysis.
 
 This module only wires the app together: configuration, static files, the
@@ -59,7 +59,7 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(
     title="LitSieve",
-    version="5.3.0",
+    version="5.3.1",
     lifespan=lifespan,
 )
 app.state.limiter = core.limiter

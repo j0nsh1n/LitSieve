@@ -76,7 +76,7 @@ a substitute for school library databases.
 - **Explain this study** sits in the shared AI row on Search and Clean up cards
   (`renderKeyPointsHtml`). The panel does not replace the abstract. Hidden when
   the abstract is under 40 characters.
-- Health: `GET /health` → `{"status":"healthy","version":"5.3.0"}` (version as of
+- Health: `GET /health` → `{"status":"healthy","version":"5.3.1"}` (version as of
   this writing; bump when releasing)
 
 ## Architecture

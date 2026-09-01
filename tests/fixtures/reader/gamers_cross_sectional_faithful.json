@@ -34,8 +34,7 @@
     "numeric_detail": "pass",
     "study_design": "pass",
     "negation": "pass",
-    "uncertainty_language": "pass",
-    "entity_retention": "pass"
+    "uncertainty_language": "pass"
   },
   "note": "Faithful pair for gamers_design_omitted: names the cross-sectional design, keeps 200 / 13-21 / n = 122 / n = 78 / 5 hours per week, the leading p-values, and the two null results (IQ, visual acuity).",
   "expected_status": "no_automatic_issues"

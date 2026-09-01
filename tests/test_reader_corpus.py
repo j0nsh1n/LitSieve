@@ -52,11 +52,17 @@ def test_corpus_is_big_enough_and_balanced():
     faithful = [d for d in CORPUS if d["variant"] == "faithful"]
     degraded = [d for d in CORPUS if d["variant"] == "degraded"]
     assert len(faithful) >= 8
-    assert len(degraded) >= 4
+    assert len(degraded) >= 6
     # Every degraded fixture names the single check it is meant to trip, and
     # every one of those checks is covered by at least one fixture.
     seeded = {d["seeded_defect"] for d in degraded}
     assert seeded == {"numeric_detail", "negation", "uncertainty_language", "study_design"}
+    # Two of the degraded fixtures pin audit findings 1.2 and 1.3 specifically:
+    # a negation loss masked by the model's own boundary sentence, and a hedge
+    # loss where only precision qualifiers remain. Both passed before the fix.
+    ids = {d["id"] for d in degraded}
+    assert "sst_rct_negation_masked_by_boundary" in ids
+    assert "dsst_meta_hedge_lost_precision_only" in ids
 
 
 @pytest.mark.parametrize("doc", CORPUS, ids=IDS)

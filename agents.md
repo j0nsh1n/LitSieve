@@ -7,6 +7,15 @@
 - State assumptions explicitly. If a requirement is ambiguous, ask one focused question — do not guess silently.
 - Report what you changed, why, and what you did NOT touch.
 
+## Writing Style
+- Write in plain English. No grug speak, no caveman dialect, no filler jargon.
+- Keep real technical names, APIs, and safety terms only when they are the
+  actual thing (example: FastAPI, Pydantic, non-diagnostic, git first).
+- Comments: English, why-only, never restating the code.
+- Be brief and specific. Smallest correct change. No extra files, abstractions,
+  or praise.
+- Reviews: evidence, file paths, and failing cases — not vibes.
+
 ## Language Baseline
 - Python projects use Python 3.14 unless spec.md says otherwise. Never
   downgrade below the version pinned in spec.md or the repo's existing config.
