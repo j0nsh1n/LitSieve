@@ -1,7 +1,7 @@
 # context.md — LitSieve
 
 ## Current State
-- App version **5.3.0** (`app/main.py`, `GET /health`). Product name **LitSieve**.
+- App version **5.3.1** (`app/main.py`, `GET /health`). Product name **LitSieve**.
 - Example public deployment pattern: HTTPS at the edge (e.g. Cloudflare Tunnel)
   → `uvicorn` HTTP on `127.0.0.1:7860` only. Operator sets `PUBLIC_BASE_URL` and
   `DEBUG=false` with a real `SECRET_KEY` in gitignored `.env`.
@@ -112,9 +112,10 @@ Guest User (is_guest) → sample corpus only; purged by age
 
 ## Session Handoff
 - **Date:** 2026-08-31
-- **Branch:** `feat/5.3-reader-mode` (local; do not push until asked)
-- **Done:** 5.3.0 Reader Mode — Explain this study, deterministic verifier,
-  14-fixture evaluation corpus. Audit findings 1.1/1.2/1.3/3.1 fixed:
-  verifier version bumped to v2 so pre-rewrite cached verdicts regenerate.
-- **Next:** Audit finding 1.5 (drop the near-inert `entity_retention` check).
-  Audit log in `docs/READER_MODE_AUDIT.md` (untracked).
+- **Branch:** `feat/5.3-reader-mode` (PR open for 5.3.1)
+- **Done:** 5.3.0 shipped Reader Mode (Explain this study, deterministic
+  verifier, evaluation corpus). 5.3.1 fixes what the independent audit found:
+  three checks that could not fail, and a verifier version stamp that was never
+  bumped, so cached verdicts outlived the rules behind them. Entity-retention
+  check dropped as near-inert.
+- **Next:** 5.3.1 PR open. Audit log in `docs/READER_MODE_AUDIT.md` (untracked).

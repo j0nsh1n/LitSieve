@@ -8,6 +8,30 @@ and this project aims to follow Semantic Versioning for app version strings
 
 ## [Unreleased]
 
+## [5.3.1] - 2026-08-31
+
+### Fixed
+- **Reader Mode verification could not fail on three of its checks.** Found by an
+  independent audit of 5.3.0 (`docs/READER_MODE_AUDIT.md`):
+  - Cached explanations kept showing verdicts from an older, noisier verifier.
+    The version stamp that exists to invalidate them was never bumped, so a
+    warning a student saw could outlive the rule that produced it. Explanations
+    regenerate the next time they are opened.
+  - The negation check read the explanation's "What this study does not show"
+    section, which is always phrased negatively, so it counted as preserved
+    negation for free while the abstract's actual negative finding went missing.
+  - The hedging check treated "about", "roughly" and "on average" as caution.
+    Those describe how exact a number is, not how confident a claim is, so an
+    explanation could assert a flat causal claim and still pass.
+  - The number check took whichever figures came first, which are usually
+    statistical diagnostics, so a study's headline result could be dropped
+    without a warning. Figures stated in an abstract's conclusion are now required.
+
+### Changed
+- Dropped the entity-retention check. It skipped on 10 of 12 test abstracts and
+  could only trigger in a case the storage keys already prevent, so it took a row
+  in the verification report without ever saying anything useful.
+
 ## [5.3.0] - 2026-08-29
 
 ### Added
