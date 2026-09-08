@@ -155,6 +155,9 @@ docker build -t litsieve .
 docker run -p 7860:7860 -e SECRET_KEY="$(python -c 'import secrets;print(secrets.token_urlsafe(48))')" litsieve
 ```
 
+The image copies only runtime code and assets. Supply credentials through
+runtime environment variables, an env file, or the platform secret store.
+
 ### Production / host deploy
 
 See **[docs/DEPLOY.md](docs/DEPLOY.md)** for the full operator checklist:

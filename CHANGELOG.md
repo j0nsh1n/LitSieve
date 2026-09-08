@@ -17,6 +17,7 @@ and this project aims to follow Semantic Versioning for app version strings
   library, mode, and account sit in a drawer so they do not eat the page.
 
 ### Fixed
+<<<<<<< HEAD
 - A running fetch or prepare is no longer dropped from tracking when other
   accounts fill the in-memory progress cache, so a second copy of the same job
   cannot start while the first is still working.
@@ -27,6 +28,14 @@ and this project aims to follow Semantic Versioning for app version strings
   ladder (previously up to ~2.6 minutes per unreachable source). Retries
   and backoff abort as soon as the job is cancelled; an in-flight socket
   wait of up to ~30 seconds may still finish before the cancel lands.
+=======
+- Only listed administrators can change server-wide AI settings or call the
+  direct Ollama start and stop routes. Web changes now default to disabled.
+- Password reset codes now belong to an immutable account ID and are deleted
+  with the account, so an old code cannot reset a new account with the same login.
+- Docker builds now use an explicit runtime-file allowlist and a default-deny
+  build context so local environment files, credentials, and databases cannot
+  enter new image layers.
 
 ## [5.3.1] - 2026-08-31
 

@@ -15,11 +15,15 @@ RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/wh
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
+# Copy only runtime code and assets. tools/operator is invoked by path from
+# app/operator/runner.py; other host tools do not belong in the image.
 # NOTE: SECRET_KEY must be provided at runtime (e.g. `docker run -e SECRET_KEY=...`
 # or via the platform's secret store). The app refuses to start without it unless
 # DEBUG=true is set. See .env.example.
-COPY . .
+COPY app/ ./app/
+COPY templates/ ./templates/
+COPY static/ ./static/
+COPY tools/operator/ ./tools/operator/
 
 # Writable data dir for SQLite / ai_settings (volume-mounted in many hosts).
 RUN mkdir -p /code/user_data && chown -R appuser:appuser /code

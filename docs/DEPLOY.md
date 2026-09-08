@@ -31,6 +31,9 @@ docker run -p 7860:7860 \
 curl -sS http://127.0.0.1:7860/health
 ```
 
+The image copies only runtime code and assets. Supply credentials through
+runtime environment variables, an env file, or the platform secret store.
+
 **Render** — `render.yaml` sets `PYTHON_VERSION=3.14`, generates `SECRET_KEY`,
 starts uvicorn on `$PORT`, health check `/health`. Add other env vars in the
 dashboard (SMTP, `PUBLIC_BASE_URL`, quota, etc.).
