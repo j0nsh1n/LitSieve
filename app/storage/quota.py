@@ -156,6 +156,16 @@ def check_quota(user_id: str) -> None:
         raise QuotaExceeded(used, cap)
 
 
+def would_increase_stored_text(old: str, new: Optional[str]) -> bool:
+    """True when replacing ``old`` with ``new`` stores more UTF-8 bytes.
+
+    ``None`` means the field is unchanged (star-only note updates).
+    """
+    if new is None:
+        return False
+    return len(new.encode("utf-8")) > len((old or "").encode("utf-8"))
+
+
 def library_file_bytes(db_path: str) -> int:
     """On-disk size of a library SQLite file plus WAL/SHM sidecars."""
     path = Path(db_path)

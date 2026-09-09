@@ -111,11 +111,9 @@ Guest User (is_guest) → sample corpus only; purged by age
 - Host entry: `app.main:app` port 7860; Linux `./venv`
 
 ## Session Handoff
-- **Date:** 2026-08-31
-- **Branch:** `feat/5.3-reader-mode` (PR open for 5.3.1)
-- **Done:** 5.3.0 shipped Reader Mode (Explain this study, deterministic
-  verifier, evaluation corpus). 5.3.1 fixes what the independent audit found:
-  three checks that could not fail, and a verifier version stamp that was never
-  bumped, so cached verdicts outlived the rules behind them. Entity-retention
-  check dropped as near-inert.
-- **Next:** 5.3.1 PR open. Audit log in `docs/READER_MODE_AUDIT.md` (untracked).
+- **Date:** 2026-09-09
+- **Branch:** `fix/a07-note-quota`
+- **Done:** A07 — notes have an 8,000-character bound; growing a note while
+  over the storage cap returns 507. Library-code join and AI key-point save
+  use the same growth gate. Tests in `tests/test_quota.py`.
+- **Next:** A08 (stale tabs write into a different library).

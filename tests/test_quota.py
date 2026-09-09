@@ -254,3 +254,85 @@ def test_fetch_finish_status_distinguishes_quota_from_cancel():
     status, cancelled = quota.fetch_finish_status(cancelled=False, hit_quota=False)
     assert status == "success"
     assert cancelled is False
+
+
+def test_would_increase_stored_text():
+    assert quota.would_increase_stored_text("", "a") is True
+    assert quota.would_increase_stored_text("aa", "a") is False
+    assert quota.would_increase_stored_text("a", "a") is False
+    assert quota.would_increase_stored_text("a", None) is False
+    assert quota.would_increase_stored_text("é", "e") is False  # 2 bytes -> 1
+
+
+def _first_article(username: str):
+    uid = core.user_db.get_by_username(username)["id"]
+    p = core.get_pipeline(uid)
+    try:
+        arts = p.db.get_all_articles()
+        assert arts
+        return arts[0]
+    finally:
+        core.release_pipeline(uid)
+
+
+def test_note_growth_blocked_when_over_quota(app_module, monkeypatch):
+    """The reproduced hole: a megabyte-scale note stored after the cap was hit."""
+    from app.schemas import NOTE_MAX_CHARS
+
+    c = TestClient(app_module.app)
+    headers = _register(c, "notequota")
+    r = c.post("/api/load-sample-corpus", json={"clear_first": True}, headers=headers)
+    assert r.status_code == 200, r.text
+    art = _first_article("notequota")
+    key = {"article_id": art["article_id"], "source": art["source"]}
+
+    r = c.post("/api/notes", json={**key, "note": "keep"}, headers=headers)
+    assert r.status_code == 200, r.text
+
+    monkeypatch.setattr(quota, "usage_bytes", lambda uid: 10**9)
+    monkeypatch.setenv(quota.ENV_KEY, "1")
+
+    r = c.post("/api/notes", json={**key, "note": "keep plus more"}, headers=headers)
+    assert r.status_code == 507, r.text
+    assert "storage limit" in r.json()["detail"].lower()
+    got = c.get("/api/notes", params=key, headers=headers).json()
+    assert got["note"] == "keep"
+
+    r = c.post("/api/notes", json={**key, "note": "k"}, headers=headers)
+    assert r.status_code == 200, r.text
+    got = c.get("/api/notes", params=key, headers=headers).json()
+    assert got["note"] == "k"
+
+    r = c.post("/api/notes", json={**key, "note": ""}, headers=headers)
+    assert r.status_code == 200, r.text
+
+    r = c.post("/api/notes", json={**key, "starred": True}, headers=headers)
+    assert r.status_code == 200, r.text
+
+    r = c.post("/api/notes", json={**key, "note": "x" * (NOTE_MAX_CHARS + 1)}, headers=headers)
+    assert r.status_code == 422, r.text
+
+
+def test_share_join_and_ai_keypoints_gated_when_over_quota(app_module, monkeypatch):
+    c = TestClient(app_module.app)
+    headers = _register(c, "growthgate")
+    r = c.post("/api/load-sample-corpus", json={"clear_first": True}, headers=headers)
+    assert r.status_code == 200, r.text
+    art = _first_article("growthgate")
+
+    monkeypatch.setattr(quota, "usage_bytes", lambda uid: 10**9)
+    monkeypatch.setenv(quota.ENV_KEY, "1")
+
+    r = c.post("/api/shares/join", json={"code": "ABCD-EFGH"}, headers=headers)
+    assert r.status_code == 507, r.text
+
+    r = c.post(
+        "/api/ai/key-points",
+        json={
+            "article_id": art["article_id"],
+            "source": art["source"],
+            "key_points": ["one finding"],
+        },
+        headers=headers,
+    )
+    assert r.status_code == 507, r.text

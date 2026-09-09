@@ -18,6 +18,7 @@ from app.schemas import (
     ShareCreateRequest,
     ShareJoinRequest,
 )
+from app.storage import quota
 from app.storage import shares as shares_mod
 from app.storage.libraries import (
     ensure_libraries,
@@ -154,11 +155,19 @@ async def api_join_share(req: ShareJoinRequest, request: Request):
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
     if csrf_failed(request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    uid = user["user_id"]
+    try:
+        quota.check_quota(uid)
+    except quota.QuotaExceeded as e:
+        return JSONResponse(
+            status_code=507,
+            content={"detail": str(e), "quota": quota.usage_report(uid)},
+        )
     try:
         result = await run_in_thread(
             shares_mod.join_share,
             core.user_db,
-            user["user_id"],
+            uid,
             user["username"],
             req.code,
         )
