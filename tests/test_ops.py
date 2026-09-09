@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -44,6 +45,10 @@ def _ops_env(tmp_path, monkeypatch):
     monkeypatch.setenv("LITSIEVE_LIVE", str(repo))
     monkeypatch.setenv("LITSIEVE_STAGING", str(staging))
     monkeypatch.setenv("LITSIEVE_SKIP_RESTART", "1")
+    # These tests assert on the deploy's own verdict, so they need the blocking
+    # path. The detached path is covered separately below; leaving it on here
+    # would only ever assert that a dispatch receipt came back.
+    monkeypatch.setenv("LITSIEVE_DEPLOY_DETACHED", "0")
     monkeypatch.setenv("LITSIEVE_HEALTH_MODE", "file")
     monkeypatch.setenv("LITSIEVE_HEALTH_FILE", str(health))
     return repo, staging, health
@@ -609,3 +614,125 @@ def test_deploy_state_write_is_atomic_and_survives_corruption(tmp_path, monkeypa
     deploy_state.begin(sha="e" * 40, previous_sha="f" * 40)
     assert deploy_state.read()["previous_sha"] == "f" * 40
     assert not list(path.parent.glob(".deploy-state-*.tmp")), "temp file left behind"
+
+
+# --- A04: the detached path, which is what production actually runs ----------
+# _ops_env pins LITSIEVE_DEPLOY_DETACHED=0 so the older tests can assert on a
+# deploy verdict. These drive the path that runs when systemd-run exists.
+
+
+def _fake_systemd_run(tmp_path, monkeypatch, *, rc=0):
+    """Put a recording stub named systemd-run at the front of PATH."""
+    bindir = tmp_path / "fakebin"
+    bindir.mkdir(exist_ok=True)
+    log = tmp_path / "systemd-run.log"
+    stub = bindir / "systemd-run"
+    stub.write_text(
+        "#!/bin/sh\n"
+        f'printf "%s\\n" "$@" >> "{log}"\n'
+        f"exit {rc}\n",
+        encoding="utf-8",
+    )
+    stub.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{bindir}:{os.environ.get('PATH', '')}")
+    return log
+
+
+def test_deploy_dispatches_into_its_own_unit_and_returns_immediately(tmp_path, monkeypatch):
+    """A04: the request must not wait for a deploy that will kill the server.
+
+    The restart inside the deploy tears down this worker's control group, so a
+    synchronous response could never arrive. Assert the handoff, and assert the
+    unit is transient and carries the actor.
+    """
+    client, _db = _ops_client(tmp_path, monkeypatch)
+    monkeypatch.delenv("LITSIEVE_DEPLOY_DETACHED", raising=False)
+    log = _fake_systemd_run(tmp_path, monkeypatch)
+    _reauth(client)
+
+    save = client.post(
+        "/api/ops/file",
+        json={"path": "app/ok.py", "content": "VALUE = 3\n"},
+        headers=_csrf(client),
+    )
+    assert save.status_code == 200, save.text
+    assert client.post("/api/ops/validate", json={}, headers=_csrf(client)).status_code == 200
+    commit = client.post(
+        "/api/ops/commit", json={"message": "bump"}, headers=_csrf(client)
+    )
+    assert commit.status_code == 200, commit.text
+    sha = commit.json()["sha"]
+
+    resp = client.post(
+        "/api/ops/deploy",
+        json={"confirm": "DEPLOY", "sha": sha},
+        headers=_csrf(client),
+    )
+    assert resp.status_code == 202, resp.text
+    body = resp.json()
+    assert body.get("dispatched") is True
+    assert body.get("unit", "").startswith("litsieve-deploy-")
+
+    args = log.read_text(encoding="utf-8")
+    assert "--user" in args
+    assert "--collect" in args, "unit must be transient, or a failed deploy blocks the next one"
+    assert "LITSIEVE_DEPLOY_ACTOR=opadmin" in args, "deploy cannot write its audit row without the actor"
+    # The handoff must not carry the coupling that caused A04 in the first place.
+    assert "litsieve-uvicorn.service" not in args
+
+
+def test_deploy_refuses_to_start_on_top_of_an_interrupted_one(tmp_path, monkeypatch):
+    """A stuck record means the live checkout is at an unknown revision."""
+    from app.operator import deploy_state
+
+    client, _db = _ops_client(tmp_path, monkeypatch)
+    monkeypatch.delenv("LITSIEVE_DEPLOY_DETACHED", raising=False)
+    monkeypatch.setenv("LITSIEVE_DEPLOY_STATE", str(tmp_path / "deploy-state.json"))
+    _fake_systemd_run(tmp_path, monkeypatch)
+    _reauth(client)
+
+    save = client.post(
+        "/api/ops/file",
+        json={"path": "app/ok.py", "content": "VALUE = 4\n"},
+        headers=_csrf(client),
+    )
+    assert save.status_code == 200
+    assert client.post("/api/ops/validate", json={}, headers=_csrf(client)).status_code == 200
+    commit = client.post(
+        "/api/ops/commit", json={"message": "bump again"}, headers=_csrf(client)
+    )
+    assert commit.status_code == 200
+
+    deploy_state.begin(sha="f" * 40, previous_sha="e" * 40, actor_username="opadmin")
+    deploy_state.write(phase=deploy_state.PHASE_RESTARTING)
+
+    resp = client.post(
+        "/api/ops/deploy",
+        json={"confirm": "DEPLOY", "sha": commit.json()["sha"]},
+        headers=_csrf(client),
+    )
+    assert resp.status_code == 409, resp.text
+    assert "in flight" in resp.json().get("detail", "")
+
+
+def test_deploy_state_endpoint_reports_progress_and_requires_operator(tmp_path, monkeypatch):
+    from app.operator import deploy_state
+
+    client, _db = _ops_client(tmp_path, monkeypatch)
+    monkeypatch.setenv("LITSIEVE_DEPLOY_STATE", str(tmp_path / "deploy-state.json"))
+
+    idle = client.get("/api/ops/deploy-state")
+    assert idle.status_code == 200, idle.text
+    assert idle.json()["in_flight"] is False
+
+    deploy_state.begin(sha="a" * 40, previous_sha="b" * 40, actor_username="opadmin")
+    deploy_state.write(phase=deploy_state.PHASE_HEALTH)
+    busy = client.get("/api/ops/deploy-state").json()
+    assert busy["in_flight"] is True
+    assert busy["phase"] == deploy_state.PHASE_HEALTH
+    assert busy["record"]["previous_sha"] == "b" * 40
+
+    deploy_state.finish(result="ok")
+    done = client.get("/api/ops/deploy-state").json()
+    assert done["in_flight"] is False
+    assert done["record"]["result"] == "ok"

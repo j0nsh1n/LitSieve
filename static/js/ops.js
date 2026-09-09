@@ -860,6 +860,65 @@ async function commit() {
  }
 }
 
+/** Poll deploy state until it settles.
+ *
+ * The server restarts partway through, so requests are expected to fail for a
+ * few seconds — a failed poll is not a failed deploy and must not be reported
+ * as one. Only a terminal record, or running out of attempts, ends the wait.
+ */
+async function followDeploy(sha, status) {
+ const PHASES = {
+  started: 'preparing',
+  reset: 'updating checkout',
+  deps: 'syncing dependencies',
+  restarting: 'restarting site',
+  health: 'checking health',
+  rolling_back: 'rolling back',
+ };
+ const deadline = Date.now() + 180000;
+ let lastPhase = '';
+ while (Date.now() < deadline) {
+  await new Promise((r) => setTimeout(r, 1500));
+  let state = null;
+  try {
+   state = await apiCall('/api/ops/deploy-state');
+  } catch (e) {
+   // Expected while the worker is down. Keep waiting.
+   if (status) status.textContent = 'deploy ' + shortSha(sha) + ' — site restarting…';
+   continue;
+  }
+  const rec = state && state.record;
+  if (!rec) continue;
+  const phase = String(rec.phase || '');
+  if (phase && phase !== lastPhase) {
+   lastPhase = phase;
+   const label = PHASES[phase] || phase;
+   if (status) status.textContent = 'deploy ' + shortSha(sha) + ' — ' + label;
+   appendOutput('deploy ' + shortSha(sha) + ': ' + label);
+  }
+  if (!state.in_flight && phase === 'done') {
+   const result = String(rec.result || '');
+   const detail = String(rec.detail || '');
+   if (result === 'ok') {
+    if (status) status.textContent = 'deploy ' + shortSha(sha) + ' — done';
+    showNotification('Deployed.', 'success');
+   } else if (result === 'rolled_back') {
+    if (status) status.textContent = 'deploy ' + shortSha(sha) + ' — rolled back';
+    showNotification(detail || 'Health check failed; previous commit restored.', 'warning');
+   } else {
+    if (status) status.textContent = 'deploy ' + shortSha(sha) + ' — failed';
+    showNotification(detail || 'Deploy failed.', 'error');
+   }
+   appendOutput('deploy ' + shortSha(sha) + ': ' + (result || 'finished') + (detail ? ' — ' + detail : ''));
+   return;
+  }
+ }
+ // Timed out watching. The deploy owns its own outcome, so say that plainly
+ // rather than claiming it failed.
+ if (status) status.textContent = 'deploy ' + shortSha(sha) + ' — still running';
+ showNotification('Still deploying. Check Ship history or the host journal.', 'warning');
+}
+
 async function deploy() {
  const vals = await openSiteForm({
   title: 'Deploy live',
@@ -876,9 +935,17 @@ async function deploy() {
    method: 'POST',
    body: { confirm: 'DEPLOY', sha: st.staging_sha },
   });
-  if (status) status.textContent = `deploy ${shortSha(data.sha)}`;
-  showNotification('Deployed.', 'success');
-  appendOutput('deploy ' + shortSha(data.sha));
+  // A04: a detached deploy answers 202 with a receipt, not a verdict. The
+  // restart it performs kills this worker, so the outcome can only arrive by
+  // polling the state file the deploy process writes.
+  if (data && data.dispatched) {
+   appendOutput('deploy ' + shortSha(data.sha) + ' dispatched to ' + (data.unit || 'unit'));
+   await followDeploy(data.sha, status);
+  } else {
+   if (status) status.textContent = `deploy ${shortSha(data.sha)}`;
+   showNotification('Deployed.', 'success');
+   appendOutput('deploy ' + shortSha(data.sha));
+  }
   await loadStatus();
   await loadDiff();
  } catch (e) {

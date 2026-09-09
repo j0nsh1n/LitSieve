@@ -25,7 +25,7 @@ from app.core import (
     limiter,
     templates,
 )
-from app.operator import gitutil
+from app.operator import deploy_state, gitutil, runner
 from app.operator.runner import TIMEOUTS, run_action
 from app.storage import ops_audit
 
@@ -427,6 +427,36 @@ async def api_ops_deploy(request: Request):
     if diff.get("empty"):
         return JSONResponse(status_code=400, content={"detail": "Review a non-empty diff before deploying."})
     sha = str(body.get("sha") or diff.get("staging_sha") or "")
+
+    # A04: when the deploy can be put in its own control group, dispatch it and
+    # return a receipt. The restart it performs would kill this request anyway,
+    # so there is no result to wait for — the browser polls /api/ops/deploy-state
+    # and the deploy process writes its own operator_deploys row.
+    if runner.detached_supported():
+        stuck = deploy_state.interrupted()
+        if stuck:
+            return JSONResponse(status_code=409, content={
+                "detail": (
+                    f"A deploy of {str(stuck.get('sha') or '')[:8]} is still in flight "
+                    f"(phase {stuck.get('phase')}). Wait for it or clear it on the host."
+                ),
+                "deploy_state": stuck,
+            })
+        receipt = runner.run_action_detached(
+            "deploy", [sha],
+            unit_name=f"litsieve-deploy-{sha[:12] or 'head'}",
+            extra_env={"LITSIEVE_DEPLOY_ACTOR": user["username"]},
+        )
+        ops_audit.add(
+            core.user_db, actor_id=user["user_id"], actor_username=user["username"],
+            action="deploy", result="dispatched" if receipt.get("ok") else "fail",
+            sha=sha, previous_sha="", detail=receipt.get("detail") or "",
+            ip=client_bucket(request),
+        )
+        if not receipt.get("ok"):
+            return JSONResponse(status_code=400, content=receipt)
+        return JSONResponse(status_code=202, content={**receipt, "sha": sha})
+
     result = run_action("deploy", [sha])
     ok = bool(result.get("ok"))
     ops_audit.add(
@@ -448,6 +478,27 @@ async def api_ops_deploy(request: Request):
     if not ok:
         return JSONResponse(status_code=400, content=result)
     return result
+
+
+@router.get("/api/ops/deploy-state")
+@limiter.limit("120/minute")
+async def api_ops_deploy_state(request: Request):
+    """Current or most recent deploy, for the browser to poll after dispatch.
+
+    Read-only over the state file the deploy process writes. Never starts,
+    resumes, or cancels anything.
+    """
+    user, err = _require_operator(request)
+    if err or not user:
+        return err
+    record = deploy_state.read()
+    if not record:
+        return {"phase": "", "in_flight": False, "record": None}
+    return {
+        "phase": str(record.get("phase") or ""),
+        "in_flight": deploy_state.interrupted() is not None,
+        "record": record,
+    }
 
 
 @router.post("/api/ops/rollback")

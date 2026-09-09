@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -58,6 +59,59 @@ def script_path(action: str) -> Path:
     if not path.is_file():
         raise FileNotFoundError(str(path))
     return path
+
+
+def detached_supported() -> bool:
+    """True when a deploy can be launched outside this process's control group.
+
+    A04: the deploy restarts the unit it lives in, so a plain child is killed
+    before it can health-check or roll back. systemd-run puts it in a sibling
+    scope instead. Tests and non-systemd hosts fall back to the blocking path,
+    which is honest — there the deploy really does run in-process.
+    """
+    if (os.getenv("LITSIEVE_DEPLOY_DETACHED") or "").strip().lower() in ("0", "false", "no"):
+        return False
+    return shutil.which("systemd-run") is not None
+
+
+def run_action_detached(
+    action: str,
+    argv: Optional[List[str]] = None,
+    *,
+    unit_name: str,
+    extra_env: Optional[Dict[str, str]] = None,
+) -> Dict[str, Any]:
+    """Start an action in its own transient user unit and return immediately.
+
+    Returns a dispatch receipt, never a result: by design nobody waits for this
+    process, so its outcome is read back from the deploy state file rather than
+    from an exit code.
+    """
+    path = script_path(action)
+    cmd = [
+        "systemd-run",
+        "--user",
+        "--collect",          # drop the unit once it finishes, success or fail
+        f"--unit={unit_name}",
+        "--quiet",
+        f"--setenv=PYTHONPATH={code_root()}",
+    ]
+    for key, value in (extra_env or {}).items():
+        cmd.append(f"--setenv={key}={value}")
+    cmd += [sys.executable, str(path), *(argv or [])]
+    try:
+        proc = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=30, check=False, shell=False
+        )
+    except (subprocess.TimeoutExpired, OSError) as exc:
+        return {"ok": False, "detail": f"{action} could not be dispatched: {exc}"}
+    if proc.returncode != 0:
+        return {
+            "ok": False,
+            "detail": f"{action} could not be dispatched.",
+            "output": redact((proc.stdout or "") + (proc.stderr or ""))[-2000:],
+        }
+    return {"ok": True, "dispatched": True, "unit": unit_name}
 
 
 def run_action(
