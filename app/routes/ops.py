@@ -23,6 +23,7 @@ from app.core import (
     current_user,
     is_admin_user,
     limiter,
+    run_in_thread,
     templates,
 )
 from app.operator import deploy_state, gitutil, runner
@@ -251,7 +252,7 @@ async def api_ops_status(request: Request):
         return err
     try:
         gitutil.ensure_staging()
-        diff = run_action("diff")
+        diff = await run_in_thread(run_action, "diff")
     except Exception as exc:
         logger.exception("ops status")
         return JSONResponse(status_code=503, content={"detail": str(exc)[:240]})
@@ -267,7 +268,7 @@ async def api_ops_status(request: Request):
         "reauth_default_minutes": REAUTH_TTL_DEFAULT // 60,
         "history": ops_audit.list_deploys(core.user_db, limit=15),
         "last_validate": ops_audit.get_state(core.user_db, "last_validate_ok") == "1",
-        "grok": run_action(
+        "grok": await run_in_thread(run_action, 
             "grok_status",
             extra_env={"LITSIEVE_GROK_SESSION": ops_audit.get_state(core.user_db, "grok_session")},
         ),
@@ -280,7 +281,7 @@ async def api_ops_files(request: Request):
     _user, err = _require_operator(request)
     if err:
         return err
-    result = run_action("list_files")
+    result = await run_in_thread(run_action, "list_files")
     if not result.get("ok"):
         return JSONResponse(status_code=400, content={"detail": result.get("detail") or "list failed"})
     return result
@@ -292,7 +293,7 @@ async def api_ops_read(request: Request, path: str = ""):
     user, err = _require_operator(request)
     if err or not user:
         return err
-    result = run_action("read_file", [path])
+    result = await run_in_thread(run_action, "read_file", [path])
     ops_audit.add(
         core.user_db, actor_id=user["user_id"], actor_username=user["username"],
         action="read_file", result="ok" if result.get("ok") else "fail",
@@ -316,7 +317,7 @@ async def api_ops_save(request: Request):
     body = await _read_json(request)
     rel = str(body.get("path") or "")
     content = str(body.get("content") if body.get("content") is not None else "")
-    result = run_action("save_file", [rel], stdin=content.encode("utf-8"))
+    result = await run_in_thread(run_action, "save_file", [rel], stdin=content.encode("utf-8"))
     ops_audit.add(
         core.user_db, actor_id=user["user_id"], actor_username=user["username"],
         action="save_file", result="ok" if result.get("ok") else "fail",
@@ -339,7 +340,7 @@ async def api_ops_diff(request: Request):
     _user, err = _require_operator(request)
     if err:
         return err
-    return run_action("diff")
+    return await run_in_thread(run_action, "diff")
 
 
 @router.post("/api/ops/validate")
@@ -350,7 +351,7 @@ async def api_ops_validate(request: Request):
         return err
     if csrf_failed(request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
-    result = run_action("validate")
+    result = await run_in_thread(run_action, "validate")
     ok = bool(result.get("ok"))
     ops_audit.set_state(core.user_db, "last_validate_ok", "1" if ok else "0")
     ops_audit.set_state(core.user_db, "last_validate_sha", result.get("sha") or "")
@@ -390,7 +391,7 @@ async def api_ops_commit(request: Request):
         return blocked
     body = await _read_json(request)
     message = str(body.get("message") or "").strip()
-    result = run_action(
+    result = await run_in_thread(run_action, 
         "commit", [message],
         extra_env={"LITSIEVE_OPS_AUTHOR": user["username"]},
     )
@@ -423,7 +424,7 @@ async def api_ops_deploy(request: Request):
     body = await _read_json(request)
     if str(body.get("confirm") or "") != "DEPLOY":
         return JSONResponse(status_code=400, content={"detail": "Type DEPLOY to confirm."})
-    diff = run_action("diff")
+    diff = await run_in_thread(run_action, "diff")
     if diff.get("empty"):
         return JSONResponse(status_code=400, content={"detail": "Review a non-empty diff before deploying."})
     sha = str(body.get("sha") or diff.get("staging_sha") or "")
@@ -457,7 +458,7 @@ async def api_ops_deploy(request: Request):
             return JSONResponse(status_code=400, content=receipt)
         return JSONResponse(status_code=202, content={**receipt, "sha": sha})
 
-    result = run_action("deploy", [sha])
+    result = await run_in_thread(run_action, "deploy", [sha])
     ok = bool(result.get("ok"))
     ops_audit.add(
         core.user_db, actor_id=user["user_id"], actor_username=user["username"],
@@ -514,7 +515,7 @@ async def api_ops_rollback(request: Request):
     body = await _read_json(request)
     sha = str(body.get("sha") or "").strip()
     argv = [sha] if sha else []
-    result = run_action("rollback", argv)
+    result = await run_in_thread(run_action, "rollback", argv)
     ok = bool(result.get("ok"))
     ops_audit.add(
         core.user_db, actor_id=user["user_id"], actor_username=user["username"],
@@ -549,7 +550,7 @@ async def api_ops_revert_last(request: Request):
         return _need_reauth()
     last = ops_audit.last_good_deploy(core.user_db)
     sha = (last or {}).get("previous_sha") or ""
-    result = run_action("revert_last", [sha] if sha else [])
+    result = await run_in_thread(run_action, "revert_last", [sha] if sha else [])
     ok = bool(result.get("ok"))
     ops_audit.add(
         core.user_db, actor_id=user["user_id"], actor_username=user["username"],
@@ -599,7 +600,7 @@ async def api_ops_ask_grok(request: Request):
         user["user_id"], "ask_grok", remaining, TIMEOUTS.get("ask_grok", 180),
     )
     try:
-        result = run_action("ask_grok", argv, extra_env={"LITSIEVE_GROK_SESSION": sid})
+        result = await run_in_thread(run_action, "ask_grok", argv, extra_env={"LITSIEVE_GROK_SESSION": sid})
     finally:
         ttl = _finish_unlock_hold(user["user_id"])
     ops_audit.add(

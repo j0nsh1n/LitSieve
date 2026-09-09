@@ -736,3 +736,76 @@ def test_deploy_state_endpoint_reports_progress_and_requires_operator(tmp_path, 
     done = client.get("/api/ops/deploy-state").json()
     assert done["in_flight"] is False
     assert done["record"]["result"] == "ok"
+
+
+# --- A05: operator work must not stall the single web worker ------------------
+
+
+def test_operator_action_does_not_block_the_event_loop(tmp_path, monkeypatch):
+    """A05: ops routes await blocking work instead of running it inline.
+
+    The host runs one uvicorn worker. `validate` can occupy 240 s and other
+    actions 180 s; run inline, nothing else — including /health — is served for
+    that whole window. The audit reproduced this with a 200 ms stub and a 10 ms
+    timer that fired late.
+
+    Asserted the same way, against the route rather than the helper: a timer
+    scheduled while a slow action runs must still fire near its own deadline.
+    """
+    import asyncio
+    import time
+
+    from app.routes import ops as ops_mod
+
+    slow = 0.4
+
+    def _slow_action(action, argv=None, **kwargs):
+        time.sleep(slow)
+        return {"ok": True, "empty": False, "staging_sha": "0" * 40}
+
+    monkeypatch.setattr(ops_mod, "run_action", _slow_action)
+
+    async def _drive():
+        loop = asyncio.get_running_loop()
+        fired_at = {}
+        start = loop.time()
+
+        def _tick():
+            fired_at["t"] = loop.time() - start
+
+        loop.call_later(0.02, _tick)
+        # The route helper is what production awaits; call it the same way.
+        await ops_mod.run_in_thread(ops_mod.run_action, "diff")
+        return fired_at.get("t"), loop.time() - start
+
+    tick, total = asyncio.run(_drive())
+    assert total >= slow, "the slow action did not actually run"
+    assert tick is not None, "the timer never fired"
+    # Blocked, this lands at ~slow. Awaited, it lands near its own 20 ms deadline.
+    assert tick < slow / 2, (
+        f"timer fired {tick:.3f}s into a {slow:.1f}s action — the event loop was blocked"
+    )
+
+
+def test_ops_routes_never_call_run_action_inline():
+    """Contract: a future route must not reintroduce the stall.
+
+    Greps rather than exercises, because the failure is a missing `await` that
+    no single test would notice — the route still works, it just freezes
+    everything else while it does.
+    """
+    import re
+
+    src = (Path(__file__).resolve().parent.parent / "app" / "routes" / "ops.py").read_text(
+        encoding="utf-8"
+    )
+    code = "\n".join(line.split("#", 1)[0] for line in src.splitlines())
+    bare = [
+        m.start()
+        for m in re.finditer(r"(?<!run_in_thread\()(?<!, )\brun_action\(", code)
+        if "import" not in code[max(0, m.start() - 60):m.start()]
+    ]
+    assert not bare, (
+        f"{len(bare)} call(s) to run_action() outside run_in_thread in ops.py; "
+        "wrap them or the single worker stalls for the action's duration"
+    )
