@@ -536,3 +536,76 @@ def test_deploy_ignores_untracked_files_in_live(tmp_path, monkeypatch):
     )
     assert deploy.status_code == 200, deploy.text
     assert (live / "scratch_notes.md").exists()
+
+
+# --- A04: deploy state survives the process that writes it -------------------
+
+def test_deploy_state_records_previous_sha_before_touching_the_checkout(tmp_path, monkeypatch):
+    """The one fact a recovery cannot reconstruct must be on disk first.
+
+    A04: _restart_service() can kill this process mid-deploy. If previous_sha
+    only ever lived in a local variable, a bad deploy would be unrecoverable
+    without reading the reflog. Assert ordering, not just presence: the record
+    must exist while the checkout is still at the OLD revision.
+    """
+    from app.operator import actions, deploy_state
+
+    repo, _staging, _health = _ops_env(tmp_path, monkeypatch)
+    monkeypatch.setenv("LITSIEVE_DEPLOY_STATE", str(tmp_path / "deploy-state.json"))
+    before = subprocess.check_output(
+        ["git", "-C", str(repo), "rev-parse", "HEAD"], text=True
+    ).strip()
+
+    seen = {}
+    real_reset = actions.gitutil.reset_hard
+
+    def _spy(root, sha):
+        # Called before the checkout moves; capture what recovery would find.
+        seen["record"] = deploy_state.read()
+        seen["head_at_reset"] = subprocess.check_output(
+            ["git", "-C", str(root), "rev-parse", "HEAD"], text=True
+        ).strip()
+        return real_reset(root, sha)
+
+    monkeypatch.setattr(actions.gitutil, "reset_hard", _spy)
+    actions._do_deploy(before)
+
+    record = seen.get("record")
+    assert record, "no deploy state existed when the checkout was about to move"
+    assert record["previous_sha"] == before
+    assert seen["head_at_reset"] == before, "state was written after the reset, too late"
+
+
+def test_interrupted_deploy_is_distinguishable_from_no_deploy(tmp_path, monkeypatch):
+    """A killed deploy must not look like an idle system."""
+    from app.operator import deploy_state
+
+    monkeypatch.setenv("LITSIEVE_DEPLOY_STATE", str(tmp_path / "deploy-state.json"))
+    assert deploy_state.interrupted() is None
+
+    deploy_state.begin(sha="a" * 40, previous_sha="b" * 40, actor_username="op")
+    deploy_state.write(phase=deploy_state.PHASE_RESTARTING)
+    stuck = deploy_state.interrupted()
+    assert stuck is not None, "a deploy killed mid-restart reported nothing in flight"
+    assert stuck["previous_sha"] == "b" * 40
+
+    deploy_state.finish(result="ok")
+    assert deploy_state.interrupted() is None
+
+
+def test_deploy_state_write_is_atomic_and_survives_corruption(tmp_path, monkeypatch):
+    """A damaged record must not take the deploy down with it."""
+    from app.operator import deploy_state
+
+    path = tmp_path / "deploy-state.json"
+    monkeypatch.setenv("LITSIEVE_DEPLOY_STATE", str(path))
+    deploy_state.begin(sha="c" * 40, previous_sha="d" * 40)
+    assert deploy_state.read()["previous_sha"] == "d" * 40
+
+    path.write_text("{ truncated", encoding="utf-8")
+    assert deploy_state.read() is None
+    assert deploy_state.interrupted() is None
+    # and it recovers: a fresh begin() overwrites the damaged file
+    deploy_state.begin(sha="e" * 40, previous_sha="f" * 40)
+    assert deploy_state.read()["previous_sha"] == "f" * 40
+    assert not list(path.parent.glob(".deploy-state-*.tmp")), "temp file left behind"

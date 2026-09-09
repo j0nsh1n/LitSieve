@@ -14,7 +14,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Dict, List
 
-from app.operator import gitutil, paths
+from app.operator import deploy_state, gitutil, paths
 from app.operator.paths import PathJailError
 
 SHA_RE = re.compile(r"^[0-9a-f]{7,40}$")
@@ -268,6 +268,49 @@ def _sync_deps(live: Path, prev: str, new: str) -> None:
         )
 
 
+def _finish_deploy(result: Dict[str, Any], *, actor: str) -> Dict[str, Any]:
+    """Close the state record and write the audit row from this process.
+
+    A04: the web process used to write `operator_deploys` after run_action
+    returned. When the deploy runs in its own unit that caller is already gone,
+    so the outcome has to be recorded by whoever actually knows it. users.db is
+    WAL with a busy timeout, so a second writer here is safe.
+
+    Neither the audit write nor the state write may change the deploy verdict —
+    a bookkeeping failure is logged and swallowed.
+    """
+    verdict = "ok" if result.get("ok") else ("rolled_back" if result.get("rolled_back") else "failed")
+    try:
+        deploy_state.finish(result=verdict, detail=str(result.get("detail") or ""))
+    except OSError:
+        pass
+    if actor:
+        try:
+            from app.storage import ops_audit
+            from app.storage.user_db import UserDatabase
+
+            db = UserDatabase()
+            try:
+                ops_audit.add_deploy(
+                    db,
+                    sha=str(result.get("sha") or ""),
+                    previous_sha=str(result.get("previous_sha") or ""),
+                    actor_username=actor,
+                    result=verdict,
+                    detail=str(result.get("detail") or ""),
+                )
+            finally:
+                try:
+                    db.conn.close()
+                except Exception:
+                    pass
+        except Exception:
+            # An unrecorded deploy is bad; a deploy that fails because it could
+            # not write its own history entry is worse.
+            pass
+    return result
+
+
 def _do_deploy(sha: str) -> Dict[str, Any]:
     live = paths.live_root()
     if not gitutil.is_git_repo(live):
@@ -297,33 +340,54 @@ def _do_deploy(sha: str) -> Dict[str, Any]:
         prev = gitutil.rev_parse(live)
     except gitutil.GitError as exc:
         return {"ok": False, "detail": str(exc)}
+    # A04: record the previous SHA before anything mutates the live checkout.
+    # _restart_service() below can kill this process, and once the checkout has
+    # moved, `prev` in memory is the only thing that knows where to go back to.
+    actor = (os.getenv("LITSIEVE_DEPLOY_ACTOR") or "").strip()
+    deploy_state.begin(sha=sha, previous_sha=prev, actor_username=actor)
     try:
         gitutil.reset_hard(live, sha)
     except gitutil.GitError as exc:
-        return {"ok": False, "detail": str(exc), "previous_sha": prev}
+        return _finish_deploy(
+            {"ok": False, "detail": str(exc), "previous_sha": prev, "sha": sha},
+            actor=actor,
+        )
+    deploy_state.write(phase=deploy_state.PHASE_DEPS)
     _sync_deps(live, prev, sha)
+    deploy_state.write(phase=deploy_state.PHASE_RESTARTING)
     _restart_service()
+    deploy_state.write(phase=deploy_state.PHASE_HEALTH)
     if _poll_health():
-        return {"ok": True, "sha": sha, "previous_sha": prev, "rolled_back": False}
+        return _finish_deploy(
+            {"ok": True, "sha": sha, "previous_sha": prev, "rolled_back": False},
+            actor=actor,
+        )
+    deploy_state.write(phase=deploy_state.PHASE_ROLLING_BACK)
     try:
         gitutil.reset_hard(live, prev)
     except gitutil.GitError as exc:
-        return {
-            "ok": False,
-            "detail": f"Health check failed and rollback failed: {exc}",
-            "previous_sha": prev,
-            "sha": sha,
-            "rolled_back": False,
-        }
+        return _finish_deploy(
+            {
+                "ok": False,
+                "detail": f"Health check failed and rollback failed: {exc}",
+                "previous_sha": prev,
+                "sha": sha,
+                "rolled_back": False,
+            },
+            actor=actor,
+        )
     _restart_service()
     _poll_health()
-    return {
-        "ok": False,
-        "detail": "Health check failed; previous commit was restored.",
-        "sha": sha,
-        "previous_sha": prev,
-        "rolled_back": True,
-    }
+    return _finish_deploy(
+        {
+            "ok": False,
+            "detail": "Health check failed; previous commit was restored.",
+            "sha": sha,
+            "previous_sha": prev,
+            "rolled_back": True,
+        },
+        actor=actor,
+    )
 
 
 def cmd_deploy(argv: List[str]) -> int:
