@@ -39,6 +39,7 @@ from app.schemas import (
     SetLookRequest,
 )
 from app.services import mailer
+from app.storage.user_db import AccountCapExceeded
 
 logger = logging.getLogger(__name__)
 
@@ -203,7 +204,8 @@ async def register_page(request: Request):
     if current_user(request):
         return RedirectResponse(url="/data-management", status_code=302)
     return templates.TemplateResponse(
-        request, "register.html", context=_register_ctx(),
+        request, "register.html",
+        context=_register_ctx(error=core.user_db.registration_closed_reason() or ""),
     )
 
 
@@ -356,6 +358,12 @@ async def register_submit(
     try:
         user = core.user_db.create_user(
             username, await hash_password_async(password), look=DEFAULT_LOOK,
+        )
+    except AccountCapExceeded as e:
+        return templates.TemplateResponse(
+            request, "register.html",
+            context=_register_ctx(error=str(e), username=username),
+            status_code=403,
         )
     except ValueError:
         # Lost the race against a concurrent registration of the same login.
