@@ -8,6 +8,11 @@ and this project aims to follow Semantic Versioning for app version strings
 
 ## [Unreleased]
 
+### Fixed
+- Backups follow `USERS_DB` and `USER_DATA_DIR` instead of assuming
+  `users.db` and `user_data/` live under the checkout. Archives still use
+  those names as stable prefixes, so restore can land on a custom layout.
+
 ## [5.3.1] - 2026-08-31
 
 ### Fixed

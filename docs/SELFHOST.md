@@ -234,6 +234,7 @@ systemctl --user enable --now litsieve-backup.timer
 tools/backup.py --list                 # what exists
 tools/backup.py                        # run one now
 tools/backup.py --verify <archive>     # integrity-check an archive
+tools/backup.py --restore <archive>    # copy onto current USERS_DB / USER_DATA_DIR
 systemctl --user list-timers litsieve-backup.timer
 ```
 
@@ -257,14 +258,20 @@ decrypted, so a restore would be partial. Archives are written `0600`. Use
 
 ### Restoring
 
+Archives always store the accounts file as `litsieve/users.db` and libraries
+under `litsieve/user_data/`, even when the live host uses a custom `USERS_DB`
+or a `USER_DATA_DIR` outside the checkout. Restore onto the paths the app
+actually uses:
+
 ```bash
-# REPO = path to the LitSieve checkout on the origin host
-tar -xzf ~/litsieve-backups/litsieve-YYYYMMDD-HHMMSS.tar.gz -C /tmp/restore
 systemctl --user stop litsieve-uvicorn.service
-cp /tmp/restore/litsieve/users.db "$REPO/"
-cp -r /tmp/restore/litsieve/user_data "$REPO/"
+tools/backup.py --restore ~/litsieve-backups/litsieve-YYYYMMDD-HHMMSS.tar.gz
 systemctl --user start litsieve-uvicorn.service
 ```
+
+`--restore` honours `USERS_DB` and `USER_DATA_DIR` the same way the app does.
+`--no-env` skips copying `.env`. Manual extract still works for the default
+layout (`users.db` and `user_data/` at the checkout root).
 
 Off-machine copies remain the operator’s job: local archives protect against a
 bad deploy, accidental delete, or filesystem corruption — not against total

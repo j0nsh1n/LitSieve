@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Back up the accounts database and every user's papers.
 
-Everything lives on one desktop: `users.db` (real accounts) plus `user_data/`
-(each account's libraries, embeddings, notes, screening decisions). A dead disk
-loses all of it, and there is no second copy anywhere.
+Everything lives on one desktop: the accounts DB (real accounts) plus the
+user-data tree (each account's libraries, embeddings, notes, screening
+decisions). A dead disk loses all of it, and there is no second copy anywhere.
 
 Two details that make this more than `cp -r`:
 
@@ -13,6 +13,10 @@ Two details that make this more than `cp -r`:
   the worst kind of backup, because it looks fine until you need it.
 * **Every copy is integrity-checked before the archive is written.** An
   unverified backup is a guess.
+
+The live layout follows `USERS_DB` and `USER_DATA_DIR` (same helpers the app
+uses). Archives always use stable prefixes — `users.db` and `user_data/` —
+so a restore can put them back at whatever those variables point to now.
 
 Archives land *outside* the repo by default, so `git clean` or a bad deploy
 cannot take the backups with it.
@@ -26,7 +30,8 @@ Usage:
     tools/backup.py                 # create an archive, prune old ones
     tools/backup.py --list          # what exists now
     tools/backup.py --verify FILE   # integrity-check an existing archive
-    tools/backup.py --no-env        # exclude .env from the archive
+    tools/backup.py --restore FILE  # copy archive contents onto USERS_DB / USER_DATA_DIR
+    tools/backup.py --no-env        # exclude .env from the archive (or skip it on restore)
 """
 
 from __future__ import annotations
@@ -45,34 +50,69 @@ REPO = Path(__file__).resolve().parent.parent
 DEFAULT_DEST = Path(os.getenv("BACKUP_DIR") or (Path.home() / "litsieve-backups"))
 KEEP = int(os.getenv("BACKUP_KEEP", "14") or 14)
 
+ARCHIVE_USERS = Path("users.db")
+ARCHIVE_DATA = Path("user_data")
+ARCHIVE_ENV = Path(".env")
+
 
 def _log(msg: str) -> None:
     print(msg, flush=True)
 
 
-def _sqlite_files() -> list[Path]:
-    """Every SQLite database that matters, relative paths under the repo."""
-    found: list[Path] = []
-    users = REPO / "users.db"
-    if users.exists():
-        found.append(users)
-    data = Path(os.getenv("USER_DATA_DIR") or (REPO / "user_data"))
-    if data.exists():
-        found.extend(sorted(data.rglob("*.db")))
-    return found
+def _ensure_app_path() -> None:
+    root = str(REPO)
+    if root not in sys.path:
+        sys.path.insert(0, root)
 
 
-def _plain_files(include_env: bool) -> list[Path]:
-    """Non-SQLite files worth keeping (library metadata, AI settings, .env)."""
-    found: list[Path] = []
-    data = Path(os.getenv("USER_DATA_DIR") or (REPO / "user_data"))
-    if data.exists():
-        found.extend(sorted(data.rglob("*.json")))
+def _resolve(path: Path) -> Path:
+    """Absolute as-is; relative against the checkout this tool belongs to."""
+    return path if path.is_absolute() else (REPO / path)
+
+
+def _accounts_db() -> Path:
+    _ensure_app_path()
+    from app.storage.user_db import users_db_path
+
+    return _resolve(Path(users_db_path())).resolve()
+
+
+def _data_root() -> Path:
+    _ensure_app_path()
+    from app.storage.libraries import data_root
+
+    return _resolve(data_root()).resolve()
+
+
+def _archive_under_data(src: Path, root: Path) -> Path:
+    return ARCHIVE_DATA / src.resolve().relative_to(root)
+
+
+def _backup_items(include_env: bool) -> list[tuple[Path, Path]]:
+    """(source file, path inside the archive under litsieve/)."""
+    items: list[tuple[Path, Path]] = []
+    accounts = _accounts_db()
+    if accounts.is_file():
+        items.append((accounts, ARCHIVE_USERS))
+
+    root = _data_root()
+    if root.is_dir():
+        for src in sorted(root.rglob("*")):
+            if not src.is_file():
+                continue
+            if src.suffix not in (".db", ".json"):
+                continue
+            try:
+                rel = _archive_under_data(src, root)
+            except ValueError:
+                continue
+            items.append((src, rel))
+
     if include_env:
         env = REPO / ".env"
-        if env.exists():
-            found.append(env)
-    return found
+        if env.is_file():
+            items.append((env, ARCHIVE_ENV))
+    return items
 
 
 def _copy_db(src: Path, dest: Path) -> None:
@@ -81,7 +121,7 @@ def _copy_db(src: Path, dest: Path) -> None:
     Goes through app.storage.dbconn so an encrypted (SQLCipher) source is
     opened with its key and the copy stays readable by the app.
     """
-    sys.path.insert(0, str(REPO))
+    _ensure_app_path()
     from app.storage import dbconn
 
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -98,7 +138,7 @@ def _copy_db(src: Path, dest: Path) -> None:
 
 def _integrity_ok(path: Path) -> bool:
     try:
-        sys.path.insert(0, str(REPO))
+        _ensure_app_path()
         from app.storage import dbconn
 
         conn = dbconn.connect(str(path), check_same_thread=True)
@@ -120,23 +160,19 @@ def create(dest_dir: Path, include_env: bool = True) -> Path:
         staging = Path(tmp) / "litsieve"
         staging.mkdir(parents=True)
 
-        dbs = _sqlite_files()
-        if not dbs:
+        items = _backup_items(include_env)
+        if not items:
             raise SystemExit("backup: found no databases to back up — wrong directory?")
 
-        for src in dbs:
-            rel = src.relative_to(REPO)
+        for src, rel in items:
             out = staging / rel
-            _copy_db(src, out)
-            if not _integrity_ok(out):
-                raise SystemExit(f"backup: integrity check FAILED for {rel} — aborting")
-            _log(f"  ok  {rel}")
-
-        for src in _plain_files(include_env):
-            rel = src.relative_to(REPO)
-            out = staging / rel
-            out.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(src, out)
+            if src.suffix == ".db":
+                _copy_db(src, out)
+                if not _integrity_ok(out):
+                    raise SystemExit(f"backup: integrity check FAILED for {rel} — aborting")
+            else:
+                out.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src, out)
             _log(f"  ok  {rel}")
 
         with tarfile.open(archive, "w:gz") as tar:
@@ -176,6 +212,49 @@ def verify(archive: Path) -> bool:
         return True
 
 
+def _extract_root(archive: Path, dest: Path) -> Path:
+    with tarfile.open(archive, "r:gz") as tar:
+        tar.extractall(dest, filter="data")
+    root = dest / "litsieve"
+    if root.is_dir():
+        return root
+    nested = list(dest.glob("*/litsieve"))
+    if len(nested) == 1 and nested[0].is_dir():
+        return nested[0]
+    raise SystemExit("restore: archive is missing the litsieve/ prefix")
+
+
+def restore(archive: Path, *, include_env: bool = True) -> None:
+    """Copy archive contents onto the live USERS_DB / USER_DATA_DIR layout."""
+    if not archive.exists():
+        raise SystemExit(f"restore: no such archive {archive}")
+    with tempfile.TemporaryDirectory(prefix="litsieve-restore-") as tmp:
+        root = _extract_root(archive, Path(tmp))
+        src_users = root / ARCHIVE_USERS
+        if src_users.is_file():
+            dest = _accounts_db()
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src_users, dest)
+            _log(f"  restored {ARCHIVE_USERS} -> {dest}")
+        src_data = root / ARCHIVE_DATA
+        if src_data.is_dir():
+            dest_data = _data_root()
+            dest_data.mkdir(parents=True, exist_ok=True)
+            for src in src_data.rglob("*"):
+                if not src.is_file():
+                    continue
+                out = dest_data / src.relative_to(src_data)
+                out.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src, out)
+            _log(f"  restored {ARCHIVE_DATA}/ -> {dest_data}")
+        if include_env:
+            src_env = root / ARCHIVE_ENV
+            if src_env.is_file():
+                dest_env = REPO / ".env"
+                shutil.copy2(src_env, dest_env)
+                _log(f"  restored {ARCHIVE_ENV} -> {dest_env}")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--dest", default=str(DEFAULT_DEST), help="where archives go")
@@ -183,12 +262,17 @@ def main() -> int:
     ap.add_argument("--no-env", action="store_true", help="exclude .env (and SECRET_KEY)")
     ap.add_argument("--list", action="store_true", help="list existing archives")
     ap.add_argument("--verify", metavar="FILE", help="integrity-check an archive")
+    ap.add_argument("--restore", metavar="FILE", help="restore an archive onto USERS_DB / USER_DATA_DIR")
     args = ap.parse_args()
 
     dest = Path(args.dest).expanduser()
 
     if args.verify:
         return 0 if verify(Path(args.verify).expanduser()) else 1
+
+    if args.restore:
+        restore(Path(args.restore).expanduser(), include_env=not args.no_env)
+        return 0
 
     if args.list:
         archives = sorted(dest.glob("litsieve-*.tar.gz"))
