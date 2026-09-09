@@ -113,9 +113,8 @@ Guest User (is_guest) → sample corpus only; purged by age
 
 ## Session Handoff
 - **Date:** 2026-09-11
-- **Branch:** `fix/a09-a10-jobs-and-embeddings` (airy glass + A09/A10)
-- **Done:** Airy glass CSS (frost cards, soft-blue accent, Source Serif 4
-  headings). Audit A09 (live jobs stay in the progress LRU) and A10
-  (title/abstract change drops embeddings and extractive key points).
-- **Next:** PR this combined branch. Remaining audit: A08, A07, A06. A01/A02
-  if that security pass has not landed.
+- **Branch:** `fix/a09-a10-jobs-and-embeddings` (PR #64)
+- **Done:** Airy glass CSS; A09 live-job LRU; A10 stale embeddings; fetch
+  cancel now aborts HTTP retries instead of sleeping the backoff ladder.
+- **Next:** Remaining audit A08, A07, A06. A01/A02 if that security pass
+  has not landed.

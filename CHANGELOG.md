@@ -21,6 +21,10 @@ and this project aims to follow Semantic Versioning for app version strings
 - Refreshing a paper's title or abstract now drops that paper's search vector
   and extractive bullets so ranking matches the text on the card. Notes, stars,
   and student-saved AI bullets stay.
+- Cancelling a multi-source fetch no longer waits out the full HTTP retry
+  ladder (previously up to ~2.6 minutes per unreachable source). Retries
+  and backoff abort as soon as the job is cancelled; an in-flight socket
+  wait of up to ~30 seconds may still finish before the cancel lands.
 
 ## [5.3.1] - 2026-08-31
 

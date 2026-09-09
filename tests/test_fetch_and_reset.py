@@ -30,40 +30,54 @@ def _record_sleeps(monkeypatch):
     return slept
 
 
+def _assert_interruptible_total(slept: list[float], expected: float, *, tol: float = 1e-9):
+    """Backoff sleeps in ≤0.2s slices; assert total duration and slice size."""
+    assert abs(sum(slept) - expected) <= tol, (expected, slept)
+    assert all(s <= 0.2 + 1e-12 for s in slept), slept
+
+
 def test_backoff_honours_retry_after(monkeypatch):
     """A server's Retry-After wins; ignoring it is how you get IP-blocked."""
     slept = _record_sleeps(monkeypatch)
     HttpClient._backoff_sleep(0, retry_after="7")
-    assert slept == [7.0]
+    _assert_interruptible_total(slept, 7.0)
 
 
 def test_backoff_caps_absurd_retry_after(monkeypatch):
     """A hostile or broken header must not park a job for hours."""
     slept = _record_sleeps(monkeypatch)
     HttpClient._backoff_sleep(0, retry_after="86400")
-    assert slept == [60.0]
+    _assert_interruptible_total(slept, 60.0)
 
 
 def test_backoff_falls_back_when_retry_after_is_garbage(monkeypatch):
     """Unparseable header -> exponential path, not a crash and not zero."""
     slept = _record_sleeps(monkeypatch)
     HttpClient._backoff_sleep(0, retry_after="not-a-number")
-    assert len(slept) == 1
-    assert 0.5 <= slept[0] <= 0.75, slept
+    total = sum(slept)
+    assert 0.5 <= total <= 0.75, slept
+    assert all(s <= 0.2 + 1e-12 for s in slept), slept
 
 
 def test_backoff_is_exponential_and_capped(monkeypatch):
     """~0.5, 1, 2, 4 … with jitter, flattening at 30s."""
     slept = _record_sleeps(monkeypatch)
+    totals: list[float] = []
     for attempt in range(5):
+        slept.clear()
         HttpClient._backoff_sleep(attempt, retry_after=None)
+        totals.append(sum(slept))
+        assert all(s <= 0.2 + 1e-12 for s in slept), slept
+    slept.clear()
     HttpClient._backoff_sleep(99, retry_after=None)
+    totals.append(sum(slept))
+    assert all(s <= 0.2 + 1e-12 for s in slept), slept
 
     for attempt in range(5):
         expected = 0.5 * (2 ** attempt)
-        assert expected <= slept[attempt] <= expected + 0.25, (attempt, slept)
-    assert slept[:-1] == sorted(slept[:-1]), "backoff must not shrink"
-    assert 30.0 <= slept[-1] <= 30.25, f"cap not applied: {slept[-1]}"
+        assert expected <= totals[attempt] <= expected + 0.25, (attempt, totals)
+    assert totals[:-1] == sorted(totals[:-1]), "backoff must not shrink"
+    assert 30.0 <= totals[-1] <= 30.25, f"cap not applied: {totals[-1]}"
 
 
 def test_backoff_zero_retry_after_does_not_stall(monkeypatch):
@@ -77,7 +91,9 @@ def test_backoff_ignores_negative_retry_after(monkeypatch):
     """Negative is nonsense; fall back rather than compute a negative sleep."""
     slept = _record_sleeps(monkeypatch)
     HttpClient._backoff_sleep(0, retry_after="-5")
-    assert len(slept) == 1 and slept[0] >= 0.5, slept
+    total = sum(slept)
+    assert total >= 0.5, slept
+    assert all(s <= 0.2 + 1e-12 for s in slept), slept
 
 
 def test_insert_articles_dedupes_cross_source_title(tmp_path):
