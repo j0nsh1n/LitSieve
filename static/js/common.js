@@ -844,11 +844,11 @@ function bindAiArticleActions(rootEl, article) {
                             // actually stored, not what we submitted.
                             const savedResp = await apiCall('/api/ai/key-points', {
                                 method: 'POST',
-                                body: {
+                                body: withPageLibrary({
                                     article_id: aid,
                                     source: source,
                                     key_points: data.key_points || [],
-                                },
+                                }),
                             });
                             const savedPoints = (savedResp && savedResp.key_points) || data.key_points || [];
                             showNotification('Key points updated (AI rewrite saved).', 'success');
@@ -1020,6 +1020,23 @@ function populateLibrarySelect(sel, data) {
         sel.appendChild(opt);
     });
     sel.dataset.activeId = active;
+    // Pin the library this page rendered against. A later focus refresh
+    // compares the live active id to this; switching here already reloads.
+    if (active && !sel.dataset.pageLibraryId) {
+        sel.dataset.pageLibraryId = active;
+    }
+}
+
+function pageLibraryId() {
+    const sel = document.getElementById('nav-library-select');
+    if (!sel) return '';
+    return sel.dataset.pageLibraryId || sel.dataset.activeId || sel.value || '';
+}
+
+function withPageLibrary(body) {
+    const id = pageLibraryId();
+    if (id) body.library_id = id;
+    return body;
 }
 
 /** Refresh library dropdown after create/rename/delete on Account page. */
@@ -1028,7 +1045,12 @@ async function refreshLibrarySwitcher() {
     if (!sel) return;
     try {
         const data = await apiCall('/api/libraries');
+        const pageId = sel.dataset.pageLibraryId || '';
+        const liveId = (data && data.active_id) || '';
         populateLibrarySelect(sel, data);
+        if (pageId && liveId && pageId !== liveId) {
+            window.location.reload();
+        }
     } catch (e) { /* ignore */ }
 }
 

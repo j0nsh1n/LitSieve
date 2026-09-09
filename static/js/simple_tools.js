@@ -1292,7 +1292,7 @@ async function simpleToolsReprepare() {
   const onlyMissing = _simpleOnlyMissing !== false;
   const started = await apiCall('/api/create-embeddings', {
    method: 'POST',
-   body: { model: 'general', only_missing: onlyMissing },
+   body: withPageLibrary({ model: 'general', only_missing: onlyMissing }),
   });
   if (started && started.status === 'started' && typeof waitForJob === 'function') {
    await waitForJob('embed', null, null, null, null);

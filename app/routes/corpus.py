@@ -12,6 +12,7 @@ from app.core import (
     _ensure_progress,
     csrf_failed,
     current_user,
+    get_owned_pipeline,
     get_pipeline,
     is_job_cancelled,
     limiter,
@@ -37,6 +38,7 @@ from app.schemas import (
 )
 from app.services.enrich import attach_key_points
 from app.storage import quota
+from app.storage.libraries import owned_library_id
 from app.utils import (
     coverage_suggestions,
 )
@@ -167,6 +169,10 @@ async def api_fetch_multi(req: MultiFetchRequest, request: Request):
     if core.is_guest_user(user):
         return core.guest_forbidden_response()
     uid = user["user_id"]
+    try:
+        lib_id = owned_library_id(uid, req.library_id)
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"detail": str(e)})
     # Replace/clear_first must be allowed while over quota so students can
     # wipe the library and free disk; mid-fetch still stops if they go over again.
     if not req.clear_first:
@@ -186,7 +192,13 @@ async def api_fetch_multi(req: MultiFetchRequest, request: Request):
         uid=uid,
     )
     if not req.wait:
-        if not start_user_job(uid, 'fetch', _run_multi_fetch, **job_kwargs):
+        try:
+            started = start_user_job(
+                uid, 'fetch', _run_multi_fetch, library_id=lib_id, **job_kwargs,
+            )
+        except ValueError as e:
+            return JSONResponse(status_code=400, content={"detail": str(e)})
+        if not started:
             return JSONResponse(
                 status_code=409,
                 content={"detail": "A fetch is already running"},
@@ -197,6 +209,7 @@ async def api_fetch_multi(req: MultiFetchRequest, request: Request):
     # overlapping fetches (sync or background) would reset or mix staged rows.
     if not try_begin_user_job(
         uid, 'fetch',
+        library_id=lib_id,
         total=len(req.sources),
         sources=list(req.sources),
         by_source={},
@@ -213,7 +226,7 @@ async def api_fetch_multi(req: MultiFetchRequest, request: Request):
             content={"detail": "A fetch is already running"},
         )
     try:
-        p = get_pipeline(uid)
+        p = get_pipeline(uid, lib_id)
         result = await run_in_thread(_run_multi_fetch, p, **job_kwargs)
         update_progress(uid, 'fetch', active=False, result=result, error=None)
         return result
@@ -280,19 +293,29 @@ async def api_create_embeddings(req: EmbeddingsRequest, request: Request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
     uid = user["user_id"]
     try:
+        lib_id = owned_library_id(uid, req.library_id)
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"detail": str(e)})
+    try:
         quota.check_quota(uid)
     except quota.QuotaExceeded as e:
         return JSONResponse(status_code=507, content={"detail": str(e), "quota": quota.usage_report(uid)})
     job_kwargs = dict(model=req.model, only_missing=req.only_missing, uid=uid)
     if not req.wait:
-        if not start_user_job(uid, 'embed', _run_create_embeddings, **job_kwargs):
+        try:
+            started = start_user_job(
+                uid, 'embed', _run_create_embeddings, library_id=lib_id, **job_kwargs,
+            )
+        except ValueError as e:
+            return JSONResponse(status_code=400, content={"detail": str(e)})
+        if not started:
             return JSONResponse(
                 status_code=409,
                 content={"detail": "A embed is already running"},
             )
         return JSONResponse(status_code=202, content={"status": "started"})
 
-    p = get_pipeline(uid)
+    p = get_pipeline(uid, lib_id)
     update_progress(uid, 'embed', active=True, done=0, total=0, result=None, error=None)
     try:
         result = await run_in_thread(_run_create_embeddings, p, **job_kwargs)
@@ -438,7 +461,10 @@ async def api_screening(req: ScreeningRequest, request: Request):
     if csrf_failed(request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
     uid = user["user_id"]
-    p = get_pipeline(uid)
+    try:
+        p = get_owned_pipeline(uid, req.library_id)
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"detail": str(e)})
     try:
         keys = [(item.article_id, item.source) for item in req.items]
         if req.action == "exclude":

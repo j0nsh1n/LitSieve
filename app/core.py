@@ -36,6 +36,7 @@ from app.storage.libraries import (
     ensure_libraries,
     get_active_library_id,
     library_db_path,
+    owned_library_id,
     pipeline_cache_key,
 )
 from app.storage.user_db import UserDatabase
@@ -181,6 +182,18 @@ def get_pipeline(
         _pipelines.move_to_end(key)
         _pipeline_refcounts[key] = _pipeline_refcounts.get(key, 0) + 1
         return _pipelines[key]
+
+
+def get_owned_pipeline(
+    user_id: str, library_id: Optional[str] = None
+) -> LiteratureSearchPipeline:
+    """Like get_pipeline, but reject a library_id this account does not own.
+
+    Omit library_id to use the active library. Raises ValueError for an
+    unknown or foreign id so callers can return HTTP 400 instead of opening
+    a new on-disk library by accident.
+    """
+    return get_pipeline(user_id, owned_library_id(user_id, library_id))
 
 
 def release_pipeline(user_id: str, library_id: Optional[str] = None) -> None:
@@ -498,9 +511,10 @@ def start_user_job(uid: str, task: str, fn, /, **kwargs) -> bool:
 
     Returns False if a job of this task type is already active for uid.
     The worker holds the pipeline ref until completion (release in done callback).
-    Jobs bind to the library that was active when the job started.
+    Jobs bind to kwargs['library_id'] when that id is owned, else the library
+    that was active when the job started. library_id is not forwarded to fn.
     """
-    lib_id = get_active_library_id(uid)
+    lib_id = owned_library_id(uid, kwargs.pop("library_id", None))
     extra = {"library_id": lib_id}
     if task == "fetch":
         extra["last_fetch"] = {
