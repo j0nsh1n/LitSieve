@@ -8,6 +8,14 @@ and this project aims to follow Semantic Versioning for app version strings
 
 ## [Unreleased]
 
+### Fixed
+- A running fetch or prepare is no longer dropped from tracking when other
+  accounts fill the in-memory progress cache, so a second copy of the same job
+  cannot start while the first is still working.
+- Refreshing a paper's title or abstract now drops that paper's search vector
+  and extractive bullets so ranking matches the text on the card. Notes, stars,
+  and student-saved AI bullets stay.
+
 ## [5.3.1] - 2026-08-31
 
 ### Fixed

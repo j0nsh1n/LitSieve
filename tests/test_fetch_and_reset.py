@@ -110,9 +110,41 @@ def test_insert_articles_dedupes_cross_source_title(tmp_path):
         db.close()
 
 
-def test_insert_articles_upsert_does_not_wipe_children(tmp_path):
-    """ON CONFLICT DO UPDATE must not cascade-delete embeddings."""
+def test_insert_articles_upsert_does_not_wipe_notes(tmp_path):
+    """ON CONFLICT DO UPDATE must not cascade-delete notes/stars."""
     db = ArticleDatabase(db_path=str(tmp_path / "e.db"))
+    try:
+        art = {
+            "article_id": "1",
+            "source": "pubmed",
+            "title": "Title",
+            "abstract": "Abstract",
+            "year": "2021",
+            "authors": [],
+            "journal": "J",
+        }
+        db.insert_articles([art], dedupe=False)
+        db.upsert_note("1", "pubmed", note="keep me", starred=True)
+        import numpy as np
+        db.insert_embeddings({("1", "pubmed"): np.ones(4, dtype=np.float32)}, "general")
+        db.insert_key_points({("1", "pubmed"): ["old extractive"]}, origin="extractive")
+        art2 = dict(art, title="Title updated")
+        stats = db.insert_articles([art2], dedupe=False)
+        assert stats["stale_derived"] == 1
+        ids, _emb = db.get_all_embeddings()
+        assert ids == []
+        assert ("1", "pubmed") not in db.get_key_points_keys()
+        note = db.get_note("1", "pubmed")
+        assert note["note"] == "keep me"
+        assert note["starred"] is True
+        assert db.get_article_by_id("1", "pubmed")["title"] == "Title updated"
+    finally:
+        db.close()
+
+
+def test_insert_articles_same_text_keeps_embeddings(tmp_path):
+    """Year/authors refresh must not drop vectors built from unchanged text."""
+    db = ArticleDatabase(db_path=str(tmp_path / "e2.db"))
     try:
         art = {
             "article_id": "1",
@@ -126,12 +158,31 @@ def test_insert_articles_upsert_does_not_wipe_children(tmp_path):
         db.insert_articles([art], dedupe=False)
         import numpy as np
         db.insert_embeddings({("1", "pubmed"): np.ones(4, dtype=np.float32)}, "general")
-        # Upsert same key with new title
-        art2 = dict(art, title="Title updated")
-        db.insert_articles([art2], dedupe=False)
-        ids, emb = db.get_all_embeddings()
+        stats = db.insert_articles([dict(art, year="2022")], dedupe=False)
+        assert stats["stale_derived"] == 0
+        ids, _emb = db.get_all_embeddings()
         assert len(ids) == 1
-        assert db.get_article_by_id("1", "pubmed")["title"] == "Title updated"
+    finally:
+        db.close()
+
+
+def test_insert_articles_keeps_ai_key_points_when_text_changes(tmp_path):
+    db = ArticleDatabase(db_path=str(tmp_path / "e3.db"))
+    try:
+        art = {
+            "article_id": "1",
+            "source": "pubmed",
+            "title": "Title",
+            "abstract": "Abstract text that is long enough.",
+            "year": "2021",
+            "authors": [],
+            "journal": "J",
+        }
+        db.insert_articles([art], dedupe=False)
+        db.insert_key_points({("1", "pubmed"): ["student rewrite"]}, origin="ai")
+        db.insert_articles([dict(art, abstract="A different abstract entirely.")], dedupe=False)
+        assert db.get_key_points_origin_map().get(("1", "pubmed")) == "ai"
+        assert db.get_key_points_map()[("1", "pubmed")] == ["student rewrite"]
     finally:
         db.close()
 

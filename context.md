@@ -111,11 +111,10 @@ Guest User (is_guest) → sample corpus only; purged by age
 - Host entry: `app.main:app` port 7860; Linux `./venv`
 
 ## Session Handoff
-- **Date:** 2026-08-31
-- **Branch:** `feat/5.3-reader-mode` (PR open for 5.3.1)
-- **Done:** 5.3.0 shipped Reader Mode (Explain this study, deterministic
-  verifier, evaluation corpus). 5.3.1 fixes what the independent audit found:
-  three checks that could not fail, and a verifier version stamp that was never
-  bumped, so cached verdicts outlived the rules behind them. Entity-retention
-  check dropped as near-inert.
-- **Next:** 5.3.1 PR open. Audit log in `docs/READER_MODE_AUDIT.md` (untracked).
+- **Date:** 2026-09-11
+- **Branch:** `fix/a09-a10-jobs-and-embeddings`
+- **Done:** Audit A09 (live jobs no longer evicted from the progress LRU) and
+  A10 (title/abstract change drops embeddings and extractive key points; notes
+  and AI bullets kept).
+- **Next:** A08 stale-tab library writes, then A07 notes quota, A06 backups.
+  A01/A02 still the first security pair if that pass has not landed.
