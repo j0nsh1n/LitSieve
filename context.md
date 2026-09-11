@@ -19,10 +19,11 @@
   then a short finish leg into Search. After papers exist, topics/fetch hide;
   Start over is a popup. Advanced: full steps including Clean up + Clusters;
   its progress bars share Simple height/tokens, with counts on a detail line.
-  Teal Soft tokens: accent `#0f766e`, 8/12/18px radii. Headings Source Serif 4,
-  body/UI Source Sans 3 (self-hosted). Flat paper / near-black dark, score
-  ring on Search. Sieve pan as favicon, nav mark, and empty-state illustration
-  (Search / Clean up / Clusters).
+  Airy glass tokens: accent `#2563eb` (dark `#93b4ff`), 10/16/22px radii.
+  Source Serif 4 headings, Source Sans 3 body/UI (self-hosted). Hybrid frost
+  cards on a soft wash, score ring on Search. Sieve pan as favicon, nav
+  mark, and empty-state illustration (Search / Clean up / Clusters).
+  CSS cache-bust `style.css?v=20260911c`.
 - Reader Mode: **Explain this study** on Search/Clean up cards — structured
   plain-language reading of one abstract, cached per
   `(article_id, source, audience)` in the library DB, warnings-only verifier.
@@ -111,11 +112,11 @@ Guest User (is_guest) → sample corpus only; purged by age
 - Host entry: `app.main:app` port 7860; Linux `./venv`
 
 ## Session Handoff
-- **Date:** 2026-08-31
-- **Branch:** `feat/5.3-reader-mode` (PR open for 5.3.1)
-- **Done:** 5.3.0 shipped Reader Mode (Explain this study, deterministic
-  verifier, evaluation corpus). 5.3.1 fixes what the independent audit found:
-  three checks that could not fail, and a verifier version stamp that was never
-  bumped, so cached verdicts outlived the rules behind them. Entity-retention
-  check dropped as near-inert.
-- **Next:** 5.3.1 PR open. Audit log in `docs/READER_MODE_AUDIT.md` (untracked).
+- **Date:** 2026-09-11
+- **Branch:** `feat/airy-glass-ui` (worktree
+  `/home/jonathans/HealthDatabaseAccess-glass`; demo `http://127.0.0.1:7862`).
+  Separate from `fix/a09-a10-jobs-and-embeddings`.
+- **Done:** Airy glass CSS committed. Frost cards, soft-blue accent, pill
+  buttons and nav chips with hairline edges, Source Serif 4 headings.
+  Cache-bust `style.css?v=20260911c`. Human has not signed off the look.
+- **Next:** Human sign-off on frost chrome, radii, accent, and type.
