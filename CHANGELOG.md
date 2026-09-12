@@ -8,6 +8,12 @@ and this project aims to follow Semantic Versioning for app version strings
 
 ## [Unreleased]
 
+### Changed
+- Refreshed the look with an airy glass style: frosted cards on a light
+  wash, a softer blue accent, pill buttons and nav chips with frost fill
+  and hairline edges (no ink outlines), Source Serif 4 on headings, and
+  denser search results. Layout and workflow are unchanged.
+
 ### Fixed
 - A running fetch or prepare is no longer dropped from tracking when other
   accounts fill the in-memory progress cache, so a second copy of the same job

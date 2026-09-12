@@ -19,10 +19,11 @@
   then a short finish leg into Search. After papers exist, topics/fetch hide;
   Start over is a popup. Advanced: full steps including Clean up + Clusters;
   its progress bars share Simple height/tokens, with counts on a detail line.
-  Teal Soft tokens: accent `#0f766e`, 8/12/18px radii. Headings Source Serif 4,
-  body/UI Source Sans 3 (self-hosted). Flat paper / near-black dark, score
-  ring on Search. Sieve pan as favicon, nav mark, and empty-state illustration
-  (Search / Clean up / Clusters).
+  Airy glass tokens: accent `#2563eb` (dark `#93b4ff`), 10/16/22px radii.
+  Source Serif 4 headings, Source Sans 3 body/UI (self-hosted). Hybrid frost
+  cards on a soft wash, score ring on Search. Sieve pan as favicon, nav
+  mark, and empty-state illustration (Search / Clean up / Clusters).
+  CSS cache-bust `style.css?v=20260911c`.
 - Reader Mode: **Explain this study** on Search/Clean up cards — structured
   plain-language reading of one abstract, cached per
   `(article_id, source, audience)` in the library DB, warnings-only verifier.
@@ -112,9 +113,9 @@ Guest User (is_guest) → sample corpus only; purged by age
 
 ## Session Handoff
 - **Date:** 2026-09-11
-- **Branch:** `fix/a09-a10-jobs-and-embeddings`
-- **Done:** Audit A09 (live jobs no longer evicted from the progress LRU) and
-  A10 (title/abstract change drops embeddings and extractive key points; notes
-  and AI bullets kept).
-- **Next:** A08 stale-tab library writes, then A07 notes quota, A06 backups.
-  A01/A02 still the first security pair if that pass has not landed.
+- **Branch:** `fix/a09-a10-jobs-and-embeddings` (airy glass + A09/A10)
+- **Done:** Airy glass CSS (frost cards, soft-blue accent, Source Serif 4
+  headings). Audit A09 (live jobs stay in the progress LRU) and A10
+  (title/abstract change drops embeddings and extractive key points).
+- **Next:** PR this combined branch. Remaining audit: A08, A07, A06. A01/A02
+  if that security pass has not landed.
