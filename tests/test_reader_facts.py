@@ -39,13 +39,16 @@ def test_extract_numbers_kinds_and_units():
     assert all(t["unit"] == "minute" for t in durations), "unit class is singular"
 
     assert by_kind["ci"][0]["surface"] == "95% CI 21 to 65"
-    assert by_kind["ci"][0]["value"] == 95.0
+    assert by_kind["ci"][0]["ci_level"] == 95.0
+    assert by_kind["ci"][0]["ci_low"] == 21.0
+    assert by_kind["ci"][0]["ci_high"] == 65.0
 
     assert by_kind["percent"][0]["value"] == 34.0
     assert by_kind["percent"][0]["unit"] == "%"
 
     assert by_kind["p_value"][0]["value"] == 0.01
     assert by_kind["p_value"][0]["unit"] == "p"
+    assert by_kind["p_value"][0]["p_op"] == "<"
 
     assert by_kind["dose"][0]["value"] == 20.0
     assert by_kind["dose"][0]["unit"] == "mg"
@@ -98,5 +101,21 @@ def test_cues_tightened_lists_reject_overbroad_terms():
 def test_causal_upgrades_match():
     cues = facts.extract_cues("This proves the drug causes harm.")
     assert set(cues["causal"]) == {"proves", "causes"}
+
+
+def test_ci_tokens_keep_both_bounds():
+    """A 95% interval is not just the number 95."""
+    toks = facts.extract_numbers("95% CI 1.2 to 1.8 versus 95% CI 4.2 to 9.8")
+    cis = [t for t in toks if t["kind"] == "ci"]
+    assert len(cis) == 2
+    assert (cis[0]["ci_low"], cis[0]["ci_high"]) == (1.2, 1.8)
+    assert (cis[1]["ci_low"], cis[1]["ci_high"]) == (4.2, 9.8)
+
+
+def test_p_value_tokens_keep_the_operator():
+    toks = facts.extract_numbers("p < 0.01 and p = 0.01")
+    ps = [t for t in toks if t["kind"] == "p_value"]
+    assert [t["p_op"] for t in ps] == ["<", "="]
+    assert [t["value"] for t in ps] == [0.01, 0.01]
 
 
