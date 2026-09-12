@@ -227,3 +227,25 @@ def test_mobile_nav_keeps_account_link_reachable():
     )
     assert "nav-username-short" in phone
     assert "display: inline" in phone or "display:inline" in phone
+
+
+def test_mobile_nav_drawer_is_closed_by_default():
+    """≤900px must not keep steps and tools on screen until the menu is opened."""
+    root = pathlib.Path(__file__).resolve().parent.parent
+    base = (root / "templates" / "base.html").read_text(encoding="utf-8")
+    assert 'id="nav-drawer"' in base
+    assert 'aria-controls="nav-drawer"' in base
+    js = (root / "static" / "js" / "common.js").read_text(encoding="utf-8")
+    assert "getElementById('nav-drawer')" in js or 'getElementById("nav-drawer")' in js
+    css = (root / "static" / "css" / "style.css").read_text(encoding="utf-8")
+    start = css.find("/* Tablet and below: one row")
+    assert start != -1
+    tablet = css[start : css.find("@media (max-width: 640px)", start)]
+    assert ".nav-drawer" in tablet
+    assert "display: none" in tablet
+    assert ".navbar.nav-open .nav-drawer" in tablet
+    desktop = css.find("@media (min-width: 901px)")
+    hide_simple_toggle = css.find(
+        "html[data-mode=\"simple\"] .nav-menu-toggle {\n        display: none !important;"
+    )
+    assert hide_simple_toggle > desktop, "Simple must keep the menu button on phones"

@@ -250,6 +250,38 @@ def _empty_job_slot(task: str) -> dict:
     return slot
 
 
+def _has_live_job(user_id: str) -> bool:
+    """True if this account still has a fetch/embed worker. Call under _progress_lock."""
+    rec = _all_progress.get(user_id)
+    if rec:
+        for task in ('fetch', 'embed'):
+            if rec.get(task, {}).get('active'):
+                return True
+    for task in ('fetch', 'embed'):
+        if _job_sync.get((user_id, task)):
+            return True
+        fut = _job_futures.get((user_id, task))
+        if fut is not None and not fut.done():
+            return True
+    return False
+
+
+def _evict_idle_progress() -> None:
+    """Drop oldest idle progress rows until at cap. Never drop a live job."""
+    while len(_all_progress) > MAX_CACHED_USERS:
+        victim = None
+        for uid in _all_progress:
+            if not _has_live_job(uid):
+                victim = uid
+                break
+        if victim is None:
+            break
+        _all_progress.pop(victim, None)
+        for task in ('fetch', 'embed'):
+            _job_futures.pop((victim, task), None)
+            _job_sync.pop((victim, task), None)
+
+
 def _ensure_progress(user_id: str) -> dict:
     """Return progress dict for user, creating it if needed. Must be called under _progress_lock."""
     if user_id not in _all_progress:
@@ -257,11 +289,7 @@ def _ensure_progress(user_id: str) -> dict:
             'fetch': _empty_job_slot('fetch'),
             'embed': _empty_job_slot('embed'),
         }
-        while len(_all_progress) > MAX_CACHED_USERS:
-            evicted, _ = _all_progress.popitem(last=False)
-            for task in ('fetch', 'embed'):
-                _job_futures.pop((evicted, task), None)
-                _job_sync.pop((evicted, task), None)
+        _evict_idle_progress()
     _all_progress.move_to_end(user_id)
     # Backfill keys if an older in-memory entry lacks them.
     for task in ('fetch', 'embed'):
@@ -479,6 +507,9 @@ def try_begin_user_job(uid: str, task: str, **extra) -> bool:
     with _progress_lock:
         p = _ensure_progress(uid)
         if p[task].get('active'):
+            return False
+        fut = _job_futures.get((uid, task))
+        if _job_sync.get((uid, task)) or (fut is not None and not fut.done()):
             return False
         slot = {
             'active': True, 'done': 0, 'total': 0, 'result': None, 'error': None,
