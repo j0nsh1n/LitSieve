@@ -30,6 +30,14 @@ and this project aims to follow Semantic Versioning for app version strings
   chose.** AI keys are now stored per account under `USER_DATA_DIR`, the
   Account page no longer rewrites process env, and a student's base URL
   is used only with that student's own key.
+- **Reader Mode treated two different 95% confidence intervals as the
+  same number**, and dropped whether a p-value was `<` or `=`. Cached
+  explanations re-check under verifier v3.
+- **An operator alias such as `auditmodel=org/real-model` tried to
+  download `auditmodel`.** Embedding load now uses the configured repo
+  path.
+- **Density clustering crashed on a library with one paper.** Tiny
+  corpora now form one group instead of a server error.
 
 ### Changed
 - Saving AI settings writes `{USER_DATA_DIR}/{account id}/ai_settings.json`

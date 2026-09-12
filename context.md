@@ -115,11 +115,10 @@ Guest User (is_guest) → sample corpus only; purged by age
 ## Session Handoff
 - **Date:** 2026-09-12
 - **Branch:** `fix/audit-a01-a11-a15` (includes A02)
-- **Done:** A02 reset tokens bind to account id. A11 embedding cache does
-  not publish a stale generation. A12 older fetchers re-raise FetchError.
-  A15 operator JSON parses before redaction. A01 option 2: per-account AI
-  keys under USER_DATA_DIR, no env copy (A13), no mix of host key with a
-  student base URL (A14 path isolation included).
+- **Done:** A01 option 2 (per-account AI keys) plus A02, A11–A18 from the
+  2026-09-06 audit. Reader verifier is v3 (CI bounds and p-value operators).
+  Embedding aliases resolve to the configured repo. HDBSCAN on tiny libraries
+  returns one group.
 - **Next:** Roadmap Phase 4 leftover: account cap and restore drill.
-  A06–A10 exist on other local branches / PR #64. spec.md still says AI
+  A03–A10 exist on other local branches / PR #64. spec.md still says AI
   keys live in `user_data/ai_settings.json` (drift, not edited).
