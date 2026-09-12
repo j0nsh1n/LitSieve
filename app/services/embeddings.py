@@ -164,8 +164,9 @@ class EmbeddingEngine:
     def allowed_models(cls) -> Dict[str, str]:
         """Catalog names plus any the operator allow-listed via env.
 
-        `MODELS.get(name, name)` treats an unknown name as a HuggingFace path,
-        which is a useful escape hatch but must not be driven by request bodies:
+        `allowed_models()` maps catalog names and EXTRA_EMBEDDING_MODELS aliases
+        to HuggingFace paths. Unknown names still fall through as a path, which
+        is a useful escape hatch but must not be driven by request bodies:
         that would let any logged-in user trigger arbitrary model downloads onto
         the host's disk. Extra models are therefore an operator decision, set as
         a comma-separated EXTRA_EMBEDDING_MODELS (either "org/model" or
@@ -181,6 +182,11 @@ class EmbeddingEngine:
             allowed[name] = path or name
         return allowed
 
+    @classmethod
+    def resolve_model_path(cls, name: str) -> str:
+        """HuggingFace path for a catalog name or EXTRA_EMBEDDING_MODELS alias."""
+        return cls.allowed_models().get(name, name)
+
     def __init__(self, model_name: str = 'general'):
         self.model_name = model_name
         self.device = None  # resolved lazily when the model is first loaded
@@ -194,7 +200,7 @@ class EmbeddingEngine:
         pipeline and undo the sharing. Callers hit this once per batch/query,
         so a locked dict lookup is noise next to the encode itself.
         """
-        model_path = self.MODELS.get(self.model_name, self.model_name)
+        model_path = self.resolve_model_path(self.model_name)
         model, resolved = get_shared_model(model_path, select_device())
         self.device = resolved
         return model
