@@ -7,7 +7,7 @@
     <link rel="icon" href="/static/favicon.svg?v=20260828a" type="image/svg+xml">
     <link rel="icon" href="/static/favicon.ico?v=20260803a" sizes="32x32">
     <link rel="apple-touch-icon" href="/static/favicon.png?v=20260803a">
-    <link rel="stylesheet" href="/static/css/style.css?v=20260911c">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260912a">
     <script src="/static/js/theme-init.js?v=20260823a"></script>
     {% block head_extra %}{% endblock %}
 </head>
@@ -70,8 +70,8 @@
                     class="nav-menu-toggle"
                     id="nav-menu-toggle"
                     aria-expanded="false"
-                    aria-controls="nav-links-panel"
-                    title="Open steps menu">
+                    aria-controls="nav-drawer"
+                    title="Open menu">
                 <span class="nav-menu-toggle-icon" aria-hidden="true">☰</span>
                 <span class="nav-menu-toggle-text">
                     {% if ns.current_num %}
@@ -84,6 +84,7 @@
                 </span>
                 <span class="nav-menu-caret" aria-hidden="true">▾</span>
             </button>
+            <div class="nav-drawer" id="nav-drawer">
             <div class="nav-links" id="nav-links-panel" aria-label="Workflow steps in order">
                 {% for key, label, simple_label, href, tip, simple_step in workflow %}
                 {% if not loop.first %}
@@ -103,8 +104,6 @@
                 </a>
                 {% endfor %}
             </div>
-        </div>
-
         <div class="shell-tools nav-stats" aria-label="Workspace tools">
             {% if user %}
             <label class="nav-library-wrap" title="Switch library (separate paper collections)">
@@ -141,6 +140,8 @@
             {% endif %}
             <span class="stat-badge" id="nav-article-count" aria-live="polite">-- articles</span>
         </div>
+            </div>
+        </div>
     </nav>
 
     <main class="container {% block container_mod %}{% endblock %}" id="page-main">
@@ -157,7 +158,7 @@
         {{ scope_footer() }}
     </footer>
 
-    <script src="/static/js/common.js?v=20260829a"></script>
+    <script src="/static/js/common.js?v=20260912a"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

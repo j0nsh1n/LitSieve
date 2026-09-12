@@ -13,6 +13,8 @@ and this project aims to follow Semantic Versioning for app version strings
   wash, a softer blue accent, pill buttons and nav chips with frost fill
   and hairline edges (no ink outlines), Source Serif 4 on headings, and
   denser search results. Layout and workflow are unchanged.
+- On phones and tablets the top bar is one row (brand + menu). Steps,
+  library, mode, and account sit in a drawer so they do not eat the page.
 
 ### Fixed
 - A running fetch or prepare is no longer dropped from tracking when other

@@ -460,13 +460,23 @@ body {
         padding: var(--space-2) var(--space-5);
     }
     .shell-primary {
+        display: flex;
         flex: 1 1 auto;
         min-width: 0;
+        align-items: center;
+        gap: var(--space-4);
+        width: 100%;
+    }
+    .nav-drawer {
+        display: flex;
+        flex: 1 1 auto;
+        min-width: 0;
+        align-items: center;
         gap: var(--space-4);
     }
     .shell-tools,
     .nav-stats {
-        margin-left: 0;
+        margin-left: auto;
         flex: 0 0 auto;
         padding: var(--space-1) var(--space-2);
         border: 1px solid var(--frost-edge);
@@ -4625,7 +4635,7 @@ html, body {
     max-width: 100%;
 }
 
-/* Tablet and below: brand | steps menu | tools; steps expand full width below */
+/* Tablet and below: one row (brand + menu). Drawer holds steps and tools. */
 @media (max-width: 900px) {
     .navbar,
     .app-shell {
@@ -4634,7 +4644,7 @@ html, body {
         position: sticky;
         overflow: visible;
         display: grid;
-        grid-template-columns: minmax(0, auto) minmax(0, 1fr) minmax(0, auto);
+        grid-template-columns: minmax(0, auto) minmax(0, 1fr);
         grid-template-rows: auto auto;
         align-items: center;
     }
@@ -4652,26 +4662,30 @@ html, body {
         display: inline-flex !important;
         grid-column: 2;
         grid-row: 1;
-        justify-self: center;
-        max-width: min(100%, 14rem);
+        justify-self: end;
+        max-width: min(100%, 16rem);
         width: auto;
         min-width: 0;
     }
-    .shell-tools,
-    .nav-stats {
-        grid-column: 3;
-        grid-row: 1;
-        gap: var(--space-1);
-        flex-wrap: nowrap;
-        justify-content: flex-end;
-        min-width: 0;
-        max-width: 100%;
-        border: none;
-        background: transparent;
-        padding: 0;
-    }
     .stat-badge { display: none; }
     .nav-username { max-width: 5.5rem; }
+
+    .nav-drawer {
+        display: none;
+        grid-column: 1 / -1;
+        grid-row: 2;
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--space-2);
+        margin: var(--space-2) 0 0;
+        padding: var(--space-2) 0 0;
+        border-top: 1px solid var(--rule);
+        width: 100%;
+    }
+    .navbar.nav-open .nav-drawer,
+    body.nav-menu-open .navbar .nav-drawer {
+        display: flex;
+    }
 
     /*
      * Closed by default. Open when either the navbar or body has the open flag
@@ -4679,16 +4693,14 @@ html, body {
      */
     .nav-links,
     #nav-links-panel {
-        display: none !important;
-        grid-column: 1 / -1;
-        grid-row: 2;
+        display: flex;
         flex-direction: column;
         align-items: stretch;
         flex-wrap: nowrap;
         gap: 0;
-        margin: var(--space-2) 0 0;
-        padding: var(--space-1) 0 0;
-        border-top: 1px solid var(--rule);
+        margin: 0;
+        padding: 0;
+        border-top: none;
         overflow: visible;
         mask-image: none !important;
         -webkit-mask-image: none !important;
@@ -4701,6 +4713,22 @@ html, body {
     body.nav-menu-open .navbar .nav-links,
     body.nav-menu-open #nav-links-panel {
         display: flex !important;
+    }
+
+    .shell-tools,
+    .nav-stats {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-start;
+        align-items: center;
+        gap: var(--space-2);
+        width: 100%;
+        min-width: 0;
+        max-width: none;
+        border: none;
+        background: transparent;
+        padding: var(--space-2) 0 0;
+        margin: 0;
     }
 
     .nav-flow-arrow {
@@ -4795,7 +4823,7 @@ html, body {
     .app-shell,
     .navbar {
         gap: var(--space-1);
-        grid-template-columns: minmax(0, 5.75rem) minmax(0, 1fr) minmax(0, auto);
+        grid-template-columns: minmax(0, 5.75rem) minmax(0, 1fr);
     }
     .nav-brand {
         font-size: var(--fs-sm);
@@ -5383,7 +5411,7 @@ html, body {
 
     .app-shell,
     .navbar {
-        grid-template-columns: minmax(0, 4.75rem) minmax(0, 1fr) minmax(0, auto);
+        grid-template-columns: minmax(0, 4.75rem) minmax(0, 1fr);
     }
     .nav-brand { max-width: 4.75rem; font-size: var(--fs-sm); }
     .nav-menu-toggle { max-width: 100%; padding: var(--space-1) var(--space-1); min-height: 2.75rem; }
@@ -5548,7 +5576,6 @@ html[data-mode="simple"] .nav-flow-arrow-before-statistics {
 }
 /* Simple: one unnumbered Search tab. Get papers / Clusters / Clean up stay
    off the bar (collect is still /search?collect=1 via Start over). */
-html[data-mode="simple"] .nav-menu-toggle,
 html[data-mode="simple"] .nav-step-data_management,
 html[data-mode="simple"] .nav-step-clusters,
 html[data-mode="simple"] .nav-step-statistics,
@@ -5556,11 +5583,14 @@ html[data-mode="simple"] .nav-flow-arrow,
 html[data-mode="simple"] .nav-step-search .nav-step-num {
     display: none !important;
 }
-html[data-mode="simple"] .nav-links,
-html[data-mode="simple"] #nav-links-panel {
-    display: flex !important;
-}
 @media (min-width: 901px) {
+    html[data-mode="simple"] .nav-menu-toggle {
+        display: none !important;
+    }
+    html[data-mode="simple"] .nav-links,
+    html[data-mode="simple"] #nav-links-panel {
+        display: flex !important;
+    }
     html[data-mode="simple"] .nav-links,
     html[data-mode="simple"] #nav-links-panel,
     html[data-mode="simple"] .navbar.nav-open .nav-links,
@@ -5584,72 +5614,38 @@ html[data-mode="simple"] #nav-links-panel {
         color: var(--text);
     }
 }
-/* Simple phones: three centered rows — brand+Search, tools, library chip.
-   Do not keep Library inside a flex-end tools cluster: that right-biases
-   the second row and stretches the bordered wrap across the bar. */
+/* Simple phones: same collapsed bar as Advanced (brand + menu). */
 @media (max-width: 900px) {
-    html[data-mode="simple"] .navbar,
-    html[data-mode="simple"] .app-shell {
-        display: flex;
-        flex-direction: column;
-        flex-wrap: nowrap;
-        align-items: center;
-        gap: var(--space-2);
-    }
-    html[data-mode="simple"] .shell-primary {
-        display: flex;
-        flex: 0 0 auto;
-        justify-content: center;
-        align-items: center;
-        gap: var(--space-3);
-        width: 100%;
-        min-width: 0;
+    html[data-mode="simple"] .nav-menu-toggle {
+        display: inline-flex !important;
     }
     html[data-mode="simple"] .nav-links,
     html[data-mode="simple"] #nav-links-panel {
-        display: flex !important;
-        flex-direction: row;
-        flex: 0 0 auto;
-        width: auto;
+        display: flex;
+        flex-direction: column;
+        width: 100%;
         margin: 0;
         padding: 0;
         border: none;
-        grid-column: auto;
-        grid-row: auto;
     }
     html[data-mode="simple"] .nav-step-search {
-        width: auto;
-        min-height: 2.75rem;
-        border-bottom: none;
-        padding: var(--space-2) var(--space-3);
-    }
-    html[data-mode="simple"] .shell-tools,
-    html[data-mode="simple"] .nav-stats {
-        display: flex;
-        flex: 0 0 auto;
-        flex-wrap: wrap;
-        justify-content: center;
-        align-items: center;
-        gap: var(--space-2) var(--space-3);
         width: 100%;
-        min-width: 0;
-        max-width: none;
-        border: none;
-        background: transparent;
-        padding: 0;
+        min-height: 2.75rem;
+        justify-content: flex-start;
+        border-bottom: 1px solid var(--rule);
+        padding: var(--space-3) var(--space-2);
     }
     html[data-mode="simple"] .nav-library-label {
         display: none;
     }
     html[data-mode="simple"] .nav-library-wrap {
         flex: 1 1 100%;
-        order: 20;
         max-width: none;
         min-height: 2.75rem;
         margin: 0;
         padding: 0;
         display: flex;
-        justify-content: center;
+        justify-content: flex-start;
         border: none;
         background: transparent;
     }
@@ -5658,18 +5654,9 @@ html[data-mode="simple"] #nav-links-panel {
         max-width: min(18rem, 100%);
         min-width: 8rem;
         min-height: 2.75rem;
-        margin-inline: 0;
         padding: 0 var(--space-2);
         border: 1px solid var(--rule);
         border-radius: var(--radius-md);
-        text-align: center;
-        text-align-last: center;
-    }
-    html[data-mode="simple"] .mode-toggle,
-    html[data-mode="simple"] .theme-toggle,
-    html[data-mode="simple"] .nav-username,
-    html[data-mode="simple"] .nav-logout {
-        flex-shrink: 0;
     }
 }
 /* Dual nav labels: Advanced names by default; Simple swaps in. */

@@ -23,7 +23,8 @@
   Source Serif 4 headings, Source Sans 3 body/UI (self-hosted). Hybrid frost
   cards on a soft wash, score ring on Search. Sieve pan as favicon, nav
   mark, and empty-state illustration (Search / Clean up / Clusters).
-  CSS cache-bust `style.css?v=20260911c`.
+  CSS cache-bust `style.css?v=20260912a`. Mobile app nav is a one-row
+  brand + menu; steps and tools open in a drawer.
 - Reader Mode: **Explain this study** on Search/Clean up cards — structured
   plain-language reading of one abstract, cached per
   `(article_id, source, audience)` in the library DB, warnings-only verifier.
@@ -116,5 +117,6 @@ Guest User (is_guest) → sample corpus only; purged by age
 - **Branch:** `fix/a09-a10-jobs-and-embeddings` (PR #64)
 - **Done:** Airy glass CSS; A09 live-job LRU; A10 stale embeddings; fetch
   cancel now aborts HTTP retries instead of sleeping the backoff ladder.
+  Mobile nav is a collapsed drawer (brand + menu on one row).
 - **Next:** Remaining audit A08, A07, A06. A01/A02 if that security pass
   has not landed.
