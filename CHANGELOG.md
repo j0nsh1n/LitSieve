@@ -8,6 +8,14 @@ and this project aims to follow Semantic Versioning for app version strings
 
 ## [Unreleased]
 
+### Fixed
+- **A deleted account's password-reset link could unlock the next account
+  with the same username.** Reset tokens were keyed by username, and
+  deleting an account left unused tokens behind. A later account reusing
+  that username could have its password reset by whoever still held the
+  old link. Tokens now bind to the account id, are removed on delete, and
+  only work for the account they were issued to.
+
 ## [5.3.1] - 2026-08-31
 
 ### Fixed

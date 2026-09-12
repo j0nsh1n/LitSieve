@@ -98,6 +98,7 @@ class UserDatabase:
         self.conn.execute("""
             CREATE TABLE IF NOT EXISTS password_reset_tokens (
                 username     TEXT NOT NULL COLLATE NOCASE,
+                user_id      TEXT,
                 token_hash   TEXT NOT NULL,
                 expires_at   TEXT NOT NULL,
                 used         INTEGER NOT NULL DEFAULT 0,
@@ -105,6 +106,34 @@ class UserDatabase:
                 PRIMARY KEY (username, token_hash)
             )
         """)
+        prt_cols = {
+            row[1]
+            for row in self.conn.execute(
+                "PRAGMA table_info(password_reset_tokens)"
+            ).fetchall()
+        }
+        if "user_id" not in prt_cols:
+            self.conn.execute(
+                "ALTER TABLE password_reset_tokens ADD COLUMN user_id TEXT"
+            )
+            self.conn.execute(
+                """
+                UPDATE password_reset_tokens
+                SET user_id = (
+                    SELECT id FROM users
+                    WHERE users.username = password_reset_tokens.username
+                    COLLATE NOCASE
+                )
+                WHERE user_id IS NULL
+                """
+            )
+            self.conn.execute(
+                "DELETE FROM password_reset_tokens WHERE user_id IS NULL"
+            )
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_password_reset_user "
+            "ON password_reset_tokens(user_id)"
+        )
         # Optional library copy codes: clone into another account (not live view).
         self.conn.execute("""
             CREATE TABLE IF NOT EXISTS shares (
@@ -818,6 +847,28 @@ class UserDatabase:
     def delete_user(self, user_id: str) -> bool:
         """Delete a user account. Returns True if a row was removed."""
         with self._lock:
+            row = self.conn.execute(
+                "SELECT username FROM users WHERE id = ?", (user_id,)
+            ).fetchone()
+            uname = row[0] if row else None
+            self.conn.execute(
+                "DELETE FROM password_reset_tokens WHERE user_id = ?",
+                (user_id,),
+            )
+            if uname:
+                self.conn.execute(
+                    "DELETE FROM password_reset_tokens "
+                    "WHERE username = ? COLLATE NOCASE",
+                    (uname,),
+                )
+                self.conn.execute(
+                    "DELETE FROM email_verification_tokens "
+                    "WHERE username = ? COLLATE NOCASE",
+                    (uname,),
+                )
+            self.conn.execute(
+                "DELETE FROM one_time_logins WHERE user_id = ?", (user_id,)
+            )
             # Drop shares owned by this user and any of their redemptions.
             # Subquery instead of expanded placeholders: a long share history
             # would exceed SQLite's host-parameter limit and abort the delete.
@@ -1038,17 +1089,19 @@ class UserDatabase:
             datetime.now(timezone.utc) + timedelta(minutes=ttl_minutes)
         ).strftime("%Y-%m-%d %H:%M:%S")
         uname = user["username"]
+        uid = user["id"]
         with self._lock:
-            # Invalidate prior unused tokens for this user.
+            # Invalidate prior unused tokens for this account, not the login name.
             self.conn.execute(
                 "UPDATE password_reset_tokens SET used = 1 "
-                "WHERE username = ? COLLATE NOCASE AND used = 0",
-                (uname,),
+                "WHERE user_id = ? AND used = 0",
+                (uid,),
             )
             self.conn.execute(
-                "INSERT INTO password_reset_tokens (username, token_hash, expires_at, used) "
-                "VALUES (?, ?, ?, 0)",
-                (uname, token_hash, expires),
+                "INSERT INTO password_reset_tokens "
+                "(username, user_id, token_hash, expires_at, used) "
+                "VALUES (?, ?, ?, ?, 0)",
+                (uname, uid, token_hash, expires),
             )
             self.conn.commit()
         return token
@@ -1059,17 +1112,21 @@ class UserDatabase:
         """Validate token and set password. Returns (ok, error_message)."""
         if not token or not username:
             return False, "Reset code and login are required."
+        user = self.get_by_username(username)
+        if not user:
+            return False, "Invalid or expired reset code."
         token_hash = self._hash_reset_token(token.strip())
         now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        uid = user["id"]
         with self._lock:
             row = self.conn.execute(
-                "SELECT username, expires_at, used FROM password_reset_tokens "
-                "WHERE username = ? COLLATE NOCASE AND token_hash = ?",
-                (username.strip(), token_hash),
+                "SELECT user_id, expires_at, used FROM password_reset_tokens "
+                "WHERE user_id = ? AND token_hash = ?",
+                (uid, token_hash),
             ).fetchone()
             if not row:
                 return False, "Invalid or expired reset code."
-            uname, expires_at, used = row[0], row[1], int(row[2] or 0)
+            expires_at, used = row[1], int(row[2] or 0)
             if used:
                 return False, "This reset code was already used."
             if expires_at < now:
@@ -1077,15 +1134,15 @@ class UserDatabase:
             cur = self.conn.execute(
                 "UPDATE users SET hashed_password = ?, "
                 "token_version = token_version + 1, password_changed_at = ? "
-                "WHERE username = ? COLLATE NOCASE",
-                (new_hashed_password, now, uname),
+                "WHERE id = ?",
+                (new_hashed_password, now, uid),
             )
             if cur.rowcount == 0:
                 return False, "Account not found."
             self.conn.execute(
                 "UPDATE password_reset_tokens SET used = 1 "
-                "WHERE username = ? COLLATE NOCASE AND token_hash = ?",
-                (uname, token_hash),
+                "WHERE user_id = ? AND token_hash = ?",
+                (uid, token_hash),
             )
             self.conn.commit()
         return True, ""

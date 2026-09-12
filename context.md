@@ -111,11 +111,11 @@ Guest User (is_guest) → sample corpus only; purged by age
 - Host entry: `app.main:app` port 7860; Linux `./venv`
 
 ## Session Handoff
-- **Date:** 2026-08-31
-- **Branch:** `feat/5.3-reader-mode` (PR open for 5.3.1)
-- **Done:** 5.3.0 shipped Reader Mode (Explain this study, deterministic
-  verifier, evaluation corpus). 5.3.1 fixes what the independent audit found:
-  three checks that could not fail, and a verifier version stamp that was never
-  bumped, so cached verdicts outlived the rules behind them. Entity-retention
-  check dropped as near-inert.
-- **Next:** 5.3.1 PR open. Audit log in `docs/READER_MODE_AUDIT.md` (untracked).
+- **Date:** 2026-09-12
+- **Branch:** `fix/a02-reset-token-userid`
+- **Done:** A02. Password-reset tokens bind to the account id, `delete_user`
+  wipes outstanding reset / one-time-login / email-verify tokens, and
+  consume matches that id. Username stays the form field.
+- **Next:** A01 needs a human pick (operator-only host AI settings vs
+  per-account student credentials) before code. A06–A10 exist on other
+  local branches / PR #64.

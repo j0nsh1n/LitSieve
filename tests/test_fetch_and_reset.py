@@ -188,6 +188,78 @@ def test_password_reset_flow(tmp_path):
         udb.conn.close()
 
 
+def test_password_reset_token_does_not_take_over_reregistered_username(tmp_path):
+    """A02: deleting an account must not leave a reset token that can
+    change the password of a later account that reused the username."""
+    udb = UserDatabase(db_path=str(tmp_path / "u.db"))
+    try:
+        first = udb.create_user("alice", hash_password("oldpassword"))
+        token = udb.create_password_reset_token("alice")
+        assert token
+        assert udb.delete_user(first["id"]) is True
+
+        second = udb.create_user("alice", hash_password("brand-new-pass1"))
+        assert second["id"] != first["id"]
+
+        ok, err = udb.consume_password_reset_token(
+            "alice", token, hash_password(TEST_PASSWORD_ALT)
+        )
+        assert not ok, err
+        row = udb.get_by_username("alice")
+        assert row["id"] == second["id"]
+        assert verify_password("brand-new-pass1", row["hashed_password"])
+        assert not verify_password(TEST_PASSWORD_ALT, row["hashed_password"])
+    finally:
+        udb.conn.close()
+
+
+def test_legacy_username_reset_token_still_works_for_same_account(tmp_path):
+    """Outstanding codes issued before user_id still reset that same account."""
+    import sqlite3
+
+    path = tmp_path / "legacy.db"
+    raw = sqlite3.connect(path)
+    raw.execute(
+        "CREATE TABLE users ("
+        "id TEXT PRIMARY KEY, username TEXT UNIQUE NOT NULL COLLATE NOCASE, "
+        "hashed_password TEXT NOT NULL, created_at TEXT, "
+        "token_version INTEGER NOT NULL DEFAULT 0)"
+    )
+    raw.execute(
+        "CREATE TABLE password_reset_tokens ("
+        "username TEXT NOT NULL COLLATE NOCASE, token_hash TEXT NOT NULL, "
+        "expires_at TEXT NOT NULL, used INTEGER NOT NULL DEFAULT 0, "
+        "created_at TEXT, PRIMARY KEY (username, token_hash))"
+    )
+    uid = "legacy-alice-id"
+    raw.execute(
+        "INSERT INTO users (id, username, hashed_password, token_version) "
+        "VALUES (?, 'alice', ?, 0)",
+        (uid, hash_password("oldpassword")),
+    )
+    token = "legacy-reset-token-value"
+    token_hash = UserDatabase._hash_reset_token(token)
+    raw.execute(
+        "INSERT INTO password_reset_tokens "
+        "(username, token_hash, expires_at, used) "
+        "VALUES ('alice', ?, '2099-01-01 00:00:00', 0)",
+        (token_hash,),
+    )
+    raw.commit()
+    raw.close()
+
+    udb = UserDatabase(db_path=str(path))
+    try:
+        ok, err = udb.consume_password_reset_token(
+            "alice", token, hash_password(TEST_PASSWORD_ALT)
+        )
+        assert ok, err
+        row = udb.get_by_id(uid)
+        assert verify_password(TEST_PASSWORD_ALT, row["hashed_password"])
+    finally:
+        udb.conn.close()
+
+
 def test_foreign_keys_pragma_on(tmp_path):
     db = ArticleDatabase(db_path=str(tmp_path / "fk.db"))
     try:
