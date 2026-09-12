@@ -8,7 +8,7 @@ import logging
 import os
 from typing import Dict, List
 
-from app.fetchers.base import BaseFetcher, HttpClient
+from app.fetchers.base import BaseFetcher, HttpClient, reraise_fetch_error
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +60,7 @@ class NASAADSFetcher(BaseFetcher):
                     break
                 start += len(docs)
             except Exception as e:
+                reraise_fetch_error(e)
                 logger.exception("NASA ADS fetch error: %s", e)
                 break
 

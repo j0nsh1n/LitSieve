@@ -8,7 +8,7 @@ import logging
 import xml.etree.ElementTree as ET
 from typing import Dict, List, Optional
 
-from app.fetchers.base import BaseFetcher, HttpClient
+from app.fetchers.base import BaseFetcher, HttpClient, reraise_fetch_error
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +53,7 @@ class ArXivFetcher(BaseFetcher):
                     break
                 start += len(entries)
             except Exception as e:
+                reraise_fetch_error(e)
                 logger.exception("arXiv search error: %s", e)
                 break
 
@@ -76,6 +77,7 @@ class ArXivFetcher(BaseFetcher):
                     if article:
                         articles.append(article)
             except Exception as e:
+                reraise_fetch_error(e)
                 logger.exception("arXiv fetch_details error: %s", e)
 
         return articles

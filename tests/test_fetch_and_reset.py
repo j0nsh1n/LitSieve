@@ -1,5 +1,6 @@
 """Tests for fetch helpers, insert dedupe, and password-reset flow."""
 
+import pytest
 from conftest import TEST_PASSWORD_ALT
 
 from app.auth import hash_password, verify_password
@@ -8,6 +9,21 @@ from app.fetchers.base import FetchError, HttpClient, classify_error
 from app.storage.database import ArticleDatabase
 from app.storage.user_db import UserDatabase
 from app.utils import build_screening_report, format_screening_report_txt
+
+
+def test_openalex_search_and_fetch_reraises_fetcherror():
+    """HttpClient failures must not look like an empty successful search."""
+    from app.fetchers.openalex import OpenAlexFetcher
+
+    fetcher = OpenAlexFetcher()
+
+    def boom(*_args, **_kwargs):
+        raise FetchError("OpenAlex 429", kind="rate_limited")
+
+    fetcher.http.get = boom
+    with pytest.raises(FetchError) as ei:
+        fetcher.search_and_fetch("crispr", max_results=5)
+    assert ei.value.kind == "rate_limited"
 
 
 def test_classify_error_kinds():

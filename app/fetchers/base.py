@@ -28,6 +28,12 @@ class FetchError(Exception):
         self.kind = kind  # rate_limited | network | http | no_results | error
 
 
+def reraise_fetch_error(exc: BaseException) -> None:
+    """Let typed HTTP failures reach the coordinator instead of looking empty."""
+    if isinstance(exc, FetchError):
+        raise exc
+
+
 def classify_error(exc: BaseException) -> str:
     """Map an exception to a stable error class for UI reports."""
     if isinstance(exc, FetchError):

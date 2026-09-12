@@ -8,7 +8,7 @@ import logging
 import re
 from typing import Dict, List
 
-from app.fetchers.base import BaseFetcher, HttpClient
+from app.fetchers.base import BaseFetcher, HttpClient, reraise_fetch_error
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +60,7 @@ class CrossRefFetcher(BaseFetcher):
                     break
                 offset += n
             except Exception as e:
+                reraise_fetch_error(e)
                 logger.exception("CrossRef fetch error: %s", e)
                 break
 
