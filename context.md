@@ -19,10 +19,12 @@
   then a short finish leg into Search. After papers exist, topics/fetch hide;
   Start over is a popup. Advanced: full steps including Clean up + Clusters;
   its progress bars share Simple height/tokens, with counts on a detail line.
-  Teal Soft tokens: accent `#0f766e`, 8/12/18px radii. Headings Source Serif 4,
-  body/UI Source Sans 3 (self-hosted). Flat paper / near-black dark, score
-  ring on Search. Sieve pan as favicon, nav mark, and empty-state illustration
-  (Search / Clean up / Clusters).
+  Airy glass tokens: accent `#2563eb` (dark `#93b4ff`), 10/16/22px radii.
+  Source Serif 4 headings, Source Sans 3 body/UI (self-hosted). Hybrid frost
+  cards on a soft wash, score ring on Search. Sieve pan as favicon, nav
+  mark, and empty-state illustration (Search / Clean up / Clusters).
+  CSS cache-bust `style.css?v=20260912a`. Mobile app nav is a one-row
+  brand + menu; steps and tools open in a drawer.
 - Reader Mode: **Explain this study** on Search/Clean up cards — structured
   plain-language reading of one abstract, cached per
   `(article_id, source, audience)` in the library DB, warnings-only verifier.
@@ -114,11 +116,12 @@ Guest User (is_guest) → sample corpus only; purged by age
 
 ## Session Handoff
 - **Date:** 2026-09-12
-- **Branch:** `fix/audit-a01-a11-a15` (includes A02)
+- **Branch:** `fix/audit-a01-a11-a15` (includes A02; merged origin/main)
 - **Done:** A01 option 2 (per-account AI keys) plus A02, A11–A18 from the
   2026-09-06 audit. Reader verifier is v3 (CI bounds and p-value operators).
   Embedding aliases resolve to the configured repo. HDBSCAN on tiny libraries
-  returns one group.
+  returns one group. Merged PR #64 so the airy glass UI is back on this
+  branch (`style.css?v=20260912a`).
 - **Next:** Roadmap Phase 4 leftover: account cap and restore drill.
-  A03–A10 exist on other local branches / PR #64. spec.md still says AI
-  keys live in `user_data/ai_settings.json` (drift, not edited).
+  A03–A08 exist on other local branches. spec.md still says AI keys live
+  in `user_data/ai_settings.json` (drift, not edited).

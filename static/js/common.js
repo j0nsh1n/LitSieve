@@ -1068,15 +1068,14 @@ document.addEventListener('DOMContentLoaded', function() {
     window.addEventListener('scroll', onScroll, { passive: true });
 });
 
-// === Mobile nav dropdown (workflow steps) ===
-// Uses body.nav-menu-open + .navbar.nav-open so CSS can force the panel open
-// even when other display rules fight. Outside-close is deferred one tick so
-// the same tap that opens the menu does not immediately close it.
+// === Mobile nav dropdown (steps + tools) ===
+// Uses body.nav-menu-open + .navbar.nav-open so CSS can force the drawer open
+// even when other display rules fight.
 document.addEventListener('DOMContentLoaded', function() {
     const nav = document.getElementById('site-navbar') || document.querySelector('.navbar');
     const toggle = document.getElementById('nav-menu-toggle');
-    const panel = document.getElementById('nav-links-panel');
-    if (!nav || !toggle || !panel) return;
+    const drawer = document.getElementById('nav-drawer');
+    if (!nav || !toggle || !drawer) return;
 
     let open = false;
 
@@ -1085,12 +1084,12 @@ document.addEventListener('DOMContentLoaded', function() {
         nav.classList.toggle('nav-open', open);
         document.body.classList.toggle('nav-menu-open', open);
         toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-        toggle.title = open ? 'Close steps menu' : 'Open steps menu';
-        // Keep panel in tab order only when open on mobile (desktop always shows it)
+        toggle.title = open ? 'Close menu' : 'Open menu';
+        // Keep drawer out of tab order when closed on mobile (desktop always shows it)
         if (window.matchMedia('(max-width: 900px)').matches) {
-            panel.setAttribute('aria-hidden', open ? 'false' : 'true');
+            drawer.setAttribute('aria-hidden', open ? 'false' : 'true');
         } else {
-            panel.removeAttribute('aria-hidden');
+            drawer.removeAttribute('aria-hidden');
         }
     }
 
@@ -1102,7 +1101,7 @@ document.addEventListener('DOMContentLoaded', function() {
         setOpen(!open);
     });
 
-    panel.querySelectorAll('a.nav-link').forEach(function(link) {
+    drawer.querySelectorAll('a.nav-link, a.nav-username, a.nav-logout').forEach(function(link) {
         link.addEventListener('click', function() {
             setOpen(false);
         });

@@ -610,6 +610,7 @@ class ArticleDatabase:
         updated = 0
         skipped_duplicates = 0
         dropped = 0
+        stale_derived = 0
         table = self.STAGING_TABLE if staging else "articles"
 
         with self._lock:
@@ -638,10 +639,12 @@ class ArticleDatabase:
                     doi = self._norm_doi(aid, source)
 
                     cursor.execute(
-                        f"SELECT 1 FROM {table} WHERE article_id = ? AND source = ?",
+                        f"SELECT title, abstract FROM {table} "
+                        f"WHERE article_id = ? AND source = ?",
                         (aid, source),
                     )
-                    existed = cursor.fetchone() is not None
+                    prior = cursor.fetchone()
+                    existed = prior is not None
 
                     # Same primary key → upsert OK. Cross-source title/DOI dups skip.
                     if dedupe and not existed:
@@ -673,6 +676,26 @@ class ArticleDatabase:
                     ))
                     if existed:
                         updated += 1
+                        # Title/abstract are what embeddings and extractive
+                        # bullets were built from. Notes/stars/AI bullets stay;
+                        # ON CONFLICT does not cascade-delete children.
+                        if (
+                            not staging
+                            and (
+                                (prior[0] or "") != (title or "")
+                                or (prior[1] or "") != (article.get("abstract") or "")
+                            )
+                        ):
+                            cursor.execute(
+                                "DELETE FROM embeddings WHERE article_id = ? AND source = ?",
+                                (aid, source),
+                            )
+                            cursor.execute(
+                                "DELETE FROM key_points WHERE article_id = ? AND source = ? "
+                                "AND origin = 'extractive'",
+                                (aid, source),
+                            )
+                            stale_derived += 1
                     else:
                         inserted += 1
                         if nt:
@@ -686,14 +709,15 @@ class ArticleDatabase:
                     logger.warning("Error inserting article %s: %s", article.get('article_id'), e)
             self.conn.commit()
         logger.info(
-            "Articles upsert: inserted=%d updated=%d skipped_dups=%d dropped=%d",
-            inserted, updated, skipped_duplicates, dropped,
+            "Articles upsert: inserted=%d updated=%d skipped_dups=%d dropped=%d stale_derived=%d",
+            inserted, updated, skipped_duplicates, dropped, stale_derived,
         )
         return {
             "inserted": inserted,
             "updated": updated,
             "skipped_duplicates": skipped_duplicates,
             "dropped": dropped,
+            "stale_derived": stale_derived,
         }
 
     def get_all_articles(self) -> List[Dict]:

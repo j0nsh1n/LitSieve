@@ -163,21 +163,20 @@ def test_simple_nav_shows_unnumbered_search():
     assert "Get papers" in base
 
 
-def test_simple_mobile_nav_rows_are_centered():
-    """≤900px Simple: brand, tools, and library are centered rows — not flex-end."""
+def test_simple_mobile_nav_uses_collapsed_drawer():
+    """≤900px Simple: brand + menu on one row; steps and tools live in the drawer."""
     css = _read("static", "css", "style.css")
     start = css.find("/* Simple phones:")
     assert start != -1
     end = css.find("/* Dual nav labels:", start)
     block = css[start:end]
+    assert ".nav-menu-toggle" in block
+    assert "display: inline-flex !important" in block
     assert "flex-direction: column" in block
-    assert "justify-content: center" in block
-    assert "justify-content: flex-end" not in block
-    tools = block[block.find(".shell-tools") :]
-    assert "justify-content: center" in tools
-    lib = block[block.find(".nav-library-wrap") :]
-    assert "justify-content: center" in lib
-    assert "border: none" in lib
+    nav = css[css.find("/* Tablet and below: one row") : css.find("@media (max-width: 640px)", css.find("/* Tablet and below: one row"))]
+    assert ".nav-drawer" in nav
+    assert "display: none" in nav
+    assert ".navbar.nav-open .nav-drawer" in nav
 
 
 def test_advanced_nav_keeps_clusters_and_four_steps():
