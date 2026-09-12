@@ -73,7 +73,9 @@
 - **Embeddings / clusters / screening / notes / key_points / reader_explanations**: per library DB
 - **Share / clone code**: registry in users.db; join copies library (not live)
 - **Jobs**: fetch / embed progress per user; bind to active library at start
-- **AI settings**: server-wide `user_data/ai_settings.json` (keys encrypted)
+- **AI settings**: per account `{USER_DATA_DIR}/{user_id}/ai_settings.json`
+  (keys encrypted). Host env is the deploy default. A student base URL
+  never rides with the host API key.
 - **Quota**: disk under `user_data/<uid>/` vs `MAX_USER_STORAGE_MB`; optional
   per-account `quota_limit_mb` + `quota_limit_until` overlay (helpdesk bump)
 - **Support view**: httponly `support_view` cookie overlays identity; admin JWT
@@ -112,10 +114,12 @@ Guest User (is_guest) → sample corpus only; purged by age
 
 ## Session Handoff
 - **Date:** 2026-09-12
-- **Branch:** `fix/a02-reset-token-userid`
-- **Done:** A02. Password-reset tokens bind to the account id, `delete_user`
-  wipes outstanding reset / one-time-login / email-verify tokens, and
-  consume matches that id. Username stays the form field.
-- **Next:** A01 needs a human pick (operator-only host AI settings vs
-  per-account student credentials) before code. A06–A10 exist on other
-  local branches / PR #64.
+- **Branch:** `fix/audit-a01-a11-a15` (includes A02)
+- **Done:** A02 reset tokens bind to account id. A11 embedding cache does
+  not publish a stale generation. A12 older fetchers re-raise FetchError.
+  A15 operator JSON parses before redaction. A01 option 2: per-account AI
+  keys under USER_DATA_DIR, no env copy (A13), no mix of host key with a
+  student base URL (A14 path isolation included).
+- **Next:** Roadmap Phase 4 leftover: account cap and restore drill.
+  A06–A10 exist on other local branches / PR #64. spec.md still says AI
+  keys live in `user_data/ai_settings.json` (drift, not edited).
