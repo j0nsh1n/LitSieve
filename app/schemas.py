@@ -129,7 +129,7 @@ class ReaderExplainRequest(BaseModel):
 
 
 class AISettingsUpdate(BaseModel):
-    """Server-wide AI deploy settings (keys stored in user_data/ai_settings.json)."""
+    """Per-account AI keys and models (stored under USER_DATA_DIR/<user_id>/)."""
     llm_provider: Optional[str] = None
     ollama_host: Optional[str] = None
     ollama_model: Optional[str] = None

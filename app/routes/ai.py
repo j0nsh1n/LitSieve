@@ -28,21 +28,22 @@ router = APIRouter()
 
 @router.get("/api/ai/settings")
 async def api_ai_settings_get(request: Request):
-    """Masked AI deploy settings for the Account page."""
+    """Masked AI settings for the signed-in account."""
     user = current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
-    from app.services.llm import public_ai_settings
+    from app.services.llm import ai_for_user, public_ai_settings
     from app.services.llm import status as ai_status
-    return {"settings": public_ai_settings(), "status": ai_status()}
+    with ai_for_user(user["user_id"]):
+        return {"settings": public_ai_settings(), "status": ai_status()}
 
 
 @router.post("/api/ai/settings")
 @limiter.limit("20/minute")
 async def api_ai_settings_save(req: AISettingsUpdate, request: Request):
-    """Save server-wide AI keys/models (user_data/ai_settings.json).
+    """Save this account's AI keys/models.
 
-    Gated by AI_ALLOW_SETTINGS_WRITE (default true for single-teacher hosts).
+    Gated by AI_ALLOW_SETTINGS_WRITE (default true).
     """
     user = current_user(request)
     if not user:
@@ -50,6 +51,7 @@ async def api_ai_settings_save(req: AISettingsUpdate, request: Request):
     if csrf_failed(request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
     from app.services.llm import (
+        ai_for_user,
         ai_settings_write_allowed,
         public_ai_settings,
         save_ai_settings,
@@ -62,7 +64,7 @@ async def api_ai_settings_save(req: AISettingsUpdate, request: Request):
                 "detail": (
                     "Saving AI settings is disabled on this server "
                     "(AI_ALLOW_SETTINGS_WRITE=false). Ask a teacher or deployer "
-                    "to change env / ai_settings.json."
+                    "to change the environment."
                 )
             },
         )
@@ -75,12 +77,14 @@ async def api_ai_settings_save(req: AISettingsUpdate, request: Request):
                 content={"detail": "llm_provider must be auto, ollama, openai, or anthropic"},
             )
         payload["llm_provider"] = prov
-    save_ai_settings(payload)
-    return {
-        "status": "success",
-        "settings": public_ai_settings(),
-        "status_detail": ai_status(),
-    }
+    uid = user["user_id"]
+    with ai_for_user(uid):
+        save_ai_settings(payload, user_id=uid)
+        return {
+            "status": "success",
+            "settings": public_ai_settings(),
+            "status_detail": ai_status(),
+        }
 
 
 @router.post("/api/ai/ollama/start")
@@ -174,28 +178,31 @@ async def api_ai_refine_article(req: AIArticleRequest, request: Request):
         from app.services.llm import (
             LLMError,
             LLMUnavailable,
+            ai_for_user,
             is_configured,
             refine_article,
             run_with_ephemeral_builtin,
         )
 
-        if not is_configured():
-            return JSONResponse(status_code=503, content={"detail": _ai_unconfigured_detail()})
+        with ai_for_user(uid):
+            if not is_configured():
+                return JSONResponse(status_code=503, content={"detail": _ai_unconfigured_detail()})
         article = p.db.get_article_by_id(req.article_id, req.source)
         if not article:
             return JSONResponse(status_code=404, content={"detail": "Article not found"})
         existing = (p.db.get_key_points_map().get((req.article_id, req.source)) or [])
 
         def _work():
-            return run_with_ephemeral_builtin(
-                lambda: refine_article(
-                    title=article.get("title") or "",
-                    abstract=article.get("abstract") or "",
-                    existing_key_points=existing,
-                    source=req.source or "",
-                    article_id=req.article_id or "",
+            with ai_for_user(uid):
+                return run_with_ephemeral_builtin(
+                    lambda: refine_article(
+                        title=article.get("title") or "",
+                        abstract=article.get("abstract") or "",
+                        existing_key_points=existing,
+                        source=req.source or "",
+                        article_id=req.article_id or "",
+                    )
                 )
-            )
 
         result = await run_in_thread(_work)
         if req.save_key_points and result.get("key_points"):
@@ -278,27 +285,30 @@ async def api_ai_ask_article(req: AIAskRequest, request: Request):
         from app.services.llm import (
             LLMError,
             LLMUnavailable,
+            ai_for_user,
             ask_article,
             is_configured,
             run_with_ephemeral_builtin,
         )
 
-        if not is_configured():
-            return JSONResponse(status_code=503, content={"detail": _ai_unconfigured_detail()})
+        with ai_for_user(uid):
+            if not is_configured():
+                return JSONResponse(status_code=503, content={"detail": _ai_unconfigured_detail()})
         article = p.db.get_article_by_id(req.article_id, req.source)
         if not article:
             return JSONResponse(status_code=404, content={"detail": "Article not found"})
 
         def _work():
-            return run_with_ephemeral_builtin(
-                lambda: ask_article(
-                    question=req.question,
-                    title=article.get("title") or "",
-                    abstract=article.get("abstract") or "",
-                    source=req.source or "",
-                    article_id=req.article_id or "",
+            with ai_for_user(uid):
+                return run_with_ephemeral_builtin(
+                    lambda: ask_article(
+                        question=req.question,
+                        title=article.get("title") or "",
+                        abstract=article.get("abstract") or "",
+                        source=req.source or "",
+                        article_id=req.article_id or "",
+                    )
                 )
-            )
 
         result = await run_in_thread(_work)
         result["article_id"] = req.article_id

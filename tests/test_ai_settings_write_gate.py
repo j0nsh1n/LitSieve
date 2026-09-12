@@ -1,5 +1,6 @@
 """HTTP tests for AI_ALLOW_SETTINGS_WRITE gate on settings / ollama control."""
 
+import json
 import os
 import pathlib
 
@@ -98,13 +99,7 @@ def test_settings_post_forbidden_when_write_disabled(app_module, monkeypatch):
 
 
 def test_settings_post_ok_when_write_enabled(app_module, monkeypatch, tmp_path):
-    from app.services import llm as llm_service
-
     monkeypatch.setenv("AI_ALLOW_SETTINGS_WRITE", "true")
-    settings_path = tmp_path / "user_data" / "ai_settings.json"
-    settings_path.parent.mkdir(parents=True, exist_ok=True)
-    monkeypatch.setattr(llm_service, "AI_SETTINGS_PATH", settings_path)
-    monkeypatch.setattr(llm_service, "_SETTINGS_CACHE", None)
 
     c = TestClient(app_module.app)
     _register(c)
@@ -117,6 +112,37 @@ def test_settings_post_ok_when_write_enabled(app_module, monkeypatch, tmp_path):
     body = r.json()
     assert body.get("status") == "success"
     assert body["settings"]["openai_model"] == "gpt-4o-mini"
+    saved = list((tmp_path / "user_data").glob("*/ai_settings.json"))
+    assert len(saved) == 1
+    assert json.loads(saved[0].read_text(encoding="utf-8"))["openai_model"] == "gpt-4o-mini"
+
+
+def test_settings_post_stays_on_the_callers_account(app_module, monkeypatch, tmp_path):
+    monkeypatch.setenv("AI_ALLOW_SETTINGS_WRITE", "true")
+    a = TestClient(app_module.app)
+    _register(a, username="student_a")
+    r = a.post(
+        "/api/ai/settings",
+        json={"openai_api_key": "sk-aaa", "openai_base_url": "https://evil.example/v1"},
+        headers=_csrf(a),
+    )
+    assert r.status_code == 200, r.text
+
+    b = TestClient(app_module.app)
+    _register(b, username="student_b")
+    got = b.get("/api/ai/settings")
+    assert got.status_code == 200
+    other = got.json()["settings"]
+    assert other["openai_api_key_set"] is False
+    assert "evil.example" not in (other.get("openai_base_url") or "")
+
+    b.post(
+        "/api/ai/settings",
+        json={"openai_model": "gpt-b-only"},
+        headers=_csrf(b),
+    )
+    again = a.get("/api/ai/settings")
+    assert again.json()["settings"]["openai_model"] != "gpt-b-only"
 
 
 def test_ollama_start_forbidden_when_write_disabled(app_module, monkeypatch):
