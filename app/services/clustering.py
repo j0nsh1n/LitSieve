@@ -96,18 +96,24 @@ class ArticleClusterer:
         vectors by density.
         """
         n_samples, n_features = embeddings.shape
+        if n_samples < 1:
+            return embeddings
         try:
             import umap  # optional; big (numba) dep, so not required
-            target = min(DENSITY_UMAP_DIMS, n_features, max(2, n_samples - 1))
+            target = min(DENSITY_UMAP_DIMS, n_features, max(1, n_samples - 1))
+            n_neighbors = max(2, min(15, n_samples - 1))
             logger.info("Density reduce: UMAP -> %d dims", target)
             reducer = umap.UMAP(
-                n_components=target, n_neighbors=min(15, n_samples - 1),
+                n_components=target, n_neighbors=n_neighbors,
                 min_dist=0.0, metric='cosine', random_state=42,
             )
             return reducer.fit_transform(embeddings)
         except Exception as e:
             logger.info("Density reduce: PCA fallback (%s)", type(e).__name__)
-            target = min(DENSITY_PCA_DIMS, n_features, max(2, n_samples - 1))
+            max_comp = min(n_samples, n_features)
+            if max_comp < 1:
+                return embeddings
+            target = min(DENSITY_PCA_DIMS, max_comp)
             if target >= n_features:
                 return embeddings
             reduced = PCA(n_components=target, random_state=42).fit_transform(embeddings)
@@ -120,10 +126,17 @@ class ArticleClusterer:
         """HDBSCAN density clustering: finds the cluster count itself and marks
         points in no dense region as noise (NOISE_CLUSTER_ID)."""
         n = len(embeddings)
-        reduced = self._reduce_for_density(embeddings)
+        if n == 0:
+            self.cluster_model = None
+            return np.array([], dtype=int)
         # min_cluster_size is the main knob: the smallest group we'll call a
         # topic. Scale gently with corpus size, floor at 5.
         min_cluster_size = max(5, n // 40)
+        if n < min_cluster_size:
+            # Too few papers for a density cluster. One group, not a crash.
+            self.cluster_model = None
+            return np.zeros(n, dtype=int)
+        reduced = self._reduce_for_density(embeddings)
         model = HDBSCAN(
             min_cluster_size=min_cluster_size,
             min_samples=max(2, min_cluster_size // 2),  # lower -> less noise
