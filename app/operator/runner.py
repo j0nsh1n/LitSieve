@@ -48,6 +48,45 @@ def redact(text: str) -> str:
     return _SECRET_RE.sub(r"\1=[redacted]", text or "")
 
 
+_DIAGNOSTIC_KEYS = ("detail", "output", "error", "message")
+
+
+def decode_action_payload(
+    stdout: str,
+    stderr: str,
+    returncode: int,
+    action: str,
+) -> Dict[str, Any]:
+    """Parse action JSON first, then redact diagnostic fields only.
+
+    Source `content` must stay intact so the editor does not save redacted code.
+    Parse failure is always a failed action, even if the process exited 0.
+    """
+    raw_out = stdout or ""
+    raw_err = stderr or ""
+    try:
+        line = raw_out.strip().splitlines()[-1] if raw_out.strip() else "{}"
+        payload = json.loads(line)
+        if not isinstance(payload, dict):
+            payload = {"ok": False, "detail": "Action returned invalid output."}
+    except (json.JSONDecodeError, IndexError):
+        return {
+            "ok": False,
+            "detail": "Action returned no JSON.",
+            "output": redact((raw_out + raw_err)[-4000:]),
+        }
+    payload["ok"] = bool(payload.get("ok")) and returncode == 0
+    if raw_err and "output" not in payload:
+        payload["output"] = raw_err[-2000:]
+    for key in _DIAGNOSTIC_KEYS:
+        val = payload.get(key)
+        if isinstance(val, str):
+            payload[key] = redact(val)
+    if not payload["ok"] and not payload.get("detail"):
+        payload["detail"] = f"{action} failed."
+    return payload
+
+
 def script_path(action: str) -> Path:
     if action not in ACTION_SCRIPTS:
         raise ValueError("Unknown action.")
@@ -87,22 +126,6 @@ def run_action(
         return {"ok": False, "detail": f"{action} timed out.", "output": ""}
     except OSError as exc:
         return {"ok": False, "detail": f"{action} could not start: {exc}", "output": ""}
-    stdout = redact(proc.stdout.decode("utf-8", "replace") if isinstance(proc.stdout, bytes) else (proc.stdout or ""))
-    stderr = redact(proc.stderr.decode("utf-8", "replace") if isinstance(proc.stderr, bytes) else (proc.stderr or ""))
-    payload: Dict[str, Any]
-    try:
-        payload = json.loads(stdout.strip().splitlines()[-1] if stdout.strip() else "{}")
-        if not isinstance(payload, dict):
-            payload = {"ok": False, "detail": "Action returned invalid output."}
-    except (json.JSONDecodeError, IndexError):
-        payload = {
-            "ok": proc.returncode == 0,
-            "detail": "Action returned no JSON.",
-            "output": (stdout + stderr)[-4000:],
-        }
-    if stderr and "output" not in payload:
-        payload["output"] = (payload.get("output") or "") + stderr[-2000:]
-    payload["ok"] = bool(payload.get("ok")) and proc.returncode == 0
-    if not payload["ok"] and not payload.get("detail"):
-        payload["detail"] = f"{action} failed."
-    return payload
+    stdout = proc.stdout.decode("utf-8", "replace") if isinstance(proc.stdout, bytes) else (proc.stdout or "")
+    stderr = proc.stderr.decode("utf-8", "replace") if isinstance(proc.stderr, bytes) else (proc.stderr or "")
+    return decode_action_payload(stdout, stderr, proc.returncode, action)
