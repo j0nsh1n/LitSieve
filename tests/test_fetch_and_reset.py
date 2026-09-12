@@ -30,40 +30,54 @@ def _record_sleeps(monkeypatch):
     return slept
 
 
+def _assert_interruptible_total(slept: list[float], expected: float, *, tol: float = 1e-9):
+    """Backoff sleeps in ≤0.2s slices; assert total duration and slice size."""
+    assert abs(sum(slept) - expected) <= tol, (expected, slept)
+    assert all(s <= 0.2 + 1e-12 for s in slept), slept
+
+
 def test_backoff_honours_retry_after(monkeypatch):
     """A server's Retry-After wins; ignoring it is how you get IP-blocked."""
     slept = _record_sleeps(monkeypatch)
     HttpClient._backoff_sleep(0, retry_after="7")
-    assert slept == [7.0]
+    _assert_interruptible_total(slept, 7.0)
 
 
 def test_backoff_caps_absurd_retry_after(monkeypatch):
     """A hostile or broken header must not park a job for hours."""
     slept = _record_sleeps(monkeypatch)
     HttpClient._backoff_sleep(0, retry_after="86400")
-    assert slept == [60.0]
+    _assert_interruptible_total(slept, 60.0)
 
 
 def test_backoff_falls_back_when_retry_after_is_garbage(monkeypatch):
     """Unparseable header -> exponential path, not a crash and not zero."""
     slept = _record_sleeps(monkeypatch)
     HttpClient._backoff_sleep(0, retry_after="not-a-number")
-    assert len(slept) == 1
-    assert 0.5 <= slept[0] <= 0.75, slept
+    total = sum(slept)
+    assert 0.5 <= total <= 0.75, slept
+    assert all(s <= 0.2 + 1e-12 for s in slept), slept
 
 
 def test_backoff_is_exponential_and_capped(monkeypatch):
     """~0.5, 1, 2, 4 … with jitter, flattening at 30s."""
     slept = _record_sleeps(monkeypatch)
+    totals: list[float] = []
     for attempt in range(5):
+        slept.clear()
         HttpClient._backoff_sleep(attempt, retry_after=None)
+        totals.append(sum(slept))
+        assert all(s <= 0.2 + 1e-12 for s in slept), slept
+    slept.clear()
     HttpClient._backoff_sleep(99, retry_after=None)
+    totals.append(sum(slept))
+    assert all(s <= 0.2 + 1e-12 for s in slept), slept
 
     for attempt in range(5):
         expected = 0.5 * (2 ** attempt)
-        assert expected <= slept[attempt] <= expected + 0.25, (attempt, slept)
-    assert slept[:-1] == sorted(slept[:-1]), "backoff must not shrink"
-    assert 30.0 <= slept[-1] <= 30.25, f"cap not applied: {slept[-1]}"
+        assert expected <= totals[attempt] <= expected + 0.25, (attempt, totals)
+    assert totals[:-1] == sorted(totals[:-1]), "backoff must not shrink"
+    assert 30.0 <= totals[-1] <= 30.25, f"cap not applied: {totals[-1]}"
 
 
 def test_backoff_zero_retry_after_does_not_stall(monkeypatch):
@@ -77,7 +91,9 @@ def test_backoff_ignores_negative_retry_after(monkeypatch):
     """Negative is nonsense; fall back rather than compute a negative sleep."""
     slept = _record_sleeps(monkeypatch)
     HttpClient._backoff_sleep(0, retry_after="-5")
-    assert len(slept) == 1 and slept[0] >= 0.5, slept
+    total = sum(slept)
+    assert total >= 0.5, slept
+    assert all(s <= 0.2 + 1e-12 for s in slept), slept
 
 
 def test_insert_articles_dedupes_cross_source_title(tmp_path):
@@ -110,9 +126,41 @@ def test_insert_articles_dedupes_cross_source_title(tmp_path):
         db.close()
 
 
-def test_insert_articles_upsert_does_not_wipe_children(tmp_path):
-    """ON CONFLICT DO UPDATE must not cascade-delete embeddings."""
+def test_insert_articles_upsert_does_not_wipe_notes(tmp_path):
+    """ON CONFLICT DO UPDATE must not cascade-delete notes/stars."""
     db = ArticleDatabase(db_path=str(tmp_path / "e.db"))
+    try:
+        art = {
+            "article_id": "1",
+            "source": "pubmed",
+            "title": "Title",
+            "abstract": "Abstract",
+            "year": "2021",
+            "authors": [],
+            "journal": "J",
+        }
+        db.insert_articles([art], dedupe=False)
+        db.upsert_note("1", "pubmed", note="keep me", starred=True)
+        import numpy as np
+        db.insert_embeddings({("1", "pubmed"): np.ones(4, dtype=np.float32)}, "general")
+        db.insert_key_points({("1", "pubmed"): ["old extractive"]}, origin="extractive")
+        art2 = dict(art, title="Title updated")
+        stats = db.insert_articles([art2], dedupe=False)
+        assert stats["stale_derived"] == 1
+        ids, _emb = db.get_all_embeddings()
+        assert ids == []
+        assert ("1", "pubmed") not in db.get_key_points_keys()
+        note = db.get_note("1", "pubmed")
+        assert note["note"] == "keep me"
+        assert note["starred"] is True
+        assert db.get_article_by_id("1", "pubmed")["title"] == "Title updated"
+    finally:
+        db.close()
+
+
+def test_insert_articles_same_text_keeps_embeddings(tmp_path):
+    """Year/authors refresh must not drop vectors built from unchanged text."""
+    db = ArticleDatabase(db_path=str(tmp_path / "e2.db"))
     try:
         art = {
             "article_id": "1",
@@ -126,12 +174,31 @@ def test_insert_articles_upsert_does_not_wipe_children(tmp_path):
         db.insert_articles([art], dedupe=False)
         import numpy as np
         db.insert_embeddings({("1", "pubmed"): np.ones(4, dtype=np.float32)}, "general")
-        # Upsert same key with new title
-        art2 = dict(art, title="Title updated")
-        db.insert_articles([art2], dedupe=False)
-        ids, emb = db.get_all_embeddings()
+        stats = db.insert_articles([dict(art, year="2022")], dedupe=False)
+        assert stats["stale_derived"] == 0
+        ids, _emb = db.get_all_embeddings()
         assert len(ids) == 1
-        assert db.get_article_by_id("1", "pubmed")["title"] == "Title updated"
+    finally:
+        db.close()
+
+
+def test_insert_articles_keeps_ai_key_points_when_text_changes(tmp_path):
+    db = ArticleDatabase(db_path=str(tmp_path / "e3.db"))
+    try:
+        art = {
+            "article_id": "1",
+            "source": "pubmed",
+            "title": "Title",
+            "abstract": "Abstract text that is long enough.",
+            "year": "2021",
+            "authors": [],
+            "journal": "J",
+        }
+        db.insert_articles([art], dedupe=False)
+        db.insert_key_points({("1", "pubmed"): ["student rewrite"]}, origin="ai")
+        db.insert_articles([dict(art, abstract="A different abstract entirely.")], dedupe=False)
+        assert db.get_key_points_origin_map().get(("1", "pubmed")) == "ai"
+        assert db.get_key_points_map()[("1", "pubmed")] == ["student rewrite"]
     finally:
         db.close()
 

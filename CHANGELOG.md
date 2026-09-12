@@ -8,6 +8,26 @@ and this project aims to follow Semantic Versioning for app version strings
 
 ## [Unreleased]
 
+### Changed
+- Refreshed the look with an airy glass style: frosted cards on a light
+  wash, a softer blue accent, pill buttons and nav chips with frost fill
+  and hairline edges (no ink outlines), Source Serif 4 on headings, and
+  denser search results. Layout and workflow are unchanged.
+- On phones and tablets the top bar is one row (brand + menu). Steps,
+  library, mode, and account sit in a drawer so they do not eat the page.
+
+### Fixed
+- A running fetch or prepare is no longer dropped from tracking when other
+  accounts fill the in-memory progress cache, so a second copy of the same job
+  cannot start while the first is still working.
+- Refreshing a paper's title or abstract now drops that paper's search vector
+  and extractive bullets so ranking matches the text on the card. Notes, stars,
+  and student-saved AI bullets stay.
+- Cancelling a multi-source fetch no longer waits out the full HTTP retry
+  ladder (previously up to ~2.6 minutes per unreachable source). Retries
+  and backoff abort as soon as the job is cancelled; an in-flight socket
+  wait of up to ~30 seconds may still finish before the cancel lands.
+
 ## [5.3.1] - 2026-08-31
 
 ### Fixed

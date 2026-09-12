@@ -142,7 +142,7 @@ def test_font_size_scale_discipline():
 def test_border_radius_scale_discipline():
     """At most 4 radius steps — only --radius-* tokens (plus 0).
 
-    Teal Soft adds --radius-lg (18px cards) on top of sm/md/full.
+    Teal Soft added --radius-lg (cards) on top of sm/md/full.
     """
     allowed = {"--radius-sm", "--radius-md", "--radius-lg", "--radius-full"}
     used = set()
@@ -158,18 +158,34 @@ def test_border_radius_scale_discipline():
     assert used
 
 
-def test_teal_soft_radius_tokens():
-    """Teal Soft: --radius-sm/md/lg are 8/12/18px (was quad-notice 6/10).
+def test_glass_radius_tokens():
+    """Airy glass: --radius-sm/md/lg are 10/16/22px so buttons and popups read as rounded.
 
-    --radius-lg is now a real token (cards, dialogs, rails), not a fallback.
+    --radius-lg is a real token (cards, dialogs, rails), not a fallback.
     """
     root = _root_block()
-    for name, want in (("--radius-sm", "8px"), ("--radius-md", "12px"), ("--radius-lg", "18px")):
+    for name, want in (("--radius-sm", "10px"), ("--radius-md", "16px"), ("--radius-lg", "22px")):
         m = re.search(rf"{name}\s*:\s*([^;]+);", root)
         assert m, f"missing {name} in :root"
         assert m.group(1).strip() == want, f"{name}={m.group(1)!r}, want {want}"
     # No bare fallbacks left now that --radius-lg is defined.
     assert "var(--radius-lg, " not in _css_without_comments()
+
+
+def test_chrome_is_frost_not_ink():
+    """Buttons and nav chips use frost hairlines, not ink outlines or uppercase."""
+    btn = re.search(r"\.btn \{\n((?:    .*\n)+)\}", CSS)
+    assert btn, ".btn rule missing"
+    body = btn.group(1)
+    assert "var(--frost-edge)" in body
+    assert "var(--radius-full)" in body
+    assert "1px solid var(--text)" not in body
+    assert "border: 1px solid var(--text)" not in CSS
+    assert re.search(
+        r"\.nav-link \{[^}]*text-transform:\s*none",
+        CSS,
+        flags=re.S,
+    )
 
 
 def test_padding_uses_spacing_scale_only():
@@ -438,9 +454,9 @@ def test_phase8_info_text_is_body_scale():
     m2 = re.search(r"\.help-text\s*\{[^}]+\}", css)
     assert m2, ".help-text rule missing"
     assert "var(--fs-sm)" in m2.group(0)
-    # Dark grounds are Teal Soft (was newsprint #1c1a15 / #242118).
-    assert "--bg: #0d1012" in css or "--bg:#0d1012" in css
-    assert "--surface: #161a1d" in css or "--surface:#161a1d" in css
+    # Dark grounds are airy glass navy.
+    assert "--bg: #0c1424" in css or "--bg:#0c1424" in css
+    assert "--surface: #152036" in css or "--surface:#152036" in css
 
 
 def _css_block_tokens(block: str) -> dict[str, str]:
@@ -474,34 +490,36 @@ def test_phase10_dark_blocks_stay_in_parity():
     assert shared, "dark blocks share no tokens"
     drifted = {k: (a[k], b[k]) for k in sorted(shared) if a[k] != b[k]}
     assert not drifted, f"dark blocks drifted: {drifted}"
-    # Teal Soft dark grounds (both blocks).
+    # Airy glass dark grounds (both blocks).
     for tokens in (a, b):
-        assert tokens.get("--bg") == "#0d1012"
-        assert tokens.get("--surface") == "#161a1d"
-        assert tokens.get("--text") == "#e9eef0"
-        assert tokens.get("--text-soft") == "#98a3aa"
-        assert tokens.get("--rule") == "#232a2e"
-        assert tokens.get("--accent") == "#5eead4"
+        assert tokens.get("--bg") == "#0c1424"
+        assert tokens.get("--surface") == "#152036"
+        assert tokens.get("--text") == "#e8eef8"
+        assert tokens.get("--text-soft") == "#9aa8bd"
+        assert tokens.get("--rule") == "#243044"
+        assert tokens.get("--accent") == "#93b4ff"
         assert tokens.get("--ok") == "#6ee7a8"
-        assert tokens.get("--on-accent") == "#062421"
+        assert tokens.get("--on-accent") == "#0c1424"
 
 
-def test_teal_soft_light_tokens():
-    """Live accent is Teal Soft; success green must not collide with it."""
+def test_airy_glass_light_tokens():
+    """Live accent is soft blue; success green must not collide with it."""
     root = _root_block()
     tokens = _css_block_tokens(root)
-    assert tokens.get("--bg") == "#f7f8f8"
-    assert tokens.get("--surface") == "#ffffff"
-    assert tokens.get("--accent") == "#0f766e"
-    assert tokens.get("--accent-hover") == "#0b5c56"
+    assert tokens.get("--bg") == "#eef1f8"
+    assert tokens.get("--surface") == "#f7f9fd"
+    assert tokens.get("--accent") == "#2563eb"
+    assert tokens.get("--accent-hover") == "#1d4ed8"
     assert tokens.get("--ok") == "#15803d"
     assert tokens.get("--ok") != tokens.get("--accent")
     assert tokens.get("--on-accent") == "#fff"
     # Amber was #a8700f = 4.21:1 on white, under AA. Darkened for contrast.
     assert tokens.get("--warn") == "#96640c"
     assert "Source Sans 3" in tokens.get("--font-sans", "")
-    # --font-serif now names an actual serif (it used to hold Public Sans, a sans).
     assert "Source Serif 4" in tokens.get("--font-serif", "")
+    assert "--frost" in root
+    assert "--frost-blur" in root
+    assert "--glass-shine" in root
 
 
 def test_typefaces_are_self_hosted():
@@ -520,12 +538,13 @@ def test_typefaces_are_self_hosted():
     assert not (fonts / "fraunces-latin.woff2").exists()
 
 
-def test_body_background_is_flat():
-    """No paper grain or radial wash on the page canvas."""
+def test_body_sits_on_soft_wash():
+    """Page canvas is a soft radial wash (html::before), not paper grain."""
     assert "feTurbulence" not in CSS
+    assert "html::before" in CSS
     body = CSS[CSS.find("\nbody {") : CSS.find("\n::selection")]
     assert "background-image" not in body
-    assert "background: var(--bg)" in body
+    assert "background: transparent" in body
 
 
 def test_phase8_search_workbench_and_score_meter():

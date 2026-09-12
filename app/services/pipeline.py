@@ -153,7 +153,7 @@ class LiteratureSearchPipeline:
         cancel_check: optional zero-arg callable returning True if the job
             should stop between sources.
         """
-        from app.fetchers.base import FetchError, classify_error
+        from app.fetchers.base import FetchError, classify_error, set_cancel_check
 
         logger.info(f"\n=== Fetching from {len(sources)} sources in parallel ===")
         lock = threading.Lock()
@@ -168,6 +168,7 @@ class LiteratureSearchPipeline:
             fetcher_cls = FETCHERS.get(source)
             if not fetcher_cls:
                 return (source, [], "Unknown source", "error")
+            set_cancel_check(cancel_check)
             try:
                 fetcher = fetcher_cls(email=email)
                 articles = fetcher.search_and_fetch(query, max_results) or []
@@ -180,6 +181,8 @@ class LiteratureSearchPipeline:
             except Exception as e:
                 logger.error("Error fetching %s: %s", source, e)
                 return (source, [], str(e), classify_error(e))
+            finally:
+                set_cancel_check(None)
 
         results = {}
         with ThreadPoolExecutor(max_workers=min(len(sources), 6)) as executor:

@@ -7,9 +7,10 @@ from __future__ import annotations
 
 import logging
 import random
+import threading
 import time
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 import requests
 
@@ -19,13 +20,36 @@ DEFAULT_TIMEOUT = 30
 DEFAULT_DELAY = 0.3
 MAX_RETRIES = 4
 
+# Per-thread cancel token: concurrent fetches must not share one process-global.
+_CANCEL_TOKEN = threading.local()
+
+
+def set_cancel_check(fn: Optional[Callable[[], bool]]) -> None:
+    """Bind or clear this thread's cancel predicate (None clears)."""
+    _CANCEL_TOKEN.check = fn
+
+
+def _cancel_requested() -> bool:
+    fn = getattr(_CANCEL_TOKEN, "check", None)
+    try:
+        return bool(fn and fn())
+    except Exception:
+        return False
+
 
 class FetchError(Exception):
     """Typed fetch failure for per-source student-facing reports."""
 
     def __init__(self, message: str, kind: str = "error"):
         super().__init__(message)
-        self.kind = kind  # rate_limited | network | http | no_results | error
+        self.kind = kind  # rate_limited | network | http | no_results | error | cancelled
+
+
+class FetchCancelled(FetchError):
+    """Job cancel interrupted the HTTP retry ladder (message must stay exact)."""
+
+    def __init__(self, message: str = "Cancelled"):
+        super().__init__(message, kind="cancelled")
 
 
 def classify_error(exc: BaseException) -> str:
@@ -100,11 +124,17 @@ class HttpClient:
         headers: Optional[Dict[str, str]] = None,
         timeout: Optional[float] = None,
     ) -> requests.Response:
-        """HTTP request with retries on 429/5xx; raises FetchError on hard failure."""
+        """HTTP request with retries on 429/5xx; raises FetchError on hard failure.
+
+        A job cancel aborts further retries and backoff immediately (FetchCancelled).
+        An in-flight socket wait still runs out (≤ DEFAULT_TIMEOUT, typically 30s).
+        """
         timeout = self.timeout if timeout is None else timeout
         last_exc: Optional[BaseException] = None
 
         for attempt in range(self.max_retries + 1):
+            if _cancel_requested():
+                raise FetchCancelled()
             self.polite_delay()
             try:
                 resp = self.session.request(
@@ -160,13 +190,31 @@ class HttpClient:
             try:
                 seconds = float(retry_after)
                 if seconds >= 0:
-                    time.sleep(min(seconds, 60.0))
+                    HttpClient._sleep_interruptible(min(seconds, 60.0))
                     return
             except (TypeError, ValueError):
                 pass
         # Exponential backoff with jitter: ~0.5, 1, 2, 4 …
         base = min(30.0, 0.5 * (2 ** attempt))
-        time.sleep(base + random.uniform(0, 0.25))
+        HttpClient._sleep_interruptible(base + random.uniform(0, 0.25))
+
+    @staticmethod
+    def _sleep_interruptible(seconds: float) -> None:
+        """Sleep in ≤0.2s slices so a job cancel can abort long Retry-After waits."""
+        remaining = max(0.0, float(seconds))
+        if remaining == 0.0:
+            time.sleep(0)
+            if _cancel_requested():
+                raise FetchCancelled()
+            return
+        while remaining > 0:
+            if _cancel_requested():
+                raise FetchCancelled()
+            slice_s = min(0.2, remaining)
+            time.sleep(slice_s)
+            remaining -= slice_s
+        if _cancel_requested():
+            raise FetchCancelled()
 
 
 def polite_sleep(seconds: float = DEFAULT_DELAY) -> None:
