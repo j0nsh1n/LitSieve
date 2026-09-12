@@ -1003,6 +1003,7 @@ async function doSimpleScreenApply() {
   setStatus('simple-screen-status', `Set aside ${n} paper(s). You can undo once.`, 'success');
   showNotification(`Set aside ${n} paper(s).`, 'success');
   setSimpleScreenGotoVisible(true);
+  await refreshSimpleScreeningCard();
   updateNavStats();
   copyScreenQuestionToSearch();
   setSimpleScreenGatePending(false);

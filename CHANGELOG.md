@@ -18,6 +18,10 @@ and this project aims to follow Semantic Versioning for app version strings
 - Saving AI settings writes `{USER_DATA_DIR}/{account id}/ai_settings.json`
   for the signed-in account. Host `.env` keys stay deploy defaults.
   Built-in Ollama start/stop is still process-wide.
+- Simple Search screening counts are two bar rows: collected as the full
+  set, then kept versus removed of that total, with duplicate and
+  screened-out counts under the second bar. The bars refresh when you
+  set papers aside.
 
 ### Fixed
 - **A deleted account's password-reset link could unlock the next account

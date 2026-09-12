@@ -13,9 +13,31 @@
  </a>
  <p class="help-text" id="simple-export-status" aria-live="polite"></p>
  <div class="rail-stats" id="simple-rail-stats" hidden>
-  <div class="rail-stat"><span>Collected</span><b id="rail-stat-fetched">—</b></div>
-  <div class="rail-stat"><span>Duplicates removed</span><b id="rail-stat-dups">—</b></div>
-  <div class="rail-stat"><span>Screened out</span><b id="rail-stat-out">—</b></div>
-  <div class="rail-stat"><span>Kept</span><b id="rail-stat-kept">—</b></div>
+  <div class="funnel-row">
+   <div class="funnel-row-head">
+    <span>Collected</span>
+    <b id="rail-stat-fetched">—</b>
+   </div>
+   <div class="funnel-track funnel-track--collected" id="funnel-collected-bar"
+        role="img" aria-label="Collected papers"></div>
+  </div>
+  <div class="funnel-row">
+   <div class="funnel-row-head">
+    <span>Of that total</span>
+   </div>
+   <div class="funnel-track funnel-track--split" id="funnel-split-bar"
+        role="img" aria-label="Kept versus removed">
+    <span class="funnel-seg funnel-seg--kept"></span>
+    <span class="funnel-seg funnel-seg--removed"></span>
+   </div>
+   <ul class="funnel-legend">
+    <li class="funnel-legend--kept">Kept <b id="rail-stat-kept">—</b></li>
+    <li class="funnel-legend--removed">Removed <b id="rail-stat-removed">—</b></li>
+   </ul>
+   <p class="funnel-split" id="funnel-removed-detail">
+    Duplicates <b id="rail-stat-dups">—</b>
+    · Screened out <b id="rail-stat-out">—</b>
+   </p>
+  </div>
  </div>
 </aside>

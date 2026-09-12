@@ -23,7 +23,7 @@
   Source Serif 4 headings, Source Sans 3 body/UI (self-hosted). Hybrid frost
   cards on a soft wash, score ring on Search. Sieve pan as favicon, nav
   mark, and empty-state illustration (Search / Clean up / Clusters).
-  CSS cache-bust `style.css?v=20260912a`. Mobile app nav is a one-row
+  CSS cache-bust `style.css?v=20260912c`. Mobile app nav is a one-row
   brand + menu; steps and tools open in a drawer.
 - Reader Mode: **Explain this study** on Search/Clean up cards — structured
   plain-language reading of one abstract, cached per
@@ -121,11 +121,12 @@ Guest User (is_guest) → sample corpus only; purged by age
   2026-09-06 audit. Reader verifier is v3 (CI bounds and p-value operators).
   Embedding aliases resolve to the configured repo. HDBSCAN on tiny libraries
   returns one group. Merged PR #64 so the airy glass UI is back on this
-  branch (`style.css?v=20260912a`). UX round 2 mockups (GLM-5.3 Flash wrote,
-  reviewed here) live in gitignored `design_mockups/ux2/` (`index.html`):
-  m1 focused Search list, m2 split-pane triage, m3 Account with section nav.
-  Serve the repo root over HTTP to view them; nothing is wired to the app.
-- **Next:** Pick a mockup direction (or parts of several) before touching
-  `static/css/style.css`. Roadmap Phase 4 leftover: account cap and restore drill.
+  branch (`style.css?v=20260912c`). Simple Search screening counts are a
+  two-row funnel (collected, then kept vs removed). UX round 2 mockups
+  live in gitignored `design_mockups/ux2/` (`index.html`): m1 focused
+  Search list, m2 split-pane triage, m3 Account with section nav.
+- **Next:** Drafted, not built: Simple "More like this paper" (re-rank
+  the already-collected library from one paper, like starred search).
+  Roadmap Phase 4 leftover: account cap and restore drill.
   A03–A08 exist on other local branches. spec.md still says AI keys live
   in `user_data/ai_settings.json` (drift, not edited).

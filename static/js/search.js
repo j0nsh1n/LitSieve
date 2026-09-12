@@ -379,6 +379,7 @@ function fillSimpleRailStats(stats, report) {
  const kept = report && report.included != null
   ? Number(report.included)
   : Math.max(0, total - excludedTotal);
+ const removed = Math.max(0, dups + out);
  const set = (id, n) => {
   const el = document.getElementById(id);
   if (el) el.textContent = String(n);
@@ -387,6 +388,23 @@ function fillSimpleRailStats(stats, report) {
  set('rail-stat-dups', dups);
  set('rail-stat-out', out);
  set('rail-stat-kept', kept);
+ set('rail-stat-removed', removed);
+ const keptPct = total > 0 ? (100 * kept / total) : 0;
+ const removedPct = total > 0 ? (100 * removed / total) : 0;
+ host.style.setProperty('--funnel-kept-pct', keptPct + '%');
+ host.style.setProperty('--funnel-removed-pct', removedPct + '%');
+ const collectedBar = document.getElementById('funnel-collected-bar');
+ if (collectedBar) {
+  collectedBar.setAttribute('aria-label', `Collected ${total} papers`);
+ }
+ const splitBar = document.getElementById('funnel-split-bar');
+ if (splitBar) {
+  splitBar.setAttribute(
+   'aria-label',
+   `Of ${total} collected: ${kept} kept, ${removed} removed`
+   + ` (${dups} duplicates, ${out} screened out)`
+  );
+ }
  host.hidden = total <= 0;
 }
 

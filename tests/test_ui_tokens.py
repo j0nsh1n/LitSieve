@@ -631,6 +631,8 @@ RUNTIME_SET_VARS = {
     "--simple-panel-h",  # search.js: measured bottom-bar clearance
     "--range-fill",      # range input progress
     "--wait-pct",        # simple wait bar fill
+    "--funnel-kept-pct",     # search.js: simple screening funnel
+    "--funnel-removed-pct",  # search.js: simple screening funnel
     "--tx", "--ty", "--tr",  # view-transition offsets
 }
 

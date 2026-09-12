@@ -920,6 +920,7 @@ def test_simple_screen_apply_and_undo_use_low_relevance():
     assert "setSimpleScreenStripOutcome" in apply_fn
     assert "undo: true" in apply_fn or "undo:true" in apply_fn
     assert "Set aside" in apply_fn
+    assert "await refreshSimpleScreeningCard()" in apply_fn
     undo_fn = dm[dm.find("async function doSimpleScreenUndo") : dm.find("async function silentResolveDuplicatesAfterPrepare")]
     if "async function doSimpleScreenUndo" not in dm:
         undo_fn = dm[dm.find("async function doSimpleScreenUndo") :]
@@ -1134,12 +1135,21 @@ def test_simple_search_side_panel_exists_and_hidden_in_advanced():
     assert 'id="simple-export-results-btn"' in html
     assert 'id="simple-screening-report-btn"' in html
     assert 'screening-report?format=txt' in html
+    assert 'id="funnel-split-bar"' in html
+    assert 'id="rail-stat-removed"' in html
+    assert "funnel-track--collected" in html
     css = _read("static", "css", "style.css")
     assert 'html:not([data-mode="simple"]) #search-simple-panel' in css or \
            'html:not([data-mode="simple"]) .search-simple-panel' in css
+    assert "var(--funnel-kept-pct)" in css
+    assert ".funnel-track--split" in css
     js = _read("static", "js", "search.js")
     assert "updateSimpleSearchPanel" in js
     assert "simple-export-results-btn" in js
+    fill = js[js.find("function fillSimpleRailStats") : js.find("async function loadSearchEmptyState")]
+    assert "setProperty('--funnel-kept-pct'" in fill
+    assert "setProperty('--funnel-removed-pct'" in fill
+    assert "rail-stat-removed" in fill
 
 
 def test_simple_small_screen_css_for_panel_and_card():
