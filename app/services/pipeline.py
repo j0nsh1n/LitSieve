@@ -500,9 +500,13 @@ class LiteratureSearchPipeline:
                 return self._cached_emb_ids, self._cached_emb_matrix
         ids, matrix = self.db.get_all_embeddings()
         with self._corpus_cache_lock:
-            self._cached_emb_ids = ids
-            self._cached_emb_matrix = matrix
-            self._cached_emb_gen = self._corpus_cache_gen
+            # Tag with the generation captured before the read. If an
+            # invalidation landed during the load, current gen has moved on
+            # and this snapshot must not be published as fresh.
+            if self._corpus_cache_gen == gen:
+                self._cached_emb_ids = ids
+                self._cached_emb_matrix = matrix
+                self._cached_emb_gen = gen
         return ids, matrix
 
     def _candidate_pool(
