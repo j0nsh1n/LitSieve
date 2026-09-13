@@ -238,10 +238,16 @@ Losing the key loses the data. Keep it in the host secret store.
 ### AI study aid (optional)
 
 - Env: `LLM_PROVIDER`, `OPENAI_*`, `ANTHROPIC_*`, `OLLAMA_*` — see `.env.example`.
-- Or Account → AI settings → `user_data/ai_settings.json` (AES-GCM `enc:v2:`,
-  derived from `SECRET_KEY`). File mode `600`.
-- Shared multi-user hosts: consider `AI_ALLOW_SETTINGS_WRITE=false` so only the
-  deployer sets keys.
+  These host settings supply the optional built-in Ollama service and any
+  deployer-level provider keys.
+- Per-account keys: each student saves their own via Account → AI settings,
+  stored under `USER_DATA_DIR/<account>/ai_settings.json` (AES-GCM `enc:v2:`,
+  derived from `SECRET_KEY`). File mode `600`. Writes are gated by
+  `AI_ALLOW_SETTINGS_WRITE` (default true).
+- Starting/stopping the built-in Ollama service is admin-only
+  (`ADMIN_USERNAMES`) and additionally gated by `AI_ALLOW_OLLAMA_CONTROL`.
+- Shared multi-user hosts: set `AI_ALLOW_SETTINGS_WRITE=false` to keep keys
+  env-only.
 
 ### Other optional knobs
 
