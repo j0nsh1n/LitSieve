@@ -292,12 +292,16 @@ def test_password_reset_token_does_not_take_over_reregistered_username(tmp_path)
         assert row["id"] == second["id"]
         assert verify_password("brand-new-pass1", row["hashed_password"])
         assert not verify_password(TEST_PASSWORD_ALT, row["hashed_password"])
+        assert udb.conn.execute(
+            "SELECT COUNT(*) FROM password_reset_tokens"
+        ).fetchone()[0] == 0
     finally:
         udb.conn.close()
 
 
-def test_legacy_username_reset_token_still_works_for_same_account(tmp_path):
-    """Outstanding codes issued before user_id still reset that same account."""
+def test_password_reset_schema_migration_discards_username_tokens(tmp_path):
+    """A02 under the account-ID schema: legacy username-bound codes are
+    discarded, not mapped — a reused username could make a backfill wrong."""
     import sqlite3
 
     path = tmp_path / "legacy.db"
@@ -333,12 +337,23 @@ def test_legacy_username_reset_token_still_works_for_same_account(tmp_path):
 
     udb = UserDatabase(db_path=str(path))
     try:
-        ok, err = udb.consume_password_reset_token(
+        columns = {
+            row[1]
+            for row in udb.conn.execute(
+                "PRAGMA table_info(password_reset_tokens)"
+            ).fetchall()
+        }
+        assert "user_id" in columns
+        assert "username" not in columns
+        assert udb.conn.execute(
+            "SELECT COUNT(*) FROM password_reset_tokens"
+        ).fetchone()[0] == 0
+        ok, _ = udb.consume_password_reset_token(
             "alice", token, hash_password(TEST_PASSWORD_ALT)
         )
-        assert ok, err
+        assert not ok
         row = udb.get_by_id(uid)
-        assert verify_password(TEST_PASSWORD_ALT, row["hashed_password"])
+        assert verify_password("oldpassword", row["hashed_password"])
     finally:
         udb.conn.close()
 
