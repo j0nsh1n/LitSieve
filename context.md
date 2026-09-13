@@ -1,7 +1,7 @@
 # context.md — LitSieve
 
 ## Current State
-- App version **5.3.1** (`app/main.py`, `GET /health`). Product name **LitSieve**.
+- App version **5.4.0** (`app/main.py`, `GET /health`). Product name **LitSieve**.
 - Example public deployment pattern: HTTPS at the edge (e.g. Cloudflare Tunnel)
   → `uvicorn` HTTP on `127.0.0.1:7860` only. Operator sets `PUBLIC_BASE_URL` and
   `DEBUG=false` with a real `SECRET_KEY` in gitignored `.env`.
@@ -119,7 +119,7 @@ Guest User (is_guest) → sample corpus only; purged by age
 
 ## Session Handoff
 - **Date:** 2026-09-13
-- **Branch:** `fix/audit-a01-a11-a15` (includes A02; merged origin/main)
+- **Branch:** `fix/audit-a01-a11-a15` (PR #65). Version **5.4.0**.
 - **Done:** A01 option 2 (per-account AI keys) plus A02, A11–A18 from the
   2026-09-06 audit. Reader verifier is v3 (CI bounds and p-value operators).
   Embedding aliases resolve to the configured repo. HDBSCAN on tiny libraries

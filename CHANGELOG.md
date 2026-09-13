@@ -8,6 +8,8 @@ and this project aims to follow Semantic Versioning for app version strings
 
 ## [Unreleased]
 
+## [5.4.0] - 2026-09-13
+
 ### Changed
 - Refreshed the look with an airy glass style: frosted cards on a light
   wash, a softer blue accent, pill buttons and nav chips with frost fill
