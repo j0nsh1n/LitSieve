@@ -62,7 +62,8 @@ and this project aims to follow Semantic Versioning for app version strings
 - **Any signed-in student could point the host OpenAI key at a URL they
   chose.** AI keys are now stored per account under `USER_DATA_DIR`, the
   Account page no longer rewrites process env, and a student's base URL
-  is used only with that student's own key.
+  is used only with that student's own key. Built-in Ollama start/stop
+  is admin-only.
 - **Reader Mode treated two different 95% confidence intervals as the
   same number**, and dropped whether a p-value was `<` or `=`. Cached
   explanations re-check under verifier v3.
@@ -81,17 +82,18 @@ and this project aims to follow Semantic Versioning for app version strings
   ladder (previously up to ~2.6 minutes per unreachable source). Retries
   and backoff abort as soon as the job is cancelled; an in-flight socket
   wait of up to ~30 seconds may still finish before the cancel lands.
-### Fixed
 - Backups follow `USERS_DB` and `USER_DATA_DIR` instead of assuming
   `users.db` and `user_data/` live under the checkout. Archives still use
   those names as stable prefixes, so restore can land on a custom layout.
-### Fixed
 - Notes on Search can no longer grow after an account is over its storage
   cap, and notes longer than 8,000 characters are rejected. Clearing or
   shortening a note still works so a student can free disk.
 - A Search tab that was left open no longer saves notes, stars, or
   screening into a different library after another tab switches. Fetch
   and prepare from that tab stay on the library the page loaded.
+- Docker builds now use an explicit runtime-file allowlist and a
+  default-deny build context so local environment files, credentials,
+  and databases cannot enter new image layers.
 
 ## [5.3.1] - 2026-08-31
 

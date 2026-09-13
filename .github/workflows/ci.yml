@@ -84,6 +84,13 @@ jobs:
 
       - name: Build image
         run: |
+          mkdir -p secrets app/secrets tools/operator/secrets user_data
+          printf 'context-sentinel\n' > .env.local
+          printf 'context-sentinel\n' > secrets/cloudflared.token
+          printf 'context-sentinel\n' > app/.env.local
+          printf 'context-sentinel\n' > app/secrets/token
+          printf 'context-sentinel\n' > tools/operator/secrets/token
+          printf 'context-sentinel\n' > user_data/ai_settings.json
           for attempt in 1 2 3; do
             if docker build -t litsieve:ci .; then
               exit 0
@@ -92,6 +99,23 @@ jobs:
             sleep 15
           done
           exit 1
+
+      - name: Inspect image contents
+        run: |
+          docker run --rm --entrypoint sh litsieve:ci -c '
+            test -f /code/app/main.py
+            test -d /code/templates
+            test -d /code/static
+            test -f /code/tools/operator/validate.py
+            test -f /code/requirements.txt
+            test -d /code/user_data
+            test ! -e /code/.env.local
+            test ! -e /code/secrets/cloudflared.token
+            test ! -e /code/app/.env.local
+            test ! -e /code/app/secrets/token
+            test ! -e /code/tools/operator/secrets/token
+            test ! -e /code/user_data/ai_settings.json
+          '
 
       - name: Boot the container and check /health
         run: |
