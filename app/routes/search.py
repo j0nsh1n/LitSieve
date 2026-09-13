@@ -22,6 +22,7 @@ from app.schemas import (
 from app.services.enrich import (
     enrich_search_results,
 )
+from app.storage import quota
 from app.storage.dbconn import integrity_errors
 from app.utils import (
     sort_articles,
@@ -139,6 +140,15 @@ async def api_upsert_note(req: NoteRequest, request: Request):
     uid = user["user_id"]
     p = get_pipeline(uid)
     try:
+        current = p.db.get_note(req.article_id, req.source)
+        if quota.would_increase_stored_text(current["note"], req.note):
+            try:
+                quota.check_quota(uid)
+            except quota.QuotaExceeded as e:
+                return JSONResponse(
+                    status_code=507,
+                    content={"detail": str(e), "quota": quota.usage_report(uid)},
+                )
         note = p.db.upsert_note(req.article_id, req.source, note=req.note, starred=req.starred)
         return {"status": "success", "note": note}
     except integrity_errors():

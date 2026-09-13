@@ -22,6 +22,7 @@ from app.schemas import (
     AISaveKeyPointsRequest,
     AISettingsUpdate,
 )
+from app.storage import quota
 
 logger = logging.getLogger(__name__)
 
@@ -262,6 +263,13 @@ async def api_ai_save_key_points(req: AISaveKeyPointsRequest, request: Request):
         article = p.db.get_article_by_id(req.article_id, req.source)
         if not article:
             return JSONResponse(status_code=404, content={"detail": "Article not found"})
+        try:
+            quota.check_quota(uid)
+        except quota.QuotaExceeded as e:
+            return JSONResponse(
+                status_code=507,
+                content={"detail": str(e), "quota": quota.usage_report(uid)},
+            )
         p.db.insert_key_points(
             {(req.article_id, req.source): points},
             origin="ai",

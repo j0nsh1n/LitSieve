@@ -90,10 +90,13 @@ class ChangePasswordRequest(BaseModel):
     new_password_confirm: str
 
 
+NOTE_MAX_CHARS = 8000
+
+
 class NoteRequest(BaseModel):
     article_id: str
     source: str
-    note: Optional[str] = None
+    note: Optional[str] = Field(default=None, max_length=NOTE_MAX_CHARS)
     starred: Optional[bool] = None
 
 

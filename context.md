@@ -144,3 +144,9 @@ Guest User (is_guest) → sample corpus only; purged by age
   them back to those live paths.
 - **Next:** A07 (unbounded notes bypass the storage cap). Do not push/PR
   until asked.
+- **Date:** 2026-09-09
+- **Branch:** `fix/a07-note-quota`
+- **Done:** A07 — notes have an 8,000-character bound; growing a note while
+  over the storage cap returns 507. Library-code join and AI key-point save
+  use the same growth gate. Tests in `tests/test_quota.py`.
+- **Next:** A08 (stale tabs write into a different library).

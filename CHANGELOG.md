@@ -85,6 +85,10 @@ and this project aims to follow Semantic Versioning for app version strings
 - Backups follow `USERS_DB` and `USER_DATA_DIR` instead of assuming
   `users.db` and `user_data/` live under the checkout. Archives still use
   those names as stable prefixes, so restore can land on a custom layout.
+### Fixed
+- Notes on Search can no longer grow after an account is over its storage
+  cap, and notes longer than 8,000 characters are rejected. Clearing or
+  shortening a note still works so a student can free disk.
 
 ## [5.3.1] - 2026-08-31
 
