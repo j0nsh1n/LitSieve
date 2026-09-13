@@ -358,6 +358,63 @@ def test_password_reset_schema_migration_discards_username_tokens(tmp_path):
         udb.conn.close()
 
 
+def test_password_reset_schema_migration_discards_hybrid_3007b89_tokens(tmp_path):
+    """This branch once added user_id beside username; that table must rebuild too."""
+    import sqlite3
+
+    path = tmp_path / "hybrid.db"
+    raw = sqlite3.connect(path)
+    raw.execute(
+        "CREATE TABLE users ("
+        "id TEXT PRIMARY KEY, username TEXT UNIQUE NOT NULL COLLATE NOCASE, "
+        "hashed_password TEXT NOT NULL, created_at TEXT, "
+        "token_version INTEGER NOT NULL DEFAULT 0)"
+    )
+    raw.execute(
+        "CREATE TABLE password_reset_tokens ("
+        "username TEXT NOT NULL COLLATE NOCASE, user_id TEXT, "
+        "token_hash TEXT NOT NULL, expires_at TEXT NOT NULL, "
+        "used INTEGER NOT NULL DEFAULT 0, created_at TEXT, "
+        "PRIMARY KEY (username, token_hash))"
+    )
+    uid = "hybrid-alice-id"
+    raw.execute(
+        "INSERT INTO users (id, username, hashed_password, token_version) "
+        "VALUES (?, 'alice', ?, 0)",
+        (uid, hash_password("oldpassword")),
+    )
+    token = "hybrid-reset-token-value"
+    token_hash = UserDatabase._hash_reset_token(token)
+    raw.execute(
+        "INSERT INTO password_reset_tokens "
+        "(username, user_id, token_hash, expires_at, used) "
+        "VALUES ('alice', ?, ?, '2099-01-01 00:00:00', 0)",
+        (uid, token_hash),
+    )
+    raw.commit()
+    raw.close()
+
+    udb = UserDatabase(db_path=str(path))
+    try:
+        columns = {
+            row[1]
+            for row in udb.conn.execute(
+                "PRAGMA table_info(password_reset_tokens)"
+            ).fetchall()
+        }
+        assert "user_id" in columns
+        assert "username" not in columns
+        assert udb.conn.execute(
+            "SELECT COUNT(*) FROM password_reset_tokens"
+        ).fetchone()[0] == 0
+        ok, _ = udb.consume_password_reset_token(
+            "alice", token, hash_password(TEST_PASSWORD_ALT)
+        )
+        assert not ok
+    finally:
+        udb.conn.close()
+
+
 def test_foreign_keys_pragma_on(tmp_path):
     db = ArticleDatabase(db_path=str(tmp_path / "fk.db"))
     try:

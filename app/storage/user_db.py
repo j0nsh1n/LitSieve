@@ -93,10 +93,9 @@ class UserDatabase:
                 PRIMARY KEY (username, token_hash)
             )
         """)
-        # One-time password-reset codes (hashed). Classroom hosts can surface
-        # the plaintext code when DEBUG/RESET_CODES_IN_RESPONSE is set.
         # Reset codes belong to an immutable account ID. Legacy username-bound
-        # codes cannot be safely mapped after a username has been reused.
+        # codes (and the 3007b89 hybrid username+user_id table) cannot be
+        # safely mapped after a username has been reused — drop them.
         reset_token_table_sql = """
             CREATE TABLE password_reset_tokens (
                 token_hash   TEXT PRIMARY KEY,
@@ -113,7 +112,10 @@ class UserDatabase:
                 "PRAGMA table_info(password_reset_tokens)"
             ).fetchall()
         }
-        if reset_token_columns and "user_id" not in reset_token_columns:
+        needs_rebuild = bool(reset_token_columns) and (
+            "user_id" not in reset_token_columns or "username" in reset_token_columns
+        )
+        if needs_rebuild:
             self.conn.execute("SAVEPOINT migrate_password_reset_tokens")
             try:
                 self.conn.execute("DROP TABLE password_reset_tokens")
