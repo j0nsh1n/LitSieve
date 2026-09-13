@@ -134,8 +134,8 @@ async function resolveLibraryId() {
 
 function captureSearchSession(kind) {
  // kind: 'text' | 'pico' | 'seed' | 'starred'
- const mode = kind === 'starred'
-  ? 'starred'
+ const mode = (kind === 'starred' || kind === 'seed')
+  ? kind
   : (document.querySelector('input[name="input_method"]:checked') || {}).value || 'text';
  const filters = collectSearchFilters();
  return {
@@ -194,7 +194,9 @@ function applySearchSessionToForm(state) {
  _restoringSearch = true;
  try {
   if (state.mode === 'text' || state.mode === 'pico' || state.mode === 'seed') {
-   setInputMethod(state.mode);
+   const keepSimpleQuery = state.mode === 'seed'
+    && typeof isSimpleMode === 'function' && isSimpleMode();
+   if (!keepSimpleQuery) setInputMethod(state.mode);
   }
   const qt = document.getElementById('query-text');
   if (qt && state.query_text != null) qt.value = state.query_text;
@@ -288,6 +290,12 @@ async function restoreSearchSession() {
 
  if (state.mode === 'starred') {
   await doStarredSearch({ fromRestore: true });
+  return;
+ }
+ if (state.mode === 'seed' && typeof isSimpleMode === 'function' && isSimpleMode()) {
+  const seedId = (state.seed_query || '').trim();
+  if (!seedId) return;
+  await doMoreLikeThisPaper({ article_id: seedId }, { fromRestore: true });
   return;
  }
  // Only auto-run when there is something to search with.
@@ -875,6 +883,83 @@ async function doStarredSearch(opts) {
  }
 }
 
+async function doMoreLikeThisPaper(article, opts) {
+ const fromRestore = !!(opts && opts.fromRestore);
+ const seedId = article && article.article_id ? String(article.article_id).trim() : '';
+ if (!seedId) return;
+ if (!fromRestore) {
+  const scoped = await promptSimpleSearchScope();
+  if (!scoped) return;
+ }
+ const filters = collectSearchFilters();
+ if (!requireSelectedSources(filters, fromRestore)) return;
+ const seedField = document.getElementById('seed-query');
+ if (seedField) seedField.value = seedId;
+ const btn = document.getElementById('search-btn');
+ setLoading(btn, true);
+ const resultsSec = document.getElementById('results-section');
+ if (resultsSec) {
+  resultsSec.classList.remove('u-hidden');
+  resultsSec.style.display = 'block';
+ }
+ showResultSkeletons(6);
+ lastSearchParams = {
+ query_text: seedId,
+ top_k: filters.top_k,
+ sort_by: filters.sort_by,
+ source_filter: filters.source_filter,
+ pico_boost: false,
+ lexical_boost: filters.lexical_boost,
+ year_min: filters.year_min,
+ year_max: filters.year_max,
+ mode: 'seed',
+ };
+ lastQueryTokens = tokensFromQuery(`${article.title || ''} ${article.abstract || ''}`);
+ try {
+ const data = await apiCall('/api/search/seed', {
+ method: 'POST',
+ body: {
+ seed: seedId,
+ top_k: filters.top_k,
+ source_filter: filters.source_filter,
+ year_min: filters.year_min,
+ year_max: filters.year_max,
+ lexical_boost: filters.lexical_boost,
+ include_seed: true,
+ },
+ });
+ const seed = data.seed || article;
+ const banner = document.getElementById('seed-banner');
+ const bannerText = document.getElementById('seed-banner-text');
+ if (banner && bannerText) {
+ banner.classList.remove('u-hidden');
+ banner.style.display = 'block';
+ bannerText.textContent =
+ `Starting from “${seed.title || seed.article_id}” (${getSourceName(seed.source)} · ${seed.year || 'n.d.'}). Showing papers most like this one.`;
+ lastQueryTokens = tokensFromQuery(`${seed.title || ''} ${seed.abstract || ''}`);
+ }
+ let results = data.results || [];
+ const sid = String(seed.article_id || '');
+ const src = String(seed.source || '');
+ const hasSeed = results.some((row) => String(row.article_id) === sid && String(row.source || '') === src);
+ if (!hasSeed && sid) {
+ results = [Object.assign({}, seed, { similarity_score: 1 })].concat(results);
+ if (filters.top_k) results = results.slice(0, filters.top_k);
+ }
+ if (filters.sort_by !== 'similarity') {
+ results = clientSort(results, filters.sort_by);
+ }
+ lastResults = results;
+ showSearchResults(results);
+ await saveSearchSession('seed');
+ } catch (e) {
+ if (!fromRestore) showNotification(`Search failed: ${e.message}`, 'error');
+ clearResultSkeletonsOnError(fromRestore);
+ } finally {
+ setLoading(btn, false);
+ }
+}
+
 function clientSort(results, sortBy) {
  const arr = results.slice();
  if (sortBy === 'year') {
@@ -1037,6 +1122,8 @@ function buildResultCard(article, idx) {
  ${openLink}
  <button type="button" class="star-btn ${starred ? 'is-starred' : ''}" title="Bookmark" aria-label="Star article" aria-pressed="${starred ? 'true' : 'false'}">${starLabelHtml(starred)}</button>
  <button type="button" class="note-toggle" ${noteVal ? 'hidden' : ''}>Add note</button>
+ <button type="button" class="more-like-this-btn"
+  title="Rank the rest of your collection by how similar they are to this paper">More like this</button>
  <button type="button" class="not-relevant-btn"
   title="Screen this paper out as not about your topic">Not relevant</button>
  </div>
@@ -1069,6 +1156,15 @@ function buildResultCard(article, idx) {
 
  if (typeof bindAiArticleActions === 'function') {
  bindAiArticleActions(card, article);
+ }
+
+ const moreBtn = card.querySelector('.more-like-this-btn');
+ if (moreBtn) {
+  moreBtn.addEventListener('click', async (e) => {
+   e.preventDefault();
+   e.stopPropagation();
+   await doMoreLikeThisPaper(article);
+  });
  }
 
  const starBtn = card.querySelector('.star-btn');

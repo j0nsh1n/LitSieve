@@ -5859,8 +5859,19 @@ html[data-mode="simple"] details.advanced-details:has(#lexical-boost),
 html[data-mode="simple"] details.advanced-details:has(#lib-export-scope),
 html[data-mode="simple"] .input-method-toggle label:has(input[value="seed"]),
 html[data-mode="simple"] #seed-input-panel,
-html[data-mode="simple"] #seed-banner,
 html[data-mode="simple"] .sim-badge {
+    display: none !important;
+}
+.seed-banner-heading-simple {
+    display: none;
+}
+html[data-mode="simple"] .seed-banner-heading-advanced {
+    display: none !important;
+}
+html[data-mode="simple"] .seed-banner-heading-simple {
+    display: block;
+}
+html:not([data-mode="simple"]) .more-like-this-btn {
     display: none !important;
 }
 /* Score meter stays visible in Simple (numeric 0–1, not Low/Med/High). */
@@ -6850,6 +6861,7 @@ html[data-mode="simple"] body:has(#search-workbench) #simple-screen-dock-hint {
 .article-actions-row .result-open-link,
 .article-actions-row .star-btn,
 .article-actions-row .note-toggle,
+.article-actions-row .more-like-this-btn,
 .article-actions-row .not-relevant-btn {
     background: none;
     border: 0;
@@ -6865,6 +6877,7 @@ html[data-mode="simple"] body:has(#search-workbench) #simple-screen-dock-hint {
     .article-actions-row .result-open-link,
     .article-actions-row .star-btn,
     .article-actions-row .note-toggle,
+    .article-actions-row .more-like-this-btn,
     .article-actions-row .not-relevant-btn {
         min-height: 2.75rem;
         min-width: 2.75rem;
@@ -6884,6 +6897,7 @@ html[data-mode="simple"] body:has(#search-workbench) #simple-screen-dock-hint {
 .article-actions-row .star-btn.is-starred,
 .article-actions-row .star-btn:hover,
 .article-actions-row .note-toggle:hover,
+.article-actions-row .more-like-this-btn:hover,
 .article-actions-row .not-relevant-btn:hover {
     color: var(--text);
 }
@@ -7006,6 +7020,7 @@ html[data-mode="simple"] body:has(#search-workbench) #simple-screen-dock-hint {
 .star-ico{width:0.95em;height:0.95em}
 .article-actions-row .star-btn,
 .article-actions-row .note-toggle,
+.article-actions-row .more-like-this-btn,
 .article-actions-row .not-relevant-btn,
 .article-actions-row .result-open-link{
     display: inline-flex;

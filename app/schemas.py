@@ -33,6 +33,8 @@ class SeedSearchRequest(BaseModel):
     year_min: Optional[int] = None
     year_max: Optional[int] = None
     lexical_boost: bool = True
+    # When true, the seed paper stays in the ranked list (Simple "More like this").
+    include_seed: bool = False
 
 
 class StarredSearchRequest(BaseModel):

@@ -579,7 +579,9 @@ def test_search_simple_subtitle_and_work_gate():
     assert "Step 4 of 4" in html  # Advanced only
     assert "search-work" in html
     # Simple help must not mention Seed; Advanced help may.
-    simple_help = html[html.find("search-help-simple") : html.find("input-method-toggle")]
+    simple_help_at = html.find("search-help-simple")
+    assert simple_help_at != -1
+    simple_help = html[simple_help_at : html.find("</p>", simple_help_at)]
     assert "Seed" not in simple_help
     assert "Seed" in html  # Advanced block still documents seed mode
     # Screening report link uses Clean up naming.
@@ -618,6 +620,27 @@ def test_search_advanced_keeps_seed_and_ranking_in_dom():
     assert 'html[data-mode="simple"]' in css and "seed" in css
 
 
+def test_simple_more_like_this_paper_reranks_without_fetch():
+    """Simple result cards re-rank the same library from one paper."""
+    html = _read("templates", "search.html")
+    simple_help_at = html.find("search-help-simple")
+    assert simple_help_at != -1
+    simple_help = html[simple_help_at : html.find("</p>", simple_help_at)]
+    assert "More like this" in simple_help
+    assert "Seed" not in simple_help
+    js = _read("static", "js", "search.js")
+    more = js[js.index("async function doMoreLikeThisPaper") : js.index("function clientSort")]
+    assert "more-like-this-btn" in js
+    assert "/api/search/seed" in more
+    assert "include_seed: true" in more
+    assert "/api/fetch" not in more
+    assert "/api/multi-fetch" not in more
+    assert "load-sample-corpus" not in more
+    css = _read("static", "css", "style.css")
+    assert "html:not([data-mode=\"simple\"]) .more-like-this-btn" in css
+    assert 'html[data-mode="simple"] #seed-banner,' not in css
+
+
 # ---------------------------------------------------------------------------
 # Cross-mode dual-label pattern (no cross-bleed)
 # ---------------------------------------------------------------------------
@@ -638,6 +661,7 @@ def test_dual_mode_labels_never_cross_bleed_in_css():
         ("search-sub-advanced", "search-sub-simple"),
         ("search-title-advanced", "search-title-simple"),
         ("search-help-advanced", "search-help-simple"),
+        ("seed-banner-heading-advanced", "seed-banner-heading-simple"),
     ]
     for advanced, simple in pairs:
         assert (

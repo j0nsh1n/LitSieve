@@ -26,6 +26,9 @@ and this project aims to follow Semantic Versioning for app version strings
   would be set aside on the left, the selected abstract on the right.
   You can keep or mark individual papers, including ones that would have
   stayed. Nothing is excluded until you confirm.
+- Simple Search result cards have **More like this**: re-rank the same
+  collected library from that paper. The starting paper stays in the
+  list. Nothing new is fetched.
 
 ### Fixed
 - **A deleted account's password-reset link could unlock the next account

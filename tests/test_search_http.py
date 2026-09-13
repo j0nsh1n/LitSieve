@@ -156,6 +156,36 @@ def test_seed_search_by_title_fragment(app_module):
     assert "seed" in body and body["total"] == len(body["results"])
 
 
+def test_seed_search_excludes_seed_by_default(app_module):
+    c = TestClient(app_module.app)
+    headers = _register(c)
+    arts = _seed(app_module, c, headers)
+    seed = arts[0]
+    r = c.post(
+        "/api/search/seed",
+        json={"seed": seed["article_id"], "top_k": 50},
+        headers=headers,
+    )
+    assert r.status_code == 200, r.text
+    keys = {(row["article_id"], row["source"]) for row in r.json()["results"]}
+    assert (seed["article_id"], seed["source"]) not in keys
+
+
+def test_seed_search_include_seed_keeps_seed_in_results(app_module):
+    c = TestClient(app_module.app)
+    headers = _register(c)
+    arts = _seed(app_module, c, headers)
+    seed = arts[0]
+    r = c.post(
+        "/api/search/seed",
+        json={"seed": seed["article_id"], "top_k": 50, "include_seed": True},
+        headers=headers,
+    )
+    assert r.status_code == 200, r.text
+    keys = {(row["article_id"], row["source"]) for row in r.json()["results"]}
+    assert (seed["article_id"], seed["source"]) in keys
+
+
 def test_seed_search_unknown_seed_is_400_not_500(app_module):
     """A miss is user error; it must not surface as a server fault."""
     c = TestClient(app_module.app)

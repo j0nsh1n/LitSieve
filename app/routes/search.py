@@ -77,6 +77,7 @@ async def api_search_seed(req: SeedSearchRequest, request: Request):
             p.search_by_seed, req.seed, req.top_k,
             req.source_filter, req.cluster_filter,
             req.year_min, req.year_max, req.lexical_boost,
+            req.include_seed,
         )
         results = data["results"]
         enrich_search_results(results, p)

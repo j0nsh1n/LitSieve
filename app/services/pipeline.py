@@ -960,6 +960,7 @@ class LiteratureSearchPipeline:
         year_min: Optional[int] = None,
         year_max: Optional[int] = None,
         lexical_boost: bool = True,
+        include_seed: bool = False,
     ) -> Dict:
         """Find a local seed article (by id/title), then rank similar papers."""
         article = self.db.find_article_by_seed(seed)
@@ -970,14 +971,16 @@ class LiteratureSearchPipeline:
             )
         query = f"{article.get('title') or ''}. {article.get('abstract') or ''}".strip()
         seed_key = (article["article_id"], article["source"])
+        extra_exclude = None if include_seed else {seed_key}
+        fetch_k = top_k if include_seed else top_k + 1
         results = self.search_similar(
-            query, top_k=top_k + 1,
+            query, top_k=fetch_k,
             source_filter=source_filter,
             cluster_filter=cluster_filter,
             year_min=year_min,
             year_max=year_max,
             lexical_boost=lexical_boost,
-            extra_exclude={seed_key},
+            extra_exclude=extra_exclude,
         )[:top_k]
         return {"seed": article, "results": results}
 
