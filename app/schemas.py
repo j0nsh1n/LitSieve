@@ -55,6 +55,8 @@ class MultiFetchRequest(BaseModel):
     clear_first: bool = True
     # wait=true: block until done (tests / legacy). Default: 202 + poll progress.
     wait: bool = False
+    # Bind this job to a library this account owns. Omit to use the active library.
+    library_id: Optional[str] = Field(default=None, max_length=128)
 
 
 class EmbeddingsRequest(BaseModel):
@@ -62,6 +64,8 @@ class EmbeddingsRequest(BaseModel):
     # Skip articles that already have vectors (unless the model changes).
     only_missing: bool = True
     wait: bool = False
+    # Bind this job to a library this account owns. Omit to use the active library.
+    library_id: Optional[str] = Field(default=None, max_length=128)
 
     @field_validator("model")
     @classmethod
@@ -98,6 +102,9 @@ class NoteRequest(BaseModel):
     source: str
     note: Optional[str] = Field(default=None, max_length=NOTE_MAX_CHARS)
     starred: Optional[bool] = None
+    # Bind this write to a library this account owns. Omit to use the
+    # currently active library (legacy clients / tests).
+    library_id: Optional[str] = Field(default=None, max_length=128)
 
 
 class AIArticleRequest(BaseModel):
@@ -116,6 +123,7 @@ class AISaveKeyPointsRequest(BaseModel):
     article_id: str
     source: str
     key_points: List[str]
+    library_id: Optional[str] = Field(default=None, max_length=128)
 
 
 class AIAskRequest(BaseModel):
@@ -173,6 +181,7 @@ class ScreeningRequest(BaseModel):
     action: str = Field(default="exclude", pattern="^(exclude|include)$")
     # Exclusion reason code (see screening_reasons.EXCLUSION_REASONS).
     reason: Optional[str] = "manual"
+    library_id: Optional[str] = Field(default=None, max_length=128)
 
 
 class QuickScreenPreviewRequest(BaseModel):

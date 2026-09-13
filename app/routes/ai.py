@@ -9,6 +9,7 @@ from app.core import (
     admin_forbidden_response,
     csrf_failed,
     current_user,
+    get_owned_pipeline,
     get_pipeline,
     is_admin_user,
     limiter,
@@ -254,7 +255,10 @@ async def api_ai_save_key_points(req: AISaveKeyPointsRequest, request: Request):
     if csrf_failed(request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
     uid = user["user_id"]
-    p = get_pipeline(uid)
+    try:
+        p = get_owned_pipeline(uid, req.library_id)
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"detail": str(e)})
     try:
         points = [str(x).strip()[:500] for x in (req.key_points or []) if str(x).strip()]
         points = points[:6]

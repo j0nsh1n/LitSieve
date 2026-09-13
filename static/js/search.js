@@ -1219,11 +1219,11 @@ function buildResultCard(article, idx) {
  try {
  await apiCall('/api/notes', {
  method: 'POST',
- body: {
+ body: withPageLibrary({
  article_id: article.article_id,
  source: article.source,
  starred: next,
- },
+ }),
  });
  patchLastResult(article, { starred: next });
  bumpStarredCount(next ? 1 : -1);
@@ -1245,11 +1245,11 @@ function buildResultCard(article, idx) {
  try {
  await apiCall('/api/notes', {
  method: 'POST',
- body: {
+ body: withPageLibrary({
  article_id: article.article_id,
  source: article.source,
  note: noteField.value,
- },
+ }),
  });
  patchLastResult(article, { note: noteField.value });
  showNotification('Note saved.', 'success');
@@ -1279,11 +1279,11 @@ function buildResultCard(article, idx) {
  try {
  await apiCall('/api/screening', {
  method: 'POST',
- body: {
+ body: withPageLibrary({
  items: [{ article_id: article.article_id, source: article.source }],
  action: 'exclude',
  reason: 'off_topic',
- },
+ }),
  });
  if (strip) {
   strip.classList.remove('is-pending');
@@ -1335,10 +1335,10 @@ function replaceCardWithUndo(cardEl, article, opts) {
  try {
  await apiCall('/api/screening', {
  method: 'POST',
- body: {
+ body: withPageLibrary({
  items: [{ article_id: article.article_id, source: article.source }],
  action: 'include',
- },
+ }),
  });
  if (strip.parentNode === parent) {
   parent.replaceChild(cardEl, strip);

@@ -89,6 +89,9 @@ and this project aims to follow Semantic Versioning for app version strings
 - Notes on Search can no longer grow after an account is over its storage
   cap, and notes longer than 8,000 characters are rejected. Clearing or
   shortening a note still works so a student can free disk.
+- A Search tab that was left open no longer saves notes, stars, or
+  screening into a different library after another tab switches. Fetch
+  and prepare from that tab stay on the library the page loaded.
 
 ## [5.3.1] - 2026-08-31
 

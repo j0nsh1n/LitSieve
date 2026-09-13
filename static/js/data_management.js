@@ -1365,13 +1365,13 @@ async function doFetch() {
  try {
  const started = await apiCall('/api/fetch-articles-multi', {
  method: 'POST',
- body: {
+ body: withPageLibrary({
  sources,
  query,
  max_results: maxResults,
  email: email || null,
  clear_first: clearFirst,
- },
+ }),
  });
  // 202 → {status: started}; poll for result. (wait=true legacy returns full body.)
  let data = started;
@@ -1540,7 +1540,7 @@ async function doCreateEmbeddings(opts) {
  try {
  const started = await apiCall('/api/create-embeddings', {
  method: 'POST',
- body: { model, only_missing: onlyMissing },
+ body: withPageLibrary({ model, only_missing: onlyMissing }),
  });
  let data = started;
  if (started && started.status === 'started') {

@@ -175,3 +175,19 @@ def test_migration_failure_keeps_legacy_and_meta_unpublished(user_id, monkeypatc
     dest = lib.library_db_path(user_id, meta["active_id"])
     assert dest.read_bytes() == b"db-bytes"
     assert not legacy.exists()
+
+
+def test_owned_library_id_active_or_owned_only(user_id):
+    meta = lib.ensure_libraries(user_id)
+    first = meta["active_id"]
+    assert lib.owned_library_id(user_id, None) == first
+    assert lib.owned_library_id(user_id, "") == first
+    created = lib.create_library(user_id, "Second")
+    second = created["library"]["id"]
+    assert created["active_id"] == second
+    assert lib.owned_library_id(user_id, first) == first
+    assert lib.owned_library_id(user_id, second) == second
+    with pytest.raises(ValueError, match="Library not found"):
+        lib.owned_library_id(user_id, "00000000-0000-0000-0000-000000000000")
+    with pytest.raises(ValueError, match="Invalid library id"):
+        lib.owned_library_id(user_id, "../nope")

@@ -78,6 +78,9 @@
 - **AI settings**: per account `{USER_DATA_DIR}/{user_id}/ai_settings.json`
   (keys encrypted). Host env is the deploy default. A student base URL
   never rides with the host API key.
+- **Jobs**: fetch / embed progress per user; bind to an explicit owned
+  library id when the client sends one, otherwise the active library at start
+- **AI settings**: server-wide `user_data/ai_settings.json` (keys encrypted)
 - **Quota**: disk under `user_data/<uid>/` vs `MAX_USER_STORAGE_MB`; optional
   per-account `quota_limit_mb` + `quota_limit_until` overlay (helpdesk bump)
 - **Support view**: httponly `support_view` cookie overlays identity; admin JWT
@@ -90,7 +93,7 @@
 ```
 User 1---* Library 1---* Article
               |            +-- embeddings, screening, notes, key_points
-              +-- jobs (fetch/embed) use active library
+              +-- jobs (fetch/embed) bind explicit library_id or active
 ShareCode *---1 Library (owner); redeem → clone Library for joiner
 Guest User (is_guest) → sample corpus only; purged by age
 ```
@@ -145,8 +148,11 @@ Guest User (is_guest) → sample corpus only; purged by age
 - **Next:** A07 (unbounded notes bypass the storage cap). Do not push/PR
   until asked.
 - **Date:** 2026-09-09
-- **Branch:** `fix/a07-note-quota`
-- **Done:** A07 — notes have an 8,000-character bound; growing a note while
-  over the storage cap returns 507. Library-code join and AI key-point save
-  use the same growth gate. Tests in `tests/test_quota.py`.
-- **Next:** A08 (stale tabs write into a different library).
+- **Branch:** `fix/a08-stale-tab-library`
+- **Done:** A08 — Search/note/screening/fetch/prepare can bind to an owned
+  `library_id` instead of whichever library is currently active. A tab
+  that loaded library A reloads if another tab made B active. Tests in
+  `tests/test_libraries_http.py`, `tests/test_libraries.py`, and
+  `tests/test_static_js.py`.
+- **Next:** A09+ of the 2026-09-06 code audit (not started). A06–A08 are
+  separate branches off `origin/main` (A08 stacked on A07).

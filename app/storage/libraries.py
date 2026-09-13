@@ -236,6 +236,23 @@ def get_active_library_id(user_id: str) -> str:
     return ensure_libraries(user_id)["active_id"]
 
 
+def owned_library_id(user_id: str, library_id: Optional[str] = None) -> str:
+    """Resolve an optional library_id to one this account owns.
+
+    Empty/None uses the active library. A set id that is missing from this
+    account's library list, or is not a safe path segment, raises ValueError.
+    """
+    meta = ensure_libraries(user_id)
+    raw = str(library_id or "").strip()
+    if not raw:
+        return str(meta["active_id"])
+    lid = _safe_fs_id(raw, label="library id")
+    ids = {str(L.get("id") or "") for L in meta.get("libraries") or []}
+    if lid not in ids:
+        raise ValueError("Library not found.")
+    return lid
+
+
 def set_active_library(user_id: str, library_id: str) -> Dict:
     with _lock:
         meta = _read_meta_unlocked(user_id) or _migrate_legacy_unlocked(user_id)
