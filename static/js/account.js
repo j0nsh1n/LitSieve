@@ -76,12 +76,34 @@ document.addEventListener('DOMContentLoaded', () => {
  }
  }
  if (joinInput) {
- joinInput.addEventListener('keydown', (e) => {
- if (e.key === 'Enter') {
- e.preventDefault();
- doAccountJoinPreview();
+  joinInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+  e.preventDefault();
+  doAccountJoinPreview();
+  }
+  });
  }
- });
+
+ // Sidenav scroll-spy: highlight the account section currently in view.
+ const spyLinks = Array.from(document.querySelectorAll('.account-nav-link'));
+ if (spyLinks.length) {
+  const sectionLink = {};
+  spyLinks.forEach((link) => {
+  const section = document.querySelector(link.getAttribute('href'));
+  if (section) sectionLink[section.id] = link;
+  });
+  const spy = new IntersectionObserver((entries) => {
+  entries.forEach((entry) => {
+  if (!entry.isIntersecting) return;
+  spyLinks.forEach((link) => link.removeAttribute('aria-current'));
+  const active = sectionLink[entry.target.id];
+  if (active) active.setAttribute('aria-current', 'true');
+  });
+  }, { rootMargin: '-40% 0px -55% 0px' });
+  Object.keys(sectionLink).forEach((id) => {
+  const section = document.getElementById(id);
+  if (section) spy.observe(section);
+  });
  }
 });
 

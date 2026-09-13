@@ -15,7 +15,10 @@
  <p class="subtitle search-sub-simple">Rank the papers you kept by how well they match your question,
  then export your list for Zotero.</p>
  {% from "macros/disclaimers.html" import scope_search %}
- {{ scope_search() }}
+ <details class="search-scope-note" open>
+  <summary>Starting point only: ranks papers already in your collection.</summary>
+  {{ scope_search() }}
+ </details>
 </section>
 
 <div class="search-query-top search-work" id="search-query-top" hidden>
@@ -356,5 +359,5 @@
 <script src="/static/js/simple_tools.js?v=20260912d"></script>
 <script src="/static/js/data_management.js?v=20260828a"></script>
 <script src="/static/js/reader.js?v=20260829a"></script>
-<script src="/static/js/search.js?v=20260912c"></script>
+<script src="/static/js/search.js?v=20260912d"></script>
 {% endblock %}

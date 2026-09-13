@@ -7,12 +7,17 @@
   <button type="button" class="btn btn-primary" id="simple-screen-open-btn">
    Narrow it down
   </button>
-  <button type="button" class="btn btn-secondary simple-tools-search-only" id="simple-tools-reprepare-btn">
-   Re-prepare
-  </button>
-  <button type="button" class="btn btn-secondary simple-tools-search-only" id="simple-tools-startover-btn">
-   Start over
-  </button>
+  <details class="simple-tools-more simple-tools-search-only">
+   <summary>More</summary>
+   <div class="simple-tools-more-menu">
+    <button type="button" class="btn btn-secondary simple-tools-search-only" id="simple-tools-reprepare-btn">
+     Re-prepare
+    </button>
+    <button type="button" class="btn btn-secondary simple-tools-search-only" id="simple-tools-startover-btn">
+     Start over
+    </button>
+   </div>
+  </details>
   <span class="help-text" id="simple-tools-status"></span>
   <p class="help-text" id="simple-screen-dock-hint" hidden>Set aside papers least related to your question, or skip.</p>
   <div id="simple-screen-outcome" class="simple-screen-outcome u-hidden" hidden>

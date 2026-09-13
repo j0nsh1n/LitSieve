@@ -32,6 +32,14 @@ and this project aims to follow Semantic Versioning for app version strings
 - Simple Search result cards have **More like this**: re-rank the same
   collected library from that paper. The starting paper stays in the
   list. Nothing new is fetched.
+- Simple Search is a tighter ranked list: collapsed collection note,
+  sticky query plus Search, Narrow it down with Re-prepare and Start
+  over under More, abstracts behind Show abstract, AI under Study aid,
+  and Star / Note / Not relevant in a right-hand rail.
+- Account uses a section nav (Profile, Libraries, Study aid, Recovery
+  email, Password, Danger zone) beside a narrower column. Long
+  explanations sit under How this works. Delete keeps the export-first
+  warning.
 
 ### Fixed
 - **A deleted account's password-reset link could unlock the next account

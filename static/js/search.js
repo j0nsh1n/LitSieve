@@ -1071,12 +1071,14 @@ function buildResultCard(article, idx) {
  const authors = (article.authors || []).join('; ');
  const abstractHtml = highlightText(article.abstract || '', lastQueryTokens);
  const picoHtml = renderPicoBlock(article.pico);
+ const simpleMode = document.documentElement.getAttribute('data-mode') === 'simple';
  const keyPointsHtml = typeof renderKeyPointsHtml === 'function'
  ? renderKeyPointsHtml(article.key_points, {
  articleId: article.article_id,
  source: article.source,
  origin: article.key_points_origin || 'extractive',
  abstractLen: String(article.abstract || '').length,
+ compactAid: simpleMode,
  })
  : '';
  const studyTypeHtml = renderStudyTypeBadge(article);
@@ -1096,7 +1098,7 @@ function buildResultCard(article, idx) {
   ? `${escapeHtml(authors)}${journal ? ' — ' + journal : ''}`
   : journal;
 
- card.innerHTML = `
+ const headHtml = `
  <div class="result-row-head result-row-meta">
  <div class="score-meter" role="img" aria-label="Similarity ${simLabel} of 1. Higher is a closer match to your query." title="${escapeHtml(scoreHelp)}">
   <span class="score-meter-value">${escapeHtml(simLabel)}</span>
@@ -1109,31 +1111,69 @@ function buildResultCard(article, idx) {
  </span>
  </div>
  <h3 class="article-title result-row-title">${escapeHtml(article.title || '')}</h3>
- <div class="byline result-byline">${byline}</div>
- <div class="article-body result-row-body">
- <div class="article-meta result-row-ids">
- <span><strong>ID:</strong> ${idLink}</span>
- ${clusterBit}
- </div>
- ${keyPointsHtml}
- <div class="article-abstract">${abstractHtml}</div>
- ${picoHtml}
- <div class="article-actions-row">
- ${openLink}
- <button type="button" class="star-btn ${starred ? 'is-starred' : ''}" title="Bookmark" aria-label="Star article" aria-pressed="${starred ? 'true' : 'false'}">${starLabelHtml(starred)}</button>
- <button type="button" class="note-toggle" ${noteVal ? 'hidden' : ''}>Add note</button>
- <button type="button" class="more-like-this-btn"
-  title="Rank the rest of your collection by how similar they are to this paper">More like this</button>
- <button type="button" class="not-relevant-btn"
-  title="Screen this paper out as not about your topic">Not relevant</button>
- </div>
+ <div class="byline result-byline">${byline}</div>`;
+
+ const noteRowHtml = `
  <div class="note-row" ${noteVal ? '' : 'hidden'}>
  <label class="help-text">Private note</label>
  <textarea class="note-field" rows="2" placeholder="Optional study note (saved to your account)…"></textarea>
  <button type="button" class="btn btn-sm btn-secondary note-save">Save note</button>
- </div>
- </div>
- `;
+ </div>`;
+
+ if (simpleMode) {
+  card.innerHTML = `
+  <div class="result-row-main">
+  ${headHtml}
+  <div class="article-body result-row-body">
+  <div class="article-meta result-row-ids">
+  <span><strong>ID:</strong> ${idLink}</span>
+  ${clusterBit}
+  </div>
+  ${keyPointsHtml}
+  <details class="result-abstract">
+  <summary>Show abstract</summary>
+  <div class="article-abstract">${abstractHtml}</div>
+  </details>
+  ${picoHtml}
+  <div class="article-actions-row result-row-inline-actions">
+  ${openLink}
+  <button type="button" class="more-like-this-btn"
+   title="Rank the rest of your collection by how similar they are to this paper">More like this</button>
+  </div>
+  ${noteRowHtml}
+  </div>
+  </div>
+  <div class="result-row-rail" aria-label="Article actions">
+  <button type="button" class="star-btn ${starred ? 'is-starred' : ''}" title="Bookmark" aria-label="Star article" aria-pressed="${starred ? 'true' : 'false'}">${starLabelHtml(starred)}</button>
+  <button type="button" class="note-toggle" ${noteVal ? 'hidden' : ''}><span class="result-rail-label">Note</span></button>
+  <button type="button" class="not-relevant-btn"
+   title="Screen this paper out as not about your topic"><span class="result-rail-label">Not relevant</span></button>
+  </div>
+  `;
+ } else {
+  card.innerHTML = `
+  ${headHtml}
+  <div class="article-body result-row-body">
+  <div class="article-meta result-row-ids">
+  <span><strong>ID:</strong> ${idLink}</span>
+  ${clusterBit}
+  </div>
+  ${keyPointsHtml}
+  <div class="article-abstract">${abstractHtml}</div>
+  ${picoHtml}
+  <div class="article-actions-row">
+  ${openLink}
+  <button type="button" class="star-btn ${starred ? 'is-starred' : ''}" title="Bookmark" aria-label="Star article" aria-pressed="${starred ? 'true' : 'false'}">${starLabelHtml(starred)}</button>
+  <button type="button" class="note-toggle" ${noteVal ? 'hidden' : ''}>Add note</button>
+  <button type="button" class="more-like-this-btn"
+   title="Rank the rest of your collection by how similar they are to this paper">More like this</button>
+  <button type="button" class="not-relevant-btn"
+   title="Screen this paper out as not about your topic">Not relevant</button>
+  </div>
+  ${noteRowHtml}
+  </div>
+  `;
+ }
 
  // CSP: no style= attributes — set the score via a CSS variable.
  // The ring (.score-meter) and the fill both read --score-pct.
@@ -1574,15 +1614,31 @@ function watchSimplePanelClearance() {
  window.addEventListener('resize', syncSimplePanelClearance);
 }
 
+/** Simple keeps the scope note collapsed; Advanced pins it open (summary hidden). */
+function syncSearchScopeNote() {
+ const note = document.querySelector('.search-scope-note');
+ if (!note) return;
+ const simple = document.documentElement.getAttribute('data-mode') === 'simple';
+ if (simple) {
+  note.removeAttribute('open');
+ } else {
+  note.setAttribute('open', '');
+ }
+}
+
 // If the user toggles Simple/Advanced after a search, re-show the panel.
 document.addEventListener('DOMContentLoaded', () => {
  watchSimplePanelClearance();
+ syncSearchScopeNote();
  const modeBtn = document.getElementById('mode-toggle');
  if (modeBtn) {
   modeBtn.addEventListener('click', () => {
    // common.js flips data-mode first in the same tick; re-evaluate after.
    requestAnimationFrame(() => {
     updateSimpleSearchPanel(!!(lastResults && lastResults.length));
+    syncSearchScopeNote();
+    // Result cards carry mode-specific markup: rebuild for the new mode.
+    if (lastResults && lastResults.length) showSearchResults();
    });
   });
  }
