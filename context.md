@@ -136,3 +136,11 @@ Guest User (is_guest) → sample corpus only; purged by age
   paper and more like starred, not Simple per-card More like this, and
   does not describe the Simple split-pane screening review, the Simple
   focused-list card chrome, or the Account section nav.
+- **Date:** 2026-09-09
+- **Branch:** `fix/a06-backup-custom-paths`
+- **Done:** Audit finding A06 — `tools/backup.py` discovers the live accounts
+  DB via `USERS_DB` and the library tree via `USER_DATA_DIR`, archives them
+  under stable `users.db` / `user_data/` prefixes, and `--restore` writes
+  them back to those live paths.
+- **Next:** A07 (unbounded notes bypass the storage cap). Do not push/PR
+  until asked.

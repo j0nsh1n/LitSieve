@@ -81,6 +81,10 @@ and this project aims to follow Semantic Versioning for app version strings
   ladder (previously up to ~2.6 minutes per unreachable source). Retries
   and backoff abort as soon as the job is cancelled; an in-flight socket
   wait of up to ~30 seconds may still finish before the cancel lands.
+### Fixed
+- Backups follow `USERS_DB` and `USER_DATA_DIR` instead of assuming
+  `users.db` and `user_data/` live under the checkout. Archives still use
+  those names as stable prefixes, so restore can land on a custom layout.
 
 ## [5.3.1] - 2026-08-31
 
