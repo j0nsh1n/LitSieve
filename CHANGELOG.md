@@ -15,9 +15,9 @@ and this project aims to follow Semantic Versioning for app version strings
   denser search results. Layout and workflow are unchanged.
 - On phones and tablets the top bar is one row (brand + menu). Steps,
   library, mode, and account sit in a drawer so they do not eat the page.
-- “What would be set aside” uses solid `--surface` / `--bg` instead of
-  color-mix frost, which was reading as slate in dark. Ask for help is a
-  quiet `--surface` pill with `--text-soft` ink.
+- Modal backdrops are transparent (no `color-mix` wash). That wash was
+  the slate veil on “What would be set aside”. Ask for help is a quiet
+  `--surface` pill with `--text-soft` ink.
 - Saving AI settings writes `{USER_DATA_DIR}/{account id}/ai_settings.json`
   for the signed-in account. Host `.env` keys stay deploy defaults.
   Built-in Ollama start/stop is still process-wide.

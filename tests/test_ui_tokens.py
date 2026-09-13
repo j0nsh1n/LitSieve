@@ -540,6 +540,9 @@ def test_typefaces_are_self_hosted():
 
 def test_triage_and_help_use_glass_surfaces():
     """Triage pane uses solid page tokens — color-mix was reading as slate."""
+    backdrop = CSS[CSS.find(".lra-modal-backdrop {") : CSS.find(".lra-modal-card {")]
+    assert "background: transparent" in backdrop
+    assert "color-mix" not in backdrop
     assert "color-mix(in srgb, var(--text) 45%, transparent)" not in CSS
     panel = CSS[CSS.find(".screen-triage-panel {") : CSS.find(".screen-triage-head {")]
     assert "background: var(--surface)" in panel
