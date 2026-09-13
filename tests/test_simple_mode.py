@@ -521,6 +521,14 @@ def test_quick_screen_preview_does_not_exclude(tmp_path):
         assert len(result["candidates"]) == result["proposed_count"]
         ids = {c["article_id"] for c in result["candidates"]}
         assert "0" not in ids
+        assert result["staying"]
+        assert len(result["staying"]) == result["total_ranked"] - result["proposed_count"]
+        stay_ids = {c["article_id"] for c in result["staying"]}
+        assert ids.isdisjoint(stay_ids)
+        row = result["candidates"][0]
+        assert "abstract" in row
+        assert "authors" in row
+        assert "similarity_score" in row
     finally:
         p.close()
 
@@ -908,6 +916,17 @@ def test_simple_screen_preview_does_not_exclude():
     assert "/api/screening/quick-preview" in fn
     assert 'action: \'exclude\'' not in fn and 'action: "exclude"' not in fn
     assert "low_relevance" not in fn
+    assert "openSimpleScreenTriage()" in fn
+    assert "innerHTML" not in fn
+    html = _read("templates", "partials", "simple_screening_card.html")
+    assert 'id="screen-triage-go-rows"' in html
+    assert 'id="screen-triage-stay-rows"' in html
+    assert 'id="screen-triage-detail-body"' in html
+    css = _read("static", "css", "style.css")
+    assert ".screen-triage-workbench" in css
+    assert "grid-template-columns: minmax(16rem, 38%) minmax(0, 1fr)" in css
+    assert "_screenTriageMatches()" in dm
+    assert "moveScreenTriagePaper" in dm
 
 
 def test_simple_screen_apply_and_undo_use_low_relevance():

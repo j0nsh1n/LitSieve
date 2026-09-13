@@ -743,6 +743,7 @@ class LiteratureSearchPipeline:
         if total == 0:
             return {
                 "candidates": [],
+                "staying": [],
                 "total_ranked": 0,
                 "proposed_count": 0,
                 "fraction": fraction,
@@ -771,21 +772,29 @@ class LiteratureSearchPipeline:
         n_propose = max(1, n_propose) if total > 1 else 0
         n_propose = min(n_propose, max(0, total - 1))
 
-        candidates: List[Dict] = []
-        for idx in order[:n_propose]:
+        def _preview_row(idx: int) -> Dict:
             key = article_ids[idx]
             meta = articles_all.get(key) or {}
-            candidates.append({
+            authors = meta.get("authors") or []
+            if not isinstance(authors, list):
+                authors = [str(authors)]
+            return {
                 "article_id": key[0],
                 "source": key[1],
                 "title": meta.get("title") or "",
                 "year": meta.get("year") or "",
                 "journal": meta.get("journal") or "",
+                "authors": authors,
+                "abstract": meta.get("abstract") or "",
                 "similarity_score": float(scores[idx]),
-            })
+            }
+
+        candidates = [_preview_row(idx) for idx in order[:n_propose]]
+        staying = [_preview_row(idx) for idx in reversed(list(order[n_propose:]))]
 
         return {
             "candidates": candidates,
+            "staying": staying,
             "total_ranked": total,
             "proposed_count": len(candidates),
             "fraction": fraction,

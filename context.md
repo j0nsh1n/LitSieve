@@ -23,7 +23,7 @@
   Source Serif 4 headings, Source Sans 3 body/UI (self-hosted). Hybrid frost
   cards on a soft wash, score ring on Search. Sieve pan as favicon, nav
   mark, and empty-state illustration (Search / Clean up / Clusters).
-  CSS cache-bust `style.css?v=20260912c`. Mobile app nav is a one-row
+  CSS cache-bust `style.css?v=20260912f`. Mobile app nav is a one-row
   brand + menu; steps and tools open in a drawer.
 - Reader Mode: **Explain this study** on Search/Clean up cards — structured
   plain-language reading of one abstract, cached per
@@ -121,8 +121,10 @@ Guest User (is_guest) → sample corpus only; purged by age
   2026-09-06 audit. Reader verifier is v3 (CI bounds and p-value operators).
   Embedding aliases resolve to the configured repo. HDBSCAN on tiny libraries
   returns one group. Merged PR #64 so the airy glass UI is back on this
-  branch (`style.css?v=20260912c`). Simple Search screening counts are a
-  two-row funnel (collected, then kept vs removed). UX round 2 mockups
+  branch (`style.css?v=20260912f`). Simple Search screening counts are a
+  two-row funnel (collected, then kept vs removed). Show me what would
+  go is a split-pane review of proposed set-aside vs stay, with per-paper
+  keep/aside before confirm. UX round 2 mockups
   live in gitignored `design_mockups/ux2/` (`index.html`): m1 focused
   Search list, m2 split-pane triage, m3 Account with section nav.
 - **Next:** Drafted, not built: Simple "More like this paper" (re-rank

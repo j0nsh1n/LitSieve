@@ -22,6 +22,10 @@ and this project aims to follow Semantic Versioning for app version strings
   set, then kept versus removed of that total, with duplicate and
   screened-out counts under the second bar. The bars refresh when you
   set papers aside.
+- Simple Show me what would go opens a split-pane review: papers that
+  would be set aside on the left, the selected abstract on the right.
+  You can keep or mark individual papers, including ones that would have
+  stayed. Nothing is excluded until you confirm.
 
 ### Fixed
 - **A deleted account's password-reset link could unlock the next account

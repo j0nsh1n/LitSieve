@@ -488,7 +488,7 @@ async def api_screening_quick_preview(req: QuickScreenPreviewRequest, request: R
     """Rank papers against a research question; return least-related for review.
 
     Read-only: never writes screening. Apply via POST /api/screening with
-    reason=low_relevance after the student confirms the title list.
+    reason=low_relevance after the student confirms the proposed set.
     """
     user = current_user(request)
     if not user:
