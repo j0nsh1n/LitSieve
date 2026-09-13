@@ -276,11 +276,12 @@ cleanly during tests. Coverage includes:
   `token_version` claim so changing a password revokes that user's other
   sessions. CSRF uses a double-submit token on every mutating request.
 - **Passwords** — bcrypt (used directly; passlib dropped). Never stored or logged in the clear.
-- **Provider API keys** — encrypted at rest in `user_data/ai_settings.json`
-  with **AES-256-GCM** (`enc:v2:`, fresh nonce each save; key via HKDF from
-  `SECRET_KEY`). Older Fernet (`enc:v1:`) blobs still load and upgrade on the
-  next save. File is `chmod 600`. Rotating `SECRET_KEY` drops unreadable keys
-  rather than sending ciphertext to a provider.
+- **Provider API keys** — per account, encrypted at rest under
+  `USER_DATA_DIR/<account>/ai_settings.json` with **AES-256-GCM** (`enc:v2:`,
+  fresh nonce each save; key via HKDF from `SECRET_KEY`). Older Fernet
+  (`enc:v1:`) blobs still load and upgrade on the next save. File is
+  `chmod 600`. Rotating `SECRET_KEY` drops unreadable keys rather than
+  sending ciphertext to a provider.
 - **Databases at rest (optional)** — set `DB_ENCRYPTION_KEY` to open every
   SQLite file through SQLCipher. Off by default. Convert existing databases
   first, or the app will refuse to open them:
