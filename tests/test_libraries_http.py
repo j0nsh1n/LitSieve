@@ -261,3 +261,138 @@ def test_ai_key_points_saves_displayed_bullets(app_module):
         headers=_csrf(c),
     )
     assert r.status_code == 404
+
+
+def test_note_library_id_writes_named_library_not_active(app_module):
+    """A stale tab can send library_id for the library it loaded, not the active one."""
+    c = TestClient(app_module.app)
+    _register(c, "stale08")
+    lib_a = c.get("/api/libraries").json()["active_id"]
+    assert _fetch(c, "sleep").status_code == 200
+    key = {"article_id": "fake-sleep", "source": "pubmed"}
+
+    r = c.post("/api/libraries", json={"name": "Other lib"}, headers=_csrf(c))
+    assert r.status_code == 200, r.text
+    lib_b = r.json()["library"]["id"]
+    assert r.json()["active_id"] == lib_b
+    assert _fetch(c, "sleep").status_code == 200
+
+    r = c.post(
+        "/api/notes",
+        json={**key, "note": "belongs to A", "library_id": lib_a},
+        headers=_csrf(c),
+    )
+    assert r.status_code == 200, r.text
+
+    got_b = c.get("/api/notes", params=key).json()
+    assert (got_b.get("note") or "") == ""
+
+    got_a = c.get("/api/notes", params={**key, "library_id": lib_a}).json()
+    assert got_a.get("note") == "belongs to A"
+
+    r = c.post(
+        "/api/notes",
+        json={**key, "note": "evil", "library_id": "not-a-real-lib"},
+        headers=_csrf(c),
+    )
+    assert r.status_code == 400
+    assert (c.get("/api/notes", params=key).json().get("note") or "") == ""
+
+    c2 = TestClient(app_module.app)
+    _register(c2, "stale08b")
+    other_id = c2.get("/api/libraries").json()["active_id"]
+    r = c.post(
+        "/api/notes",
+        json={**key, "note": "cross", "library_id": other_id},
+        headers=_csrf(c),
+    )
+    assert r.status_code == 400
+    got_a = c.get("/api/notes", params={**key, "library_id": lib_a}).json()
+    assert got_a.get("note") == "belongs to A"
+
+
+def test_screening_library_id_writes_named_library_not_active(app_module):
+    c = TestClient(app_module.app)
+    _register(c, "stale08s")
+    lib_a = c.get("/api/libraries").json()["active_id"]
+    assert _fetch(c, "sleep").status_code == 200
+    key = {"article_id": "fake-sleep", "source": "pubmed"}
+
+    r = c.post("/api/libraries", json={"name": "Screen other"}, headers=_csrf(c))
+    lib_b = r.json()["library"]["id"]
+    assert r.json()["active_id"] == lib_b
+    assert _fetch(c, "sleep").status_code == 200
+
+    r = c.post(
+        "/api/screening",
+        json={
+            "items": [key],
+            "action": "exclude",
+            "reason": "off_topic",
+            "library_id": lib_a,
+        },
+        headers=_csrf(c),
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["count"] == 1
+    assert c.get("/api/screening-report?format=json").json()["excluded"]["total"] == 0
+
+    r = c.post(
+        "/api/libraries/switch",
+        json={"library_id": lib_a},
+        headers=_csrf(c),
+    )
+    assert r.status_code == 200
+    report_a = c.get("/api/screening-report?format=json").json()
+    assert report_a["excluded"]["off_topic"] == 1
+    assert report_a["excluded"]["total"] == 1
+
+
+def test_fetch_library_id_writes_named_library_not_active(app_module):
+    c = TestClient(app_module.app)
+    _register(c, "stale08f")
+    lib_a = c.get("/api/libraries").json()["active_id"]
+    assert _fetch(c, "sleep").status_code == 200
+    sleep_count = c.get("/api/statistics").json()["total_articles"]
+    assert sleep_count >= 1
+
+    r = c.post("/api/libraries", json={"name": "Fetch other"}, headers=_csrf(c))
+    assert r.status_code == 200
+    assert c.get("/api/statistics").json()["total_articles"] == 0
+
+    r = c.post(
+        "/api/fetch-articles-multi",
+        json={
+            "sources": ["pubmed"],
+            "query": "climate",
+            "max_results": 5,
+            "email": None,
+            "wait": True,
+            "clear_first": False,
+            "library_id": lib_a,
+        },
+        headers=_csrf(c),
+    )
+    assert r.status_code == 200, r.text
+    assert c.get("/api/statistics").json()["total_articles"] == 0
+
+    r = c.post(
+        "/api/libraries/switch",
+        json={"library_id": lib_a},
+        headers=_csrf(c),
+    )
+    assert r.status_code == 200
+    assert c.get("/api/statistics").json()["total_articles"] >= sleep_count + 1
+
+    r = c.post(
+        "/api/fetch-articles-multi",
+        json={
+            "sources": ["pubmed"],
+            "query": "nope",
+            "max_results": 5,
+            "wait": True,
+            "library_id": "not-a-real-lib",
+        },
+        headers=_csrf(c),
+    )
+    assert r.status_code == 400

@@ -11,11 +11,14 @@ from app.services import llm
 
 @pytest.fixture
 def settings_file(tmp_path, monkeypatch):
-    path = tmp_path / "ai_settings.json"
-    monkeypatch.setattr(llm, "AI_SETTINGS_PATH", path)
-    monkeypatch.setattr(llm, "_SETTINGS_CACHE", None)
+    monkeypatch.setenv("USER_DATA_DIR", str(tmp_path))
     monkeypatch.setenv("SECRET_KEY", "unit-test-secret-key")
-    return path
+    path = tmp_path / "user-a" / "ai_settings.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    llm._SETTINGS_CACHE = None
+    token = llm._AI_USER_ID.set("user-a")
+    yield path
+    llm._AI_USER_ID.reset(token)
 
 
 def test_api_key_is_encrypted_on_disk_but_plaintext_in_memory(settings_file):

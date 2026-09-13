@@ -7,12 +7,17 @@
   <button type="button" class="btn btn-primary" id="simple-screen-open-btn">
    Narrow it down
   </button>
-  <button type="button" class="btn btn-secondary simple-tools-search-only" id="simple-tools-reprepare-btn">
-   Re-prepare
-  </button>
-  <button type="button" class="btn btn-secondary simple-tools-search-only" id="simple-tools-startover-btn">
-   Start over
-  </button>
+  <details class="simple-tools-more simple-tools-search-only">
+   <summary>More</summary>
+   <div class="simple-tools-more-menu">
+    <button type="button" class="btn btn-secondary simple-tools-search-only" id="simple-tools-reprepare-btn">
+     Re-prepare
+    </button>
+    <button type="button" class="btn btn-secondary simple-tools-search-only" id="simple-tools-startover-btn">
+     Start over
+    </button>
+   </div>
+  </details>
   <span class="help-text" id="simple-tools-status"></span>
   <p class="help-text" id="simple-screen-dock-hint" hidden>Set aside papers least related to your question, or skip.</p>
   <div id="simple-screen-outcome" class="simple-screen-outcome u-hidden" hidden>
@@ -64,11 +69,55 @@
     <button type="button" class="btn btn-primary" id="simple-screen-apply-btn">Set them aside</button>
     <button type="button" class="btn btn-secondary" id="simple-screen-skip-btn">Skip this</button>
    </div>
-   <div id="simple-screen-preview" class="simple-screen-preview u-hidden" hidden></div>
    <div id="simple-screen-status" class="status-indicator"></div>
    <div class="lra-modal-actions">
     <button type="button" class="btn btn-secondary" id="simple-screen-modal-close" data-simple-screen-close>Close</button>
    </div>
+  </div>
+ </div>
+
+ <div id="simple-screen-preview" class="lra-modal-root screen-triage u-hidden" hidden>
+  <div class="lra-modal-backdrop" data-screen-triage-close></div>
+  <div class="screen-triage-panel" role="dialog" aria-modal="true"
+   aria-labelledby="screen-triage-title">
+   <header class="screen-triage-head">
+    <div>
+     <h2 id="screen-triage-title">What would be set aside</h2>
+     <p class="help-text" id="screen-triage-lead">
+      Papers least related to your question. Read them, keep any you still want.
+      Nothing is excluded until you set them aside.
+     </p>
+    </div>
+    <button type="button" class="btn btn-secondary" data-screen-triage-close>Back</button>
+   </header>
+   <div class="screen-triage-workbench">
+    <section class="screen-triage-list" aria-label="Papers">
+     <h3 class="screen-triage-group-title" id="screen-triage-go-heading">Would go</h3>
+     <ul class="screen-triage-rows" id="screen-triage-go-rows"></ul>
+     <h3 class="screen-triage-group-title" id="screen-triage-stay-heading">Would stay</h3>
+     <ul class="screen-triage-rows" id="screen-triage-stay-rows"></ul>
+    </section>
+    <aside class="screen-triage-detail" id="screen-triage-detail" aria-label="Selected paper">
+     <div class="screen-triage-sheet-head">
+      <span class="screen-triage-drag" aria-hidden="true"></span>
+      <button type="button" class="btn btn-secondary" id="screen-triage-detail-close">Close</button>
+     </div>
+     <div class="screen-triage-detail-body" id="screen-triage-detail-body">
+      <p class="help-text">Select a paper to read it.</p>
+     </div>
+    </aside>
+   </div>
+   <footer class="screen-triage-foot">
+    <div class="screen-triage-paper-actions">
+     <button type="button" class="btn btn-secondary" id="screen-triage-keep-btn">Keep this paper</button>
+     <button type="button" class="btn btn-secondary" id="screen-triage-aside-btn">Set this one aside</button>
+    </div>
+    <div class="screen-triage-confirm">
+     <button type="button" class="btn btn-primary" id="screen-triage-apply-btn">Set aside 0 papers</button>
+     <button type="button" class="btn btn-secondary" data-screen-triage-close>Back</button>
+    </div>
+    <p class="help-text screen-triage-hint">J and K move between papers. Nothing is excluded until you set them aside.</p>
+   </footer>
   </div>
  </div>
 </div>

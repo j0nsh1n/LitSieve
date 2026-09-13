@@ -13,7 +13,7 @@ def _clear_providers(monkeypatch):
     ):
         monkeypatch.delenv(k, raising=False)
     monkeypatch.setattr(llm_service, "_SETTINGS_CACHE", {})
-    monkeypatch.setattr(llm_service, "load_ai_settings", lambda force=False: {})
+    monkeypatch.setattr(llm_service, "load_ai_settings", lambda force=False, user_id=None: {})
 
 
 def test_provider_none_when_unconfigured(monkeypatch):
@@ -58,21 +58,22 @@ def test_save_and_load_ai_settings(tmp_path, monkeypatch):
         "OLLAMA_MODELS", "OLLAMA_HOST",
     ):
         monkeypatch.delenv(k, raising=False)
-    path = tmp_path / "ai_settings.json"
-    monkeypatch.setattr(llm_service, "AI_SETTINGS_PATH", path)
+    monkeypatch.setenv("USER_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("SECRET_KEY", "unit-test-secret-key")
     monkeypatch.setattr(llm_service, "_SETTINGS_CACHE", None)
     saved = llm_service.save_ai_settings({
         "llm_provider": "openai",
         "openai_api_key": "sk-secret-test",
         "openai_model": "gpt-4o-mini",
-        "ollama_models_dir": "/var/mnt/games/LLM_Models",
-    })
+    }, user_id="user-a")
     assert saved["openai_api_key"] == "sk-secret-test"
+    path = tmp_path / "user-a" / "ai_settings.json"
     assert path.is_file()
     monkeypatch.setattr(llm_service, "_SETTINGS_CACHE", None)
-    loaded = llm_service.load_ai_settings(force=True)
+    loaded = llm_service.load_ai_settings(force=True, user_id="user-a")
     assert loaded["openai_model"] == "gpt-4o-mini"
-    pub = llm_service.public_ai_settings()
+    with llm_service.ai_for_user("user-a"):
+        pub = llm_service.public_ai_settings()
     assert pub["openai_api_key_set"] is True
     assert "sk-secret-test" not in (pub.get("openai_api_key_masked") or "")
 
@@ -87,7 +88,7 @@ def test_ollama_binary_finds_home_local_when_not_on_path(monkeypatch, tmp_path):
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("PATH", "/usr/bin")
     monkeypatch.setattr(llm_service.shutil, "which", lambda _name: None)
-    monkeypatch.setattr(llm_service, "load_ai_settings", lambda force=False: {})
+    monkeypatch.setattr(llm_service, "load_ai_settings", lambda force=False, user_id=None: {})
     found = llm_service._ollama_binary()
     assert found == str(wrapper)
 
@@ -126,7 +127,7 @@ def test_ai_settings_write_allowed_true_values(monkeypatch, flag):
 
 def test_public_ai_settings_exposes_write_flag(monkeypatch):
     monkeypatch.setenv("AI_ALLOW_SETTINGS_WRITE", "false")
-    monkeypatch.setattr(llm_service, "load_ai_settings", lambda force=False: {})
+    monkeypatch.setattr(llm_service, "load_ai_settings", lambda force=False, user_id=None: {})
     pub = llm_service.public_ai_settings()
     assert pub["settings_write_allowed"] is False
 

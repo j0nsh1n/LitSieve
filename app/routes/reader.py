@@ -54,7 +54,7 @@ async def api_reader_explain(req: ReaderExplainRequest, request: Request):
     uid = user["user_id"]
     p = get_pipeline(uid)
     try:
-        from app.services.llm import LLMBadInput, LLMError, LLMUnavailable
+        from app.services.llm import LLMBadInput, LLMError, LLMUnavailable, ai_for_user
         from app.services.reader_mode import explain_article
 
         article = p.db.get_article_by_id(req.article_id, req.source)
@@ -62,12 +62,13 @@ async def api_reader_explain(req: ReaderExplainRequest, request: Request):
             return JSONResponse(status_code=404, content={"detail": "Article not found"})
 
         def _work():
-            return explain_article(
-                p.db,
-                article,
-                req.audience,
-                force_regenerate=bool(req.force_regenerate),
-            )
+            with ai_for_user(uid):
+                return explain_article(
+                    p.db,
+                    article,
+                    req.audience,
+                    force_regenerate=bool(req.force_regenerate),
+                )
 
         return await run_in_thread(_work)
     except LLMUnavailable as e:

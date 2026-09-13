@@ -15,8 +15,63 @@ and this project aims to follow Semantic Versioning for app version strings
   denser search results. Layout and workflow are unchanged.
 - On phones and tablets the top bar is one row (brand + menu). Steps,
   library, mode, and account sit in a drawer so they do not eat the page.
+- Modal backdrops are transparent (no `color-mix` wash). That wash was
+  the slate veil on “What would be set aside”. Ask for help is a quiet
+  `--surface` pill with `--text-soft` ink.
+- Saving AI settings writes `{USER_DATA_DIR}/{account id}/ai_settings.json`
+  for the signed-in account. Host `.env` keys stay deploy defaults.
+  Built-in Ollama start/stop is still process-wide.
+- Simple Search screening counts are two bar rows: collected as the full
+  set, then kept versus removed of that total, with duplicate and
+  screened-out counts under the second bar. The bars refresh when you
+  set papers aside.
+- Simple Show me what would go opens a split-pane review: papers that
+  would be set aside on the left, the selected abstract on the right.
+  You can keep or mark individual papers, including ones that would have
+  stayed. Nothing is excluded until you confirm.
+- Simple Search result cards have **More like this**: re-rank the same
+  collected library from that paper. The starting paper stays in the
+  list. Nothing new is fetched.
+- Simple Search is a tighter ranked list: collapsed collection note,
+  sticky query plus Search, Narrow it down with Re-prepare and Start
+  over under More, abstracts behind Show abstract, AI under Study aid,
+  and Star / Note / Not relevant in a right-hand rail.
+- Account uses a section nav (Profile, Libraries, Study aid, Recovery
+  email, Password, Danger zone) beside a narrower column. Long
+  explanations sit under How this works. Delete keeps the export-first
+  warning.
 
 ### Fixed
+- **A deleted account's password-reset link could unlock the next account
+  with the same username.** Reset tokens were keyed by username, and
+  deleting an account left unused tokens behind. A later account reusing
+  that username could have its password reset by whoever still held the
+  old link. Tokens now bind to the account id, are removed on delete, and
+  only work for the account they were issued to.
+- **Search could keep embeddings from a library that had just changed.**
+  Loading the vector cache tagged a snapshot with the generation after
+  SQLite returned, so a bump during that read looked like a cache hit.
+- **A rate-limited or down literature source could look like an empty
+  successful search.** Older fetchers swallowed typed HTTP failures and
+  returned no papers. OpenAlex, PubMed, arXiv, Europe PMC, CrossRef,
+  ClinicalTrials.gov, and NASA ADS now surface those failures.
+- **Operator file reads could redact source and still report success.**
+  Secret redaction ran on stdout before JSON parse, so `token = …` in a
+  file became `[redacted]` and a broken payload could still be `ok` when
+  the process exited 0.
+- **Any signed-in student could point the host OpenAI key at a URL they
+  chose.** AI keys are now stored per account under `USER_DATA_DIR`, the
+  Account page no longer rewrites process env, and a student's base URL
+  is used only with that student's own key. Built-in Ollama start/stop
+  is admin-only.
+- **Reader Mode treated two different 95% confidence intervals as the
+  same number**, and dropped whether a p-value was `<` or `=`. Cached
+  explanations re-check under verifier v3.
+- **An operator alias such as `auditmodel=org/real-model` tried to
+  download `auditmodel`.** Embedding load now uses the configured repo
+  path.
+- **Density clustering crashed on a library with one paper.** Tiny
+  corpora now form one group instead of a server error.
 - A running fetch or prepare is no longer dropped from tracking when other
   accounts fill the in-memory progress cache, so a second copy of the same job
   cannot start while the first is still working.
@@ -27,6 +82,18 @@ and this project aims to follow Semantic Versioning for app version strings
   ladder (previously up to ~2.6 minutes per unreachable source). Retries
   and backoff abort as soon as the job is cancelled; an in-flight socket
   wait of up to ~30 seconds may still finish before the cancel lands.
+- Backups follow `USERS_DB` and `USER_DATA_DIR` instead of assuming
+  `users.db` and `user_data/` live under the checkout. Archives still use
+  those names as stable prefixes, so restore can land on a custom layout.
+- Notes on Search can no longer grow after an account is over its storage
+  cap, and notes longer than 8,000 characters are rejected. Clearing or
+  shortening a note still works so a student can free disk.
+- A Search tab that was left open no longer saves notes, stars, or
+  screening into a different library after another tab switches. Fetch
+  and prepare from that tab stay on the library the page loaded.
+- Docker builds now use an explicit runtime-file allowlist and a
+  default-deny build context so local environment files, credentials,
+  and databases cannot enter new image layers.
 
 ## [5.3.1] - 2026-08-31
 

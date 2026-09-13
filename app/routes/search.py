@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from app.core import (
     csrf_failed,
     current_user,
+    get_owned_pipeline,
     get_pipeline,
     release_pipeline,
     run_in_thread,
@@ -22,6 +23,7 @@ from app.schemas import (
 from app.services.enrich import (
     enrich_search_results,
 )
+from app.storage import quota
 from app.storage.dbconn import integrity_errors
 from app.utils import (
     sort_articles,
@@ -77,6 +79,7 @@ async def api_search_seed(req: SeedSearchRequest, request: Request):
             p.search_by_seed, req.seed, req.top_k,
             req.source_filter, req.cluster_filter,
             req.year_min, req.year_max, req.lexical_boost,
+            req.include_seed,
         )
         results = data["results"]
         enrich_search_results(results, p)
@@ -136,8 +139,20 @@ async def api_upsert_note(req: NoteRequest, request: Request):
     if csrf_failed(request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
     uid = user["user_id"]
-    p = get_pipeline(uid)
     try:
+        p = get_owned_pipeline(uid, req.library_id)
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"detail": str(e)})
+    try:
+        current = p.db.get_note(req.article_id, req.source)
+        if quota.would_increase_stored_text(current["note"], req.note):
+            try:
+                quota.check_quota(uid)
+            except quota.QuotaExceeded as e:
+                return JSONResponse(
+                    status_code=507,
+                    content={"detail": str(e), "quota": quota.usage_report(uid)},
+                )
         note = p.db.upsert_note(req.article_id, req.source, note=req.note, starred=req.starred)
         return {"status": "success", "note": note}
     except integrity_errors():
@@ -158,14 +173,22 @@ async def api_upsert_note(req: NoteRequest, request: Request):
 
 
 @router.get("/api/notes")
-async def api_get_note(request: Request, article_id: str = "", source: str = ""):
+async def api_get_note(
+    request: Request,
+    article_id: str = "",
+    source: str = "",
+    library_id: str = "",
+):
     user = current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
     if not article_id or not source:
         return JSONResponse(status_code=400, content={"detail": "article_id and source required"})
     uid = user["user_id"]
-    p = get_pipeline(uid)
+    try:
+        p = get_owned_pipeline(uid, library_id)
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"detail": str(e)})
     try:
         return p.db.get_note(article_id, source)
     except Exception as e:

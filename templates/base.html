@@ -7,7 +7,7 @@
     <link rel="icon" href="/static/favicon.svg?v=20260828a" type="image/svg+xml">
     <link rel="icon" href="/static/favicon.ico?v=20260803a" sizes="32x32">
     <link rel="apple-touch-icon" href="/static/favicon.png?v=20260803a">
-    <link rel="stylesheet" href="/static/css/style.css?v=20260912a">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260912k">
     <script src="/static/js/theme-init.js?v=20260823a"></script>
     {% block head_extra %}{% endblock %}
 </head>
@@ -126,7 +126,7 @@
                title="Ship">Ship</a>
             {% endif %}
             {% if user and not user.is_guest and not support_view %}
-            <button type="button" class="nav-logout" id="ask-help-btn">Ask for help</button>
+            <button type="button" class="nav-ask-help" id="ask-help-btn">Ask for help</button>
             {% endif %}
             {% if user %}
             <a href="/account"
@@ -158,7 +158,7 @@
         {{ scope_footer() }}
     </footer>
 
-    <script src="/static/js/common.js?v=20260912a"></script>
+    <script src="/static/js/common.js?v=20260913a"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

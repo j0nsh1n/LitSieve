@@ -15,8 +15,10 @@ Policy (do not break without product review):
   • No AI evidence grades; no silent rewrite of stored key points without an
     explicit user save action; no paywall / full-text scraping.
 
-Settings load from environment, then optional ``user_data/ai_settings.json``
-(server-wide deploy file; never commit it).
+Settings load from environment (host deploy defaults), then the signed-in
+account's ``{USER_DATA_DIR}/{user_id}/ai_settings.json``. Never copy file
+settings into ``os.environ``. A student's ``openai_base_url`` must not ride
+along with the host ``OPENAI_API_KEY``.
 
 Ollama lifecycle (start/stop) follows Local-Schedule-Assistant: detached
 ``ollama serve`` with optional ``OLLAMA_MODELS``, and full stop via pkill /
@@ -25,6 +27,7 @@ taskkill so the model runner frees VRAM.
 
 from __future__ import annotations
 
+import contextvars
 import json
 import logging
 import os
@@ -34,6 +37,7 @@ import shutil
 import subprocess
 import threading
 import time
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 
@@ -41,10 +45,14 @@ from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
-# Server-wide optional AI config (keys, models path). Not per-user.
-AI_SETTINGS_PATH = Path("user_data") / "ai_settings.json"
-
-_SETTINGS_CACHE: Optional[Dict[str, Any]] = None
+# Per-account AI config. Host env is the immutable deploy default.
+_AI_USER_ID: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
+    "ai_user_id", default=None
+)
+_SETTINGS_CACHE: Optional[Dict[str, Dict[str, Any]]] = {}
+_settings_lock = threading.Lock()
+_HOST_ONLY_FILE_KEYS = frozenset({"ollama_host", "ollama_models_dir"})
+_DEFAULT_OPENAI_BASE = "https://api.openai.com/v1"
 
 # Built-in local service (Ollama under the hood; keep UI wording generic).
 # hold_count: concurrent Refine/Ask ops share one started process; stop only
@@ -130,8 +138,36 @@ def _env(name: str, default: str = "") -> str:
     return (os.getenv(name) or default).strip()
 
 
-def _settings_path() -> Path:
-    return AI_SETTINGS_PATH
+def _current_ai_user(user_id: Optional[str] = None) -> Optional[str]:
+    if user_id is not None:
+        return user_id
+    return _AI_USER_ID.get()
+
+
+@contextmanager
+def ai_for_user(user_id: Optional[str]):
+    """Bind per-account AI settings for this call stack (and the same thread)."""
+    token = _AI_USER_ID.set(user_id)
+    try:
+        yield
+    finally:
+        _AI_USER_ID.reset(token)
+
+
+def _settings_cache() -> Dict[str, Dict[str, Any]]:
+    global _SETTINGS_CACHE
+    if _SETTINGS_CACHE is None:
+        _SETTINGS_CACHE = {}
+    return _SETTINGS_CACHE
+
+
+def _settings_path(user_id: Optional[str] = None) -> Path:
+    uid = _current_ai_user(user_id)
+    if not uid:
+        raise ValueError("AI settings need an account")
+    from app.storage.libraries import user_dir
+
+    return user_dir(uid) / "ai_settings.json"
 
 
 # --- API keys at rest -------------------------------------------------------
@@ -282,13 +318,19 @@ def _decrypt_secrets(data: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
-def load_ai_settings(force: bool = False) -> Dict[str, Any]:
-    """Load server AI settings from JSON (empty dict if missing)."""
-    global _SETTINGS_CACHE
-    if _SETTINGS_CACHE is not None and not force:
-        return dict(_SETTINGS_CACHE)
-    path = _settings_path()
+def load_ai_settings(force: bool = False, user_id: Optional[str] = None) -> Dict[str, Any]:
+    """Load this account's AI settings from JSON (empty dict if missing)."""
+    uid = _current_ai_user(user_id)
+    if not uid:
+        return {}
+    cache = _settings_cache()
+    if not force and uid in cache:
+        return dict(cache[uid])
     data: Dict[str, Any] = {}
+    try:
+        path = _settings_path(uid)
+    except ValueError:
+        return {}
     if path.is_file():
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
@@ -298,116 +340,148 @@ def load_ai_settings(force: bool = False) -> Dict[str, Any]:
             logger.warning("Could not read %s: %s", path, exc)
             data = {}
     data = _decrypt_secrets(data)
-    _SETTINGS_CACHE = data
+    with _settings_lock:
+        cache[uid] = data
     return dict(data)
 
 
-def save_ai_settings(updates: Dict[str, Any]) -> Dict[str, Any]:
-    """Merge updates into ai_settings.json and refresh cache + process env."""
-    global _SETTINGS_CACHE
-    path = _settings_path()
+def save_ai_settings(updates: Dict[str, Any], user_id: Optional[str] = None) -> Dict[str, Any]:
+    """Merge updates into this account's ai_settings.json. Does not touch env."""
+    uid = _current_ai_user(user_id)
+    if not uid:
+        raise ValueError("AI settings need an account")
+    path = _settings_path(uid)
     path.parent.mkdir(parents=True, exist_ok=True)
-    current = load_ai_settings(force=True)
+    current = load_ai_settings(force=True, user_id=uid)
     for key, value in updates.items():
-        if value is None:
+        if value is None or key in _HOST_ONLY_FILE_KEYS:
             continue
         if isinstance(value, str) and value.strip() == "" and key.endswith("_api_key"):
-            # Empty string clears stored key
             current.pop(key, None)
             continue
         current[key] = value
-    # On disk: API keys encrypted. In memory/cache: plaintext, so callers and
-    # apply_ai_settings_to_env() keep working unchanged.
     on_disk = _encrypt_secrets(current)
     path.write_text(json.dumps(on_disk, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     try:
         os.chmod(path, 0o600)
     except OSError:
         pass
-    _SETTINGS_CACHE = current
-    apply_ai_settings_to_env(current)
+    with _settings_lock:
+        _settings_cache()[uid] = current
     return dict(current)
 
 
 def apply_ai_settings_to_env(settings: Optional[Dict[str, Any]] = None) -> None:
-    """Push file settings into os.environ when env var is unset (env wins)."""
-    data = settings if settings is not None else load_ai_settings()
-    mapping = {
-        "llm_provider": "LLM_PROVIDER",
-        "ollama_host": "OLLAMA_HOST",
-        "ollama_model": "OLLAMA_MODEL",
-        "ollama_models_dir": "OLLAMA_MODELS",
-        "anthropic_api_key": "ANTHROPIC_API_KEY",
-        "llm_model": "LLM_MODEL",
-        "openai_api_key": "OPENAI_API_KEY",
-        "openai_base_url": "OPENAI_BASE_URL",
-        "openai_model": "OPENAI_MODEL",
-        "llm_timeout_seconds": "LLM_TIMEOUT_SECONDS",
+    """No-op. File settings must not enter the process environment."""
+    return
+
+
+def runtime_ai(user_id: Optional[str] = None) -> Dict[str, str]:
+    """Resolve host env + this account's file. Never mix host key with user URL."""
+    file = load_ai_settings(user_id=user_id)
+    user_openai_key = str(file.get("openai_api_key") or "").strip()
+    user_openai_base = str(file.get("openai_base_url") or "").strip()
+    user_openai_model = str(file.get("openai_model") or "").strip()
+    user_anthropic = str(file.get("anthropic_api_key") or "").strip()
+    user_llm_model = str(file.get("llm_model") or "").strip()
+    user_provider = str(file.get("llm_provider") or "").strip().lower()
+    user_timeout = str(file.get("llm_timeout_seconds") or "").strip()
+    user_ollama_model = str(file.get("ollama_model") or "").strip()
+
+    host_openai_key = _env("OPENAI_API_KEY")
+    host_openai_base = _env("OPENAI_BASE_URL")
+    host_openai_model = _env("OPENAI_MODEL")
+    host_anthropic = _env("ANTHROPIC_API_KEY")
+    host_llm_model = _env("LLM_MODEL")
+    host_provider = (_env("LLM_PROVIDER", "auto") or "auto").lower()
+    host_timeout = _env("LLM_TIMEOUT_SECONDS", "120") or "120"
+    host_ollama_model = _env("OLLAMA_MODEL")
+    host_ollama_host = _env("OLLAMA_HOST", "http://localhost:11434") or "http://localhost:11434"
+
+    if user_openai_key:
+        openai_key = user_openai_key
+        openai_base = user_openai_base or _DEFAULT_OPENAI_BASE
+        openai_model = user_openai_model or "gpt-4o-mini"
+    else:
+        openai_key = host_openai_key
+        openai_base = host_openai_base or _DEFAULT_OPENAI_BASE
+        openai_model = host_openai_model or "gpt-4o-mini"
+
+    if user_anthropic:
+        anthropic_key = user_anthropic
+        llm_model = user_llm_model or "claude-sonnet-4-6"
+    else:
+        anthropic_key = host_anthropic
+        llm_model = host_llm_model or "claude-sonnet-4-6"
+
+    provider_pref = user_provider if user_provider in ("auto", "ollama", "openai", "anthropic") else host_provider
+    return {
+        "llm_provider": provider_pref or "auto",
+        "openai_api_key": openai_key,
+        "openai_base_url": openai_base.rstrip("/") or _DEFAULT_OPENAI_BASE,
+        "openai_model": openai_model,
+        "anthropic_api_key": anthropic_key,
+        "llm_model": llm_model,
+        "llm_timeout_seconds": user_timeout or host_timeout,
+        "ollama_model": host_ollama_model or user_ollama_model,
+        "ollama_host": host_ollama_host.rstrip("/"),
+        "ollama_models_dir": _env("OLLAMA_MODELS"),
     }
-    for file_key, env_key in mapping.items():
-        if os.getenv(env_key):
-            continue
-        val = data.get(file_key)
-        if val is None or val == "":
-            continue
-        os.environ[env_key] = str(val)
 
 
-def study_aid_mode() -> str:
+def study_aid_mode(user_id: Optional[str] = None) -> str:
     """Student-facing mode: built_in (local service) or api_key (cloud)."""
-    apply_ai_settings_to_env()
-    pref = (_env("LLM_PROVIDER", "auto") or "auto").lower()
+    rt = runtime_ai(user_id=user_id)
+    pref = (rt["llm_provider"] or "auto").lower()
     if pref == "ollama":
         return "built_in"
     if pref in ("openai", "anthropic"):
         return "api_key"
-    # auto: prefer built-in when a local model is configured, else API keys.
-    if _env("OLLAMA_MODEL") or load_ai_settings().get("ollama_model"):
+    if rt["ollama_model"]:
         return "built_in"
-    if _env("OPENAI_API_KEY") or _env("ANTHROPIC_API_KEY"):
-        return "api_key"
-    if load_ai_settings().get("openai_api_key") or load_ai_settings().get("anthropic_api_key"):
+    if rt["openai_api_key"] or rt["anthropic_api_key"]:
         return "api_key"
     return "built_in"
 
 
-def public_ai_settings() -> Dict[str, Any]:
-    """Settings safe to show in the UI (keys masked)."""
-    apply_ai_settings_to_env()
-    data = load_ai_settings()
-    def mask(key_env: str, file_key: str) -> str:
-        raw = _env(key_env) or str(data.get(file_key) or "")
+def public_ai_settings(user_id: Optional[str] = None) -> Dict[str, Any]:
+    """Settings safe to show in the UI (this account's keys masked)."""
+    data = load_ai_settings(user_id=user_id)
+    rt = runtime_ai(user_id=user_id)
+
+    def mask_stored(file_key: str) -> str:
+        raw = str(data.get(file_key) or "")
         if not raw:
             return ""
         if len(raw) <= 8:
             return "••••••••"
         return raw[:4] + "…" + raw[-4:]
 
+    path = ""
+    uid = _current_ai_user(user_id)
+    if uid:
+        try:
+            path = str(_settings_path(uid))
+        except ValueError:
+            path = ""
+
     return {
-        "llm_provider": _env("LLM_PROVIDER", str(data.get("llm_provider") or "auto")) or "auto",
-        "ollama_host": _env("OLLAMA_HOST", str(data.get("ollama_host") or "http://localhost:11434")),
-        "ollama_model": _env("OLLAMA_MODEL", str(data.get("ollama_model") or "")),
-        "ollama_models_dir": _env(
-            "OLLAMA_MODELS",
-            str(data.get("ollama_models_dir") or ""),
-        ),
-        "llm_model": _env("LLM_MODEL", str(data.get("llm_model") or "claude-sonnet-4-6")),
-        "openai_base_url": _env(
-            "OPENAI_BASE_URL",
-            str(data.get("openai_base_url") or "https://api.openai.com/v1"),
-        ),
-        "openai_model": _env("OPENAI_MODEL", str(data.get("openai_model") or "gpt-4o-mini")),
-        "anthropic_api_key_set": bool(_env("ANTHROPIC_API_KEY") or data.get("anthropic_api_key")),
-        "openai_api_key_set": bool(_env("OPENAI_API_KEY") or data.get("openai_api_key")),
-        "anthropic_api_key_masked": mask("ANTHROPIC_API_KEY", "anthropic_api_key"),
-        "openai_api_key_masked": mask("OPENAI_API_KEY", "openai_api_key"),
-        "llm_timeout_seconds": _env(
-            "LLM_TIMEOUT_SECONDS", str(data.get("llm_timeout_seconds") or "120")
-        ),
+        "llm_provider": str(data.get("llm_provider") or rt["llm_provider"] or "auto"),
+        "ollama_host": rt["ollama_host"],
+        "ollama_model": rt["ollama_model"],
+        "ollama_models_dir": rt["ollama_models_dir"],
+        "llm_model": str(data.get("llm_model") or rt["llm_model"] or "claude-sonnet-4-6"),
+        "openai_base_url": str(data.get("openai_base_url") or _DEFAULT_OPENAI_BASE),
+        "openai_model": str(data.get("openai_model") or "gpt-4o-mini"),
+        "anthropic_api_key_set": bool(data.get("anthropic_api_key")),
+        "openai_api_key_set": bool(data.get("openai_api_key")),
+        "anthropic_api_key_masked": mask_stored("anthropic_api_key"),
+        "openai_api_key_masked": mask_stored("openai_api_key"),
+        "llm_timeout_seconds": str(data.get("llm_timeout_seconds") or rt["llm_timeout_seconds"] or "120"),
         "ollama_control_allowed": ollama_control_allowed(),
         "settings_write_allowed": ai_settings_write_allowed(),
-        "study_aid_mode": study_aid_mode(),
-        "settings_path": str(_settings_path()),
+        "study_aid_mode": study_aid_mode(user_id=user_id),
+        "settings_path": path,
     }
 
 
@@ -420,39 +494,27 @@ def ollama_control_allowed() -> bool:
 def ai_settings_write_allowed() -> bool:
     """Whether authenticated users may POST /api/ai/settings (default: yes).
 
-    Set AI_ALLOW_SETTINGS_WRITE=false on multi-user shared hosts so students
-    cannot change server-wide keys; configure via env / ai_settings.json only.
+    Set AI_ALLOW_SETTINGS_WRITE=false so students cannot save their own keys.
     """
     flag = _env("AI_ALLOW_SETTINGS_WRITE", "true").lower()
     return flag not in ("0", "false", "no", "off")
 
 
-# Apply file settings once at import so env-style reads work.
-try:
-    apply_ai_settings_to_env()
-except Exception:
-    pass
-
-
 def provider() -> Optional[str]:
     """Pick active provider: auto prefers Ollama, then OpenAI-compatible, then Anthropic."""
-    apply_ai_settings_to_env()
-    pref = _env("LLM_PROVIDER", "auto").lower() or "auto"
-    # Built-in: model may be filled after the local service starts (first installed tag).
-    has_ollama = bool(_env("OLLAMA_MODEL") or load_ai_settings().get("ollama_model"))
-    has_openai = bool(_env("OPENAI_API_KEY"))
-    has_anthropic = bool(_env("ANTHROPIC_API_KEY"))
+    rt = runtime_ai()
+    pref = (rt["llm_provider"] or "auto").lower()
+    has_ollama = bool(rt["ollama_model"])
+    has_openai = bool(rt["openai_api_key"])
+    has_anthropic = bool(rt["anthropic_api_key"])
     if pref in ("ollama", "openai", "anthropic"):
         if pref == "ollama":
-            # Built-in mode is selected even before a model tag is known — ensure
-            # will pick the first installed model after the service starts.
             return "ollama" if (has_ollama or ollama_control_allowed()) else None
         if pref == "openai" and has_openai:
             return "openai"
         if pref == "anthropic" and has_anthropic:
             return "anthropic"
         return None
-    # auto: only claim ollama when a model is configured (or file has one).
     if has_ollama:
         return "ollama"
     if has_openai:
@@ -467,9 +529,8 @@ def is_configured() -> bool:
 
 
 def _ensure_ollama_model_env() -> Optional[str]:
-    """Return a usable model tag, preferring env/settings, else first installed."""
-    apply_ai_settings_to_env()
-    model = _env("OLLAMA_MODEL") or str(load_ai_settings().get("ollama_model") or "").strip()
+    """Return a usable model tag, preferring host env, else this account, else first installed."""
+    model = runtime_ai()["ollama_model"]
     if model:
         os.environ["OLLAMA_MODEL"] = model
         return model
@@ -565,7 +626,7 @@ def run_with_ephemeral_builtin(fn: Callable[[], Any]) -> Any:
 
 def _timeout() -> float:
     try:
-        return float(_env("LLM_TIMEOUT_SECONDS", "120") or "120")
+        return float(runtime_ai().get("llm_timeout_seconds") or "120")
     except ValueError:
         return 120.0
 
@@ -620,7 +681,7 @@ def ollama_running(force: bool = False) -> bool:
 def ollama_env_for_serve() -> Dict[str, str]:
     """Environment for `ollama serve` with optional OLLAMA_MODELS."""
     env = os.environ.copy()
-    models_dir = _env("OLLAMA_MODELS") or str(load_ai_settings().get("ollama_models_dir") or "")
+    models_dir = _env("OLLAMA_MODELS").strip()
     models_dir = models_dir.strip()
     if models_dir:
         p = Path(models_dir).expanduser()
@@ -648,10 +709,7 @@ def _ollama_binary() -> Optional[str]:
         Path("/usr/local/bin/ollama"),
         Path("/usr/bin/ollama"),
     ]
-    models_dir = (
-        _env("OLLAMA_MODELS")
-        or str(load_ai_settings().get("ollama_models_dir") or "")
-    ).strip()
+    models_dir = _env("OLLAMA_MODELS").strip()
     if models_dir:
         candidates.append(
             Path(models_dir).expanduser() / "ollama-dist" / "bin" / "ollama"
@@ -758,10 +816,10 @@ def stop_ollama() -> Tuple[bool, str]:
 
 def status() -> Dict[str, Any]:
     """Honest multi-provider status for the UI (student copy avoids engine names)."""
-    apply_ai_settings_to_env()
     selected = provider()
     ollama_on, models = _probe_ollama()
     mode = study_aid_mode()
+    rt = runtime_ai()
     base = {
         "provider": selected,
         "study_aid_mode": mode,
@@ -784,7 +842,7 @@ def status() -> Dict[str, Any]:
         })
         return base
     if selected == "ollama":
-        model = _env("OLLAMA_MODEL") or str(load_ai_settings().get("ollama_model") or "")
+        model = rt["ollama_model"]
         available = any(
             n == model or n.split(":")[0] == (model.split(":")[0] if model else "")
             for n in models
@@ -812,7 +870,7 @@ def status() -> Dict[str, Any]:
         })
         return base
     if selected == "openai":
-        model = _env("OPENAI_MODEL", "gpt-4o-mini")
+        model = rt["openai_model"] or "gpt-4o-mini"
         base.update({
             "model": model,
             "reachable": True,
@@ -821,7 +879,7 @@ def status() -> Dict[str, Any]:
         })
         return base
     # anthropic
-    model = _env("LLM_MODEL", "claude-sonnet-4-6")
+    model = rt["llm_model"] or "claude-sonnet-4-6"
     base.update({
         "model": model,
         "reachable": True,
@@ -1098,8 +1156,8 @@ def _is_connection_failure(exc: BaseException) -> bool:
 def _structured_ollama(system: str, prompt: str, schema_model: Type[BaseModel]):
     import httpx
 
-    host = _env("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
-    model = _env("OLLAMA_MODEL")
+    host = runtime_ai()["ollama_host"] or "http://localhost:11434"
+    model = runtime_ai()["ollama_model"]
     try:
         response = httpx.post(
             f"{host}/api/chat",
@@ -1131,11 +1189,12 @@ def _structured_openai(system: str, prompt: str, schema_model: Type[BaseModel]):
     """OpenAI Chat Completions API or compatible (OpenRouter, Groq, etc.)."""
     import httpx
 
-    api_key = _env("OPENAI_API_KEY")
+    rt = runtime_ai()
+    api_key = rt["openai_api_key"]
     if not api_key:
         raise LLMUnavailable("OPENAI_API_KEY is not set.")
-    base = _env("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
-    model = _env("OPENAI_MODEL", "gpt-4o-mini")
+    base = (rt["openai_base_url"] or _DEFAULT_OPENAI_BASE).rstrip("/")
+    model = rt["openai_model"] or "gpt-4o-mini"
     schema = json.dumps(schema_model.model_json_schema())
     user = (
         f"{prompt}\n\n"
@@ -1192,8 +1251,8 @@ def _structured_anthropic(system: str, prompt: str, schema_model: Type[BaseModel
     except ImportError as exc:
         raise LLMUnavailable("The 'anthropic' package is not installed.") from exc
 
-    client = anthropic.Anthropic(api_key=_env("ANTHROPIC_API_KEY"))
-    model = _env("LLM_MODEL", "claude-sonnet-4-6")
+    client = anthropic.Anthropic(api_key=runtime_ai()["anthropic_api_key"])
+    model = runtime_ai()["llm_model"] or "claude-sonnet-4-6"
     schema = json.dumps(schema_model.model_json_schema())
     user = (
         f"{prompt}\n\n"

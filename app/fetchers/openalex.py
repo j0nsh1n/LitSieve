@@ -6,7 +6,7 @@ Fetches scholarly works from OpenAlex API
 import logging
 from typing import Dict, List, Optional
 
-from app.fetchers.base import BaseFetcher, HttpClient
+from app.fetchers.base import BaseFetcher, HttpClient, reraise_fetch_error
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +57,7 @@ class OpenAlexFetcher(BaseFetcher):
                 page += 1
 
             except Exception as e:
+                reraise_fetch_error(e)
                 logger.exception("Error searching OpenAlex: %s", e)
                 break
 
@@ -95,6 +96,7 @@ class OpenAlexFetcher(BaseFetcher):
                 page += 1
 
             except Exception as e:
+                reraise_fetch_error(e)
                 logger.exception("Error fetching from OpenAlex: %s", e)
                 break
 
@@ -123,6 +125,7 @@ class OpenAlexFetcher(BaseFetcher):
                     if parsed:
                         articles.append(parsed)
             except Exception as e:
+                reraise_fetch_error(e)
                 logger.exception("Error fetching batch: %s", e)
 
         logger.info("Successfully fetched %s works", len(articles))

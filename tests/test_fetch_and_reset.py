@@ -1,5 +1,6 @@
 """Tests for fetch helpers, insert dedupe, and password-reset flow."""
 
+import pytest
 from conftest import TEST_PASSWORD_ALT
 
 from app.auth import hash_password, verify_password
@@ -8,6 +9,21 @@ from app.fetchers.base import FetchError, HttpClient, classify_error
 from app.storage.database import ArticleDatabase
 from app.storage.user_db import UserDatabase
 from app.utils import build_screening_report, format_screening_report_txt
+
+
+def test_openalex_search_and_fetch_reraises_fetcherror():
+    """HttpClient failures must not look like an empty successful search."""
+    from app.fetchers.openalex import OpenAlexFetcher
+
+    fetcher = OpenAlexFetcher()
+
+    def boom(*_args, **_kwargs):
+        raise FetchError("OpenAlex 429", kind="rate_limited")
+
+    fetcher.http.get = boom
+    with pytest.raises(FetchError) as ei:
+        fetcher.search_and_fetch("crispr", max_results=5)
+    assert ei.value.kind == "rate_limited"
 
 
 def test_classify_error_kinds():
@@ -250,6 +266,150 @@ def test_password_reset_flow(tmp_path):
         assert int(row["token_version"]) == 1
         # Reuse fails
         ok, err = udb.consume_password_reset_token("alice", token, hash_password("anotherpass1"))
+        assert not ok
+    finally:
+        udb.conn.close()
+
+
+def test_password_reset_token_does_not_take_over_reregistered_username(tmp_path):
+    """A02: deleting an account must not leave a reset token that can
+    change the password of a later account that reused the username."""
+    udb = UserDatabase(db_path=str(tmp_path / "u.db"))
+    try:
+        first = udb.create_user("alice", hash_password("oldpassword"))
+        token = udb.create_password_reset_token("alice")
+        assert token
+        assert udb.delete_user(first["id"]) is True
+
+        second = udb.create_user("alice", hash_password("brand-new-pass1"))
+        assert second["id"] != first["id"]
+
+        ok, err = udb.consume_password_reset_token(
+            "alice", token, hash_password(TEST_PASSWORD_ALT)
+        )
+        assert not ok, err
+        row = udb.get_by_username("alice")
+        assert row["id"] == second["id"]
+        assert verify_password("brand-new-pass1", row["hashed_password"])
+        assert not verify_password(TEST_PASSWORD_ALT, row["hashed_password"])
+        assert udb.conn.execute(
+            "SELECT COUNT(*) FROM password_reset_tokens"
+        ).fetchone()[0] == 0
+    finally:
+        udb.conn.close()
+
+
+def test_password_reset_schema_migration_discards_username_tokens(tmp_path):
+    """A02 under the account-ID schema: legacy username-bound codes are
+    discarded, not mapped — a reused username could make a backfill wrong."""
+    import sqlite3
+
+    path = tmp_path / "legacy.db"
+    raw = sqlite3.connect(path)
+    raw.execute(
+        "CREATE TABLE users ("
+        "id TEXT PRIMARY KEY, username TEXT UNIQUE NOT NULL COLLATE NOCASE, "
+        "hashed_password TEXT NOT NULL, created_at TEXT, "
+        "token_version INTEGER NOT NULL DEFAULT 0)"
+    )
+    raw.execute(
+        "CREATE TABLE password_reset_tokens ("
+        "username TEXT NOT NULL COLLATE NOCASE, token_hash TEXT NOT NULL, "
+        "expires_at TEXT NOT NULL, used INTEGER NOT NULL DEFAULT 0, "
+        "created_at TEXT, PRIMARY KEY (username, token_hash))"
+    )
+    uid = "legacy-alice-id"
+    raw.execute(
+        "INSERT INTO users (id, username, hashed_password, token_version) "
+        "VALUES (?, 'alice', ?, 0)",
+        (uid, hash_password("oldpassword")),
+    )
+    token = "legacy-reset-token-value"
+    token_hash = UserDatabase._hash_reset_token(token)
+    raw.execute(
+        "INSERT INTO password_reset_tokens "
+        "(username, token_hash, expires_at, used) "
+        "VALUES ('alice', ?, '2099-01-01 00:00:00', 0)",
+        (token_hash,),
+    )
+    raw.commit()
+    raw.close()
+
+    udb = UserDatabase(db_path=str(path))
+    try:
+        columns = {
+            row[1]
+            for row in udb.conn.execute(
+                "PRAGMA table_info(password_reset_tokens)"
+            ).fetchall()
+        }
+        assert "user_id" in columns
+        assert "username" not in columns
+        assert udb.conn.execute(
+            "SELECT COUNT(*) FROM password_reset_tokens"
+        ).fetchone()[0] == 0
+        ok, _ = udb.consume_password_reset_token(
+            "alice", token, hash_password(TEST_PASSWORD_ALT)
+        )
+        assert not ok
+        row = udb.get_by_id(uid)
+        assert verify_password("oldpassword", row["hashed_password"])
+    finally:
+        udb.conn.close()
+
+
+def test_password_reset_schema_migration_discards_hybrid_3007b89_tokens(tmp_path):
+    """This branch once added user_id beside username; that table must rebuild too."""
+    import sqlite3
+
+    path = tmp_path / "hybrid.db"
+    raw = sqlite3.connect(path)
+    raw.execute(
+        "CREATE TABLE users ("
+        "id TEXT PRIMARY KEY, username TEXT UNIQUE NOT NULL COLLATE NOCASE, "
+        "hashed_password TEXT NOT NULL, created_at TEXT, "
+        "token_version INTEGER NOT NULL DEFAULT 0)"
+    )
+    raw.execute(
+        "CREATE TABLE password_reset_tokens ("
+        "username TEXT NOT NULL COLLATE NOCASE, user_id TEXT, "
+        "token_hash TEXT NOT NULL, expires_at TEXT NOT NULL, "
+        "used INTEGER NOT NULL DEFAULT 0, created_at TEXT, "
+        "PRIMARY KEY (username, token_hash))"
+    )
+    uid = "hybrid-alice-id"
+    raw.execute(
+        "INSERT INTO users (id, username, hashed_password, token_version) "
+        "VALUES (?, 'alice', ?, 0)",
+        (uid, hash_password("oldpassword")),
+    )
+    token = "hybrid-reset-token-value"
+    token_hash = UserDatabase._hash_reset_token(token)
+    raw.execute(
+        "INSERT INTO password_reset_tokens "
+        "(username, user_id, token_hash, expires_at, used) "
+        "VALUES ('alice', ?, ?, '2099-01-01 00:00:00', 0)",
+        (uid, token_hash),
+    )
+    raw.commit()
+    raw.close()
+
+    udb = UserDatabase(db_path=str(path))
+    try:
+        columns = {
+            row[1]
+            for row in udb.conn.execute(
+                "PRAGMA table_info(password_reset_tokens)"
+            ).fetchall()
+        }
+        assert "user_id" in columns
+        assert "username" not in columns
+        assert udb.conn.execute(
+            "SELECT COUNT(*) FROM password_reset_tokens"
+        ).fetchone()[0] == 0
+        ok, _ = udb.consume_password_reset_token(
+            "alice", token, hash_password(TEST_PASSWORD_ALT)
+        )
         assert not ok
     finally:
         udb.conn.close()

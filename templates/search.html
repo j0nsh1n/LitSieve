@@ -15,7 +15,10 @@
  <p class="subtitle search-sub-simple">Rank the papers you kept by how well they match your question,
  then export your list for Zotero.</p>
  {% from "macros/disclaimers.html" import scope_search %}
- {{ scope_search() }}
+ <details class="search-scope-note" open>
+  <summary>Starting point only: ranks papers already in your collection.</summary>
+  {{ scope_search() }}
+ </details>
 </section>
 
 <div class="search-query-top search-work" id="search-query-top" hidden>
@@ -169,8 +172,9 @@
      <strong>Seed</strong> starts from one paper already in your collection. <strong>More like my starred</strong>
      uses bookmarked papers. Screened-out papers never appear. The score meter shows the 0–1 similarity rank.</p>
      <p class="info-text search-help-simple">Searches <strong>your collection only</strong>.
-     <strong>Text</strong> or <strong>PICO</strong> for your question; <strong>More like my starred</strong>
-     after bookmarking with ★. After a search, <strong>Show</strong> chips filter the list on this
+     <strong>Text</strong> or <strong>PICO</strong> for your question. On a result,
+     <strong>More like this</strong> re-ranks the same collection from that paper.
+     After a search, <strong>Show</strong> chips filter the list on this
      page (starred, notes, recent years, source) without running a new search. Screened-out papers
      never appear. The score meter shows how well each paper matches (0–1).</p>
     </div>
@@ -255,11 +259,6 @@
     </button>
     <p class="help-text">Finds papers similar to the ones you starred (the starred papers themselves are left out).</p>
    </section>
-
-   <section id="seed-banner" class="card u-hidden">
-    <h2>Seed paper</h2>
-    <p class="info-text" id="seed-banner-text"></p>
-   </section>
    </div>{# /.search-rail-scroll #}
 
    {# Simple: pinned under the rail (not inside the scroll area) so it stays visible. #}
@@ -273,6 +272,11 @@
     <div class="results-header">
     <h2 class="results-count-line results-count-line-legacy">Results</h2>
     </div>
+    <section id="seed-banner" class="card u-hidden">
+     <h2 class="seed-banner-heading-advanced">Seed paper</h2>
+     <h2 class="seed-banner-heading-simple">Starting from this paper</h2>
+     <p class="info-text" id="seed-banner-text"></p>
+    </section>
     <div class="display-filters" id="display-filters" hidden>
      <span class="display-filters-label" id="display-filters-label">Show</span>
      <div class="display-filter-chips" id="display-filter-chips" role="group"
@@ -352,8 +356,8 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/simple_tools.js?v=20260828b"></script>
-<script src="/static/js/data_management.js?v=20260828a"></script>
+<script src="/static/js/simple_tools.js?v=20260913a"></script>
+<script src="/static/js/data_management.js?v=20260913a"></script>
 <script src="/static/js/reader.js?v=20260829a"></script>
-<script src="/static/js/search.js?v=20260829a"></script>
+<script src="/static/js/search.js?v=20260913a"></script>
 {% endblock %}

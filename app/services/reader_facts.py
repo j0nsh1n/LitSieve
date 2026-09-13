@@ -96,6 +96,34 @@ _NUMBER_TOKEN_RE = re.compile(
 )
 
 _P_VALUE_TAIL_RE = re.compile(r"(0?\.\d+)\s*$")
+_P_VALUE_PARTS_RE = re.compile(r"[Pp]\s*([=<>≤≥])\s*(0?\.\d+)")
+_CI_BOUNDS_RE = re.compile(
+    r"(?:(?P<level>\d+(?:\.\d+)?)\s*%\s*CI:?\s*)?"
+    r"(?P<low>-?\d+(?:\.\d+)?)\s*(?:to|[-–—,])\s*(?P<high>-?\d+(?:\.\d+)?)",
+    re.IGNORECASE,
+)
+_CI_BRACKET_RE = re.compile(
+    r"\[\s*(?P<low>-?\d+(?:\.\d+)?)\s*,\s*(?P<high>-?\d+(?:\.\d+)?)\s*\]"
+)
+
+
+def _parse_p_value(surface: str) -> tuple[Optional[str], Optional[float]]:
+    m = _P_VALUE_PARTS_RE.search(surface or "")
+    if not m:
+        return None, None
+    return m.group(1), float(m.group(2))
+
+
+def _parse_ci(surface: str) -> Optional[tuple[Optional[float], float, float]]:
+    """Return (confidence level or None, lower, upper)."""
+    bracket = _CI_BRACKET_RE.search(surface or "")
+    if bracket:
+        return None, float(bracket.group("low")), float(bracket.group("high"))
+    m = _CI_BOUNDS_RE.search(surface or "")
+    if not m:
+        return None
+    level = float(m.group("level")) if m.group("level") else None
+    return level, float(m.group("low")), float(m.group("high"))
 
 
 def normalise(text: str) -> str:
@@ -147,13 +175,27 @@ def extract_numbers(text: str) -> List[Dict]:
         surface = m.group(kind).strip()
         unit: Optional[str] = None
         value: Optional[float] = None
+        extra: Dict = {}
         if kind == "p_value":
-            tail = _P_VALUE_TAIL_RE.search(surface)
-            value = float(tail.group(1)) if tail else None
+            op, value = _parse_p_value(surface)
+            if op is None or value is None:
+                tail = _P_VALUE_TAIL_RE.search(surface)
+                value = float(tail.group(1)) if tail else None
+                op = None
             unit = "p"
+            extra["p_op"] = op
         elif kind == "ci":
-            value = _first_number(surface)
+            parsed = _parse_ci(surface)
+            if parsed is None:
+                continue
+            level, low, high = parsed
+            # Store an endpoint, not the 95, so a shared confidence level
+            # cannot make two different intervals look equal.
+            value = low
             unit = "ci"
+            extra["ci_level"] = level
+            extra["ci_low"] = low
+            extra["ci_high"] = high
         elif kind == "duration":
             value = _first_number(surface)
             unit = _DURATION_UNITS.get(
@@ -176,12 +218,14 @@ def extract_numbers(text: str) -> List[Dict]:
             value = float(surface)
         if value is None:
             continue
-        tokens.append({
+        token = {
             "kind": kind,
             "value": value,
             "unit": unit,
             "surface": surface,
-        })
+        }
+        token.update(extra)
+        tokens.append(token)
     return tokens
 
 

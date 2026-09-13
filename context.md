@@ -23,7 +23,7 @@
   Source Serif 4 headings, Source Sans 3 body/UI (self-hosted). Hybrid frost
   cards on a soft wash, score ring on Search. Sieve pan as favicon, nav
   mark, and empty-state illustration (Search / Clean up / Clusters).
-  CSS cache-bust `style.css?v=20260912a`. Mobile app nav is a one-row
+  CSS cache-bust `style.css?v=20260912k`. Mobile app nav is a one-row
   brand + menu; steps and tools open in a drawer.
 - Reader Mode: **Explain this study** on Search/Clean up cards — structured
   plain-language reading of one abstract, cached per
@@ -75,6 +75,11 @@
 - **Embeddings / clusters / screening / notes / key_points / reader_explanations**: per library DB
 - **Share / clone code**: registry in users.db; join copies library (not live)
 - **Jobs**: fetch / embed progress per user; bind to active library at start
+- **AI settings**: per account `{USER_DATA_DIR}/{user_id}/ai_settings.json`
+  (keys encrypted). Host env is the deploy default. A student base URL
+  never rides with the host API key.
+- **Jobs**: fetch / embed progress per user; bind to an explicit owned
+  library id when the client sends one, otherwise the active library at start
 - **AI settings**: server-wide `user_data/ai_settings.json` (keys encrypted)
 - **Quota**: disk under `user_data/<uid>/` vs `MAX_USER_STORAGE_MB`; optional
   per-account `quota_limit_mb` + `quota_limit_until` overlay (helpdesk bump)
@@ -88,7 +93,7 @@
 ```
 User 1---* Library 1---* Article
               |            +-- embeddings, screening, notes, key_points
-              +-- jobs (fetch/embed) use active library
+              +-- jobs (fetch/embed) bind explicit library_id or active
 ShareCode *---1 Library (owner); redeem → clone Library for joiner
 Guest User (is_guest) → sample corpus only; purged by age
 ```
@@ -113,10 +118,41 @@ Guest User (is_guest) → sample corpus only; purged by age
 - Host entry: `app.main:app` port 7860; Linux `./venv`
 
 ## Session Handoff
-- **Date:** 2026-09-11
-- **Branch:** `fix/a09-a10-jobs-and-embeddings` (PR #64)
-- **Done:** Airy glass CSS; A09 live-job LRU; A10 stale embeddings; fetch
-  cancel now aborts HTTP retries instead of sleeping the backoff ladder.
-  Mobile nav is a collapsed drawer (brand + menu on one row).
-- **Next:** Remaining audit A08, A07, A06. A01/A02 if that security pass
-  has not landed.
+- **Date:** 2026-09-13
+- **Branch:** `fix/audit-a01-a11-a15` (includes A02; merged origin/main)
+- **Done:** A01 option 2 (per-account AI keys) plus A02, A11–A18 from the
+  2026-09-06 audit. Reader verifier is v3 (CI bounds and p-value operators).
+  Embedding aliases resolve to the configured repo. HDBSCAN on tiny libraries
+  returns one group. Merged PR #64 so the airy glass UI is back on this
+  branch (`style.css?v=20260912k`). Simple Search screening counts are a
+  two-row funnel (collected, then kept vs removed). Show me what would
+  go is a split-pane review of proposed set-aside vs stay, with per-paper
+  keep/aside before confirm. Simple result cards have More like this,
+  which re-ranks the same collected library from that paper (seed stays
+  in the list; no new fetch). UX round 2 m1 (focused Simple Search list)
+  and m3 (Account section nav) are in production CSS/HTML/JS, not the
+  gitignored mockups. Funnel, split-pane screening, and More like this
+  are unchanged.
+- **Next:** Roadmap Phase 4 leftover: account cap and restore drill.
+  A03–A08 exist on other local branches. spec.md still says AI keys live
+  in `user_data/ai_settings.json` (drift, not edited). Spec lists seed
+  paper and more like starred, not Simple per-card More like this, and
+  does not describe the Simple split-pane screening review, the Simple
+  focused-list card chrome, or the Account section nav.
+- **Date:** 2026-09-09
+- **Branch:** `fix/a06-backup-custom-paths`
+- **Done:** Audit finding A06 — `tools/backup.py` discovers the live accounts
+  DB via `USERS_DB` and the library tree via `USER_DATA_DIR`, archives them
+  under stable `users.db` / `user_data/` prefixes, and `--restore` writes
+  them back to those live paths.
+- **Next:** A07 (unbounded notes bypass the storage cap). Do not push/PR
+  until asked.
+- **Date:** 2026-09-09
+- **Branch:** `fix/a08-stale-tab-library`
+- **Done:** A08 — Search/note/screening/fetch/prepare can bind to an owned
+  `library_id` instead of whichever library is currently active. A tab
+  that loaded library A reloads if another tab made B active. Tests in
+  `tests/test_libraries_http.py`, `tests/test_libraries.py`, and
+  `tests/test_static_js.py`.
+- **Next:** A09+ of the 2026-09-06 code audit (not started). A06–A08 are
+  separate branches off `origin/main` (A08 stacked on A07).

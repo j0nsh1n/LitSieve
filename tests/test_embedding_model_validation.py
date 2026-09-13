@@ -103,6 +103,38 @@ def test_extra_models_bare_path_form(monkeypatch):
     assert allowed["some-org/some-model"] == "some-org/some-model"
 
 
+def test_engine_loads_alias_from_the_configured_repo(monkeypatch):
+    """EXTRA_EMBEDDING_MODELS aliases must not be sent to HF as the short name."""
+    from app.services import embeddings as emb_mod
+
+    monkeypatch.setenv("EXTRA_EMBEDDING_MODELS", "auditmodel=example/real-model")
+    captured = {}
+
+    def fake_get(path, device):
+        captured["path"] = path
+        return object(), "cpu"
+
+    monkeypatch.setattr(emb_mod, "get_shared_model", fake_get)
+    engine = EmbeddingEngine("auditmodel")
+    _ = engine.model
+    assert captured["path"] == "example/real-model"
+
+
+def test_engine_loads_catalog_name_as_its_repo(monkeypatch):
+    from app.services import embeddings as emb_mod
+
+    captured = {}
+
+    def fake_get(path, device):
+        captured["path"] = path
+        return object(), "cpu"
+
+    monkeypatch.setattr(emb_mod, "get_shared_model", fake_get)
+    engine = EmbeddingEngine("general")
+    _ = engine.model
+    assert captured["path"] == EmbeddingEngine.MODELS["general"]
+
+
 def test_extra_models_ignores_blanks(monkeypatch):
     monkeypatch.setenv("EXTRA_EMBEDDING_MODELS", " , ,")
     assert EmbeddingEngine.allowed_models() == dict(EmbeddingEngine.MODELS)

@@ -249,3 +249,23 @@ def test_mobile_nav_drawer_is_closed_by_default():
         "html[data-mode=\"simple\"] .nav-menu-toggle {\n        display: none !important;"
     )
     assert hide_simple_toggle > desktop, "Simple must keep the menu button on phones"
+def test_stale_tab_reloads_and_mutations_send_library_id():
+    """Another tab can switch libraries; this tab must not keep writing there."""
+    common = (JS_DIR / "common.js").read_text(encoding="utf-8")
+    refresh = common[common.find("async function refreshLibrarySwitcher") :]
+    refresh = refresh.split("document.addEventListener('visibilitychange')")[0]
+    assert "pageLibraryId" in refresh
+    assert "location.reload" in refresh
+    assert "function withPageLibrary" in common
+
+    search = (JS_DIR / "search.js").read_text(encoding="utf-8")
+    assert search.count("withPageLibrary(") >= 4
+    dm = (JS_DIR / "data_management.js").read_text(encoding="utf-8")
+    fetch_call = dm[dm.find("/api/fetch-articles-multi") : dm.find("/api/fetch-articles-multi") + 400]
+    assert "withPageLibrary" in fetch_call
+    embed_idx = dm.find("/api/create-embeddings")
+    embed_call = dm[embed_idx : embed_idx + 250]
+    assert "withPageLibrary" in embed_call
+    tools = (JS_DIR / "simple_tools.js").read_text(encoding="utf-8")
+    tools_embed = tools[tools.find("/api/create-embeddings") : tools.find("/api/create-embeddings") + 250]
+    assert "withPageLibrary" in tools_embed

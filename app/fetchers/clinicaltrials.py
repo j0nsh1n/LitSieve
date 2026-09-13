@@ -6,7 +6,7 @@ Fetches clinical trial records from the ClinicalTrials.gov v2 API
 import logging
 from typing import Dict, List, Optional
 
-from app.fetchers.base import BaseFetcher, HttpClient
+from app.fetchers.base import BaseFetcher, HttpClient, reraise_fetch_error
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +58,7 @@ class ClinicalTrialsFetcher(BaseFetcher):
                     break
 
             except Exception as e:
+                reraise_fetch_error(e)
                 logger.exception("Error searching ClinicalTrials.gov: %s", e)
                 break
 
@@ -97,6 +98,7 @@ class ClinicalTrialsFetcher(BaseFetcher):
                     break
 
             except Exception as e:
+                reraise_fetch_error(e)
                 logger.exception("Error fetching from ClinicalTrials.gov: %s", e)
                 break
 
@@ -118,6 +120,7 @@ class ClinicalTrialsFetcher(BaseFetcher):
                 if parsed:
                     articles.append(parsed)
             except Exception as e:
+                reraise_fetch_error(e)
                 logger.exception("Error fetching %s: %s", nct_id, e)
 
         logger.info("Successfully fetched %s studies", len(articles))

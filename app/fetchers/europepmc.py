@@ -6,7 +6,7 @@ Fetches articles from Europe PMC REST API
 import logging
 from typing import Dict, List, Optional
 
-from app.fetchers.base import BaseFetcher, HttpClient
+from app.fetchers.base import BaseFetcher, HttpClient, reraise_fetch_error
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +57,7 @@ class EuropePMCFetcher(BaseFetcher):
                 cursor_mark = next_cursor
 
             except Exception as e:
+                reraise_fetch_error(e)
                 logger.exception("Error searching Europe PMC: %s", e)
                 break
 
@@ -98,6 +99,7 @@ class EuropePMCFetcher(BaseFetcher):
                 cursor_mark = next_cursor
 
             except Exception as e:
+                reraise_fetch_error(e)
                 logger.exception("Error fetching from Europe PMC: %s", e)
                 break
 
@@ -125,6 +127,7 @@ class EuropePMCFetcher(BaseFetcher):
                     if parsed:
                         articles.append(parsed)
             except Exception as e:
+                reraise_fetch_error(e)
                 logger.exception("Error fetching %s: %s", article_id, e)
 
         logger.info("Successfully fetched %s articles", len(articles))

@@ -129,6 +129,23 @@ def test_hdbscan_finds_dense_groups():
     assert len(labels) == len(X)
 
 
+def test_hdbscan_small_corpus_does_not_crash():
+    """PCA/UMAP must not request more components than papers."""
+    import numpy as np
+
+    from app.services.clustering import ArticleClusterer
+
+    for n in (0, 1, 2, 4):
+        X = np.ones((n, 16), dtype=np.float32)
+        clusterer = ArticleClusterer(method="hdbscan")
+        labels = clusterer.fit(X)
+        assert len(labels) == n
+        if n == 0:
+            assert clusterer.resolved_n_clusters == 0
+        else:
+            assert clusterer.resolved_n_clusters >= 1
+
+
 def test_noise_bucket_is_relabelled_in_pipeline(monkeypatch):
     """The HDBSCAN noise bucket gets a fixed, honest label and no headline."""
     for _dep in ("requests", "Bio", "dotenv"):

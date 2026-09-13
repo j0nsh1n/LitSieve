@@ -521,6 +521,14 @@ def test_quick_screen_preview_does_not_exclude(tmp_path):
         assert len(result["candidates"]) == result["proposed_count"]
         ids = {c["article_id"] for c in result["candidates"]}
         assert "0" not in ids
+        assert result["staying"]
+        assert len(result["staying"]) == result["total_ranked"] - result["proposed_count"]
+        stay_ids = {c["article_id"] for c in result["staying"]}
+        assert ids.isdisjoint(stay_ids)
+        row = result["candidates"][0]
+        assert "abstract" in row
+        assert "authors" in row
+        assert "similarity_score" in row
     finally:
         p.close()
 
@@ -571,7 +579,9 @@ def test_search_simple_subtitle_and_work_gate():
     assert "Step 4 of 4" in html  # Advanced only
     assert "search-work" in html
     # Simple help must not mention Seed; Advanced help may.
-    simple_help = html[html.find("search-help-simple") : html.find("input-method-toggle")]
+    simple_help_at = html.find("search-help-simple")
+    assert simple_help_at != -1
+    simple_help = html[simple_help_at : html.find("</p>", simple_help_at)]
     assert "Seed" not in simple_help
     assert "Seed" in html  # Advanced block still documents seed mode
     # Screening report link uses Clean up naming.
@@ -610,6 +620,27 @@ def test_search_advanced_keeps_seed_and_ranking_in_dom():
     assert 'html[data-mode="simple"]' in css and "seed" in css
 
 
+def test_simple_more_like_this_paper_reranks_without_fetch():
+    """Simple result cards re-rank the same library from one paper."""
+    html = _read("templates", "search.html")
+    simple_help_at = html.find("search-help-simple")
+    assert simple_help_at != -1
+    simple_help = html[simple_help_at : html.find("</p>", simple_help_at)]
+    assert "More like this" in simple_help
+    assert "Seed" not in simple_help
+    js = _read("static", "js", "search.js")
+    more = js[js.index("async function doMoreLikeThisPaper") : js.index("function clientSort")]
+    assert "more-like-this-btn" in js
+    assert "/api/search/seed" in more
+    assert "include_seed: true" in more
+    assert "/api/fetch" not in more
+    assert "/api/multi-fetch" not in more
+    assert "load-sample-corpus" not in more
+    css = _read("static", "css", "style.css")
+    assert "html:not([data-mode=\"simple\"]) .more-like-this-btn" in css
+    assert 'html[data-mode="simple"] #seed-banner,' not in css
+
+
 # ---------------------------------------------------------------------------
 # Cross-mode dual-label pattern (no cross-bleed)
 # ---------------------------------------------------------------------------
@@ -630,6 +661,7 @@ def test_dual_mode_labels_never_cross_bleed_in_css():
         ("search-sub-advanced", "search-sub-simple"),
         ("search-title-advanced", "search-title-simple"),
         ("search-help-advanced", "search-help-simple"),
+        ("seed-banner-heading-advanced", "seed-banner-heading-simple"),
     ]
     for advanced, simple in pairs:
         assert (
@@ -908,6 +940,17 @@ def test_simple_screen_preview_does_not_exclude():
     assert "/api/screening/quick-preview" in fn
     assert 'action: \'exclude\'' not in fn and 'action: "exclude"' not in fn
     assert "low_relevance" not in fn
+    assert "openSimpleScreenTriage()" in fn
+    assert "innerHTML" not in fn
+    html = _read("templates", "partials", "simple_screening_card.html")
+    assert 'id="screen-triage-go-rows"' in html
+    assert 'id="screen-triage-stay-rows"' in html
+    assert 'id="screen-triage-detail-body"' in html
+    css = _read("static", "css", "style.css")
+    assert ".screen-triage-workbench" in css
+    assert "grid-template-columns: minmax(16rem, 38%) minmax(0, 1fr)" in css
+    assert "_screenTriageMatches()" in dm
+    assert "moveScreenTriagePaper" in dm
 
 
 def test_simple_screen_apply_and_undo_use_low_relevance():
@@ -920,6 +963,7 @@ def test_simple_screen_apply_and_undo_use_low_relevance():
     assert "setSimpleScreenStripOutcome" in apply_fn
     assert "undo: true" in apply_fn or "undo:true" in apply_fn
     assert "Set aside" in apply_fn
+    assert "await refreshSimpleScreeningCard()" in apply_fn
     undo_fn = dm[dm.find("async function doSimpleScreenUndo") : dm.find("async function silentResolveDuplicatesAfterPrepare")]
     if "async function doSimpleScreenUndo" not in dm:
         undo_fn = dm[dm.find("async function doSimpleScreenUndo") :]
@@ -1134,12 +1178,21 @@ def test_simple_search_side_panel_exists_and_hidden_in_advanced():
     assert 'id="simple-export-results-btn"' in html
     assert 'id="simple-screening-report-btn"' in html
     assert 'screening-report?format=txt' in html
+    assert 'id="funnel-split-bar"' in html
+    assert 'id="rail-stat-removed"' in html
+    assert "funnel-track--collected" in html
     css = _read("static", "css", "style.css")
     assert 'html:not([data-mode="simple"]) #search-simple-panel' in css or \
            'html:not([data-mode="simple"]) .search-simple-panel' in css
+    assert "var(--funnel-kept-pct)" in css
+    assert ".funnel-track--split" in css
     js = _read("static", "js", "search.js")
     assert "updateSimpleSearchPanel" in js
     assert "simple-export-results-btn" in js
+    fill = js[js.find("function fillSimpleRailStats") : js.find("async function loadSearchEmptyState")]
+    assert "setProperty('--funnel-kept-pct'" in fill
+    assert "setProperty('--funnel-removed-pct'" in fill
+    assert "rail-stat-removed" in fill
 
 
 def test_simple_small_screen_css_for_panel_and_card():

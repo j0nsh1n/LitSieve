@@ -503,9 +503,13 @@ class LiteratureSearchPipeline:
                 return self._cached_emb_ids, self._cached_emb_matrix
         ids, matrix = self.db.get_all_embeddings()
         with self._corpus_cache_lock:
-            self._cached_emb_ids = ids
-            self._cached_emb_matrix = matrix
-            self._cached_emb_gen = self._corpus_cache_gen
+            # Tag with the generation captured before the read. If an
+            # invalidation landed during the load, current gen has moved on
+            # and this snapshot must not be published as fresh.
+            if self._corpus_cache_gen == gen:
+                self._cached_emb_ids = ids
+                self._cached_emb_matrix = matrix
+                self._cached_emb_gen = gen
         return ids, matrix
 
     def _candidate_pool(
@@ -739,6 +743,7 @@ class LiteratureSearchPipeline:
         if total == 0:
             return {
                 "candidates": [],
+                "staying": [],
                 "total_ranked": 0,
                 "proposed_count": 0,
                 "fraction": fraction,
@@ -767,21 +772,29 @@ class LiteratureSearchPipeline:
         n_propose = max(1, n_propose) if total > 1 else 0
         n_propose = min(n_propose, max(0, total - 1))
 
-        candidates: List[Dict] = []
-        for idx in order[:n_propose]:
+        def _preview_row(idx: int) -> Dict:
             key = article_ids[idx]
             meta = articles_all.get(key) or {}
-            candidates.append({
+            authors = meta.get("authors") or []
+            if not isinstance(authors, list):
+                authors = [str(authors)]
+            return {
                 "article_id": key[0],
                 "source": key[1],
                 "title": meta.get("title") or "",
                 "year": meta.get("year") or "",
                 "journal": meta.get("journal") or "",
+                "authors": authors,
+                "abstract": meta.get("abstract") or "",
                 "similarity_score": float(scores[idx]),
-            })
+            }
+
+        candidates = [_preview_row(idx) for idx in order[:n_propose]]
+        staying = [_preview_row(idx) for idx in reversed(list(order[n_propose:]))]
 
         return {
             "candidates": candidates,
+            "staying": staying,
             "total_ranked": total,
             "proposed_count": len(candidates),
             "fraction": fraction,
@@ -947,6 +960,7 @@ class LiteratureSearchPipeline:
         year_min: Optional[int] = None,
         year_max: Optional[int] = None,
         lexical_boost: bool = True,
+        include_seed: bool = False,
     ) -> Dict:
         """Find a local seed article (by id/title), then rank similar papers."""
         article = self.db.find_article_by_seed(seed)
@@ -957,14 +971,16 @@ class LiteratureSearchPipeline:
             )
         query = f"{article.get('title') or ''}. {article.get('abstract') or ''}".strip()
         seed_key = (article["article_id"], article["source"])
+        extra_exclude = None if include_seed else {seed_key}
+        fetch_k = top_k if include_seed else top_k + 1
         results = self.search_similar(
-            query, top_k=top_k + 1,
+            query, top_k=fetch_k,
             source_filter=source_filter,
             cluster_filter=cluster_filter,
             year_min=year_min,
             year_max=year_max,
             lexical_boost=lexical_boost,
-            extra_exclude={seed_key},
+            extra_exclude=extra_exclude,
         )[:top_k]
         return {"seed": article, "results": results}
 

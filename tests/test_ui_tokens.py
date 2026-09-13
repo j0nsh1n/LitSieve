@@ -538,6 +538,27 @@ def test_typefaces_are_self_hosted():
     assert not (fonts / "fraunces-latin.woff2").exists()
 
 
+def test_triage_and_help_use_glass_surfaces():
+    """Triage pane uses solid page tokens — color-mix was reading as slate."""
+    backdrop = CSS[CSS.find(".lra-modal-backdrop {") : CSS.find(".lra-modal-card {")]
+    assert "background: transparent" in backdrop
+    assert "color-mix" not in backdrop
+    assert "color-mix(in srgb, var(--text) 45%, transparent)" not in CSS
+    panel = CSS[CSS.find(".screen-triage-panel {") : CSS.find(".screen-triage-head {")]
+    assert "background: var(--surface)" in panel
+    assert "color-mix" not in panel
+    listing = CSS[CSS.find(".screen-triage-list {") : CSS.find(".screen-triage-detail {")]
+    assert "background: var(--bg)" in listing
+    assert "color-mix" not in listing
+    foot = CSS[CSS.find(".screen-triage-foot {") : CSS.find(".screen-triage-paper-actions")]
+    assert "background: var(--surface)" in foot
+    assert "color-mix" not in foot
+    help_btn = CSS[CSS.find(".nav-ask-help {") : CSS.find(".nav-ask-help:hover")]
+    assert "background: var(--surface)" in help_btn
+    assert "var(--text-soft)" in help_btn
+    assert "color-mix" not in help_btn
+
+
 def test_body_sits_on_soft_wash():
     """Page canvas is a soft radial wash (html::before), not paper grain."""
     assert "feTurbulence" not in CSS
@@ -631,6 +652,8 @@ RUNTIME_SET_VARS = {
     "--simple-panel-h",  # search.js: measured bottom-bar clearance
     "--range-fill",      # range input progress
     "--wait-pct",        # simple wait bar fill
+    "--funnel-kept-pct",     # search.js: simple screening funnel
+    "--funnel-removed-pct",  # search.js: simple screening funnel
     "--tx", "--ty", "--tr",  # view-transition offsets
 }
 

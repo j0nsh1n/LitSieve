@@ -110,6 +110,37 @@ def test_ci_and_dose_preserved():
     assert chk["outcome"] == "pass"
 
 
+def test_ci_bound_change_warns():
+    """Same 95% label with different endpoints is a different statistic."""
+    abstract = (
+        "Results: The odds ratio was 1.6 (95% CI 1.2 to 1.8). "
+        "Conclusions: The association remained (95% CI 1.2 to 1.8)."
+    )
+    generated = _generated(
+        plain_summary="The odds ratio was 1.6.",
+        what_was_found="The association remained (95% CI 4.2 to 9.8).",
+        who_was_studied="Participants in the reported analysis.",
+    )
+    chk = _check(verify(abstract, "Odds", generated), "numeric_detail")
+    assert chk["outcome"] == "warn"
+    assert any("1.2" in m and "1.8" in m for m in chk["details"]["missing"])
+
+
+def test_p_value_operator_change_warns():
+    abstract = (
+        "Results: Sleep improved. "
+        "Conclusions: The difference was significant (p < 0.01)."
+    )
+    generated = _generated(
+        plain_summary="Sleep improved.",
+        what_was_found="The difference was significant (p = 0.01).",
+        who_was_studied="The reported sample.",
+    )
+    chk = _check(verify(abstract, "Sleep", generated), "numeric_detail")
+    assert chk["outcome"] == "warn"
+    assert any("p < 0.01" in m for m in chk["details"]["missing"])
+
+
 def test_negation_loss_warns():
     abstract = (
         "Results: Sleep improved by 43 minutes per night. "

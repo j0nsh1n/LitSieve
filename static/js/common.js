@@ -357,17 +357,32 @@ function renderKeyPointsHtml(bullets, options) {
     const readerBtn = (aid && src && showAi && abstractOk)
         ? `<button type="button" class="btn btn-secondary btn-sm reader-mode-btn" title="Plain-language explanation of this abstract">Explain this study</button>`
         : '';
-    const actions = (aid && src && showAi)
+    const aiRow = (aid && src && showAi)
         ? `<div class="ai-actions" data-article-id="${aid}" data-source="${src}">
             <button type="button" class="btn btn-secondary btn-sm ai-refine-btn" title="Optional AI rewrite of summary and bullets from this abstract only">Refine with AI</button>
             <button type="button" class="btn btn-secondary btn-sm ai-ask-btn" title="Ask a question answered only from this abstract">Ask about this paper</button>
             ${readerBtn}
             <span class="ai-status-line help-text" hidden role="status" aria-live="polite"></span>
-           </div>
+           </div>`
+        : '';
+    const actions = aiRow
+        ? `${aiRow}
            <div class="ai-panel" hidden></div>`
         : '';
     // Nothing to show (no list, no AI chrome).
     if (!list && !actions) return '';
+    // Compact aid (Simple Search): the AI button row collapses into a menu;
+    // .ai-panel stays a sibling of the details so the card can still find it.
+    if (options.compactAid && actions) {
+        return `<div class="key-points key-points-compact-aid" data-kp-origin="${isAi ? 'ai' : 'extractive'}">
+      ${list ? `<div class="key-points-label">${escapeHtml(label)}</div>${list}` : ''}
+      <details class="study-aid">
+        <summary class="btn btn-secondary btn-sm">Study aid</summary>
+        ${aiRow}
+      </details>
+      <div class="ai-panel" hidden></div>
+    </div>`;
+    }
     // Extractive + abstract shown: only AI chrome (no empty "Key points" header).
     if (hideExtractiveList && actions) {
         return `<div class="key-points key-points-actions-only" data-kp-origin="extractive">
@@ -790,6 +805,10 @@ function bindAiArticleActions(rootEl, article) {
         if (!panel) return;
         panel.hidden = false;
         panel.innerHTML = html;
+        // Compact aid (Simple): the buttons sit in a study-aid dropdown;
+        // close it once results land so the panel below stays readable.
+        const menu = wrap.closest('details.study-aid');
+        if (menu) menu.removeAttribute('open');
     };
 
     const softAiError = (msg, verb) => {
@@ -844,11 +863,11 @@ function bindAiArticleActions(rootEl, article) {
                             // actually stored, not what we submitted.
                             const savedResp = await apiCall('/api/ai/key-points', {
                                 method: 'POST',
-                                body: {
+                                body: withPageLibrary({
                                     article_id: aid,
                                     source: source,
                                     key_points: data.key_points || [],
-                                },
+                                }),
                             });
                             const savedPoints = (savedResp && savedResp.key_points) || data.key_points || [];
                             showNotification('Key points updated (AI rewrite saved).', 'success');
@@ -1020,6 +1039,23 @@ function populateLibrarySelect(sel, data) {
         sel.appendChild(opt);
     });
     sel.dataset.activeId = active;
+    // Pin the library this page rendered against. A later focus refresh
+    // compares the live active id to this; switching here already reloads.
+    if (active && !sel.dataset.pageLibraryId) {
+        sel.dataset.pageLibraryId = active;
+    }
+}
+
+function pageLibraryId() {
+    const sel = document.getElementById('nav-library-select');
+    if (!sel) return '';
+    return sel.dataset.pageLibraryId || sel.dataset.activeId || sel.value || '';
+}
+
+function withPageLibrary(body) {
+    const id = pageLibraryId();
+    if (id) body.library_id = id;
+    return body;
 }
 
 /** Refresh library dropdown after create/rename/delete on Account page. */
@@ -1028,7 +1064,12 @@ async function refreshLibrarySwitcher() {
     if (!sel) return;
     try {
         const data = await apiCall('/api/libraries');
+        const pageId = sel.dataset.pageLibraryId || '';
+        const liveId = (data && data.active_id) || '';
         populateLibrarySelect(sel, data);
+        if (pageId && liveId && pageId !== liveId) {
+            window.location.reload();
+        }
     } catch (e) { /* ignore */ }
 }
 
@@ -1101,7 +1142,7 @@ document.addEventListener('DOMContentLoaded', function() {
         setOpen(!open);
     });
 
-    drawer.querySelectorAll('a.nav-link, a.nav-username, a.nav-logout').forEach(function(link) {
+    drawer.querySelectorAll('a.nav-link, a.nav-username, a.nav-logout, button.nav-ask-help').forEach(function(link) {
         link.addEventListener('click', function() {
             setOpen(false);
         });

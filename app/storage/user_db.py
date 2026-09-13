@@ -93,18 +93,44 @@ class UserDatabase:
                 PRIMARY KEY (username, token_hash)
             )
         """)
-        # One-time password-reset codes (hashed). Classroom hosts can surface
-        # the plaintext code when DEBUG/RESET_CODES_IN_RESPONSE is set.
-        self.conn.execute("""
-            CREATE TABLE IF NOT EXISTS password_reset_tokens (
-                username     TEXT NOT NULL COLLATE NOCASE,
-                token_hash   TEXT NOT NULL,
+        # Reset codes belong to an immutable account ID. Legacy username-bound
+        # codes (and the 3007b89 hybrid username+user_id table) cannot be
+        # safely mapped after a username has been reused — drop them.
+        reset_token_table_sql = """
+            CREATE TABLE password_reset_tokens (
+                token_hash   TEXT PRIMARY KEY,
+                user_id      TEXT NOT NULL,
                 expires_at   TEXT NOT NULL,
                 used         INTEGER NOT NULL DEFAULT 0,
                 created_at   TEXT DEFAULT (datetime('now')),
-                PRIMARY KEY (username, token_hash)
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             )
-        """)
+        """
+        reset_token_columns = {
+            row[1]
+            for row in self.conn.execute(
+                "PRAGMA table_info(password_reset_tokens)"
+            ).fetchall()
+        }
+        needs_rebuild = bool(reset_token_columns) and (
+            "user_id" not in reset_token_columns or "username" in reset_token_columns
+        )
+        if needs_rebuild:
+            self.conn.execute("SAVEPOINT migrate_password_reset_tokens")
+            try:
+                self.conn.execute("DROP TABLE password_reset_tokens")
+                self.conn.execute(reset_token_table_sql)
+                self.conn.execute("RELEASE SAVEPOINT migrate_password_reset_tokens")
+            except Exception:
+                self.conn.execute("ROLLBACK TO SAVEPOINT migrate_password_reset_tokens")
+                self.conn.execute("RELEASE SAVEPOINT migrate_password_reset_tokens")
+                raise
+        elif not reset_token_columns:
+            self.conn.execute(reset_token_table_sql)
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user_id "
+            "ON password_reset_tokens(user_id)"
+        )
         # Optional library copy codes: clone into another account (not live view).
         self.conn.execute("""
             CREATE TABLE IF NOT EXISTS shares (
@@ -818,6 +844,23 @@ class UserDatabase:
     def delete_user(self, user_id: str) -> bool:
         """Delete a user account. Returns True if a row was removed."""
         with self._lock:
+            row = self.conn.execute(
+                "SELECT username FROM users WHERE id = ?", (user_id,)
+            ).fetchone()
+            uname = row[0] if row else None
+            self.conn.execute(
+                "DELETE FROM password_reset_tokens WHERE user_id = ?",
+                (user_id,),
+            )
+            if uname:
+                self.conn.execute(
+                    "DELETE FROM email_verification_tokens "
+                    "WHERE username = ? COLLATE NOCASE",
+                    (uname,),
+                )
+            self.conn.execute(
+                "DELETE FROM one_time_logins WHERE user_id = ?", (user_id,)
+            )
             # Drop shares owned by this user and any of their redemptions.
             # Subquery instead of expanded placeholders: a long share history
             # would exceed SQLite's host-parameter limit and abort the delete.
@@ -1029,26 +1072,29 @@ class UserDatabase:
         self, username: str, ttl_minutes: int = 60
     ) -> Optional[str]:
         """Create a one-time reset code for username. Returns plaintext token or None."""
-        user = self.get_by_username(username)
-        if not user:
-            return None
         token = secrets.token_urlsafe(24)
         token_hash = self._hash_reset_token(token)
         expires = (
             datetime.now(timezone.utc) + timedelta(minutes=ttl_minutes)
         ).strftime("%Y-%m-%d %H:%M:%S")
-        uname = user["username"]
         with self._lock:
-            # Invalidate prior unused tokens for this user.
+            row = self.conn.execute(
+                "SELECT id FROM users WHERE username = ? COLLATE NOCASE",
+                (username,),
+            ).fetchone()
+            if not row:
+                return None
+            user_id = row[0]
+            # Invalidate prior unused tokens for this account, not the login name.
             self.conn.execute(
                 "UPDATE password_reset_tokens SET used = 1 "
-                "WHERE username = ? COLLATE NOCASE AND used = 0",
-                (uname,),
+                "WHERE user_id = ? AND used = 0",
+                (user_id,),
             )
             self.conn.execute(
-                "INSERT INTO password_reset_tokens (username, token_hash, expires_at, used) "
+                "INSERT INTO password_reset_tokens (token_hash, user_id, expires_at, used) "
                 "VALUES (?, ?, ?, 0)",
-                (uname, token_hash, expires),
+                (token_hash, user_id, expires),
             )
             self.conn.commit()
         return token
@@ -1056,20 +1102,27 @@ class UserDatabase:
     def consume_password_reset_token(
         self, username: str, token: str, new_hashed_password: str
     ) -> Tuple[bool, str]:
-        """Validate token and set password. Returns (ok, error_message)."""
+        """Validate token and set password. Returns (ok, error_message).
+
+        The code is owned by the account ID; the username here is only the
+        handle that locates it. A token from a deleted account can never
+        authenticate against a later account reusing that name.
+        """
         if not token or not username:
             return False, "Reset code and login are required."
         token_hash = self._hash_reset_token(token.strip())
         now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
         with self._lock:
             row = self.conn.execute(
-                "SELECT username, expires_at, used FROM password_reset_tokens "
-                "WHERE username = ? COLLATE NOCASE AND token_hash = ?",
+                "SELECT t.user_id, t.expires_at, t.used "
+                "FROM password_reset_tokens AS t "
+                "JOIN users AS u ON u.id = t.user_id "
+                "WHERE u.username = ? COLLATE NOCASE AND t.token_hash = ?",
                 (username.strip(), token_hash),
             ).fetchone()
             if not row:
                 return False, "Invalid or expired reset code."
-            uname, expires_at, used = row[0], row[1], int(row[2] or 0)
+            user_id, expires_at, used = row[0], row[1], int(row[2] or 0)
             if used:
                 return False, "This reset code was already used."
             if expires_at < now:
@@ -1077,15 +1130,15 @@ class UserDatabase:
             cur = self.conn.execute(
                 "UPDATE users SET hashed_password = ?, "
                 "token_version = token_version + 1, password_changed_at = ? "
-                "WHERE username = ? COLLATE NOCASE",
-                (new_hashed_password, now, uname),
+                "WHERE id = ?",
+                (new_hashed_password, now, user_id),
             )
             if cur.rowcount == 0:
                 return False, "Account not found."
             self.conn.execute(
                 "UPDATE password_reset_tokens SET used = 1 "
-                "WHERE username = ? COLLATE NOCASE AND token_hash = ?",
-                (uname, token_hash),
+                "WHERE token_hash = ?",
+                (token_hash,),
             )
             self.conn.commit()
         return True, ""

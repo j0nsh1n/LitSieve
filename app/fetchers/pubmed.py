@@ -9,7 +9,7 @@ from typing import Dict, List, Optional
 
 from Bio import Entrez
 
-from app.fetchers.base import BaseFetcher, polite_sleep
+from app.fetchers.base import BaseFetcher, polite_sleep, reraise_fetch_error
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +55,7 @@ class PubMedFetcher(BaseFetcher):
             return pmids
 
         except Exception as e:
+            reraise_fetch_error(e)
             logger.exception("Error searching PubMed: %s", e)
             return []
 
@@ -83,6 +84,7 @@ class PubMedFetcher(BaseFetcher):
                 polite_sleep(0.5)
 
             except Exception as e:
+                reraise_fetch_error(e)
                 logger.exception("Error fetching batch: %s", e)
                 continue
 

@@ -261,6 +261,13 @@ const SIMPLE_SCREEN_LEVELS = {
 /** @type {Record<string, {proposed_count:number, total_ranked:number, candidates:array}|null>} */
 var _simpleScreenCounts = { low: null, medium: null, high: null };
 let _simpleScreenCandidates = [];
+let _simpleTriageUsed = false;
+let _simpleTriageLevel = '';
+let _simpleTriageQuery = '';
+let _simpleTriageGo = [];
+let _simpleTriageStay = [];
+let _simpleTriageKey = '';
+let _simpleTriageKeyHandler = null;
 let _simpleScreenLastItems = null;
 /** Session-only: skip hides the decision UI until reload (pending is corpus-derived). */
 let _simpleScreenSkippedSession = false;
@@ -548,6 +555,7 @@ function closeSimpleScreenModal(opts) {
  const force = !!(opts && opts.force);
  // Pending gate: only Apply or Skip may close the popup.
  if (isSimpleScreenGatePending() && !force) return;
+ closeSimpleScreenTriage();
  const modal = document.getElementById('simple-screen-modal');
  if (!modal || modal.hidden) return;
  modal.hidden = true;
@@ -620,6 +628,7 @@ function openSimpleScreenModal() {
   return r.width > 0 || r.height > 0;
  });
  _simpleScreenModalKey = (ev) => {
+  if (isSimpleScreenTriageOpen()) return;
   if (ev.key === 'Escape') {
    ev.preventDefault();
    ev.stopPropagation();
@@ -865,6 +874,7 @@ function wireSimpleScreeningCard() {
   syncApply();
   queryEl.addEventListener('change', () => {
    _simpleScreenCounts = { low: null, medium: null, high: null };
+   _simpleTriageUsed = false;
    loadSimpleScreenCounts();
    syncApply();
   });
@@ -873,17 +883,324 @@ function wireSimpleScreeningCard() {
    clearTimeout(t);
    t = setTimeout(() => {
     _simpleScreenCounts = { low: null, medium: null, high: null };
+    _simpleTriageUsed = false;
     loadSimpleScreenCounts();
    }, 600);
   });
  }
+ const triageApply = document.getElementById('screen-triage-apply-btn');
+ const keepBtn = document.getElementById('screen-triage-keep-btn');
+ const asideBtn = document.getElementById('screen-triage-aside-btn');
+ const detailClose = document.getElementById('screen-triage-detail-close');
+ if (triageApply) triageApply.addEventListener('click', doSimpleScreenApply);
+ if (keepBtn) keepBtn.addEventListener('click', () => moveScreenTriagePaper('stay'));
+ if (asideBtn) asideBtn.addEventListener('click', () => moveScreenTriagePaper('go'));
+ if (detailClose) {
+  detailClose.addEventListener('click', () => {
+   const detail = document.getElementById('screen-triage-detail');
+   if (detail) detail.classList.remove('is-open');
+  });
+ }
+ document.querySelectorAll('[data-screen-triage-close]').forEach((el) => {
+  el.addEventListener('click', (ev) => {
+   ev.preventDefault();
+   closeSimpleScreenTriage();
+  });
+ });
  // Radios only switch labels already loaded — no re-fetch.
 }
 
 function _simpleScreenEnsureQuery(query) {
  if (_simpleScreenCounts._query !== query) {
   _simpleScreenCounts = { low: null, medium: null, high: null, _query: query };
+  _simpleTriageUsed = false;
  }
+}
+
+function _screenPaperKey(p) {
+ return `${p.article_id}::${p.source}`;
+}
+
+function _screenAuthorsLine(p) {
+ const a = p && p.authors;
+ if (Array.isArray(a)) return a.filter(Boolean).join('; ');
+ return String(a || '');
+}
+
+function _screenScoreLabel(p) {
+ const n = Number(p && p.similarity_score);
+ if (!Number.isFinite(n)) return '';
+ return n.toFixed(2);
+}
+
+function _screenTriageMatches() {
+ return _simpleTriageUsed
+  && _simpleTriageLevel === simpleScreenSelectedLevel()
+  && _simpleTriageQuery === simpleScreenQuery();
+}
+
+function isSimpleScreenTriageOpen() {
+ const el = document.getElementById('simple-screen-preview');
+ return !!(el && !el.hidden);
+}
+
+function closeSimpleScreenTriage() {
+ const el = document.getElementById('simple-screen-preview');
+ if (!el || el.hidden) {
+  if (_simpleTriageKeyHandler) {
+   document.removeEventListener('keydown', _simpleTriageKeyHandler, true);
+   _simpleTriageKeyHandler = null;
+  }
+  return;
+ }
+ el.hidden = true;
+ el.classList.add('u-hidden');
+ document.body.classList.remove('simple-screen-triage-open');
+ const detail = document.getElementById('screen-triage-detail');
+ if (detail) detail.classList.remove('is-open');
+ if (_simpleTriageKeyHandler) {
+  document.removeEventListener('keydown', _simpleTriageKeyHandler, true);
+  _simpleTriageKeyHandler = null;
+ }
+ const btn = document.getElementById('simple-screen-preview-btn');
+ if (btn && typeof btn.focus === 'function') {
+  try { btn.focus({ preventScroll: true }); } catch (e) {
+   try { btn.focus(); } catch (e2) { /* ignore */ }
+  }
+ }
+}
+
+function _screenTriageOrder() {
+ return _simpleTriageGo.concat(_simpleTriageStay);
+}
+
+function _screenTriagePaper(key) {
+ return _screenTriageOrder().find((p) => _screenPaperKey(p) === key) || null;
+}
+
+function _screenTriageRowEl(key) {
+ return Array.from(document.querySelectorAll('.screen-triage-row'))
+  .find((el) => el.dataset.key === key) || null;
+}
+
+function _screenTriageGoing(key) {
+ return _simpleTriageGo.some((p) => _screenPaperKey(p) === key);
+}
+
+function renderScreenTriage() {
+ const goRows = document.getElementById('screen-triage-go-rows');
+ const stayRows = document.getElementById('screen-triage-stay-rows');
+ const goHead = document.getElementById('screen-triage-go-heading');
+ const stayHead = document.getElementById('screen-triage-stay-heading');
+ const applyBtn = document.getElementById('screen-triage-apply-btn');
+ const lead = document.getElementById('screen-triage-lead');
+ if (goHead) goHead.textContent = `Would go (${_simpleTriageGo.length})`;
+ if (stayHead) stayHead.textContent = `Would stay (${_simpleTriageStay.length})`;
+ if (applyBtn) {
+  const n = _simpleTriageGo.length;
+  applyBtn.textContent = `Set aside ${n} paper${n === 1 ? '' : 's'}`;
+  applyBtn.disabled = n <= 0;
+ }
+ if (lead) {
+  lead.textContent = _simpleTriageGo.length
+   ? `Papers least related to your question. Read them, keep any you still want. Nothing is excluded until you set them aside.`
+   : `Nothing would be set aside at this level. You can still mark papers below.`;
+ }
+ if (goRows) {
+  goRows.textContent = '';
+  _simpleTriageGo.forEach((p) => goRows.appendChild(_screenTriageRow(p)));
+ }
+ if (stayRows) {
+  stayRows.textContent = '';
+  _simpleTriageStay.forEach((p) => stayRows.appendChild(_screenTriageRow(p)));
+ }
+ renderScreenTriageDetail();
+}
+
+function _screenTriageRow(paper) {
+ const li = document.createElement('li');
+ const btn = document.createElement('button');
+ btn.type = 'button';
+ btn.className = 'screen-triage-row';
+ const key = _screenPaperKey(paper);
+ btn.dataset.key = key;
+ if (_simpleTriageKey === key) btn.setAttribute('aria-current', 'true');
+ const score = document.createElement('span');
+ score.className = 'screen-triage-row-score';
+ score.textContent = _screenScoreLabel(paper) || '—';
+ const body = document.createElement('span');
+ body.className = 'screen-triage-row-body';
+ const title = document.createElement('span');
+ title.className = 'screen-triage-row-title';
+ title.textContent = paper.title || '(no title)';
+ const meta = document.createElement('span');
+ meta.className = 'screen-triage-row-meta';
+ const srcName = typeof getSourceName === 'function' ? getSourceName(paper.source) : paper.source;
+ meta.textContent = [paper.journal, paper.year, srcName].filter(Boolean).join(' · ');
+ body.appendChild(title);
+ body.appendChild(meta);
+ btn.appendChild(score);
+ btn.appendChild(body);
+ btn.addEventListener('click', () => selectScreenTriagePaper(key, false));
+ li.appendChild(btn);
+ return li;
+}
+
+function renderScreenTriageDetail() {
+ const host = document.getElementById('screen-triage-detail-body');
+ const keepBtn = document.getElementById('screen-triage-keep-btn');
+ const asideBtn = document.getElementById('screen-triage-aside-btn');
+ const paper = _screenTriagePaper(_simpleTriageKey);
+ if (!host) return;
+ host.textContent = '';
+ if (!paper) {
+  const empty = document.createElement('p');
+  empty.className = 'help-text';
+  empty.textContent = 'Select a paper to read it.';
+  host.appendChild(empty);
+  if (keepBtn) keepBtn.disabled = true;
+  if (asideBtn) asideBtn.disabled = true;
+  return;
+ }
+ const going = _screenTriageGoing(_simpleTriageKey);
+ if (keepBtn) keepBtn.disabled = !going;
+ if (asideBtn) asideBtn.disabled = going;
+
+ const kicker = document.createElement('p');
+ kicker.className = 'screen-triage-kicker';
+ const score = _screenScoreLabel(paper);
+ kicker.textContent = [score && `Match ${score}`, paper.journal, paper.year]
+  .filter(Boolean).join(' · ');
+ const title = document.createElement('h3');
+ title.className = 'screen-triage-detail-title';
+ title.textContent = paper.title || '(no title)';
+ const authors = document.createElement('p');
+ authors.className = 'screen-triage-authors';
+ authors.textContent = _screenAuthorsLine(paper);
+ const absLabel = document.createElement('h4');
+ absLabel.className = 'screen-triage-kicker';
+ absLabel.textContent = 'Abstract';
+ const abs = document.createElement('p');
+ abs.className = 'screen-triage-abstract';
+ abs.textContent = paper.abstract || 'No abstract on file.';
+ host.appendChild(kicker);
+ host.appendChild(title);
+ host.appendChild(authors);
+ host.appendChild(absLabel);
+ host.appendChild(abs);
+
+ const active = _screenTriageRowEl(_simpleTriageKey);
+ if (active && typeof active.scrollIntoView === 'function') {
+  active.scrollIntoView({ block: 'nearest' });
+ }
+}
+
+function selectScreenTriagePaper(key, moveFocus) {
+ const order = _screenTriageOrder();
+ if (!order.length) {
+  _simpleTriageKey = '';
+  renderScreenTriage();
+  return;
+ }
+ let next = key;
+ if (!order.some((p) => _screenPaperKey(p) === next)) {
+  next = _screenPaperKey(order[0]);
+ }
+ _simpleTriageKey = next;
+ const detail = document.getElementById('screen-triage-detail');
+ if (detail) detail.classList.add('is-open');
+ renderScreenTriage();
+ if (moveFocus) {
+ const row = _screenTriageRowEl(_simpleTriageKey);
+ if (row) row.focus();
+ }
+}
+
+function moveScreenTriagePaper(dest) {
+ const key = _simpleTriageKey;
+ const paper = _screenTriagePaper(key);
+ if (!paper) return;
+ _simpleTriageGo = _simpleTriageGo.filter((p) => _screenPaperKey(p) !== key);
+ _simpleTriageStay = _simpleTriageStay.filter((p) => _screenPaperKey(p) !== key);
+ if (dest === 'go') _simpleTriageGo.unshift(paper);
+ else _simpleTriageStay.push(paper);
+ _simpleScreenCandidates = _simpleTriageGo.slice();
+ selectScreenTriagePaper(key, false);
+}
+
+function stepScreenTriage(delta) {
+ const order = _screenTriageOrder();
+ if (!order.length) return;
+ const keys = order.map(_screenPaperKey);
+ let i = keys.indexOf(_simpleTriageKey);
+ if (i < 0) i = 0;
+ else i = (i + delta + keys.length) % keys.length;
+ selectScreenTriagePaper(keys[i], true);
+}
+
+function openSimpleScreenTriage() {
+ const el = document.getElementById('simple-screen-preview');
+ const panel = el && el.querySelector('.screen-triage-panel');
+ if (!el) return;
+ el.hidden = false;
+ el.classList.remove('u-hidden');
+ document.body.classList.add('simple-screen-triage-open');
+ const first = _simpleTriageGo[0] || _simpleTriageStay[0];
+ _simpleTriageKey = first ? _screenPaperKey(first) : '';
+ const detail = document.getElementById('screen-triage-detail');
+ if (detail && _simpleTriageKey) detail.classList.add('is-open');
+ renderScreenTriage();
+ if (_simpleTriageKeyHandler) {
+  document.removeEventListener('keydown', _simpleTriageKeyHandler, true);
+ }
+ _simpleTriageKeyHandler = (ev) => {
+  if (!isSimpleScreenTriageOpen()) return;
+  const tag = (ev.target && ev.target.tagName) || '';
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+  if (ev.key === 'Escape') {
+   ev.preventDefault();
+   ev.stopPropagation();
+   closeSimpleScreenTriage();
+   return;
+  }
+  const k = ev.key.toLowerCase();
+  if (k === 'j') {
+   ev.preventDefault();
+   stepScreenTriage(1);
+  } else if (k === 'k') {
+   ev.preventDefault();
+   stepScreenTriage(-1);
+  }
+  if (ev.key !== 'Tab' || !panel) return;
+  const focusableSelector = [
+   'button:not([disabled])',
+   '[href]',
+   'input:not([disabled]):not([type="hidden"])',
+   'select:not([disabled])',
+   'textarea:not([disabled])',
+   '[tabindex]:not([tabindex="-1"])',
+  ].join(',');
+  const list = Array.from(panel.querySelectorAll(focusableSelector)).filter((node) => {
+   const r = node.getBoundingClientRect();
+   return r.width > 0 || r.height > 0;
+  });
+  if (!list.length) return;
+  const firstEl = list[0];
+  const lastEl = list[list.length - 1];
+  const active = document.activeElement;
+  if (ev.shiftKey) {
+   if (active === firstEl || !panel.contains(active)) {
+    ev.preventDefault();
+    lastEl.focus();
+   }
+  } else if (active === lastEl || !panel.contains(active)) {
+   ev.preventDefault();
+   firstEl.focus();
+  }
+ };
+ document.addEventListener('keydown', _simpleTriageKeyHandler, true);
+ const firstRow = document.querySelector('.screen-triage-row');
+ if (firstRow) firstRow.focus();
 }
 
 async function doSimpleScreenPreview() {
@@ -891,7 +1208,6 @@ async function doSimpleScreenPreview() {
  const fraction = simpleScreenFraction(level);
  const query = simpleScreenQuery();
  const btn = document.getElementById('simple-screen-preview-btn');
- const panel = document.getElementById('simple-screen-preview');
  if (!query) {
   showNotification('Enter a research question first.', 'error');
   return;
@@ -910,32 +1226,18 @@ async function doSimpleScreenPreview() {
    applySimpleScreenCountLabels();
   }
   const candidates = data.candidates || [];
-  _simpleScreenCandidates = candidates;
-  if (!panel) return;
-  panel.innerHTML = '';
-  if (!candidates.length) {
-   panel.innerHTML = '<p class="info-text">Nothing to set aside at this level.</p>';
-  } else {
-   const list = document.createElement('div');
-   list.className = 'simple-screen-list';
-   candidates.forEach((c) => {
-    const row = document.createElement('div');
-    row.className = 'quick-screen-row';
-    const title = document.createElement('span');
-    title.className = 'qs-title';
-    title.textContent = c.title || '(no title)';
-    const meta = document.createElement('span');
-    meta.className = 'qs-meta help-text';
-    meta.textContent =
-     `${c.year || ''} · ${typeof getSourceName === 'function' ? getSourceName(c.source) : c.source}`;
-    row.appendChild(title);
-    row.appendChild(meta);
-    list.appendChild(row);
-   });
-   panel.appendChild(list);
+  const staying = data.staying || [];
+  _simpleScreenCandidates = candidates.slice();
+  _simpleTriageGo = candidates.slice();
+  _simpleTriageStay = staying.slice();
+  _simpleTriageUsed = true;
+  _simpleTriageLevel = level;
+  _simpleTriageQuery = query;
+  if (!candidates.length && !staying.length) {
+   setStatus('simple-screen-status', 'Nothing to set aside at this level.', 'info');
+   return;
   }
-  panel.hidden = false;
-  panel.classList.remove('u-hidden');
+  openSimpleScreenTriage();
   setStatus(
    'simple-screen-status',
    `Showing ${candidates.length} paper(s) that would be set aside. Nothing is excluded yet.`,
@@ -954,11 +1256,13 @@ async function doSimpleScreenApply() {
  const fraction = simpleScreenFraction(level);
  const query = simpleScreenQuery();
  const btn = document.getElementById('simple-screen-apply-btn');
+ const triageBtn = document.getElementById('screen-triage-apply-btn');
+ const loadBtn = isSimpleScreenTriageOpen() && triageBtn ? triageBtn : btn;
  if (!query) {
   showNotification('Enter a research question first.', 'error');
   return;
  }
- setLoading(btn, true);
+ setLoading(loadBtn, true);
  setStatus('simple-screen-status', 'Setting aside the least related papers…', 'info');
  try {
   _simpleScreenEnsureQuery(query);
@@ -971,20 +1275,30 @@ async function doSimpleScreenApply() {
    _simpleScreenCounts[level] = data;
   }
   const candidates = data.candidates || [];
-  if (!candidates.length) {
+  let items;
+  if (_screenTriageMatches()) {
+   items = _simpleTriageGo.map((c) => ({
+    article_id: c.article_id,
+    source: c.source,
+   }));
+  } else {
+   items = candidates.map((c) => ({
+    article_id: c.article_id,
+    source: c.source,
+   }));
+  }
+  if (!items.length) {
    setStatus('simple-screen-status', 'Nothing to set aside at this level.', 'info');
    return;
   }
-  const items = candidates.map((c) => ({
-   article_id: c.article_id,
-   source: c.source,
-  }));
   const applied = await apiCall('/api/screening', {
    method: 'POST',
    body: { items, action: 'exclude', reason: 'low_relevance' },
   });
   saveSimpleScreenUndoItems(items);
   _simpleScreenCandidates = [];
+  _simpleTriageUsed = false;
+  closeSimpleScreenTriage();
   const n = applied.count || items.length;
   const decision = document.getElementById('simple-screen-levels');
   const actions = document.getElementById('simple-screen-actions');
@@ -1003,6 +1317,7 @@ async function doSimpleScreenApply() {
   setStatus('simple-screen-status', `Set aside ${n} paper(s). You can undo once.`, 'success');
   showNotification(`Set aside ${n} paper(s).`, 'success');
   setSimpleScreenGotoVisible(true);
+  await refreshSimpleScreeningCard();
   updateNavStats();
   copyScreenQuestionToSearch();
   setSimpleScreenGatePending(false);
@@ -1016,13 +1331,14 @@ async function doSimpleScreenApply() {
   setStatus('simple-screen-status', `Could not set papers aside: ${e.message}`, 'error');
   showNotification(`Could not set papers aside: ${e.message}`, 'error');
  } finally {
-  setLoading(btn, false);
+  setLoading(loadBtn, false);
  }
 }
 
 function doSimpleScreenSkip() {
  setSimpleScreenSkipped(true);
  clearSimpleScreenUndoItems();
+ closeSimpleScreenTriage();
  const decision = document.getElementById('simple-screen-levels');
  const actions = document.getElementById('simple-screen-actions');
  const preview = document.getElementById('simple-screen-preview');
@@ -1292,7 +1608,7 @@ async function simpleToolsReprepare() {
   const onlyMissing = _simpleOnlyMissing !== false;
   const started = await apiCall('/api/create-embeddings', {
    method: 'POST',
-   body: { model: 'general', only_missing: onlyMissing },
+   body: withPageLibrary({ model: 'general', only_missing: onlyMissing }),
   });
   if (started && started.status === 'started' && typeof waitForJob === 'function') {
    await waitForJob('embed', null, null, null, null);

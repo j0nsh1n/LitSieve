@@ -25,7 +25,7 @@ from app.services.summarize import parse_structured_abstract, split_sentences
 # otherwise: v1 verdicts came from rules that warned on 8/8 faithful
 # explanations, and a cached "Some details may need checking" chip would
 # outlive the rules that produced it (audit 3.1).
-CURRENT_VERIFIER_VERSION = "v2"
+CURRENT_VERIFIER_VERSION = "v3"
 
 STATUS_NO_ISSUES = "no_automatic_issues"
 STATUS_NEEDS_REVIEW = "needs_review"
@@ -160,8 +160,23 @@ def _same_measure(required: Dict, candidate: Dict) -> bool:
 
     43-minute equals 43 minutes; percentages match only percentages. A bare
     generated number satisfies a sample_size token (n= is notation, not
-    meaning); dose/p_value/ci tokens must keep their unit class.
+    meaning); dose/p_value/ci tokens must keep their unit class. Confidence
+    intervals compare both bounds (and the stated level). P-values keep the
+    comparison operator.
     """
+    if required["kind"] == "ci":
+        return (
+            candidate.get("kind") == "ci"
+            and required.get("ci_level") == candidate.get("ci_level")
+            and required.get("ci_low") == candidate.get("ci_low")
+            and required.get("ci_high") == candidate.get("ci_high")
+        )
+    if required["kind"] == "p_value":
+        return (
+            candidate.get("kind") == "p_value"
+            and required.get("value") == candidate.get("value")
+            and required.get("p_op") == candidate.get("p_op")
+        )
     if required.get("value") != candidate.get("value"):
         return False
     if required.get("unit") == "%" or candidate.get("unit") == "%":

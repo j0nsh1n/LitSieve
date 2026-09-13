@@ -134,8 +134,8 @@ async function resolveLibraryId() {
 
 function captureSearchSession(kind) {
  // kind: 'text' | 'pico' | 'seed' | 'starred'
- const mode = kind === 'starred'
-  ? 'starred'
+ const mode = (kind === 'starred' || kind === 'seed')
+  ? kind
   : (document.querySelector('input[name="input_method"]:checked') || {}).value || 'text';
  const filters = collectSearchFilters();
  return {
@@ -194,7 +194,9 @@ function applySearchSessionToForm(state) {
  _restoringSearch = true;
  try {
   if (state.mode === 'text' || state.mode === 'pico' || state.mode === 'seed') {
-   setInputMethod(state.mode);
+   const keepSimpleQuery = state.mode === 'seed'
+    && typeof isSimpleMode === 'function' && isSimpleMode();
+   if (!keepSimpleQuery) setInputMethod(state.mode);
   }
   const qt = document.getElementById('query-text');
   if (qt && state.query_text != null) qt.value = state.query_text;
@@ -290,6 +292,12 @@ async function restoreSearchSession() {
   await doStarredSearch({ fromRestore: true });
   return;
  }
+ if (state.mode === 'seed' && typeof isSimpleMode === 'function' && isSimpleMode()) {
+  const seedId = (state.seed_query || '').trim();
+  if (!seedId) return;
+  await doMoreLikeThisPaper({ article_id: seedId }, { fromRestore: true });
+  return;
+ }
  // Only auto-run when there is something to search with.
  const q = buildQueryText();
  if (!q) return;
@@ -379,6 +387,7 @@ function fillSimpleRailStats(stats, report) {
  const kept = report && report.included != null
   ? Number(report.included)
   : Math.max(0, total - excludedTotal);
+ const removed = Math.max(0, dups + out);
  const set = (id, n) => {
   const el = document.getElementById(id);
   if (el) el.textContent = String(n);
@@ -387,6 +396,23 @@ function fillSimpleRailStats(stats, report) {
  set('rail-stat-dups', dups);
  set('rail-stat-out', out);
  set('rail-stat-kept', kept);
+ set('rail-stat-removed', removed);
+ const keptPct = total > 0 ? (100 * kept / total) : 0;
+ const removedPct = total > 0 ? (100 * removed / total) : 0;
+ host.style.setProperty('--funnel-kept-pct', keptPct + '%');
+ host.style.setProperty('--funnel-removed-pct', removedPct + '%');
+ const collectedBar = document.getElementById('funnel-collected-bar');
+ if (collectedBar) {
+  collectedBar.setAttribute('aria-label', `Collected ${total} papers`);
+ }
+ const splitBar = document.getElementById('funnel-split-bar');
+ if (splitBar) {
+  splitBar.setAttribute(
+   'aria-label',
+   `Of ${total} collected: ${kept} kept, ${removed} removed`
+   + ` (${dups} duplicates, ${out} screened out)`
+  );
+ }
  host.hidden = total <= 0;
 }
 
@@ -857,6 +883,83 @@ async function doStarredSearch(opts) {
  }
 }
 
+async function doMoreLikeThisPaper(article, opts) {
+ const fromRestore = !!(opts && opts.fromRestore);
+ const seedId = article && article.article_id ? String(article.article_id).trim() : '';
+ if (!seedId) return;
+ if (!fromRestore) {
+  const scoped = await promptSimpleSearchScope();
+  if (!scoped) return;
+ }
+ const filters = collectSearchFilters();
+ if (!requireSelectedSources(filters, fromRestore)) return;
+ const seedField = document.getElementById('seed-query');
+ if (seedField) seedField.value = seedId;
+ const btn = document.getElementById('search-btn');
+ setLoading(btn, true);
+ const resultsSec = document.getElementById('results-section');
+ if (resultsSec) {
+  resultsSec.classList.remove('u-hidden');
+  resultsSec.style.display = 'block';
+ }
+ showResultSkeletons(6);
+ lastSearchParams = {
+ query_text: seedId,
+ top_k: filters.top_k,
+ sort_by: filters.sort_by,
+ source_filter: filters.source_filter,
+ pico_boost: false,
+ lexical_boost: filters.lexical_boost,
+ year_min: filters.year_min,
+ year_max: filters.year_max,
+ mode: 'seed',
+ };
+ lastQueryTokens = tokensFromQuery(`${article.title || ''} ${article.abstract || ''}`);
+ try {
+ const data = await apiCall('/api/search/seed', {
+ method: 'POST',
+ body: {
+ seed: seedId,
+ top_k: filters.top_k,
+ source_filter: filters.source_filter,
+ year_min: filters.year_min,
+ year_max: filters.year_max,
+ lexical_boost: filters.lexical_boost,
+ include_seed: true,
+ },
+ });
+ const seed = data.seed || article;
+ const banner = document.getElementById('seed-banner');
+ const bannerText = document.getElementById('seed-banner-text');
+ if (banner && bannerText) {
+ banner.classList.remove('u-hidden');
+ banner.style.display = 'block';
+ bannerText.textContent =
+ `Starting from “${seed.title || seed.article_id}” (${getSourceName(seed.source)} · ${seed.year || 'n.d.'}). Showing papers most like this one.`;
+ lastQueryTokens = tokensFromQuery(`${seed.title || ''} ${seed.abstract || ''}`);
+ }
+ let results = data.results || [];
+ const sid = String(seed.article_id || '');
+ const src = String(seed.source || '');
+ const hasSeed = results.some((row) => String(row.article_id) === sid && String(row.source || '') === src);
+ if (!hasSeed && sid) {
+ results = [Object.assign({}, seed, { similarity_score: 1 })].concat(results);
+ if (filters.top_k) results = results.slice(0, filters.top_k);
+ }
+ if (filters.sort_by !== 'similarity') {
+ results = clientSort(results, filters.sort_by);
+ }
+ lastResults = results;
+ showSearchResults(results);
+ await saveSearchSession('seed');
+ } catch (e) {
+ if (!fromRestore) showNotification(`Search failed: ${e.message}`, 'error');
+ clearResultSkeletonsOnError(fromRestore);
+ } finally {
+ setLoading(btn, false);
+ }
+}
+
 function clientSort(results, sortBy) {
  const arr = results.slice();
  if (sortBy === 'year') {
@@ -968,12 +1071,14 @@ function buildResultCard(article, idx) {
  const authors = (article.authors || []).join('; ');
  const abstractHtml = highlightText(article.abstract || '', lastQueryTokens);
  const picoHtml = renderPicoBlock(article.pico);
+ const simpleMode = document.documentElement.getAttribute('data-mode') === 'simple';
  const keyPointsHtml = typeof renderKeyPointsHtml === 'function'
  ? renderKeyPointsHtml(article.key_points, {
  articleId: article.article_id,
  source: article.source,
  origin: article.key_points_origin || 'extractive',
  abstractLen: String(article.abstract || '').length,
+ compactAid: simpleMode,
  })
  : '';
  const studyTypeHtml = renderStudyTypeBadge(article);
@@ -993,7 +1098,7 @@ function buildResultCard(article, idx) {
   ? `${escapeHtml(authors)}${journal ? ' — ' + journal : ''}`
   : journal;
 
- card.innerHTML = `
+ const headHtml = `
  <div class="result-row-head result-row-meta">
  <div class="score-meter" role="img" aria-label="Similarity ${simLabel} of 1. Higher is a closer match to your query." title="${escapeHtml(scoreHelp)}">
   <span class="score-meter-value">${escapeHtml(simLabel)}</span>
@@ -1006,29 +1111,69 @@ function buildResultCard(article, idx) {
  </span>
  </div>
  <h3 class="article-title result-row-title">${escapeHtml(article.title || '')}</h3>
- <div class="byline result-byline">${byline}</div>
- <div class="article-body result-row-body">
- <div class="article-meta result-row-ids">
- <span><strong>ID:</strong> ${idLink}</span>
- ${clusterBit}
- </div>
- ${keyPointsHtml}
- <div class="article-abstract">${abstractHtml}</div>
- ${picoHtml}
- <div class="article-actions-row">
- ${openLink}
- <button type="button" class="star-btn ${starred ? 'is-starred' : ''}" title="Bookmark" aria-label="Star article" aria-pressed="${starred ? 'true' : 'false'}">${starLabelHtml(starred)}</button>
- <button type="button" class="note-toggle" ${noteVal ? 'hidden' : ''}>Add note</button>
- <button type="button" class="not-relevant-btn"
-  title="Screen this paper out as not about your topic">Not relevant</button>
- </div>
+ <div class="byline result-byline">${byline}</div>`;
+
+ const noteRowHtml = `
  <div class="note-row" ${noteVal ? '' : 'hidden'}>
  <label class="help-text">Private note</label>
  <textarea class="note-field" rows="2" placeholder="Optional study note (saved to your account)…"></textarea>
  <button type="button" class="btn btn-sm btn-secondary note-save">Save note</button>
- </div>
- </div>
- `;
+ </div>`;
+
+ if (simpleMode) {
+  card.innerHTML = `
+  <div class="result-row-main">
+  ${headHtml}
+  <div class="article-body result-row-body">
+  <div class="article-meta result-row-ids">
+  <span><strong>ID:</strong> ${idLink}</span>
+  ${clusterBit}
+  </div>
+  ${keyPointsHtml}
+  <details class="result-abstract">
+  <summary>Show abstract</summary>
+  <div class="article-abstract">${abstractHtml}</div>
+  </details>
+  ${picoHtml}
+  <div class="article-actions-row result-row-inline-actions">
+  ${openLink}
+  <button type="button" class="more-like-this-btn"
+   title="Rank the rest of your collection by how similar they are to this paper">More like this</button>
+  </div>
+  ${noteRowHtml}
+  </div>
+  </div>
+  <div class="result-row-rail" aria-label="Article actions">
+  <button type="button" class="star-btn ${starred ? 'is-starred' : ''}" title="Bookmark" aria-label="Star article" aria-pressed="${starred ? 'true' : 'false'}">${starLabelHtml(starred)}</button>
+  <button type="button" class="note-toggle" ${noteVal ? 'hidden' : ''}><span class="result-rail-label">Note</span></button>
+  <button type="button" class="not-relevant-btn"
+   title="Screen this paper out as not about your topic"><span class="result-rail-label">Not relevant</span></button>
+  </div>
+  `;
+ } else {
+  card.innerHTML = `
+  ${headHtml}
+  <div class="article-body result-row-body">
+  <div class="article-meta result-row-ids">
+  <span><strong>ID:</strong> ${idLink}</span>
+  ${clusterBit}
+  </div>
+  ${keyPointsHtml}
+  <div class="article-abstract">${abstractHtml}</div>
+  ${picoHtml}
+  <div class="article-actions-row">
+  ${openLink}
+  <button type="button" class="star-btn ${starred ? 'is-starred' : ''}" title="Bookmark" aria-label="Star article" aria-pressed="${starred ? 'true' : 'false'}">${starLabelHtml(starred)}</button>
+  <button type="button" class="note-toggle" ${noteVal ? 'hidden' : ''}>Add note</button>
+  <button type="button" class="more-like-this-btn"
+   title="Rank the rest of your collection by how similar they are to this paper">More like this</button>
+  <button type="button" class="not-relevant-btn"
+   title="Screen this paper out as not about your topic">Not relevant</button>
+  </div>
+  ${noteRowHtml}
+  </div>
+  `;
+ }
 
  // CSP: no style= attributes — set the score via a CSS variable.
  // The ring (.score-meter) and the fill both read --score-pct.
@@ -1053,6 +1198,15 @@ function buildResultCard(article, idx) {
  bindAiArticleActions(card, article);
  }
 
+ const moreBtn = card.querySelector('.more-like-this-btn');
+ if (moreBtn) {
+  moreBtn.addEventListener('click', async (e) => {
+   e.preventDefault();
+   e.stopPropagation();
+   await doMoreLikeThisPaper(article);
+  });
+ }
+
  const starBtn = card.querySelector('.star-btn');
  starBtn.addEventListener('click', async (e) => {
  e.preventDefault();
@@ -1065,11 +1219,11 @@ function buildResultCard(article, idx) {
  try {
  await apiCall('/api/notes', {
  method: 'POST',
- body: {
+ body: withPageLibrary({
  article_id: article.article_id,
  source: article.source,
  starred: next,
- },
+ }),
  });
  patchLastResult(article, { starred: next });
  bumpStarredCount(next ? 1 : -1);
@@ -1091,11 +1245,11 @@ function buildResultCard(article, idx) {
  try {
  await apiCall('/api/notes', {
  method: 'POST',
- body: {
+ body: withPageLibrary({
  article_id: article.article_id,
  source: article.source,
  note: noteField.value,
- },
+ }),
  });
  patchLastResult(article, { note: noteField.value });
  showNotification('Note saved.', 'success');
@@ -1125,11 +1279,11 @@ function buildResultCard(article, idx) {
  try {
  await apiCall('/api/screening', {
  method: 'POST',
- body: {
+ body: withPageLibrary({
  items: [{ article_id: article.article_id, source: article.source }],
  action: 'exclude',
  reason: 'off_topic',
- },
+ }),
  });
  if (strip) {
   strip.classList.remove('is-pending');
@@ -1181,10 +1335,10 @@ function replaceCardWithUndo(cardEl, article, opts) {
  try {
  await apiCall('/api/screening', {
  method: 'POST',
- body: {
+ body: withPageLibrary({
  items: [{ article_id: article.article_id, source: article.source }],
  action: 'include',
- },
+ }),
  });
  if (strip.parentNode === parent) {
   parent.replaceChild(cardEl, strip);
@@ -1460,15 +1614,31 @@ function watchSimplePanelClearance() {
  window.addEventListener('resize', syncSimplePanelClearance);
 }
 
+/** Simple keeps the scope note collapsed; Advanced pins it open (summary hidden). */
+function syncSearchScopeNote() {
+ const note = document.querySelector('.search-scope-note');
+ if (!note) return;
+ const simple = document.documentElement.getAttribute('data-mode') === 'simple';
+ if (simple) {
+  note.removeAttribute('open');
+ } else {
+  note.setAttribute('open', '');
+ }
+}
+
 // If the user toggles Simple/Advanced after a search, re-show the panel.
 document.addEventListener('DOMContentLoaded', () => {
  watchSimplePanelClearance();
+ syncSearchScopeNote();
  const modeBtn = document.getElementById('mode-toggle');
  if (modeBtn) {
   modeBtn.addEventListener('click', () => {
    // common.js flips data-mode first in the same tick; re-evaluate after.
    requestAnimationFrame(() => {
     updateSimpleSearchPanel(!!(lastResults && lastResults.length));
+    syncSearchScopeNote();
+    // Result cards carry mode-specific markup: rebuild for the new mode.
+    if (lastResults && lastResults.length) showSearchResults();
    });
   });
  }

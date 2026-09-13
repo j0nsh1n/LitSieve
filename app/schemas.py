@@ -33,6 +33,8 @@ class SeedSearchRequest(BaseModel):
     year_min: Optional[int] = None
     year_max: Optional[int] = None
     lexical_boost: bool = True
+    # When true, the seed paper stays in the ranked list (Simple "More like this").
+    include_seed: bool = False
 
 
 class StarredSearchRequest(BaseModel):
@@ -53,6 +55,8 @@ class MultiFetchRequest(BaseModel):
     clear_first: bool = True
     # wait=true: block until done (tests / legacy). Default: 202 + poll progress.
     wait: bool = False
+    # Bind this job to a library this account owns. Omit to use the active library.
+    library_id: Optional[str] = Field(default=None, max_length=128)
 
 
 class EmbeddingsRequest(BaseModel):
@@ -60,6 +64,8 @@ class EmbeddingsRequest(BaseModel):
     # Skip articles that already have vectors (unless the model changes).
     only_missing: bool = True
     wait: bool = False
+    # Bind this job to a library this account owns. Omit to use the active library.
+    library_id: Optional[str] = Field(default=None, max_length=128)
 
     @field_validator("model")
     @classmethod
@@ -88,11 +94,17 @@ class ChangePasswordRequest(BaseModel):
     new_password_confirm: str
 
 
+NOTE_MAX_CHARS = 8000
+
+
 class NoteRequest(BaseModel):
     article_id: str
     source: str
-    note: Optional[str] = None
+    note: Optional[str] = Field(default=None, max_length=NOTE_MAX_CHARS)
     starred: Optional[bool] = None
+    # Bind this write to a library this account owns. Omit to use the
+    # currently active library (legacy clients / tests).
+    library_id: Optional[str] = Field(default=None, max_length=128)
 
 
 class AIArticleRequest(BaseModel):
@@ -111,6 +123,7 @@ class AISaveKeyPointsRequest(BaseModel):
     article_id: str
     source: str
     key_points: List[str]
+    library_id: Optional[str] = Field(default=None, max_length=128)
 
 
 class AIAskRequest(BaseModel):
@@ -129,7 +142,7 @@ class ReaderExplainRequest(BaseModel):
 
 
 class AISettingsUpdate(BaseModel):
-    """Server-wide AI deploy settings (keys stored in user_data/ai_settings.json)."""
+    """Per-account AI keys and models (stored under USER_DATA_DIR/<user_id>/)."""
     llm_provider: Optional[str] = None
     ollama_host: Optional[str] = None
     ollama_model: Optional[str] = None
@@ -168,6 +181,7 @@ class ScreeningRequest(BaseModel):
     action: str = Field(default="exclude", pattern="^(exclude|include)$")
     # Exclusion reason code (see screening_reasons.EXCLUSION_REASONS).
     reason: Optional[str] = "manual"
+    library_id: Optional[str] = Field(default=None, max_length=128)
 
 
 class QuickScreenPreviewRequest(BaseModel):

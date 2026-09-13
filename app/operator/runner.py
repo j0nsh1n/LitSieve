@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -48,6 +49,45 @@ def redact(text: str) -> str:
     return _SECRET_RE.sub(r"\1=[redacted]", text or "")
 
 
+_DIAGNOSTIC_KEYS = ("detail", "output", "error", "message")
+
+
+def decode_action_payload(
+    stdout: str,
+    stderr: str,
+    returncode: int,
+    action: str,
+) -> Dict[str, Any]:
+    """Parse action JSON first, then redact diagnostic fields only.
+
+    Source `content` must stay intact so the editor does not save redacted code.
+    Parse failure is always a failed action, even if the process exited 0.
+    """
+    raw_out = stdout or ""
+    raw_err = stderr or ""
+    try:
+        line = raw_out.strip().splitlines()[-1] if raw_out.strip() else "{}"
+        payload = json.loads(line)
+        if not isinstance(payload, dict):
+            payload = {"ok": False, "detail": "Action returned invalid output."}
+    except (json.JSONDecodeError, IndexError):
+        return {
+            "ok": False,
+            "detail": "Action returned no JSON.",
+            "output": redact((raw_out + raw_err)[-4000:]),
+        }
+    payload["ok"] = bool(payload.get("ok")) and returncode == 0
+    if raw_err and "output" not in payload:
+        payload["output"] = raw_err[-2000:]
+    for key in _DIAGNOSTIC_KEYS:
+        val = payload.get(key)
+        if isinstance(val, str):
+            payload[key] = redact(val)
+    if not payload["ok"] and not payload.get("detail"):
+        payload["detail"] = f"{action} failed."
+    return payload
+
+
 def script_path(action: str) -> Path:
     if action not in ACTION_SCRIPTS:
         raise ValueError("Unknown action.")
@@ -58,6 +98,59 @@ def script_path(action: str) -> Path:
     if not path.is_file():
         raise FileNotFoundError(str(path))
     return path
+
+
+def detached_supported() -> bool:
+    """True when a deploy can be launched outside this process's control group.
+
+    A04: the deploy restarts the unit it lives in, so a plain child is killed
+    before it can health-check or roll back. systemd-run puts it in a sibling
+    scope instead. Tests and non-systemd hosts fall back to the blocking path,
+    which is honest — there the deploy really does run in-process.
+    """
+    if (os.getenv("LITSIEVE_DEPLOY_DETACHED") or "").strip().lower() in ("0", "false", "no"):
+        return False
+    return shutil.which("systemd-run") is not None
+
+
+def run_action_detached(
+    action: str,
+    argv: Optional[List[str]] = None,
+    *,
+    unit_name: str,
+    extra_env: Optional[Dict[str, str]] = None,
+) -> Dict[str, Any]:
+    """Start an action in its own transient user unit and return immediately.
+
+    Returns a dispatch receipt, never a result: by design nobody waits for this
+    process, so its outcome is read back from the deploy state file rather than
+    from an exit code.
+    """
+    path = script_path(action)
+    cmd = [
+        "systemd-run",
+        "--user",
+        "--collect",          # drop the unit once it finishes, success or fail
+        f"--unit={unit_name}",
+        "--quiet",
+        f"--setenv=PYTHONPATH={code_root()}",
+    ]
+    for key, value in (extra_env or {}).items():
+        cmd.append(f"--setenv={key}={value}")
+    cmd += [sys.executable, str(path), *(argv or [])]
+    try:
+        proc = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=30, check=False, shell=False
+        )
+    except (subprocess.TimeoutExpired, OSError) as exc:
+        return {"ok": False, "detail": f"{action} could not be dispatched: {exc}"}
+    if proc.returncode != 0:
+        return {
+            "ok": False,
+            "detail": f"{action} could not be dispatched.",
+            "output": redact((proc.stdout or "") + (proc.stderr or ""))[-2000:],
+        }
+    return {"ok": True, "dispatched": True, "unit": unit_name}
 
 
 def run_action(
@@ -87,22 +180,6 @@ def run_action(
         return {"ok": False, "detail": f"{action} timed out.", "output": ""}
     except OSError as exc:
         return {"ok": False, "detail": f"{action} could not start: {exc}", "output": ""}
-    stdout = redact(proc.stdout.decode("utf-8", "replace") if isinstance(proc.stdout, bytes) else (proc.stdout or ""))
-    stderr = redact(proc.stderr.decode("utf-8", "replace") if isinstance(proc.stderr, bytes) else (proc.stderr or ""))
-    payload: Dict[str, Any]
-    try:
-        payload = json.loads(stdout.strip().splitlines()[-1] if stdout.strip() else "{}")
-        if not isinstance(payload, dict):
-            payload = {"ok": False, "detail": "Action returned invalid output."}
-    except (json.JSONDecodeError, IndexError):
-        payload = {
-            "ok": proc.returncode == 0,
-            "detail": "Action returned no JSON.",
-            "output": (stdout + stderr)[-4000:],
-        }
-    if stderr and "output" not in payload:
-        payload["output"] = (payload.get("output") or "") + stderr[-2000:]
-    payload["ok"] = bool(payload.get("ok")) and proc.returncode == 0
-    if not payload["ok"] and not payload.get("detail"):
-        payload["detail"] = f"{action} failed."
-    return payload
+    stdout = proc.stdout.decode("utf-8", "replace") if isinstance(proc.stdout, bytes) else (proc.stdout or "")
+    stderr = proc.stderr.decode("utf-8", "replace") if isinstance(proc.stderr, bytes) else (proc.stderr or "")
+    return decode_action_payload(stdout, stderr, proc.returncode, action)

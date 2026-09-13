@@ -17,7 +17,7 @@ def _clear_providers(monkeypatch):
     ):
         monkeypatch.delenv(k, raising=False)
     monkeypatch.setattr(llm_service, "_SETTINGS_CACHE", {})
-    monkeypatch.setattr(llm_service, "load_ai_settings", lambda force=False: {})
+    monkeypatch.setattr(llm_service, "load_ai_settings", lambda force=False, user_id=None: {})
 
 
 def _sample(**overrides):
