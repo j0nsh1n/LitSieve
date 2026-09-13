@@ -779,6 +779,36 @@ body {
 
 .nav-logout:hover { color: var(--accent); }
 
+/* Quiet extra in the tools cluster: same frost pill as Simple/Library, but
+   ink from --text-soft so it does not compete with Search or Logout. */
+.nav-ask-help {
+    font-size: var(--fs-sm);
+    font-family: var(--font-sans);
+    font-weight: 500;
+    color: var(--text-soft);
+    text-decoration: none;
+    white-space: nowrap;
+    min-height: 2.15rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 var(--space-3);
+    border: 1px solid var(--frost-edge);
+    border-radius: var(--radius-full);
+    background: var(--surface);
+    box-shadow: var(--glass-shine);
+    cursor: pointer;
+    transition: color var(--dur-fast) var(--ease-soft),
+                background var(--dur-fast) var(--ease-soft),
+                border-color var(--dur-fast) var(--ease-soft);
+}
+
+.nav-ask-help:hover {
+    color: var(--text);
+    background: var(--hover);
+    border-color: var(--frost-edge);
+}
+
 .stat-badge {
     font-size: var(--fs-sm);
     font-style: italic;
@@ -2034,8 +2064,11 @@ body.lra-modal-open {
 .lra-modal-backdrop {
     position: absolute;
     inset: 0;
-    background: color-mix(in srgb, var(--text) 45%, transparent);
-    backdrop-filter: blur(2px);
+    /* Mix the page wash, not --text: in dark --text is light ink, so 45% of
+       it was a gray fog over navy glass. */
+    background: color-mix(in srgb, var(--bg) 62%, transparent);
+    backdrop-filter: blur(12px) saturate(1.1);
+    -webkit-backdrop-filter: blur(12px) saturate(1.1);
 }
 .lra-modal-card {
     position: relative;
@@ -2048,9 +2081,10 @@ body.lra-modal-open {
     box-shadow: var(--elev-2, 0 12px 40px color-mix(in srgb, var(--text) 18%, transparent));
     border: 1px solid var(--frost-edge);
     border-radius: var(--radius-lg);
-    background: var(--frost);
-    backdrop-filter: blur(var(--frost-blur)) saturate(1.2);
-    -webkit-backdrop-filter: blur(var(--frost-blur)) saturate(1.2);
+    background: var(--surface);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: var(--elev-2), var(--glass-shine);
 }
 /* Phones: bottom sheet so inputs stay above the soft keyboard. */
 @media (max-width: 640px) {
@@ -4864,10 +4898,11 @@ html, body {
     }
     .nav-username-full { display: none; }
     .nav-username-short { display: inline; }
-    .nav-logout {
+    .nav-logout,
+    .nav-ask-help {
         font-size: var(--fs-xs);
         min-height: 2.75rem;
-        padding: 0 var(--space-1);
+        padding: 0 var(--space-2);
         flex-shrink: 0;
     }
     .theme-toggle,
@@ -6529,6 +6564,14 @@ html[data-mode="simple"] body:has(#search-workbench) .simple-tools-search-only {
     justify-content: center;
     padding: var(--space-3);
 }
+.simple-screen-preview .lra-modal-backdrop {
+    /* Solid page wash. Mixing --frost/--text over dark navy is what turned
+       this dialog slate-gray. */
+    background: var(--bg);
+    opacity: 0.82;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
 @media (max-width: 640px) {
     .simple-screen-preview.lra-modal-root {
         align-items: stretch;
@@ -6548,11 +6591,12 @@ html[data-mode="simple"] body:has(#search-workbench) .simple-tools-search-only {
     padding: 0;
     overflow: hidden;
     border-radius: var(--radius-lg);
-    background: var(--frost);
-    backdrop-filter: blur(var(--frost-blur)) saturate(1.2);
-    -webkit-backdrop-filter: blur(var(--frost-blur)) saturate(1.2);
+    /* Solid page surface, not transparent frost over a gray veil. */
+    background: var(--surface);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
     border: 1px solid var(--frost-edge);
-    box-shadow: var(--elev-2);
+    box-shadow: var(--elev-2), var(--glass-shine);
 }
 .screen-triage-head {
     display: flex;
@@ -6583,6 +6627,7 @@ html[data-mode="simple"] body:has(#search-workbench) .simple-tools-search-only {
     overflow: auto;
     padding: var(--space-2);
     border-right: 1px solid var(--rule);
+    background: var(--bg);
 }
 .screen-triage-detail {
     grid-column: 2;
@@ -6714,7 +6759,7 @@ html[data-mode="simple"] body:has(#search-workbench) .simple-tools-search-only {
     grid-row: 3;
     padding: var(--space-3) var(--space-5) var(--space-4);
     border-top: 1px solid var(--rule);
-    background: var(--frost);
+    background: var(--surface);
 }
 .screen-triage-paper-actions,
 .screen-triage-confirm {

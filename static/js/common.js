@@ -1101,7 +1101,7 @@ document.addEventListener('DOMContentLoaded', function() {
         setOpen(!open);
     });
 
-    drawer.querySelectorAll('a.nav-link, a.nav-username, a.nav-logout').forEach(function(link) {
+    drawer.querySelectorAll('a.nav-link, a.nav-username, a.nav-logout, button.nav-ask-help').forEach(function(link) {
         link.addEventListener('click', function() {
             setOpen(false);
         });
