@@ -1,4 +1,4 @@
-# LitSieve 📚 — v5.3.1
+# LitSieve 📚 — v5.4.0
 
 A multi-user web app for **students** to fetch, screen, and rank research papers
 across public academic databases as a **research starting point**. Semantic
