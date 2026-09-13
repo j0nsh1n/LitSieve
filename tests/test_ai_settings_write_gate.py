@@ -145,19 +145,61 @@ def test_settings_post_stays_on_the_callers_account(app_module, monkeypatch, tmp
     assert again.json()["settings"]["openai_model"] != "gpt-b-only"
 
 
-def test_ollama_start_forbidden_when_write_disabled(app_module, monkeypatch):
-    monkeypatch.setenv("AI_ALLOW_SETTINGS_WRITE", "false")
+def test_ollama_start_forbidden_for_non_admin(app_module, monkeypatch):
+    monkeypatch.setenv("AI_ALLOW_SETTINGS_WRITE", "true")
     c = TestClient(app_module.app)
     _register(c)
+    r = c.post("/api/ai/ollama/start", headers=_csrf(c))
+    assert r.status_code == 403
+    body = r.json()
+    assert body["detail"] == "Admin only."
+    assert body.get("admin") is True
+
+
+def test_ollama_stop_forbidden_for_non_admin(app_module, monkeypatch):
+    monkeypatch.setenv("AI_ALLOW_SETTINGS_WRITE", "true")
+    c = TestClient(app_module.app)
+    _register(c)
+    r = c.post("/api/ai/ollama/stop", headers=_csrf(c))
+    assert r.status_code == 403
+    assert r.json()["detail"] == "Admin only."
+
+
+def test_ollama_start_forbidden_when_write_disabled(app_module, monkeypatch):
+    """Admin gate passed; the host-wide write flag still binds admins too."""
+    monkeypatch.setenv("ADMIN_USERNAMES", "gate_admin")
+    monkeypatch.setenv("AI_ALLOW_SETTINGS_WRITE", "false")
+    c = TestClient(app_module.app)
+    _register(c, username="gate_admin")
     r = c.post("/api/ai/ollama/start", headers=_csrf(c))
     assert r.status_code == 403
     assert "disabled" in r.json().get("detail", "").lower()
 
 
-def test_ollama_stop_forbidden_when_write_disabled(app_module, monkeypatch):
-    monkeypatch.setenv("AI_ALLOW_SETTINGS_WRITE", "false")
+def test_ollama_start_allowed_for_admin_when_flags_allow(app_module, monkeypatch):
+    monkeypatch.setenv("ADMIN_USERNAMES", "gate_admin")
+    monkeypatch.setenv("AI_ALLOW_SETTINGS_WRITE", "true")
+    monkeypatch.setattr(
+        "app.services.llm.start_ollama", lambda: (True, "started")
+    )
     c = TestClient(app_module.app)
-    _register(c)
-    r = c.post("/api/ai/ollama/stop", headers=_csrf(c))
-    assert r.status_code == 403
-    assert "disabled" in r.json().get("detail", "").lower()
+    _register(c, username="gate_admin")
+    r = c.post("/api/ai/ollama/start", headers=_csrf(c))
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["ok"] is True
+    assert body["message"] == "started"
+
+
+def test_ollama_control_flag_requires_admin(app_module, monkeypatch):
+    monkeypatch.setenv("ADMIN_USERNAMES", "gate_admin")
+    monkeypatch.setenv("AI_ALLOW_OLLAMA_CONTROL", "true")
+    c = TestClient(app_module.app)
+    _register(c, username="student_plain")
+    student = c.get("/api/ai/settings").json()["settings"]
+    assert student["ollama_control_allowed"] is False
+
+    admin = TestClient(app_module.app)
+    _register(admin, username="gate_admin")
+    got = admin.get("/api/ai/settings").json()["settings"]
+    assert got["ollama_control_allowed"] is True
