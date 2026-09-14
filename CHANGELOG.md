@@ -8,11 +8,6 @@ and this project aims to follow Semantic Versioning for app version strings
 
 ## [Unreleased]
 
-### Changed
-- Simple Search results use a split-pane triage: dense ranked rows on the
-  left, the selected paper in full on the right. J/K move between papers.
-  On phones the detail pane is a bottom sheet.
-
 ## [5.4.0] - 2026-09-13
 
 ### Changed

@@ -118,12 +118,6 @@ Guest User (is_guest) → sample corpus only; purged by age
 - Host entry: `app.main:app` port 7860; Linux `./venv`
 
 ## Session Handoff
-- **Date:** 2026-09-14
-- **Branch:** `feat/ux2-m2-split-pane`
-- **Done:** UX round 2 Stage 2 (m2): Simple Search split-pane triage
-  (dense rows + sticky detail, J/K, phone bottom sheet).
-- **Next:** Polish Stage 2 (chips on query tile, 44px rail in the detail
-  pane). Then remaining Phase 4 leftovers.
 - **Date:** 2026-09-13
 - **Branch:** `fix/audit-a01-a11-a15` (PR #65). Version **5.4.0**.
 - **Done:** A01 option 2 (per-account AI keys) plus A02, A11–A18 from the

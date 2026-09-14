@@ -249,23 +249,6 @@ def test_mobile_nav_drawer_is_closed_by_default():
         "html[data-mode=\"simple\"] .nav-menu-toggle {\n        display: none !important;"
     )
     assert hide_simple_toggle > desktop, "Simple must keep the menu button on phones"
-
-
-def test_simple_search_has_split_pane_triage():
-    """Stage 2: Simple ranked results are list + detail, not only stacked cards."""
-    root = pathlib.Path(__file__).resolve().parent.parent
-    html = (root / "templates" / "search.html").read_text(encoding="utf-8")
-    assert 'id="search-triage"' in html
-    assert 'id="search-triage-rows"' in html
-    assert 'id="search-triage-detail"' in html
-    js = (root / "static" / "js" / "search.js").read_text(encoding="utf-8")
-    assert "syncSimpleTriage" in js
-    assert "selectSimpleTriage" in js
-    css = (root / "static" / "css" / "style.css").read_text(encoding="utf-8")
-    assert "html[data-mode=\"simple\"] #search-triage" in css
-    assert "minmax(16rem, 38%)" in css
-
-
 def test_stale_tab_reloads_and_mutations_send_library_id():
     """Another tab can switch libraries; this tab must not keep writing there."""
     common = (JS_DIR / "common.js").read_text(encoding="utf-8")
