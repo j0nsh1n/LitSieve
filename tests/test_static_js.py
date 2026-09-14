@@ -249,6 +249,22 @@ def test_mobile_nav_drawer_is_closed_by_default():
         "html[data-mode=\"simple\"] .nav-menu-toggle {\n        display: none !important;"
     )
     assert hide_simple_toggle > desktop, "Simple must keep the menu button on phones"
+
+
+def test_footers_center_version_and_disclaimer():
+    """Version + disclaimer must share a centered column, not a left-shifted 40rem block."""
+    root = pathlib.Path(__file__).resolve().parent.parent
+    css = (root / "static" / "css" / "style.css").read_text(encoding="utf-8")
+    app = css[css.find(".footer {") : css.find("/* === Page header")]
+    assert "align-items: center" in app
+    assert "text-align: center" in app
+    disc = css[css.find(".footer .site-disclaimer-foot {") : css.find(".public-footer .site-disclaimer-foot {")]
+    assert "margin: var(--space-1) auto 0" in disc
+    public = css[css.find(".public-footer {") : css.find(".public-folio {")]
+    assert "align-items: center" in public
+    assert "text-align: center" in public
+
+
 def test_stale_tab_reloads_and_mutations_send_library_id():
     """Another tab can switch libraries; this tab must not keep writing there."""
     common = (JS_DIR / "common.js").read_text(encoding="utf-8")
