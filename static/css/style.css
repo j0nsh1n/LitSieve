@@ -932,6 +932,9 @@ html[data-theme="dark"] .theme-toggle .icon-moon { display: block; }
 }
 
 .footer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     text-align: center;
     padding: var(--space-4);
     color: var(--text-soft);
@@ -3483,11 +3486,12 @@ select option,
     margin-right: 0;
 }
 .footer .site-disclaimer-foot {
-    margin: var(--space-1) 0 0;
+    margin: var(--space-1) auto 0;
     font-size: var(--fs-xs);
     color: var(--text-soft);
     max-width: 40rem;
     line-height: 1.4;
+    text-align: center;
 }
 .public-footer .site-disclaimer-foot {
     margin: var(--space-1) auto 0;
@@ -4078,6 +4082,9 @@ html[data-mode="simple"] body.simple-collecting #search-query-top {
 }
 
 .public-footer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     text-align: center;
     color: var(--text-soft);
     font-size: var(--fs-xs);
@@ -4095,6 +4102,7 @@ html[data-mode="simple"] body.simple-collecting #search-query-top {
     letter-spacing: 0.14em;
     text-transform: uppercase;
     color: var(--text-soft);
+    text-align: center;
 }
 
 
