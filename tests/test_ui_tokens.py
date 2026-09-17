@@ -825,3 +825,24 @@ def test_backdrop_filter_unsupported_falls_back_to_opaque_surface():
     body = CSS[brace + 1 : end]
     assert re.search(r"--frost\s*:\s*var\(--surface\)", body)
     assert re.search(r"--nav-blur\s*:\s*var\(--surface\)", body)
+    # A rule that is transparent and relies on a real blur (not `none`) has
+    # nothing behind it once blur is unsupported, so the block must give each
+    # such selector a background of its own. Token fallbacks do not reach them.
+    css_nc = _css_without_comments()
+    fallback_selectors = {
+        " ".join(sel.split())
+        for sel, rule in re.findall(r"([^{}]+)\{([^{}]*)\}", body)
+        if re.search(r"(?:^|;)\s*background(?:-color)?\s*:", rule)
+    }
+    uncovered = []
+    for sel, rule in re.findall(r"([^{}]+)\{([^{}]*)\}", css_nc):
+        blur = re.search(r"(?:^|;)\s*backdrop-filter\s*:\s*([^;]+)", rule)
+        if not blur or blur.group(1).strip() == "none":
+            continue
+        if not re.search(r"(?:^|;)\s*background(?:-color)?\s*:\s*transparent\b", rule):
+            continue
+        for one in sel.split(","):
+            one = " ".join(one.split())
+            if one and one not in fallback_selectors:
+                uncovered.append(one)
+    assert not uncovered, f"transparent blur surfaces with no @supports fallback: {uncovered}"
