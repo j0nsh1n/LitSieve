@@ -51,6 +51,7 @@ def _ops_env(tmp_path, monkeypatch):
     monkeypatch.setenv("LITSIEVE_DEPLOY_DETACHED", "0")
     monkeypatch.setenv("LITSIEVE_HEALTH_MODE", "file")
     monkeypatch.setenv("LITSIEVE_HEALTH_FILE", str(health))
+    monkeypatch.setenv("LITSIEVE_DEPLOY_STATE", str(tmp_path / "deploy-state.json"))
     return repo, staging, health
 
 
@@ -543,6 +544,13 @@ def test_deploy_ignores_untracked_files_in_live(tmp_path, monkeypatch):
     assert (live / "scratch_notes.md").exists()
 
 
+def test_deploy_state_path_is_under_tmp_path(tmp_path):
+    from app.operator import deploy_state
+
+    path = deploy_state.state_path()
+    assert path.is_relative_to(tmp_path.resolve()), path
+
+
 # --- A04: deploy state survives the process that writes it -------------------
 
 def test_deploy_state_records_previous_sha_before_touching_the_checkout(tmp_path, monkeypatch):
@@ -679,6 +687,39 @@ def test_deploy_dispatches_into_its_own_unit_and_returns_immediately(tmp_path, m
     assert "LITSIEVE_DEPLOY_ACTOR=opadmin" in args, "deploy cannot write its audit row without the actor"
     # The handoff must not carry the coupling that caused A04 in the first place.
     assert "litsieve-uvicorn.service" not in args
+
+
+def test_detached_unit_runs_from_live_root_with_env_file_not_secrets(
+    tmp_path, monkeypatch
+):
+    from app.operator import paths, runner
+
+    live = tmp_path / "live"
+    live.mkdir()
+    users_db = tmp_path / "users.db"
+    secret = "pytest-secret-must-not-leak-on-argv"
+    db_key = "pytest-db-enc-must-not-leak-on-argv"
+    monkeypatch.setenv("LITSIEVE_LIVE", str(live))
+    monkeypatch.setenv("USERS_DB", str(users_db))
+    monkeypatch.setenv("SECRET_KEY", secret)
+    monkeypatch.setenv("DB_ENCRYPTION_KEY", db_key)
+    log = _fake_systemd_run(tmp_path, monkeypatch)
+
+    result = runner.run_action_detached(
+        "deploy",
+        ["deadbeef"],
+        unit_name="litsieve-deploy-deadbeef",
+        extra_env={"LITSIEVE_DEPLOY_ACTOR": "op"},
+    )
+    assert result.get("ok") is True
+    argv = log.read_text(encoding="utf-8").splitlines()
+    live_root = str(paths.live_root())
+    assert f"--working-directory={live_root}" in argv
+    assert f"--property=EnvironmentFile=-{live_root}/.env" in argv
+    assert f"--setenv=USERS_DB={users_db}" in argv
+    joined = "\n".join(argv)
+    assert secret not in joined
+    assert db_key not in joined
 
 
 def test_deploy_refuses_to_start_on_top_of_an_interrupted_one(tmp_path, monkeypatch):
