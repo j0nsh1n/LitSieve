@@ -158,13 +158,13 @@ def test_border_radius_scale_discipline():
     assert used
 
 
-def test_glass_radius_tokens():
-    """Airy glass: --radius-sm/md/lg are 10/16/22px so buttons and popups read as rounded.
+def test_workshop_radius_tokens():
+    """Workshop: --radius-sm/md/lg are 8/14/18px, rounded but not pill-soft.
 
     --radius-lg is a real token (cards, dialogs, rails), not a fallback.
     """
     root = _root_block()
-    for name, want in (("--radius-sm", "10px"), ("--radius-md", "16px"), ("--radius-lg", "22px")):
+    for name, want in (("--radius-sm", "8px"), ("--radius-md", "14px"), ("--radius-lg", "18px")):
         m = re.search(rf"{name}\s*:\s*([^;]+);", root)
         assert m, f"missing {name} in :root"
         assert m.group(1).strip() == want, f"{name}={m.group(1)!r}, want {want}"
@@ -172,12 +172,12 @@ def test_glass_radius_tokens():
     assert "var(--radius-lg, " not in _css_without_comments()
 
 
-def test_chrome_is_frost_not_ink():
-    """Buttons and nav chips use frost hairlines, not ink outlines or uppercase."""
+def test_chrome_has_a_tool_edge_not_ink():
+    """Buttons sit on a solid edge (border-bottom --edge), not an ink outline."""
     btn = re.search(r"\.btn \{\n((?:    .*\n)+)\}", CSS)
     assert btn, ".btn rule missing"
     body = btn.group(1)
-    assert "var(--frost-edge)" in body
+    assert "border-bottom: 3px solid var(--edge)" in body
     assert "var(--radius-full)" in body
     assert "1px solid var(--text)" not in body
     assert "border: 1px solid var(--text)" not in CSS
@@ -526,9 +526,9 @@ def test_phase8_info_text_is_body_scale():
     m2 = re.search(r"\.help-text\s*\{[^}]+\}", css)
     assert m2, ".help-text rule missing"
     assert "var(--fs-sm)" in m2.group(0)
-    # Dark grounds are airy glass navy.
-    assert "--bg: #0c1424" in css or "--bg:#0c1424" in css
-    assert "--surface: #152036" in css or "--surface:#152036" in css
+    # Dark grounds are warm workshop wood.
+    assert "--bg: #1b1712" in css or "--bg:#1b1712" in css
+    assert "--surface: #262019" in css or "--surface:#262019" in css
 
 
 def _css_block_tokens(block: str) -> dict[str, str]:
@@ -621,31 +621,33 @@ def test_phase10_dark_blocks_stay_in_parity():
     assert shared, "dark blocks share no tokens"
     drifted = {k: (a[k], b[k]) for k in sorted(shared) if a[k] != b[k]}
     assert not drifted, f"dark blocks drifted: {drifted}"
-    # Airy glass dark grounds (both blocks).
+    # Workshop dark grounds (both blocks).
     for tokens in (a, b):
-        assert tokens.get("--bg") == "#0c1424"
-        assert tokens.get("--surface") == "#152036"
-        assert tokens.get("--rule") == "#243044"
-        assert tokens.get("--accent") == "#93b4ff"
-        assert tokens.get("--on-accent") == "#0c1424"
+        assert tokens.get("--bg") == "#1b1712"
+        assert tokens.get("--surface") == "#262019"
+        assert tokens.get("--rule") == "#3d3328"
+        assert tokens.get("--accent") == "#e39a73"
+        assert tokens.get("--on-accent") == "#1b1712"
+        assert tokens.get("--edge") == "#14100c"
         assert tokens.get("--ok") != tokens.get("--accent")
 
 
-def test_airy_glass_light_tokens():
-    """Live accent is soft blue; success green must not collide with it."""
+def test_workshop_light_tokens():
+    """Warm sand paper with a clay accent; success green must not collide with it."""
     root = _root_block()
     tokens = _css_block_tokens(root)
-    assert tokens.get("--bg") == "#eef1f8"
-    assert tokens.get("--surface") == "#f7f9fd"
-    assert tokens.get("--accent") == "#2563eb"
-    assert tokens.get("--accent-hover") == "#1d4ed8"
+    assert tokens.get("--bg") == "#f3ede3"
+    assert tokens.get("--surface") == "#fbf7f0"
+    assert tokens.get("--accent") == "#a8472a"
+    assert tokens.get("--accent-hover") == "#8f3b22"
     assert tokens.get("--ok") != tokens.get("--accent")
     assert tokens.get("--on-accent") == "#fff"
     assert "Source Sans 3" in tokens.get("--font-sans", "")
     assert "Source Serif 4" in tokens.get("--font-serif", "")
-    assert "--frost" in root
-    assert "--frost-blur" in root
-    assert "--glass-shine" in root
+    for name in ("--edge", "--sheen", "--scrim", "--nav-bg", "--ease-spring", "--ease-settle"):
+        assert name in tokens, name
+    assert "--frost" not in root
+    assert "--glass-shine" not in root
 
 
 def test_typefaces_are_self_hosted():
@@ -664,10 +666,10 @@ def test_typefaces_are_self_hosted():
     assert not (fonts / "fraunces-latin.woff2").exists()
 
 
-def test_triage_and_help_use_glass_surfaces():
-    """Triage pane uses solid page tokens — color-mix was reading as slate."""
+def test_triage_and_help_use_solid_surfaces():
+    """Triage pane uses solid page tokens; the modal scrim is one theme token."""
     backdrop = CSS[CSS.find(".lra-modal-backdrop {") : CSS.find(".lra-modal-card {")]
-    assert "background: transparent" in backdrop
+    assert "background: var(--scrim)" in backdrop
     assert "color-mix" not in backdrop
     assert "color-mix(in srgb, var(--text) 45%, transparent)" not in CSS
     panel = CSS[CSS.find(".screen-triage-panel {") : CSS.find(".screen-triage-head {")]
@@ -685,10 +687,14 @@ def test_triage_and_help_use_glass_surfaces():
     assert "color-mix" not in help_btn
 
 
-def test_body_sits_on_soft_wash():
-    """Page canvas is a soft radial wash (html::before), not paper grain."""
+def test_paper_grain_is_gradients_not_svg():
+    """Wash on html::before, grain on body::before as gradients; no SVG filter."""
     assert "feTurbulence" not in CSS
     assert "html::before" in CSS
+    grain = re.search(r"body::before \{([^}]+)\}", CSS)
+    assert grain, "body::before grain missing"
+    assert "radial-gradient(var(--grain-ink)" in grain.group(1)
+    assert "pointer-events: none" in grain.group(1)
     body = CSS[CSS.find("\nbody {") : CSS.find("\n::selection")]
     assert "background-image" not in body
     assert "background: transparent" in body
@@ -803,46 +809,6 @@ def test_no_css_var_falls_back_to_a_hardcoded_colour():
     )
 
 
-def test_backdrop_filter_unsupported_falls_back_to_opaque_surface():
-    needle = (
-        "@supports not ((backdrop-filter: blur(1px)) or "
-        "(-webkit-backdrop-filter: blur(1px)))"
-    )
-    start = CSS.find(needle)
-    assert start != -1, "backdrop-filter @supports fallback missing"
-    brace = CSS.find("{", start)
-    depth = 0
-    end = None
-    for i, ch in enumerate(CSS[brace:], brace):
-        if ch == "{":
-            depth += 1
-        elif ch == "}":
-            depth -= 1
-            if depth == 0:
-                end = i
-                break
-    assert end is not None
-    body = CSS[brace + 1 : end]
-    assert re.search(r"--frost\s*:\s*var\(--surface\)", body)
-    assert re.search(r"--nav-blur\s*:\s*var\(--surface\)", body)
-    # A rule that is transparent and relies on a real blur (not `none`) has
-    # nothing behind it once blur is unsupported, so the block must give each
-    # such selector a background of its own. Token fallbacks do not reach them.
-    css_nc = _css_without_comments()
-    fallback_selectors = {
-        " ".join(sel.split())
-        for sel, rule in re.findall(r"([^{}]+)\{([^{}]*)\}", body)
-        if re.search(r"(?:^|;)\s*background(?:-color)?\s*:", rule)
-    }
-    uncovered = []
-    for sel, rule in re.findall(r"([^{}]+)\{([^{}]*)\}", css_nc):
-        blur = re.search(r"(?:^|;)\s*backdrop-filter\s*:\s*([^;]+)", rule)
-        if not blur or blur.group(1).strip() == "none":
-            continue
-        if not re.search(r"(?:^|;)\s*background(?:-color)?\s*:\s*transparent\b", rule):
-            continue
-        for one in sel.split(","):
-            one = " ".join(one.split())
-            if one and one not in fallback_selectors:
-                uncovered.append(one)
-    assert not uncovered, f"transparent blur surfaces with no @supports fallback: {uncovered}"
+def test_no_backdrop_filter_anywhere():
+    """Workshop surfaces are solid. A blur rule means someone brought frost back."""
+    assert "backdrop-filter" not in _css_without_comments()
