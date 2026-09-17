@@ -813,3 +813,21 @@ def test_no_css_var_falls_back_to_a_hardcoded_colour():
 def test_no_backdrop_filter_anywhere():
     """Workshop surfaces are solid. A blur rule means someone brought frost back."""
     assert "backdrop-filter" not in _css_without_comments()
+
+
+def test_workshop_motion_hooks_are_wired():
+    """Every Workshop motion has both halves: a keyframe in CSS and the class JS sets.
+
+    The universal prefers-reduced-motion rule already neutralises all of them.
+    """
+    css = _css_without_comments()
+    for name in ("rowSettle", "rowOpen", "chipTag", "starPop", "lineSwap", "collectArrive", "barStripes"):
+        assert f"@keyframes {name}" in css, name
+    search = (REPO / "static" / "js" / "search.js").read_text(encoding="utf-8")
+    assert "starBtn.classList.add('pop')" in search
+    assert ".star-btn.pop {" in css
+    tools = (REPO / "static" / "js" / "simple_tools.js").read_text(encoding="utf-8")
+    assert "el.classList.add('line-swap')" in tools
+    assert ".wait-status.line-swap {" in css
+    reduce = css[css.rfind("@media (prefers-reduced-motion: reduce)") :]
+    assert "animation-duration: 0.01ms !important" in reduce

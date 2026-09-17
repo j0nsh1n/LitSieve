@@ -1246,6 +1246,11 @@ function buildResultCard(article, idx) {
  starBtn.classList.toggle('is-starred', next);
  starBtn.innerHTML = starLabelHtml(next);
  starBtn.setAttribute('aria-pressed', next ? 'true' : 'false');
+ if (next) {
+  starBtn.classList.remove('pop');
+  void starBtn.offsetWidth;
+  starBtn.classList.add('pop');
+ }
  try {
  await apiCall('/api/notes', {
  method: 'POST',

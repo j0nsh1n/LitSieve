@@ -1543,6 +1543,14 @@ input[type="range"]::-moz-range-thumb:hover {
     60% { transform: scale(1.05); }
     100% { transform: none; }
 }
+/* Starring a paper gets one small celebration; unstarring gets none. */
+.star-btn.pop {
+    animation: starPop 380ms var(--ease-spring);
+}
+@keyframes starPop {
+    30% { transform: scale(1.25) rotate(-8deg); }
+    100% { transform: none; }
+}
 #display-filter-status:empty {
     display: none;
 }

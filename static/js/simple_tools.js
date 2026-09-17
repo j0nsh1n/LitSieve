@@ -125,7 +125,12 @@ function _startWaitMessages() {
   if (window._simpleWaitHolding) return;
   _waitMsgIndex = (_waitMsgIndex + 1) % WAIT_STATUS_LINES.length;
   const el = document.getElementById('search-preparing-status');
-  if (el) el.textContent = WAIT_STATUS_LINES[_waitMsgIndex];
+  if (el) {
+   el.classList.remove('line-swap');
+   void el.offsetWidth;
+   el.textContent = WAIT_STATUS_LINES[_waitMsgIndex];
+   el.classList.add('line-swap');
+  }
  }, 2500);
 }
 
