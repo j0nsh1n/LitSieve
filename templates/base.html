@@ -151,14 +151,14 @@
 
     {% from "macros/disclaimers.html" import scope_footer %}
     <footer class="footer">
-        <p>LitSieve - v5.4.0</p>
+        <p>LitSieve - v5.5.0</p>
         {% if support_links %}
         <p class="help-text">{% for link in support_links %}<a href="{{ link.url }}">{{ link.label }}</a>{% if not loop.last %} · {% endif %}{% endfor %}</p>
         {% endif %}
         {{ scope_footer() }}
     </footer>
 
-    <script src="/static/js/common.js?v=20260917a"></script>
+    <script src="/static/js/common.js?v=20260918a"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>
