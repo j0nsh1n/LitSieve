@@ -254,19 +254,22 @@ def test_hidden_source_grid_still_submits_checked_sources():
     assert "checkbox.checked = recommended.has(sourceId)" in dm_js
 
 
-def test_simple_mode_renumbers_fetch_not_advanced():
-    """Simple: Fetch is step 2 (sources hidden). Advanced keeps Fetch as step 3."""
+def test_simple_collect_asks_questions_advanced_keeps_steps():
+    """Simple headings are questions with no step numbers; Advanced keeps 1/2/3."""
     html = _dm_markup()
     assert "dm-step-simple" in html
     assert "dm-step-advanced" in html
-    assert "2. Find articles on your topic" in html
+    assert "Which areas does your topic belong to?" in html
+    assert "What topic do you want papers about?" in html
+    for heading in re.findall(r'<h2 class="dm-step-heading dm-step-simple">(.*?)</h2>', html):
+        assert not re.match(r"\s*\d", heading), heading
+    assert "1. Select Topics" in html
     assert "3. Fetch Articles" in html
-    assert "1. Narrow your lens" in html
     assert "topic-pack-grid" not in html
     assert "dm-sub-simple" in html
     assert "dm-sub-advanced" in html
     assert "Steps 1–3." in html  # Advanced page lead (prepare is optional after auto-embed)
-    assert "Steps 1–2." in html  # Simple page lead
+    assert "Steps 1–2." not in html
     css = _read("static", "css", "style.css")
     # Simple labels default-hidden; advanced labels hide only under data-mode=simple.
     assert ".dm-step-simple" in css
@@ -1062,8 +1065,7 @@ def test_simple_fetch_asks_for_topic_not_question():
     """Fetch copy: topic now; the real question is for Search later."""
     html = _read("templates", "partials", "collect_ui.html")
     assert 'id="fetch-lead"' in html
-    assert "Type the" in html and "topic" in html
-    assert "not your full research question" in html
+    assert "A subject, not your full research question" in html
     assert 'class="dm-step-simple">Topic</label>' in html
     assert "Search Query" in html
     assert "save your real question for Search later" in html
@@ -1310,3 +1312,31 @@ def test_simple_results_open_in_place_one_at_a_time():
     assert 'html[data-mode="simple"] .result-row:not(.is-open) .result-row-body' in css
     assert 'html[data-mode="simple"] .result-row.is-open {' in css
     assert 'html:not([data-mode="simple"]) .result-toggle' not in css
+
+
+def test_simple_collect_is_one_guided_column():
+    """Topics first as chips with line icons; the topic box waits for a first pick.
+
+    A library that already has papers (Start over) must not hide the box, or
+    the unlock button inside it becomes unreachable.
+    """
+    js = _read("static", "js", "data_management.js")
+    grid = js[js.index("function renderTopicGrid") : js.index("function syncCollectStep")]
+    assert "topic.icon_svg" in grid
+    assert 'stroke="currentColor"' in grid
+    sync = js[js.index("function syncCollectStep") : js.index("function renderTopicPacks")]
+    assert "classList.toggle('has-topic', has)" in sync
+    toggle = js[js.index("function toggleTopic") : js.index("function recommendModel")]
+    assert "syncCollectStep();" in toggle
+    restore = js[js.index("function restoreFetchPrefs") : js.index("function restoreFetchPrefs") + 2200]
+    assert "syncCollectStep();" in restore
+    css = _read("static", "css", "style.css")
+    assert 'html[data-mode="simple"] #search-collect:not(.has-topic):not(.has-papers):not(.is-startover) #collect-fetch-card' in css
+    assert ".topic-grid {\n    display: flex;" in css
+    assert ".topic-icon svg {" in css
+    from app.content.source_catalog import list_topics_for_api
+    topics = list_topics_for_api()
+    assert topics
+    for topic in topics:
+        assert topic["icon_svg"].startswith("<"), topic["id"]
+        assert "<script" not in topic["icon_svg"]

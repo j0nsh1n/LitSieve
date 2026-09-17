@@ -2804,23 +2804,36 @@ select option,
 
 /* === Topic chips === */
 .topic-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    display: flex;
+    flex-wrap: wrap;
     gap: var(--space-2);
 }
 
+/* Topic chips: one wrapped row you can scan in a glance, a line icon in the
+   accent colour, and the same tool edge as every button. */
 .topic-card {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 2.5rem;
+    padding: var(--space-2) var(--space-4) var(--space-2) var(--space-3);
     border: 1px solid var(--rule);
+    border-bottom: 3px solid var(--edge);
+    border-radius: var(--radius-full);
     background: var(--surface);
-    padding: var(--space-3) var(--space-2);
-    text-align: center;
+    box-shadow: var(--sheen);
+    color: var(--text);
+    font-size: var(--fs-sm);
+    font-weight: 500;
+    line-height: 1;
+    text-align: left;
     cursor: pointer;
     transition:
         border-color var(--dur-fast) var(--ease-soft),
         background var(--dur-fast) var(--ease-soft),
         color var(--dur-fast) var(--ease-soft),
-        transform var(--dur-med) var(--ease-out),
-        box-shadow var(--dur-med) var(--ease-soft);
+        transform 120ms var(--ease-settle),
+        box-shadow 120ms var(--ease-settle);
     user-select: none;
     animation: listIn var(--dur-med) var(--ease-out) both;
 }
@@ -2836,40 +2849,41 @@ select option,
 .topic-card:nth-child(n+9) { animation-delay: 0.18s; }
 
 .topic-card:hover {
-    border-color: var(--text);
-    transform: translateY(-2px);
-    box-shadow: var(--elev-1);
+    border-color: var(--accent);
+    transform: translateY(-1px);
 }
 
-.topic-card:active {
-    transform: translateY(0);
+.topic-card:active,
+.topic-card.selected {
+    transform: translateY(2px);
+    border-bottom-width: 1px;
+    box-shadow: none;
 }
 
 .topic-card.selected {
-    background: var(--text);
-    border-color: var(--text);
-    color: var(--bg);
-    box-shadow: var(--elev-1);
+    background: var(--accent);
+    border-color: color-mix(in srgb, var(--accent) 60%, #000);
+    color: var(--on-accent);
 }
 
-.topic-card.selected .topic-name { color: var(--bg); }
+.topic-card.selected .topic-name { color: var(--on-accent); }
 
 .topic-icon {
-    font-size: var(--fs-xl);
-    display: block;
-    margin-bottom: var(--space-1);
+    display: inline-flex;
+    width: 1.15rem;
+    height: 1.15rem;
+    flex: none;
+    color: var(--accent);
+    font-size: var(--fs-base);
     line-height: 1;
-    transition: transform var(--dur-med) var(--ease-out);
 }
-
-.topic-card:hover .topic-icon {
-    transform: scale(1.08);
-}
+.topic-icon svg { width: 100%; height: 100%; }
+.topic-card.selected .topic-icon { color: var(--on-accent); }
 
 .topic-name {
-    font-size: var(--fs-xs);
-    font-weight: 500;
-    line-height: 1.3;
+    font-size: inherit;
+    font-weight: inherit;
+    line-height: 1.2;
 }
 
 /* === Source options === */
@@ -7660,4 +7674,70 @@ html[data-mode="simple"] .study-aid[open] .ai-actions .btn:hover:not(:disabled) 
     .account-content {
         max-width: none;
     }
+}
+
+/* === Simple collect: one guided column (Phase 14) === */
+html[data-mode="simple"] #search-collect {
+    max-width: 52rem;
+    margin: 0 auto;
+}
+html[data-mode="simple"] .collect-header-simple h1 {
+    font-size: var(--fs-3xl);
+    margin-bottom: var(--space-2);
+}
+html[data-mode="simple"] .collect-header-simple .subtitle {
+    font-size: var(--fs-md);
+    color: var(--text-body);
+    margin: 0 0 var(--space-2);
+}
+/* The scope note stays, as one quiet line instead of a boxed notice. */
+html[data-mode="simple"] .collect-header-simple .site-disclaimer {
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+    margin: 0 0 var(--space-4);
+    font-size: var(--fs-sm);
+    color: var(--text-soft);
+}
+html[data-mode="simple"] .collect-header-simple .site-disclaimer .notice-label { display: none; }
+html[data-mode="simple"] .collect-header-simple .site-disclaimer strong { font-weight: 500; }
+html[data-mode="simple"] .getting-started-list,
+html[data-mode="simple"] #collect-fetch-card .form-group:has(#fetch-max) { display: none; }
+html[data-mode="simple"] #collect-topics-card,
+html[data-mode="simple"] #collect-fetch-card {
+    padding: var(--space-5) var(--space-6);
+}
+html[data-mode="simple"] .dm-step-heading.dm-step-simple {
+    font-size: var(--fs-xl);
+    margin: 0 0 var(--space-2);
+}
+html[data-mode="simple"] #collect-topics-card .dm-sub-simple,
+html[data-mode="simple"] #collect-fetch-card .dm-sub-simple {
+    font-size: var(--fs-sm);
+    color: var(--text-soft);
+    margin: 0 0 var(--space-4);
+}
+/* The topic box waits until an area is picked, then arrives. A library that
+   already has papers (Start over) shows it at once. */
+html[data-mode="simple"] #search-collect:not(.has-topic):not(.has-papers):not(.is-startover) #collect-fetch-card {
+    display: none;
+}
+html[data-mode="simple"] #collect-fetch-card .form-row { display: block; }
+html[data-mode="simple"] #collect-fetch-card .form-group.flex-2 { max-width: none; }
+html[data-mode="simple"] #fetch-query {
+    font-size: var(--fs-md);
+    min-height: 3.25rem;
+}
+html[data-mode="simple"] #collect-fetch-card .fetch-actions { margin-top: var(--space-3); }
+html[data-mode="simple"] #fetch-btn {
+    min-height: 3rem;
+    padding-inline: var(--space-6);
+}
+html[data-mode="simple"] #collect-fetch-card.scene-in {
+    animation: collectArrive 360ms var(--ease-out) both;
+}
+@keyframes collectArrive {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: none; }
 }

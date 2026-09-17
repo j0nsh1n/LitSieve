@@ -107,6 +107,7 @@ async function loadSourceCatalog() {
  id: t.id,
  name: t.name,
  icon: t.icon || '',
+ icon_svg: t.icon_svg || '',
  sources: t.sources || [],
  }));
  }
@@ -274,10 +275,31 @@ function renderTopicGrid() {
  const card = document.createElement('div');
  card.className = 'topic-card';
  card.dataset.topicId = topic.id;
- card.innerHTML = `<span class="topic-icon">${topic.icon}</span><span class="topic-name">${topic.name}</span>`;
+ const iconHtml = topic.icon_svg
+  ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${topic.icon_svg}</svg>`
+  : topic.icon;
+ card.innerHTML = `<span class="topic-icon">${iconHtml}</span><span class="topic-name">${topic.name}</span>`;
  card.addEventListener('click', () => toggleTopic(topic.id, card));
  grid.appendChild(card);
  });
+ syncCollectStep();
+}
+
+/** Simple collect is one guided column: the topic box waits for a first area. */
+function syncCollectStep() {
+ const collect = document.getElementById('search-collect');
+ if (!collect) return;
+ const had = collect.classList.contains('has-topic');
+ const has = selectedTopics.size > 0;
+ collect.classList.toggle('has-topic', has);
+ if (has && !had) {
+  const card = document.getElementById('collect-fetch-card');
+  if (card) {
+   card.classList.remove('scene-in');
+   void card.offsetWidth;
+   card.classList.add('scene-in');
+  }
+ }
 }
 
 function renderTopicPacks() {
@@ -330,6 +352,7 @@ function applyTopicPack(packId) {
  saveFetchPrefs();
  refreshCoverage();
  updateGettingStartedChecklist();
+ syncCollectStep();
  showNotification(`Applied pack: ${pack.name}`, 'success');
 }
 
@@ -345,6 +368,7 @@ function toggleTopic(topicId, card) {
  applyModelRecommendation();
  saveFetchPrefs();
  refreshCoverage();
+ syncCollectStep();
 }
 
 /** Model that best matches the selected topics ('general' when mixed or none). */
@@ -521,6 +545,7 @@ function restoreFetchPrefs() {
  if (card) card.classList.add('selected');
  });
  updateRecommendedSources();
+ syncCollectStep();
  }
  if (Array.isArray(prefs.sources) && prefs.sources.length) {
  Object.keys(ALL_SOURCES).forEach(id => {

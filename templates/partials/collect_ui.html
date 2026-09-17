@@ -2,9 +2,10 @@
    Data Management (Advanced) and Search (Simple empty / start-over). #}
 <section class="page-header collect-header-simple">
  <h1>Get papers</h1>
- <p class="subtitle">Narrow your lens to the general areas that fit, then find
+ <p class="subtitle dm-sub-advanced">Narrow your lens to the general areas that fit, then find
   papers by <strong>topic</strong>. Save your actual research question for later,
   when you search the collection.</p>
+ <p class="subtitle dm-sub-simple">Pick the areas your topic belongs to, then name the topic.</p>
  {% from "macros/disclaimers.html" import scope_fetch %}
  {{ scope_fetch() }}
 </section>
@@ -30,11 +31,9 @@
 <!-- Step 1: Topics / general areas -->
 <section class="card" id="collect-topics-card">
  <h2 class="dm-step-heading dm-step-advanced">1. Select Topics</h2>
- <h2 class="dm-step-heading dm-step-simple">1. Narrow your lens</h2>
+ <h2 class="dm-step-heading dm-step-simple">Which areas does your topic belong to?</h2>
  <p class="info-text dm-sub-advanced">Choose the academic areas you care about - we use them to recommend sources.</p>
- <p class="info-text dm-sub-simple">Required. Pick the general areas your topic belongs in. That chooses
-  which journals and databases we search, so we do not pull papers from fields
-  that do not fit your topic.</p>
+ <p class="info-text dm-sub-simple">Pick one or more. This chooses which databases we search.</p>
  <div class="topic-grid" id="topic-grid"></div>
 </section>
 
@@ -48,13 +47,12 @@
 <!-- Fetch: Advanced step 3 (sources is 2); Simple step 2 (sources hidden). -->
 <section class="card" id="collect-fetch-card">
  <h2 class="dm-step-heading dm-step-advanced">3. Fetch Articles</h2>
- <h2 class="dm-step-heading dm-step-simple">2. Find articles on your topic</h2>
+ <h2 class="dm-step-heading dm-step-simple">What topic do you want papers about?</h2>
  <div id="fetch-lead">
   <p class="info-text dm-sub-advanced">Searches every selected source at once and saves the papers
    to your private collection. Preparing for search starts automatically after a successful fetch.</p>
-  <p class="info-text dm-sub-simple">Type the <strong>topic</strong> you want papers about — a subject,
-   not your full research question. Save the actual question for the next step, when you search
-   through the papers you collect. Preparing for search starts automatically after a successful fetch.</p>
+  <p class="info-text dm-sub-simple">A subject, not your full research question. Save the question for
+   Search. Preparing for search starts on its own after the fetch.</p>
  </div>
  {% include "partials/guest_fetch_note.html" %}
  <div id="simple-fetch-locked" class="simple-fetch-locked" hidden>
