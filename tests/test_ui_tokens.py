@@ -253,6 +253,8 @@ def test_mobile_380_has_overflow_guard_and_tap_targets():
     # Library switcher stays reachable (do not hide the wrap).
     assert ".nav-library-wrap { display: none" not in block
     assert ".nav-library-wrap { display: none; }" not in block
+    assert "minmax(0, 4.75rem)" not in block
+    assert "max-width: 4.75rem" not in block
 
 
 def test_simple_results_clear_the_fixed_export_bar():
@@ -467,6 +469,65 @@ def _css_block_tokens(block: str) -> dict[str, str]:
     }
 
 
+_HEX6 = re.compile(r"^#[0-9a-fA-F]{6}$")
+_CONTRAST_INKS = ("--text", "--text-soft", "--accent", "--ok", "--warn", "--err")
+_CONTRAST_GROUNDS = ("--bg", "--surface")
+
+
+def _srgb_channel(value: float) -> float:
+    return value / 12.92 if value <= 0.04045 else ((value + 0.055) / 1.055) ** 2.4
+
+
+def _relative_luminance(hex_color: str) -> float:
+    raw = hex_color.removeprefix("#")
+    r = int(raw[0:2], 16) / 255.0
+    g = int(raw[2:4], 16) / 255.0
+    b = int(raw[4:6], 16) / 255.0
+    return 0.2126 * _srgb_channel(r) + 0.7152 * _srgb_channel(g) + 0.0722 * _srgb_channel(b)
+
+
+def _wcag_contrast(fg: str, bg: str) -> float:
+    lighter = max(_relative_luminance(fg), _relative_luminance(bg))
+    darker = min(_relative_luminance(fg), _relative_luminance(bg))
+    return (lighter + 0.05) / (darker + 0.05)
+
+
+def _theme_token_blocks() -> list[tuple[str, dict[str, str]]]:
+    css = CSS
+    pref = re.search(
+        r"@media\s*\(\s*prefers-color-scheme\s*:\s*dark\s*\)\s*\{"
+        r"\s*:root:not\(\[data-theme=\"light\"\]\)\s*\{([^}]+)\}",
+        css,
+    )
+    explicit = re.search(r"\[data-theme=\"dark\"\]\s*\{([^}]+)\}", css)
+    assert pref, "prefers-color-scheme dark block missing"
+    assert explicit, "[data-theme=dark] block missing"
+    return [
+        (":root", _css_block_tokens(_root_block())),
+        ('[data-theme="dark"]', _css_block_tokens(explicit.group(1))),
+        ("prefers-color-scheme dark", _css_block_tokens(pref.group(1))),
+    ]
+
+
+def test_theme_inks_meet_wcag_aa_on_page_grounds():
+    """Ink tokens must stay AA against both page grounds, measured not pinned."""
+    failures = []
+    for label, tokens in _theme_token_blocks():
+        for name in _CONTRAST_INKS:
+            value = tokens.get(name, "")
+            assert _HEX6.fullmatch(value), f"{label} {name} is not a 6-digit hex: {value!r}"
+        for ground_name in _CONTRAST_GROUNDS:
+            ground = tokens.get(ground_name, "")
+            assert _HEX6.fullmatch(ground), f"{label} {ground_name} is not a 6-digit hex: {ground!r}"
+            for ink_name in _CONTRAST_INKS:
+                ratio = _wcag_contrast(tokens[ink_name], ground)
+                if ratio < 4.5:
+                    failures.append(
+                        f"{label} {ink_name}={tokens[ink_name]} on {ground_name}={ground}: {ratio}"
+                    )
+    assert not failures, "contrast below 4.5:1: " + "; ".join(failures)
+
+
 def test_phase10_dark_blocks_stay_in_parity():
     """Phase 10: prefers-color-scheme dark and [data-theme=dark] must match.
 
@@ -494,12 +555,10 @@ def test_phase10_dark_blocks_stay_in_parity():
     for tokens in (a, b):
         assert tokens.get("--bg") == "#0c1424"
         assert tokens.get("--surface") == "#152036"
-        assert tokens.get("--text") == "#e8eef8"
-        assert tokens.get("--text-soft") == "#9aa8bd"
         assert tokens.get("--rule") == "#243044"
         assert tokens.get("--accent") == "#93b4ff"
-        assert tokens.get("--ok") == "#6ee7a8"
         assert tokens.get("--on-accent") == "#0c1424"
+        assert tokens.get("--ok") != tokens.get("--accent")
 
 
 def test_airy_glass_light_tokens():
@@ -510,11 +569,8 @@ def test_airy_glass_light_tokens():
     assert tokens.get("--surface") == "#f7f9fd"
     assert tokens.get("--accent") == "#2563eb"
     assert tokens.get("--accent-hover") == "#1d4ed8"
-    assert tokens.get("--ok") == "#15803d"
     assert tokens.get("--ok") != tokens.get("--accent")
     assert tokens.get("--on-accent") == "#fff"
-    # Amber was #a8700f = 4.21:1 on white, under AA. Darkened for contrast.
-    assert tokens.get("--warn") == "#96640c"
     assert "Source Sans 3" in tokens.get("--font-sans", "")
     assert "Source Serif 4" in tokens.get("--font-serif", "")
     assert "--frost" in root
@@ -675,3 +731,27 @@ def test_no_css_var_falls_back_to_a_hardcoded_colour():
         "Define them in :root, use an existing token, or add to RUNTIME_SET_VARS "
         "if JS sets them via setProperty."
     )
+
+
+def test_backdrop_filter_unsupported_falls_back_to_opaque_surface():
+    needle = (
+        "@supports not ((backdrop-filter: blur(1px)) or "
+        "(-webkit-backdrop-filter: blur(1px)))"
+    )
+    start = CSS.find(needle)
+    assert start != -1, "backdrop-filter @supports fallback missing"
+    brace = CSS.find("{", start)
+    depth = 0
+    end = None
+    for i, ch in enumerate(CSS[brace:], brace):
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                end = i
+                break
+    assert end is not None
+    body = CSS[brace + 1 : end]
+    assert re.search(r"--frost\s*:\s*var\(--surface\)", body)
+    assert re.search(r"--nav-blur\s*:\s*var\(--surface\)", body)
