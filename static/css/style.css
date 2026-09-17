@@ -7731,6 +7731,8 @@ html[data-mode="simple"] #collect-fetch-card .dm-sub-simple {
 html[data-mode="simple"] #search-collect:not(.has-topic):not(.has-papers):not(.is-startover) #collect-fetch-card {
     display: none;
 }
+html[data-mode="simple"] .collect-next-row { margin: var(--space-4) 0 0; }
+html[data-mode="simple"] #collect-topics-next { min-height: 2.75rem; }
 html[data-mode="simple"] #collect-fetch-card .form-row { display: block; }
 html[data-mode="simple"] #collect-fetch-card .form-group.flex-2 { max-width: none; }
 html[data-mode="simple"] #fetch-query {

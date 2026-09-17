@@ -1324,12 +1324,19 @@ def test_simple_collect_is_one_guided_column():
     grid = js[js.index("function renderTopicGrid") : js.index("function syncCollectStep")]
     assert "topic.icon_svg" in grid
     assert 'stroke="currentColor"' in grid
-    sync = js[js.index("function syncCollectStep") : js.index("function renderTopicPacks")]
-    assert "classList.toggle('has-topic', has)" in sync
+    sync = js[js.index("function syncCollectStep") : js.index("function revealCollectStep")]
+    assert "next.hidden = !(selectedTopics.size > 0 && !revealed)" in sync
+    reveal = js[js.index("function revealCollectStep") : js.index("function renderTopicPacks")]
+    assert "collect.classList.add('has-topic')" in reveal
+    assert "q.focus(" in reveal
+    assert "topicsNext.addEventListener('click', () => revealCollectStep(true))" in js
     toggle = js[js.index("function toggleTopic") : js.index("function recommendModel")]
     assert "syncCollectStep();" in toggle
     restore = js[js.index("function restoreFetchPrefs") : js.index("function restoreFetchPrefs") + 2200]
-    assert "syncCollectStep();" in restore
+    assert "revealCollectStep(false)" in restore
+    html = _read("templates", "partials", "collect_ui.html")
+    assert 'id="collect-topics-next"' in html
+    assert "Next: name your topic" in html
     css = _read("static", "css", "style.css")
     assert 'html[data-mode="simple"] #search-collect:not(.has-topic):not(.has-papers):not(.is-startover) #collect-fetch-card' in css
     assert ".topic-grid {\n    display: flex;" in css

@@ -205,6 +205,8 @@ document.addEventListener('DOMContentLoaded', () => {
  if (embeddingsBtn) embeddingsBtn.addEventListener('click', doCreateEmbeddings);
  const coverageBtn = document.getElementById('coverage-refresh');
  if (coverageBtn) coverageBtn.addEventListener('click', refreshCoverage);
+ const topicsNext = document.getElementById('collect-topics-next');
+ if (topicsNext) topicsNext.addEventListener('click', () => revealCollectStep(true));
  const dismissGs = document.getElementById('dismiss-getting-started');
  if (dismissGs) dismissGs.addEventListener('click', () => {
  if (typeof dismissGettingStarted === 'function') dismissGettingStarted();
@@ -285,19 +287,32 @@ function renderTopicGrid() {
  syncCollectStep();
 }
 
-/** Simple collect is one guided column: the topic box waits for a first area. */
+/** Simple collect is one guided column: pick areas, press Next, name the topic.
+ * The Next button appears once an area is picked and disappears once the
+ * topic box is open; a returning student with saved areas skips the gate. */
 function syncCollectStep() {
  const collect = document.getElementById('search-collect');
  if (!collect) return;
- const had = collect.classList.contains('has-topic');
- const has = selectedTopics.size > 0;
- collect.classList.toggle('has-topic', has);
- if (has && !had) {
-  const card = document.getElementById('collect-fetch-card');
-  if (card) {
-   card.classList.remove('scene-in');
-   void card.offsetWidth;
-   card.classList.add('scene-in');
+ const next = document.getElementById('collect-topics-next');
+ const revealed = collect.classList.contains('has-topic');
+ if (next) next.hidden = !(selectedTopics.size > 0 && !revealed);
+}
+
+function revealCollectStep(focus) {
+ const collect = document.getElementById('search-collect');
+ if (!collect || collect.classList.contains('has-topic')) return;
+ collect.classList.add('has-topic');
+ syncCollectStep();
+ const card = document.getElementById('collect-fetch-card');
+ if (card) {
+  card.classList.remove('scene-in');
+  void card.offsetWidth;
+  card.classList.add('scene-in');
+  if (focus) {
+   const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+   card.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+   const q = document.getElementById('fetch-query');
+   if (q) q.focus({ preventScroll: true });
   }
  }
 }
@@ -545,6 +560,7 @@ function restoreFetchPrefs() {
  if (card) card.classList.add('selected');
  });
  updateRecommendedSources();
+ if (prefs.topics.length) revealCollectStep(false);
  syncCollectStep();
  }
  if (Array.isArray(prefs.sources) && prefs.sources.length) {
