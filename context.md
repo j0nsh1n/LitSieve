@@ -1,7 +1,7 @@
 # context.md — LitSieve
 
 ## Current State
-- App version **5.4.0** (`app/main.py`, `GET /health`). Product name **LitSieve**.
+- App version **5.5.0** (`app/main.py`, `GET /health`). Product name **LitSieve**.
 - Example public deployment pattern: HTTPS at the edge (e.g. Cloudflare Tunnel)
   → `uvicorn` HTTP on `127.0.0.1:7860` only. Operator sets `PUBLIC_BASE_URL` and
   `DEBUG=false` with a real `SECRET_KEY` in gitignored `.env`.
@@ -20,12 +20,15 @@
   then a short finish leg into Search. After papers exist, topics/fetch hide;
   Start over is a popup. Advanced: full steps including Clean up + Clusters;
   its progress bars share Simple height/tokens, with counts on a detail line.
-  Airy glass tokens: accent `#2563eb` (dark `#93b4ff`), 10/16/22px radii.
-  Source Serif 4 headings, Source Sans 3 body/UI (self-hosted). Hybrid frost
-  cards on a soft wash, score ring on Search. Sieve pan as favicon, nav
-  mark, and empty-state illustration (Search / Clean up / Clusters).
-  CSS cache-bust `style.css?v=20260917b`. Mobile app nav is a one-row
-  brand + menu; steps and tools open in a drawer.
+  Workshop tokens (Phase 14): accent `#a8472a` (dark `#e39a73`), 8/14/18px
+  radii, solid surfaces on a `--edge` with a `--sheen`, no backdrop-filter,
+  gradient paper grain on `body::before`. Source Serif 4 headings, Source
+  Sans 3 body/UI (self-hosted). Simple results open in place (one row open,
+  `.result-toggle` with aria-expanded); Simple collect is one guided column
+  (question headings, topic chips with `icon_svg` from the catalog, Next
+  reveals the topic box). Sieve pan as favicon, nav mark, and empty-state
+  illustration. CSS cache-bust `style.css?v=20260918a`. Mobile app nav is a
+  one-row brand + menu; steps and tools open in a drawer.
 - Reader Mode: **Explain this study** on Search/Clean up cards — structured
   plain-language reading of one abstract, cached per
   `(article_id, source, audience)` in the library DB, warnings-only verifier.
@@ -119,15 +122,14 @@ Guest User (is_guest) → sample corpus only; purged by age
 - Host entry: `app.main:app` port 7860; Linux `./venv`
 
 ## Session Handoff
-- **Date:** 2026-09-17
-- **Branch:** `fix/audit-followups-2026-09-17` (local, off `main` at `7da5864`).
-  Version **5.4.0**. Nothing pushed.
-- **Done:** Audit follow-ups 1 to 8. Deploy tests isolate
-  `LITSIEVE_DEPLOY_STATE`. Detached deploys use the live working directory
-  and `.env`. Light `--ok` is `#137537`. Phone wordmark is unclipped.
-  Frost tokens fall back to `--surface` without backdrop-filter. Nav count
-  stays hidden until `/api/statistics`. Demo banner is at most 6rem at
-  380px. Failed fetch sources use `is-failed` with `--warn`.
-- **Next:** Claude review. GLM writes the `docs/DEPLOY.md` detached-deploy
-  section after this lands. Host-side Phase 4 status list. `spec.md:96`
-  drift still needs approval.
+- **Date:** 2026-09-18
+- **Branch:** `feat/ui3-workshop`, stacked on `fix/audit-followups-2026-09-17`
+  (both unmerged, nothing pushed). Version **5.5.0** in `app/main.py`.
+- **Done:** Roadmap Phase 14 in five commits: Workshop tokens and surfaces
+  with no blur; Simple results open in place; Simple collect as a guided
+  column with line-icon chips and a Next button; the motion set; release
+  bookkeeping. Full suite green after each unit; each unit driven in headless
+  Chromium on a throwaway server (`design_mockups/ui3/capture/*.mjs`).
+- **Next:** Jonathan reviews on the throwaway server or merges; then deploy
+  5.5.0 to the host and tick Phase 14. `spec.md:79` still says 5.4.0 (drift,
+  needs approval). Phase 13 (fold Advanced into Simple) waits behind this.

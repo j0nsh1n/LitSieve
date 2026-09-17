@@ -8,6 +8,25 @@ and this project aims to follow Semantic Versioning for app version strings
 
 ## [Unreleased]
 
+### Changed
+- New look, Workshop: warm sand paper with a clay accent in light, warm
+  wood tones in dark, and every card, button, chip, and the query tile
+  sitting on a solid edge that presses down when you click. No blur
+  anywhere; a faint paper grain sits over the page. Both themes keep every
+  ink above 4.5:1.
+- Simple search results open in place. Rows show score, venue, title, and
+  byline; the top result opens by default and any row opens on click or
+  with its Open button (Enter or Space), closing the one before. Star,
+  Note, and Not relevant sit in one row under the open card.
+- Simple collect is one guided column: three questions instead of numbered
+  steps, topic areas as chips with line icons, a Next button that reveals
+  the topic box and focuses it, and Max results and fetch mode kept out of
+  the way. Advanced keeps its numbered steps and every control.
+- Motion: results settle in with a spring, chips bounce when picked,
+  starring a paper pops once, the wait screen's sieve shakes harder over a
+  striped bar and each status line rises in, and the open row slides open.
+  Reduced motion turns all of it off.
+
 ### Fixed
 - Light success green meets 4.5:1 contrast on the page wash.
 - The phone top bar shows the full LitSieve wordmark.
