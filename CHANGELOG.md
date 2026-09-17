@@ -26,6 +26,11 @@ and this project aims to follow Semantic Versioning for app version strings
   starring a paper pops once, the wait screen's sieve shakes harder over a
   striped bar and each status line rises in, and the open row slides open.
   Reduced motion turns all of it off.
+- Pressing Find articles on your topic in Simple opens one dialog first:
+  how many papers from each database, as preset chips (25, 50, 100, 200)
+  or a number you write yourself (10 to 2000), and, when the collection
+  already has papers, whether to start fresh or add to them. The choice
+  is remembered for next time.
 
 ### Fixed
 - Light success green meets 4.5:1 contrast on the page wash.

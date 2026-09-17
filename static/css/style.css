@@ -2202,9 +2202,73 @@ body.lra-modal-open {
 .lra-modal-fields .lra-modal-input-group {
     margin: 0;
 }
-.lra-modal-fields .lra-modal-input-group:first-child {
+.lra-modal-fields .lra-modal-input-group:first-child,
+.lra-modal-fields .lra-modal-choice {
     grid-column: 1 / -1;
 }
+/* Preset chips inside a dialog: radios drawn as tool-edge tags, the checked
+   one pressed in and filled. The native radio stays in the tab order. */
+.lra-modal-choice {
+    border: 0;
+    padding: 0;
+    min-width: 0;
+}
+.lra-modal-choice legend {
+    padding: 0;
+}
+.lra-choice-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+}
+.lra-modal-choice .lra-choice-chip {
+    position: relative;
+    display: inline-flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    margin: 0;
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: var(--fs-sm);
+    color: var(--text);
+    min-height: 2.75rem;
+    padding: var(--space-2) var(--space-4);
+    border: 1px solid var(--rule);
+    border-bottom: 3px solid var(--edge);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    box-shadow: var(--sheen);
+    cursor: pointer;
+    transition: transform 120ms var(--ease-settle), box-shadow 120ms var(--ease-settle),
+                background-color var(--dur-fast) var(--ease-soft), color var(--dur-fast) var(--ease-soft);
+}
+.lra-modal-choice .lra-choice-chip input {
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+}
+.lra-choice-chip-label {
+    font-weight: 600;
+    line-height: 1.2;
+}
+.lra-choice-chip-hint {
+    font-size: var(--fs-xs);
+    color: var(--text-soft);
+    line-height: 1.2;
+}
+.lra-modal-choice .lra-choice-chip:hover { border-color: var(--accent); }
+.lra-modal-choice .lra-choice-chip:has(input:focus-visible) { box-shadow: var(--focus-ring); }
+.lra-modal-choice .lra-choice-chip:has(input:checked) {
+    background: var(--accent);
+    border-color: color-mix(in srgb, var(--accent) 60%, #000);
+    color: var(--on-accent);
+    transform: translateY(2px);
+    border-bottom-width: 1px;
+    box-shadow: none;
+}
+.lra-modal-choice .lra-choice-chip:has(input:checked) .lra-choice-chip-hint { color: var(--on-accent); }
 .lra-modal-input-group {
     margin: var(--space-3) 0 0;
 }

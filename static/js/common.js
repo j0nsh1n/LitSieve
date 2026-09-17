@@ -470,6 +470,19 @@ function openSiteModal(opts) {
             fieldHtml = `<div class="lra-modal-fields">${formFields.map((f) => {
                 const fid = escapeAttr(safeDomId(f.id));
                 const label = escapeHtml(String(f.label || f.id || ''));
+                if (f.type === 'choice') {
+                    // Preset chips: one radio per option, the checked one reads as pressed.
+                    const chips = (Array.isArray(f.options) ? f.options : []).map((opt) => {
+                        const val = escapeAttr(String(opt.value));
+                        const checked = f.value != null && String(f.value) === String(opt.value) ? ' checked' : '';
+                        const hint = opt.hint ? `<small class="lra-choice-chip-hint">${escapeHtml(String(opt.hint))}</small>` : '';
+                        return `<label class="lra-choice-chip"><input type="radio" name="site-modal-field-${fid}" value="${val}"${checked}><span class="lra-choice-chip-label">${escapeHtml(String(opt.label))}</span>${hint}</label>`;
+                    }).join('');
+                    return `<fieldset class="form-group lra-modal-input-group lra-modal-choice" data-field="${fid}">
+              <legend class="help-text">${label}</legend>
+              <div class="lra-choice-chips">${chips}</div>
+            </fieldset>`;
+                }
                 const typ = escapeAttr(String(f.type || 'text'));
                 const ph = escapeAttr(f.placeholder || '');
                 const min = f.min != null ? ` min="${escapeAttr(String(f.min))}"` : '';
@@ -660,6 +673,11 @@ function openSiteModal(opts) {
                 if (isForm) {
                     const values = {};
                     formFields.forEach((f) => {
+                        if (f.type === 'choice') {
+                            const on = root.querySelector('input[name="site-modal-field-' + safeDomId(f.id) + '"]:checked');
+                            values[f.id] = on ? on.value : '';
+                            return;
+                        }
                         const el = root.querySelector('#site-modal-field-' + safeDomId(f.id));
                         values[f.id] = el ? el.value : '';
                     });
@@ -700,7 +718,7 @@ function openSiteModal(opts) {
                 const el = root.querySelector('#site-modal-field-' + safeDomId(f.id));
                 if (el && f.value != null) el.value = String(f.value);
             });
-            root.querySelectorAll('.lra-modal-fields .lra-modal-input').forEach((el) => {
+            root.querySelectorAll('.lra-modal-fields .lra-modal-input, .lra-modal-fields .lra-choice-chip input').forEach((el) => {
                 el.addEventListener('keydown', (ev) => {
                     if (ev.key === 'Enter' && !ev.shiftKey) {
                         ev.preventDefault();
@@ -708,7 +726,7 @@ function openSiteModal(opts) {
                     }
                 });
             });
-            const firstField = root.querySelector('.lra-modal-fields .lra-modal-input');
+            const firstField = root.querySelector('.lra-modal-fields .lra-choice-chip input:checked, .lra-modal-fields .lra-choice-chip input, .lra-modal-fields .lra-modal-input');
             setTimeout(() => {
                 if (firstField) firstField.focus();
             }, 30);

@@ -1339,7 +1339,6 @@ async function doFetch() {
  document.querySelectorAll('#source-option-grid input[type="checkbox"]:checked')
  ).map(cb => cb.value);
  const query = ((document.getElementById('fetch-query') || {}).value || '').trim();
- const maxResults = parseInt((document.getElementById('fetch-max') || {}).value, 10) || 100;
  const email = ((document.getElementById('fetch-email') || {}).value || '').trim();
 
  setNextStepVisible(false);
@@ -1359,10 +1358,13 @@ async function doFetch() {
  let proceed = true;
  if (_simpleFetchModePicked) {
   _simpleFetchModePicked = false;
+  proceed = await resolveSimpleFetchModeBeforeRequest({ modeAlreadyPicked: true });
  } else {
   proceed = await resolveSimpleFetchModeBeforeRequest();
  }
  if (!proceed) return;
+ // Read the per-database cap after the dialog: Simple sets it there.
+ const maxResults = parseInt((document.getElementById('fetch-max') || {}).value, 10) || 100;
 
  const mode = (document.querySelector('input[name="fetch-mode"]:checked') || {}).value || 'replace';
  const clearFirst = mode === 'replace';

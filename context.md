@@ -131,5 +131,5 @@ Guest User (is_guest) → sample corpus only; purged by age
   bookkeeping. Full suite green after each unit; each unit driven in headless
   Chromium on a throwaway server (`design_mockups/ui3/capture/*.mjs`).
 - **Next:** Jonathan reviews on the throwaway server or merges; then deploy
-  5.5.0 to the host and tick Phase 14. `spec.md:79` still says 5.4.0 (drift,
-  needs approval). Phase 13 (fold Advanced into Simple) waits behind this.
+  5.5.0 to the host and tick Phase 14. `spec.md:79` updated to 5.5.0 with
+  approval. Phase 13 (fold Advanced into Simple) waits behind this.

@@ -59,6 +59,9 @@ asks one question at a time.
 4. Star pop and wait-line swap.
 5. Next button after choosing areas (Jonathan's note during review).
 6. Bookkeeping: changelog, 5.5.0, cache-bust, context.
+7. Pre-fetch dialog: per-database count as preset chips or a written number,
+   with the fresh-or-add choice folded in when papers exist (Jonathan's note
+   after 5.5.0 approval). `openSiteForm` gained a `choice` field type.
 
 ## Verification
 
@@ -67,6 +70,7 @@ run against a throwaway server on port 8801 with a temporary users database
 (`design_mockups/ui3/capture/*.mjs`), checking behaviour by reading the DOM,
 not only screenshots. Mutation checks on every new test.
 
-## spec.md (propose, do not edit until approved)
+## spec.md
 
-- Line 79: health version example still says 5.4.0.
+- Line 79 health example moved to 5.5.0 with Jonathan's approval on
+  2026-09-18.
