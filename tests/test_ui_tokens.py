@@ -786,7 +786,8 @@ RUNTIME_SET_VARS = {
     "--wait-pct",        # simple wait bar fill
     "--funnel-kept-pct",     # search.js: simple screening funnel
     "--funnel-removed-pct",  # search.js: simple screening funnel
-    "--tx", "--ty", "--tr",  # view-transition offsets
+    "--tx", "--ty", "--tr",  # view-transition offsets,
+    "--i",  # per-row reveal stagger, set by search.js buildResultCard
 }
 
 

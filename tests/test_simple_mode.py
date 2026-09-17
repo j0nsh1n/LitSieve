@@ -1279,3 +1279,34 @@ def test_simple_mode_markup_lives_in_labeled_partials():
     assert 'id="search-simple-panel"' not in search
     assert 'id="search-simple-panel"' in _read("templates", "partials", "simple_search_panel.html")
     assert "Narrow it down" in _read("templates", "partials", "simple_screening_card.html")
+
+
+# ---------------------------------------------------------------------------
+# Results open in place (Phase 14): compact rows, one open at a time
+# ---------------------------------------------------------------------------
+
+
+def test_simple_results_open_in_place_one_at_a_time():
+    """Simple rows render compact; a real button opens one row in place.
+
+    Advanced keeps the full card, so the toggle exists only in the Simple
+    template branch. The opener closes every other open row and announces
+    the state through aria-expanded, which is what a keyboard user hears.
+    """
+    js = _read("static", "js", "search.js")
+    build = js[js.index("function buildResultCard") : js.index("function renderResults")]
+    assert build.count('class="result-toggle"') == 1
+    simple_branch = build[build.index("if (simpleMode) {") : build.index("} else {")]
+    assert 'class="result-toggle"' in simple_branch
+    assert 'aria-expanded="false"' in simple_branch
+    assert 'aria-controls="result-body-${idx}"' in simple_branch
+    assert 'id="result-body-${idx}"' in simple_branch
+    opener = js[js.index("function setResultRowOpen") : js.index("function buildResultCard")]
+    assert "setAttribute('aria-expanded', open ? 'true' : 'false')" in opener
+    assert "#results-list .result-row.is-open" in opener
+    render = js[js.index("function renderResults") : js.index("function renderResults") + 1200]
+    assert "openResultRow(container.querySelector('.result-row'), false)" in render
+    css = _read("static", "css", "style.css")
+    assert 'html[data-mode="simple"] .result-row:not(.is-open) .result-row-body' in css
+    assert 'html[data-mode="simple"] .result-row.is-open {' in css
+    assert 'html:not([data-mode="simple"]) .result-toggle' not in css

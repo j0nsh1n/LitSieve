@@ -7296,12 +7296,88 @@ html[data-mode="simple"] .simple-tools-more-menu .btn:hover:not(:disabled) {
 /* Simple result cards: content left, Star / Note / Not relevant rail right. */
 html[data-mode="simple"] .result-row {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: var(--space-4);
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
     overflow: visible;
+    cursor: pointer;
+    border-left: 4px solid transparent;
+    animation: rowSettle 460ms var(--ease-spring) both;
+    animation-delay: calc(min(var(--i, 0), 10) * 55ms);
+}
+@keyframes rowSettle {
+    from { opacity: 0; transform: translateY(16px) scale(0.985); }
+    to { opacity: 1; transform: none; }
 }
 html[data-mode="simple"] .result-row::before {
     display: none;
+}
+/* One row open at a time. Closed rows show only what you need to pick one:
+   score, venue, title, byline. The open row is the full card. */
+html[data-mode="simple"] .result-row:not(.is-open) {
+    padding: var(--space-3) var(--space-4);
+    margin-bottom: var(--space-2);
+}
+html[data-mode="simple"] .result-row:not(.is-open):hover {
+    transform: none;
+    box-shadow: var(--elev-card);
+    background: color-mix(in srgb, var(--accent) 5%, var(--surface));
+}
+html[data-mode="simple"] .result-row:not(.is-open) .result-row-body,
+html[data-mode="simple"] .result-row:not(.is-open) .result-row-rail,
+html[data-mode="simple"] .result-row:not(.is-open) .result-tags .study-type-wrap {
+    display: none;
+}
+html[data-mode="simple"] .result-row:not(.is-open) .result-row-title {
+    font-size: var(--fs-md);
+    line-height: var(--lh-snug);
+    margin: var(--space-1) 0;
+}
+html[data-mode="simple"] .result-row:not(.is-open) .result-byline { margin: 0; }
+html[data-mode="simple"] .result-row:not(.is-open) .result-row-head { margin-bottom: 0; }
+html[data-mode="simple"] .result-row.is-open {
+    cursor: default;
+    border-left-color: var(--accent);
+    box-shadow: var(--elev-2);
+    margin: var(--space-3) 0 var(--space-4);
+}
+html[data-mode="simple"] .result-row .result-row-head { padding-right: calc(var(--space-6) + var(--space-6)); }
+html[data-mode="simple"] .result-toggle {
+    position: absolute;
+    right: var(--space-4);
+    top: var(--space-3);
+    border: 0;
+    background: transparent;
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-sm);
+    font: inherit;
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-soft);
+    cursor: pointer;
+}
+html[data-mode="simple"] .result-row.is-open .result-toggle,
+html[data-mode="simple"] .result-toggle:hover,
+html[data-mode="simple"] .result-toggle:focus-visible {
+    color: var(--accent);
+}
+html[data-mode="simple"] .result-toggle:hover,
+html[data-mode="simple"] .result-toggle:focus-visible {
+    background: var(--hover);
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+html[data-mode="simple"] .result-row.is-open .result-row-body {
+    animation: rowOpen 360ms var(--ease-spring) both;
+    transform-origin: top;
+}
+html[data-mode="simple"] .result-row.is-open .result-row-rail {
+    animation: rowOpen 360ms var(--ease-spring) 60ms both;
+}
+@keyframes rowOpen {
+    from { opacity: 0; transform: translateY(-6px) scaleY(0.97); }
+    to { opacity: 1; transform: none; }
 }
 /* Menus opened on a card must paint over the cards below it. */
 html[data-mode="simple"] .result-row:has(.study-aid[open]) {
@@ -7316,32 +7392,44 @@ html[data-mode="simple"] .result-row-main {
 }
 html[data-mode="simple"] .result-row-rail {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: wrap;
     gap: var(--space-2);
-    padding-left: var(--space-4);
-    border-left: 1px solid var(--rule);
+    padding-top: var(--space-3);
+    border-top: 1px dashed var(--rule);
 }
 html[data-mode="simple"] .result-row-rail .star-btn,
 html[data-mode="simple"] .result-row-rail .note-toggle,
 html[data-mode="simple"] .result-row-rail .not-relevant-btn {
-    display: flex;
-    flex-direction: column;
+    display: inline-flex;
+    flex-direction: row;
     align-items: center;
     justify-content: center;
-    gap: var(--space-1);
-    width: 84px;
-    min-height: 56px;
-    padding: var(--space-1);
+    gap: var(--space-2);
+    width: auto;
+    min-height: 2.4rem;
+    padding: var(--space-1) var(--space-3);
     border: 1px solid var(--rule);
-    border-radius: var(--radius-md);
+    border-bottom: 3px solid var(--edge);
+    border-radius: var(--radius-full);
     background: var(--surface);
+    box-shadow: var(--sheen);
     color: var(--text-soft);
     font: inherit;
-    font-size: var(--fs-xs);
+    font-size: var(--fs-sm);
     font-weight: 600;
     letter-spacing: 0;
     text-transform: none;
     cursor: pointer;
+    transition: transform 120ms var(--ease-settle), box-shadow 120ms var(--ease-settle),
+                background-color var(--dur-fast) var(--ease-soft), color var(--dur-fast) var(--ease-soft);
+}
+html[data-mode="simple"] .result-row-rail .star-btn:active,
+html[data-mode="simple"] .result-row-rail .note-toggle:active,
+html[data-mode="simple"] .result-row-rail .not-relevant-btn:active {
+    transform: translateY(2px);
+    border-bottom-width: 1px;
+    box-shadow: none;
 }
 html[data-mode="simple"] .result-row-rail .star-btn:hover,
 html[data-mode="simple"] .result-row-rail .note-toggle:hover,
