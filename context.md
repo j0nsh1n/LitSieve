@@ -8,7 +8,8 @@
 - Python **3.14** (Dockerfile, CI, Render, ruff `py314`).
 - Lint: `ruff check .` — partial select (E9/F63/F7/F82/F401/F541/E401/I).
 - Types: `pyright app` via `pyrightconfig.json` (basic); CI **continue-on-error**
-  (report-only). Last recorded baseline: **61 errors, 6 warnings** (2026-08-02).
+  (report-only). Last recorded: **60 errors, 6 warnings** (2026-09-17). The
+  previously cited baseline was 56/6.
 - Tests: `SECRET_KEY=x DEBUG=true ./venv/bin/python -m pytest -q` — prefer
   `./venv` for sqlcipher. Count drifts with the branch; re-run before release.
 - UI: Simple/Advanced via `localStorage.uiMode` + `data-mode` (theme-init pre-paint).
@@ -23,7 +24,7 @@
   Source Serif 4 headings, Source Sans 3 body/UI (self-hosted). Hybrid frost
   cards on a soft wash, score ring on Search. Sieve pan as favicon, nav
   mark, and empty-state illustration (Search / Clean up / Clusters).
-  CSS cache-bust `style.css?v=20260912k`. Mobile app nav is a one-row
+  CSS cache-bust `style.css?v=20260917b`. Mobile app nav is a one-row
   brand + menu; steps and tools open in a drawer.
 - Reader Mode: **Explain this study** on Search/Clean up cards — structured
   plain-language reading of one abstract, cached per
@@ -118,41 +119,15 @@ Guest User (is_guest) → sample corpus only; purged by age
 - Host entry: `app.main:app` port 7860; Linux `./venv`
 
 ## Session Handoff
-- **Date:** 2026-09-13
-- **Branch:** `fix/audit-a01-a11-a15` (PR #65). Version **5.4.0**.
-- **Done:** A01 option 2 (per-account AI keys) plus A02, A11–A18 from the
-  2026-09-06 audit. Reader verifier is v3 (CI bounds and p-value operators).
-  Embedding aliases resolve to the configured repo. HDBSCAN on tiny libraries
-  returns one group. Merged PR #64 so the airy glass UI is back on this
-  branch (`style.css?v=20260912k`). Simple Search screening counts are a
-  two-row funnel (collected, then kept vs removed). Show me what would
-  go is a split-pane review of proposed set-aside vs stay, with per-paper
-  keep/aside before confirm. Simple result cards have More like this,
-  which re-ranks the same collected library from that paper (seed stays
-  in the list; no new fetch). UX round 2 m1 (focused Simple Search list)
-  and m3 (Account section nav) are in production CSS/HTML/JS, not the
-  gitignored mockups. Funnel, split-pane screening, and More like this
-  are unchanged.
-- **Next:** Roadmap Phase 4 leftover: account cap and restore drill.
-  A03–A08 exist on other local branches. spec.md still says AI keys live
-  in `user_data/ai_settings.json` (drift, not edited). Spec lists seed
-  paper and more like starred, not Simple per-card More like this, and
-  does not describe the Simple split-pane screening review, the Simple
-  focused-list card chrome, or the Account section nav.
-- **Date:** 2026-09-09
-- **Branch:** `fix/a06-backup-custom-paths`
-- **Done:** Audit finding A06 — `tools/backup.py` discovers the live accounts
-  DB via `USERS_DB` and the library tree via `USER_DATA_DIR`, archives them
-  under stable `users.db` / `user_data/` prefixes, and `--restore` writes
-  them back to those live paths.
-- **Next:** A07 (unbounded notes bypass the storage cap). Do not push/PR
-  until asked.
-- **Date:** 2026-09-09
-- **Branch:** `fix/a08-stale-tab-library`
-- **Done:** A08 — Search/note/screening/fetch/prepare can bind to an owned
-  `library_id` instead of whichever library is currently active. A tab
-  that loaded library A reloads if another tab made B active. Tests in
-  `tests/test_libraries_http.py`, `tests/test_libraries.py`, and
-  `tests/test_static_js.py`.
-- **Next:** A09+ of the 2026-09-06 code audit (not started). A06–A08 are
-  separate branches off `origin/main` (A08 stacked on A07).
+- **Date:** 2026-09-17
+- **Branch:** `fix/audit-followups-2026-09-17` (local, off `main` at `7da5864`).
+  Version **5.4.0**. Nothing pushed.
+- **Done:** Audit follow-ups 1 to 8. Deploy tests isolate
+  `LITSIEVE_DEPLOY_STATE`. Detached deploys use the live working directory
+  and `.env`. Light `--ok` is `#137537`. Phone wordmark is unclipped.
+  Frost tokens fall back to `--surface` without backdrop-filter. Nav count
+  stays hidden until `/api/statistics`. Demo banner is at most 6rem at
+  380px. Failed fetch sources use `is-failed` with `--warn`.
+- **Next:** Claude review. GLM writes the `docs/DEPLOY.md` detached-deploy
+  section after this lands. Host-side Phase 4 status list. `spec.md:96`
+  drift still needs approval.

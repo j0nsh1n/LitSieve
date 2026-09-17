@@ -8,6 +8,16 @@ and this project aims to follow Semantic Versioning for app version strings
 
 ## [Unreleased]
 
+### Fixed
+- Light success green meets 4.5:1 contrast on the page wash.
+- The phone top bar shows the full LitSieve wordmark.
+- Frosted surfaces stay solid when the browser cannot blur.
+- The top-bar article count stays empty until the real number loads.
+- The demo banner is a single compact strip on small phones.
+- A source that failed during fetch is marked as failed, not as empty.
+- Detached operator deploys start in the live checkout with its `.env`, so
+  the audit row writes to the live accounts database.
+
 ## [5.4.0] - 2026-09-13
 
 ### Changed

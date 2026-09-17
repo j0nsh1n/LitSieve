@@ -827,6 +827,9 @@ body {
     transition: color var(--dur-fast) var(--ease-soft),
                 opacity var(--dur-med) var(--ease-soft);
 }
+#nav-article-count[hidden] {
+    display: none !important;
+}
 
 .theme-toggle,
 .mode-toggle {
@@ -3801,7 +3804,10 @@ html[data-mode="simple"] body.simple-collecting #search-query-top {
     color: var(--text-soft);
     opacity: 0.9;
 }
-/* Failures stay muted — not --err alarm (overall job often still succeeds). */
+.fetch-live-row.is-failed .fetch-live-detail {
+    color: var(--warn);
+}
+/* Failures use --warn, not --err alarm (overall job often still succeeds). */
 
 /* List skeletons — match article-card vertical rhythm */
 .skeleton-card {
@@ -5921,6 +5927,30 @@ body[data-guest="1"] .guest-fetch-note {
 }
 .guest-banner-logout {
     font-weight: 500;
+}
+@media (max-width: 380px) {
+    .guest-banner {
+        padding: var(--space-1) var(--space-2);
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-1);
+        max-height: 6rem;
+    }
+    .guest-banner-text {
+        margin: 0;
+        font-size: var(--fs-xs);
+        line-height: var(--lh-tight);
+    }
+    .guest-banner-actions {
+        flex-wrap: nowrap;
+        margin: 0;
+        gap: var(--space-1);
+    }
+    .guest-banner-actions .btn {
+        min-height: 2.75rem;
+        flex: 1 1 0;
+        min-width: 0;
+    }
 }
 
 /* Search */

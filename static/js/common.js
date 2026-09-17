@@ -977,6 +977,7 @@ async function updateNavStats() {
         if (!response.ok) return;
         const stats = await response.json();
         el.textContent = `${stats.total_articles} articles`;
+        el.hidden = false;
     } catch (e) {
         // silent
     }

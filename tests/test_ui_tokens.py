@@ -212,10 +212,19 @@ def test_fetch_live_sources_markup_and_renderer():
     assert "source_status" in dm_js
     # Must not invent progress — only fields from the progress payload.
     assert "searching…" in dm_js or "searching..." in dm_js
+    assert "is-failed" in dm_js
+    assert "is-muted" in dm_js
     css = CSS
     assert ".fetch-live-sources" in css
     assert ".skeleton-card" in css
     assert "shimmer" in css
+    failed = re.search(
+        r"\.fetch-live-row\.is-failed\s+\.fetch-live-detail\s*\{([^}]+)\}",
+        css,
+    )
+    assert failed, "failed-source detail rule missing"
+    assert "var(--warn)" in failed.group(1)
+    assert "var(--err)" not in failed.group(1)
 
 
 def test_search_optimistic_star_and_skeletons():
@@ -255,6 +264,67 @@ def test_mobile_380_has_overflow_guard_and_tap_targets():
     assert ".nav-library-wrap { display: none; }" not in block
     assert "minmax(0, 4.75rem)" not in block
     assert "max-width: 4.75rem" not in block
+
+
+def test_guest_banner_compacts_within_six_rem_at_380px():
+    css = CSS
+    found = False
+    for m in re.finditer(r"@media \(max-width: 380px\)\s*\{", css):
+        brace = m.end() - 1
+        depth = 0
+        end = None
+        for i, ch in enumerate(css[brace:], brace):
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    end = i
+                    break
+        if end is None:
+            continue
+        body = css[brace + 1 : end]
+        if ".guest-banner" not in body:
+            continue
+        found = True
+        banner = re.search(r"\.guest-banner\s*\{([^}]+)\}", body)
+        assert banner, "380px .guest-banner rule missing"
+        assert "max-height: 6rem" in banner.group(1)
+        actions = re.search(r"\.guest-banner-actions\s*\{([^}]+)\}", body)
+        assert actions, "380px .guest-banner-actions rule missing"
+        assert "flex-wrap: nowrap" in actions.group(1)
+        btns = re.search(r"\.guest-banner-actions\s+\.btn\s*\{([^}]+)\}", body)
+        assert btns, "380px guest banner button rule missing"
+        assert "min-height: 2.75rem" in btns.group(1)
+    assert found, "no 380px guest-banner compact rule"
+
+
+def test_nav_article_count_stays_hidden_until_statistics():
+    base = (REPO / "templates" / "base.html").read_text(encoding="utf-8")
+    assert "-- articles" not in base
+    badge = re.search(
+        r"<span[^>]*id=\"nav-article-count\"[^>]*>",
+        base,
+    )
+    assert badge, "nav article count badge missing"
+    assert re.search(r"\bhidden\b", badge.group(0))
+    assert 'aria-live="polite"' in badge.group(0)
+    common = (REPO / "static" / "js" / "common.js").read_text(encoding="utf-8")
+    fn = common[
+        common.find("async function updateNavStats") : common.find(
+            "document.addEventListener('DOMContentLoaded'"
+        )
+    ]
+    assert "/api/statistics" in fn
+    ok_guard = fn.find("if (!response.ok) return")
+    stats_json = fn.find("response.json()")
+    show = fn.find("el.hidden = false")
+    if show == -1:
+        show = fn.find('removeAttribute("hidden")')
+    if show == -1:
+        show = fn.find("removeAttribute('hidden')")
+    assert ok_guard != -1 and stats_json != -1 and show != -1
+    assert ok_guard < stats_json < show
 
 
 def test_simple_results_clear_the_fixed_export_bar():

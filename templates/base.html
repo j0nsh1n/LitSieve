@@ -7,7 +7,7 @@
     <link rel="icon" href="/static/favicon.svg?v=20260828a" type="image/svg+xml">
     <link rel="icon" href="/static/favicon.ico?v=20260803a" sizes="32x32">
     <link rel="apple-touch-icon" href="/static/favicon.png?v=20260803a">
-    <link rel="stylesheet" href="/static/css/style.css?v=20260917a">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260917b">
     <script src="/static/js/theme-init.js?v=20260823a"></script>
     {% block head_extra %}{% endblock %}
 </head>
@@ -27,7 +27,7 @@
     {% if user and user.is_guest %}
     <div class="guest-banner" role="status">
      <p class="guest-banner-text">
-      <strong>Demo mode</strong> (ends after 30 minutes). Sample papers only — no real database fetch.
+      <strong>Demo mode</strong> (30-minute limit).
      </p>
      <div class="guest-banner-actions">
       <a href="/register" class="btn btn-primary btn-sm guest-banner-register">Create a free account</a>
@@ -138,7 +138,7 @@
             </a>
             <a href="/logout" class="nav-logout">Logout</a>
             {% endif %}
-            <span class="stat-badge" id="nav-article-count" aria-live="polite">-- articles</span>
+            <span class="stat-badge" id="nav-article-count" aria-live="polite" hidden></span>
         </div>
             </div>
         </div>
@@ -158,7 +158,7 @@
         {{ scope_footer() }}
     </footer>
 
-    <script src="/static/js/common.js?v=20260913a"></script>
+    <script src="/static/js/common.js?v=20260917a"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>
