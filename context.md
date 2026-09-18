@@ -126,11 +126,16 @@ Guest User (is_guest) → sample corpus only; purged by age
 - **Branch:** `feat/ui3-workshop` (PR #70, phone round folded in), stacked
   on `fix/audit-followups-2026-09-17` (PR #69). Version **5.5.0** in
   `app/main.py`.
-- **Done:** Roadmap Phase 14 in five commits: Workshop tokens and surfaces
-  with no blur; Simple results open in place; Simple collect as a guided
-  column with line-icon chips and a Next button; the motion set; release
-  bookkeeping. Full suite green after each unit; each unit driven in headless
-  Chromium on a throwaway server (`design_mockups/ui3/capture/*.mjs`).
+- **Done:** Roadmap Phase 14: Workshop tokens and surfaces with no blur;
+  Simple results open in place; Simple collect as a guided column with
+  line-icon chips and a Next button; the motion set; the pre-fetch count
+  dialog; the phone round; Save your work anchored while scrolling. Full
+  suite green after each unit; each unit driven in headless Chromium on a
+  throwaway server (`design_mockups/ui3/capture/*.mjs`).
+- **Watch out:** a CSS animation with `fill-mode: both`/`forwards` that
+  animates `transform` leaves an identity matrix behind, which makes that
+  element the containing block for its `position: fixed` descendants. Use
+  `backwards` for entrance animations.
 - **Next:** Merge #69 then #70; deploy 5.5.0 to the host and tick Phase 14
   on the roadmap branch. Phase 13 (fold Advanced into Simple) waits behind
   this.

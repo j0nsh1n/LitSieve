@@ -42,6 +42,11 @@ and this project aims to follow Semantic Versioning for app version strings
   fields stack.
 - A button that carries an icon or two mode labels keeps them through a
   loading cycle instead of collapsing to plain text.
+- **Save your work stayed at the bottom of the page instead of following
+  you.** On phones the export bar is pinned to the bottom of the screen and
+  on wide screens the panel stays beside the results while you scroll.
+  Toasts, the screening triage overlay, and its detail pane were anchored
+  the same wrong way and are fixed by the same change.
 
 ### Fixed
 - Light success green meets 4.5:1 contrast on the page wash.

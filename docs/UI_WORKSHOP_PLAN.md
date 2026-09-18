@@ -68,6 +68,13 @@ asks one question at a time.
    44 px Open buttons, folded Getting started card, drawer as a panel over a
    scrim, Account nav edge fade, thumb-sized checkboxes, stacked dialog
    fields. `setLoading` now restores markup, not text.
+9. Save your work anchored while scrolling (Jonathan's note). The page shell
+   animation filled forwards, and a filled transform serialises as an
+   identity matrix even when the last keyframe says `none`, so `.container`
+   was the containing block for every `position: fixed` surface inside it.
+   The fill is now `backwards`. On desktop the rail also needed
+   `align-self: stretch`, since `align-items: start` left its sticky child
+   no travel.
 
 ## Verification
 

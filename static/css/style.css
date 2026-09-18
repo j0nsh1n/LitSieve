@@ -1920,6 +1920,11 @@ input[type="range"]::-moz-range-thumb:hover {
     margin-bottom: var(--space-5);
 }
 @media (min-width: 901px) {
+    /* align-items: start sizes this grid item to its content, which leaves its
+       sticky child no room to travel, so Save your work scrolled away. */
+    .search-rail {
+        align-self: stretch;
+    }
     .search-rail .card {
         background: var(--surface);
         border: 1px solid var(--rule);
@@ -5690,8 +5695,16 @@ html, body {
 /* Soft enter: content is ALWAYS visible by default (never pre-hide).
    Optional fade-up runs only after body.page-enter is set.
    Exit fade is the only path that drops opacity. */
+/* backwards, never both. A forward fill keeps the animated transform applied
+   after the run, and an animated transform serialises as an identity matrix
+   even when the last keyframe says `none`. Any transform makes .container the
+   containing block for its position: fixed descendants, so every fixed surface
+   inside the page was measured against the container instead of the viewport:
+   the Simple Save your work bar, the toast area, the screening triage overlay
+   and its detail pane. With backwards the element returns to its own style
+   when the animation ends, which already matches the final keyframe. */
 html.js-ready body.page-enter .container {
-    animation: pageEnter var(--dur-slow) var(--ease-out) both;
+    animation: pageEnter var(--dur-slow) var(--ease-out) backwards;
 }
 
 html.js-ready body.page-exit .container {

@@ -16,19 +16,35 @@ CSS = (REPO / "static" / "css" / "style.css").read_text(encoding="utf-8")
 PHONE = CSS[CSS.index("/* === Phones (Phase 15)") :]
 
 
+def _blocks(text: str, query: str) -> list[str]:
+    """Bodies of every @media block with this query inside `text`."""
+    out = []
+    needle = f"@media ({query})"
+    pos = 0
+    while True:
+        start = text.find(needle, pos)
+        if start == -1:
+            return out
+        brace = text.index("{", start)
+        depth = 0
+        for i in range(brace, len(text)):
+            if text[i] == "{":
+                depth += 1
+            elif text[i] == "}":
+                depth -= 1
+                if depth == 0:
+                    out.append(text[brace + 1 : i])
+                    pos = i
+                    break
+        else:
+            raise AssertionError("unbalanced block")
+
+
 def _block(text: str, query: str) -> str:
-    """Body of the first @media block with this query inside `text`."""
-    start = text.index(f"@media ({query})")
-    brace = text.index("{", start)
-    depth = 0
-    for i in range(brace, len(text)):
-        if text[i] == "{":
-            depth += 1
-        elif text[i] == "}":
-            depth -= 1
-            if depth == 0:
-                return text[brace + 1 : i]
-    raise AssertionError("unbalanced block")
+    """Every @media block with this query, joined."""
+    blocks = _blocks(text, query)
+    assert blocks, f"no @media ({query}) block"
+    return "\n".join(blocks)
 
 
 def test_phone_search_bar_is_one_row_with_an_icon_button():
@@ -118,3 +134,43 @@ def test_set_loading_keeps_button_markup():
     assert '<button id="search-btn" class="btn btn-primary" aria-label="Search" data-keep-content>' in search
     collect = (REPO / "templates" / "partials" / "collect_ui.html").read_text(encoding="utf-8")
     assert 'id="fetch-btn" class="btn btn-primary" data-keep-content>' in collect
+
+
+def test_page_shell_animation_does_not_fill_forwards():
+    """A filled transform on .container breaks every fixed surface inside it.
+
+    An animated transform serialises as an identity matrix even when the last
+    keyframe says `none`, and any transform makes the element the containing
+    block for its position: fixed descendants. The Simple Save your work bar,
+    the toast area and the screening triage overlay all live inside
+    .container, so a forwards fill anchors them to the page instead of the
+    viewport.
+    """
+    rule = re.search(r"html\.js-ready body\.page-enter \.container \{([^}]+)\}", CSS)
+    assert rule, "page-enter animation rule missing"
+    animation = re.search(r"animation:\s*([^;]+);", rule.group(1))
+    assert animation, "page-enter rule has no animation"
+    value = animation.group(1)
+    assert "pageEnter" in value
+    assert " backwards" in value, value
+    assert "both" not in value and "forwards" not in value, value
+
+
+def test_simple_panel_is_anchored_while_scrolling():
+    """Save your work stays reachable: a bottom bar on phones, a sticky rail on
+    desktop. The rail is a grid item under align-items: start, so it needs
+    align-self: stretch or its sticky child has no room to travel."""
+    phone = _block(CSS[CSS.index("/* --- Phase 6 small screens") :], "max-width: 900px")
+    panel = re.search(r'html\[data-mode="simple"\] \.search-simple-panel:not\(\[hidden\]\) \{([^}]+)\}', phone)
+    assert panel, "phone bottom bar rule missing"
+    assert "position: fixed" in panel.group(1)
+    assert "bottom: 0" in panel.group(1)
+    desktop = _block(CSS, "min-width: 901px")
+    rail = re.search(r"\.search-rail \{([^}]+)\}", desktop)
+    assert rail and "align-self: stretch" in rail.group(1), "desktop rail needs sticky travel"
+    sticky = re.search(r"\.search-rail-sticky \{([^}]+)\}", CSS)
+    assert sticky and "position: sticky" in sticky.group(1)
+    # The results column reserves room for the bar so the last paper is reachable.
+    search_js = (REPO / "static" / "js" / "search.js").read_text(encoding="utf-8")
+    assert "--simple-panel-h" in search_js
+    assert "has-simple-panel" in search_js
