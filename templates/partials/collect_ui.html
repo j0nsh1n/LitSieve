@@ -15,16 +15,16 @@
   <h2>Getting started</h2>
   <button type="button" class="btn btn-sm btn-secondary" id="dismiss-getting-started" title="Hide this checklist">Dismiss</button>
  </div>
- <p class="info-text">Three quick steps. Preparing papers for search runs itself after the fetch.</p>
+ <p class="info-text gs-lead">Three quick steps. Preparing papers for search runs itself after the fetch.</p>
  <ol class="getting-started-list">
   <li data-step="topics"><span class="gs-check" aria-hidden="true">○</span> Narrow your lens — pick at least one general area</li>
   <li data-step="query"><span class="gs-check" aria-hidden="true">○</span> Type a <strong>topic</strong> (save your real question for Search later)</li>
   <li data-step="fetch"><span class="gs-check" aria-hidden="true">○</span> Press <strong>Find articles on your topic</strong></li>
  </ol>
- <p class="info-text u-mt-lg">
-  Prefer a dry run with no APIs?
+ <p class="info-text u-mt-lg gs-sample">
+  <span class="gs-sample-ask">Prefer a dry run with no APIs?</span><span class="gs-sample-ask-short">New here?</span>
   <button type="button" id="load-sample-btn" class="btn btn-secondary btn-sm">Load sample papers</button>
-  (~20 education-themed demos; replaces an empty collection)
+  <span class="gs-sample-note">(~20 education-themed demos; replaces an empty collection)</span>
  </p>
 </section>
 
@@ -100,7 +100,7 @@
   </div>
  </details>
  <div class="form-row fetch-actions">
- <button type="submit" id="fetch-btn" class="btn btn-primary">
+ <button type="submit" id="fetch-btn" class="btn btn-primary" data-keep-content>
   <span class="dm-btn-advanced">Fetch Articles</span>
   <span class="dm-btn-simple">Find articles on your topic</span>
  </button>

@@ -5519,8 +5519,10 @@ html, body {
 
 /* Very small phones — different layout (not a squeezed desktop) */
 @media (max-width: 380px) {
+    /* clip, not hidden: hidden turns body into a scroll container and kills
+       position: sticky for the top bar and the phone query bar. */
     body {
-        overflow-x: hidden;
+        overflow-x: clip;
     }
     .search-workbench {
         gap: var(--space-3);
@@ -7814,4 +7816,216 @@ html[data-mode="simple"] #collect-fetch-card.scene-in {
 @keyframes collectArrive {
     from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: none; }
+}
+
+/* === Phones (Phase 15): what a student sees on a 360 to 430 px screen === */
+
+/* The Search button carries a magnifier for phones; the word stays for
+   wider screens and for screen readers through aria-label. */
+.search-btn-icon {
+    display: none;
+    width: 1.35rem;
+    height: 1.35rem;
+}
+.gs-sample-ask-short { display: none; }
+
+/* Native checkboxes are 13 px; a thumb needs more. */
+input[type="checkbox"] {
+    width: 1.25rem;
+    height: 1.25rem;
+    accent-color: var(--accent);
+}
+
+@media (max-width: 900px) {
+    /* The drawer is a real panel over a scrim, not a list bleeding into the page. */
+    .nav-drawer {
+        background: var(--surface);
+        border: 1px solid var(--rule);
+        border-bottom: 3px solid var(--edge);
+        border-radius: var(--radius-md);
+        padding: var(--space-3);
+        box-shadow: var(--elev-2);
+    }
+    body.nav-menu-open::after {
+        content: "";
+        position: fixed;
+        inset: 0;
+        z-index: 99;
+        background: var(--scrim);
+    }
+    body.nav-menu-open .navbar .nav-username,
+    body.nav-menu-open .navbar .nav-logout {
+        display: inline-flex;
+        align-items: center;
+        min-height: 2.75rem;
+        padding: 0 var(--space-3);
+        font-size: var(--fs-sm);
+        border: 1px solid var(--rule);
+        border-radius: var(--radius-full);
+        color: var(--text);
+    }
+    /* The Account section nav scrolls sideways; a fade at the edge says so. */
+    .account-sidenav::after {
+        content: "";
+        position: sticky;
+        right: 0;
+        flex: none;
+        align-self: stretch;
+        width: 2.5rem;
+        margin-left: calc(-1 * var(--space-6));
+        background: linear-gradient(to right, transparent, var(--surface));
+        pointer-events: none;
+    }
+    .account-nav-link { scroll-snap-align: start; }
+    .account-sidenav { scroll-snap-type: x proximity; scroll-padding: var(--space-4); }
+}
+
+@media (max-width: 640px) {
+    /* Search header: one title, the count inline, no kicker. */
+    html[data-mode="simple"] .search-page-header {
+        margin-bottom: var(--space-3);
+        padding-bottom: var(--space-2);
+    }
+    html[data-mode="simple"] .search-page-header .search-kicker,
+    html[data-mode="simple"] .search-page-header .search-kicker-simple { display: none !important; }
+    html[data-mode="simple"] .search-page-header .pagehead h1 { font-size: var(--fs-xl); }
+    html[data-mode="simple"] .search-page-header .search-scope-note summary { font-size: var(--fs-xs); }
+    html[data-mode="simple"] #results-count-line { font-size: var(--fs-xs); }
+
+    /* Query bar: the field and a round magnifier button on one row. */
+    html[data-mode="simple"] .searchcard {
+        flex-direction: row;
+        align-items: center;
+        gap: var(--space-2);
+        padding: var(--space-2);
+    }
+    html[data-mode="simple"] .searchcard #query-text {
+        min-height: 2.75rem;
+        border-right: 1px solid var(--rule);
+        border-radius: var(--radius-full);
+    }
+    html[data-mode="simple"] .searchcard #search-btn {
+        width: 2.75rem;
+        min-width: 2.75rem;
+        max-width: 2.75rem;
+        padding: 0;
+        border-radius: var(--radius-full);
+        flex: 0 0 auto;
+    }
+    html[data-mode="simple"] .searchcard .search-btn-label { display: none; }
+    html[data-mode="simple"] .searchcard .search-btn-icon { display: inline-block; }
+    html[data-mode="simple"] .searchcard #search-btn.is-loading .search-btn-icon {
+        animation: spin 0.9s linear infinite;
+    }
+
+    /* The bar stays under the top bar while the list scrolls. */
+    html[data-mode="simple"] body.simple-screen-ready #search-query-top {
+        position: sticky;
+        top: var(--nav-h, 3.5rem);
+        z-index: 30;
+        margin: 0;
+        padding: var(--space-2) 0;
+        background: var(--bg);
+        border-bottom: 1px solid var(--rule);
+    }
+
+    /* Tools strip: count, Narrow it down, More on one row. */
+    html[data-mode="simple"] .simple-tools-strip,
+    html[data-mode="simple"] .simple-screen-dock {
+        flex-wrap: nowrap;
+        gap: var(--space-2);
+        padding: var(--space-2) var(--space-3);
+    }
+    html[data-mode="simple"] .simple-tools-count {
+        flex: 1 1 auto;
+        min-width: 0;
+        font-size: var(--fs-sm);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    html[data-mode="simple"] .simple-screen-dock #simple-screen-open-btn {
+        flex: 0 0 auto;
+        width: auto;
+        min-height: 2.5rem;
+        padding: var(--space-1) var(--space-3);
+        font-size: var(--fs-sm);
+    }
+    html[data-mode="simple"] .simple-screen-dock .simple-tools-more { flex: 0 0 auto; }
+
+    /* Compact rows: one line of meta, a small ring, a thumb-sized Open. */
+    html[data-mode="simple"] .result-row:not(.is-open) .result-row-head {
+        flex-wrap: nowrap;
+        align-items: center;
+        gap: var(--space-2);
+    }
+    html[data-mode="simple"] .result-row:not(.is-open) .score-meter {
+        width: 2.25rem;
+        height: 2.25rem;
+        min-width: 2.25rem;
+    }
+    html[data-mode="simple"] .result-row:not(.is-open) .result-venue {
+        flex: 1 1 auto;
+        min-width: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-size: var(--fs-xs);
+    }
+    html[data-mode="simple"] .result-row:not(.is-open) .result-tags { display: none; }
+    html[data-mode="simple"] .result-toggle {
+        top: var(--space-1);
+        right: var(--space-1);
+        min-height: 2.75rem;
+        min-width: 2.75rem;
+        padding: var(--space-2);
+    }
+    html[data-mode="simple"] .result-row.is-open .result-row-head {
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-2);
+    }
+    html[data-mode="simple"] .result-row.is-open .result-venue {
+        flex: 1 1 auto;
+        min-width: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    html[data-mode="simple"] .result-row.is-open .result-tags {
+        flex: 1 1 100%;
+        order: 3;
+    }
+    html[data-mode="simple"] .result-row.is-open .result-row-rail .star-btn,
+    html[data-mode="simple"] .result-row.is-open .result-row-rail .note-toggle,
+    html[data-mode="simple"] .result-row.is-open .result-row-rail .not-relevant-btn {
+        flex: 1 1 0;
+        max-width: none;
+    }
+
+    /* Collect: the Getting started card folds to one line. */
+    html[data-mode="simple"] #getting-started-card { padding: var(--space-3) var(--space-4); }
+    html[data-mode="simple"] #getting-started-card .getting-started-header h2 { font-size: var(--fs-base); }
+    html[data-mode="simple"] #getting-started-card .gs-lead,
+    html[data-mode="simple"] #getting-started-card .gs-sample-ask,
+    html[data-mode="simple"] #getting-started-card .gs-sample-note { display: none; }
+    html[data-mode="simple"] #getting-started-card .gs-sample-ask-short { display: inline; }
+    html[data-mode="simple"] #getting-started-card .gs-sample { margin-top: var(--space-2); }
+    html[data-mode="simple"] .collect-header-simple h1 { font-size: var(--fs-2xl); }
+    html[data-mode="simple"] .collect-header-simple .site-disclaimer {
+        font-size: var(--fs-xs);
+        line-height: var(--lh-snug);
+    }
+    html[data-mode="simple"] #collect-topics-card,
+    html[data-mode="simple"] #collect-fetch-card { padding: var(--space-4) var(--space-4); }
+    html[data-mode="simple"] #collect-topics-next { width: 100%; }
+
+    /* Dialog fields stack; preset chips keep their row. */
+    .lra-modal-fields { grid-template-columns: 1fr; }
+
+    /* Public notice box: quieter on a phone. */
+    .public-body .site-disclaimer {
+        padding: var(--space-3) var(--space-3);
+        font-size: var(--fs-sm);
+    }
 }

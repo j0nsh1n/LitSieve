@@ -31,6 +31,17 @@ and this project aims to follow Semantic Versioning for app version strings
   or a number you write yourself (10 to 2000), and, when the collection
   already has papers, whether to start fresh or add to them. The choice
   is remembered for next time.
+- Phones: the Search bar is the field with a round magnifier button on one
+  row and stays under the top bar while the list scrolls; the title is
+  smaller with the count beside it; the tools strip fits one row; closed
+  result rows show one line of meta with a thumb-sized Open; the open row's
+  actions split the width in thirds; the Getting started card folds to
+  "New here? Load sample papers"; the menu opens as a panel over a dimmed
+  page with full-height Account and Logout rows; the Account section nav
+  fades at its edge to show it scrolls; checkboxes are thumb-sized; dialog
+  fields stack.
+- A button that carries an icon or two mode labels keeps them through a
+  loading cycle instead of collapsing to plain text.
 
 ### Fixed
 - Light success green meets 4.5:1 contrast on the page wash.

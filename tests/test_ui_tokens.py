@@ -256,7 +256,8 @@ def test_mobile_380_has_overflow_guard_and_tap_targets():
     """380px treatment is a real layout: no horizontal scroll intent, 44px taps."""
     css = CSS
     block = css[css.find("@media (max-width: 380px)") :]
-    assert "overflow-x: hidden" in block or "overflow-x:hidden" in block
+    assert "overflow-x: clip" in block or "overflow-x:clip" in block
+    assert "overflow-x: hidden" not in block  # hidden would break position: sticky
     assert "min-height: 2.75rem" in CSS  # 44px-class targets used on small screens
     assert "flex-direction: column" in block  # form-row stacks
     # Library switcher stays reachable (do not hide the wrap).
@@ -788,6 +789,7 @@ RUNTIME_SET_VARS = {
     "--funnel-removed-pct",  # search.js: simple screening funnel
     "--tx", "--ty", "--tr",  # view-transition offsets,
     "--i",  # per-row reveal stagger, set by search.js buildResultCard
+    "--nav-h",  # common.js: measured top bar height for the phone sticky bar
 }
 
 

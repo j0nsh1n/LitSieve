@@ -123,12 +123,20 @@ function showNotification(message, type = 'info') {
 // === Loading helper ===
 function setLoading(buttonEl, loading) {
     if (!buttonEl) return;
-    if (!buttonEl.dataset.originalText) {
-        buttonEl.dataset.originalText = buttonEl.textContent;
-    }
     buttonEl.disabled = loading;
     buttonEl.classList.toggle('is-loading', loading);
-    buttonEl.textContent = loading ? 'Processing...' : buttonEl.dataset.originalText;
+    buttonEl.setAttribute('aria-busy', loading ? 'true' : 'false');
+    // Buttons that carry markup (an icon, dual-mode labels) keep it and show
+    // the busy state through CSS; plain buttons swap their text.
+    if (buttonEl.hasAttribute('data-keep-content')) return;
+    if (!buttonEl.dataset.originalHtml) {
+        buttonEl.dataset.originalHtml = buttonEl.innerHTML;
+    }
+    if (loading) {
+        buttonEl.textContent = 'Processing...';
+    } else {
+        buttonEl.innerHTML = buttonEl.dataset.originalHtml;
+    }
 }
 
 // === Status indicator helper ===
@@ -1136,6 +1144,18 @@ document.addEventListener('DOMContentLoaded', function() {
     const toggle = document.getElementById('nav-menu-toggle');
     const drawer = document.getElementById('nav-drawer');
     if (!nav || !toggle || !drawer) return;
+
+    // The sticky query bar on phones sits exactly under the top bar, whose
+    // height depends on the wordmark and drawer state.
+    const publishNavHeight = () => {
+        document.documentElement.style.setProperty('--nav-h', nav.offsetHeight + 'px');
+    };
+    publishNavHeight();
+    if (typeof ResizeObserver === 'function') {
+        new ResizeObserver(publishNavHeight).observe(nav);
+    } else {
+        window.addEventListener('resize', publishNavHeight);
+    }
 
     let open = false;
 

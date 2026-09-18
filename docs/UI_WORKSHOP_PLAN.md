@@ -62,6 +62,12 @@ asks one question at a time.
 7. Pre-fetch dialog: per-database count as preset chips or a written number,
    with the fresh-or-add choice folded in when papers exist (Jonathan's note
    after 5.5.0 approval). `openSiteForm` gained a `choice` field type.
+8. Phones (branch `feat/ui3-mobile`): one-row search bar with a magnifier
+   button that sticks under the top bar (`--nav-h` published by
+   `common.js`), compact header and tools strip, one-line closed rows with
+   44 px Open buttons, folded Getting started card, drawer as a panel over a
+   scrim, Account nav edge fade, thumb-sized checkboxes, stacked dialog
+   fields. `setLoading` now restores markup, not text.
 
 ## Verification
 
