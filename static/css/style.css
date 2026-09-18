@@ -2,7 +2,7 @@
    LitSieve — Airy glass (hybrid frost)
    Light: bg #eef1f8, surface #f7f9fd, text #1c2430,
    muted #5b6573, accent #2563eb, accent-hover #1d4ed8,
-   on-accent #fff, ok #15803d, warn #96640c, err #a33b35.
+   on-accent #fff, ok #137537, warn #96640c, err #a33b35.
    Dark: bg #0c1424, surface #152036, text #e8eef8,
    muted #9aa8bd, accent #93b4ff, accent-hover #b4c9ff,
    on-accent #0c1424, ok #6ee7a8.
@@ -59,7 +59,7 @@
     --accent: #2563eb;
     --accent-hover: #1d4ed8;
     --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
-    --ok: #15803d;
+    --ok: #137537;
     --warn: #96640c;
     --err: #a33b35;
     --on-accent: #fff;
@@ -193,7 +193,7 @@
     --accent: #2563eb;
     --accent-hover: #1d4ed8;
     --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
-    --ok: #15803d;
+    --ok: #137537;
     --warn: #96640c;
     --err: #a33b35;
     --on-accent: #fff;
@@ -826,6 +826,9 @@ body {
     padding: var(--space-1) var(--space-2);
     transition: color var(--dur-fast) var(--ease-soft),
                 opacity var(--dur-med) var(--ease-soft);
+}
+#nav-article-count[hidden] {
+    display: none !important;
 }
 
 .theme-toggle,
@@ -2086,6 +2089,30 @@ body.lra-modal-open {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
     box-shadow: var(--elev-2), var(--glass-shine);
+}
+/* Without backdrop-filter, frost is a translucent smear and modal scrims vanish. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    :root {
+        --frost: var(--surface);
+        --nav-blur: var(--surface);
+    }
+    [data-theme="dark"] {
+        --frost: var(--surface);
+        --nav-blur: var(--surface);
+    }
+    [data-theme="light"] {
+        --frost: var(--surface);
+        --nav-blur: var(--surface);
+    }
+    @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+            --frost: var(--surface);
+            --nav-blur: var(--surface);
+        }
+    }
+    .lra-modal-backdrop {
+        background: color-mix(in srgb, var(--bg) 70%, transparent);
+    }
 }
 /* Phones: bottom sheet so inputs stay above the soft keyboard. */
 @media (max-width: 640px) {
@@ -3777,7 +3804,10 @@ html[data-mode="simple"] body.simple-collecting #search-query-top {
     color: var(--text-soft);
     opacity: 0.9;
 }
-/* Failures stay muted — not --err alarm (overall job often still succeeds). */
+.fetch-live-row.is-failed .fetch-live-detail {
+    color: var(--warn);
+}
+/* Failures use --warn, not --err alarm (overall job often still succeeds). */
 
 /* List skeletons — match article-card vertical rhythm */
 .skeleton-card {
@@ -5456,9 +5486,9 @@ html, body {
 
     .app-shell,
     .navbar {
-        grid-template-columns: minmax(0, 4.75rem) minmax(0, 1fr);
+        grid-template-columns: max-content minmax(0, 1fr);
     }
-    .nav-brand { max-width: 4.75rem; font-size: var(--fs-sm); }
+    .nav-brand { max-width: none; font-size: var(--fs-sm); }
     .nav-menu-toggle { max-width: 100%; padding: var(--space-1) var(--space-1); min-height: 2.75rem; }
     .nav-library-wrap {
         display: inline-flex;
@@ -5897,6 +5927,30 @@ body[data-guest="1"] .guest-fetch-note {
 }
 .guest-banner-logout {
     font-weight: 500;
+}
+@media (max-width: 380px) {
+    .guest-banner {
+        padding: var(--space-1) var(--space-2);
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-1);
+        max-height: 6rem;
+    }
+    .guest-banner-text {
+        margin: 0;
+        font-size: var(--fs-xs);
+        line-height: var(--lh-tight);
+    }
+    .guest-banner-actions {
+        flex-wrap: nowrap;
+        margin: 0;
+        gap: var(--space-1);
+    }
+    .guest-banner-actions .btn {
+        min-height: 2.75rem;
+        flex: 1 1 0;
+        min-width: 0;
+    }
 }
 
 /* Search */

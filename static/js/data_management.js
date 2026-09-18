@@ -909,9 +909,9 @@ function renderFetchLiveSources(p) {
    detail = 'searching…';
    rowClass += ' is-pending';
   } else if (kind && kind !== 'ok' && kind !== 'no_results') {
-   // Muted — per-source failure is normal while the job overall succeeds.
+   // Warn ink, not alarm: per-source failure is normal while the job overall succeeds.
    detail = String(kind).replace(/_/g, ' ');
-   rowClass += ' is-muted';
+   rowClass += ' is-failed';
   } else if (kind === 'no_results' || count === 0) {
    detail = '0 papers';
    rowClass += ' is-muted';

@@ -212,10 +212,19 @@ def test_fetch_live_sources_markup_and_renderer():
     assert "source_status" in dm_js
     # Must not invent progress — only fields from the progress payload.
     assert "searching…" in dm_js or "searching..." in dm_js
+    assert "is-failed" in dm_js
+    assert "is-muted" in dm_js
     css = CSS
     assert ".fetch-live-sources" in css
     assert ".skeleton-card" in css
     assert "shimmer" in css
+    failed = re.search(
+        r"\.fetch-live-row\.is-failed\s+\.fetch-live-detail\s*\{([^}]+)\}",
+        css,
+    )
+    assert failed, "failed-source detail rule missing"
+    assert "var(--warn)" in failed.group(1)
+    assert "var(--err)" not in failed.group(1)
 
 
 def test_search_optimistic_star_and_skeletons():
@@ -253,6 +262,69 @@ def test_mobile_380_has_overflow_guard_and_tap_targets():
     # Library switcher stays reachable (do not hide the wrap).
     assert ".nav-library-wrap { display: none" not in block
     assert ".nav-library-wrap { display: none; }" not in block
+    assert "minmax(0, 4.75rem)" not in block
+    assert "max-width: 4.75rem" not in block
+
+
+def test_guest_banner_compacts_within_six_rem_at_380px():
+    css = CSS
+    found = False
+    for m in re.finditer(r"@media \(max-width: 380px\)\s*\{", css):
+        brace = m.end() - 1
+        depth = 0
+        end = None
+        for i, ch in enumerate(css[brace:], brace):
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    end = i
+                    break
+        if end is None:
+            continue
+        body = css[brace + 1 : end]
+        if ".guest-banner" not in body:
+            continue
+        found = True
+        banner = re.search(r"\.guest-banner\s*\{([^}]+)\}", body)
+        assert banner, "380px .guest-banner rule missing"
+        assert "max-height: 6rem" in banner.group(1)
+        actions = re.search(r"\.guest-banner-actions\s*\{([^}]+)\}", body)
+        assert actions, "380px .guest-banner-actions rule missing"
+        assert "flex-wrap: nowrap" in actions.group(1)
+        btns = re.search(r"\.guest-banner-actions\s+\.btn\s*\{([^}]+)\}", body)
+        assert btns, "380px guest banner button rule missing"
+        assert "min-height: 2.75rem" in btns.group(1)
+    assert found, "no 380px guest-banner compact rule"
+
+
+def test_nav_article_count_stays_hidden_until_statistics():
+    base = (REPO / "templates" / "base.html").read_text(encoding="utf-8")
+    assert "-- articles" not in base
+    badge = re.search(
+        r"<span[^>]*id=\"nav-article-count\"[^>]*>",
+        base,
+    )
+    assert badge, "nav article count badge missing"
+    assert re.search(r"\bhidden\b", badge.group(0))
+    assert 'aria-live="polite"' in badge.group(0)
+    common = (REPO / "static" / "js" / "common.js").read_text(encoding="utf-8")
+    fn = common[
+        common.find("async function updateNavStats") : common.find(
+            "document.addEventListener('DOMContentLoaded'"
+        )
+    ]
+    assert "/api/statistics" in fn
+    ok_guard = fn.find("if (!response.ok) return")
+    stats_json = fn.find("response.json()")
+    show = fn.find("el.hidden = false")
+    if show == -1:
+        show = fn.find('removeAttribute("hidden")')
+    if show == -1:
+        show = fn.find("removeAttribute('hidden')")
+    assert ok_guard != -1 and stats_json != -1 and show != -1
+    assert ok_guard < stats_json < show
 
 
 def test_simple_results_clear_the_fixed_export_bar():
@@ -467,6 +539,65 @@ def _css_block_tokens(block: str) -> dict[str, str]:
     }
 
 
+_HEX6 = re.compile(r"^#[0-9a-fA-F]{6}$")
+_CONTRAST_INKS = ("--text", "--text-soft", "--accent", "--ok", "--warn", "--err")
+_CONTRAST_GROUNDS = ("--bg", "--surface")
+
+
+def _srgb_channel(value: float) -> float:
+    return value / 12.92 if value <= 0.04045 else ((value + 0.055) / 1.055) ** 2.4
+
+
+def _relative_luminance(hex_color: str) -> float:
+    raw = hex_color.removeprefix("#")
+    r = int(raw[0:2], 16) / 255.0
+    g = int(raw[2:4], 16) / 255.0
+    b = int(raw[4:6], 16) / 255.0
+    return 0.2126 * _srgb_channel(r) + 0.7152 * _srgb_channel(g) + 0.0722 * _srgb_channel(b)
+
+
+def _wcag_contrast(fg: str, bg: str) -> float:
+    lighter = max(_relative_luminance(fg), _relative_luminance(bg))
+    darker = min(_relative_luminance(fg), _relative_luminance(bg))
+    return (lighter + 0.05) / (darker + 0.05)
+
+
+def _theme_token_blocks() -> list[tuple[str, dict[str, str]]]:
+    css = CSS
+    pref = re.search(
+        r"@media\s*\(\s*prefers-color-scheme\s*:\s*dark\s*\)\s*\{"
+        r"\s*:root:not\(\[data-theme=\"light\"\]\)\s*\{([^}]+)\}",
+        css,
+    )
+    explicit = re.search(r"\[data-theme=\"dark\"\]\s*\{([^}]+)\}", css)
+    assert pref, "prefers-color-scheme dark block missing"
+    assert explicit, "[data-theme=dark] block missing"
+    return [
+        (":root", _css_block_tokens(_root_block())),
+        ('[data-theme="dark"]', _css_block_tokens(explicit.group(1))),
+        ("prefers-color-scheme dark", _css_block_tokens(pref.group(1))),
+    ]
+
+
+def test_theme_inks_meet_wcag_aa_on_page_grounds():
+    """Ink tokens must stay AA against both page grounds, measured not pinned."""
+    failures = []
+    for label, tokens in _theme_token_blocks():
+        for name in _CONTRAST_INKS:
+            value = tokens.get(name, "")
+            assert _HEX6.fullmatch(value), f"{label} {name} is not a 6-digit hex: {value!r}"
+        for ground_name in _CONTRAST_GROUNDS:
+            ground = tokens.get(ground_name, "")
+            assert _HEX6.fullmatch(ground), f"{label} {ground_name} is not a 6-digit hex: {ground!r}"
+            for ink_name in _CONTRAST_INKS:
+                ratio = _wcag_contrast(tokens[ink_name], ground)
+                if ratio < 4.5:
+                    failures.append(
+                        f"{label} {ink_name}={tokens[ink_name]} on {ground_name}={ground}: {ratio}"
+                    )
+    assert not failures, "contrast below 4.5:1: " + "; ".join(failures)
+
+
 def test_phase10_dark_blocks_stay_in_parity():
     """Phase 10: prefers-color-scheme dark and [data-theme=dark] must match.
 
@@ -494,12 +625,10 @@ def test_phase10_dark_blocks_stay_in_parity():
     for tokens in (a, b):
         assert tokens.get("--bg") == "#0c1424"
         assert tokens.get("--surface") == "#152036"
-        assert tokens.get("--text") == "#e8eef8"
-        assert tokens.get("--text-soft") == "#9aa8bd"
         assert tokens.get("--rule") == "#243044"
         assert tokens.get("--accent") == "#93b4ff"
-        assert tokens.get("--ok") == "#6ee7a8"
         assert tokens.get("--on-accent") == "#0c1424"
+        assert tokens.get("--ok") != tokens.get("--accent")
 
 
 def test_airy_glass_light_tokens():
@@ -510,11 +639,8 @@ def test_airy_glass_light_tokens():
     assert tokens.get("--surface") == "#f7f9fd"
     assert tokens.get("--accent") == "#2563eb"
     assert tokens.get("--accent-hover") == "#1d4ed8"
-    assert tokens.get("--ok") == "#15803d"
     assert tokens.get("--ok") != tokens.get("--accent")
     assert tokens.get("--on-accent") == "#fff"
-    # Amber was #a8700f = 4.21:1 on white, under AA. Darkened for contrast.
-    assert tokens.get("--warn") == "#96640c"
     assert "Source Sans 3" in tokens.get("--font-sans", "")
     assert "Source Serif 4" in tokens.get("--font-serif", "")
     assert "--frost" in root
@@ -675,3 +801,48 @@ def test_no_css_var_falls_back_to_a_hardcoded_colour():
         "Define them in :root, use an existing token, or add to RUNTIME_SET_VARS "
         "if JS sets them via setProperty."
     )
+
+
+def test_backdrop_filter_unsupported_falls_back_to_opaque_surface():
+    needle = (
+        "@supports not ((backdrop-filter: blur(1px)) or "
+        "(-webkit-backdrop-filter: blur(1px)))"
+    )
+    start = CSS.find(needle)
+    assert start != -1, "backdrop-filter @supports fallback missing"
+    brace = CSS.find("{", start)
+    depth = 0
+    end = None
+    for i, ch in enumerate(CSS[brace:], brace):
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                end = i
+                break
+    assert end is not None
+    body = CSS[brace + 1 : end]
+    assert re.search(r"--frost\s*:\s*var\(--surface\)", body)
+    assert re.search(r"--nav-blur\s*:\s*var\(--surface\)", body)
+    # A rule that is transparent and relies on a real blur (not `none`) has
+    # nothing behind it once blur is unsupported, so the block must give each
+    # such selector a background of its own. Token fallbacks do not reach them.
+    css_nc = _css_without_comments()
+    fallback_selectors = {
+        " ".join(sel.split())
+        for sel, rule in re.findall(r"([^{}]+)\{([^{}]*)\}", body)
+        if re.search(r"(?:^|;)\s*background(?:-color)?\s*:", rule)
+    }
+    uncovered = []
+    for sel, rule in re.findall(r"([^{}]+)\{([^{}]*)\}", css_nc):
+        blur = re.search(r"(?:^|;)\s*backdrop-filter\s*:\s*([^;]+)", rule)
+        if not blur or blur.group(1).strip() == "none":
+            continue
+        if not re.search(r"(?:^|;)\s*background(?:-color)?\s*:\s*transparent\b", rule):
+            continue
+        for one in sel.split(","):
+            one = " ".join(one.split())
+            if one and one not in fallback_selectors:
+                uncovered.append(one)
+    assert not uncovered, f"transparent blur surfaces with no @supports fallback: {uncovered}"

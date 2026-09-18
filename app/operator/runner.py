@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from app.operator.paths import code_root
+from app.operator.paths import code_root, live_root
 
 ACTION_SCRIPTS = {
     "list_files": "tools/operator/list_files.py",
@@ -29,6 +29,21 @@ ACTION_SCRIPTS = {
 
 _SECRET_RE = re.compile(
     r"(?i)(secret_key|password|passwd|token|authorization|api[_-]?key)\s*[=:]\s*\S+"
+)
+# Forwarded onto the transient unit when set. Secrets stay in EnvironmentFile
+# so they never appear on the systemd-run command line.
+_DETACHED_ENV_NAMES = (
+    "USERS_DB",
+    "USER_DATA_DIR",
+    "LITSIEVE_LIVE",
+    "LITSIEVE_REPO",
+    "LITSIEVE_STAGING",
+    "LITSIEVE_HEALTH_URL",
+    "LITSIEVE_HEALTH_MODE",
+    "LITSIEVE_HEALTH_FILE",
+    "LITSIEVE_SKIP_RESTART",
+    "LITSIEVE_DEPLOY_STATE",
+    "LITSIEVE_OPS_AUTHOR",
 )
 TIMEOUTS = {
     "list_files": 30,
@@ -127,14 +142,21 @@ def run_action_detached(
     from an exit code.
     """
     path = script_path(action)
+    live = live_root()
     cmd = [
         "systemd-run",
         "--user",
         "--collect",          # drop the unit once it finishes, success or fail
         f"--unit={unit_name}",
         "--quiet",
+        f"--working-directory={live}",
+        f"--property=EnvironmentFile=-{live / '.env'}",
         f"--setenv=PYTHONPATH={code_root()}",
     ]
+    for key in _DETACHED_ENV_NAMES:
+        value = os.environ.get(key)
+        if value:
+            cmd.append(f"--setenv={key}={value}")
     for key, value in (extra_env or {}).items():
         cmd.append(f"--setenv={key}={value}")
     cmd += [sys.executable, str(path), *(argv or [])]

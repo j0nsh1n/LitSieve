@@ -21,6 +21,12 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 
 @pytest.fixture(autouse=True)
+def _isolate_deploy_state(tmp_path, monkeypatch):
+    """Deploy helpers write a state file; tests must not use the operator's."""
+    monkeypatch.setenv("LITSIEVE_DEPLOY_STATE", str(tmp_path / "deploy-state.json"))
+
+
+@pytest.fixture(autouse=True)
 def _reset_rate_limits():
     """Register/login limits are IP-keyed; many HTTP tests share TestClient host.
 
