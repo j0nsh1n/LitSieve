@@ -176,16 +176,42 @@ def test_simple_fetch_mode_resolver_exists():
     assert do.index("resolveSimpleFetchModeBeforeRequest") < do.index("clearFirst")
 
 
-def test_simple_fetch_skips_dialog_when_empty_and_sets_replace():
-    """Empty collection → no openSiteChoice; force replace (clear_first true)."""
+def test_simple_fetch_dialog_asks_count_every_time_and_mode_only_with_papers():
+    """One dialog before every Simple fetch: preset chips plus a write-your-own
+    number; the fresh-or-add choice joins it only when papers exist, and never
+    twice after Start over already asked."""
     fn = DM[DM.index("async function resolveSimpleFetchModeBeforeRequest") :
             DM.index("async function doFetch")]
-    assert "total <= 0" in fn or "total === 0" in fn
-    assert "setMode('replace')" in fn or 'setMode("replace")' in fn
-    # Dialog only when there are papers.
-    assert "openSiteChoice" in fn
+    assert "openSiteForm" in fn
+    assert "openSiteChoice" not in fn
+    assert "FETCH_COUNT_PRESETS = [25, 50, 100, 200]" in DM
+    for preset in ("'25'", "'50'", "'100'", "'200'"):
+        assert f"value: {preset}" in fn, preset
+    assert "type: 'choice'" in fn
+    assert "Or write your own (10 to 2000)" in fn
+    assert "n < 10 || n > 2000" in fn
+    assert "total <= 0" in fn
+    assert "setMode('replace')" in fn
+    assert "askMode = total > 0 && !(opts && opts.modeAlreadyPicked)" in fn
     assert "Start fresh" in fn
     assert "Add to them" in fn
+    assert "maxEl.value = String(count)" in fn
+    do = DM[DM.index("async function doFetch") : DM.index("async function doCreateEmbeddings")]
+    assert "resolveSimpleFetchModeBeforeRequest({ modeAlreadyPicked: true })" in do
+    # The cap is read after the dialog, so what the student picked is what is sent.
+    assert do.index("if (!proceed) return") < do.index("const maxResults")
+    assert do.index("const maxResults") < do.index("max_results: maxResults")
+
+
+def test_site_form_supports_choice_chips():
+    """openSiteForm renders type 'choice' as radio chips and collects the checked value."""
+    common = (ROOT / "static" / "js" / "common.js").read_text(encoding="utf-8")
+    assert "if (f.type === 'choice') {" in common
+    assert 'class="lra-choice-chip"' in common
+    assert "input[name=\"site-modal-field-' + safeDomId(f.id) + '\"]:checked" in common
+    css = (ROOT / "static" / "css" / "style.css").read_text(encoding="utf-8")
+    assert ".lra-choice-chip:has(input:checked) {" in css
+    assert ".lra-choice-chip:has(input:focus-visible)" in css
 
 
 def test_simple_fetch_cancel_returns_false_before_request():

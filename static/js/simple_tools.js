@@ -125,7 +125,12 @@ function _startWaitMessages() {
   if (window._simpleWaitHolding) return;
   _waitMsgIndex = (_waitMsgIndex + 1) % WAIT_STATUS_LINES.length;
   const el = document.getElementById('search-preparing-status');
-  if (el) el.textContent = WAIT_STATUS_LINES[_waitMsgIndex];
+  if (el) {
+   el.classList.remove('line-swap');
+   void el.offsetWidth;
+   el.textContent = WAIT_STATUS_LINES[_waitMsgIndex];
+   el.classList.add('line-swap');
+  }
  }, 2500);
 }
 
@@ -1500,7 +1505,11 @@ async function resolveSimplePrepareModeBeforeRequest() {
  return true;
 }
 
-async function resolveSimpleFetchModeBeforeRequest() {
+// Per-database cap presets for the Simple pre-fetch dialog. 100 is the
+// long-standing default; a student can still write any number from 10 to 2000.
+var FETCH_COUNT_PRESETS = [25, 50, 100, 200];
+
+async function resolveSimpleFetchModeBeforeRequest(opts) {
  if (typeof isSimpleMode !== 'function' || !isSimpleMode()) {
   return true;
  }
@@ -1519,32 +1528,81 @@ async function resolveSimpleFetchModeBeforeRequest() {
   if (radio) radio.checked = true;
   syncOnlyMissingFromFetchMode();
  };
- // Empty collection: choice is meaningless — start fresh, no dialog.
- if (total <= 0) {
-  setMode('replace');
+ // Empty collection: the fresh-or-add choice is meaningless, so only the
+ // count is asked. Start over already asked it, so it is not asked twice.
+ if (total <= 0) setMode('replace');
+ const askMode = total > 0 && !(opts && opts.modeAlreadyPicked);
+ if (typeof openSiteForm !== 'function') {
+  // Fallback: keep the hidden fields' values if the modal helper is missing.
   return true;
  }
- if (typeof openSiteChoice !== 'function') {
-  // Fallback: keep radios (hidden in Simple CSS) if modal helper missing.
-  return true;
+ const maxEl = document.getElementById('fetch-max');
+ const current = parseInt(maxEl && maxEl.value, 10) || 100;
+ const preset = FETCH_COUNT_PRESETS.includes(current) ? String(current) : '';
+ const fields = [
+  {
+   id: 'count',
+   type: 'choice',
+   label: 'How many papers from each database?',
+   value: preset,
+   options: [
+    { value: '25', label: '25', hint: 'quick look' },
+    { value: '50', label: '50', hint: 'a solid start' },
+    { value: '100', label: '100', hint: 'usual' },
+    { value: '200', label: '200', hint: 'thorough' },
+   ],
+  },
+  {
+   id: 'custom',
+   type: 'number',
+   label: 'Or write your own (10 to 2000)',
+   value: preset ? '' : String(current),
+   placeholder: 'e.g. 150',
+   min: 10,
+   max: 2000,
+   step: 10,
+  },
+ ];
+ if (askMode) {
+  const nLabel = total === 1 ? '1 paper' : `${total} papers`;
+  const currentMode = (document.querySelector('input[name="fetch-mode"]:checked') || {}).value || 'replace';
+  fields.push({
+   id: 'mode',
+   type: 'choice',
+   label: `You already have ${nLabel}. What should happen to them?`,
+   value: currentMode,
+   options: [
+    { value: 'replace', label: 'Start fresh', hint: 'papers that do not come back are removed, with their notes' },
+    { value: 'append', label: 'Add to them', hint: 'keep everything you have' },
+   ],
+  });
  }
- const nLabel = total === 1 ? '1 paper' : `${total} papers`;
- const choice = await openSiteChoice({
-  title: 'You already have papers',
-  message:
-   `You already have ${nLabel}. Start fresh keeps notes, stars, and saved AI key points ` +
-   `only on papers that come back. Papers that do not return are deleted, ` +
-   `along with their notes. Or add these results to what you have?`,
-  choices: [
-   { label: 'Start fresh', value: 'replace', primary: true },
-   { label: 'Add to them', value: 'append' },
-   { label: 'Cancel', value: null, cancel: true },
-  ],
+ const choice = await openSiteForm({
+  title: 'Before we fetch',
+  message: 'Each database returns up to this many papers. More takes longer to fetch and prepare, and leaves more to screen.',
+  confirmLabel: 'Find articles',
+  fields,
+  validate: (vals) => {
+   const custom = String(vals.custom || '').trim();
+   if (custom) {
+    const n = parseInt(custom, 10);
+    if (!Number.isFinite(n) || n < 10 || n > 2000) return 'Write a number from 10 to 2000.';
+   } else if (!vals.count) {
+    return 'Pick how many papers from each database, or write your own number.';
+   }
+   if (askMode && !vals.mode) return 'Choose what happens to the papers you already have.';
+   return '';
+  },
  });
  if (choice == null) return false;
- const picked = choice === 'append' ? 'append' : 'replace';
- setMode(picked);
- _persistFetchMode(picked);
+ const custom = String(choice.custom || '').trim();
+ const count = custom ? parseInt(custom, 10) : parseInt(choice.count, 10);
+ if (maxEl && Number.isFinite(count)) maxEl.value = String(count);
+ if (askMode) {
+  const picked = choice.mode === 'append' ? 'append' : 'replace';
+  setMode(picked);
+  _persistFetchMode(picked);
+ }
  return true;
 }
 

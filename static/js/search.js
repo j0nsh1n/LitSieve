@@ -1043,6 +1043,35 @@ function starLabelHtml(on) {
   + '<span>' + (on ? 'Starred' : 'Star') + '</span>';
 }
 
+// Simple mode: rows render compact and one opens in place. The toggle is a
+// real button so the keyboard gets the same contract as a click on the row.
+function setResultRowOpen(card, open) {
+ card.classList.toggle('is-open', open);
+ const toggle = card.querySelector('.result-toggle');
+ if (toggle) {
+  toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  toggle.textContent = open ? 'Close' : 'Open';
+ }
+}
+
+function openResultRow(card, scrollIntoView) {
+ if (!card) return;
+ document.querySelectorAll('#results-list .result-row.is-open').forEach((row) => {
+  if (row !== card) setResultRowOpen(row, false);
+ });
+ setResultRowOpen(card, true);
+ if (scrollIntoView) {
+  const top = card.getBoundingClientRect().top;
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (top < 96) window.scrollBy({ top: top - 96, behavior: reduce ? 'auto' : 'smooth' });
+ }
+}
+
+function toggleResultRow(card) {
+ if (card.classList.contains('is-open')) setResultRowOpen(card, false);
+ else openResultRow(card, true);
+}
+
 function buildResultCard(article, idx) {
  // Phase 8: scannable row with numeric 0–1 score meter (not Low/Medium/High details).
  const card = document.createElement('article');
@@ -1124,7 +1153,8 @@ function buildResultCard(article, idx) {
   card.innerHTML = `
   <div class="result-row-main">
   ${headHtml}
-  <div class="article-body result-row-body">
+  <button type="button" class="result-toggle" aria-expanded="false" aria-controls="result-body-${idx}">Open</button>
+  <div class="article-body result-row-body" id="result-body-${idx}">
   <div class="article-meta result-row-ids">
   <span><strong>ID:</strong> ${idLink}</span>
   ${clusterBit}
@@ -1216,6 +1246,11 @@ function buildResultCard(article, idx) {
  starBtn.classList.toggle('is-starred', next);
  starBtn.innerHTML = starLabelHtml(next);
  starBtn.setAttribute('aria-pressed', next ? 'true' : 'false');
+ if (next) {
+  starBtn.classList.remove('pop');
+  void starBtn.offsetWidth;
+  starBtn.classList.add('pop');
+ }
  try {
  await apiCall('/api/notes', {
  method: 'POST',
@@ -1311,6 +1346,18 @@ function buildResultCard(article, idx) {
  });
  }
 
+ if (simpleMode) {
+  card.style.setProperty('--i', String(idx));
+  const toggle = card.querySelector('.result-toggle');
+  if (toggle) {
+   toggle.addEventListener('click', (e) => { e.stopPropagation(); toggleResultRow(card); });
+  }
+  card.addEventListener('click', (e) => {
+   if (card.classList.contains('is-open')) return;
+   if (e.target.closest('button, a, summary, textarea, input, select, details[open]')) return;
+   openResultRow(card, true);
+  });
+ }
  return card;
 }
 
@@ -1558,6 +1605,9 @@ function renderResults(results) {
  renderPaginatedList(container, results, buildResultCard, { noun: 'results' });
  } else {
  results.forEach((article, idx) => container.appendChild(buildResultCard(article, idx)));
+ }
+ if (document.documentElement.getAttribute('data-mode') === 'simple') {
+  openResultRow(container.querySelector('.result-row'), false);
  }
 
  if (typeof enhanceAbstracts === 'function') {
