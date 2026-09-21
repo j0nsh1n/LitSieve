@@ -63,6 +63,13 @@ Planned 2026-09-17 to follow the Workshop round, which shipped in 5.5.0. Simple'
 to every moved function: one URL, popups only on tap, plain words, preview
 before apply with one-click undo, hidden until needed, one wait screen.
 - Tasks, one branch each off `main`, in this order:
+  - First, before anything is removed: a Simple "Set aside" list that shows
+    papers excluded for every reason, not only `low_relevance`, with restore.
+    Today the Clusters page is the only screen that can restore any other
+    reason: on 2026-09-21 that was 60 duplicate copies in 5 accounts, plus
+    every Not relevant (`off_topic`) once its instant Undo is gone. It also
+    covers duplicates ("N duplicates set aside" in the funnel); the silent
+    0.98 resolve stays, the threshold control goes
   - Search chips: Years and Sources popovers, Newest first toggle, More like
     starred chip once a paper is starred, export-whole-library option in the
     export panel, PMID/DOI and study type moved inside the abstract
@@ -70,9 +77,6 @@ before apply with one-click undo, hidden until needed, one wait screen.
   - Fetch dialog gains a Databases disclosure (topics still pick the
     defaults); the What we fetched popup gains per-source counts, coverage,
     and year spread, replacing the Data Management and Clean up cards
-  - Duplicates visible: "N duplicates set aside" in the funnel with a popup
-    that restores one pair per click; the silent 0.98 resolve stays, the
-    threshold control goes
   - Re-prepare: only-missing becomes the default; embedding model picker
     leaves the UI (env default stays)
   - Clusters prototype gate: throwaway Group by theme popup, density only,
