@@ -51,8 +51,11 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "Simple: type a topic (the subject you want papers about — save your "
             "actual research question for Narrow it down and Search). Advanced: "
             "type a normal research query (the kind you would type into a library site).",
-            "Set max results per source and choose Replace (start fresh) or Add "
-            "(keep what you already have).",
+            "Simple: pressing Find articles on your topic asks how many papers to "
+            "take from each database (25, 50, 100, or 200, or your own number from "
+            "10 to 2000) and, if the library already has papers, whether to start "
+            "fresh or add to them. Advanced: set max results per source and choose "
+            "Replace (start fresh) or Add (keep what you already have).",
             "Fetch runs sources in parallel in the background; when papers arrive, "
             "prepare-for-search (embeddings) starts automatically so you do not "
             "need a second click. Simple shows a wait screen for fetch and prepare, "
@@ -300,6 +303,10 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "the progress bar follows until they complete.",
             "Theme (light/dark) and Simple/Advanced stay in your browser "
             "on this device.",
+            "Your look (Workshop, Broadsheet, Lab, Night, or Catalog) is saved on "
+            "your account, so it comes with you when you log in on another device. "
+            "New accounts are offered the choice after signing up; change it any "
+            "time on the Account page.",
         ],
         "tips": [
             "Shared computers: log out when finished; do not reuse simple passwords.",

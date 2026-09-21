@@ -16,6 +16,9 @@ and this project aims to follow Semantic Versioning for app version strings
 ### Changed
 - On desktop Simple search, Save your work now sticks just below the Search
   bar instead of sliding under it.
+- The Collect help page explains the per-database paper count asked before a
+  Simple fetch, and the Account help page explains that your look is saved
+  on your account.
 - New look, Workshop: warm sand paper with a clay accent in light, warm
   wood tones in dark, and every card, button, chip, and the query tile
   sitting on a solid edge that presses down when you click. No blur
