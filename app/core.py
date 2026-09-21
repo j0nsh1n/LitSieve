@@ -31,6 +31,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from app.auth import get_current_user
+from app.content.looks import DEFAULT_LOOK, LOOK_CARDS, normalize_look
 from app.services.pipeline import LiteratureSearchPipeline
 from app.storage.libraries import (
     ensure_libraries,
@@ -67,6 +68,8 @@ def _template_context(request: Request) -> dict:
         "site_content": site,
         "known_issues": site.get("known_issues") or "",
         "support_links": site.get("support_links") or [],
+        "look_cards": LOOK_CARDS,
+        "default_look": DEFAULT_LOOK,
     }
 
 
@@ -639,6 +642,7 @@ def current_user(request: Request) -> Optional[dict]:
         "is_guest": guest,
         "is_admin": (not guest) and is_admin_username(username),
         "created_at": record.get("created_at"),
+        "look": normalize_look(record.get("look")),
     }
     request.state._current_user = result
     return result
@@ -663,6 +667,7 @@ def _support_view_user(request: Request) -> Optional[dict]:
         "is_guest": guest,
         "is_admin": False,
         "created_at": record.get("created_at"),
+        "look": normalize_look(record.get("look")),
         "support_view": {
             "id": view["id"],
             "admin_username": view["admin_username"],
@@ -765,6 +770,20 @@ def _set_auth_cookies(response, token: str, max_age: Optional[int] = None):
     response.set_cookie(
         "csrf_token", csrf_token, httponly=False, secure=COOKIE_SECURE,
         samesite="lax", max_age=age,
+    )
+
+
+def _set_look_cookie(response, look: Optional[str], max_age: Optional[int] = None):
+    """Readable cookie so theme-init can paint the account look before CSS."""
+    age = 365 * 24 * 3600 if max_age is None else int(max_age)
+    response.set_cookie(
+        "ui_look",
+        normalize_look(look),
+        httponly=False,
+        secure=COOKIE_SECURE,
+        samesite="lax",
+        max_age=age,
+        path="/",
     )
 
 

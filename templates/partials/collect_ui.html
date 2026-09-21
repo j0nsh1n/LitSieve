@@ -2,9 +2,10 @@
    Data Management (Advanced) and Search (Simple empty / start-over). #}
 <section class="page-header collect-header-simple">
  <h1>Get papers</h1>
- <p class="subtitle">Narrow your lens to the general areas that fit, then find
+ <p class="subtitle dm-sub-advanced">Narrow your lens to the general areas that fit, then find
   papers by <strong>topic</strong>. Save your actual research question for later,
   when you search the collection.</p>
+ <p class="subtitle dm-sub-simple">Pick the areas your topic belongs to, then name the topic.</p>
  {% from "macros/disclaimers.html" import scope_fetch %}
  {{ scope_fetch() }}
 </section>
@@ -14,28 +15,29 @@
   <h2>Getting started</h2>
   <button type="button" class="btn btn-sm btn-secondary" id="dismiss-getting-started" title="Hide this checklist">Dismiss</button>
  </div>
- <p class="info-text">Three quick steps. Preparing papers for search runs itself after the fetch.</p>
+ <p class="info-text gs-lead">Three quick steps. Preparing papers for search runs itself after the fetch.</p>
  <ol class="getting-started-list">
   <li data-step="topics"><span class="gs-check" aria-hidden="true">○</span> Narrow your lens — pick at least one general area</li>
   <li data-step="query"><span class="gs-check" aria-hidden="true">○</span> Type a <strong>topic</strong> (save your real question for Search later)</li>
   <li data-step="fetch"><span class="gs-check" aria-hidden="true">○</span> Press <strong>Find articles on your topic</strong></li>
  </ol>
- <p class="info-text u-mt-lg">
-  Prefer a dry run with no APIs?
+ <p class="info-text u-mt-lg gs-sample">
+  <span class="gs-sample-ask">Prefer a dry run with no APIs?</span><span class="gs-sample-ask-short">New here?</span>
   <button type="button" id="load-sample-btn" class="btn btn-secondary btn-sm">Load sample papers</button>
-  (~20 education-themed demos; replaces an empty collection)
+  <span class="gs-sample-note">(~20 education-themed demos; replaces an empty collection)</span>
  </p>
 </section>
 
 <!-- Step 1: Topics / general areas -->
 <section class="card" id="collect-topics-card">
  <h2 class="dm-step-heading dm-step-advanced">1. Select Topics</h2>
- <h2 class="dm-step-heading dm-step-simple">1. Narrow your lens</h2>
+ <h2 class="dm-step-heading dm-step-simple">Which areas does your topic belong to?</h2>
  <p class="info-text dm-sub-advanced">Choose the academic areas you care about - we use them to recommend sources.</p>
- <p class="info-text dm-sub-simple">Required. Pick the general areas your topic belongs in. That chooses
-  which journals and databases we search, so we do not pull papers from fields
-  that do not fit your topic.</p>
+ <p class="info-text dm-sub-simple">Pick one or more. This chooses which databases we search.</p>
  <div class="topic-grid" id="topic-grid"></div>
+ <p class="dm-step-simple collect-next-row">
+  <button type="button" id="collect-topics-next" class="btn btn-primary" hidden>Next: name your topic</button>
+ </p>
 </section>
 
 <!-- Step 2: Sources -->
@@ -48,13 +50,12 @@
 <!-- Fetch: Advanced step 3 (sources is 2); Simple step 2 (sources hidden). -->
 <section class="card" id="collect-fetch-card">
  <h2 class="dm-step-heading dm-step-advanced">3. Fetch Articles</h2>
- <h2 class="dm-step-heading dm-step-simple">2. Find articles on your topic</h2>
+ <h2 class="dm-step-heading dm-step-simple">What topic do you want papers about?</h2>
  <div id="fetch-lead">
   <p class="info-text dm-sub-advanced">Searches every selected source at once and saves the papers
    to your private collection. Preparing for search starts automatically after a successful fetch.</p>
-  <p class="info-text dm-sub-simple">Type the <strong>topic</strong> you want papers about — a subject,
-   not your full research question. Save the actual question for the next step, when you search
-   through the papers you collect. Preparing for search starts automatically after a successful fetch.</p>
+  <p class="info-text dm-sub-simple">A subject, not your full research question. Save the question for
+   Search. Preparing for search starts on its own after the fetch.</p>
  </div>
  {% include "partials/guest_fetch_note.html" %}
  <div id="simple-fetch-locked" class="simple-fetch-locked" hidden>
@@ -99,7 +100,7 @@
   </div>
  </details>
  <div class="form-row fetch-actions">
- <button type="submit" id="fetch-btn" class="btn btn-primary">
+ <button type="submit" id="fetch-btn" class="btn btn-primary" data-keep-content>
   <span class="dm-btn-advanced">Fetch Articles</span>
   <span class="dm-btn-simple">Find articles on your topic</span>
  </button>

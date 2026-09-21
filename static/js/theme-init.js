@@ -43,6 +43,36 @@
         // Falling back to the default theme/mode is fine; never break the page.
         root.setAttribute('data-mode', 'advanced');
     }
+
+    // Cookie wins so a just-signed-in account is not stuck with the previous
+    // visitor's localStorage look on a shared computer.
+    var LOOKS = {workshop:1, broadsheet:1, lab:1, night:1, catalog:1};
+    window.LRA_LOOKS = LOOKS;
+    window.LRA_LOOK_CARDS = [
+        {id: 'workshop', title: 'Workshop', blurb: 'Warm paper and a clay accent. The current LitSieve look.'},
+        {id: 'broadsheet', title: 'Broadsheet', blurb: 'Ink on newsprint. Serif type, square corners, a double rule.'},
+        {id: 'lab', title: 'Lab', blurb: 'Cool light and a blue accent. Tight corners, like a product UI.'},
+        {id: 'night', title: 'Night', blurb: 'Low light and a lamp glow. Amber on charcoal.'},
+        {id: 'catalog', title: 'Catalog', blurb: 'Library card stock, a maroon stamp, ruled lines.'}
+    ];
+    var look = '';
+    try {
+        var lookCookie = document.cookie.match(/(?:^|;\s*)ui_look=([^;]*)/);
+        if (lookCookie) look = decodeURIComponent(lookCookie[1]);
+        if (!LOOKS[look]) look = localStorage.getItem('uiLook') || '';
+    } catch (eLook) { look = ''; }
+    function applyUiLook(id) {
+        if (!LOOKS[id]) id = 'workshop';
+        root.setAttribute('data-look', id);
+        try { localStorage.setItem('uiLook', id); } catch (eApply) { /* ignore */ }
+        try {
+            var secureApply = location.protocol === 'https:' ? '; Secure' : '';
+            document.cookie = 'ui_look=' + id + '; Path=/; SameSite=Lax; Max-Age=31536000' + secureApply;
+        } catch (eApply2) { /* ignore */ }
+        return id;
+    }
+    window.applyUiLook = applyUiLook;
+    applyUiLook(look);
     root.classList.add('js-ready');
 })();
 

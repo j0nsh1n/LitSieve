@@ -39,7 +39,10 @@
    <input type="text" id="query-text" name="query-text"
     placeholder="How do school start times affect adolescent sleep?" autocomplete="off">
   </div>
-  <button id="search-btn" class="btn btn-primary">Search</button>
+  <button id="search-btn" class="btn btn-primary" aria-label="Search" data-keep-content>
+   <span class="search-btn-label">Search</span>
+   <svg class="search-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.6-4.6"/></svg>
+  </button>
  </div>
  <div class="u-hidden" id="pico-input-panel">
   <p class="info-text">Fill in the parts you know.</p>
@@ -356,8 +359,8 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/simple_tools.js?v=20260913a"></script>
-<script src="/static/js/data_management.js?v=20260917a"></script>
+<script src="/static/js/simple_tools.js?v=20260918b"></script>
+<script src="/static/js/data_management.js?v=20260918a"></script>
 <script src="/static/js/reader.js?v=20260829a"></script>
-<script src="/static/js/search.js?v=20260913a"></script>
+<script src="/static/js/search.js?v=20260918b"></script>
 {% endblock %}

@@ -12,6 +12,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple
 
+from app.content.looks import DEFAULT_LOOK, normalize_look, parse_look
 from app.storage import dbconn
 
 DEFAULT_USERS_DB = "users.db"
@@ -192,6 +193,10 @@ class UserDatabase:
             self.conn.execute("ALTER TABLE users ADD COLUMN quota_limit_mb INTEGER")
         if "quota_limit_until" not in extra:
             self.conn.execute("ALTER TABLE users ADD COLUMN quota_limit_until TEXT")
+        if "look" not in extra:
+            self.conn.execute(
+                "ALTER TABLE users ADD COLUMN look TEXT NOT NULL DEFAULT 'workshop'"
+            )
         self.conn.execute("""
             CREATE TABLE IF NOT EXISTS support_notes (
                 id              TEXT PRIMARY KEY,
@@ -259,7 +264,12 @@ class UserDatabase:
         self.conn.commit()
 
     def create_user(
-        self, username: str, hashed_password: str, *, is_guest: bool = False
+        self,
+        username: str,
+        hashed_password: str,
+        *,
+        is_guest: bool = False,
+        look: str = DEFAULT_LOOK,
     ) -> Dict:
         """Create a user. Raises ValueError if the username is already taken.
 
@@ -269,12 +279,13 @@ class UserDatabase:
         """
         user_id = str(uuid.uuid4())
         guest = 1 if is_guest else 0
+        look = normalize_look(look)
         with self._lock:
             try:
                 self.conn.execute(
-                    "INSERT INTO users (id, username, hashed_password, token_version, is_guest) "
-                    "VALUES (?, ?, ?, 0, ?)",
-                    (user_id, username, hashed_password, guest),
+                    "INSERT INTO users (id, username, hashed_password, token_version, is_guest, look) "
+                    "VALUES (?, ?, ?, 0, ?, ?)",
+                    (user_id, username, hashed_password, guest, look),
                 )
                 self.conn.commit()
             except dbconn.integrity_errors() as e:
@@ -287,7 +298,23 @@ class UserDatabase:
             "username": username,
             "token_version": 0,
             "is_guest": bool(guest),
+            "look": look,
         }
+
+    def set_look(self, user_id: str, look: str) -> Optional[str]:
+        """Persist an allowlisted look. Returns None if the id is unknown or the look is not allowed."""
+        parsed = parse_look(look)
+        if parsed is None:
+            return None
+        with self._lock:
+            cur = self.conn.execute(
+                "UPDATE users SET look = ? WHERE id = ?",
+                (parsed, user_id),
+            )
+            self.conn.commit()
+            if cur.rowcount == 0:
+                return None
+        return parsed
 
     _USER_COLS = (
         "id, username, hashed_password, token_version, email, email_verified, "
@@ -295,7 +322,8 @@ class UserDatabase:
         "COALESCE(failed_logins, 0), last_login_at, last_seen_at, "
         "password_changed_at, COALESCE(storage_bytes, 0), "
         "quota_limit_mb, quota_limit_until, "
-        "disabled_until, disabled_message, disabled_at"
+        "disabled_until, disabled_message, disabled_at, "
+        "COALESCE(look, 'workshop')"
     )
 
     @staticmethod
@@ -325,6 +353,7 @@ class UserDatabase:
             "disabled_until": row[16],
             "disabled_message": row[17],
             "disabled_at": row[18],
+            "look": normalize_look(row[19] if len(row) > 19 else None),
         }
 
     def get_by_username(self, username: str) -> Optional[Dict]:

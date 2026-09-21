@@ -1043,6 +1043,35 @@ function starLabelHtml(on) {
   + '<span>' + (on ? 'Starred' : 'Star') + '</span>';
 }
 
+// Simple mode: rows render compact and one opens in place. The toggle is a
+// real button so the keyboard gets the same contract as a click on the row.
+function setResultRowOpen(card, open) {
+ card.classList.toggle('is-open', open);
+ const toggle = card.querySelector('.result-toggle');
+ if (toggle) {
+  toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  toggle.textContent = open ? 'Close' : 'Open';
+ }
+}
+
+function openResultRow(card, scrollIntoView) {
+ if (!card) return;
+ document.querySelectorAll('#results-list .result-row.is-open').forEach((row) => {
+  if (row !== card) setResultRowOpen(row, false);
+ });
+ setResultRowOpen(card, true);
+ if (scrollIntoView) {
+  const top = card.getBoundingClientRect().top;
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (top < 96) window.scrollBy({ top: top - 96, behavior: reduce ? 'auto' : 'smooth' });
+ }
+}
+
+function toggleResultRow(card) {
+ if (card.classList.contains('is-open')) setResultRowOpen(card, false);
+ else openResultRow(card, true);
+}
+
 function buildResultCard(article, idx) {
  // Phase 8: scannable row with numeric 0–1 score meter (not Low/Medium/High details).
  const card = document.createElement('article');
@@ -1124,7 +1153,8 @@ function buildResultCard(article, idx) {
   card.innerHTML = `
   <div class="result-row-main">
   ${headHtml}
-  <div class="article-body result-row-body">
+  <button type="button" class="result-toggle" aria-expanded="false" aria-controls="result-body-${idx}">Open</button>
+  <div class="article-body result-row-body" id="result-body-${idx}">
   <div class="article-meta result-row-ids">
   <span><strong>ID:</strong> ${idLink}</span>
   ${clusterBit}
@@ -1216,6 +1246,11 @@ function buildResultCard(article, idx) {
  starBtn.classList.toggle('is-starred', next);
  starBtn.innerHTML = starLabelHtml(next);
  starBtn.setAttribute('aria-pressed', next ? 'true' : 'false');
+ if (next) {
+  starBtn.classList.remove('pop');
+  void starBtn.offsetWidth;
+  starBtn.classList.add('pop');
+ }
  try {
  await apiCall('/api/notes', {
  method: 'POST',
@@ -1311,6 +1346,18 @@ function buildResultCard(article, idx) {
  });
  }
 
+ if (simpleMode) {
+  card.style.setProperty('--i', String(idx));
+  const toggle = card.querySelector('.result-toggle');
+  if (toggle) {
+   toggle.addEventListener('click', (e) => { e.stopPropagation(); toggleResultRow(card); });
+  }
+  card.addEventListener('click', (e) => {
+   if (card.classList.contains('is-open')) return;
+   if (e.target.closest('button, a, summary, textarea, input, select, details[open]')) return;
+   openResultRow(card, true);
+  });
+ }
  return card;
 }
 
@@ -1559,6 +1606,9 @@ function renderResults(results) {
  } else {
  results.forEach((article, idx) => container.appendChild(buildResultCard(article, idx)));
  }
+ if (document.documentElement.getAttribute('data-mode') === 'simple') {
+  openResultRow(container.querySelector('.result-row'), false);
+ }
 
  if (typeof enhanceAbstracts === 'function') {
  enhanceAbstracts(container);
@@ -1614,6 +1664,36 @@ function watchSimplePanelClearance() {
  window.addEventListener('resize', syncSimplePanelClearance);
 }
 
+/** Desktop: keep the Save-your-work rail under the sticky Search tile. */
+function syncSimpleRailAnchor() {
+ const root = document.documentElement;
+ const query = document.getElementById('search-query-top');
+ if (root.getAttribute('data-mode') !== 'simple' || !query || query.hidden) {
+  root.style.removeProperty('--simple-rail-top');
+  return;
+ }
+ const qStyle = window.getComputedStyle(query);
+ if (qStyle.position !== 'sticky') {
+  root.style.removeProperty('--simple-rail-top');
+  return;
+ }
+ const stickyTop = Number.parseFloat(qStyle.top) || 0;
+ const gap = 12;
+ const top = Math.ceil(stickyTop + query.getBoundingClientRect().height + gap);
+ root.style.setProperty('--simple-rail-top', `${top}px`);
+}
+
+function watchSimpleRailAnchor() {
+ if (watchSimpleRailAnchor._wired) return;
+ watchSimpleRailAnchor._wired = true;
+ const query = document.getElementById('search-query-top');
+ if (query && typeof ResizeObserver === 'function') {
+  new ResizeObserver(() => syncSimpleRailAnchor()).observe(query);
+ }
+ window.addEventListener('resize', syncSimpleRailAnchor);
+ syncSimpleRailAnchor();
+}
+
 /** Simple keeps the scope note collapsed; Advanced pins it open (summary hidden). */
 function syncSearchScopeNote() {
  const note = document.querySelector('.search-scope-note');
@@ -1629,6 +1709,7 @@ function syncSearchScopeNote() {
 // If the user toggles Simple/Advanced after a search, re-show the panel.
 document.addEventListener('DOMContentLoaded', () => {
  watchSimplePanelClearance();
+ watchSimpleRailAnchor();
  syncSearchScopeNote();
  const modeBtn = document.getElementById('mode-toggle');
  if (modeBtn) {
@@ -1637,6 +1718,7 @@ document.addEventListener('DOMContentLoaded', () => {
    requestAnimationFrame(() => {
     updateSimpleSearchPanel(!!(lastResults && lastResults.length));
     syncSearchScopeNote();
+    if (typeof syncSimpleRailAnchor === 'function') syncSimpleRailAnchor();
     // Result cards carry mode-specific markup: rebuild for the new mode.
     if (lastResults && lastResults.length) showSearchResults();
    });

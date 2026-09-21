@@ -8,7 +8,59 @@ and this project aims to follow Semantic Versioning for app version strings
 
 ## [Unreleased]
 
+### Added
+- Five looks on the same Simple Search shell: Workshop, Broadsheet, Lab, Night,
+  and Catalog. After you create an account, Search opens a Look popup. Change
+  it later in Account. The choice is stored on the account and follows login.
+
+### Changed
+- On desktop Simple search, Save your work now sticks just below the Search
+  bar instead of sliding under it.
+- New look, Workshop: warm sand paper with a clay accent in light, warm
+  wood tones in dark, and every card, button, chip, and the query tile
+  sitting on a solid edge that presses down when you click. No blur
+  anywhere; a faint paper grain sits over the page. Both themes keep every
+  ink above 4.5:1.
+- Simple search results open in place. Rows show score, venue, title, and
+  byline; the top result opens by default and any row opens on click or
+  with its Open button (Enter or Space), closing the one before. Star,
+  Note, and Not relevant sit in one row under the open card.
+- Simple collect is one guided column: three questions instead of numbered
+  steps, topic areas as chips with line icons, a Next button that reveals
+  the topic box and focuses it, and Max results and fetch mode kept out of
+  the way. Advanced keeps its numbered steps and every control.
+- Motion: results settle in with a spring, chips bounce when picked,
+  starring a paper pops once, the wait screen's sieve shakes harder over a
+  striped bar and each status line rises in, and the open row slides open.
+  Reduced motion turns all of it off.
+- Pressing Find articles on your topic in Simple opens one dialog first:
+  how many papers from each database, as preset chips (25, 50, 100, 200)
+  or a number you write yourself (10 to 2000), and, when the collection
+  already has papers, whether to start fresh or add to them. The choice
+  is remembered for next time.
+- Phones: the Search bar is the field with a round magnifier button on one
+  row and stays under the top bar while the list scrolls; the title is
+  smaller with the count beside it; the tools strip fits one row; closed
+  result rows show one line of meta with a thumb-sized Open; the open row's
+  actions split the width in thirds; the Getting started card folds to
+  "New here? Load sample papers"; the menu opens as a panel over a dimmed
+  page with full-height Account and Logout rows; the Account section nav
+  fades at its edge to show it scrolls; checkboxes are thumb-sized; dialog
+  fields stack.
+- A button that carries an icon or two mode labels keeps them through a
+  loading cycle instead of collapsing to plain text.
+- **Save your work stayed at the bottom of the page instead of following
+  you.** On phones the export bar is pinned to the bottom of the screen and
+  on wide screens the panel stays beside the results while you scroll.
+  Toasts, the screening triage overlay, and its detail pane were anchored
+  the same wrong way and are fixed by the same change.
+
 ### Fixed
+- Account Look showed the heading with no colour choices. The picker now
+  lists the five looks in the page itself, so a running server that has
+  not reloaded Python still draws the cards.
+- Look is no longer a section on the register form. After Create Account,
+  Search opens a dialog with the five choices. Login does not reopen it.
 - Light success green meets 4.5:1 contrast on the page wash.
 - The phone top bar shows the full LitSieve wordmark.
 - Frosted surfaces stay solid when the browser cannot blur.

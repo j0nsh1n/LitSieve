@@ -123,12 +123,20 @@ function showNotification(message, type = 'info') {
 // === Loading helper ===
 function setLoading(buttonEl, loading) {
     if (!buttonEl) return;
-    if (!buttonEl.dataset.originalText) {
-        buttonEl.dataset.originalText = buttonEl.textContent;
-    }
     buttonEl.disabled = loading;
     buttonEl.classList.toggle('is-loading', loading);
-    buttonEl.textContent = loading ? 'Processing...' : buttonEl.dataset.originalText;
+    buttonEl.setAttribute('aria-busy', loading ? 'true' : 'false');
+    // Buttons that carry markup (an icon, dual-mode labels) keep it and show
+    // the busy state through CSS; plain buttons swap their text.
+    if (buttonEl.hasAttribute('data-keep-content')) return;
+    if (!buttonEl.dataset.originalHtml) {
+        buttonEl.dataset.originalHtml = buttonEl.innerHTML;
+    }
+    if (loading) {
+        buttonEl.textContent = 'Processing...';
+    } else {
+        buttonEl.innerHTML = buttonEl.dataset.originalHtml;
+    }
 }
 
 // === Status indicator helper ===
@@ -470,6 +478,19 @@ function openSiteModal(opts) {
             fieldHtml = `<div class="lra-modal-fields">${formFields.map((f) => {
                 const fid = escapeAttr(safeDomId(f.id));
                 const label = escapeHtml(String(f.label || f.id || ''));
+                if (f.type === 'choice') {
+                    // Preset chips: one radio per option, the checked one reads as pressed.
+                    const chips = (Array.isArray(f.options) ? f.options : []).map((opt) => {
+                        const val = escapeAttr(String(opt.value));
+                        const checked = f.value != null && String(f.value) === String(opt.value) ? ' checked' : '';
+                        const hint = opt.hint ? `<small class="lra-choice-chip-hint">${escapeHtml(String(opt.hint))}</small>` : '';
+                        return `<label class="lra-choice-chip"><input type="radio" name="site-modal-field-${fid}" value="${val}"${checked}><span class="lra-choice-chip-label">${escapeHtml(String(opt.label))}</span>${hint}</label>`;
+                    }).join('');
+                    return `<fieldset class="form-group lra-modal-input-group lra-modal-choice" data-field="${fid}">
+              <legend class="help-text">${label}</legend>
+              <div class="lra-choice-chips">${chips}</div>
+            </fieldset>`;
+                }
                 const typ = escapeAttr(String(f.type || 'text'));
                 const ph = escapeAttr(f.placeholder || '');
                 const min = f.min != null ? ` min="${escapeAttr(String(f.min))}"` : '';
@@ -660,6 +681,11 @@ function openSiteModal(opts) {
                 if (isForm) {
                     const values = {};
                     formFields.forEach((f) => {
+                        if (f.type === 'choice') {
+                            const on = root.querySelector('input[name="site-modal-field-' + safeDomId(f.id) + '"]:checked');
+                            values[f.id] = on ? on.value : '';
+                            return;
+                        }
                         const el = root.querySelector('#site-modal-field-' + safeDomId(f.id));
                         values[f.id] = el ? el.value : '';
                     });
@@ -695,12 +721,16 @@ function openSiteModal(opts) {
             });
         }
 
+        if (typeof o.onReady === 'function') {
+            try { o.onReady(root); } catch (eReady) { /* keep the dialog usable */ }
+        }
+
         if (isForm) {
             formFields.forEach((f) => {
                 const el = root.querySelector('#site-modal-field-' + safeDomId(f.id));
                 if (el && f.value != null) el.value = String(f.value);
             });
-            root.querySelectorAll('.lra-modal-fields .lra-modal-input').forEach((el) => {
+            root.querySelectorAll('.lra-modal-fields .lra-modal-input, .lra-modal-fields .lra-choice-chip input').forEach((el) => {
                 el.addEventListener('keydown', (ev) => {
                     if (ev.key === 'Enter' && !ev.shiftKey) {
                         ev.preventDefault();
@@ -708,7 +738,7 @@ function openSiteModal(opts) {
                     }
                 });
             });
-            const firstField = root.querySelector('.lra-modal-fields .lra-modal-input');
+            const firstField = root.querySelector('.lra-modal-fields .lra-choice-chip input:checked, .lra-modal-fields .lra-choice-chip input, .lra-modal-fields .lra-modal-input');
             setTimeout(() => {
                 if (firstField) firstField.focus();
             }, 30);
@@ -991,8 +1021,125 @@ document.addEventListener('DOMContentLoaded', () => {
     ]).finally(() => {
         updateNavStats();
         initLibrarySwitcher();
+        promptLookIfNeeded();
     });
 });
+
+function clearLookPromptCookie() {
+    try {
+        document.cookie = 'ui_look_prompt=; Max-Age=0; Path=/'
+            + (location.protocol === 'https:' ? '; Secure' : '')
+            + '; SameSite=Lax';
+    } catch (ePrompt) { /* ignore */ }
+}
+
+function lookPromptPending() {
+    try {
+        if (/(?:^|;\s*)ui_look_prompt=1(?:;|$)/.test(document.cookie || '')) return true;
+    } catch (eCookie) { /* ignore */ }
+    try {
+        return new URL(location.href).searchParams.get('pickLook') === '1';
+    } catch (eUrl) {
+        return false;
+    }
+}
+
+function consumeLookPrompt() {
+    clearLookPromptCookie();
+    try {
+        const url = new URL(location.href);
+        if (!url.searchParams.has('pickLook')) return;
+        url.searchParams.delete('pickLook');
+        const q = url.searchParams.toString();
+        history.replaceState(null, '', url.pathname + (q ? '?' + q : '') + url.hash);
+    } catch (eUrl) { /* ignore */ }
+}
+
+function promptLookIfNeeded() {
+    if (document.body.getAttribute('data-support-view') === '1') return;
+    if (typeof openSiteConfirm !== 'function') return;
+    const cards = Array.isArray(window.LRA_LOOK_CARDS) ? window.LRA_LOOK_CARDS : [];
+    const allowed = window.LRA_LOOKS || {};
+    if (!cards.length) return;
+    if (!lookPromptPending()) return;
+    const original = document.documentElement.getAttribute('data-look') || 'workshop';
+    let chosen = allowed[original] ? original : 'workshop';
+    consumeLookPrompt();
+
+    const mountPicker = (root) => {
+        const picker = document.createElement('div');
+        picker.className = 'look-picker';
+        picker.setAttribute('role', 'radiogroup');
+        picker.setAttribute('aria-label', 'Look');
+        cards.forEach((card) => {
+            if (!allowed[card.id]) return;
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'look-card' + (card.id === chosen ? ' is-selected' : '');
+            btn.setAttribute('data-look-pick', card.id);
+            btn.setAttribute('aria-pressed', card.id === chosen ? 'true' : 'false');
+            const swatch = document.createElement('span');
+            swatch.className = 'look-card-swatch look-card-swatch--' + card.id;
+            swatch.setAttribute('aria-hidden', 'true');
+            const text = document.createElement('span');
+            text.className = 'look-card-text';
+            const title = document.createElement('strong');
+            title.textContent = card.title || card.id;
+            const blurb = document.createElement('span');
+            blurb.className = 'look-card-blurb';
+            blurb.textContent = card.blurb || '';
+            text.appendChild(title);
+            text.appendChild(blurb);
+            btn.appendChild(swatch);
+            btn.appendChild(text);
+            btn.addEventListener('click', () => {
+                chosen = card.id;
+                if (typeof window.applyUiLook === 'function') window.applyUiLook(card.id);
+                else document.documentElement.setAttribute('data-look', card.id);
+                picker.querySelectorAll('[data-look-pick]').forEach((other) => {
+                    const on = other.getAttribute('data-look-pick') === card.id;
+                    other.classList.toggle('is-selected', on);
+                    other.setAttribute('aria-pressed', on ? 'true' : 'false');
+                });
+            });
+            picker.appendChild(btn);
+        });
+        const msg = root.querySelector('.lra-modal-message');
+        const titleEl = root.querySelector('#site-modal-title');
+        if (msg) msg.after(picker);
+        else if (titleEl) titleEl.after(picker);
+        else {
+            const cardEl = root.querySelector('[data-site-modal-card]');
+            if (cardEl) cardEl.insertBefore(picker, cardEl.querySelector('.lra-modal-actions'));
+        }
+    };
+
+    openSiteConfirm({
+        title: 'Look',
+        message: 'Colours and type for this account. You can change this later in Account. Light and dark stay on the sun/moon control.',
+        confirmLabel: 'Continue',
+        cancelLabel: 'Not now',
+        onReady: (root) => {
+            root.classList.add('look-prompt-modal');
+            mountPicker(root);
+        },
+    }).then((ok) => {
+        if (!ok) {
+            if (typeof window.applyUiLook === 'function') window.applyUiLook(original);
+            else document.documentElement.setAttribute('data-look', original);
+            return;
+        }
+        if (typeof window.applyUiLook === 'function') window.applyUiLook(chosen);
+        else document.documentElement.setAttribute('data-look', chosen);
+        if (typeof apiCall !== 'function') return;
+        apiCall('/api/account/look', { method: 'POST', body: { look: chosen } }).catch((err) => {
+            const msg = String(err && err.message || '');
+            if (typeof showNotification === 'function') {
+                showNotification(msg || 'Could not save look.', 'error');
+            }
+        });
+    });
+}
 
 // === Multi-library switcher (nav) ===
 async function initLibrarySwitcher() {
@@ -1118,6 +1265,18 @@ document.addEventListener('DOMContentLoaded', function() {
     const toggle = document.getElementById('nav-menu-toggle');
     const drawer = document.getElementById('nav-drawer');
     if (!nav || !toggle || !drawer) return;
+
+    // The sticky query bar on phones sits exactly under the top bar, whose
+    // height depends on the wordmark and drawer state.
+    const publishNavHeight = () => {
+        document.documentElement.style.setProperty('--nav-h', nav.offsetHeight + 'px');
+    };
+    publishNavHeight();
+    if (typeof ResizeObserver === 'function') {
+        new ResizeObserver(publishNavHeight).observe(nav);
+    } else {
+        window.addEventListener('resize', publishNavHeight);
+    }
 
     let open = false;
 

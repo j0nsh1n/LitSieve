@@ -7,8 +7,8 @@
     <link rel="icon" href="/static/favicon.svg?v=20260828a" type="image/svg+xml">
     <link rel="icon" href="/static/favicon.ico?v=20260803a" sizes="32x32">
     <link rel="apple-touch-icon" href="/static/favicon.png?v=20260803a">
-    <link rel="stylesheet" href="/static/css/style.css?v=20260917b">
-    <script src="/static/js/theme-init.js?v=20260823a"></script>
+    <link rel="stylesheet" href="/static/css/style.css?v=20260918g">
+    <script src="/static/js/theme-init.js?v=20260918h"></script>
     {% block head_extra %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}"{% if user and user.is_guest %} data-guest="1"{% endif %}{% if support_view %} data-support-view="1"{% endif %}>
@@ -151,14 +151,14 @@
 
     {% from "macros/disclaimers.html" import scope_footer %}
     <footer class="footer">
-        <p>LitSieve - v5.4.0</p>
+        <p>LitSieve - v5.5.0</p>
         {% if support_links %}
         <p class="help-text">{% for link in support_links %}<a href="{{ link.url }}">{{ link.label }}</a>{% if not loop.last %} · {% endif %}{% endfor %}</p>
         {% endif %}
         {{ scope_footer() }}
     </footer>
 
-    <script src="/static/js/common.js?v=20260917a"></script>
+    <script src="/static/js/common.js?v=20260920a"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

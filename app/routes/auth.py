@@ -18,9 +18,11 @@ from app.auth import (
     validate_new_username,
     verify_password_async,
 )
+from app.content.looks import DEFAULT_LOOK, LOOKS, normalize_look, parse_look
 from app.core import (
     _evict_pipeline,
     _set_auth_cookies,
+    _set_look_cookie,
     csrf_failed,
     current_user,
     get_pipeline,
@@ -34,6 +36,7 @@ from app.schemas import (
     ChangePasswordRequest,
     DeleteAccountRequest,
     SetEmailRequest,
+    SetLookRequest,
 )
 from app.services import mailer
 
@@ -142,6 +145,7 @@ async def login_submit(
     )
     response = RedirectResponse(url=next_url, status_code=302)
     _set_auth_cookies(response, token)
+    _set_look_cookie(response, user.get("look"))
     return response
 
 
@@ -190,6 +194,7 @@ async def login_once(request: Request, token: str = ""):
     )
     response = RedirectResponse(url="/search", status_code=302)
     _set_auth_cookies(response, jwt_token)
+    _set_look_cookie(response, rec.get("look"))
     return response
 
 
@@ -197,7 +202,16 @@ async def login_once(request: Request, token: str = ""):
 async def register_page(request: Request):
     if current_user(request):
         return RedirectResponse(url="/data-management", status_code=302)
-    return templates.TemplateResponse(request, "register.html", context={"error": "", "username": ""})
+    return templates.TemplateResponse(
+        request, "register.html", context=_register_ctx(),
+    )
+
+
+def _register_ctx(*, error: str = "", username: str = "") -> dict:
+    return {
+        "error": error,
+        "username": username,
+    }
 
 
 def _reset_codes_in_response() -> bool:
@@ -335,30 +349,46 @@ async def register_submit(
     if error:
         return templates.TemplateResponse(
             request, "register.html",
-            context={"error": error, "username": username},
+            context=_register_ctx(error=error, username=username),
             status_code=400,
         )
 
     try:
-        user = core.user_db.create_user(username, await hash_password_async(password))
+        user = core.user_db.create_user(
+            username, await hash_password_async(password), look=DEFAULT_LOOK,
+        )
     except ValueError:
         # Lost the race against a concurrent registration of the same login.
         return templates.TemplateResponse(
             request, "register.html",
-            context={"error": "That login is already taken.", "username": username},
+            context=_register_ctx(
+                error="That login is already taken.",
+                username=username,
+            ),
             status_code=400,
         )
     token = create_token(
         user["id"], user["username"], user.get("token_version", 0),
     )
-    response = RedirectResponse(url="/search", status_code=302)
+    response = RedirectResponse(url="/search?pickLook=1", status_code=302)
     _set_auth_cookies(response, token)
+    _set_look_cookie(response, user.get("look"))
     # One-shot seed: theme-init reads this when localStorage.uiMode is unset,
     # sets Simple mode for brand-new accounts, then clears the cookie.
     # Existing accounts never get this cookie (login path only sets auth).
     response.set_cookie(
         "ui_mode_seed",
         "simple",
+        httponly=False,
+        secure=core.COOKIE_SECURE,
+        samesite="lax",
+        max_age=600,
+        path="/",
+    )
+    # One-shot: Search opens the Look picker once after register, then clears it.
+    response.set_cookie(
+        "ui_look_prompt",
+        "1",
         httponly=False,
         secure=core.COOKIE_SECURE,
         samesite="lax",
@@ -422,6 +452,7 @@ async def _start_guest_session(request: Request) -> RedirectResponse:
     _set_auth_cookies(
         response, token, max_age=core.GUEST_MAX_AGE_MINUTES * 60,
     )
+    _set_look_cookie(response, DEFAULT_LOOK, max_age=core.GUEST_MAX_AGE_MINUTES * 60)
     # Guests start in Simple mode (same seed as new registrations).
     response.set_cookie(
         "ui_mode_seed",
@@ -448,6 +479,31 @@ async def guest_start_post(request: Request):
     """Form POST entry (same as GET /guest)."""
     return await _start_guest_session(request)
 
+
+@router.get("/api/account/look")
+async def get_account_look(request: Request):
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    return {"look": normalize_look(user.get("look")), "looks": list(LOOKS)}
+
+
+@router.post("/api/account/look")
+async def set_account_look(request: Request, body: SetLookRequest):
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    parsed = parse_look(body.look)
+    if not parsed:
+        return JSONResponse(status_code=400, content={"detail": "Unknown look"})
+    saved = core.user_db.set_look(user["user_id"], parsed)
+    if not saved:
+        return JSONResponse(status_code=400, content={"detail": "Unknown look"})
+    response = JSONResponse({"look": saved})
+    _set_look_cookie(response, saved)
+    return response
 
 
 @router.get("/logout")
