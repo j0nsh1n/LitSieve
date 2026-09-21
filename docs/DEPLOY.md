@@ -89,6 +89,87 @@ Optional LAN Caddy (`deploy/Caddyfile*`) is separate from the public hostname.
 Heavy work (fetch, embed, cluster) is CPU/GPU and disk on the origin machine
 either way; the edge path only shuttles bytes.
 
+### Detached deploys (operator console)
+
+A deploy started from the `/ops` console does not run inside the web
+process. `POST /api/ops/deploy` starts a transient systemd user unit named
+`litsieve-deploy-` plus the first 12 characters of the target SHA (or
+`head` when there is no SHA), and returns a receipt (`202`) with the unit
+name right away, or `400` if the unit could not be started. The deploy
+process writes its own outcome to the state file and the audit history, because its `systemctl --user` restart of
+`litsieve-uvicorn.service` would otherwise kill its caller. The console
+polls `GET /api/ops/deploy-state` to follow it.
+
+Watch the deploy from the host:
+
+```bash
+journalctl --user -u 'litsieve-deploy-*' -f
+```
+
+The unit is removed from systemd when it finishes, so the journal is the
+only log. It runs with the live checkout as its working directory and loads
+`<live>/.env` as an EnvironmentFile, so secrets stay off the command line.
+Operator settings are forwarded onto the unit: `USERS_DB`, `USER_DATA_DIR`,
+`LITSIEVE_LIVE`, `LITSIEVE_REPO`, `LITSIEVE_STAGING`, `LITSIEVE_HEALTH_URL`,
+`LITSIEVE_HEALTH_MODE`, `LITSIEVE_HEALTH_FILE`, `LITSIEVE_SKIP_RESTART`,
+`LITSIEVE_DEPLOY_STATE`, and `LITSIEVE_OPS_AUTHOR`. `LITSIEVE_LIVE` defaults
+to the repo checkout itself. `LITSIEVE_STAGING` defaults to
+`~/.local/share/litsieve/staging`.
+
+Set `LITSIEVE_DEPLOY_DETACHED=0` (also `false` or `no`) to run the deploy
+blocking inside the web request instead. Unset or any other value means
+detached whenever `systemd-run` exists. On the blocking path the restart
+kills the deploy child before it can health-check or roll back. The
+detached path exists to avoid that.
+
+A deploy resets the live checkout hard to the staging SHA that was just
+reviewed. It refuses to start when tracked files in the live checkout have
+uncommitted changes, because the reset would discard them. It names the
+files and asks you to commit or stash first. If the health check after the
+restart fails, the deploy resets the checkout back to the previous SHA and
+restarts again.
+
+Progress lives in `~/.local/share/litsieve/deploy-state.json` (override it
+with `LITSIEVE_DEPLOY_STATE`): the target SHA, the previous SHA, the actor,
+and a phase. Phases are `started`, `reset`, `deps`, `restarting`, `health`,
+`rolling_back`, and `done`. Only `done` is terminal. A record in any other
+phase means a deploy was interrupted and nobody finished the job. Further
+deploys are refused with `409` until the record is handled. The file holds
+one in-flight or most recent deploy, never a history. The durable history
+is the `operator_deploys` table in `users.db`.
+
+To recover, work on the host:
+
+```bash
+LIVE=~/HealthDatabaseAccess   # the live checkout (LITSIEVE_LIVE)
+STATE=~/.local/share/litsieve/deploy-state.json   # or $LITSIEVE_DEPLOY_STATE
+
+# Where did it stop? The phase, the target sha, and previous_sha.
+cat "$STATE"
+
+# Where is the checkout, is it clean, and is the site up?
+git -C "$LIVE" rev-parse HEAD
+git -C "$LIVE" status --short --untracked-files=no
+curl -sS http://127.0.0.1:7860/health
+
+# Only if HEAD is not the commit you want and status printed nothing:
+git -C "$LIVE" reset --hard <previous_sha>
+systemctl --user restart litsieve-uvicorn.service
+curl -sS http://127.0.0.1:7860/health
+
+# Once the checkout is right and /health answers, clear the record:
+rm "$STATE"
+```
+
+A recovery done by hand writes no `operator_deploys` row.
+
+Do not use the console's rollback for this. `POST /api/ops/rollback` runs
+inside the web service rather than in its own unit, so the service restart
+it triggers also stops the rollback before it can check health or close its
+record, and a new interrupted record is left behind. If you call it anyway,
+the body field is `sha`; without one it goes back one commit from the
+current HEAD, which after an interrupted reset may be the wrong commit.
+
 ---
 
 ## 2. Required secrets
