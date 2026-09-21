@@ -1133,9 +1133,7 @@ function promptLookIfNeeded() {
         else document.documentElement.setAttribute('data-look', chosen);
         if (typeof apiCall !== 'function') return;
         apiCall('/api/account/look', { method: 'POST', body: { look: chosen } }).catch((err) => {
-            // Stale uvicorn has the picker but not the save route (404 "Not Found").
             const msg = String(err && err.message || '');
-            if (/not found/i.test(msg)) return;
             if (typeof showNotification === 'function') {
                 showNotification(msg || 'Could not save look.', 'error');
             }

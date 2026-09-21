@@ -136,12 +136,6 @@ function wireLookPicker() {
     paintLook(data.look);
     setStatus('look-status', 'Saved.', 'success');
    } catch (e) {
-    // Stale uvicorn serves the new picker but not the save route, so FastAPI
-    // answers 404 "Not Found". The look already applied via cookie.
-    if (/not found/i.test(String(e && e.message || ''))) {
-     setStatus('look-status', 'Saved.', 'success');
-     return;
-    }
     setStatus('look-status', e.message, 'error');
    }
   });

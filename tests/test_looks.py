@@ -265,7 +265,10 @@ def test_look_prompt_opens_after_register_not_login():
     assert "onReady:" in prompt_fn
     assert "/api/account/look" in prompt_fn
     assert "applyUiLook" in prompt_fn
-    assert re.search(r"/not found/i\s*\.test", prompt_fn)
+    # A failed save reports its error. Nothing reads "Not Found" as success.
+    save_fail = prompt_fn.split("/api/account/look")[1].split(".catch(")[1]
+    assert "showNotification" in save_fail and "'error'" in save_fail
+    assert "not found" not in prompt_fn.lower()
     assert "style=" not in prompt_fn
     for look_id, title, blurb in LOOK_CARDS:
         assert f"id: '{look_id}'" in INIT or f'id: "{look_id}"' in INIT
@@ -279,7 +282,9 @@ def test_account_js_saves_look_without_inline_style():
     fn = js.split("function wireLookPicker")[1].split("async function loadLibraryManager")[0]
     assert "/api/account/look" in fn
     assert "applyUiLook" in fn
-    assert re.search(r"/not found/i\s*\.test", fn)
+    # "Saved." only on the success path; a failed save shows its error.
+    assert fn.count("'Saved.'") == 1
+    assert "not found" not in fn.lower()
     assert "setAttribute('data-look'" in fn or 'setAttribute("data-look"' in fn
     assert "style=" not in fn
 
