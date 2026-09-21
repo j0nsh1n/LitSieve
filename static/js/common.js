@@ -123,12 +123,20 @@ function showNotification(message, type = 'info') {
 // === Loading helper ===
 function setLoading(buttonEl, loading) {
     if (!buttonEl) return;
-    if (!buttonEl.dataset.originalText) {
-        buttonEl.dataset.originalText = buttonEl.textContent;
-    }
     buttonEl.disabled = loading;
     buttonEl.classList.toggle('is-loading', loading);
-    buttonEl.textContent = loading ? 'Processing...' : buttonEl.dataset.originalText;
+    buttonEl.setAttribute('aria-busy', loading ? 'true' : 'false');
+    // Buttons that carry markup (an icon, dual-mode labels) keep it and show
+    // the busy state through CSS; plain buttons swap their text.
+    if (buttonEl.hasAttribute('data-keep-content')) return;
+    if (!buttonEl.dataset.originalHtml) {
+        buttonEl.dataset.originalHtml = buttonEl.innerHTML;
+    }
+    if (loading) {
+        buttonEl.textContent = 'Processing...';
+    } else {
+        buttonEl.innerHTML = buttonEl.dataset.originalHtml;
+    }
 }
 
 // === Status indicator helper ===
@@ -470,6 +478,19 @@ function openSiteModal(opts) {
             fieldHtml = `<div class="lra-modal-fields">${formFields.map((f) => {
                 const fid = escapeAttr(safeDomId(f.id));
                 const label = escapeHtml(String(f.label || f.id || ''));
+                if (f.type === 'choice') {
+                    // Preset chips: one radio per option, the checked one reads as pressed.
+                    const chips = (Array.isArray(f.options) ? f.options : []).map((opt) => {
+                        const val = escapeAttr(String(opt.value));
+                        const checked = f.value != null && String(f.value) === String(opt.value) ? ' checked' : '';
+                        const hint = opt.hint ? `<small class="lra-choice-chip-hint">${escapeHtml(String(opt.hint))}</small>` : '';
+                        return `<label class="lra-choice-chip"><input type="radio" name="site-modal-field-${fid}" value="${val}"${checked}><span class="lra-choice-chip-label">${escapeHtml(String(opt.label))}</span>${hint}</label>`;
+                    }).join('');
+                    return `<fieldset class="form-group lra-modal-input-group lra-modal-choice" data-field="${fid}">
+              <legend class="help-text">${label}</legend>
+              <div class="lra-choice-chips">${chips}</div>
+            </fieldset>`;
+                }
                 const typ = escapeAttr(String(f.type || 'text'));
                 const ph = escapeAttr(f.placeholder || '');
                 const min = f.min != null ? ` min="${escapeAttr(String(f.min))}"` : '';
@@ -660,6 +681,11 @@ function openSiteModal(opts) {
                 if (isForm) {
                     const values = {};
                     formFields.forEach((f) => {
+                        if (f.type === 'choice') {
+                            const on = root.querySelector('input[name="site-modal-field-' + safeDomId(f.id) + '"]:checked');
+                            values[f.id] = on ? on.value : '';
+                            return;
+                        }
                         const el = root.querySelector('#site-modal-field-' + safeDomId(f.id));
                         values[f.id] = el ? el.value : '';
                     });
@@ -700,7 +726,7 @@ function openSiteModal(opts) {
                 const el = root.querySelector('#site-modal-field-' + safeDomId(f.id));
                 if (el && f.value != null) el.value = String(f.value);
             });
-            root.querySelectorAll('.lra-modal-fields .lra-modal-input').forEach((el) => {
+            root.querySelectorAll('.lra-modal-fields .lra-modal-input, .lra-modal-fields .lra-choice-chip input').forEach((el) => {
                 el.addEventListener('keydown', (ev) => {
                     if (ev.key === 'Enter' && !ev.shiftKey) {
                         ev.preventDefault();
@@ -708,7 +734,7 @@ function openSiteModal(opts) {
                     }
                 });
             });
-            const firstField = root.querySelector('.lra-modal-fields .lra-modal-input');
+            const firstField = root.querySelector('.lra-modal-fields .lra-choice-chip input:checked, .lra-modal-fields .lra-choice-chip input, .lra-modal-fields .lra-modal-input');
             setTimeout(() => {
                 if (firstField) firstField.focus();
             }, 30);
@@ -1118,6 +1144,18 @@ document.addEventListener('DOMContentLoaded', function() {
     const toggle = document.getElementById('nav-menu-toggle');
     const drawer = document.getElementById('nav-drawer');
     if (!nav || !toggle || !drawer) return;
+
+    // The sticky query bar on phones sits exactly under the top bar, whose
+    // height depends on the wordmark and drawer state.
+    const publishNavHeight = () => {
+        document.documentElement.style.setProperty('--nav-h', nav.offsetHeight + 'px');
+    };
+    publishNavHeight();
+    if (typeof ResizeObserver === 'function') {
+        new ResizeObserver(publishNavHeight).observe(nav);
+    } else {
+        window.addEventListener('resize', publishNavHeight);
+    }
 
     let open = false;
 

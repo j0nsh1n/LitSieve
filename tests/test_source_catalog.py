@@ -102,3 +102,16 @@ def test_eligible_for_coverage_excludes_preprints_and_unkeyed():
     assert eligible_for_coverage_suggestion("clinicaltrials") is False
     assert eligible_for_coverage_suggestion("zenodo") is False
     assert eligible_for_coverage_suggestion("dblp") is False
+
+
+def test_every_topic_has_a_line_icon():
+    """Each topic ships inner SVG markup for a 24x24 stroke icon, emoji kept as fallback."""
+    from app.content.source_catalog import TOPIC_META, list_topics_for_api
+
+    for tid, meta in TOPIC_META.items():
+        assert meta.get("icon_svg", "").startswith(("<path", "<circle", "<rect")), tid
+        assert meta.get("icon"), tid
+    api = {t["id"]: t for t in list_topics_for_api()}
+    assert set(api) == set(TOPIC_META)
+    for tid, meta in TOPIC_META.items():
+        assert api[tid]["icon_svg"] == meta["icon_svg"]

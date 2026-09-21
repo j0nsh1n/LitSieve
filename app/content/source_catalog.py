@@ -252,20 +252,74 @@ TOPIC_SOURCE_HINTS: Dict[str, List[str]] = {
     ],
 }
 
+# icon_svg is the inner markup of a 24x24 stroke icon (currentColor); the
+# emoji stays as the fallback for any client that has not been updated.
 TOPIC_META: Dict[str, Dict[str, str]] = {
-    "health": {"name": "Health & Medicine", "icon": "🏥"},
-    "biology": {"name": "Biology", "icon": "🧬"},
-    "chemistry": {"name": "Chemistry", "icon": "⚗️"},
-    "physics": {"name": "Physics", "icon": "⚛️"},
-    "math": {"name": "Mathematics", "icon": "📐"},
-    "cs": {"name": "Computer Science", "icon": "💻"},
-    "earth": {"name": "Earth & Environment", "icon": "🌍"},
-    "history": {"name": "History", "icon": "📜"},
-    "economics": {"name": "Economics", "icon": "📊"},
-    "psychology": {"name": "Psychology", "icon": "🧠"},
-    "polisci": {"name": "Political Science", "icon": "🏛️"},
-    "literature": {"name": "Literature & Language", "icon": "📖"},
-    "education": {"name": "Education", "icon": "🎓"},
+    "health": {
+        "name": "Health & Medicine",
+        "icon": "🏥",
+        "icon_svg": '<path d="M3 12h4l2-5 4 10 2-5h6"/>',
+    },
+    "biology": {
+        "name": "Biology",
+        "icon": "🧬",
+        "icon_svg": '<path d="M4 20c0-8 6-14 16-16-2 10-8 16-16 16z"/><path d="M4 20l8-8"/>',
+    },
+    "chemistry": {
+        "name": "Chemistry",
+        "icon": "⚗️",
+        "icon_svg": '<path d="M9 3h6"/><path d="M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/>',
+    },
+    "physics": {
+        "name": "Physics",
+        "icon": "⚛️",
+        "icon_svg": '<circle cx="12" cy="12" r="1.6"/><ellipse cx="12" cy="12" rx="9" ry="3.5"/><ellipse cx="12" cy="12" rx="9" ry="3.5" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="9" ry="3.5" transform="rotate(120 12 12)"/>',
+    },
+    "math": {
+        "name": "Mathematics",
+        "icon": "📐",
+        "icon_svg": '<path d="M18 5H6l7 7-7 7h12"/>',
+    },
+    "cs": {
+        "name": "Computer Science",
+        "icon": "💻",
+        "icon_svg": '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
+    },
+    "earth": {
+        "name": "Earth & Environment",
+        "icon": "🌍",
+        "icon_svg": '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>',
+    },
+    "history": {
+        "name": "History",
+        "icon": "📜",
+        "icon_svg": '<path d="M6 3h12M6 21h12M7 3c0 6 5 6 5 9s-5 3-5 9M17 3c0 6-5 6-5 9s5 3 5 9"/>',
+    },
+    "economics": {
+        "name": "Economics",
+        "icon": "📊",
+        "icon_svg": '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+    },
+    "psychology": {
+        "name": "Psychology",
+        "icon": "🧠",
+        "icon_svg": '<path d="M8 21a4 4 0 0 1 0-8 5 5 0 0 1 9-3 4 4 0 0 1 1 8H8z"/><path d="M12 13v8"/>',
+    },
+    "polisci": {
+        "name": "Political Science",
+        "icon": "🏛️",
+        "icon_svg": '<path d="M3 21h18M5 21V10M9 21V10M15 21V10M19 21V10M2 10l10-6 10 6z"/>',
+    },
+    "literature": {
+        "name": "Literature & Language",
+        "icon": "📖",
+        "icon_svg": '<path d="M4 4h7a3 3 0 0 1 3 3v13a2 2 0 0 0-2-2H4z"/><path d="M20 4h-7a3 3 0 0 0-3 3v13a2 2 0 0 1 2-2h8z"/>',
+    },
+    "education": {
+        "name": "Education",
+        "icon": "🎓",
+        "icon_svg": '<path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c3 3 9 3 12 0v-5"/>',
+    },
 }
 
 TOPIC_PACKS: List[Dict[str, Any]] = [
@@ -414,6 +468,7 @@ def list_topics_for_api() -> List[Dict[str, Any]]:
             "id": tid,
             "name": meta.get("name") or tid,
             "icon": meta.get("icon") or "",
+            "icon_svg": meta.get("icon_svg") or "",
             "sources": list(sources),
         })
     # Keep a classroom-friendly order (matches historical UI).
