@@ -28,6 +28,7 @@
 <div class="account-layout">
  <nav class="account-sidenav" aria-label="Account sections">
   <a class="account-nav-link" href="#account-profile" aria-current="true">Profile</a>
+  <a class="account-nav-link" href="#account-look">Look</a>
   <a class="account-nav-link" href="#account-libraries">Libraries</a>
   <a class="account-nav-link" href="#ai-settings-section">Study aid</a>
   <a class="account-nav-link" href="#email-section">Recovery email</a>
@@ -51,6 +52,14 @@
    clusters, screening, notes). Switch libraries from the nav bar. Jobs run in the background from
    Data Management.</p>
   </details>
+ </section>
+
+ <section class="card" id="account-look">
+  <h2>Look</h2>
+  <p class="info-text">Colours and type for this account. Light and dark stay on the sun/moon control.</p>
+  {% set current_look = user.look %}
+  {% include "partials/look_picker.html" %}
+  <div id="look-status" class="status-indicator"></div>
  </section>
 
  <section class="card" id="account-libraries">
@@ -302,5 +311,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/account.js?v=20260912a"></script>
+<script src="/static/js/account.js?v=20260918g"></script>
 {% endblock %}

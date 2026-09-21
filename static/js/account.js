@@ -84,6 +84,8 @@ document.addEventListener('DOMContentLoaded', () => {
   });
  }
 
+ wireLookPicker();
+
  // Sidenav scroll-spy: highlight the account section currently in view.
  const spyLinks = Array.from(document.querySelectorAll('.account-nav-link'));
  if (spyLinks.length) {
@@ -106,6 +108,45 @@ document.addEventListener('DOMContentLoaded', () => {
   });
  }
 });
+
+function wireLookPicker() {
+ const cards = Array.from(document.querySelectorAll('#account-look [data-look-pick]'));
+ if (!cards.length) return;
+ if (document.body.getAttribute('data-support-view') === '1') {
+  cards.forEach((card) => { card.disabled = true; });
+  return;
+ }
+ function paintLook(look) {
+  const saved = (typeof window.applyUiLook === 'function')
+   ? window.applyUiLook(look)
+   : look;
+  document.documentElement.setAttribute('data-look', saved);
+  cards.forEach((other) => {
+   const on = other.getAttribute('data-look-pick') === saved;
+   other.classList.toggle('is-selected', on);
+   other.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+  return saved;
+ }
+ cards.forEach((card) => {
+  card.addEventListener('click', async () => {
+   const look = paintLook(card.getAttribute('data-look-pick'));
+   try {
+    const data = await apiCall('/api/account/look', { method: 'POST', body: { look } });
+    paintLook(data.look);
+    setStatus('look-status', 'Saved.', 'success');
+   } catch (e) {
+    // Stale uvicorn serves the new picker but not the save route, so FastAPI
+    // answers 404 "Not Found". The look already applied via cookie.
+    if (/not found/i.test(String(e && e.message || ''))) {
+     setStatus('look-status', 'Saved.', 'success');
+     return;
+    }
+    setStatus('look-status', e.message, 'error');
+   }
+  });
+ });
+}
 
 async function loadLibraryManager() {
  const list = document.getElementById('library-manage-list');

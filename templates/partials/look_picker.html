@@ -1,0 +1,25 @@
+{% set current_raw = current_look if current_look is defined and current_look else "" %}
+{% set current = current_raw if current_raw in ["workshop", "broadsheet", "lab", "night", "catalog"] else "workshop" %}
+{# Listed here so the picker still renders when look_cards is missing from
+   the Jinja context (templates reload; a uvicorn without --reload does not). #}
+{% set cards = [
+  ("workshop", "Workshop", "Warm paper and a clay accent. The current LitSieve look."),
+  ("broadsheet", "Broadsheet", "Ink on newsprint. Serif type, square corners, a double rule."),
+  ("lab", "Lab", "Cool light and a blue accent. Tight corners, like a product UI."),
+  ("night", "Night", "Low light and a lamp glow. Amber on charcoal."),
+  ("catalog", "Catalog", "Library card stock, a maroon stamp, ruled lines."),
+] %}
+<div class="look-picker" role="radiogroup" aria-label="Look">
+{% for look_id, title, blurb in cards %}
+ <button type="button"
+   class="look-card{% if look_id == current %} is-selected{% endif %}"
+   data-look-pick="{{ look_id }}"
+   aria-pressed="{{ 'true' if look_id == current else 'false' }}">
+  <span class="look-card-swatch look-card-swatch--{{ look_id }}" aria-hidden="true"></span>
+  <span class="look-card-text">
+   <strong>{{ title }}</strong>
+   <span class="look-card-blurb">{{ blurb }}</span>
+  </span>
+ </button>
+{% endfor %}
+</div>

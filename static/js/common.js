@@ -721,6 +721,10 @@ function openSiteModal(opts) {
             });
         }
 
+        if (typeof o.onReady === 'function') {
+            try { o.onReady(root); } catch (eReady) { /* keep the dialog usable */ }
+        }
+
         if (isForm) {
             formFields.forEach((f) => {
                 const el = root.querySelector('#site-modal-field-' + safeDomId(f.id));
@@ -1017,8 +1021,127 @@ document.addEventListener('DOMContentLoaded', () => {
     ]).finally(() => {
         updateNavStats();
         initLibrarySwitcher();
+        promptLookIfNeeded();
     });
 });
+
+function clearLookPromptCookie() {
+    try {
+        document.cookie = 'ui_look_prompt=; Max-Age=0; Path=/'
+            + (location.protocol === 'https:' ? '; Secure' : '')
+            + '; SameSite=Lax';
+    } catch (ePrompt) { /* ignore */ }
+}
+
+function lookPromptPending() {
+    try {
+        if (/(?:^|;\s*)ui_look_prompt=1(?:;|$)/.test(document.cookie || '')) return true;
+    } catch (eCookie) { /* ignore */ }
+    try {
+        return new URL(location.href).searchParams.get('pickLook') === '1';
+    } catch (eUrl) {
+        return false;
+    }
+}
+
+function consumeLookPrompt() {
+    clearLookPromptCookie();
+    try {
+        const url = new URL(location.href);
+        if (!url.searchParams.has('pickLook')) return;
+        url.searchParams.delete('pickLook');
+        const q = url.searchParams.toString();
+        history.replaceState(null, '', url.pathname + (q ? '?' + q : '') + url.hash);
+    } catch (eUrl) { /* ignore */ }
+}
+
+function promptLookIfNeeded() {
+    if (document.body.getAttribute('data-support-view') === '1') return;
+    if (typeof openSiteConfirm !== 'function') return;
+    const cards = Array.isArray(window.LRA_LOOK_CARDS) ? window.LRA_LOOK_CARDS : [];
+    const allowed = window.LRA_LOOKS || {};
+    if (!cards.length) return;
+    if (!lookPromptPending()) return;
+    const original = document.documentElement.getAttribute('data-look') || 'workshop';
+    let chosen = allowed[original] ? original : 'workshop';
+    consumeLookPrompt();
+
+    const mountPicker = (root) => {
+        const picker = document.createElement('div');
+        picker.className = 'look-picker';
+        picker.setAttribute('role', 'radiogroup');
+        picker.setAttribute('aria-label', 'Look');
+        cards.forEach((card) => {
+            if (!allowed[card.id]) return;
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'look-card' + (card.id === chosen ? ' is-selected' : '');
+            btn.setAttribute('data-look-pick', card.id);
+            btn.setAttribute('aria-pressed', card.id === chosen ? 'true' : 'false');
+            const swatch = document.createElement('span');
+            swatch.className = 'look-card-swatch look-card-swatch--' + card.id;
+            swatch.setAttribute('aria-hidden', 'true');
+            const text = document.createElement('span');
+            text.className = 'look-card-text';
+            const title = document.createElement('strong');
+            title.textContent = card.title || card.id;
+            const blurb = document.createElement('span');
+            blurb.className = 'look-card-blurb';
+            blurb.textContent = card.blurb || '';
+            text.appendChild(title);
+            text.appendChild(blurb);
+            btn.appendChild(swatch);
+            btn.appendChild(text);
+            btn.addEventListener('click', () => {
+                chosen = card.id;
+                if (typeof window.applyUiLook === 'function') window.applyUiLook(card.id);
+                else document.documentElement.setAttribute('data-look', card.id);
+                picker.querySelectorAll('[data-look-pick]').forEach((other) => {
+                    const on = other.getAttribute('data-look-pick') === card.id;
+                    other.classList.toggle('is-selected', on);
+                    other.setAttribute('aria-pressed', on ? 'true' : 'false');
+                });
+            });
+            picker.appendChild(btn);
+        });
+        const msg = root.querySelector('.lra-modal-message');
+        const titleEl = root.querySelector('#site-modal-title');
+        if (msg) msg.after(picker);
+        else if (titleEl) titleEl.after(picker);
+        else {
+            const cardEl = root.querySelector('[data-site-modal-card]');
+            if (cardEl) cardEl.insertBefore(picker, cardEl.querySelector('.lra-modal-actions'));
+        }
+    };
+
+    openSiteConfirm({
+        title: 'Look',
+        message: 'Colours and type for this account. You can change this later in Account. Light and dark stay on the sun/moon control.',
+        confirmLabel: 'Continue',
+        cancelLabel: 'Not now',
+        onReady: (root) => {
+            root.classList.add('look-prompt-modal');
+            mountPicker(root);
+        },
+    }).then((ok) => {
+        if (!ok) {
+            if (typeof window.applyUiLook === 'function') window.applyUiLook(original);
+            else document.documentElement.setAttribute('data-look', original);
+            return;
+        }
+        if (typeof window.applyUiLook === 'function') window.applyUiLook(chosen);
+        else document.documentElement.setAttribute('data-look', chosen);
+        if (typeof apiCall !== 'function') return;
+        apiCall('/api/account/look', { method: 'POST', body: { look: chosen } }).catch((err) => {
+            // Stale uvicorn has the picker but not the save route (404 "Not Found").
+            const msg = String(err && err.message || '');
+            if (/not found/i.test(msg)) return;
+            if (typeof showNotification === 'function') {
+                showNotification(msg || 'Could not save look.', 'error');
+            }
+        });
+    });
+}
 
 // === Multi-library switcher (nav) ===
 async function initLibrarySwitcher() {

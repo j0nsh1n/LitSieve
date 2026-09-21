@@ -7,8 +7,8 @@
     <link rel="icon" href="/static/favicon.svg?v=20260828a" type="image/svg+xml">
     <link rel="icon" href="/static/favicon.ico?v=20260803a" sizes="32x32">
     <link rel="apple-touch-icon" href="/static/favicon.png?v=20260803a">
-    <link rel="stylesheet" href="/static/css/style.css?v=20260918c">
-    <script src="/static/js/theme-init.js?v=20260823a"></script>
+    <link rel="stylesheet" href="/static/css/style.css?v=20260918g">
+    <script src="/static/js/theme-init.js?v=20260918h"></script>
     {% block head_extra %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}"{% if user and user.is_guest %} data-guest="1"{% endif %}{% if support_view %} data-support-view="1"{% endif %}>
@@ -158,7 +158,7 @@
         {{ scope_footer() }}
     </footer>
 
-    <script src="/static/js/common.js?v=20260918b"></script>
+    <script src="/static/js/common.js?v=20260918h"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>
