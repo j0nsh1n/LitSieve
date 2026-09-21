@@ -34,17 +34,19 @@ Left over after v5.4.0. Findings: `docs/CODE_AUDIT_2026-09-06.md` (on
 `audit/full-code-review`) and the follow-up audits of 2026-09-12 and
 2026-09-17 (session record).
 - Tasks:
-  - Add a detached-deploy section to `docs/DEPLOY.md`: unit naming,
-    `journalctl --user -u 'litsieve-deploy-*'`, `LITSIEVE_DEPLOY_DETACHED`,
-    and how to clear an interrupted record (GLM)
   - Confirm on the host that a detached deploy writes its `operator_deploys`
     row to the live `users.db` (the fix is in code; not yet confirmed on the host)
+  - Run rollback detached like deploy. `POST /api/ops/rollback` runs as a
+    child of the web service through `run_action`, and the unit sets no
+    `KillMode`, so the `systemctl --user restart` inside `_do_deploy` stops
+    it before `_finish_deploy`; the record is left interrupted and no audit
+    row is written (read from the code on 2026-09-20, not reproduced)
   - Delete spent branches: `feat/ux2-m2-split-pane`,
     `fix/critical-account-security`, `chore/bump-5.4.0`,
     `fix/audit-a01-a11-a15`
 - Complete when: a detached deploy on the host has been seen writing its
-  `operator_deploys` row to the live `users.db`; the runbook covers a deploy
-  that dies mid-flight; no audit-era branch is left unmerged
+  `operator_deploys` row to the live `users.db`; a console rollback closes
+  its own record; no audit-era branch is left unmerged
 - Status: [ ] open
 
 ## Phase 12 — UX round 2 leftovers
