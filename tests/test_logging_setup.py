@@ -228,3 +228,25 @@ def test_uvicorn_error_lines_are_not_duplicated(tmp_path, monkeypatch):
     assert body.count("startup-marker") == 1, (
         f"expected exactly one line, got {body.count('startup-marker')}:\n{body}"
     )
+
+
+def test_the_suite_never_writes_a_log_file_where_it_runs(tmp_path):
+    """Importing the app under this suite's environment creates no logs/ directory.
+
+    Run from the live checkout, logs/litsieve.log is production's log. A fresh
+    process is used because other tests here reconfigure the handlers, which
+    would hide a handler attached at import time.
+    """
+    import os
+    import subprocess
+    import sys
+
+    repo = pathlib.Path(__file__).resolve().parent.parent
+    (tmp_path / "static").mkdir()  # app.main mounts ./static at import
+    env = dict(os.environ, PYTHONPATH=str(repo))
+    proc = subprocess.run(
+        [sys.executable, "-c", "import app.main"],
+        cwd=tmp_path, env=env, capture_output=True, text=True, timeout=180,
+    )
+    assert proc.returncode == 0, proc.stderr[-800:]
+    assert not (tmp_path / "logs").exists(), "a test run would write into the log where it runs"

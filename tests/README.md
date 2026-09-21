@@ -40,5 +40,6 @@ Tests must catch **real regressions**, not just smoke. When you **add, fix, or r
 3. **Clone codes** are clone-only: no notes/stars/clusters; owner data must not change if the joiner mutates their copy; user-facing errors say **library code**.
 4. **Multi-library**: work binds to the **active** library; no cross-account leak; cannot delete the last library.
 5. If a guardrail fails, restore the invariant or deliberately update the test *and* product intent — do not delete a guardrail just to go green.
+6. **Never write into the checkout.** On the host this repo is the live site, so `conftest.py` forces `LOG_FILE=""` and points `LITSIEVE_DEPLOY_STATE` at a temp path. A test that appends to `logs/litsieve.log` lands in production's log and can rotate it out from under the running service. Anything a test writes goes under `tmp_path`; `test_logging_setup.py::test_the_suite_never_writes_a_log_file_where_it_runs` guards the log.
 
 Patch `core.*` in HTTP tests (e.g. `user_db`), not a stale `from app.core import user_db` binding, so monkeypatches reach the handlers.
