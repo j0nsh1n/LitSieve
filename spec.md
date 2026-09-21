@@ -25,8 +25,10 @@ a substitute for school library databases.
 - Prepare papers (embeddings) as a background job after a successful fetch
   (auto-chain; optional re-prepare); extractive key points default
 - **Simple / Advanced UI mode** (client preference: `localStorage.uiMode` +
-  `data-mode` on `<html>`, applied pre-paint). Simple does not remove Advanced
-  capability; Advanced keeps every control
+  `data-mode` on `<html>`, applied pre-paint, mirrored to a `ui_mode`
+  cookie so server pages can redirect; a one-shot `ui_mode_seed` cookie
+  starts new and guest accounts in Simple). Simple does not remove
+  Advanced capability; Advanced keeps every control
   - **Simple nav:** one page (`/search`) with an empty collect state (topics +
     fetch) and a papers-present search state (rank, Show chips, export).
     Fetch + prepare use one wait screen (animated sieve, rotating status;
@@ -35,6 +37,12 @@ a substitute for school library databases.
     leg opens Search. Screening, re-prepare, start over, and the source
     report are popups. `/data-management` in Simple redirects to `/search`.
   - **Advanced nav:** Data Management → Clean up → Clusters → Search (plus Account)
+- **Look** (per-account preference): Workshop (default), Broadsheet, Lab,
+  Night, or Catalog, stored in `users.look`, mirrored to a readable
+  `ui_look` cookie, and applied pre-paint as `data-look` on `<html>`.
+  Colour, type, and a little chrome; the layout is the same in every look.
+  Offered once after registration; changed on Account. Light/dark stays a
+  separate browser preference.
 - **Screening / triage** (exclude/restore with reason codes), not only on Clusters:
   - Clean up (`/statistics`): near-duplicates, preferred-source auto-resolve,
     **Quick screen** (rank vs research question; apply only on confirm;
@@ -93,7 +101,8 @@ a substitute for school library databases.
   - Per-account SQLite under `user_data/<uid>/libraries/<lib_id>/`
   - Accounts / shares in `users.db` (path via user_db)
   - Optional whole-DB SQLCipher via `DB_ENCRYPTION_KEY` (`app/storage/dbconn.py`)
-  - AI API keys in `user_data/ai_settings.json` encrypted AES-256-GCM (`enc:v2:`)
+  - AI API keys per account in `{USER_DATA_DIR}/{user_id}/ai_settings.json`,
+    encrypted AES-256-GCM (`enc:v2:`)
 - Major components:
   - `app/main.py` — FastAPI app wiring, lifespan (UMAP warm-up), static mount
   - `app/core.py` — process state: user_db, pipeline LRU, jobs, auth helpers
