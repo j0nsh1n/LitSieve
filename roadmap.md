@@ -3,40 +3,6 @@
 Note: "Complete when" conditions are verified locally (tests pass, feature
 works) and via PR review. One phase may span several small PRs.
 
-## Phase 1 — Governance files adoption
-- Tasks:
-  - Commit tracked `agents.md`, `spec.md`, `roadmap.md`, `context.md`, `CHANGELOG.md`
-  - Stop gitignoring `context.md`; structure it as state-only (no policy rules)
-  - Align agent workflow to agents.md (no push/PR without explicit ask)
-- Complete when: all five files tracked on the working branch; CI green;
-  agents can resume from context.md handoff without reading gitignored secrets
-- Status: [x] 2026-07-30 (local commits may still need push when human asks)
-
-## Phase 2 — Optional recovery email
-- Tasks:
-  - Username separate from email; optional verified recovery address
-  - SMTP-gated; Account UI and password-reset paths
-  - Tests in `tests/test_email_recovery.py`
-  - SMTP smoke tool (`tools/send_test_email.py`); MailerSend verified locally
-- Complete when: feature on main, human-confirmed send/recovery works, secrets
-  only in gitignored `.env` / secret dumps, `.env.example` documents SMTP
-- Status: [x] 2026-07-30 (PR #38 merged; SMTP confirmed working by human)
-
-## Phase 3 — Stabilize v4.3.x host
-- Tasks:
-  - Keep multi-library + student starting-point positioning
-  - Storage quota, AI key AES-GCM, optional SQLCipher as deploy options
-  - Deploy checklist: SECRET_KEY, optional SMTP, quota, tokens; `/health` 200
-  - No teacher LMS / live-share expansion unless human reopens scope
-- Complete when: deploy checklist documented **and** production-ish smoke
-  passes: `DEBUG=false` + real `SECRET_KEY`, `GET /health` → 200
-  (`status: healthy`). Public cloud is operator-owned — run the same smoke
-  against that URL when you deploy (see `docs/DEPLOY.md`).
-- Status: [x] 2026-08-03 — `docs/DEPLOY.md` + README link; production smoke
-  verified. Live publicly at **https://www.litpilot.org**, self-hosted on the
-  operator's desktop behind a Cloudflare Tunnel (TLS at Cloudflare; Uvicorn
-  serves plain HTTP on loopback). No PaaS involved.
-
 ## Phase 4 — Operate a live instance
 Shipping changed the risk profile: there are real accounts with real data on a
 home desktop, and the link has been shared publicly.
@@ -51,274 +17,105 @@ home desktop, and the link has been shared publicly.
 - Complete when: an account cap (or invite gate) is enforced, a restore has been
   tested at least once from a backup, and the operator can answer "what happened
   at 14:05?" from the log file
-- Status: [ ] in progress — logging, backups, and watchdog landed 2026-08-04–06;
-  **account cap still open**; restore drill still open
+- Status: [ ] in progress. Open as of 2026-09-17:
+  - merge the account cap on `fix/phase4-account-cap` (`b6e9d45`,
+    `MAX_TOTAL_ACCOUNTS`, guests exempt, HTTP-level tests)
+  - run one restore drill on the host from a real archive and record the
+    date here
+  - set `LLM_PROVIDER`, `OLLAMA_MODEL`, `OLLAMA_HOST`, `OLLAMA_MODELS` in
+    `.env` and restart: 5.4.0 stopped reading `user_data/ai_settings.json`,
+    so the built-in study aid has been off for every student since the
+    15 September restart
+  - `chmod 600` `users.db` and its `-wal`/`-shm`, the TLS key, and
+    `mailersend-smtp.txt`; `go-rwx` on `secrets/` and `user_data/`
 
-## Phase 5 — Simple / Advanced mode
-Full build doc: **[docs/SIMPLE_MODE_PLAN.md](docs/SIMPLE_MODE_PLAN.md)**.
-A per-user toggle that hides power-user surfaces and automates the steps a
-student should not have to think about. No capability is removed from Advanced.
+## Phase 11 — Audit follow-ups
+Left over after v5.4.0. Findings: `docs/CODE_AUDIT_2026-09-06.md` (on
+`audit/full-code-review`) and the follow-up audits of 2026-09-12 and
+2026-09-17 (session record).
 - Tasks:
-  - Mode toggle (`data-mode="simple"`, localStorage, applied in
-    `theme-init.js` pre-paint) + a CSS-only hiding layer; retire reading mode
-    but keep its serif abstract styling as the default
-  - Auto-chain fetch → prepare in Simple, via `start_user_job` (never inline)
-  - Rename Duplicates → **Clean up**; screening moves there, since the
-    screening report already lives on that page
-  - **Quick screen**: rank against the student's research question, propose the
-    least-related set, apply only on confirm. New `low_relevance` code in
-    `EXCLUSION_REASONS` + `SYSTEM_REASONS` so the PRISMA report distinguishes
-    machine-suggested from student-judged exclusions
-  - **By topic group**: existing cluster triage, auto-run on density, triggered
-    lazily as a background job — never on fetch completion
-  - Per-paper "Not relevant" on Search result cards as the catch-all
-- Complete when: a student can go topics → fetch → clean up → search → export
-  RIS in Simple mode without seeing "embedding", "cluster", "HDBSCAN", or a
-  model name; the screening report is non-empty and distinguishes
-  `low_relevance`; nothing heavy runs inline; `/clusters` still loads by URL
-- Status: [x] 2026-08-05 — shipped in **v4.5.0** (PR #52 lineage). Quick screen
-  + Clean up rename + auto-prepare + Simple/Advanced toggle. Phase 6 further
-  collapses Simple to two pages (below).
-- Notes: `spec.md` triage/workflow text updated 2026-08-06 (human-approved) for
-  Clean up, Quick screen, Simple screening card, and guest. Cluster label
-  quality remains a concern for topic-group triage; Phase 6 deliberately avoids
-  auto-clustering.
+  - Add a detached-deploy section to `docs/DEPLOY.md`: unit naming,
+    `journalctl --user -u 'litsieve-deploy-*'`, `LITSIEVE_DEPLOY_DETACHED`,
+    and how to clear an interrupted record (GLM)
+  - Confirm on the host that a detached deploy writes its `operator_deploys`
+    row to the live `users.db` (the fix is in code; not yet confirmed on the host)
+  - Delete spent branches: `feat/ux2-m2-split-pane`,
+    `fix/critical-account-security`, `chore/bump-5.4.0`,
+    `fix/audit-a01-a11-a15`
+- Complete when: a detached deploy on the host has been seen writing its
+  `operator_deploys` row to the live `users.db`; the runbook covers a deploy
+  that dies mid-flight; no audit-era branch is left unmerged
+- Status: [ ] open
 
-## Phase 6 — Simple mode on two pages
-Full build doc: **[docs/SIMPLE_TWO_PAGE_PLAN.md](docs/SIMPLE_TWO_PAGE_PLAN.md)**.
-Simple collapses to `Get papers` → `Search`. **Advanced is unchanged.**
+## Phase 12 — UX round 2 leftovers
+Presentation items from the 2026-09-17 audit of the airy glass restyle.
 - Tasks:
-  - Duplicates resolved **silently** after auto-prepare, reported in one line
-    (`/api/resolve-duplicates`, existing preferred-source rule)
-  - Inline **screening card** on Data Management — Low / Medium / High mapping
-    to `fraction` 0.10 / 0.25 / 0.50, each showing the real paper count before
-    it is applied; preview and apply stay separate; undo and skip both
-    first-class. Inline, not a surprise modal after a minutes-long fetch
-  - **Go to Search** action once screening is applied or skipped
-  - Search gains a sticky **export / screening report** panel, collapsing to a
-    bottom bar under ~900px
-  - Clean up and Clusters leave the Simple nav; both routes keep working and
-    stay in Advanced
-  - **No auto-clustering anywhere** — the screening card ranks against the
-    research question, which needs embeddings, not clusters
-- Complete when: a Simple student goes topics → fetch → screen → search →
-  export across two pages without seeing "embedding", "cluster", "threshold",
-  or a model name; Advanced behaviour is unchanged; nothing is excluded without
-  an explicit apply; and the flow works at 380px with no horizontal scroll
-- Status: [x] 2026-08-06 — implemented on `main` / `feat/phase6-guest-demo`
-  (guest demo + polish on the same line; live fix for fetch form 405)
-- Notes: small screens are a first-class requirement, not a retrofit — real
-  traffic is overwhelmingly mobile. Existing breakpoints: 900 / 640 / 380px.
-  Guest demo (`/guest`, sample-only, 30‑min purge) ships alongside as a low-friction
-  try-without-register path; not a separate roadmap phase.
+  - Decide whether to revive m2 split-pane triage (reverted on
+    `feat/ux2-m2-split-pane`, `57b7624` to `41fa5b9`) or drop it
+- Complete when: the decision is recorded and the branch is merged or
+  deleted
+- Status: [ ] open
 
-## Phase 7 — UI/UX refresh (design system + editorial)
-Full build doc: **[docs/UI_REFRESH_PLAN.md](docs/UI_REFRESH_PLAN.md)**.
-Presentation only — no flow, endpoint, or copy changes.
-- Tasks:
-  - **Token layer**: type / line-height / spacing / radius scales in `:root`,
-    alongside the existing colour + motion tokens (which stay). Re-point the
-    `.u-mt-*` utilities rather than deleting them
-  - **Collapse the hand-tuned values**: 38 distinct font sizes → 8, 29 paddings
-    → 6, 6 radii → 3, section by section through the 41 CSS banners
-  - **Editorial pass**: serif headings + abstracts, sans for UI chrome, hairline
-    rules instead of shadows for cards, accent reserved for actions/focus
-  - **Design the waiting** (the UX half): live per-source fetch narrative from
-    data the API already returns, skeletons matched to real card geometry,
-    optimistic star / not-relevant / note-save, and no async layout shift
-  - **Mobile first** at 380 / 640 / 900 — a different layout, not a squeeze
-  - **Motion vocabulary**: one enter, one exit, one emphasis, with a single
-    `prefers-reduced-motion` block that neutralises all of it
-- Complete when: ≤8 font sizes / ≤6 paddings / ≤3 radii remain; both themes hold
-  contrast; every interactive element shows the focus ring; 380px has no
-  horizontal scroll or overlapped controls; loading regions show skeletons
-  rather than blank space; and the Simple/Advanced guards in
-  `tests/test_simple_mode.py` still pass unchanged (proving presentation-only)
-- Status: [x] 2026-08-10 — implemented on `feat/phase6-guest-demo` (local
-  commits; presentation only). Token scales, value collapse, editorial pass,
-  fetch narrative + skeletons + optimistic writes, mobile 380 layout, motion
-  vocabulary + reduced-motion covering shimmer.
-- Notes: the colour/motion layer was preserved (existing tokens not renamed).
-  Dark mode is derived via `color-mix` — re-check contrast after future colour
-  edits. Public templates do not extend `base.html`. `--measure` stays off
-  Search result cards.
-
-## Phase 8 — UI revamp (information architecture)
-Concept pitch (four directions, mockups built from the real markup):
-**<https://claude.ai/code/artifact/7b79cf7f-fc3f-4c5e-8758-77988e54db6d>**
-
-Premise: Phase 7 already won the token layer — all 177 `font-size` declarations
-read from `--fs-*`, no raw `rem` values, and templates carry no inline styles.
-So another repaint would spend effort on the one layer that is not broken. What
-is left is **information architecture and density**.
-
-- Findings this phase is judged against (measured, not taste):
-  1. **Smallness is concentrated in the explanatory layer.** 123 rules use
-     `--fs-sm`/`--fs-xs` against 21 at `--fs-base`. Nuance worth keeping
-     straight: `.article-abstract` and `body` are *already* `--fs-base` with
-     `--lh-relaxed`, so abstracts are fine. The offenders are `.info-text`
-     (14px, `--lh-snug`, 77 uses) and `.help-text` (12px, 36 uses) — which is
-     exactly where LitSieve puts most of its words.
-  2. **The nav carries ten controls** in one strip plus a second row of four
-     workflow steps; identity and workflow-position share one bar (`base.html`).
-  3. **Search is five stacked `.card` sections** — query and results are never
-     on screen together.
-  4. **Results hide themselves** — `buildResultCard` renders `<details>` with
-     only the first three open, and shows Low/Medium/High instead of the 0–1
-     similarity score that ordered the list.
-  5. **Help outweighs the controls** — 74 inline `info-text`/`help-details`
-     blocks across five templates (22 on Data Management), plus 17 flat source
-     checkboxes.
-- Chosen direction: **A ("Reading Room") now, B ("Workbench") next**, and take
-  C's type sizes immediately. A keeps the linen/teal identity and `base.html`
-  untouched, so it can ship behind the same presentation-only guard Phase 7
-  used. B is the right end state if LitSieve should feel like an instrument, but
-  it rewrites the shell and `search.js` — its own phase, not a bolt-on.
-- Tasks (A):
-  - **Type — the C borrowings.** These are the four things taken from direction
-    C, and the cheapest real win on the list:
-    - `.info-text` → `--fs-base` / `--lh-normal` (from 14px / `--lh-snug`).
-      77 uses; this is body copy and should read as such
-    - `.help-text` → `--fs-sm` (from `--fs-xs`). 36 uses
-    - `--fs-xs` (12px) reserved for badges, meta, and true fine print —
-      **no reading copy below 14px anywhere**
-    - the Search query prompt set large (`--fs-xl`), so the page opens on the
-      question rather than on chrome
-    - Watch the `@media` override at ~3747 and the `.empty-state-card` /
-      `.help-details` / `.advanced-details` specificity chains, so mobile
-      resets do not silently undo the sizes
-    - *Not* taken from C: the single-column front-door IA and Simple-as-the-
-      product. That is a product decision about whether Advanced stays a mode,
-      and it should be settled on its own terms, not as a side effect of a
-      type change
-  - **Search layout**: sticky query rail beside a results column, replacing the
-    five-card stack. Query and results visible together
-  - **Results**: scannable rows showing the real 0–1 score as a meter, instead
-    of `<details>` collapsibles labelled Low/Medium/High
-  - **Help**: fold the inline blocks into one summonable panel per page
-  - **Dark theme — decided: re-ground A's dark on B's graphite.** Today's dark
-    reads blue-slate; B's ground is a neutral-warm graphite, and that is the
-    part of B worth having early. Change the *grounds only* and keep A's warm
-    paper ink and teal accent, because brand continuity is A's whole point —
-    B's ochre signal does not come along:
-    - `--bg` `#12151a` → `#16181a`
-    - `--surface` `#1a1e26` → `#1e2124`
-    - `--rule` `#2e343f` → `#2c2f33` (the most obviously blue of the three)
-    - `--text`, `--text-soft`, `--accent` (`#7eb8c4` teal) unchanged
-    - Both dark blocks must change: the `prefers-color-scheme` media query
-      (~line 82) *and* the explicit `[data-theme="dark"]` toggle (~line 104).
-      `--text-body`, `--accent-soft`, `--nav-blur`, `--wash-*`, and
-      `--focus-ring` are `color-mix`-derived from these, so re-check contrast
-      on both themes after the swap rather than assuming it held
-  - Note A and B are **not** light/dark variants of one design — they differ in
-    layout, and a theme toggle must never rearrange the page. Each direction
-    needs both of its own themes; borrowing B's ground is a palette decision,
-    not a merge of the two directions
-- Complete when: query and results are co-visible on Search; every result row
-  shows its numeric score; no reading surface below 14px; both themes hold
-  contrast; 380px has no horizontal scroll or overlapped controls; and the
-  Simple/Advanced guards in `tests/test_simple_mode.py` still pass unchanged
-  (proving presentation-only)
-- Status: [x] 2026-08-10 — A (Reading Room) + B shell (Workbench) landed on
-  `feat/phase6-guest-demo`. Full B “instrument” IA (ochre signal, deeper
-  rewrite) still optional backlog; shell split addresses the ten-control bar.
-- Landed for A + B shell (2026-08-10):
-  - Type C borrowings: `.info-text` → `--fs-base` / `--lh-normal`; `.help-text`
-    → `--fs-sm`; `#query-text` → `--fs-xl` serif; mobile no longer re-shrinks
-    info-text
-  - Search workbench: sticky query rail + results column; 380px stack polish
-  - Result rows with numeric 0–1 score meter (`--score-pct` CSSOM, CSP-safe)
-  - Dark grounds graphite `#16181a` / `#1e2124` / `#2c2f33` (both dark blocks)
-  - Summonable **Help** on Search, Data Management, Clean up, Clusters, Account
-  - **Workbench shell:** `shell-primary` (brand + steps) vs `shell-tools`
-    (library / mode / theme / account / logout / count)
-- Landed 2026-08-10 (not part of A, found while setting up a local preview):
-  **CSP inline-style removal.** `style-src 'self'` blocks `style-src-attr`, so
-  the five literal `style="…"` attributes still injected by `account.js`,
-  `join.js`, and `data_management.js` were being dropped in production — lost
-  margins, and a "Revoked" badge that never rendered red (it also referenced
-  `--danger`, which is not a defined token; the theme uses `--err`). Replaced
-  with `.is-revoked`, `.join-preview-lead`, `.u-m-0`, and the existing
-  `.u-mt-sm`; asset cache-bust bumped to `v=20260810a` then Phase 8 to
-  `v=20260810b`.
-- Notes: the current warm-linen + Georgia + teal palette is close to this
-  year's generic AI-generated house style. A preserves brand continuity but not
-  distinctiveness; D ("Card Catalog" — index cards, typed slips, stamped match
-  grades) was the only direction with a real point of view, and is parked rather
-  than rejected.
-- Notes on Windows (explored 2026-08-10, then reverted — host stays Linux):
-  the full stack does install and run on **Python 3.14.6** (torch 2.13.0+cpu,
-  faiss-cpu 1.15.0, sentence-transformers 5.7.0, umap-learn 0.5.12 / numba
-  0.66, scikit-learn 1.9.0) — no wheel gaps, and the app imports even without
-  torch/faiss/umap because those sit behind try/except and function-level
-  imports. Two things a future Windows attempt should expect: **17 test
-  failures that are portability, not bugs** (14 × `UnicodeDecodeError` from
-  `read_text()` with no `encoding="utf-8"` under cp1252; one POSIX `0600`
-  assertion in `test_backup.py`; and `test_hashing_does_not_block_the_event_loop`,
-  whose `ticks > 10` bar is unreachable because `asyncio.sleep(0.001)` resolves
-  at ~15ms on Windows vs ~1ms on Linux — an *idle* loop scores 10). Also
-  `sqlcipher3-binary` has no Windows wheel at all, which skips all 5
-  at-rest-encryption tests. Run the suite as CI does (`SECRET_KEY` + `DEBUG`
-  only): setting `USER_DATA_DIR` breaks `test_delete_account_flow`, which
-  asserts a hardcoded relative `user_data`, and setting `CI=true` makes
-  `test_db_encryption.py` hard-import sqlcipher3 by design.
-
-## Phase 8 — Simple-mode dialogs + dense source report
-Full build doc: **[docs/SIMPLE_DIALOGS_PLAN.md](docs/SIMPLE_DIALOGS_PLAN.md)**.
-Condenses Data Management in Simple mode. **Advanced is unchanged.**
-- Tasks:
-  - **Modal shell first** (prerequisite): `openSiteModal` lacks a focus trap,
-    focus restore, and body scroll lock. This phase puts dialogs in the main
-    flow on phones, where all three bite
-  - **Dense per-source report**: top 5 successes + one summary line, classroom
-    notes inside a `<details>` expander, failures summarised and muted (a source
-    returning nothing is normal). Must not double up with the Phase 7 live rows
-  - **Fetch mode dialog**: replace/add only *means* something once the library
-    has papers, so skip the dialog entirely on an empty collection and ask —
-    with the real paper count — when it is real
-  - **Re-prepare dialog**: asks the one real choice, only-new vs all
-    (`only_missing`); skipped when nothing is prepared
-- Complete when: Advanced renders exactly as today; Simple skips both dialogs in
-  the cases where the choice is meaningless; hidden radios still drive
-  `clear_first` and the only-missing hint; the collapsed report shows ≤5 rows;
-  and the existing Simple/guest guards pass unchanged
-- Status: [x] 2026-08-11 — modal shell, dense report, Simple fetch/prepare dialogs (local commits; not pushed)
-- Notes: the research question is **not** an input to prepare
-  (`/api/create-embeddings` takes `{model, only_missing}`), so "change your
-  question" belongs on the screening card, which already has an editable field —
-  not in the prepare dialog. After re-prepare, screening should return to
-  pending via corpus state, never a JS flag.
-
-## Phase 9 — Destructive operations become reversible
-Design: **[docs/PHASE9_STAGING_SWAP.md](docs/PHASE9_STAGING_SWAP.md)**.
-Failed replace-fetch must not wipe the library. No new Simple confirmation.
-- Tasks:
-  - Honest Start-fresh copy (notes / stars / AI key points)
-  - Advanced replace consequence inline (no modal)
-  - Staging-swap design (same-DB `staging_articles`; swap only if ≥1 paper)
-  - Sample corpus: load rows, then clear, then insert
-- Complete when: a failed replace-fetch leaves articles, notes, stars, and AI
-  key points unchanged; the xfail in `tests/test_phase9_reversible_fetch.py`
-  is removed and passing; Advanced still has every control; Simple gains no
-  new dialog
-- Status: [x] 2026-08-13 — staging swap with reattach of notes / stars / AI
-  key points on papers that come back; failed fetch leaves the library intact
-
-## Phase 10 — Broadsheet visual identity
-Approved mockup: `design_mockups/final_broadsheet.html` (not committed).
-Presentation only — no flow or endpoint changes.
-- Tasks:
-  - Radius tokens 2px / 3px; drop undefined `--radius-lg`
-  - Dark theme warm newsprint in both dark blocks + parity test
-  - Masthead nav (double rule, segmented desktop steps)
-  - Search notice band, boxed query control, result cards, boxed rail
-- Complete when: mockup identity is on Search; public pages still render;
-  Simple/guest/phase-8 tests pass unchanged; radii and dark parity tests
-  hold
-- Status: [x] 2026-08-13 — shipped on `feat/phase6-guest-demo` as **v5.0.0**. Final Simple nav is one unnumbered Search tab (no stepper; collect via Start over); that contract supersedes the original “Simple/guest tests pass unchanged” criterion.
+## Phase 13 — One flow: fold Advanced into Simple, then remove Advanced mode
+Planned 2026-09-17 to follow the Workshop round, which shipped in 5.5.0. Simple's rules apply
+to every moved function: one URL, popups only on tap, plain words, preview
+before apply with one-click undo, hidden until needed, one wait screen.
+- Tasks, one branch each off `main`, in this order:
+  - Search chips: Years and Sources popovers, Newest first toggle, More like
+    starred chip once a paper is starred, export-whole-library option in the
+    export panel, PMID/DOI and study type moved inside the abstract
+    disclosure; search state gains a `filters` shape the chips render from
+  - Fetch dialog gains a Databases disclosure (topics still pick the
+    defaults); the What we fetched popup gains per-source counts, coverage,
+    and year spread, replacing the Data Management and Clean up cards
+  - Duplicates visible: "N duplicates set aside" in the funnel with a popup
+    that restores one pair per click; the silent 0.98 resolve stays, the
+    threshold control goes
+  - Re-prepare: only-missing becomes the default; embedding model picker
+    leaves the UI (env default stays)
+  - Clusters prototype gate: throwaway Group by theme popup, density only,
+    on a real library with screenshots, then keep or drop; if kept, preview
+    and undo through the existing screening endpoints
+  - Remove Advanced in one wave: delete `/data-management`, `/statistics`,
+    `/clusters` and their templates with a 301 to `/search`; delete the
+    `ui_mode` and `ui_mode_seed` cookies (`app/routes/auth.py`,
+    `app/routes/pages.py`), the mode branch in `theme-init.js`, `setUiMode`
+    and the toggle in `common.js`, about 40 `isSimpleMode` branches across
+    four JS files, 176 mode-gated CSS selectors flattened and 7 removed, the
+    `-advanced` copy twins, and guide text that names both modes
+    (`app/content/feature_guides.py`); rewrite the 52 tests in
+    `tests/test_simple_mode.py` as one-behaviour tests; the helpdesk
+    `ui_mode` column stays for old rows and stops being written
+- Proposed drops, pending Jonathan's call: PICO fields, paste-a-paper seed
+  input, lexical and PICO boost radios, results count, embedding model
+  picker, duplicate threshold, similarity badge, email-on-fetch-finish (no
+  account has a recovery email as of 2026-09-17)
+- Also pending: clusters keep or drop after the prototype; release version
+  (6.0.0 proposed, three pages and a mode disappear); old URLs redirect
+  (proposed) or 404
+- spec.md drift once the removal lands: the Simple / Advanced mode bullet
+  and its nav lines (Required Behavior), the Simple and Advanced examples
+  (User Experience), and the two-flow lines in Acceptance Criteria describe
+  two modes (needs approval)
+- Complete when: every function a student could reach only in Advanced is
+  either on the Search page under Simple's rules or in the recorded drop
+  list; no `data-mode`, `uiMode`, or `ui_mode` reference remains in `app/`,
+  `static/`, `templates/`, or `tests/`; spec.md describes one flow
+- Status: [ ] planned, not started
 
 ## Backlog (unscheduled)
 - Make `pyright app` blocking in CI after clearing the current error backlog
+  (56 errors, 6 warnings on 2026-09-12)
+- Tell all three AI prompts (`_REFINE_SYSTEM`, `_ASK_SYSTEM`, Reader) that the
+  abstract is data, not instructions; one change covering all three
+- Startup warning when `user_data/ai_settings.json` exists and no AI env is set
+- Prune CSS left by the reverted split-pane work (stylesheet is 8,396 lines
+  on 2026-09-20)
+- A test that parses the look list in `app/content/looks.py`,
+  `static/js/theme-init.js`, and `templates/partials/look_picker.html` and
+  fails when they differ; today the three match only by hand
+- Looks beyond palette: per-look structure changes (`app/content/looks.py`
+  calls this a later job)
 - Dependency lockfile (pip-tools / uv) if reproducibility becomes a priority
 - Optional later ruff ratchet: E501 / UP / E402
 - Scale opts (FAISS defaults, TF-IDF corpus cache) only with new ≥10× evidence
