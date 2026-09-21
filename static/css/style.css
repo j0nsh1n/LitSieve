@@ -2215,8 +2215,8 @@ input[type="range"]::-moz-range-thumb:hover {
 }
 .search-rail-sticky {
     position: sticky;
-    top: 5rem;
-    max-height: calc(100vh - 6rem);
+    top: var(--simple-rail-top, 5rem);
+    max-height: calc(100vh - var(--simple-rail-top, 5rem) - 1rem);
     display: flex;
     flex-direction: column;
     min-height: 0;
@@ -7664,6 +7664,15 @@ html[data-mode="simple"] body.simple-screen-ready #search-query-top ~ #simple-sc
 }
 html[data-mode="simple"] body.simple-screen-ready:has(.guest-banner) #search-query-top {
     top: 10.5rem;
+}
+/* Save your work parks below the sticky Search tile instead of sliding under it. */
+html[data-mode="simple"] body.simple-screen-ready .search-rail-sticky {
+    top: var(--simple-rail-top, 10.25rem);
+    max-height: calc(100vh - var(--simple-rail-top, 10.25rem) - 1rem);
+}
+html[data-mode="simple"] body.simple-screen-ready:has(.guest-banner) .search-rail-sticky {
+    top: var(--simple-rail-top, 15.75rem);
+    max-height: calc(100vh - var(--simple-rail-top, 15.75rem) - 1rem);
 }
 html[data-mode="simple"] body.simple-screen-ready #simple-tools-count:not([hidden]) {
     text-decoration: none;

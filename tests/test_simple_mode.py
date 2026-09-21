@@ -1190,6 +1190,7 @@ def test_simple_search_side_panel_exists_and_hidden_in_advanced():
     assert ".funnel-track--split" in css
     js = _read("static", "js", "search.js")
     assert "updateSimpleSearchPanel" in js
+    assert "syncSimpleRailAnchor" in js
     assert "simple-export-results-btn" in js
     fill = js[js.find("function fillSimpleRailStats") : js.find("async function loadSearchEmptyState")]
     assert "setProperty('--funnel-kept-pct'" in fill

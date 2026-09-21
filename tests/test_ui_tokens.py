@@ -790,6 +790,7 @@ RUNTIME_SET_VARS = {
     "--tx", "--ty", "--tr",  # view-transition offsets,
     "--i",  # per-row reveal stagger, set by search.js buildResultCard
     "--nav-h",  # common.js: measured top bar height for the phone sticky bar
+    "--simple-rail-top",  # search.js: sticky Save-your-work rail under the search bar
 }
 
 

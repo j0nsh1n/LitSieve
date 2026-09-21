@@ -321,6 +321,7 @@ function applySimpleScreenGateUi() {
  if (work) work.hidden = !readySearch;
  const qtop = document.getElementById('search-query-top');
  if (qtop) qtop.hidden = !readySearch;
+ if (typeof syncSimpleRailAnchor === 'function') syncSimpleRailAnchor();
 }
 
 function copyScreenQuestionToSearch() {

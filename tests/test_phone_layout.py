@@ -170,7 +170,16 @@ def test_simple_panel_is_anchored_while_scrolling():
     assert rail and "align-self: stretch" in rail.group(1), "desktop rail needs sticky travel"
     sticky = re.search(r"\.search-rail-sticky \{([^}]+)\}", CSS)
     assert sticky and "position: sticky" in sticky.group(1)
+    assert "var(--simple-rail-top" in sticky.group(1)
+    rail_ready = re.search(
+        r'html\[data-mode="simple"\] body\.simple-screen-ready \.search-rail-sticky \{([^}]+)\}',
+        CSS,
+    )
+    assert rail_ready, "desktop Save panel must park below the Search tile"
+    assert "10.25rem" in rail_ready.group(1)
     # The results column reserves room for the bar so the last paper is reachable.
     search_js = (REPO / "static" / "js" / "search.js").read_text(encoding="utf-8")
     assert "--simple-panel-h" in search_js
     assert "has-simple-panel" in search_js
+    assert "syncSimpleRailAnchor" in search_js
+    assert "setProperty('--simple-rail-top'" in search_js

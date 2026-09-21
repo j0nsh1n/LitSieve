@@ -1664,6 +1664,36 @@ function watchSimplePanelClearance() {
  window.addEventListener('resize', syncSimplePanelClearance);
 }
 
+/** Desktop: keep the Save-your-work rail under the sticky Search tile. */
+function syncSimpleRailAnchor() {
+ const root = document.documentElement;
+ const query = document.getElementById('search-query-top');
+ if (root.getAttribute('data-mode') !== 'simple' || !query || query.hidden) {
+  root.style.removeProperty('--simple-rail-top');
+  return;
+ }
+ const qStyle = window.getComputedStyle(query);
+ if (qStyle.position !== 'sticky') {
+  root.style.removeProperty('--simple-rail-top');
+  return;
+ }
+ const stickyTop = Number.parseFloat(qStyle.top) || 0;
+ const gap = 12;
+ const top = Math.ceil(stickyTop + query.getBoundingClientRect().height + gap);
+ root.style.setProperty('--simple-rail-top', `${top}px`);
+}
+
+function watchSimpleRailAnchor() {
+ if (watchSimpleRailAnchor._wired) return;
+ watchSimpleRailAnchor._wired = true;
+ const query = document.getElementById('search-query-top');
+ if (query && typeof ResizeObserver === 'function') {
+  new ResizeObserver(() => syncSimpleRailAnchor()).observe(query);
+ }
+ window.addEventListener('resize', syncSimpleRailAnchor);
+ syncSimpleRailAnchor();
+}
+
 /** Simple keeps the scope note collapsed; Advanced pins it open (summary hidden). */
 function syncSearchScopeNote() {
  const note = document.querySelector('.search-scope-note');
@@ -1679,6 +1709,7 @@ function syncSearchScopeNote() {
 // If the user toggles Simple/Advanced after a search, re-show the panel.
 document.addEventListener('DOMContentLoaded', () => {
  watchSimplePanelClearance();
+ watchSimpleRailAnchor();
  syncSearchScopeNote();
  const modeBtn = document.getElementById('mode-toggle');
  if (modeBtn) {
@@ -1687,6 +1718,7 @@ document.addEventListener('DOMContentLoaded', () => {
    requestAnimationFrame(() => {
     updateSimpleSearchPanel(!!(lastResults && lastResults.length));
     syncSearchScopeNote();
+    if (typeof syncSimpleRailAnchor === 'function') syncSimpleRailAnchor();
     // Result cards carry mode-specific markup: rebuild for the new mode.
     if (lastResults && lastResults.length) showSearchResults();
    });
