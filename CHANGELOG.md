@@ -8,7 +8,14 @@ and this project aims to follow Semantic Versioning for app version strings
 
 ## [Unreleased]
 
+### Added
+- Five looks on the same Simple Search shell: Workshop, Broadsheet, Lab, Night,
+  and Catalog. After you create an account, Search opens a Look popup. Change
+  it later in Account. The choice is stored on the account and follows login.
+
 ### Changed
+- On desktop Simple search, Save your work now sticks just below the Search
+  bar instead of sliding under it.
 - New look, Workshop: warm sand paper with a clay accent in light, warm
   wood tones in dark, and every card, button, chip, and the query tile
   sitting on a solid edge that presses down when you click. No blur
@@ -49,6 +56,11 @@ and this project aims to follow Semantic Versioning for app version strings
   the same wrong way and are fixed by the same change.
 
 ### Fixed
+- Account Look showed the heading with no colour choices. The picker now
+  lists the five looks in the page itself, so a running server that has
+  not reloaded Python still draws the cards.
+- Look is no longer a section on the register form. After Create Account,
+  Search opens a dialog with the five choices. Login does not reopen it.
 - Light success green meets 4.5:1 contrast on the page wash.
 - The phone top bar shows the full LitSieve wordmark.
 - Frosted surfaces stay solid when the browser cannot blur.
