@@ -23,12 +23,17 @@
   Workshop tokens (Phase 14): accent `#a8472a` (dark `#e39a73`), 8/14/18px
   radii, solid surfaces on a `--edge` with a `--sheen`, no backdrop-filter,
   gradient paper grain on `body::before`. Source Serif 4 headings, Source
-  Sans 3 body/UI (self-hosted). Simple results open in place (one row open,
+  Sans 3 body/UI (self-hosted). Per-account **look** (`users.look`, cookie
+  `ui_look`, `html[data-look]`): Workshop (default), Broadsheet, Lab, Night,
+  Catalog. After creating an account, Search opens a Look popup. Change it
+  in Account. Light/dark stays on the
+  sun/moon control. Simple results open in place (one row open,
   `.result-toggle` with aria-expanded); Simple collect is one guided column
   (question headings, topic chips with `icon_svg` from the catalog, Next
   reveals the topic box). Sieve pan as favicon, nav mark, and empty-state
-  illustration. CSS cache-bust `style.css?v=20260918a`. Mobile app nav is a
-  one-row brand + menu; steps and tools open in a drawer.
+  illustration. CSS cache-bust `style.css?v=20260918g`. Look JS cache-bust
+  `theme-init.js?v=20260918h`, `common.js` / `account.js` `?v=20260920a`.
+  Mobile app nav is a one-row brand + menu; steps and tools open in a drawer.
 - Reader Mode: **Explain this study** on Search/Clean up cards — structured
   plain-language reading of one abstract, cached per
   `(article_id, source, audience)` in the library DB, warnings-only verifier.
@@ -63,7 +68,7 @@
 | `app/services/` | pipeline, embeddings, clustering, summarize, llm, reader_mode / facts / verify, citations, mailer |
 | `app/storage/` | database, libraries, shares, user_db, quota, dbconn, helpdesk, ops_audit |
 | `app/fetchers/` | 17 public sources + `base.py` |
-| `app/content/` | source_catalog, feature_guides, sample_corpus, ui_flags |
+| `app/content/` | source_catalog, feature_guides, sample_corpus, ui_flags, looks |
 | `templates/` + `partials/` | Jinja shell + Simple/guest partials |
 | `static/` | vanilla JS/CSS (no npm); cache-bust `?v=` |
 | `tests/` | pytest; policy in `tests/README.md` |
@@ -72,7 +77,7 @@
 
 ## Domain Model
 - **User** (`users.db`): username, password hash, token_version; optional recovery
-  email; `is_guest` + created_at for demo accounts
+  email; `is_guest` + created_at for demo accounts; `look` (workshop default)
 - **Library**: named collection; meta in `libraries.json`; SQLite
   `user_data/<uid>/libraries/<lib_id>/articles.db`
 - **Article** key `(article_id, source)`: title, abstract, year, authors, journal
@@ -122,20 +127,26 @@ Guest User (is_guest) → sample corpus only; purged by age
 - Host entry: `app.main:app` port 7860; Linux `./venv`
 
 ## Session Handoff
-- **Date:** 2026-09-18
-- **Branch:** `feat/ui3-workshop` (PR #70, phone round folded in), stacked
-  on `fix/audit-followups-2026-09-17` (PR #69). Version **5.5.0** in
-  `app/main.py`.
-- **Done:** Roadmap Phase 14: Workshop tokens and surfaces with no blur;
-  Simple results open in place; Simple collect as a guided column with
-  line-icon chips and a Next button; the motion set; the pre-fetch count
-  dialog; the phone round; Save your work anchored while scrolling. Full
-  suite green after each unit; each unit driven in headless Chromium on a
-  throwaway server (`design_mockups/ui3/capture/*.mjs`).
-- **Watch out:** a CSS animation with `fill-mode: both`/`forwards` that
-  animates `transform` leaves an identity matrix behind, which makes that
-  element the containing block for its `position: fixed` descendants. Use
-  `backwards` for entrance animations.
-- **Next:** Merge #69 then #70; deploy 5.5.0 to the host and tick Phase 14
-  on the roadmap branch. Phase 13 (fold Advanced into Simple) waits behind
-  this.
+- **Date:** 2026-09-20
+- **Branch:** `feat/account-looks`, **PR #71 into `main`**. Version **5.5.0**.
+- **Why #71 exists:** #70 merged into `fix/audit-followups-2026-09-17` after
+  #69 had already merged that branch, so 5.5.0 never reached `main`. #71
+  carries 5.5.0 plus the looks, the desktop Save-your-work anchor, a fix so
+  a failed look save shows its error, and the Reader Mode 5.3 audit doc.
+- **Production is ahead of `main`:** `litsieve-uvicorn` runs from this
+  checkout and has served 5.5.0 and the looks since its 18 Sep 13:54
+  restart. Templates and static files go live from disk as soon as they are
+  edited here; Python only on restart. The ops deploy does `git reset --hard`
+  to the staging HEAD in this checkout, so do not deploy from `main` until
+  #71 merges.
+- **spec.md drift:** Simple/Advanced is still described as client-only
+  `localStorage.uiMode`. Look is now per-account (`users.look` + `ui_look`
+  cookie). AI keys path at spec:96 still says `user_data/ai_settings.json`
+  vs per-account `{USER_DATA_DIR}/{user_id}/ai_settings.json`.
+- **Watch out:** the look list lives in `app/content/looks.py`,
+  `theme-init.js`, and `partials/look_picker.html`; they match, but no test
+  ties them together yet. A CSS animation with `fill-mode: both`/`forwards`
+  on `transform` makes the element the containing block for its
+  `position: fixed` children; use `backwards` for entrances.
+- **Next:** Merge #71, then deploy it and tick Phase 14 on the roadmap.
+  Phase 13 (fold Advanced into Simple) waits behind this.
