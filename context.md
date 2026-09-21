@@ -20,7 +20,7 @@
   then a short finish leg into Search. After papers exist, topics/fetch hide;
   Start over is a popup. Advanced: full steps including Clean up + Clusters;
   its progress bars share Simple height/tokens, with counts on a detail line.
-  Workshop tokens (Phase 14): accent `#a8472a` (dark `#e39a73`), 8/14/18px
+  Workshop tokens (5.5.0): accent `#a8472a` (dark `#e39a73`), 8/14/18px
   radii, solid surfaces on a `--edge` with a `--sheen`, no backdrop-filter,
   gradient paper grain on `body::before`. Source Serif 4 headings, Source
   Sans 3 body/UI (self-hosted). Per-account **look** (`users.look`, cookie
@@ -83,13 +83,11 @@
 - **Article** key `(article_id, source)`: title, abstract, year, authors, journal
 - **Embeddings / clusters / screening / notes / key_points / reader_explanations**: per library DB
 - **Share / clone code**: registry in users.db; join copies library (not live)
-- **Jobs**: fetch / embed progress per user; bind to active library at start
 - **AI settings**: per account `{USER_DATA_DIR}/{user_id}/ai_settings.json`
   (keys encrypted). Host env is the deploy default. A student base URL
   never rides with the host API key.
 - **Jobs**: fetch / embed progress per user; bind to an explicit owned
   library id when the client sends one, otherwise the active library at start
-- **AI settings**: server-wide `user_data/ai_settings.json` (keys encrypted)
 - **Quota**: disk under `user_data/<uid>/` vs `MAX_USER_STORAGE_MB`; optional
   per-account `quota_limit_mb` + `quota_limit_until` overlay (helpdesk bump)
 - **Support view**: httponly `support_view` cookie overlays identity; admin JWT
@@ -128,25 +126,22 @@ Guest User (is_guest) → sample corpus only; purged by age
 
 ## Session Handoff
 - **Date:** 2026-09-20
-- **Branch:** `feat/account-looks`, **PR #71 into `main`**. Version **5.5.0**.
-- **Why #71 exists:** #70 merged into `fix/audit-followups-2026-09-17` after
-  #69 had already merged that branch, so 5.5.0 never reached `main`. #71
-  carries 5.5.0 plus the looks, the desktop Save-your-work anchor, a fix so
-  a failed look save shows its error, and the Reader Mode 5.3 audit doc.
-- **Production is ahead of `main`:** `litsieve-uvicorn` runs from this
-  checkout and has served 5.5.0 and the looks since its 18 Sep 13:54
-  restart. Templates and static files go live from disk as soon as they are
-  edited here; Python only on restart. The ops deploy does `git reset --hard`
-  to the staging HEAD in this checkout, so do not deploy from `main` until
-  #71 merges.
-- **spec.md drift:** Simple/Advanced is still described as client-only
-  `localStorage.uiMode`. Look is now per-account (`users.look` + `ui_look`
-  cookie). AI keys path at spec:96 still says `user_data/ai_settings.json`
-  vs per-account `{USER_DATA_DIR}/{user_id}/ai_settings.json`.
-- **Watch out:** the look list lives in `app/content/looks.py`,
-  `theme-init.js`, and `partials/look_picker.html`; they match, but no test
-  ties them together yet. A CSS animation with `fill-mode: both`/`forwards`
-  on `transform` makes the element the containing block for its
-  `position: fixed` children; use `backwards` for entrances.
-- **Next:** Merge #71, then deploy it and tick Phase 14 on the roadmap.
-  Phase 13 (fold Advanced into Simple) waits behind this.
+- **Branch:** `docs/refresh-after-5.5.0`, **PR #72 into `main`** (docs only,
+  plus in-app help strings). #71 merged on 2026-09-20, so 5.5.0 and the
+  looks are on `main`. Version **5.5.0**.
+- **Done:** help text, README, `docs/SELFHOST.md` (templates and static
+  are live from disk; Python on restart), `docs/DEPLOY.md` detached-deploy
+  runbook (GLM draft; recovery steps rewritten, then passed by GLM 16/16 and Jev),
+  approved `spec.md` edits (mode cookies, looks, AI key path), roadmap
+  future-only (finished phases and Phase 14 removed).
+- **Production:** `litsieve-uvicorn` runs from this checkout, Python loaded
+  at its 18 Sep restart. The help-text change reaches students on the next
+  restart. Deploying from `main` is safe again now that #71 is in it.
+- **Watch out:** the console rollback (`POST /api/ops/rollback`) runs as a
+  child of the web service, so its own restart stops it before it closes
+  its record (roadmap Phase 11; read from code, not reproduced). Recover an
+  interrupted deploy by hand with the steps in `docs/DEPLOY.md`. The look
+  list lives in three files that match only by hand (backlog).
+- **Next:** Merge #72 and restart the service. Then Phase 11 (rollback
+  detached, host confirmation, spent branches), the Phase 12 split-pane
+  decision, and Phase 13 (fold Advanced into Simple).
