@@ -132,7 +132,14 @@ when the app is healthy — that is not a reliable up/down signal by itself.
 
 ### After changing code
 
-The service runs whatever was on disk when it started; it does not notice edits.
+The service loads Python once, when it starts. Templates and static files are
+read from disk on every request, so an edit under `templates/` or `static/` is
+live as soon as it is saved, while a change under `app/` waits for a restart.
+Editing this checkout in place can therefore serve new pages against old routes;
+that is how the Look picker once went live before the route that saves it.
+Browsers keep cached CSS and JS until the `?v=` string in the template changes.
+Make changes on the dev server below or in another clone, then bring them here
+and restart:
 
 ```bash
 SECRET_KEY=x DEBUG=true ./venv/bin/python -m pytest -q   # optional, but cheap
