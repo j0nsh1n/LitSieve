@@ -14,6 +14,11 @@ and this project aims to follow Semantic Versioning for app version strings
   it later in Account. The choice is stored on the account and follows login.
 
 ### Changed
+- Scrollbars and dropdown lists match the look you picked. The scrollbar
+  thumb takes the look's ink instead of the browser's grey. In Chrome, Edge,
+  and Safari 27, an open dropdown draws its list in the look's surface,
+  corners, and type, marks the chosen option with a check, and keeps the
+  keyboard behaviour it always had. Other browsers keep their own list.
 - On desktop Simple search, Save your work now sticks just below the Search
   bar instead of sliding under it.
 - The Collect help page explains the per-database paper count asked before a

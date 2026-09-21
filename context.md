@@ -125,23 +125,22 @@ Guest User (is_guest) → sample corpus only; purged by age
 - Host entry: `app.main:app` port 7860; Linux `./venv`
 
 ## Session Handoff
-- **Date:** 2026-09-20
-- **Branch:** `docs/refresh-after-5.5.0`, **PR #72 into `main`** (docs only,
-  plus in-app help strings). #71 merged on 2026-09-20, so 5.5.0 and the
-  looks are on `main`. Version **5.5.0**.
-- **Done:** help text, README, `docs/SELFHOST.md` (templates and static
-  are live from disk; Python on restart), `docs/DEPLOY.md` detached-deploy
-  runbook (GLM draft; recovery steps rewritten, then passed by GLM 16/16 and Jev),
-  approved `spec.md` edits (mode cookies, looks, AI key path), roadmap
-  future-only (finished phases and Phase 14 removed).
-- **Production:** `litsieve-uvicorn` runs from this checkout, Python loaded
-  at its 18 Sep restart. The help-text change reaches students on the next
-  restart. Deploying from `main` is safe again now that #71 is in it.
-- **Watch out:** the console rollback (`POST /api/ops/rollback`) runs as a
-  child of the web service, so its own restart stops it before it closes
-  its record (roadmap Phase 11; read from code, not reproduced). Recover an
-  interrupted deploy by hand with the steps in `docs/DEPLOY.md`. The look
-  list lives in three files that match only by hand (backlog).
-- **Next:** Merge #72 and restart the service. Then Phase 11 (rollback
-  detached, host confirmation, spent branches), the Phase 12 split-pane
-  decision, and Phase 13 (fold Advanced into Simple).
+- **Date:** 2026-09-21
+- **Branch:** `feat/themed-scrollbars-selects`, worked in the worktree
+  `/tmp/litsieve-themed-controls` because this checkout is the live site.
+  Committed locally; not pushed. Version **5.5.0**.
+- **Done:** Scrollbars use `scrollbar-color`, the thumb `--text` mixed 55%
+  into `--bg` (the lowest step at 3:1 in every look and theme). Selects use
+  customizable select (`appearance: base-select`) when the browser also has
+  `::picker(select)`: the open list takes the look's tokens, the chosen
+  option is bold with an `--accent` check, and the old light option colours
+  apply only where the themed list is unsupported. `tests/test_themed_controls.py`
+  measures the contrast in all 14 look/theme blocks. Checked in Chromium 151
+  in every look and theme, on a phone viewport, and on a full-width select.
+- **Production:** restarted 2026-09-20 23:32 after #72, so the help-text
+  fixes are live. Still on `main`; this branch is not deployed.
+- **Watch out:** Firefox reports `appearance: base-select` without
+  `::picker(select)`, so both CSS blocks test for the picker too. The console
+  rollback still cannot close its own record (roadmap Phase 11).
+- **Next:** PR this branch when Jonathan says so. Then Phase 11, the
+  Phase 12 split-pane decision, and Phase 13.
