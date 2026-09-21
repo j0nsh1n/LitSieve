@@ -1,4 +1,4 @@
-# LitSieve 📚 — v5.4.0
+# LitSieve 📚 — v5.5.0
 
 A multi-user web app for **students** to fetch, screen, and rank research papers
 across public academic databases as a **research starting point**. Semantic
@@ -25,8 +25,12 @@ Built with **FastAPI**, sentence-transformers, FAISS, and scikit-learn.
   — replace or append; **background jobs** with progress, cancel, retries, and
   per-source error classes; **auto prepare-for-search** after a successful fetch
 - 🧭 **Simple / Advanced** UI mode (client preference): Simple is one Search
-  page (fetch by **topic** → wait screen → required **Narrow it down** → rank);
+  page (fetch by **topic**, choosing how many papers per database → wait screen
+  → required **Narrow it down** → rank, with results that open in place);
   Advanced keeps Clean up, Clusters, and full controls
+- 🎨 **Looks**: Workshop (default), Broadsheet, Lab, Night, and Catalog restyle
+  the same pages. The choice is saved on the account and follows login; light
+  and dark stay a per-browser toggle
 - 🧠 Semantic embeddings (only-new or full re-embed; topic-based model pick; GPU when
   available; background job) + **extractive key points** from abstracts
 - 📖 **Explain this study** (opt-in AI on a paper you already have): a structured
@@ -61,7 +65,7 @@ Built with **FastAPI**, sentence-transformers, FAISS, and scikit-learn.
 │   ├── fetchers/           # One module per source + base.py (HttpClient, retry/backoff)
 │   ├── services/           # pipeline, embeddings, clustering, summarize, study_type, llm, reader_mode, citations
 │   ├── storage/            # database, user_db, libraries, shares (SQLite)
-│   └── content/            # feature guides, sample corpus, source catalog, UI flags
+│   └── content/            # feature guides, sample corpus, source catalog, UI flags, looks
 ├── templates/              # Jinja2 HTML pages
 ├── static/                 # CSS + page JavaScript
 ├── tests/                  # pytest suite
