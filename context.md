@@ -125,26 +125,33 @@ Guest User (is_guest) → sample corpus only; purged by age
 - Host entry: `app.main:app` port 7860; Linux `./venv`
 
 ## Session Handoff
-- **Date:** 2026-09-21
-- **Branch:** `feat/themed-scrollbars-selects`, worked in the worktree
-  `/tmp/litsieve-themed-controls` because this checkout is the live site.
-  Committed locally; not pushed. Version **5.5.0**.
-- **Done:** Scrollbars are drawn with `::-webkit-scrollbar` (no arrow
-  buttons, rounded thumb, clear track), the thumb `--accent` mixed 80% into
-  `--bg` and full `--accent` on hover, both at 3:1 or better in every look
-  and theme. `scrollbar-color` is only a Firefox fallback, because setting it
-  makes Chromium ignore `::-webkit-scrollbar` and draw its stock bar; the
-  first version did exactly that. Selects use
-  customizable select (`appearance: base-select`) when the browser also has
-  `::picker(select)`: the open list takes the look's tokens, the chosen
-  option is bold with an `--accent` check, and the old light option colours
-  apply only where the themed list is unsupported. `tests/test_themed_controls.py`
-  measures the contrast in all 14 look/theme blocks. Checked in Chromium 151
-  in every look and theme, on a phone viewport, and on a full-width select.
-- **Production:** restarted 2026-09-20 23:32 after #72, so the help-text
-  fixes are live. Still on `main`; this branch is not deployed.
-- **Watch out:** Firefox reports `appearance: base-select` without
-  `::picker(select)`, so both CSS blocks test for the picker too. The console
-  rollback still cannot close its own record (roadmap Phase 11).
-- **Next:** PR this branch when Jonathan says so. Then Phase 11, the
-  Phase 12 split-pane decision, and Phase 13.
+- **Date:** 2026-09-23
+- **Branches:** two PRs into `main`, each carrying this same handoff so
+  either can merge first. `fix/tests-never-write-live-log`: tests never
+  write a log where they run. `feat/instant-tooltips`: native `title` text
+  replaced by look-drawn tooltips. Version **5.5.0**. The live checkout is at
+  `37858e0` (#74 pulled, so the drawn scrollbar is live).
+- **Tests and logs:** `tests/conftest.py` forces `LOG_FILE=""` before the app
+  is imported. Before this, a test run from the live checkout appended to
+  production's `logs/litsieve.log` and could rotate it under the service. A
+  fresh-process test guards it; `tests/README.md` rule 6 says tests never
+  write into the checkout.
+- **Tooltips:** `static/js/tooltips.js` draws one `data-tip` bubble under
+  `<body>` in look tokens, shown on hover and keyboard focus with no delay,
+  above the control or below at the top edge, closed by Escape, skipped on
+  touch, `aria-describedby` only while shown. The bubble takes the pointer
+  with a strip over the 9px gap (WCAG 1.4.13), and a control scrolled out of
+  view hides its bubble. A realistic click in the top 1px of a `.btn` is
+  lost with or without a tooltip, because `.btn:active` moves it 2px.
+- **Tunnels:** LitSieve has one tunnel, `cloudflared-litpilot-token.service`
+  (tunnel `8f98295a…`). The other `cloudflared` process (tunnel `6ede11dd…`,
+  forwarding to 127.0.0.1:3773) is T3 Code's remote access; leave it.
+- **Advanced removal audit (2026-09-21):** not safe yet. Only the Clusters
+  page can restore exclusions other than `low_relevance` (60 duplicate
+  copies in 5 accounts; every Not relevant after its Undo), so roadmap Phase
+  13 starts with a Simple "Set aside" list for every reason. The Search page
+  loads `data_management.js`, so removing that page must keep the script.
+- **Next:** UI slice 2, drawn checkboxes (stroke tick) and radios,
+  placeholders, autofill, tap flash, spinners, the Explain glossary triangle,
+  selection contrast, and the 1px press-down edge. Slice 3 replaces the
+  browser's validation bubbles.
