@@ -62,20 +62,34 @@ def _own_rule(body: str, selector: str) -> str:
 
 
 def test_scrollbar_thumb_clears_3_to_1_in_every_look_and_theme():
-    m = re.search(
-        r"html\s*\{\s*scrollbar-color:\s*color-mix\(in srgb, var\(--text\) (\d+)%, var\(--bg\)\)\s+transparent;",
-        CSS,
-    )
-    assert m, "html must set a scrollbar-color mixed from --text and --bg"
+    m = re.search(r"--scrollbar-thumb:\s*color-mix\(in srgb, var\(--accent\) (\d+)%, var\(--bg\)\);", CSS)
+    assert m, "--scrollbar-thumb must be the look's accent mixed into --bg"
+    assert re.search(r"--scrollbar-thumb-hover:\s*var\(--accent\);", CSS)
     pct = int(m.group(1))
     failures = []
     for label, tokens in _all_token_blocks():
-        thumb = _mix(tokens["--text"], tokens["--bg"], pct)
-        for ground in ("--bg", "--surface"):
-            ratio = _wcag_contrast(thumb, tokens[ground])
-            if ratio < 3.0:
-                failures.append(f"{label} thumb {thumb} on {ground}: {ratio:.2f}")
+        for state, thumb in (("rest", _mix(tokens["--accent"], tokens["--bg"], pct)), ("hover", tokens["--accent"])):
+            for ground in ("--bg", "--surface"):
+                ratio = _wcag_contrast(thumb, tokens[ground])
+                if ratio < 3.0:
+                    failures.append(f"{label} {state} thumb {thumb} on {ground}: {ratio:.2f}")
     assert not failures, "scrollbar thumb below 3:1: " + "; ".join(failures)
+
+
+def test_scrollbar_is_drawn_without_arrows_on_a_clear_track():
+    assert "display: none" in _own_rule(CSS, "::-webkit-scrollbar-button"), "no arrow buttons"
+    assert "background: transparent" in _own_rule(CSS, "::-webkit-scrollbar-track,\n::-webkit-scrollbar-corner")
+    thumb = _own_rule(CSS, "::-webkit-scrollbar-thumb")
+    for decl in ("var(--scrollbar-thumb)", "var(--radius-full)", "background-clip: padding-box"):
+        assert decl in thumb
+
+
+def test_scrollbar_color_is_only_the_firefox_fallback():
+    """Once scrollbar-color is set, Chromium ignores ::-webkit-scrollbar and draws its stock bar."""
+    fallback = _at_rule_body("@supports not selector(::-webkit-scrollbar)")
+    assert "scrollbar-color: var(--scrollbar-thumb) transparent" in fallback
+    outside = CSS.replace(fallback, "")
+    assert "scrollbar-color" not in re.sub(r"/\*.*?\*/", "", outside, flags=re.S)
 
 
 def test_dropdown_list_is_drawn_from_theme_tokens():

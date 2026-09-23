@@ -643,13 +643,45 @@ body::before {
 [data-theme="light"] { color-scheme: light; }
 [data-theme="dark"] { color-scheme: dark; }
 
-/* Scrollbars in the look's own ink instead of the browser's grey. The thumb
-   is --text mixed 55% into --bg, the lowest step that clears 3:1 against
-   the page and every surface in all five looks and both themes
-   (tests/test_looks.py measures it). The track stays clear so panels keep
-   their colour, and the value inherits, so inner scroll areas follow. */
-html {
-    scrollbar-color: color-mix(in srgb, var(--text) 55%, var(--bg)) transparent;
+/* Scrollbars drawn in the look's accent, not the browser's grey bar with
+   arrows. Chromium and Safari take the ::-webkit-scrollbar rules: a slim
+   rounded thumb inset in a clear track, no arrow buttons. scrollbar-color
+   cannot remove the arrows, and once it is set Chromium ignores
+   ::-webkit-scrollbar entirely, so the standard properties are kept for
+   browsers without it (Firefox). The resting thumb is 80% accent into
+   --bg, the lowest step that clears 3:1 on the page and every surface in
+   all five looks and both themes; hover is the full accent
+   (tests/test_themed_controls.py measures both). */
+:root {
+    --scrollbar-thumb: color-mix(in srgb, var(--accent) 80%, var(--bg));
+    --scrollbar-thumb-hover: var(--accent);
+}
+::-webkit-scrollbar {
+    width: 0.75rem;
+    height: 0.75rem;
+}
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+    background: transparent;
+}
+::-webkit-scrollbar-button {
+    display: none;
+}
+::-webkit-scrollbar-thumb {
+    background-color: var(--scrollbar-thumb);
+    background-clip: padding-box;
+    border: 0.1875rem solid transparent;
+    border-radius: var(--radius-full);
+}
+::-webkit-scrollbar-thumb:hover,
+::-webkit-scrollbar-thumb:active {
+    background-color: var(--scrollbar-thumb-hover);
+}
+@supports not selector(::-webkit-scrollbar) {
+    html {
+        scrollbar-color: var(--scrollbar-thumb) transparent;
+        scrollbar-width: thin;
+    }
 }
 
 body {

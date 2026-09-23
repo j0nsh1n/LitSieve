@@ -129,8 +129,12 @@ Guest User (is_guest) → sample corpus only; purged by age
 - **Branch:** `feat/themed-scrollbars-selects`, worked in the worktree
   `/tmp/litsieve-themed-controls` because this checkout is the live site.
   Committed locally; not pushed. Version **5.5.0**.
-- **Done:** Scrollbars use `scrollbar-color`, the thumb `--text` mixed 55%
-  into `--bg` (the lowest step at 3:1 in every look and theme). Selects use
+- **Done:** Scrollbars are drawn with `::-webkit-scrollbar` (no arrow
+  buttons, rounded thumb, clear track), the thumb `--accent` mixed 80% into
+  `--bg` and full `--accent` on hover, both at 3:1 or better in every look
+  and theme. `scrollbar-color` is only a Firefox fallback, because setting it
+  makes Chromium ignore `::-webkit-scrollbar` and draw its stock bar; the
+  first version did exactly that. Selects use
   customizable select (`appearance: base-select`) when the browser also has
   `::picker(select)`: the open list takes the look's tokens, the chosen
   option is bold with an `--accent` check, and the old light option colours
