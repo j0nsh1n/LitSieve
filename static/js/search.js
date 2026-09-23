@@ -1028,7 +1028,7 @@ function renderStudyTypeBadge(article) {
  ? `<span class="study-type-meaning">${escapeHtml(meaning)}</span>`
  : '';
  return `<span class="study-type-wrap">`
- + `<span class="study-type-badge band-${escapeHtml(band)}" title="${escapeHtml(title)}">`
+ + `<span class="study-type-badge band-${escapeHtml(band)}" data-tip="${escapeHtml(title)}">`
  + `${escapeHtml(label)}${warnMark}</span>`
  + meaningLine
  + `</span>`;
@@ -1094,7 +1094,7 @@ function buildResultCard(article, idx) {
  // Simple mode hides the raw-ID row, so the actions row carries the real link.
  const openLink = url
  ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" class="result-open-link"
-  title="Open this paper at its source (new tab)">View paper \u2197</a>`
+  data-tip="Open this paper at its source (new tab)">View paper \u2197</a>`
  : '';
 
  const authors = (article.authors || []).join('; ');
@@ -1129,7 +1129,7 @@ function buildResultCard(article, idx) {
 
  const headHtml = `
  <div class="result-row-head result-row-meta">
- <div class="score-meter" role="img" aria-label="Similarity ${simLabel} of 1. Higher is a closer match to your query." title="${escapeHtml(scoreHelp)}">
+ <div class="score-meter" role="img" aria-label="Similarity ${simLabel} of 1. Higher is a closer match to your query." data-tip="${escapeHtml(scoreHelp)}">
   <span class="score-meter-value">${escapeHtml(simLabel)}</span>
   <span class="score-meter-track"><span class="score-meter-fill"></span></span>
  </div>
@@ -1168,16 +1168,16 @@ function buildResultCard(article, idx) {
   <div class="article-actions-row result-row-inline-actions">
   ${openLink}
   <button type="button" class="more-like-this-btn"
-   title="Rank the rest of your collection by how similar they are to this paper">More like this</button>
+   data-tip="Rank the rest of your collection by how similar they are to this paper">More like this</button>
   </div>
   ${noteRowHtml}
   </div>
   </div>
   <div class="result-row-rail" aria-label="Article actions">
-  <button type="button" class="star-btn ${starred ? 'is-starred' : ''}" title="Bookmark" aria-label="Star article" aria-pressed="${starred ? 'true' : 'false'}">${starLabelHtml(starred)}</button>
+  <button type="button" class="star-btn ${starred ? 'is-starred' : ''}" data-tip="${starred ? 'Remove star' : 'Star article'}" aria-label="${starred ? 'Remove star' : 'Star article'}" aria-pressed="${starred ? 'true' : 'false'}">${starLabelHtml(starred)}</button>
   <button type="button" class="note-toggle" ${noteVal ? 'hidden' : ''}><span class="result-rail-label">Note</span></button>
   <button type="button" class="not-relevant-btn"
-   title="Screen this paper out as not about your topic"><span class="result-rail-label">Not relevant</span></button>
+   data-tip="Screen this paper out as not about your topic"><span class="result-rail-label">Not relevant</span></button>
   </div>
   `;
  } else {
@@ -1193,12 +1193,12 @@ function buildResultCard(article, idx) {
   ${picoHtml}
   <div class="article-actions-row">
   ${openLink}
-  <button type="button" class="star-btn ${starred ? 'is-starred' : ''}" title="Bookmark" aria-label="Star article" aria-pressed="${starred ? 'true' : 'false'}">${starLabelHtml(starred)}</button>
+  <button type="button" class="star-btn ${starred ? 'is-starred' : ''}" data-tip="${starred ? 'Remove star' : 'Star article'}" aria-label="${starred ? 'Remove star' : 'Star article'}" aria-pressed="${starred ? 'true' : 'false'}">${starLabelHtml(starred)}</button>
   <button type="button" class="note-toggle" ${noteVal ? 'hidden' : ''}>Add note</button>
   <button type="button" class="more-like-this-btn"
-   title="Rank the rest of your collection by how similar they are to this paper">More like this</button>
+   data-tip="Rank the rest of your collection by how similar they are to this paper">More like this</button>
   <button type="button" class="not-relevant-btn"
-   title="Screen this paper out as not about your topic">Not relevant</button>
+   data-tip="Screen this paper out as not about your topic">Not relevant</button>
   </div>
   ${noteRowHtml}
   </div>
@@ -1242,10 +1242,12 @@ function buildResultCard(article, idx) {
  e.preventDefault();
  e.stopPropagation();
  const next = !starBtn.classList.contains('is-starred');
- // Optimistic: flip immediately; roll back on failure.
+ // Flip before saving; roll back on failure.
  starBtn.classList.toggle('is-starred', next);
  starBtn.innerHTML = starLabelHtml(next);
  starBtn.setAttribute('aria-pressed', next ? 'true' : 'false');
+ starBtn.dataset.tip = next ? 'Remove star' : 'Star article';
+ starBtn.setAttribute('aria-label', starBtn.dataset.tip);
  if (next) {
   starBtn.classList.remove('pop');
   void starBtn.offsetWidth;
@@ -1267,6 +1269,8 @@ function buildResultCard(article, idx) {
  starBtn.classList.toggle('is-starred', !next);
  starBtn.innerHTML = starLabelHtml(!next);
  starBtn.setAttribute('aria-pressed', next ? 'false' : 'true');
+ starBtn.dataset.tip = next ? 'Star article' : 'Remove star';
+ starBtn.setAttribute('aria-label', starBtn.dataset.tip);
  showNotification(`Could not save star: ${err.message}`, 'error');
  }
  });

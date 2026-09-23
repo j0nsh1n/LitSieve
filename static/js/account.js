@@ -659,9 +659,8 @@ function applyAiWriteGate(settings) {
  const modeSel = document.getElementById('ai-study-mode');
  if (saveBtn) {
   saveBtn.disabled = !allowed;
-  saveBtn.title = allowed
-   ? ''
-   : 'Saving AI settings is disabled on this server (AI_ALLOW_SETTINGS_WRITE=false)';
+  if (allowed) delete saveBtn.dataset.tip;
+  else saveBtn.dataset.tip = 'Saving AI settings is disabled on this server (AI_ALLOW_SETTINGS_WRITE=false)';
  }
  if (note) note.hidden = allowed;
  if (modeSel) modeSel.disabled = !allowed;

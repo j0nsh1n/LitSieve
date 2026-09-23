@@ -6,7 +6,7 @@
 {% block content %}
 <div class="ops-ide">
  <header class="ops-titlebar">
-  <a href="/" class="ops-title-brand" title="LitSieve home">LitSieve</a>
+  <a href="/" class="ops-title-brand" data-tip="LitSieve home">LitSieve</a>
   <span class="ops-title-sep" aria-hidden="true">/</span>
   <strong class="ops-title-app">Ship</strong>
   <span class="ops-kicker">staging</span>
@@ -14,7 +14,7 @@
   <span id="ops-file-title" class="u-visually-hidden">untitled</span>
   <div class="ops-title-actions">
    <label class="ops-ttl-label" for="ops-ttl">Unlock for</label>
-   <select id="ops-ttl" class="ops-ttl" title="How long Ship stays unlocked">
+   <select id="ops-ttl" class="ops-ttl" data-tip="How long Ship stays unlocked">
     <option value="5">5 min</option>
     <option value="10" selected>10 min</option>
     <option value="15">15 min</option>
@@ -26,24 +26,24 @@
    </select>
    <button type="button" class="ops-btn" id="ops-reauth">Unlock</button>
    <button type="button" class="ops-btn" id="ops-lock" hidden>Lock</button>
-   <button type="button" class="ops-btn" id="ops-save" disabled title="Save (Ctrl+S)">Save</button>
-   <button type="button" class="ops-btn" id="ops-validate" title="Run checks">Check</button>
+   <button type="button" class="ops-btn" id="ops-save" disabled data-tip="Save (Ctrl+S)">Save</button>
+   <button type="button" class="ops-btn" id="ops-validate" data-tip="Run checks">Check</button>
    <a href="/admin" class="ops-btn ops-linkbtn">Admin</a>
    <a href="/account" class="ops-btn ops-linkbtn">Account</a>
-   <button type="button" class="ops-btn" id="ops-theme" title="Toggle theme">Theme</button>
+   <button type="button" class="ops-btn" id="ops-theme" data-tip="Toggle theme">Theme</button>
   </div>
  </header>
 
  <nav class="ops-activity" aria-label="Workbench views">
-  <button type="button" class="ops-activity-btn is-on" data-side="explorer" title="Explorer">
+  <button type="button" class="ops-activity-btn is-on" data-side="explorer" data-tip="Explorer">
    <svg viewBox="0 0 16 16" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M1.5 1h5l1 1h7l.5.5v11l-.5.5h-13l-.5-.5v-12l.5-.5zM2 2v12h12V3H7.5L6.5 2H2z"/></svg>
    <span class="u-visually-hidden">Explorer</span>
   </button>
-  <button type="button" class="ops-activity-btn" data-side="scm" title="Source Control">
+  <button type="button" class="ops-activity-btn" data-side="scm" data-tip="Source Control">
    <svg viewBox="0 0 16 16" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M13 8.5a2.5 2.5 0 0 1-2.15 2.47L10 13.5v.5H8.5v-1l1.2-2.7A2.5 2.5 0 1 1 13 8.5zM3.5 1A2.5 2.5 0 0 1 5.9 3.03L8 6.5l-1.3.75-2.05-3.4A2.5 2.5 0 1 1 3.5 1zm9 9a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM3.5 4.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"/></svg>
    <span class="u-visually-hidden">Source Control</span>
   </button>
-  <button type="button" class="ops-activity-btn" data-side="grok" title="Grok">
+  <button type="button" class="ops-activity-btn" data-side="grok" data-tip="Grok">
    <svg viewBox="0 0 16 16" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M8 1l1.2 3.8L13 6l-3.8 1.2L8 11 6.8 7.2 3 6l3.8-1.2L8 1zm4.5 7.5l.7 2.2 2.3.7-2.3.7-.7 2.2-.7-2.2-2.3-.7 2.3-.7.7-2.2z"/></svg>
    <span class="u-visually-hidden">Grok</span>
   </button>
@@ -121,7 +121,7 @@
     <button type="button" class="ops-tab is-on" data-pane="diff">Diff</button>
     <button type="button" class="ops-tab" data-pane="check">Problems</button>
     <button type="button" class="ops-tab" data-pane="out">Output</button>
-    <button type="button" class="ops-panel-toggle" id="ops-panel-toggle" title="Toggle panel">▾</button>
+    <button type="button" class="ops-panel-toggle" id="ops-panel-toggle" data-tip="Toggle panel">▾</button>
    </div>
    <div class="ops-pane is-on" id="ops-pane-diff">
     <pre class="ops-console" id="ops-diff">Loading…</pre>
@@ -137,7 +137,7 @@
  </section>
 
  <footer class="ops-statusbar">
-  <button type="button" class="ops-sb-item" id="ops-sb-lock" title="Unlock status">locked</button>
+  <button type="button" class="ops-sb-item" id="ops-sb-lock" data-tip="Unlock status">locked</button>
   <span class="ops-sb-item" id="ops-status-line">Loading…</span>
   <span class="ops-sb-spacer"></span>
   <span class="ops-sb-item" id="ops-sb-cursor">Ln 1, Col 1</span>

@@ -363,12 +363,12 @@ function renderKeyPointsHtml(bullets, options) {
     const abstractLen = Number(options.abstractLen);
     const abstractOk = !Number.isFinite(abstractLen) || abstractLen >= 40;
     const readerBtn = (aid && src && showAi && abstractOk)
-        ? `<button type="button" class="btn btn-secondary btn-sm reader-mode-btn" title="Plain-language explanation of this abstract">Explain this study</button>`
+        ? `<button type="button" class="btn btn-secondary btn-sm reader-mode-btn" data-tip="Plain-language explanation of this abstract">Explain this study</button>`
         : '';
     const aiRow = (aid && src && showAi)
         ? `<div class="ai-actions" data-article-id="${aid}" data-source="${src}">
-            <button type="button" class="btn btn-secondary btn-sm ai-refine-btn" title="Optional AI rewrite of summary and bullets from this abstract only">Refine with AI</button>
-            <button type="button" class="btn btn-secondary btn-sm ai-ask-btn" title="Ask a question answered only from this abstract">Ask about this paper</button>
+            <button type="button" class="btn btn-secondary btn-sm ai-refine-btn" data-tip="Optional AI rewrite of summary and bullets from this abstract only">Refine with AI</button>
+            <button type="button" class="btn btn-secondary btn-sm ai-ask-btn" data-tip="Ask a question answered only from this abstract">Ask about this paper</button>
             ${readerBtn}
             <span class="ai-status-line help-text" hidden role="status" aria-live="polite"></span>
            </div>`
@@ -1285,7 +1285,7 @@ document.addEventListener('DOMContentLoaded', function() {
         nav.classList.toggle('nav-open', open);
         document.body.classList.toggle('nav-menu-open', open);
         toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-        toggle.title = open ? 'Close menu' : 'Open menu';
+        toggle.dataset.tip = open ? 'Close menu' : 'Open menu';
         // Keep drawer out of tab order when closed on mobile (desktop always shows it)
         if (window.matchMedia('(max-width: 900px)').matches) {
             drawer.setAttribute('aria-hidden', open ? 'false' : 'true');
@@ -1348,10 +1348,11 @@ function updateModeToggleButton() {
     btn.setAttribute('aria-pressed', simple ? 'false' : 'true');
     btn.classList.toggle('is-active', !simple);
     btn.textContent = simple ? 'Simple' : 'Advanced';
-    btn.title = simple
+    const modeLabel = simple
         ? 'Switch to Advanced mode — full controls'
         : 'Switch to Simple mode — fewer options';
-    btn.setAttribute('aria-label', btn.title);
+    btn.dataset.tip = modeLabel;
+    btn.setAttribute('aria-label', modeLabel);
 }
 
 function _collectQueryOn() {
