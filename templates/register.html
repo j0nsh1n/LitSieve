@@ -6,8 +6,9 @@
  <title>Register - LitSieve</title>
     <link rel="icon" href="/static/favicon.ico?v=20260803a" sizes="32x32">
     <link rel="apple-touch-icon" href="/static/favicon.png?v=20260803a">
- <link rel="stylesheet" href="/static/css/style.css?v=20260921b">
+ <link rel="stylesheet" href="/static/css/style.css?v=20260923a">
  <script src="/static/js/theme-init.js?v=20260918h"></script>
+ <script src="/static/js/tooltips.js?v=20260923a" defer></script>
 </head>
 <body class="auth-body">
  {% include "partials/site_notice.html" %}
@@ -32,8 +33,7 @@
  <input type="text" name="username" value="{{ username or '' }}"
  autocomplete="username" autofocus required
  minlength="3" maxlength="64"
- pattern="[A-Za-z0-9._+\-]{3,64}"
- title="3-64 characters: letters, numbers, and . _ + - (no @)">
+ pattern="[A-Za-z0-9._+\-]{3,64}">
  <span class="auth-hint">3-64 characters - letters, numbers, and . _ + - (e.g. alex or alex_23). Not an email address; stored lowercased.</span>
  </div>
  <div class="form-group">

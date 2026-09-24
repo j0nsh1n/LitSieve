@@ -398,7 +398,7 @@ function renderCountBars(container, rows, opts) {
   const widthPct = row.count > 0 ? Math.max(pct, 1.5) : 0;
   const div = document.createElement('div');
   div.className = ('source-bar' + (row.className ? ` ${row.className}` : '')).trim();
-  div.setAttribute('title', `${row.label}: ${row.count}` + (maxCount ? ` (max ${maxCount})` : ''));
+  div.setAttribute('data-tip', `${row.label}: ${row.count}` + (maxCount ? ` (max ${maxCount})` : ''));
 
   const name = document.createElement('span');
   name.className = 'source-name';
@@ -669,7 +669,7 @@ function buildCompareTable(articles, group, cardEl) {
  const keepBtn = document.createElement('button');
  keepBtn.className = 'btn btn-sm btn-secondary keep-btn';
  keepBtn.textContent = 'Keep this';
- keepBtn.title = 'Keep this copy and screen out the others in this group';
+ keepBtn.dataset.tip = 'Keep this copy and screen out the others in this group';
  keepBtn.addEventListener('click', () => keepArticle(group, a, cardEl));
  cell.appendChild(keepBtn);
 

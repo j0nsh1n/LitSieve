@@ -7,8 +7,9 @@
     <link rel="icon" href="/static/favicon.svg?v=20260828a" type="image/svg+xml">
     <link rel="icon" href="/static/favicon.ico?v=20260803a" sizes="32x32">
     <link rel="apple-touch-icon" href="/static/favicon.png?v=20260803a">
-    <link rel="stylesheet" href="/static/css/style.css?v=20260921b">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260923a">
     <script src="/static/js/theme-init.js?v=20260918h"></script>
+    <script src="/static/js/tooltips.js?v=20260923a" defer></script>
     {% block head_extra %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}"{% if user and user.is_guest %} data-guest="1"{% endif %}{% if support_view %} data-support-view="1"{% endif %}>
@@ -71,7 +72,7 @@
                     id="nav-menu-toggle"
                     aria-expanded="false"
                     aria-controls="nav-drawer"
-                    title="Open menu">
+                    data-tip="Open menu">
                 <span class="nav-menu-toggle-icon" aria-hidden="true">☰</span>
                 <span class="nav-menu-toggle-text">
                     {% if ns.current_num %}
@@ -92,7 +93,7 @@
                 {% endif %}
                 <a href="{{ href }}"
                    class="nav-link nav-step-{{ key }} {% if active_page == key %}active{% endif %}"
-                   title="{{ tip }}"
+                   data-tip="{{ tip }}"
                    data-step-advanced="{{ loop.index }}"
                    data-step-simple="{{ simple_step }}"
                    {% if active_page == key %}aria-current="page"{% endif %}>
@@ -106,7 +107,7 @@
             </div>
         <div class="shell-tools nav-stats" aria-label="Workspace tools">
             {% if user %}
-            <label class="nav-library-wrap" title="Switch library (separate paper collections)">
+            <label class="nav-library-wrap" data-tip="Switch library (separate paper collections)">
                 <span class="nav-library-label">Library</span>
                 <select id="nav-library-select" class="nav-library-select" aria-label="Active library">
                     <option value="">Loading…</option>
@@ -114,16 +115,14 @@
             </label>
             {% endif %}
             <button type="button" class="mode-toggle" id="mode-toggle"
-                title="Switch to Simple mode"
+                data-tip="Switch to Simple mode"
                 aria-label="Switch to Simple mode" aria-pressed="false">Advanced</button>
             {% include "partials/theme_toggle.html" %}
             {% if user and user.is_admin and not support_view %}
             <a href="/admin"
-               class="nav-logout {% if active_page == 'admin' %}active{% endif %}"
-               title="Admin">Admin</a>
+               class="nav-logout {% if active_page == 'admin' %}active{% endif %}">Admin</a>
             <a href="/ops"
-               class="nav-logout {% if active_page == 'ops' %}active{% endif %}"
-               title="Ship">Ship</a>
+               class="nav-logout {% if active_page == 'ops' %}active{% endif %}">Ship</a>
             {% endif %}
             {% if user and not user.is_guest and not support_view %}
             <button type="button" class="nav-ask-help" id="ask-help-btn">Ask for help</button>
@@ -131,7 +130,7 @@
             {% if user %}
             <a href="/account"
                class="nav-username {% if active_page == 'account' %}active{% endif %}"
-               title="Account settings"
+               data-tip="Account settings"
                aria-label="Account settings ({{ user.username }})">
                 <span class="nav-username-full">{{ user.username }}</span>
                 <span class="nav-username-short">Account</span>

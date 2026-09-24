@@ -14,6 +14,12 @@ and this project aims to follow Semantic Versioning for app version strings
   it later in Account. The choice is stored on the account and follows login.
 
 ### Changed
+- Hover help now opens immediately in a tooltip drawn with the current look,
+  instead of the browser's delayed grey or yellow preview. It works with a
+  mouse or keyboard, moves below controls at the top edge, stays inside the
+  window, closes with Escape, and does not appear on a phone tap. You can move
+  the pointer onto a tooltip to read it without it closing, and it hides while
+  its control is scrolled out of view.
 - Scrollbars and dropdown lists match the look you picked. The scrollbar is
   a slim rounded thumb in the look's accent with no arrow buttons, instead
   of the browser's grey bar (Firefox keeps its own shape in the accent

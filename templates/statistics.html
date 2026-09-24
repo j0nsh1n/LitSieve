@@ -31,11 +31,11 @@
  <div class="stat-value" id="stat-total">--</div>
  <div class="stat-label">Total Articles</div>
  </div>
- <div class="stat-card" title="Papers prepared for search (created on Data Management)">
+ <div class="stat-card" data-tip="Papers prepared for search (created on Data Management)">
  <div class="stat-value" id="stat-embeddings">--</div>
  <div class="stat-label">Ready for Search</div>
  </div>
- <div class="stat-card" title="Articles you've excluded - via Quick screen, cluster triage, duplicate resolution, or manually. Hidden from search results but never deleted.">
+ <div class="stat-card" data-tip="Articles you've excluded - via Quick screen, cluster triage, duplicate resolution, or manually. Hidden from search results but never deleted.">
  <div class="stat-value" id="stat-excluded">--</div>
  <div class="stat-label">Screened Out</div>
  </div>
@@ -78,7 +78,7 @@
  </div>
  </div>
  <button id="detect-btn" class="btn btn-primary">Detect Duplicates</button>
- <button id="resolve-btn" class="btn btn-secondary" title="Keep the best copy of every duplicate group and screen out the rest">Auto-Resolve All</button>
+ <button id="resolve-btn" class="btn btn-secondary" data-tip="Keep the best copy of every duplicate group and screen out the rest">Auto-Resolve All</button>
  <div id="duplicates-status" class="status-indicator"></div>
  <div id="duplicates-list"></div>
 </section>
@@ -135,7 +135,7 @@
  <pre id="screening-report-body" class="screening-report-body"></pre>
  <p class="screening-report-actions">
  <a id="screening-report-download" class="btn btn-secondary btn-lg btn-download" href="/api/screening-report?format=txt"
-  title="Plain-text counts for hand-ins, not a bibliography">Download (.txt)</a>
+  data-tip="Plain-text counts for hand-ins, not a bibliography">Download (.txt)</a>
  </p>
  </div>
 </section>

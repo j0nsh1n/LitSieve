@@ -698,6 +698,71 @@ body {
     text-rendering: optimizeLegibility;
 }
 
+/* Instant help text, drawn once under <body> so overflow containers cannot
+   clip it. JavaScript chooses above or below and clamps it to the viewport. */
+.app-tooltip {
+    --tooltip-arrow-x: 50%;
+    position: fixed;
+    z-index: 2000;
+    width: max-content;
+    max-width: min(22rem, calc(100vw - 1rem));
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--edge);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    box-shadow: var(--elev-2);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: var(--fs-sm);
+    font-weight: 500;
+    line-height: var(--lh-tight);
+    overflow-wrap: anywhere;
+}
+
+/* The 9px gap between control and bubble (positionTooltip in tooltips.js),
+   bridged by a clear strip so the pointer can cross onto the bubble without
+   closing it. The strip starts inside the bubble's 1px border, so it is the
+   gap plus that border: shorter leaves a row that closes the bubble, longer
+   takes clicks off the edge of the control. */
+.app-tooltip::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: calc(0.5625rem + 1px);
+}
+
+.app-tooltip[data-placement="top"]::before {
+    top: 100%;
+}
+
+.app-tooltip[data-placement="bottom"]::before {
+    bottom: 100%;
+}
+
+.app-tooltip::after {
+    content: "";
+    position: absolute;
+    left: var(--tooltip-arrow-x);
+    width: 0.5rem;
+    height: 0.5rem;
+    background: var(--surface);
+}
+
+.app-tooltip[data-placement="top"]::after {
+    bottom: -0.3125rem;
+    border-right: 1px solid var(--edge);
+    border-bottom: 1px solid var(--edge);
+    transform: translateX(-50%) rotate(45deg);
+}
+
+.app-tooltip[data-placement="bottom"]::after {
+    top: -0.3125rem;
+    border-top: 1px solid var(--edge);
+    border-left: 1px solid var(--edge);
+    transform: translateX(-50%) rotate(45deg);
+}
+
 ::selection {
     background: color-mix(in srgb, var(--accent) 82%, var(--text));
     color: #fff;

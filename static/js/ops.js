@@ -447,7 +447,7 @@ async function loadStatus() {
     ? (grok.version || 'Grok CLI')
     : 'Grok off';
    pill.classList.toggle('is-on', !!grok.connected);
-   pill.title = grok.binary || '';
+   pill.dataset.tip = grok.binary || '';
   }
   const hint = document.getElementById('ops-grok-hint');
   if (hint) {
@@ -547,9 +547,9 @@ function renderTabs() {
   const on = tab.path === _path ? ' is-on' : '';
   const dirty = tab.dirty ? ' is-dirty' : '';
   const name = tab.path.split('/').pop();
-  return `<button type="button" class="ops-filetab${on}${dirty}" data-tab="${escapeAttr(tab.path)}" title="${escapeAttr(tab.path)}" role="tab" aria-selected="${tab.path === _path ? 'true' : 'false'}">`
+  return `<button type="button" class="ops-filetab${on}${dirty}" data-tab="${escapeAttr(tab.path)}" data-tip="${escapeAttr(tab.path)}" role="tab" aria-selected="${tab.path === _path ? 'true' : 'false'}">`
    + `<span class="ops-filetab-name">${escapeHtml(name)}</span>`
-   + `<span class="ops-filetab-x" data-close="${escapeAttr(tab.path)}" title="Close">×</span>`
+   + `<span class="ops-filetab-x" data-close="${escapeAttr(tab.path)}" data-tip="Close">×</span>`
    + `</button>`;
  }).join('');
  bar.querySelectorAll('[data-tab]').forEach((btn) => {
@@ -721,7 +721,7 @@ function paintLockUi() {
  if (unlockBtn) unlockBtn.hidden = open;
  if (lockBtn) {
   lockBtn.hidden = !open;
-  lockBtn.title = grokHeld()
+  lockBtn.dataset.tip = grokHeld()
    ? 'Lock now (Grok keeps running; you will need the password again after)'
    : 'Lock now';
  }

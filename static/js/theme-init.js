@@ -93,8 +93,9 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function updateButton(theme) {
-        btn.title = theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
-        btn.setAttribute('aria-label', btn.title);
+        var label = theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+        btn.dataset.tip = label;
+        btn.setAttribute('aria-label', label);
     }
 
     function applyTheme(next) {

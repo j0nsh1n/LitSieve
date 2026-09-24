@@ -325,7 +325,6 @@ function renderTopicPacks() {
  card.type = 'button';
  card.className = 'topic-pack-card';
  card.dataset.packId = pack.id;
- card.title = pack.blurb || pack.name;
  card.innerHTML = `
  <span class="topic-icon">${pack.icon}</span>
  <span class="topic-pack-text">
@@ -473,12 +472,12 @@ function renderSourceGrid() {
  const chipParts = [];
  if (badges.includes('preprint') || badges.includes('not-peer-reviewed')) {
  chipParts.push(
- '<span class="source-chip source-chip-preprint" title="Not peer-reviewed / recent window only">Not peer-reviewed</span>'
+ '<span class="source-chip source-chip-preprint" data-tip="Not peer-reviewed / recent window only">Not peer-reviewed</span>'
  );
  }
  if (badges.includes('title-only')) {
  chipParts.push(
- '<span class="source-chip source-chip-titleonly" title="Many records are title/venue only">Title/venue</span>'
+ '<span class="source-chip source-chip-titleonly" data-tip="Many records are title/venue only">Title/venue</span>'
  );
  }
  const chips = chipParts.join('');
@@ -492,7 +491,7 @@ function renderSourceGrid() {
  tipText += ' (free API key may be required on the server.)';
  }
  const tipHtml = tipText
- ? `<span class="source-tip" title="${escapeHtml(tipText)}"><strong>Student tip:</strong> ${escapeHtml(tipText)}</span>`
+ ? `<span class="source-tip"><strong>Student tip:</strong> ${escapeHtml(tipText)}</span>`
  : '';
  label.innerHTML = `
  <input type="checkbox" id="source-${id}" value="${id}">
@@ -869,7 +868,7 @@ async function refreshCoverage() {
  const label = getSourceName(src);
  const div = document.createElement('div');
  div.className = 'source-bar';
- div.setAttribute('title', `${label}: ${count}` + (maxCount ? ` (max ${maxCount})` : ''));
+ div.setAttribute('data-tip', `${label}: ${count}` + (maxCount ? ` (max ${maxCount})` : ''));
 
  const name = document.createElement('span');
  name.className = 'source-name';
