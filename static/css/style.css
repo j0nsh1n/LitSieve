@@ -605,6 +605,7 @@ html.theme-animating *::after {
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html {
+    -webkit-tap-highlight-color: transparent;
     scroll-behavior: smooth;
     color-scheme: light dark;
     background: var(--bg);
@@ -763,9 +764,12 @@ body {
     transform: translateX(-50%) rotate(45deg);
 }
 
+/* A soft accent tint behind the ordinary text colour. The old white-on-accent
+   failed 4.5:1 in every dark theme (1.92:1 in Night dark); this keeps
+   selected text at 7:1 or better in all five looks and both themes. */
 ::selection {
-    background: color-mix(in srgb, var(--accent) 82%, var(--text));
-    color: #fff;
+    background: color-mix(in srgb, var(--accent) 30%, var(--bg));
+    color: var(--text);
 }
 
 /* Accessible focus — visible only for keyboard nav */
@@ -1589,9 +1593,6 @@ textarea { resize: vertical; border-radius: var(--radius-md); }
     font-weight: 500;
     box-shadow: var(--elev-1);
 }
-
-.radio-label input[type="radio"],
-.radio-label input[type="checkbox"] { accent-color: var(--accent); }
 
 /* Search sources with no articles for this account: dimmed + not selectable. */
 .radio-label.source-empty {
@@ -2806,6 +2807,14 @@ body.lra-modal-open {
     font-weight: 600;
     cursor: pointer;
 }
+/* Same "+" and "\2212" marker as the other disclosures, not the browser's triangle. */
+.reader-glossary > summary {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    list-style: none;
+}
+.reader-glossary > summary::-webkit-details-marker { display: none; }
 .reader-glossary dl {
     margin: var(--space-2) 0 0;
 }
@@ -3476,7 +3485,6 @@ body.lra-modal-open {
 }
 
 .source-option input[type="checkbox"] {
-    accent-color: var(--accent);
     margin-top: var(--space-1);
     flex-shrink: 0;
 }
@@ -4265,7 +4273,8 @@ html[data-mode="simple"] body.simple-collecting #search-query-top {
 .advanced-details > summary::-webkit-details-marker { display: none; }
 
 .help-details > summary::before,
-.advanced-details > summary::before {
+.advanced-details > summary::before,
+.reader-glossary > summary::before {
     content: "+";
     font-family: var(--font-sans);
     font-size: var(--fs-sm);
@@ -4280,7 +4289,8 @@ html[data-mode="simple"] body.simple-collecting #search-query-top {
 }
 
 .help-details[open] > summary::before,
-.advanced-details[open] > summary::before {
+.advanced-details[open] > summary::before,
+.reader-glossary[open] > summary::before {
     content: "\2212";
     color: var(--text-body);
     opacity: 1;
@@ -4600,7 +4610,6 @@ html[data-mode="simple"] body.simple-collecting #search-query-top {
     user-select: none;
 }
 
-.show-pass input { accent-color: var(--accent); cursor: pointer; }
 
 .pw-match {
     display: block;
@@ -8076,6 +8085,24 @@ html[data-mode="simple"] .result-row-rail .not-relevant-btn:active {
     border-bottom-width: 1px;
     box-shadow: none;
 }
+
+/* Everything that presses down moves 2px while held, so a press in its top
+   edge would release above it and the click would be lost. The transform makes
+   the element the containing block, and this strip above it covers where the
+   edge was, so the release still lands on the element. It sits above the
+   element rather than over its contents, so children keep their own clicks. */
+.btn:active:not(:disabled)::after,
+.topic-card:active::after,
+html[data-mode="simple"] .result-row-rail .star-btn:active::after,
+html[data-mode="simple"] .result-row-rail .note-toggle:active::after,
+html[data-mode="simple"] .result-row-rail .not-relevant-btn:active::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 100%;
+    height: 0.25rem;
+}
 html[data-mode="simple"] .result-row-rail .star-btn:hover,
 html[data-mode="simple"] .result-row-rail .note-toggle:hover,
 html[data-mode="simple"] .result-row-rail .not-relevant-btn:hover {
@@ -8386,11 +8413,125 @@ html[data-mode="simple"] #collect-fetch-card.scene-in {
 }
 .gs-sample-ask-short { display: none; }
 
-/* Native checkboxes are 13 px; a thumb needs more. */
-input[type="checkbox"] {
+/* Checkboxes and radios drawn in the look instead of the OS's, at a size a
+   thumb can hit (native ones are 13px). The border is --text mixed 55% into
+   --bg and the checked fill is --accent, 3:1 or better against the page and
+   every surface in all five looks and both themes; the tick is the look's
+   --on-accent (5:1 or better on the accent). The tick is a round-capped
+   stroke like the topic chips' line icons. Inputs hidden behind styled chips
+   keep their own, more specific rules. */
+input[type="checkbox"],
+input[type="radio"] {
+    -webkit-appearance: none;
+    appearance: none;
+    display: inline-grid;
+    place-content: center;
+    flex-shrink: 0;
     width: 1.25rem;
     height: 1.25rem;
-    accent-color: var(--accent);
+    margin: 0;
+    border: 2px solid color-mix(in srgb, var(--text) 55%, var(--bg));
+    background: var(--surface);
+    vertical-align: middle;
+    cursor: pointer;
+    transition:
+        background-color var(--dur-fast) var(--ease-soft),
+        border-color var(--dur-fast) var(--ease-soft);
+}
+input[type="checkbox"] {
+    border-radius: calc(var(--radius-sm) / 2);
+}
+input[type="radio"] {
+    border-radius: 50%;
+}
+input[type="checkbox"]::before {
+    content: "";
+    width: 0.875rem;
+    height: 0.875rem;
+    background: var(--on-accent);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+    transform: scale(0);
+    transition: transform var(--dur-fast) var(--ease-out);
+}
+input[type="radio"]::before {
+    content: "";
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: var(--accent);
+    transform: scale(0);
+    transition: transform var(--dur-fast) var(--ease-out);
+}
+input[type="checkbox"]:checked {
+    background: var(--accent);
+    border-color: var(--accent);
+}
+input[type="radio"]:checked {
+    border-color: var(--accent);
+}
+input[type="checkbox"]:checked::before,
+input[type="radio"]:checked::before {
+    transform: scale(1);
+}
+input[type="checkbox"]:hover:not(:disabled),
+input[type="radio"]:hover:not(:disabled) {
+    border-color: var(--accent);
+}
+input[type="checkbox"]:disabled,
+input[type="radio"]:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+/* High-contrast modes draw their own controls; hand them back. */
+@media (forced-colors: active) {
+    input[type="checkbox"],
+    input[type="radio"] {
+        -webkit-appearance: auto;
+        appearance: auto;
+    }
+    input[type="checkbox"]::before,
+    input[type="radio"]::before {
+        display: none;
+    }
+}
+
+/* Number fields type and use the arrow keys; the OS spinner arrows go. */
+input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+/* Placeholder text in the look's soft ink (4.5:1 or better on every surface);
+   Firefox fades it by default, so opacity is pinned. */
+::placeholder {
+    color: var(--text-soft);
+    opacity: 1;
+}
+
+/* Browser autofill paints its own yellow or blue over the field. An inset
+   shadow repaints the look's surface; separate rules, because a selector list
+   with one unknown pseudo-class would drop the lot. */
+input:-webkit-autofill {
+    -webkit-text-fill-color: var(--text);
+    caret-color: var(--text);
+    box-shadow: inset 0 0 0 100vmax var(--surface);
+}
+input:autofill {
+    -webkit-text-fill-color: var(--text);
+    caret-color: var(--text);
+    box-shadow: inset 0 0 0 100vmax var(--surface);
+}
+input:-webkit-autofill:focus-visible {
+    box-shadow: inset 0 0 0 100vmax var(--surface), var(--focus-ring);
+}
+input:autofill:focus-visible {
+    box-shadow: inset 0 0 0 100vmax var(--surface), var(--focus-ring);
 }
 
 @media (max-width: 900px) {

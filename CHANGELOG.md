@@ -14,6 +14,14 @@ and this project aims to follow Semantic Versioning for app version strings
   it later in Account. The choice is stored on the account and follows login.
 
 ### Changed
+- Checkboxes and radio buttons are drawn in the current look instead of the
+  operating system's: a box that meets 3:1 contrast, the look's accent when
+  chosen, and a round-capped tick like the topic icons. High-contrast modes
+  keep the system's own. Number fields lose the OS spinner arrows,
+  placeholder text uses the look's soft ink, browser autofill no longer
+  paints fields yellow or blue, phones no longer flash grey on tap, and the
+  Explain this study glossary uses the site's "+" instead of the browser's
+  triangle.
 - Hover help now opens immediately in a tooltip drawn with the current look,
   instead of the browser's delayed grey or yellow preview. It works with a
   mouse or keyboard, moves below controls at the top edge, stays inside the
@@ -72,6 +80,12 @@ and this project aims to follow Semantic Versioning for app version strings
   the same wrong way and are fixed by the same change.
 
 ### Fixed
+- Selected text is readable in dark mode. It was white on a light accent,
+  below 2:1 in Night dark; it is now the normal text colour on a soft
+  accent tint, 7:1 or better in every look.
+- A press in the top edge of a button, topic card, or result action now
+  registers. They dip 2px while pressed, so the release landed above them
+  and the click was lost.
 - Account Look showed the heading with no colour choices. The picker now
   lists the five looks in the page itself, so a running server that has
   not reloaded Python still draws the cards.
