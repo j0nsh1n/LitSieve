@@ -137,3 +137,95 @@ def test_dropdown_button_centres_its_label_and_arrow():
     """Phones give the switcher a 44px touch target; stretched items put the text at the top."""
     body = _at_rule_body("@supports (appearance: base-select) and selector(::picker(select))")
     assert "align-items: center" in _own_rule(body, LIST_SELECT)
+
+
+# --- Form controls drawn in the look (slice 2) --------------------------------
+
+
+def _hex6(value: str) -> str:
+    value = value.strip()
+    return "#" + "".join(c * 2 for c in value[1:]) if len(value) == 4 else value
+
+
+def _blocks6() -> list[tuple[str, dict[str, str]]]:
+    return [(label, {k: _hex6(v) if v.startswith("#") else v for k, v in t.items()})
+            for label, t in _all_token_blocks()]
+
+
+def test_checkbox_and_radio_are_drawn_and_legible_in_every_look():
+    base = _own_rule(CSS, 'input[type="checkbox"],\ninput[type="radio"]')
+    assert "appearance: none" in base
+    border = re.search(r"border: 2px solid color-mix\(in srgb, var\(--text\) (\d+)%, var\(--bg\)\)", base)
+    assert border, "the unchecked box border must be a --text/--bg mix"
+    pct = int(border.group(1))
+    assert "background: var(--accent)" in _own_rule(CSS, 'input[type="checkbox"]:checked')
+    assert "background: var(--on-accent)" in _own_rule(CSS, 'input[type="checkbox"]::before')
+    assert "background: var(--accent)" in _own_rule(CSS, 'input[type="radio"]::before')
+    failures = []
+    for label, t in _blocks6():
+        edge = _mix(t["--text"], t["--bg"], pct)
+        for ground in ("--bg", "--surface"):
+            if _wcag_contrast(edge, t[ground]) < 3.0:
+                failures.append(f"{label} border on {ground}")
+            if _wcag_contrast(t["--accent"], t[ground]) < 3.0:
+                failures.append(f"{label} checked fill on {ground}")
+        if _wcag_contrast(t["--on-accent"], t["--accent"]) < 3.0:
+            failures.append(f"{label} tick on accent")
+    assert not failures, "; ".join(failures)
+
+
+def test_high_contrast_modes_get_native_controls_back():
+    forced = _at_rule_body("@media (forced-colors: active)")
+    assert "appearance: auto" in forced
+    assert "display: none" in forced
+
+
+def test_selected_text_stays_readable_in_every_look():
+    rule = _own_rule(CSS, "::selection")
+    tint = re.search(r"background: color-mix\(in srgb, var\(--accent\) (\d+)%, var\(--bg\)\)", rule)
+    assert tint and "color: var(--text)" in rule, "selection must be an accent tint behind the normal text colour"
+    pct = int(tint.group(1))
+    failures = []
+    for label, t in _blocks6():
+        ground = _mix(t["--accent"], t["--bg"], pct)
+        if _wcag_contrast(t["--text"], ground) < 4.5:
+            failures.append(f"{label} text {_wcag_contrast(t['--text'], ground):.2f}")
+        if _wcag_contrast(ground, t["--bg"]) < 1.3:
+            failures.append(f"{label} tint too close to the page")
+    assert not failures, "; ".join(failures)
+
+
+def test_placeholder_number_autofill_and_tap_flash_are_the_looks_own():
+    placeholder = _own_rule(CSS, "::placeholder")
+    assert "color: var(--text-soft)" in placeholder and "opacity: 1" in placeholder
+    assert "appearance: textfield" in _own_rule(CSS, 'input[type="number"]')
+    assert "-webkit-appearance: none" in _own_rule(
+        CSS, 'input[type="number"]::-webkit-inner-spin-button,\ninput[type="number"]::-webkit-outer-spin-button')
+    for sel in ("input:-webkit-autofill", "input:autofill"):
+        assert "inset 0 0 0 100vmax var(--surface)" in _own_rule(CSS, sel), sel
+    assert re.search(r"html \{\s*-webkit-tap-highlight-color: transparent;", CSS)
+
+
+def test_glossary_disclosure_has_no_browser_triangle():
+    summary = _own_rule(CSS, ".reader-glossary > summary")
+    assert "list-style: none" in summary and "display: flex" in summary
+    assert "display: none" in _own_rule(CSS, ".reader-glossary > summary::-webkit-details-marker")
+    assert ".reader-glossary > summary::before" in CSS
+
+
+def test_press_down_elements_keep_their_top_edge_clickable():
+    """Anything that moves on :active loses clicks in its top edge unless a strip covers it."""
+    body = re.sub(r"/\*.*?\*/", "", CSS, flags=re.S)
+    moving = set()
+    for sel, decls in re.findall(r"([^{}]+)\{([^{}]*)\}", body):
+        if "translateY(" in decls:
+            for one in sel.split(","):
+                one = one.strip()
+                if one.endswith(":active") or one.endswith(":active:not(:disabled)"):
+                    moving.add(one)
+    assert moving, "expected press-down rules"
+    strips = [sel for sel, decls in re.findall(r"([^{}]+)\{([^{}]*)\}", body)
+              if "bottom: 100%" in decls and "content:" in decls]
+    covered = {s.strip() for sel in strips for s in sel.split(",")}
+    missing = sorted(m for m in moving if f"{m}::after" not in covered)
+    assert not missing, "press-down without an edge strip: " + ", ".join(missing)

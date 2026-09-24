@@ -126,11 +126,9 @@ Guest User (is_guest) → sample corpus only; purged by age
 
 ## Session Handoff
 - **Date:** 2026-09-23
-- **Branches:** two PRs into `main`, each carrying this same handoff so
-  either can merge first. `fix/tests-never-write-live-log`: tests never
-  write a log where they run. `feat/instant-tooltips`: native `title` text
-  replaced by look-drawn tooltips. Version **5.5.0**. The live checkout is at
-  `37858e0` (#74 pulled, so the drawn scrollbar is live).
+- **State:** #75 (tests never write a log where they run) and #76
+  (look-drawn tooltips) are merged, pulled to the live checkout at
+  `08829e8`, and the service restarted 2026-09-23 18:17. Version **5.5.0**.
 - **Tests and logs:** `tests/conftest.py` forces `LOG_FILE=""` before the app
   is imported. Before this, a test run from the live checkout appended to
   production's `logs/litsieve.log` and could rotate it under the service. A
@@ -151,7 +149,14 @@ Guest User (is_guest) → sample corpus only; purged by age
   copies in 5 accounts; every Not relevant after its Undo), so roadmap Phase
   13 starts with a Simple "Set aside" list for every reason. The Search page
   loads `data_management.js`, so removing that page must keep the script.
-- **Next:** UI slice 2, drawn checkboxes (stroke tick) and radios,
-  placeholders, autofill, tap flash, spinners, the Explain glossary triangle,
-  selection contrast, and the 1px press-down edge. Slice 3 replaces the
-  browser's validation bubbles.
+- **UI slice 2 (`feat/drawn-form-controls`, PR into `main`):**
+  checkboxes and radios drawn in look tokens (border `--text` 55% into
+  `--bg`, `--accent` fill, `--on-accent` tick, all measured per look), with
+  `forced-colors` handing back native controls; no number spinners;
+  placeholders on `--text-soft`; autofill repainted; no tap flash; the
+  glossary uses the site's "+" marker; selection is an accent tint behind
+  `--text` (white text had failed in every dark theme). Every press-down
+  element has a strip covering its top edge, and a test fails any new one
+  that lacks it.
+- **Next:** after slice 2 merges, pull and restart the service. Slice 3
+  replaces the browser's validation bubbles on login, register, and reset.
