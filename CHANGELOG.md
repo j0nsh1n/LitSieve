@@ -80,6 +80,11 @@ and this project aims to follow Semantic Versioning for app version strings
   the same wrong way and are fixed by the same change.
 
 ### Fixed
+- Checkboxes and radio buttons are sized to their label's text instead of a
+  fixed 20px, so they no longer dwarf small print like Show passwords
+  (14px beside 12px text); touch screens keep a 20px box for thumbs. The
+  Change password and Delete My Account buttons no longer touch the
+  checkbox above them.
 - Selected text is readable in dark mode. It was white on a light accent,
   below 2:1 in Night dark; it is now the normal text colour on a soft
   accent tint, 7:1 or better in every look.
