@@ -158,5 +158,10 @@ Guest User (is_guest) → sample corpus only; purged by age
   `--text` (white text had failed in every dark theme). Every press-down
   element has a strip covering its top edge, and a test fails any new one
   that lacks it.
-- **Next:** after slice 2 merges, pull and restart the service. Slice 3
+- **Checkbox proportions (`fix/checkbox-proportions`):** with a mouse the
+  box is `--box: max(0.875rem, 1.15em)` of its label's text (inputs set
+  `font-size: inherit` so em means the label); `@media (pointer: coarse)`
+  keeps 1.25rem for thumbs. Tick, dot, and border scale with `--box`.
+  `.show-pass + .btn` gets room before the button.
+- **Next:** after this merges, pull and restart the service. Slice 3
   replaces the browser's validation bubbles on login, register, and reset.

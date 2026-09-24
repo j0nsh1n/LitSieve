@@ -118,11 +118,11 @@ def test_phone_drawer_is_a_panel_over_a_scrim_with_tall_rows():
 def test_phone_dialog_fields_stack_and_checkboxes_are_thumb_sized():
     phone = _block(PHONE, "max-width: 640px")
     assert ".lra-modal-fields { grid-template-columns: 1fr; }" in phone
-    # Checkboxes share their drawn rule with radios; any rule that selects them
-    # must give a thumb-sized box.
-    boxes = re.findall(r'((?:input\[type="(?:checkbox|radio)"\],?\s*)+)\{([^}]+)\}', PHONE)
-    sized = [body for sel, body in boxes if 'input[type="checkbox"]' in sel and "width: 1.25rem" in body]
-    assert sized, "checkboxes must be 1.25rem, not the OS's 13px"
+    # With a mouse the box follows its label's text; on a touch screen it must
+    # be thumb-sized, not the OS's 13px.
+    coarse = PHONE[PHONE.index("@media (pointer: coarse)"):]
+    coarse = coarse[: coarse.index("\n}\n") + 2]
+    assert 'input[type="checkbox"]' in coarse and "--box: 1.25rem" in coarse
 
 
 def test_set_loading_keeps_button_markup():

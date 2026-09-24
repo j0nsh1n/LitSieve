@@ -155,7 +155,7 @@ def _blocks6() -> list[tuple[str, dict[str, str]]]:
 def test_checkbox_and_radio_are_drawn_and_legible_in_every_look():
     base = _own_rule(CSS, 'input[type="checkbox"],\ninput[type="radio"]')
     assert "appearance: none" in base
-    border = re.search(r"border: 2px solid color-mix\(in srgb, var\(--text\) (\d+)%, var\(--bg\)\)", base)
+    border = re.search(r"border: [^;]*? solid color-mix\(in srgb, var\(--text\) (\d+)%, var\(--bg\)\)", base)
     assert border, "the unchecked box border must be a --text/--bg mix"
     pct = int(border.group(1))
     assert "background: var(--accent)" in _own_rule(CSS, 'input[type="checkbox"]:checked')
@@ -229,3 +229,28 @@ def test_press_down_elements_keep_their_top_edge_clickable():
     covered = {s.strip() for sel in strips for s in sel.split(",")}
     missing = sorted(m for m in moving if f"{m}::after" not in covered)
     assert not missing, "press-down without an edge strip: " + ", ".join(missing)
+
+
+def test_checkbox_size_follows_its_label_and_leaves_room_before_buttons():
+    """A 20px box beside 12px print looked oversized (reported 2026-09-24).
+
+    With a mouse the box is sized to the label text; touch screens keep a
+    thumb-sized box. The tick, dot, and border scale with it.
+    """
+    base = _own_rule(CSS, 'input[type="checkbox"],\ninput[type="radio"]')
+    assert "--box: max(0.875rem, 1.15em)" in base, "box must follow the label's text, with a floor"
+    assert "font-size: inherit" in base, "em must mean the label's text, not the UA's control font"
+    assert "width: var(--box)" in base and "height: var(--box)" in base
+    assert "calc(var(--box) * 0.7)" in _own_rule(CSS, 'input[type="checkbox"]::before')
+    assert "calc(var(--box) * 0.4)" in _own_rule(CSS, 'input[type="radio"]::before')
+    touch_blocks = []
+    for m in re.finditer(r"@media \(pointer: coarse\) \{", CSS):
+        depth, j = 1, m.end()
+        while depth:
+            depth += {"{": 1, "}": -1}.get(CSS[j], 0)
+            j += 1
+        touch_blocks.append(CSS[m.end(): j - 1])
+    assert any('input[type="checkbox"]' in b and "--box: 1.25rem" in b for b in touch_blocks), \
+        "touch screens keep a thumb-sized box"
+    assert "margin-top: var(--space-3)" in _own_rule(CSS, ".show-pass + .btn")
+
