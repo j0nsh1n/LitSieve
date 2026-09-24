@@ -10,6 +10,14 @@ import pytest
 os.environ.setdefault("SECRET_KEY", "pytest-only-not-a-secret-32b-min!!")
 # Guest /guest starts a background embed in production; keep the suite off that path.
 os.environ.setdefault("GUEST_AUTO_PREPARE", "0")
+# app.main configures logging at import, and with LOG_FILE unset it appends to
+# logs/litsieve.log relative to the working directory. Run from the live
+# checkout, that is production's log, and the suite's own RotatingFileHandler
+# can rotate it out from under the running service. Empty switches the file off
+# (app/logging_setup.py). Forced rather than defaulted so an exported LOG_FILE
+# (run_dev.sh sets one) cannot leak in; child processes inherit it too. pytest
+# still captures log records for any failing test.
+os.environ["LOG_FILE"] = ""
 
 # Fixture credentials for HTTP / auth tests. Meet min length; not real secrets.
 # Import these instead of scattering password-looking string literals in tests.
