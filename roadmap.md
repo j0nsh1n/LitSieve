@@ -59,55 +59,106 @@ Presentation items from the 2026-09-17 audit of the airy glass restyle.
 - Status: [ ] open
 
 ## Phase 13 — One flow: fold Advanced into Simple, then remove Advanced mode
-Planned 2026-09-17 to follow the Workshop round, which shipped in 5.5.0. Simple's rules apply
-to every moved function: one URL, popups only on tap, plain words, preview
-before apply with one-click undo, hidden until needed, one wait screen.
-- Tasks, one branch each off `main`, in this order:
-  - First, before anything is removed: a Simple "Set aside" list that shows
-    papers excluded for every reason, not only `low_relevance`, with restore.
-    Today the Clusters page is the only screen that can restore any other
-    reason: on 2026-09-21 that was 60 duplicate copies in 5 accounts, plus
-    every Not relevant (`off_topic`) once its instant Undo is gone. It also
-    covers duplicates ("N duplicates set aside" in the funnel); the silent
-    0.98 resolve stays, the threshold control goes
-  - Search chips: Years and Sources popovers, Newest first toggle, More like
-    starred chip once a paper is starred, export-whole-library option in the
-    export panel, PMID/DOI and study type moved inside the abstract
-    disclosure; search state gains a `filters` shape the chips render from
-  - Fetch dialog gains a Databases disclosure (topics still pick the
-    defaults); the What we fetched popup gains per-source counts, coverage,
-    and year spread, replacing the Data Management and Clean up cards
-  - Re-prepare: only-missing becomes the default; embedding model picker
-    leaves the UI (env default stays)
-  - Clusters prototype gate: throwaway Group by theme popup, density only,
-    on a real library with screenshots, then keep or drop; if kept, preview
-    and undo through the existing screening endpoints
-  - Remove Advanced in one wave: delete `/data-management`, `/statistics`,
-    `/clusters` and their templates with a 301 to `/search`; delete the
-    `ui_mode` and `ui_mode_seed` cookies (`app/routes/auth.py`,
-    `app/routes/pages.py`), the mode branch in `theme-init.js`, `setUiMode`
-    and the toggle in `common.js`, about 40 `isSimpleMode` branches across
-    four JS files, 176 mode-gated CSS selectors flattened and 7 removed, the
-    `-advanced` copy twins, and guide text that names both modes
-    (`app/content/feature_guides.py`); rewrite the 52 tests in
-    `tests/test_simple_mode.py` as one-behaviour tests; the helpdesk
-    `ui_mode` column stays for old rows and stops being written
-- Proposed drops, pending Jonathan's call: PICO fields, paste-a-paper seed
-  input, lexical and PICO boost radios, results count, embedding model
-  picker, duplicate threshold, similarity badge, email-on-fetch-finish (no
-  account has a recovery email as of 2026-09-17)
-- Also pending: clusters keep or drop after the prototype; release version
-  (6.0.0 proposed, three pages and a mode disappear); old URLs redirect
-  (proposed) or 404
-- spec.md drift once the removal lands: the Simple / Advanced mode bullet
-  and its nav lines (Required Behavior), the Simple and Advanced examples
-  (User Experience), and the two-flow lines in Acceptance Criteria describe
-  two modes (needs approval)
-- Complete when: every function a student could reach only in Advanced is
-  either on the Search page under Simple's rules or in the recorded drop
-  list; no `data-mode`, `uiMode`, or `ui_mode` reference remains in `app/`,
-  `static/`, `templates/`, or `tests/`; spec.md describes one flow
-- Status: [ ] planned, not started
+Written 2026-09-24 (chat plan from that day; was not in git until this
+commit). Simple's rules apply to every moved function: one URL, popups
+only on tap, plain words, preview before apply with one-click undo,
+hidden until needed, one wait screen. Advanced stays live until the
+last slice. Each slice is its own branch off `main`.
+
+Jonathan's call on 2026-09-24: integrate Advanced functions into Simple,
+then remove Advanced. Do not drop features to shorten the work, except
+the open calls listed under Pending.
+
+Counts as of 2026-09-24 (older Phase 13 numbers were stale): 30
+`isSimpleMode` branches in four JS files, 272 mode-gated CSS selectors,
+54 tests in `tests/test_simple_mode.py`. Search loads
+`data_management.js`; deleting `/data-management` must keep that script
+(rename to `collect.js` in the removal slice).
+
+Where each Advanced-only feature lands in Simple:
+
+| Advanced feature | Simple home | Slice |
+|---|---|---|
+| Restore papers set aside for any reason (Clusters only today) | "Set aside" popup, grouped by reason, restore one, a group, or all | 1 |
+| Choose an exclusion reason | Reason chips in the Set aside popup, plus an optional "Why?" on the Not relevant undo toast | 2 |
+| Sort by year, journal, newest | Sort chip | 3 |
+| Filter results by source or year | Sources and Years chips | 3 |
+| Exact-word and PICO boosts, results count | "Ranking" disclosure inside the Sort chip | 3 |
+| PICO input, paste-a-paper seed | "Search by" switch under the search bar (Question, PICO, Start from a paper) | 4 |
+| Export the whole library | Scope choice in Save your work | 5 |
+| Choose databases by hand | Databases disclosure in the fetch dialog | 6 |
+| PubMed contact email, email-on-finish | An Account setting that every fetch uses | 6 |
+| Articles by source, papers-by-year chart | "What we fetched" popup | 7 |
+| Detect duplicates, auto-resolve, threshold | Duplicates group in the Set aside popup, with "Check again" and the threshold in a disclosure | 7 |
+| Re-prepare options, model picker | Re-prepare popup: only-missing is the default, model sits in a disclosure | 8 |
+| Clusters (generate, browse, set aside a theme) | "Group by theme" popup with preview and undo | 9 |
+
+Quick screen and the screening report are already in Simple.
+
+- Tasks, in this order:
+  - Slice 0: `tests/test_advanced_parity.py` with one row per feature in
+    the table. Each row names the Simple control and starts expected-to-fail.
+    Later slices flip their own rows. The removal cannot merge while any
+    row still fails.
+  - Slice 1 (first, data safety, about a day): Simple "Set aside" list
+    for every exclusion reason, with restore. Today
+    `GET /api/screening/excluded` returns only article IDs for one reason
+    (default `low_relevance`). Change it to accept every reason and
+    return title, year, source, and reason. The three Simple callers in
+    `simple_tools.js` (also `data_management.js`) stop asking only for
+    `low_relevance`. Restore uses existing `POST /api/screening` include.
+    On 2026-09-21 that was 60 duplicate copies in 5 accounts, plus every
+    Not relevant (`off_topic`) once its instant Undo is gone. Tests: set
+    aside as duplicate, `off_topic`, and `low_relevance`, list all three,
+    restore one, assert it is back in search. Browser-check against a
+    copy of an account that has hidden duplicates. The silent 0.98
+    resolve stays; the threshold control moves in slice 7.
+  - Slice 2: exclusion reason chips (about half a day). Also finishes
+    the PRISMA-style categories that feed the screening report.
+  - Slices 3 to 8: search chips and ranking (3), search-by switch (4),
+    whole-library export (5), fetch databases and contact email (6),
+    What we fetched plus duplicates (7), re-prepare and model (8). Each
+    is half a day to a day and a half. Search state gains one `filters`
+    shape that the chips draw from. PMID/DOI and study type move inside
+    the abstract disclosure with the search chips.
+  - Slice 9: Group by theme (2 to 3 days). Last fold before removal.
+    Reuses existing cluster endpoints. Preview and undo through the
+    existing screening endpoints, same pattern as Narrow it down.
+  - Slice 10: remove Advanced in one pull request (about 2 days). Delete
+    `/data-management`, `/statistics`, `/clusters` and their templates
+    with a 301 to `/search`. Delete the `ui_mode` and `ui_mode_seed`
+    cookies (`app/routes/auth.py`, `app/routes/pages.py`), the mode
+    branch in `theme-init.js`, `setUiMode` and the toggle in `common.js`,
+    the 30 `isSimpleMode` branches, and the 272 CSS selectors. Rewrite
+    the 54 tests in `tests/test_simple_mode.py` as one-behaviour tests.
+    Move "About this page" copy into the feature guides
+    (`app/content/feature_guides.py`). The helpdesk `ui_mode` column
+    stays for old rows and stops being written. Rename
+    `data_management.js` to `collect.js` in the same PR; Search keeps
+    loading it. A student who had `uiMode=advanced` saved gets a
+    one-time notice that the layout changed. `spec.md` rewrite of the
+    two-mode lines needs approval in this slice.
+- After slice 10: watch 301 hits for a week, then prune dead CSS.
+- Pending Jonathan (does not block slice 1):
+  - Email-on-fetch-finish: no account had a recovery email as of
+    2026-09-17, so nobody can receive it. Keep only if students will add
+    addresses; otherwise drop it from slice 6.
+  - Old URLs: 301 to `/search` (recommended) or 404
+  - Removal version: 6.0.0 proposed (three pages and a mode disappear)
+  - `spec.md` two-mode lines at removal (Required Behavior, User
+    Experience, Acceptance Criteria)
+- spec.md drift until the removal lands: the Simple / Advanced mode
+  bullet and its nav lines (Required Behavior), the Simple and Advanced
+  examples (User Experience), and the two-flow lines in Acceptance
+  Criteria still describe two modes
+- Complete when: every function a student could reach only in Advanced
+  is on the Search page under Simple's rules (or in a recorded drop for
+  email-on-finish if Jonathan drops it); the parity test is all passing;
+  no `data-mode`, `uiMode`, or `ui_mode` reference remains in `app/`,
+  `static/`, `templates/`, or `tests/` except the helpdesk history
+  column; spec.md describes one flow
+- Status: [ ] planned. Slice 1 is the next code. Slices 0 and 1 do not
+  wait on the pending calls.
 
 ## Backlog (unscheduled)
 - Make `pyright app` blocking in CI after clearing the current error backlog

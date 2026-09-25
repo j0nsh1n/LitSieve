@@ -125,7 +125,13 @@ Guest User (is_guest) → sample corpus only; purged by age
 - Host entry: `app.main:app` port 7860; Linux `./venv`
 
 ## Session Handoff
-- **Date:** 2026-09-23
+- **Date:** 2026-09-24
+- **Phase 13** is written in `roadmap.md` (fold every Advanced function
+  into Simple, then remove Advanced). Next code is slice 1: a Simple
+  Set aside list for every exclusion reason, with restore. Slice 0 is
+  the parity test that blocks the removal. Pending calls (email-on-finish,
+  301 vs 404, 6.0.0, spec.md at removal) do not block slice 1.
+- **Date (prior):** 2026-09-23
 - **State:** #75 (tests never write a log where they run) and #76
   (look-drawn tooltips) are merged, pulled to the live checkout at
   `08829e8`, and the service restarted 2026-09-23 18:17. Version **5.5.0**.
