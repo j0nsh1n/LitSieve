@@ -9,6 +9,12 @@ and this project aims to follow Semantic Versioning for app version strings
 ## [Unreleased]
 
 ### Added
+- Set aside papers: a popup on Search (More, or the funnel's "See set-aside
+  papers") that lists every paper left out of your searches, grouped by why
+  (marked not relevant, set aside by Narrow it down, duplicate copies, and so
+  on), with Restore per paper or per group and one click to set them aside
+  again. Before this, duplicate copies and Not relevant papers could only be
+  brought back from the Advanced Clusters page.
 - Five looks on the same Simple Search shell: Workshop, Broadsheet, Lab, Night,
   and Catalog. After you create an account, Search opens a Look popup. Change
   it later in Account. The choice is stored on the account and follows login.

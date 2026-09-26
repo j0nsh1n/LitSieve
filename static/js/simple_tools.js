@@ -491,6 +491,209 @@ function setSimpleScreenConfirmVisible(visible) {
  if (el) el.hidden = !visible;
 }
 
+/* ---------- Set aside list: every reason, restore one paper or a group ---------- */
+let _setAsideModalOpener = null;
+let _setAsideModalKey = null;
+let _setAsideItems = [];
+let _setAsideLastRestore = null;
+
+function isSimpleSetAsideOpen() {
+ const modal = document.getElementById('simple-set-aside-modal');
+ return !!(modal && !modal.hidden);
+}
+
+function closeSimpleSetAsideModal() {
+ const modal = document.getElementById('simple-set-aside-modal');
+ if (!modal || modal.hidden) return;
+ modal.hidden = true;
+ if (modal.getAttribute('data-owns-scroll-lock') === '1') {
+  modal.removeAttribute('data-owns-scroll-lock');
+  document.body.classList.remove('lra-modal-open');
+  document.body.style.top = '';
+  const y = parseInt(document.body.dataset.lraScrollY || '0', 10) || 0;
+  delete document.body.dataset.lraScrollY;
+  window.scrollTo(0, y);
+ }
+ if (_setAsideModalKey) {
+  document.removeEventListener('keydown', _setAsideModalKey, true);
+  _setAsideModalKey = null;
+ }
+ const opener = _setAsideModalOpener;
+ _setAsideModalOpener = null;
+ if (opener && typeof opener.focus === 'function') {
+  try { opener.focus({ preventScroll: true }); } catch (e) { /* ignore */ }
+ }
+}
+
+async function openSimpleSetAsideModal() {
+ const modal = document.getElementById('simple-set-aside-modal');
+ if (!modal || isSimpleSetAsideOpen()) return;
+ _setAsideModalOpener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+ if (!document.body.classList.contains('lra-modal-open')) {
+  const scrollY = window.scrollY || window.pageYOffset || 0;
+  document.body.dataset.lraScrollY = String(scrollY);
+  document.body.style.top = `-${scrollY}px`;
+  document.body.classList.add('lra-modal-open');
+  modal.setAttribute('data-owns-scroll-lock', '1');
+ }
+ modal.hidden = false;
+ _setAsideLastRestore = null;
+ const again = document.getElementById('simple-set-aside-again');
+ if (again) again.hidden = true;
+ const status = document.getElementById('simple-set-aside-status');
+ if (status) {
+  status.textContent = '';
+  status.className = 'status-indicator';
+ }
+ const card = modal.querySelector('[data-site-modal-card]') || modal;
+ const focusable = () => Array.from(card.querySelectorAll(
+  'button:not([disabled]), [href], input:not([disabled]), [tabindex]:not([tabindex="-1"])'
+ ));
+ _setAsideModalKey = (ev) => {
+  if (ev.key === 'Escape') {
+   ev.preventDefault();
+   ev.stopPropagation();
+   closeSimpleSetAsideModal();
+   return;
+  }
+  if (ev.key !== 'Tab') return;
+  const list = focusable();
+  if (!list.length) return;
+  const first = list[0];
+  const last = list[list.length - 1];
+  const active = document.activeElement;
+  if (ev.shiftKey && (active === first || !card.contains(active))) {
+   ev.preventDefault();
+   last.focus();
+  } else if (!ev.shiftKey && (active === last || !card.contains(active))) {
+   ev.preventDefault();
+   first.focus();
+  }
+ };
+ document.addEventListener('keydown', _setAsideModalKey, true);
+ const closeBtn = document.getElementById('simple-set-aside-close');
+ if (closeBtn) closeBtn.focus();
+ await loadSimpleSetAsideList();
+}
+
+/** Every set-aside paper, grouped by reason. Not just low_relevance: this is
+ *  the one place a Simple student can bring back duplicates and Not relevant. */
+async function loadSimpleSetAsideList() {
+ const host = document.getElementById('simple-set-aside-groups');
+ if (!host) return;
+ host.innerHTML = '<p class="help-text">Loading…</p>';
+ try {
+  const data = await apiCall('/api/screening/excluded');
+  _setAsideItems = (data && data.items) || [];
+  renderSimpleSetAsideGroups(_setAsideItems, (data && data.groups) || []);
+ } catch (e) {
+  host.innerHTML = '';
+  setStatus('simple-set-aside-status', `Could not load the list: ${e.message}`, 'error');
+ }
+}
+
+function renderSimpleSetAsideGroups(items, groups) {
+ const host = document.getElementById('simple-set-aside-groups');
+ if (!host) return;
+ if (!items.length) {
+  host.innerHTML = '<p class="help-text">Nothing is set aside. Every paper you collected is in your searches.</p>';
+  return;
+ }
+ const byReason = {};
+ items.forEach((it) => {
+  (byReason[it.reason] = byReason[it.reason] || []).push(it);
+ });
+ host.innerHTML = groups.map((g) => {
+  const rows = (byReason[g.reason] || []).map((it) => {
+   const meta = [it.year, it.source].filter(Boolean).join(' · ');
+   return `<li><div class="set-aside-row">
+    <div class="screen-triage-row-body">
+     <span class="screen-triage-row-title">${escapeHtml(it.title || it.article_id)}</span>
+     <span class="screen-triage-row-meta">${escapeHtml(meta)}</span>
+    </div>
+    <button type="button" class="btn btn-secondary btn-sm"
+     data-set-aside-restore="${escapeAttr(it.article_id)}|${escapeAttr(it.source)}"
+     data-set-aside-reason="${escapeAttr(it.reason)}">Restore</button>
+   </div></li>`;
+  }).join('');
+  const n = (byReason[g.reason] || []).length;
+  // One paper has its own Restore; a group button would repeat it.
+  const groupBtn = n > 1
+   ? `<button type="button" class="btn btn-secondary btn-sm"
+     data-set-aside-restore-group="${escapeAttr(g.reason)}">Restore all ${n}</button>`
+   : '';
+  return `<section class="set-aside-group" data-reason="${escapeAttr(g.reason)}">
+   <div class="set-aside-group-head">
+    <h3 class="screen-triage-group-title">${escapeHtml(g.label)} (${n})</h3>
+    ${groupBtn}
+   </div>
+   <ul class="screen-triage-rows set-aside-rows">${rows}</ul>
+  </section>`;
+ }).join('');
+}
+
+function onSetAsideListClick(ev) {
+ const one = ev.target.closest('[data-set-aside-restore]');
+ const group = ev.target.closest('[data-set-aside-restore-group]');
+ if (one) {
+  const [articleId, source] = one.getAttribute('data-set-aside-restore').split('|');
+  const items = _setAsideItems.filter((it) => it.article_id === articleId && it.source === source);
+  restoreSetAside(items, one.getAttribute('data-set-aside-reason'), one);
+ } else if (group) {
+  const reason = group.getAttribute('data-set-aside-restore-group');
+  restoreSetAside(_setAsideItems.filter((it) => it.reason === reason), reason, group);
+ }
+}
+
+async function restoreSetAside(items, reason, btn) {
+ if (!items.length) return;
+ setLoading(btn, true);
+ try {
+  const keys = items.map((it) => ({ article_id: it.article_id, source: it.source }));
+  await apiCall('/api/screening', { method: 'POST', body: { items: keys, action: 'include' } });
+  _setAsideLastRestore = { items: keys, reason };
+  // Narrow it down's own Undo caches this group; it no longer matches.
+  if (reason === 'low_relevance') clearSimpleScreenUndoItems();
+  const n = keys.length;
+  setStatus(
+   'simple-set-aside-status',
+   `Restored ${n} paper${n === 1 ? '' : 's'}. ${n === 1 ? 'It is' : 'They are'} back in your searches.`,
+   'success'
+  );
+  const again = document.getElementById('simple-set-aside-again');
+  if (again) again.hidden = false;
+  await loadSimpleSetAsideList();
+  await refreshSimpleScreeningCard();
+ } catch (e) {
+  setStatus('simple-set-aside-status', `Could not restore: ${e.message}`, 'error');
+ } finally {
+  setLoading(btn, false);
+ }
+}
+
+/** One-click undo of the last restore: set the same papers aside with the same reason. */
+async function doSetAsideAgain() {
+ const last = _setAsideLastRestore;
+ const btn = document.getElementById('simple-set-aside-again');
+ if (!last || !last.items.length) return;
+ setLoading(btn, true);
+ try {
+  await apiCall('/api/screening', {
+   method: 'POST',
+   body: { items: last.items, action: 'exclude', reason: last.reason },
+  });
+  _setAsideLastRestore = null;
+  if (btn) btn.hidden = true;
+  setStatus('simple-set-aside-status', `Set ${last.items.length} paper${last.items.length === 1 ? '' : 's'} aside again.`, 'success');
+  await loadSimpleSetAsideList();
+  await refreshSimpleScreeningCard();
+ } catch (e) {
+  setStatus('simple-set-aside-status', `Could not set them aside: ${e.message}`, 'error');
+ } finally {
+  setLoading(btn, false);
+ }
+}
+
 let _simpleScreenWired = false;
 
 function simpleScreenSelectedLevel() {
@@ -1861,6 +2064,23 @@ function wireSimpleToolsStrip() {
    });
   });
  }
+ // Set aside list. Wired here, not in the screening card, so it works before
+ // the papers are prepared (the card's own wiring waits for embeddings).
+ const once = (el, handler) => {
+  if (!el || el.dataset.wired === '1') return;
+  el.dataset.wired = '1';
+  el.addEventListener('click', handler);
+ };
+ once(document.getElementById('simple-set-aside-btn'), openSimpleSetAsideModal);
+ once(document.getElementById('funnel-set-aside-btn'), openSimpleSetAsideModal);
+ document.querySelectorAll('[data-set-aside-close]').forEach((el) => {
+  once(el, (ev) => {
+   ev.preventDefault();
+   closeSimpleSetAsideModal();
+  });
+ });
+ once(document.getElementById('simple-set-aside-groups'), onSetAsideListClick);
+ once(document.getElementById('simple-set-aside-again'), doSetAsideAgain);
 }
 
 document.addEventListener('DOMContentLoaded', () => {

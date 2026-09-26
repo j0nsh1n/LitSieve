@@ -7193,6 +7193,33 @@ html[data-mode="simple"] body:has(#search-workbench) .simple-tools-search-only {
     max-height: min(90vh, 42rem);
     border-radius: var(--radius-lg);
 }
+/* Set aside list: one group per reason, Restore per paper or per group. */
+.set-aside-groups {
+    display: grid;
+    gap: var(--space-3);
+    margin-top: var(--space-3);
+}
+.set-aside-group-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-2);
+}
+.set-aside-group-head .screen-triage-group-title {
+    margin: 0;
+}
+.set-aside-group-head .btn,
+.set-aside-row .btn {
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+.set-aside-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--space-3);
+    align-items: center;
+    padding: var(--space-2) 0;
+}
 .simple-screen-modal-card .simple-screen-actions {
     flex-wrap: wrap;
 }

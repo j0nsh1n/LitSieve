@@ -1,13 +1,18 @@
 """Building the corpus: fetch, embeddings, clustering, duplicates, screening."""
 
 import logging
+from typing import Optional
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
 from app import core
 from app.content.sample_corpus import get_sample_articles
-from app.content.screening_reasons import normalize_reason
+from app.content.screening_reasons import (
+    SET_ASIDE_GROUP_ORDER,
+    normalize_reason,
+    set_aside_group_label,
+)
 from app.core import (
     _ensure_progress,
     csrf_failed,
@@ -487,21 +492,37 @@ async def api_screening(req: ScreeningRequest, request: Request):
 
 
 @router.get("/api/screening/excluded")
-async def api_screening_excluded(request: Request, reason: str = "low_relevance"):
-    """List papers excluded with a given reason (Simple-mode Undo after Narrow it down)."""
+async def api_screening_excluded(request: Request, reason: Optional[str] = None):
+    """Papers set aside, with title, year, and reason.
+
+    No ``reason`` (or ``all``) lists every reason, grouped, for the Simple
+    Set aside list. ``reason=low_relevance`` is what Undo after Narrow it
+    down, Start over, and Re-prepare ask for: they restore only that group.
+    """
     user = current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
     uid = user["user_id"]
     p = get_pipeline(uid)
     try:
-        code = normalize_reason(reason, default="low_relevance")
-        items = p.db.get_excluded_items_for_reason(code)
+        code = None if not reason or reason == "all" else normalize_reason(reason, default="low_relevance")
+        items = p.db.get_excluded_items(code)
+        for item in items:
+            item["label"] = set_aside_group_label(item["reason"])
+        counts: dict = {}
+        for item in items:
+            counts[item["reason"]] = counts.get(item["reason"], 0) + 1
+        order = {r: i for i, r in enumerate(SET_ASIDE_GROUP_ORDER)}
+        groups = [
+            {"reason": r, "label": set_aside_group_label(r), "count": n}
+            for r, n in sorted(counts.items(), key=lambda kv: order.get(kv[0], len(order)))
+        ]
         return {
             "status": "success",
-            "reason": code,
+            "reason": code or "all",
             "count": len(items),
             "items": items,
+            "groups": groups,
         }
     except Exception as e:
         return server_error()

@@ -999,7 +999,7 @@ def test_simple_screen_confirm_question_box_after_prepare():
     # Undo after complete is corpus-backed (survives restart).
     assert "fetchLowRelevanceUndoItems" in dm
     assert "/api/screening/excluded" in dm
-    assert "get_excluded_items_for_reason" in _read("app", "storage", "database.py")
+    assert "def get_excluded_items(" in _read("app", "storage", "database.py")
     assert '("/api/screening/excluded"' in _read("app", "routes", "corpus.py") or (
         "/api/screening/excluded" in _read("app", "routes", "corpus.py")
     )
