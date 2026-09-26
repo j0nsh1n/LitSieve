@@ -15,11 +15,23 @@ and this project aims to follow Semantic Versioning for app version strings
   on), with Restore per paper or per group and one click to set them aside
   again. Before this, duplicate copies and Not relevant papers could only be
   brought back from the Advanced Clusters page.
+- `MAX_TOTAL_ACCOUNTS` in `.env`: a cap on real accounts for this host. Once
+  reached, the register page says the host is not taking new accounts,
+  existing accounts still sign in, and the demo still works. Unset or 0
+  means no cap.
 - Five looks on the same Simple Search shell: Workshop, Broadsheet, Lab, Night,
   and Catalog. After you create an account, Search opens a Look popup. Change
   it later in Account. The choice is stored on the account and follows login.
 
 ### Changed
+- Refine, Explain, and Ask appear only when the student can get an answer:
+  their own saved API key, the host's key, or a configured built-in model.
+  Before, the buttons showed and then failed. The Account study-aid card
+  stays visible so a key can be added, with a note when AI is off.
+- Login, register, and reset forms show their own messages under a field
+  ("Enter your username", "Use at least 8 characters", "The two passwords do
+  not match") instead of the browser's bubble. The first empty field gets
+  focus and the message clears as you type.
 - Checkboxes and radio buttons are drawn in the current look instead of the
   operating system's: a box that meets 3:1 contrast, the look's accent when
   chosen, and a round-capped tick like the topic icons. High-contrast modes

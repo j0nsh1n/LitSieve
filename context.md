@@ -125,27 +125,28 @@ Guest User (is_guest) → sample corpus only; purged by age
 - Host entry: `app.main:app` port 7860; Linux `./venv`
 
 ## Session Handoff
-- **Date:** 2026-09-24
-- **State:** `main` at `8762214` (#78, checkbox proportions) is pulled to
-  the live checkout and the service restarted. Version **5.5.0**.
-- **Phase 13** is written in `roadmap.md`: fold every Advanced function
-  into Simple, then remove Advanced. Grok drafted it; the review fixed the
-  table (years and result count already in Simple; "More like my starred"
-  and coverage added; no email-on-finish feature exists) and added the
-  per-slice checks. Next code is slice 1, the Set aside list for every
-  exclusion reason. Slice 0 is the parity test that blocks the removal.
-- **Permissions (host, 2026-09-24):** `users.db` and its `-wal`/`-shm`,
-  `mailersend-smtp.txt`, and everything under `secrets/` (TLS key
-  included) are 600; `user_data/` is `go-rwx`. All three LitSieve units
-  run as `jonathans`, and the site answered 200 afterwards.
-- **Tooltips and form controls:** `static/js/tooltips.js` draws one
-  `data-tip` bubble under `<body>`. Checkboxes and radios are drawn at
-  `--box: max(0.875rem, 1.15em)` of their label, 1.25rem on
-  `(pointer: coarse)`; every press-down element has a top-edge strip, and
-  a test fails any new one without it.
+- **Date:** 2026-09-25
+- **State:** one landing PR combined four branches: Phase 13 slices 0 and 1
+  (parity test, Set aside list), the account cap and per-student AI
+  buttons (Grok), inline form validation messages (ChatGPT), and the
+  Phase 13 roadmap review. Version **5.5.0**; `style.css?v=20260925b`.
+- **Set aside list:** `GET /api/screening/excluded` with no reason lists
+  every reason with title, year, and a plain-words label, plus ordered
+  `groups`. The popup (`#simple-set-aside-modal`) opens from the More menu
+  and from the funnel's "See set-aside papers"; wired in
+  `wireSimpleToolsStrip` so it works before papers are prepared. Restore
+  posts `include`; "Set them aside again" re-excludes with the same reason.
+- **Parity test:** `tests/test_advanced_parity.py`, one row per Advanced
+  feature, `xfail(strict=True)` until its slice lands. A slice that adds a
+  control must remove that row's xfail in the same PR.
+- **Account cap:** `MAX_TOTAL_ACCOUNTS`, checked in `UserDatabase.create_user`
+  under the lock; guests exempt; unset means no cap. Not set on the host yet.
+- **AI buttons:** `/api/ui-flags` folds in `llm.student_can_get_ai(uid)` for
+  signed-in students; the Account card stays with `#ai-unavailable-note`.
+- **Permissions (host, 2026-09-24):** `users.db` and sidecars,
+  `mailersend-smtp.txt`, and `secrets/` are 600; `user_data/` is `go-rwx`.
 - **Tunnels:** LitSieve has one tunnel, `cloudflared-litpilot-token.service`
-  (tunnel `8f98295a…`). The other `cloudflared` process (tunnel `6ede11dd…`,
-  forwarding to 127.0.0.1:3773) is T3 Code's remote access; leave it.
-- **Next:** Phase 4 leftovers (account cap merge, restore drill, AI
-  provider or hidden AI buttons), Phase 13 slice 1, and UI slice 3
-  (replace the browser's validation bubbles on login, register, reset).
+  (tunnel `8f98295a…`). The other `cloudflared` (tunnel `6ede11dd…`,
+  127.0.0.1:3773) is T3 Code's remote access; leave it.
+- **Next:** Phase 13 slice 2 (reason chips in the Set aside popup); set
+  `MAX_TOTAL_ACCOUNTS` and the Ollama variables in `.env`.

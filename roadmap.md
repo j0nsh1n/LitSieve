@@ -17,18 +17,15 @@ home desktop, and the link has been shared publicly.
 - Complete when: an account cap (or invite gate) is enforced, a restore has been
   tested at least once from a backup, and the operator can answer "what happened
   at 14:05?" from the log file
-- Status: [ ] in progress. Open as of 2026-09-17:
-  - merge the account cap on `fix/phase4-account-cap` (`b6e9d45`,
-    `MAX_TOTAL_ACCOUNTS`, guests exempt, HTTP-level tests)
-  - run one restore drill on the host from a real archive and record the
-    date here
+- Status: [ ] in progress. Restore drill done 2026-09-25 from
+  `litsieve-20260925-120511.tar.gz` (25 accounts, 23 libraries, 5,494
+  papers, every database intact, app served from the copy). Open:
+  - set `MAX_TOTAL_ACCOUNTS` in `.env` and restart; the cap ships unset,
+    which means no cap
   - set `LLM_PROVIDER`, `OLLAMA_MODEL`, `OLLAMA_HOST`, `OLLAMA_MODELS` in
     `.env` and restart: 5.4.0 stopped reading `user_data/ai_settings.json`,
     so the built-in study aid has been off for every student since the
-    15 September restart
-  - hide the AI buttons when no provider is set: `show_ai_buttons` is
-    still true, and students got 503s from `/api/reader/explain` (2) and
-    `/api/ai/refine-article` (1)
+    15 September restart (the buttons now hide until this is set)
 
 ## Phase 11 — Audit follow-ups
 Left over after v5.4.0. Findings: `docs/CODE_AUDIT_2026-09-06.md` (on
@@ -98,25 +95,12 @@ screening report, and the result count and year range (Search options
 popup, `static/js/search.js`).
 
 - Tasks, in this order:
-  - Slice 0: `tests/test_advanced_parity.py` with one row per feature in
-    the table. Each row names the Simple control and starts expected-to-fail.
-    Later slices flip their own rows. The removal cannot merge while any
-    row still fails. Before writing it, check the table against the
-    2026-09-21 control inventory: a feature with no row is a feature the
-    test does not protect.
-  - Slice 1 (first, data safety, about a day): Simple "Set aside" list
-    for every exclusion reason, with restore. Today
-    `GET /api/screening/excluded` returns only `article_id` and `source`
-    for one reason (default `low_relevance`). Change it to accept every
-    reason and return title, year, source, and reason. The three calls in
-    `simple_tools.js` and the one in `data_management.js` stop asking only
-    for `low_relevance`. Restore uses existing `POST /api/screening` include.
-    On 2026-09-21 that was 60 duplicate copies in 5 accounts, plus every
-    Not relevant (`off_topic`) once its instant Undo is gone. Tests: set
-    aside as duplicate, `off_topic`, and `low_relevance`, list all three,
-    restore one, assert it is back in search. Browser-check against a
-    copy of an account that has hidden duplicates. The silent 0.98
-    resolve stays; the threshold control moves in slice 7.
+  - Slice 0 (`tests/test_advanced_parity.py`) and slice 1 (the Set aside
+    list) shipped 2026-09-25. Each later slice flips its own parity rows.
+    Note for slices that touch screening: Undo, Start over, and Re-prepare
+    ask `/api/screening/excluded?reason=low_relevance` on purpose; they
+    must restore only Narrow it down's group, never duplicates or Not
+    relevant.
   - Slice 2: exclusion reason chips (about half a day). Simple sets only
     `off_topic` (Not relevant) and `low_relevance` (Narrow it down) today,
     so a Simple student's screening report has two categories; the chips
@@ -177,8 +161,8 @@ popup, `static/js/search.js`).
   passing; no `data-mode`, `uiMode`, or `ui_mode` reference remains in
   `app/`, `static/`, `templates/`, or `tests/` except the helpdesk
   history column; spec.md describes one flow
-- Status: [ ] planned. Slice 1 is the next code. Slices 0 and 1 do not
-  wait on the pending calls.
+- Status: [ ] in progress. Slices 0 and 1 shipped; slice 2 (reason
+  chips) is next. Nothing waits on the pending calls until slice 6.
 
 ## Backlog (unscheduled)
 - Make `pyright app` blocking in CI after clearing the current error backlog
