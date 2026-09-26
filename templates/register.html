@@ -9,6 +9,7 @@
  <link rel="stylesheet" href="/static/css/style.css?v=20260925a">
  <script src="/static/js/theme-init.js?v=20260918h"></script>
  <script src="/static/js/tooltips.js?v=20260923a" defer></script>
+ <script src="/static/js/form-validation.js?v=20260925a" defer></script>
 </head>
 <body class="auth-body">
  {% include "partials/site_notice.html" %}
@@ -27,7 +28,7 @@
  <div class="auth-error">{{ error }}</div>
  {% endif %}
 
- <form method="post" action="/register" class="auth-form">
+ <form method="post" action="/register" class="auth-form" novalidate>
  <div class="form-group">
  <label>Username</label>
  <input type="text" name="username" value="{{ username or '' }}"
