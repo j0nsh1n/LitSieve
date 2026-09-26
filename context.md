@@ -125,43 +125,27 @@ Guest User (is_guest) → sample corpus only; purged by age
 - Host entry: `app.main:app` port 7860; Linux `./venv`
 
 ## Session Handoff
-- **Date:** 2026-09-23
-- **State:** #75 (tests never write a log where they run) and #76
-  (look-drawn tooltips) are merged, pulled to the live checkout at
-  `08829e8`, and the service restarted 2026-09-23 18:17. Version **5.5.0**.
-- **Tests and logs:** `tests/conftest.py` forces `LOG_FILE=""` before the app
-  is imported. Before this, a test run from the live checkout appended to
-  production's `logs/litsieve.log` and could rotate it under the service. A
-  fresh-process test guards it; `tests/README.md` rule 6 says tests never
-  write into the checkout.
-- **Tooltips:** `static/js/tooltips.js` draws one `data-tip` bubble under
-  `<body>` in look tokens, shown on hover and keyboard focus with no delay,
-  above the control or below at the top edge, closed by Escape, skipped on
-  touch, `aria-describedby` only while shown. The bubble takes the pointer
-  with a strip over the 9px gap (WCAG 1.4.13), and a control scrolled out of
-  view hides its bubble. A realistic click in the top 1px of a `.btn` is
-  lost with or without a tooltip, because `.btn:active` moves it 2px.
+- **Date:** 2026-09-24
+- **State:** `main` at `8762214` (#78, checkbox proportions) is pulled to
+  the live checkout and the service restarted. Version **5.5.0**.
+- **Phase 13** is written in `roadmap.md`: fold every Advanced function
+  into Simple, then remove Advanced. Grok drafted it; the review fixed the
+  table (years and result count already in Simple; "More like my starred"
+  and coverage added; no email-on-finish feature exists) and added the
+  per-slice checks. Next code is slice 1, the Set aside list for every
+  exclusion reason. Slice 0 is the parity test that blocks the removal.
+- **Permissions (host, 2026-09-24):** `users.db` and its `-wal`/`-shm`,
+  `mailersend-smtp.txt`, and everything under `secrets/` (TLS key
+  included) are 600; `user_data/` is `go-rwx`. All three LitSieve units
+  run as `jonathans`, and the site answered 200 afterwards.
+- **Tooltips and form controls:** `static/js/tooltips.js` draws one
+  `data-tip` bubble under `<body>`. Checkboxes and radios are drawn at
+  `--box: max(0.875rem, 1.15em)` of their label, 1.25rem on
+  `(pointer: coarse)`; every press-down element has a top-edge strip, and
+  a test fails any new one without it.
 - **Tunnels:** LitSieve has one tunnel, `cloudflared-litpilot-token.service`
   (tunnel `8f98295a…`). The other `cloudflared` process (tunnel `6ede11dd…`,
   forwarding to 127.0.0.1:3773) is T3 Code's remote access; leave it.
-- **Advanced removal audit (2026-09-21):** not safe yet. Only the Clusters
-  page can restore exclusions other than `low_relevance` (60 duplicate
-  copies in 5 accounts; every Not relevant after its Undo), so roadmap Phase
-  13 starts with a Simple "Set aside" list for every reason. The Search page
-  loads `data_management.js`, so removing that page must keep the script.
-- **UI slice 2 (`feat/drawn-form-controls`, PR into `main`):**
-  checkboxes and radios drawn in look tokens (border `--text` 55% into
-  `--bg`, `--accent` fill, `--on-accent` tick, all measured per look), with
-  `forced-colors` handing back native controls; no number spinners;
-  placeholders on `--text-soft`; autofill repainted; no tap flash; the
-  glossary uses the site's "+" marker; selection is an accent tint behind
-  `--text` (white text had failed in every dark theme). Every press-down
-  element has a strip covering its top edge, and a test fails any new one
-  that lacks it.
-- **Checkbox proportions (`fix/checkbox-proportions`):** with a mouse the
-  box is `--box: max(0.875rem, 1.15em)` of its label's text (inputs set
-  `font-size: inherit` so em means the label); `@media (pointer: coarse)`
-  keeps 1.25rem for thumbs. Tick, dot, and border scale with `--box`.
-  `.show-pass + .btn` gets room before the button.
-- **Next:** after this merges, pull and restart the service. Slice 3
-  replaces the browser's validation bubbles on login, register, and reset.
+- **Next:** Phase 4 leftovers (account cap merge, restore drill, AI
+  provider or hidden AI buttons), Phase 13 slice 1, and UI slice 3
+  (replace the browser's validation bubbles on login, register, reset).
