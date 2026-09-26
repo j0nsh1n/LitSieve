@@ -119,6 +119,9 @@
   {# Optional AI: pick Built-in (local, auto start/stop) or Cloud API key. #}
   <h2>Study aid</h2>
   <p class="info-text">Optional. Choose how it runs.</p>
+  <p class="info-text" id="ai-unavailable-note" hidden>
+   Refine, Explain and Ask are not available right now. You can still add an API key below.
+  </p>
   <details class="advanced-details" id="ai-settings-details">
    <summary>AI study aid (optional — choose how it runs)</summary>
    <div class="advanced-body">
@@ -311,5 +314,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/account.js?v=20260920a"></script>
+<script src="/static/js/account.js?v=20260925a"></script>
 {% endblock %}

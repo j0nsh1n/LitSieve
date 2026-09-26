@@ -67,14 +67,21 @@ async def robots():
 
 
 @router.get("/api/ui-flags")
-async def api_ui_flags():
+async def api_ui_flags(request: Request):
     """Deployer toggles for classroom UI (env: HIDE_STUDY_TYPE_TAGS, HIDE_AI_BUTTONS).
 
     Public so the app shell can load flags before authenticated API calls.
+    Signed-in answers also fold in whether this student can get an AI reply.
     Extractive key points are never gated by these flags.
     """
     from app.content.ui_flags import get_ui_flags
-    return get_ui_flags()
+    from app.services.llm import student_can_get_ai
+
+    flags = dict(get_ui_flags())
+    user = current_user(request)
+    if user and flags.get("show_ai_buttons"):
+        flags["show_ai_buttons"] = student_can_get_ai(user["user_id"])
+    return flags
 
 
 @router.get("/api/sources")
