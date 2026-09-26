@@ -54,11 +54,9 @@ async function loadUiFlags() {
     window.LRA_UI._loaded = true;
     document.documentElement.dataset.showAi = uiFlag('show_ai_buttons') ? '1' : '0';
     document.documentElement.dataset.showStudyTypes = uiFlag('show_study_type_tags') ? '1' : '0';
-    // Hide Account AI card without waiting for account.js if already in DOM.
-    if (!uiFlag('show_ai_buttons')) {
-        const aiSec = document.getElementById('ai-settings-section');
-        if (aiSec) aiSec.hidden = true;
-    }
+    // Account AI card stays visible (that is where a student adds a key).
+    const aiNote = document.getElementById('ai-unavailable-note');
+    if (aiNote) aiNote.hidden = uiFlag('show_ai_buttons');
     return window.LRA_UI;
 }
 

@@ -444,6 +444,19 @@ def study_aid_mode(user_id: Optional[str] = None) -> str:
     return "built_in"
 
 
+def student_can_get_ai(user_id: Optional[str] = None) -> bool:
+    """Whether this student can get an AI answer from current config.
+
+    Configuration only: a host or student OpenAI/Anthropic key that
+    ``runtime_ai`` would use, or a set built-in model name. Does not ping
+    Ollama or any network.
+    """
+    rt = runtime_ai(user_id=user_id)
+    if rt["openai_api_key"] or rt["anthropic_api_key"]:
+        return True
+    return bool(rt["ollama_model"])
+
+
 def public_ai_settings(user_id: Optional[str] = None) -> Dict[str, Any]:
     """Settings safe to show in the UI (this account's keys masked)."""
     data = load_ai_settings(user_id=user_id)
