@@ -50,15 +50,15 @@ document.addEventListener('DOMContentLoaded', () => {
  if (joinBtn) joinBtn.addEventListener('click', doAccountJoin);
 
  // Optional AI study aid: Built-in (auto start/stop) vs Cloud API key.
- // Classroom deployers can hide this card with HIDE_AI_BUTTONS=true.
+ // The card stays visible so a student can add a key even when buttons are hidden.
  const aiSection = document.getElementById('ai-settings-section');
  if (aiSection) {
  const wireAi = () => {
- if (typeof uiFlag === 'function' && !uiFlag('show_ai_buttons', true)) {
- aiSection.hidden = true;
- return;
- }
  aiSection.hidden = false;
+ const note = document.getElementById('ai-unavailable-note');
+ if (note) {
+  note.hidden = !(typeof uiFlag === 'function') || uiFlag('show_ai_buttons', true);
+ }
  loadAiSettings();
  const modeSel = document.getElementById('ai-study-mode');
  if (modeSel) modeSel.addEventListener('change', syncAiModePanels);

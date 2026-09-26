@@ -1246,18 +1246,36 @@ class ArticleDatabase:
             cursor.execute("SELECT article_id, source FROM screening")
             return {(row[0], row[1]) for row in cursor.fetchall()}
 
-    def get_excluded_items_for_reason(self, reason: str) -> List[Dict[str, str]]:
-        """List excluded papers for one screening reason (for Simple-mode Undo)."""
+    def get_excluded_items(self, reason: Optional[str] = None) -> List[Dict[str, str]]:
+        """Excluded papers with their reason and enough of the article to show.
+
+        ``reason`` narrows to one code (Simple Undo after Narrow it down asks
+        for ``low_relevance``); ``None`` lists every reason for the Set aside
+        list. Newest exclusions first inside a reason.
+        """
         from app.content.screening_reasons import normalize_reason
-        reason = normalize_reason(reason, default="manual")
+        sql = (
+            "SELECT s.article_id, s.source, s.reason, a.title, a.year, a.journal"
+            " FROM screening s"
+            " LEFT JOIN articles a ON a.article_id = s.article_id AND a.source = s.source"
+        )
+        params: tuple = ()
+        if reason is not None:
+            sql += " WHERE s.reason = ?"
+            params = (normalize_reason(reason, default="manual"),)
+        sql += " ORDER BY s.reason, s.created_at DESC, a.title"
         with self._lock:
             cursor = self.conn.cursor()
-            cursor.execute(
-                "SELECT article_id, source FROM screening WHERE reason = ?",
-                (reason,),
-            )
+            cursor.execute(sql, params)
             return [
-                {"article_id": row[0], "source": row[1]}
+                {
+                    "article_id": row[0],
+                    "source": row[1],
+                    "reason": row[2],
+                    "title": row[3] or "",
+                    "year": row[4] or "",
+                    "journal": row[5] or "",
+                }
                 for row in cursor.fetchall()
             ]
 

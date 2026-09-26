@@ -6,9 +6,10 @@
  <title>Login - LitSieve</title>
     <link rel="icon" href="/static/favicon.ico?v=20260803a" sizes="32x32">
     <link rel="apple-touch-icon" href="/static/favicon.png?v=20260803a">
- <link rel="stylesheet" href="/static/css/style.css?v=20260924a">
+ <link rel="stylesheet" href="/static/css/style.css?v=20260925b">
  <script src="/static/js/theme-init.js?v=20260918h"></script>
  <script src="/static/js/tooltips.js?v=20260923a" defer></script>
+ <script src="/static/js/form-validation.js?v=20260925a" defer></script>
 </head>
 <body class="auth-body">
  {% include "partials/site_notice.html" %}
@@ -29,7 +30,7 @@
  <div class="auth-error">{{ error }}</div>
  {% endif %}
 
- <form method="post" action="/login" class="auth-form">
+ <form method="post" action="/login" class="auth-form" novalidate>
  {% if next %}
  <input type="hidden" name="next" value="{{ next }}">
  {% endif %}

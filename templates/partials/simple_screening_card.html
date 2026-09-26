@@ -16,6 +16,9 @@
     <button type="button" class="btn btn-secondary simple-tools-search-only" id="simple-tools-startover-btn">
      Start over
     </button>
+    <button type="button" class="btn btn-secondary simple-tools-search-only" id="simple-set-aside-btn">
+     Set aside papers
+    </button>
    </div>
   </details>
   <span class="help-text" id="simple-tools-status"></span>
@@ -72,6 +75,23 @@
    <div id="simple-screen-status" class="status-indicator"></div>
    <div class="lra-modal-actions">
     <button type="button" class="btn btn-secondary" id="simple-screen-modal-close" data-simple-screen-close>Close</button>
+   </div>
+  </div>
+ </div>
+
+ {# Set aside list: every reason, restore one paper or a whole group. #}
+ <div id="simple-set-aside-modal" class="lra-modal-root simple-screen-modal" hidden>
+  <div class="lra-modal-backdrop" data-set-aside-close></div>
+  <div class="lra-modal-card card simple-screen-modal-card" role="dialog" aria-modal="true"
+   aria-labelledby="simple-set-aside-title" data-site-modal-card>
+   <h2 id="simple-set-aside-title" class="lra-modal-title">Set aside papers</h2>
+   <p class="info-text">These papers stay in your collection but are left out of your searches.
+    Restore any you want back.</p>
+   <div id="simple-set-aside-groups" class="set-aside-groups"></div>
+   <div id="simple-set-aside-status" class="status-indicator" aria-live="polite"></div>
+   <div class="lra-modal-actions">
+    <button type="button" class="btn btn-secondary" id="simple-set-aside-again" hidden>Set them aside again</button>
+    <button type="button" class="btn btn-secondary" id="simple-set-aside-close" data-set-aside-close>Close</button>
    </div>
   </div>
  </div>

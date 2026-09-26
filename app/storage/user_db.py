@@ -17,6 +17,30 @@ from app.storage import dbconn
 
 DEFAULT_USERS_DB = "users.db"
 
+MAX_TOTAL_ACCOUNTS_ENV = "MAX_TOTAL_ACCOUNTS"
+
+
+class AccountCapExceeded(RuntimeError):
+    """Raised when host-wide total account cap is reached."""
+
+    def __init__(self, cap: int):
+        super().__init__("This host is not taking new accounts right now.")
+        self.cap = cap
+
+
+def _host_total_account_cap() -> Optional[int]:
+    """Host-wide cap on non-guest accounts. 0/unset disables the cap."""
+    raw = (os.getenv(MAX_TOTAL_ACCOUNTS_ENV) or "").strip()
+    if not raw:
+        return None
+    try:
+        cap = int(float(raw))
+    except (TypeError, ValueError):
+        return None
+    if cap <= 0:
+        return None
+    return cap
+
 
 def users_db_path() -> str:
     """Accounts DB location: ``USERS_DB`` env, else ``users.db`` in the cwd.
@@ -281,6 +305,16 @@ class UserDatabase:
         guest = 1 if is_guest else 0
         look = normalize_look(look)
         with self._lock:
+            if not is_guest:
+                cap = _host_total_account_cap()
+                if cap is not None:
+                    total = int(
+                        self.conn.execute(
+                            "SELECT COUNT(*) FROM users WHERE COALESCE(is_guest, 0) = 0"
+                        ).fetchone()[0]
+                    )
+                    if total >= cap:
+                        raise AccountCapExceeded(cap)
             try:
                 self.conn.execute(
                     "INSERT INTO users (id, username, hashed_password, token_version, is_guest, look) "
@@ -300,6 +334,21 @@ class UserDatabase:
             "is_guest": bool(guest),
             "look": look,
         }
+
+    def registration_closed_reason(self) -> Optional[str]:
+        """Student-facing reason if new real accounts are blocked, else None."""
+        cap = _host_total_account_cap()
+        if cap is None:
+            return None
+        with self._lock:
+            total = int(
+                self.conn.execute(
+                    "SELECT COUNT(*) FROM users WHERE COALESCE(is_guest, 0) = 0"
+                ).fetchone()[0]
+            )
+        if total >= cap:
+            return str(AccountCapExceeded(cap))
+        return None
 
     def set_look(self, user_id: str, look: str) -> Optional[str]:
         """Persist an allowlisted look. Returns None if the id is unknown or the look is not allowed."""

@@ -397,6 +397,8 @@ function fillSimpleRailStats(stats, report) {
  set('rail-stat-out', out);
  set('rail-stat-kept', kept);
  set('rail-stat-removed', removed);
+ const seeSetAside = document.getElementById('funnel-set-aside-btn');
+ if (seeSetAside) seeSetAside.hidden = removed <= 0;
  const keptPct = total > 0 ? (100 * kept / total) : 0;
  const removedPct = total > 0 ? (100 * removed / total) : 0;
  host.style.setProperty('--funnel-kept-pct', keptPct + '%');
