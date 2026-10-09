@@ -10,7 +10,7 @@
 - Types: `pyright app` via `pyrightconfig.json` (basic); CI **continue-on-error**
   (report-only). Last recorded: **60 errors, 6 warnings** (2026-09-17). The
   previously cited baseline was 56/6.
-- Latest targeted ops/fetch checks (2026-10-09): **47 passed**.
+- Latest targeted ops/fetch checks (2026-10-09): **49 passed**.
 - Tests: `SECRET_KEY=x DEBUG=true ./venv/bin/python -m pytest -q` — prefer
   `./venv` for sqlcipher. Count drifts with the branch; re-run before release.
 - UI: Simple/Advanced via `localStorage.uiMode` + `data-mode` (theme-init pre-paint).
@@ -127,14 +127,14 @@ Guest User (is_guest) → sample corpus only; purged by age
 
 ## Session Handoff
 - **Date:** 2026-10-09. **Branch:** `fix/ops-rollback-and-fetch-deadline`.
-- Task 1 complete locally. Rollback dispatches to a transient unit with the
-  actor, audits the receipt, and polls deploy state. The synchronous fallback
-  still writes route-side history. `_do_deploy` already passes the actor to
-  `_finish_deploy`; a unit test confirms rollback reaches it.
-- Verified `ruff check app tests`, JavaScript syntax, and the requested five-file
-  pytest command with `DEBUG=true`: 47 passed. The initial run without DEBUG
-  failed existing auth tests because TestClient uses HTTP and cookies were Secure.
-- Real service restarts and host rollback were not exercised. Browser behavior
-  was unit-tested in Node with mocked responses; no browser session was run.
-- Next work is Task 2, direct `_finish_deploy` persistence and host checklist,
-  followed by Task 3, whole-source fetch deadlines and progress.
+- Task 1 committed locally as `0f87780`. Rollback dispatches with the actor,
+  audits the receipt, and polls deploy state. The synchronous fallback remains.
+- Task 2 adds direct `_finish_deploy` tests using temporary `USERS_DB` files.
+  Reopening the database proves one history row for each `ok` or `rolled_back`
+  verdict, with the SHA, previous SHA, and actor. `docs/SELFHOST.md` has the
+  journal and read-only database checklist for the host operator.
+- Required lint and five-file pytest checks run with `DEBUG=true`; results
+  are recorded in Current State. No real deploy, rollback, or restart ran.
+- Host persistence remains unverified; the Phase 11 host confirmation remains
+  open. Browser polling was unit-tested in Node, without a browser session.
+- Next work is Task 3, whole-source deadlines and source progress.

@@ -922,6 +922,40 @@ def test_rollback_reaches_finish_deploy_with_the_detached_actor(tmp_path, monkey
     )
 
 
+@pytest.mark.parametrize(
+    ("ok", "rolled_back", "verdict"),
+    [(True, False, "ok"), (False, True, "rolled_back")],
+)
+def test_finish_deploy_persists_one_history_row_across_database_reopen(
+    tmp_path, monkeypatch, ok, rolled_back, verdict,
+):
+    from app.operator import actions, deploy_state
+    from app.storage.user_db import UserDatabase
+
+    db_path = tmp_path / "detached-users.db"
+    monkeypatch.setenv("USERS_DB", str(db_path))
+    monkeypatch.delenv("DB_ENCRYPTION_KEY", raising=False)
+    sha, previous = "a" * 40, "b" * 40
+    deploy_state.begin(sha=sha, previous_sha=previous, actor_username="someone")
+    result = {"ok": ok, "rolled_back": rolled_back, "sha": sha, "previous_sha": previous}
+
+    assert actions._finish_deploy(result, actor="someone") == result
+
+    db = UserDatabase()
+    try:
+        assert db.db_path == str(db_path)
+        rows = db.conn.execute(
+            "SELECT sha, previous_sha, actor_username, result FROM operator_deploys"
+        ).fetchall()
+        assert [tuple(row) for row in rows] == [(sha, previous, "someone", verdict)]
+    finally:
+        db.conn.close()
+    state = deploy_state.read()
+    assert state["phase"] == "done"
+    assert state["result"] == verdict
+    assert deploy_state.interrupted() is None
+
+
 # --- A05: operator work must not stall the single web worker ------------------
 
 

@@ -42,6 +42,38 @@ PUBLIC_BASE_URL=https://www.example.com   # your public HTTPS origin
 Point the tunnel at **`http://127.0.0.1:7860`**. Set `PUBLIC_BASE_URL` to the
 HTTPS URL users type in the browser.
 
+## Confirming a detached deploy on the host
+
+After a detached deploy from **Ship** finishes, check its receipt and history.
+
+1. Copy the transient unit name from the dispatch receipt. Read its journal,
+   replacing the example SHA prefix with the receipt's 12-character prefix:
+
+   ```bash
+   journalctl --user -u 'litsieve-deploy-<sha12>.service' --no-pager
+   ```
+
+   The final JSON result has `ok: true`, the deployed `sha`, and `previous_sha`.
+   A health-check failure that restores the previous commit has `ok: false`
+   and `rolled_back: true`. For rollback, use the receipt's
+   `litsieve-rollback-<sha12>` unit name, or `litsieve-rollback-prev`.
+
+2. Query the live accounts database read-only. If `USERS_DB` is set, use that
+   file instead of the default live checkout path:
+
+   ```bash
+   sqlite3 -readonly /home/jonathans/HealthDatabaseAccess/users.db \
+     "SELECT sha, previous_sha, actor_username, result, created_at FROM operator_deploys ORDER BY created_at DESC LIMIT 5;"
+   ```
+
+3. Match the receipt to exactly one new row. A healthy row has the deployed
+   SHA, the previous live SHA, the signed-in operator's username, result `ok`,
+   and the completion timestamp. An automatic recovery has result
+   `rolled_back`; a dispatch audit row alone does not prove completion.
+
+4. Check `/api/ops/deploy-state` while signed in as the operator. The matching
+   record has phase `done`, `in_flight: false`, and the same final result.
+
 ## Cloudflare Tunnel
 
 1. Install `cloudflared` (package or binary).
