@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 from typing import Dict, List, Optional
 
-from app.fetchers.base import BaseFetcher, FetchError, HttpClient
+from app.fetchers.base import BaseFetcher, FetchError, HttpClient, reraise_fetch_error
 
 
 class PLOSFetcher(BaseFetcher):
@@ -45,8 +45,8 @@ class PLOSFetcher(BaseFetcher):
                     },
                 )
                 docs = (r.json().get("response") or {}).get("docs") or []
-            except FetchError:
-                raise
+            except FetchError as e:
+                reraise_fetch_error(e, articles)
             except Exception as e:
                 raise FetchError(f"PLOS request failed: {e}", kind="network") from e
 

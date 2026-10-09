@@ -42,6 +42,16 @@ PUBLIC_BASE_URL=https://www.example.com   # your public HTTPS origin
 Point the tunnel at **`http://127.0.0.1:7860`**. Set `PUBLIC_BASE_URL` to the
 HTTPS URL users type in the browser.
 
+`LITSIEVE_FETCH_SOURCE_TIMEOUT` sets the fetch budget for each source in seconds
+(default `90`). It starts when the source worker begins, excluding queue time,
+and covers pagination and retry waits. Invalid or non-positive values use `90`.
+Completed pages remain in the library when a later request times out. HTTP
+requests use the remaining budget as their timeout; the retry loop stops when
+the budget expires. A blocking call outside `HttpClient`, such as PubMed's
+Entrez request, is checked when it returns or reaches a polite delay. Requests
+read timeouts measure socket inactivity, so a response that keeps sending bytes
+can also outlast the budget until control returns to the deadline check.
+
 ## Confirming a detached deploy on the host
 
 After a detached deploy from **Ship** finishes, check its receipt and history.

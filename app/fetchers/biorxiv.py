@@ -14,7 +14,7 @@ import re
 from datetime import date, timedelta
 from typing import Dict, List, Optional
 
-from app.fetchers.base import BaseFetcher, FetchError, HttpClient
+from app.fetchers.base import BaseFetcher, FetchError, HttpClient, reraise_fetch_error
 
 
 def _tokens(query: str) -> List[str]:
@@ -61,8 +61,8 @@ class _RxivFetcher(BaseFetcher):
             try:
                 r = self.http.get(url)
                 data = r.json()
-            except FetchError:
-                raise
+            except FetchError as e:
+                reraise_fetch_error(e, articles)
             except Exception as e:
                 raise FetchError(f"{self.SOURCE_NAME} request failed: {e}", kind="network") from e
 

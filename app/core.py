@@ -262,7 +262,7 @@ def _empty_job_slot(task: str) -> dict:
         'started_at': None, 'updated_at': None, 'library_id': None,
     }
     if task == 'fetch':
-        slot.update(sources=[], by_source={}, source_status={})
+        slot.update(sources=[], by_source={}, source_status={}, source_progress={})
     return slot
 
 
@@ -322,6 +322,7 @@ def _ensure_progress(user_id: str) -> dict:
             slot.setdefault('sources', [])
             slot.setdefault('by_source', {})
             slot.setdefault('source_status', {})
+            slot.setdefault('source_progress', {})
     return _all_progress[user_id]
 
 
@@ -527,11 +528,8 @@ def try_begin_user_job(uid: str, task: str, **extra) -> bool:
         fut = _job_futures.get((uid, task))
         if _job_sync.get((uid, task)) or (fut is not None and not fut.done()):
             return False
-        slot = {
-            'active': True, 'done': 0, 'total': 0, 'result': None, 'error': None,
-            'cancel': False, 'articles_so_far': 0, 'message': '',
-            'started_at': now, 'updated_at': now, 'library_id': extra.get('library_id'),
-        }
+        slot = _empty_job_slot(task)
+        slot.update(active=True, started_at=now, updated_at=now, library_id=extra.get('library_id'))
         slot.update(extra)
         slot['started_at'] = extra.get('started_at') or now
         slot['updated_at'] = now

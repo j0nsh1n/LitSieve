@@ -8,9 +8,11 @@
 - Python **3.14** (Dockerfile, CI, Render, ruff `py314`).
 - Lint: `ruff check .` — partial select (E9/F63/F7/F82/F401/F541/E401/I).
 - Types: `pyright app` via `pyrightconfig.json` (basic); CI **continue-on-error**
-  (report-only). Last recorded: **60 errors, 6 warnings** (2026-09-17). The
-  previously cited baseline was 56/6.
-- Latest targeted ops/fetch checks (2026-10-09): **49 passed**.
+  (report-only). Compared with `main` on 2026-10-09: **61 errors, 1 warning**
+  in both snapshots, with no new deadline/progress diagnostics.
+- Latest targeted ops/fetch checks (2026-10-09): **67 passed**.
+- Expanded ops/fetch/JavaScript/UI unit checks: **165 passed**; `ruff check .`,
+  JavaScript syntax, and diff checks passed.
 - Tests: `SECRET_KEY=x DEBUG=true ./venv/bin/python -m pytest -q` — prefer
   `./venv` for sqlcipher. Count drifts with the branch; re-run before release.
 - UI: Simple/Advanced via `localStorage.uiMode` + `data-mode` (theme-init pre-paint).
@@ -127,14 +129,24 @@ Guest User (is_guest) → sample corpus only; purged by age
 
 ## Session Handoff
 - **Date:** 2026-10-09. **Branch:** `fix/ops-rollback-and-fetch-deadline`.
-- Task 1 committed locally as `0f87780`. Rollback dispatches with the actor,
-  audits the receipt, and polls deploy state. The synchronous fallback remains.
-- Task 2 adds direct `_finish_deploy` tests using temporary `USERS_DB` files.
-  Reopening the database proves one history row for each `ok` or `rolled_back`
-  verdict, with the SHA, previous SHA, and actor. `docs/SELFHOST.md` has the
-  journal and read-only database checklist for the host operator.
-- Required lint and five-file pytest checks run with `DEBUG=true`; results
-  are recorded in Current State. No real deploy, rollback, or restart ran.
-- Host persistence remains unverified; the Phase 11 host confirmation remains
-  open. Browser polling was unit-tested in Node, without a browser session.
-- Next work is Task 3, whole-source deadlines and source progress.
+- Task 1 (`5887f2c`): detached rollback with actor and dispatch ID, receipt
+  audit, in-flight refusal, and polling that ignores stale records. Synchronous
+  fallback remains. Rollback already used `_finish_deploy` through `_do_deploy`.
+- Task 2 (`369882e`): direct `_finish_deploy` tests reopen temporary `USERS_DB`
+  files and prove exactly one `ok` or `rolled_back` row with both SHAs and actor.
+  The host checklist is in `docs/SELFHOST.md`; live host confirmation stays open.
+- Task 3: `LITSIEVE_FETCH_SOURCE_TIMEOUT` defaults to 90 seconds per source,
+  including pagination and retry waits. Requests use remaining time; completed
+  pages are inserted on timeout. Progress gives source states, timestamps, and
+  elapsed seconds; the UI labels waits and timeouts. Cancel closes source rows.
+- Required `ruff check app tests` and five-file pytest checks passed with
+  `DEBUG=true` (47, 49, and 67 tests for Tasks 1, 2, and 3). Additional HTTP,
+  report, JavaScript, and UI contract checks are recorded in Current State.
+- GPT-6-Luna through Codex implemented fetcher/UI slices. The main agent reviewed
+  those diffs; Luna reviewed the main-agent paths and the two corrected regressions.
+- Unverified: real systemd dispatch, service restart, live history, external APIs,
+  and browser appearance. All checks used temporary databases and mocked calls.
+- Budget limit: blocking Entrez calls and slow-trickling HTTP responses stop only
+  when control returns. The existing deploy-style check/dispatch has no atomic
+  reservation against concurrent requests; review inferred that race, without
+  reproducing it. No host operations, push, PR, or merge occurred.

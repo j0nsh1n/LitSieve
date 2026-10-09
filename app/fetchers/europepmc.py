@@ -99,7 +99,7 @@ class EuropePMCFetcher(BaseFetcher):
                 cursor_mark = next_cursor
 
             except Exception as e:
-                reraise_fetch_error(e)
+                reraise_fetch_error(e, articles)
                 logger.exception("Error fetching from Europe PMC: %s", e)
                 break
 
@@ -127,7 +127,7 @@ class EuropePMCFetcher(BaseFetcher):
                     if parsed:
                         articles.append(parsed)
             except Exception as e:
-                reraise_fetch_error(e)
+                reraise_fetch_error(e, articles)
                 logger.exception("Error fetching %s: %s", article_id, e)
 
         logger.info("Successfully fetched %s articles", len(articles))

@@ -8,7 +8,7 @@ import logging
 from typing import Dict, List
 from urllib.parse import quote
 
-from app.fetchers.base import BaseFetcher, FetchError, HttpClient
+from app.fetchers.base import BaseFetcher, FetchError, HttpClient, reraise_fetch_error
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ class DOAJFetcher(BaseFetcher):
                 page += 1
             except FetchError as e:
                 logger.exception("DOAJ fetch error: %s", e)
-                raise
+                reraise_fetch_error(e, articles)
             except Exception as e:
                 logger.exception("DOAJ fetch error: %s", e)
                 break

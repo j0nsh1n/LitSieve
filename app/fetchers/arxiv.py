@@ -77,7 +77,7 @@ class ArXivFetcher(BaseFetcher):
                     if article:
                         articles.append(article)
             except Exception as e:
-                reraise_fetch_error(e)
+                reraise_fetch_error(e, articles)
                 logger.exception("arXiv fetch_details error: %s", e)
 
         return articles

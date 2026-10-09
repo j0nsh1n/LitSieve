@@ -1,6 +1,7 @@
 """Building the corpus: fetch, embeddings, clustering, duplicates, screening."""
 
 import logging
+import time
 from typing import Optional
 
 from fastapi import APIRouter, Request
@@ -60,7 +61,15 @@ async def api_progress(request: Request):
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
     with core._progress_lock:
         p = _ensure_progress(user["user_id"])
-        return {k: dict(v) for k, v in p.items()}
+        snapshot = {k: dict(v) for k, v in p.items()}
+        sources = {}
+        for src, row in p['fetch'].get('source_progress', {}).items():
+            item = dict(row)
+            if item['state'] == 'running' and item.get('started_at') is not None:
+                item['elapsed_seconds'] = max(0, time.time() - item['started_at'])
+            sources[src] = item
+        snapshot['fetch']['source_progress'] = sources
+        return snapshot
 
 
 def _run_multi_fetch(p, *, query, sources, max_results, email, clear_first, uid):
@@ -72,6 +81,11 @@ def _run_multi_fetch(p, *, query, sources, max_results, email, clear_first, uid)
         uid, 'fetch', done=0, total=len(sources),
         articles_so_far=0, message='Starting fetch…', cancel=False,
         sources=list(sources), by_source={}, source_status={},
+        source_progress={
+            src: {'state': 'queued', 'started_at': None, 'finished_at': None,
+                  'elapsed_seconds': 0, 'error_kind': None}
+            for src in sources
+        },
     )
     reclaimable = 0
     if clear_first:
@@ -83,20 +97,24 @@ def _run_multi_fetch(p, *, query, sources, max_results, email, clear_first, uid)
         src = extra.get('source') or ''
         sc = extra.get('source_count', 0)
         kind = extra.get('error_kind')
+        state = extra.get('source_state', 'done')
         if src:
-            live_by_source[src] = int(sc or 0)
-            # None / no_results / ok — never invent; client mutes failures.
-            live_status[src] = kind or 'ok'
+            if state == 'done':
+                live_by_source[src] = int(sc or 0)
+            live_status[src] = (kind or 'ok') if state == 'done' else state
         if kind and kind not in (None, 'no_results'):
             msg = f"{done}/{total} sources · {arts} papers · {src}: {kind}"
-        else:
+        elif state == 'done':
             msg = f"{done}/{total} sources · {arts} papers · last: {src} (+{sc})"
+        else:
+            msg = f"{done}/{total} sources · {arts} papers · searching {src}"
         update_progress(
             uid, 'fetch', done=done, total=total,
             articles_so_far=arts, message=msg,
             sources=list(sources),
             by_source=dict(live_by_source),
             source_status=dict(live_status),
+            source_progress=extra.get('source_progress', {}),
         )
 
     actually_cleared = False

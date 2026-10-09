@@ -60,7 +60,7 @@ class NASAADSFetcher(BaseFetcher):
                     break
                 start += len(docs)
             except Exception as e:
-                reraise_fetch_error(e)
+                reraise_fetch_error(e, articles)
                 logger.exception("NASA ADS fetch error: %s", e)
                 break
 

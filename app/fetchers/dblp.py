@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional
 
-from app.fetchers.base import BaseFetcher, FetchError, HttpClient
+from app.fetchers.base import BaseFetcher, FetchError, HttpClient, reraise_fetch_error
 
 
 class DBLPFetcher(BaseFetcher):
@@ -42,8 +42,8 @@ class DBLPFetcher(BaseFetcher):
                     },
                 )
                 data = r.json()
-            except FetchError:
-                raise
+            except FetchError as e:
+                reraise_fetch_error(e, articles)
             except Exception as e:
                 raise FetchError(f"DBLP request failed: {e}", kind="network") from e
 

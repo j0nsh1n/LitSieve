@@ -8,7 +8,7 @@ Free API, no authentication required
 import logging
 from typing import Dict, List
 
-from app.fetchers.base import BaseFetcher, FetchError, HttpClient
+from app.fetchers.base import BaseFetcher, FetchError, HttpClient, reraise_fetch_error
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ class ERICFetcher(BaseFetcher):
                 start += len(docs)
             except FetchError as e:
                 logger.exception("ERIC fetch error: %s", e)
-                raise
+                reraise_fetch_error(e, articles)
             except Exception as e:
                 logger.exception("ERIC fetch error: %s", e)
                 break

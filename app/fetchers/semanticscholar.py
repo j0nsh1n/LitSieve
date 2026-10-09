@@ -7,7 +7,7 @@ Free API, no key required for basic use (rate limited)
 import logging
 from typing import Dict, List
 
-from app.fetchers.base import BaseFetcher, FetchError, HttpClient
+from app.fetchers.base import BaseFetcher, FetchError, HttpClient, reraise_fetch_error
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +69,7 @@ class SemanticScholarFetcher(BaseFetcher):
                         articles.append(article)
             except FetchError as e:
                 logger.exception("Semantic Scholar fetch error: %s", e)
-                raise
+                reraise_fetch_error(e, articles)
             except Exception as e:
                 logger.exception("Semantic Scholar fetch error: %s", e)
 

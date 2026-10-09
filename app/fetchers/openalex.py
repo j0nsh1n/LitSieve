@@ -96,7 +96,7 @@ class OpenAlexFetcher(BaseFetcher):
                 page += 1
 
             except Exception as e:
-                reraise_fetch_error(e)
+                reraise_fetch_error(e, articles)
                 logger.exception("Error fetching from OpenAlex: %s", e)
                 break
 
@@ -125,7 +125,7 @@ class OpenAlexFetcher(BaseFetcher):
                     if parsed:
                         articles.append(parsed)
             except Exception as e:
-                reraise_fetch_error(e)
+                reraise_fetch_error(e, articles)
                 logger.exception("Error fetching batch: %s", e)
 
         logger.info("Successfully fetched %s works", len(articles))

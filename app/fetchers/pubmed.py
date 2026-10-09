@@ -84,7 +84,7 @@ class PubMedFetcher(BaseFetcher):
                 polite_sleep(0.5)
 
             except Exception as e:
-                reraise_fetch_error(e)
+                reraise_fetch_error(e, articles)
                 logger.exception("Error fetching batch: %s", e)
                 continue
 

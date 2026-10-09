@@ -60,7 +60,7 @@ class CrossRefFetcher(BaseFetcher):
                     break
                 offset += n
             except Exception as e:
-                reraise_fetch_error(e)
+                reraise_fetch_error(e, articles)
                 logger.exception("CrossRef fetch error: %s", e)
                 break
 

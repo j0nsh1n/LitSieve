@@ -934,18 +934,32 @@ function renderFetchLiveSources(p) {
  const sources = Array.isArray(p && p.sources) ? p.sources : [];
  const by = (p && p.by_source) || {};
  const status = (p && p.source_status) || {};
+ const progress = (p && p.source_progress) || {};
  if (!sources.length) {
   hosts.forEach((host) => { host.innerHTML = ''; });
   return;
  }
  const rows = sources.map((src) => {
   const name = typeof getSourceName === 'function' ? getSourceName(src) : src;
-  const done = Object.prototype.hasOwnProperty.call(by, src);
+  const done = (progress[src] && progress[src].state === 'done')
+   || Object.prototype.hasOwnProperty.call(by, src);
   const count = done ? Number(by[src]) || 0 : null;
   const kind = status[src] || '';
+  const source = progress[src] || {};
+  const errorKind = source.error_kind || '';
   let detail;
   let rowClass = 'fetch-live-row';
-  if (!done) {
+  if (source.state === 'queued') {
+   detail = 'queued';
+   rowClass += ' is-pending';
+  } else if (source.state === 'running') {
+   const elapsed = Math.max(0, Math.floor(Number(source.elapsed_seconds) || 0));
+   detail = `waiting on ${src} (${elapsed}s)`;
+   rowClass += ' is-pending';
+  } else if (errorKind === 'timeout' || kind === 'timeout') {
+   detail = count > 0 ? `timed out (${count} papers)` : 'timed out';
+   rowClass += ' is-failed';
+  } else if (!done) {
    detail = 'searching…';
    rowClass += ' is-pending';
   } else if (kind && kind !== 'ok' && kind !== 'no_results') {
@@ -1136,19 +1150,33 @@ function buildFetchSourceReportModel(data, sources) {
  const counts = (data && data.by_source) || {};
  const errors = (data && data.errors) || {};
  const kinds = (data && data.error_kinds) || {};
+ const sourceProgress = (data && data.source_progress) || {};
  const used = new Set(sources || []);
  Object.keys(counts).forEach((s) => used.add(s));
  Object.keys(errors).forEach((s) => used.add(s));
  Object.keys(kinds).forEach((s) => used.add(s));
+ Object.keys(sourceProgress).forEach((s) => used.add(s));
 
  const successes = [];
+ const timeouts = [];
  const muted = []; // no results / soft failures (not alarming)
 
  used.forEach((src) => {
   const name = typeof getSourceName === 'function' ? getSourceName(src) : src;
   const count = Number(counts[src]) || 0;
   const err = errors[src];
-  const kind = kinds[src] || '';
+  const source = sourceProgress[src] || {};
+  const kind = source.error_kind || kinds[src] || '';
+  if (kind === 'timeout') {
+   const partial = count > 0 ? ` (${count} papers)` : '';
+   timeouts.push({
+    src,
+    name,
+    count,
+    line: `◷ ${name}: timed out${partial}`,
+   });
+   return;
+  }
   if (err) {
    const kindBit = kind ? ` [${kind}]` : '';
    muted.push({
@@ -1177,6 +1205,7 @@ function buildFetchSourceReportModel(data, sources) {
  });
 
  successes.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+ timeouts.sort((a, b) => a.name.localeCompare(b.name));
  muted.sort((a, b) => a.name.localeCompare(b.name));
 
  // Classroom notes for tricky sources (preprints / DBLP abstracts).
@@ -1195,7 +1224,7 @@ function buildFetchSourceReportModel(data, sources) {
   tipLines.push('Note: arXiv items are preprints and may not be peer-reviewed yet.');
  }
 
- return { successes, muted, tipLines };
+ return { successes, timeouts, muted, tipLines };
 }
 
 /**
@@ -1207,6 +1236,7 @@ function buildFetchSourceReportModel(data, sources) {
 function renderFetchSourceReportHtml(model, opts) {
  const simple = !!(opts && opts.simple);
  const successes = (model && model.successes) || [];
+ const timeouts = (model && model.timeouts) || [];
  const muted = (model && model.muted) || [];
  const tipLines = (model && model.tipLines) || [];
  const topN = 5;
@@ -1228,12 +1258,16 @@ function renderFetchSourceReportHtml(model, opts) {
    otherMuted === 1 ? '1 with an error' : `${otherMuted} with errors`
   );
  }
+ if (timeouts.length) {
+  summaryBits.push(timeouts.length === 1 ? '1 timed out' : `${timeouts.length} timed out`);
+ }
  const summaryLine = summaryBits.length
   ? `<div class="fetch-source-report-summary-line">${escapeHtml('and ' + summaryBits.join(' · '))}</div>`
   : '';
 
  const fullLines = [
   ...successes.map((s) => s.line),
+  ...timeouts.map((s) => s.line),
   ...muted.map((m) => m.line),
  ];
  const fullHtml = fullLines.map((ln) => escapeHtml(ln)).join('<br>');
@@ -1272,6 +1306,7 @@ function applyFetchResult(data, sources) {
  const simple = typeof isSimpleMode === 'function' && isSimpleMode();
  const reportLines = [
   ...((model && model.successes) || []).map((s) => s.line),
+  ...((model && model.timeouts) || []).map((s) => s.line),
   ...((model && model.muted) || []).map((m) => m.line),
   ...((model && model.tipLines) || []),
  ].filter(Boolean);
@@ -1283,7 +1318,8 @@ function applyFetchResult(data, sources) {
   report.innerHTML = renderFetchSourceReportHtml(model, { simple });
  }
 
- const errorCount = Object.keys(data.errors || {}).length;
+ const timeoutCount = (model.timeouts || []).length;
+ const errorCount = (model.muted || []).filter((source) => !source.zero).length;
  const breakdown = Object.entries(data.by_source || {})
  .map(([src, count]) => `${getSourceName(src)}: ${count}`)
  .join(' · ');
@@ -1315,15 +1351,20 @@ function applyFetchResult(data, sources) {
    : `Fetch cancelled (${data.total_fetched || 0} papers kept).`,
   'warning'
  );
- } else if (errorCount === 0) {
+ } else if (errorCount === 0 && timeoutCount === 0) {
  setStatus('fetch-status', `Fetched ${data.total_fetched} articles - ${breakdown}`, 'success');
  showNotification(`Fetched ${data.total_fetched} articles!`, 'success');
- } else if (errorCount < sources.length) {
- setStatus('fetch-status', `Fetched ${data.total_fetched} articles with some source errors (see list).`, 'warning');
- showNotification(`Fetched ${data.total_fetched} articles with some errors.`, 'warning');
+ } else if (errorCount + timeoutCount < sources.length) {
+ const issues = [
+  timeoutCount ? `${timeoutCount} source${timeoutCount === 1 ? '' : 's'} timed out` : '',
+  errorCount ? `${errorCount} source${errorCount === 1 ? '' : 's'} had errors` : '',
+ ].filter(Boolean).join(' and ');
+ setStatus('fetch-status', `Fetched ${data.total_fetched} articles; ${issues} (see list).`, 'warning');
+ showNotification(`Fetched ${data.total_fetched} articles; ${issues}.`, 'warning');
  } else {
- setStatus('fetch-status', 'All fetches failed.', 'error');
- showNotification('Fetch failed for all selected sources.', 'error');
+ const allTimedOut = timeoutCount === sources.length;
+ setStatus('fetch-status', allTimedOut ? 'All sources timed out.' : 'All fetches failed.', 'error');
+ showNotification(allTimedOut ? 'All sources timed out.' : 'Fetch failed for all selected sources.', 'error');
  }
 }
 

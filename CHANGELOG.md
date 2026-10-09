@@ -9,6 +9,9 @@ and this project aims to follow Semantic Versioning for app version strings
 ## [Unreleased]
 
 ### Fixed
+- 2026-10-09: Fetch sources share a configurable 90-second budget across
+  pages, requests, and retry waits. Completed pages survive a timeout, and
+  progress identifies queued, running, completed, and timed-out sources.
 - 2026-10-09: Detached deploy completion is covered by database-reopen tests
   for successful deploys and automatic rollbacks, with a host verification checklist.
 - 2026-10-09: Operator rollback runs in a detached unit when available,

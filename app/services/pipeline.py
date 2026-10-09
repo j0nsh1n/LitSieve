@@ -5,6 +5,7 @@ Orchestrates the complete workflow from data fetching to visualization
 
 import logging
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Optional, Tuple
 
@@ -149,11 +150,19 @@ class LiteratureSearchPipeline:
         Fetch from multiple sources concurrently; insert each source as it completes.
 
         progress_callback: callable(done, total, **extra) — extra may include
-            articles_so_far, source, source_count, error_kind.
+            articles_so_far, source, source_count, error_kind, source_state,
+            source_progress (states and timing for every requested source).
         cancel_check: optional zero-arg callable returning True if the job
             should stop between sources.
         """
-        from app.fetchers.base import FetchError, classify_error, set_cancel_check
+        from app.fetchers.base import (
+            FetchError,
+            check_fetch_deadline,
+            classify_error,
+            set_cancel_check,
+            set_fetch_deadline,
+            source_fetch_budget,
+        )
 
         logger.info(f"\n=== Fetching from {len(sources)} sources in parallel ===")
         lock = threading.Lock()
@@ -161,28 +170,60 @@ class LiteratureSearchPipeline:
         articles_so_far = [0]
         total = len(sources)
         cancelled = [False]
+        budget = source_fetch_budget()
+        source_progress = {
+            src: {"state": "queued", "started_at": None, "finished_at": None,
+                  "elapsed_seconds": 0, "error_kind": None}
+            for src in sources
+        }
+        started = {}
+
+        def publish(source, state, *, count=0, error_kind=None):
+            with lock:
+                item = source_progress[source]
+                item["state"] = state
+                if state == "running":
+                    item["started_at"] = time.time()
+                    started[source] = time.monotonic()
+                else:
+                    item["finished_at"] = time.time()
+                    item["elapsed_seconds"] = max(0, time.monotonic() - started[source]) if source in started else 0
+                    item["error_kind"] = error_kind
+                    completed[0] += 1
+                    articles_so_far[0] += count
+                if progress_callback:
+                    progress_callback(
+                        completed[0], total,
+                        articles_so_far=articles_so_far[0], source=source,
+                        source_count=count, error_kind=error_kind, source_state=state,
+                        source_progress={src: dict(row) for src, row in source_progress.items()},
+                    )
 
         def fetch_one(source):
+            publish(source, "running")
             if cancel_check and cancel_check():
                 return (source, [], "Cancelled", "cancelled")
             fetcher_cls = FETCHERS.get(source)
             if not fetcher_cls:
                 return (source, [], "Unknown source", "error")
             set_cancel_check(cancel_check)
+            set_fetch_deadline(time.monotonic() + budget)
             try:
                 fetcher = fetcher_cls(email=email)
                 articles = fetcher.search_and_fetch(query, max_results) or []
+                check_fetch_deadline()
                 if not articles:
                     return (source, [], None, "no_results")
                 return (source, articles, None, None)
             except FetchError as e:
                 logger.error("Error fetching %s: %s", source, e)
-                return (source, [], str(e), e.kind)
+                return (source, e.articles, str(e), e.kind)
             except Exception as e:
                 logger.error("Error fetching %s: %s", source, e)
                 return (source, [], str(e), classify_error(e))
             finally:
                 set_cancel_check(None)
+                set_fetch_deadline(None)
 
         results = {}
         with ThreadPoolExecutor(max_workers=min(len(sources), 6)) as executor:
@@ -194,7 +235,10 @@ class LiteratureSearchPipeline:
                     for f in futures:
                         f.cancel()
 
-                source, articles, error, error_kind = future.result()
+                if future.cancelled():
+                    source, articles, error, error_kind = futures[future], [], "Cancelled", "cancelled"
+                else:
+                    source, articles, error, error_kind = future.result()
                 # Insert immediately so a hung source does not block others' data.
                 inserted = 0
                 skipped_dups = 0
@@ -231,22 +275,7 @@ class LiteratureSearchPipeline:
                     source, count, error_kind or "ok",
                 )
 
-                with lock:
-                    completed[0] += 1
-                    articles_so_far[0] += count
-                    done = completed[0]
-                    total_arts = articles_so_far[0]
-                if progress_callback:
-                    progress_callback(
-                        done, total,
-                        articles_so_far=total_arts,
-                        source=source,
-                        source_count=count,
-                        error_kind=error_kind,
-                    )
-
-                if cancelled[0]:
-                    break
+                publish(source, "done", count=count, error_kind=error_kind)
 
         # Ensure every requested source appears in the report
         for src in sources:

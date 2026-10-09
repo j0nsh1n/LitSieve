@@ -2,6 +2,7 @@
 
 
 
+from app.fetchers.base import FetchError
 from app.fetchers.biorxiv import BioRxivFetcher, MedRxivFetcher, _matches
 from app.fetchers.dblp import DBLPFetcher
 from app.fetchers.hal import HALFetcher
@@ -171,3 +172,52 @@ def test_openaire_node_text_and_parse(monkeypatch):
     assert arts[0]["source"] == "openaire"
     assert arts[0]["article_id"] == "10.1234/example"
     assert "climate education" in arts[0]["title"].lower()
+
+
+def test_openaire_timeout_preserves_completed_page(monkeypatch):
+    f = OpenAIREFetcher()
+    page = {
+        "response": {
+            "results": {
+                "result": [
+                    {
+                        "header": {"dri:objIdentifier": {"$": f"obj{i}"}},
+                        "metadata": {
+                            "oaf:entity": {
+                                "oaf:result": {
+                                    "title": [{"$": f"Climate study {i}"}],
+                                    "description": {"$": "A complete abstract."},
+                                }
+                            }
+                        },
+                    }
+                    for i in range(25)
+                ]
+            }
+        }
+    }
+    requests = 0
+
+    class FakeResp:
+        def json(self):
+            return page
+
+    def get(*args, **kwargs):
+        nonlocal requests
+        requests += 1
+        if requests == 1:
+            return FakeResp()
+        raise FetchError("OpenAIRE request timed out", kind="timeout")
+
+    monkeypatch.setattr(f.http, "get", get)
+
+    try:
+        f.search_and_fetch("climate", max_results=26)
+    except FetchError as exc:
+        assert exc.kind == "timeout"
+        assert len(exc.articles) == 25
+        assert [article["article_id"] for article in exc.articles] == [
+            f"obj{i}" for i in range(25)
+        ]
+    else:
+        raise AssertionError("OpenAIRE timeout should propagate")

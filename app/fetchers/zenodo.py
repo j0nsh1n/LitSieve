@@ -8,7 +8,7 @@ import logging
 import re
 from typing import Dict, List
 
-from app.fetchers.base import BaseFetcher, FetchError, HttpClient
+from app.fetchers.base import BaseFetcher, FetchError, HttpClient, reraise_fetch_error
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +55,7 @@ class ZenodoFetcher(BaseFetcher):
                 page += 1
             except FetchError as e:
                 logger.exception("Zenodo fetch error: %s", e)
-                raise
+                reraise_fetch_error(e, articles)
             except Exception as e:
                 logger.exception("Zenodo fetch error: %s", e)
                 break
