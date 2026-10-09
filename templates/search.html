@@ -22,17 +22,6 @@
 </section>
 
 <div class="search-query-top search-work" id="search-query-top" hidden>
- <div class="input-method-toggle" id="input-method-toggle">
-  <label class="radio-label">
-   <input type="radio" name="input_method" value="text" checked> Text Input
-  </label>
-  <label class="radio-label">
-   <input type="radio" name="input_method" value="pico"> PICO Format
-  </label>
-  <label class="radio-label">
-   <input type="radio" name="input_method" value="seed"> Seed paper
-  </label>
- </div>
  <div class="searchcard" id="searchcard">
   <div id="text-input-panel">
    <label class="u-visually-hidden" for="query-text">Research question</label>
@@ -44,23 +33,35 @@
    <svg class="search-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.6-4.6"/></svg>
   </button>
  </div>
+ <fieldset class="input-method-toggle" id="input-method-toggle" aria-label="Search by">
+  <legend class="u-visually-hidden">Search by</legend>
+  <label class="radio-label">
+   <input type="radio" name="input_method" value="text" checked> Question
+  </label>
+  <label class="radio-label">
+   <input type="radio" name="input_method" value="pico"> PICO
+  </label>
+  <label class="radio-label">
+   <input type="radio" name="input_method" value="seed"> Start from a paper
+  </label>
+ </fieldset>
  <div class="u-hidden" id="pico-input-panel">
   <p class="info-text">Fill in the parts you know.</p>
   <div class="pico-grid">
    <div class="form-group">
-    <label>Population</label>
+    <label for="pico-population">Population</label>
     <input type="text" id="pico-population" placeholder="e.g., Adults with type 2 diabetes">
    </div>
    <div class="form-group">
-    <label>Intervention</label>
+    <label for="pico-intervention">Intervention</label>
     <input type="text" id="pico-intervention" placeholder="e.g., Metformin treatment">
    </div>
    <div class="form-group">
-    <label>Comparison</label>
+    <label for="pico-comparison">Comparison</label>
     <input type="text" id="pico-comparison" placeholder="e.g., Placebo or standard care">
    </div>
    <div class="form-group">
-    <label>Outcome</label>
+    <label for="pico-outcome">Outcome</label>
     <input type="text" id="pico-outcome" placeholder="e.g., Glycemic control">
    </div>
   </div>
@@ -70,7 +71,7 @@
    of a title from a paper already in your collection - the app ranks the rest by similarity to it.
    Useful when a teacher gives you one starter citation.</p>
   <div class="form-group">
-   <label>Seed id or title fragment</label>
+   <label for="seed-query">Seed id or title fragment</label>
    <input type="text" id="seed-query" placeholder="e.g. 10.1038/... or climate warming oceans">
   </div>
  </div>
@@ -367,5 +368,5 @@
 <script src="/static/js/simple_tools.js?v=20261009c"></script>
 <script src="/static/js/data_management.js?v=20261009b"></script>
 <script src="/static/js/reader.js?v=20260829a"></script>
-<script src="/static/js/search.js?v=20261009c"></script>
+<script src="/static/js/search.js?v=20261009d"></script>
 {% endblock %}

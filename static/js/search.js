@@ -16,6 +16,25 @@ const displayFilterState = searchState.filters.display;
 let librarySourceCounts = {};
 let libraryStarredCount = 0;
 let lastSuccessfulSession = null;
+
+function applySearchInputMethod(mode) {
+ const active = ['text', 'pico', 'seed'].includes(mode) ? mode : 'text';
+ const textPanel = document.getElementById('text-input-panel');
+ const picoPanel = document.getElementById('pico-input-panel');
+ const seedPanel = document.getElementById('seed-input-panel');
+ const card = document.getElementById('searchcard');
+ [
+  [textPanel, active === 'text', 'flex'],
+  [picoPanel, active === 'pico', 'block'],
+  [seedPanel, active === 'seed', 'block'],
+ ].forEach(([panel, visible, display]) => {
+  if (!panel) return;
+  panel.classList.toggle('u-hidden', !visible);
+  panel.style.display = visible ? display : 'none';
+ });
+ if (card) card.classList.toggle('is-alt-method', active !== 'text');
+}
+
 function displayRecentYear() {
  return new Date().getFullYear() - 5;
 }
@@ -66,14 +85,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
  document.querySelectorAll('input[name="input_method"]').forEach(radio => {
  radio.addEventListener('change', () => {
- const v = radio.value;
- document.getElementById('text-input-panel').style.display = v === 'text' ? 'block' : 'none';
- document.getElementById('pico-input-panel').style.display = v === 'pico' ? 'block' : 'none';
- document.getElementById('seed-input-panel').style.display = v === 'seed' ? 'block' : 'none';
- const card = document.getElementById('searchcard');
- if (card) card.classList.toggle('is-alt-method', v !== 'text');
+ if (radio.checked) applySearchInputMethod(radio.value);
  });
  });
+ const initialMethod = document.querySelector('input[name="input_method"]:checked');
+ applySearchInputMethod(initialMethod ? initialMethod.value : 'text');
 
  const topkSlider = document.getElementById('top-k');
  const topkDisplay = document.getElementById('topk-display');
@@ -138,7 +154,7 @@ async function resolveLibraryId() {
  }
 }
 
-function captureSearchSession(kind) {
+function captureSearchSession(kind, opts = {}) {
  // kind: 'text' | 'pico' | 'seed' | 'starred'
  const mode = (kind === 'starred' || kind === 'seed')
   ? kind
@@ -148,6 +164,7 @@ function captureSearchSession(kind) {
   v: 1,
   library_id: activeLibraryId(),
   mode,
+  include_seed: mode === 'seed' && opts.include_seed === true,
   query_text: (document.getElementById('query-text') || {}).value || '',
   pico_population: (document.getElementById('pico-population') || {}).value || '',
   pico_intervention: (document.getElementById('pico-intervention') || {}).value || '',
@@ -205,9 +222,7 @@ function applySearchSessionToForm(state) {
  _restoringSearch = true;
  try {
   if (state.mode === 'text' || state.mode === 'pico' || state.mode === 'seed') {
-   const keepSimpleQuery = state.mode === 'seed'
-    && typeof isSimpleMode === 'function' && isSimpleMode();
-   if (!keepSimpleQuery) setInputMethod(state.mode);
+   setInputMethod(state.mode);
   }
   const qt = document.getElementById('query-text');
   if (qt && state.query_text != null) qt.value = state.query_text;
@@ -322,7 +337,10 @@ async function restoreSearchSession() {
   await doStarredSearch({ fromRestore: true });
   return;
  }
- if (state.mode === 'seed' && typeof isSimpleMode === 'function' && isSimpleMode()) {
+ const legacySimpleSeedReplay = state.mode === 'seed'
+  && state.include_seed == null
+  && typeof isSimpleMode === 'function' && isSimpleMode();
+ if (state.mode === 'seed' && (state.include_seed === true || legacySimpleSeedReplay)) {
   const seedId = (state.seed_query || '').trim();
   if (!seedId) return;
   await doMoreLikeThisPaper({ article_id: seedId }, { fromRestore: true });
@@ -1110,7 +1128,7 @@ async function doMoreLikeThisPaper(article, opts) {
  mode: 'seed',
  include_seed: true,
  };
- const session = opts?.replay ? lastSuccessfulSession : captureSearchSession('seed');
+ const session = opts?.replay ? lastSuccessfulSession : captureSearchSession('seed', { include_seed: true });
  lastQueryTokens = tokensFromQuery(`${article.title || ''} ${article.abstract || ''}`);
  try {
  const data = await apiCall('/api/search/seed', {

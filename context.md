@@ -137,38 +137,35 @@ Guest User (is_guest) → sample corpus only; purged by age
 
 ## Session Handoff
 - **Date:** 2026-10-09. **Branch:** `fix/ops-rollback-and-fetch-deadline`.
-- Original ops/fetch fixes: `5887f2c` detached rollback, `369882e` reopened
-  deploy-history tests and host checklist, `3f97f40` whole-source deadlines,
-  partial-page retention, and per-source progress. Nothing pushed or deployed.
-- Remaining-roadmap work is now authorized: security/reliability first, then
-  Phase 13. Jonathan chose to drop the reverted split-pane design and approved
-  GPT-6-Luna through Codex for bounded implementation and test runs.
-- Security/reliability batch: raised vulnerable dependency floors; upgraded
-  only a temporary environment; audit reports no known vulnerabilities.
-  All three AI prompts treat source text as data, and Reader cache is v2.
-  Startup warns for ignored global AI settings without reading its contents.
-  Look-list drift is tested, one-paper timeout wording is fixed, and app type
-  errors are cleared so CI now blocks on Pyright. The old split-pane CSS was
-  already fully removed by its revert; no cleanup was needed.
-- Verification: full suite **910 passed, 13 xfailed**; required ops/fetch
-  suite **67 passed**; lint passed; Pyright **0 errors, 1 warning** for the
-  optional Anthropic package. Actual browser timeout report at 375px says
-  "timed out (1 paper)" and has no horizontal overflow, with synthetic sources
-  and isolated temporary data. Artifacts: `/tmp/litsieve-roadmap-ovp9uE/`.
-- Slice 2 (`af2cdc7`) and the uncommitted Slice 3 work have been replayed
-  into this branch, preserving newer fetch asset versions. Source worktrees
-  are untouched. Integration tests: **931 passed, 8 xfailed**, required
-  suite **67 passed**, lint passed, types **0 errors, 1 warning**.
-  Real browser routes with fixture embeddings covered sort/persistence,
-  sources, starred ranking, reasons, and Undo. All five looks light/dark fit
-  at 375px; selected-chip text contrast is at least **5.04:1**. Keyboard
-  focus remains visible on a selected modal chip. Desktop also fits.
-- Next: continue Phase 13 slices 4–10; Slice 4 is the Search by switch.
-- Unverified: real systemd dispatch/restart, live completion, external APIs,
-  live account cap and host AI configuration. The default live deploy-history
-  table had no rows. No live services may be restarted in this task.
-- Limits: Entrez blocking calls and slow-trickling HTTP responses cooperate
-  only when control returns; deploy check/dispatch has no atomic reservation.
-  spec.md still describes transitional Pyright/two modes; do not edit it
-  without explicit approval. No push, PR, merge, branch deletion, or host
-  configuration change occurred.
+- Local commits: `5887f2c` detached rollback; `369882e` deploy-history
+  persistence tests and host checklist; `3f97f40` whole-source deadlines
+  and partial pages; `053b2a4` security/reliability backlog; `5090a61`
+  Simple Search slices 2/3 integration. Nothing pushed or deployed.
+- Slice 4 adds Search by (Question / PICO / Start from a paper), accessible
+  field labels, and correct manual-seed versus More like this restoration.
+  Main review covered actual panel switching in the browser. A deliberate
+  visibility regression failed the new behavioral test in an isolated copy.
+- Latest working-tree verification, including uncommitted Slice 6:
+  **935 passed, 7 xfailed**; required ops/fetch **67 passed**; lint passed;
+  Pyright **0 errors, 1 optional Anthropic warning**. Shared stylesheet
+  versions agree across public and authenticated templates.
+- Slice 6 is implemented and awaiting its separate review/commit: database
+  choices inside the fetch popup, conditional remembered contact email,
+  confirmed choices used by the fetch request, and cancellation without
+  preference mutations. Next ordered work is Slice 5 whole-library export.
+- Jonathan approved 301 redirects to Search, version 6.0.0, the concrete
+  proposed one-flow spec rewrite at removal, and a real-library copy for
+  the isolated theme prototype. Luna through Codex remains approved for
+  bounded work with main review. The split-pane design was dropped.
+- Browser evidence for slices 2/3 covers real routes with fixture embeddings,
+  all five looks light/dark at 375px, selected-chip contrast at least 5.04:1,
+  keyboard focus, and desktop layout. Slice 4 browser progress was interrupted
+  by “No preview automation host is available”; fallback browser inventory
+  is empty. Its remaining visual checks are incomplete.
+- Unverified host items: actual detached deploy/rollback completion, live
+  account cap and AI configuration. Default live deploy history had no rows.
+  External APIs and real semantic-model quality were not exercised. Temporary
+  dependency audit is clean; production dependencies were not changed.
+- Artifacts: `/tmp/litsieve-roadmap-ovp9uE/`; approved spec draft:
+  `.handoff/roadmap/spec-proposed.md`. spec.md still describes two modes
+  and transitional Pyright until the approved removal rewrite is applied.

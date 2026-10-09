@@ -92,9 +92,11 @@ def test_ranking_options_in_search_options_popup():
 
 # Slice 4 -------------------------------------------------------------------
 
-@later
 def test_search_by_switch_question_pico_paper():
-    assert 'id="simple-search-by"' in _search_templates()
+    html = _search_templates()
+    assert 'id="input-method-toggle"' in html
+    assert 'aria-label="Search by"' in html
+    assert 'value="seed"> Start from a paper' in html
 
 
 # Slice 5 -------------------------------------------------------------------

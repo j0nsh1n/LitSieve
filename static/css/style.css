@@ -4136,7 +4136,10 @@ body.lra-modal-open {
     margin: var(--space-3) 0 0;
 }
 .search-query-top .input-method-toggle {
-    margin-bottom: var(--space-3);
+    border: 0;
+    min-width: 0;
+    padding: 0;
+    margin: var(--space-3) 0;
 }
 .search-query-top #pico-input-panel,
 .search-query-top #seed-input-panel {
@@ -4145,11 +4148,6 @@ body.lra-modal-open {
     background: var(--surface);
     border: 1px solid var(--rule);
     border-radius: var(--radius-md);
-}
-html[data-mode="simple"] .search-query-top .input-method-toggle,
-html[data-mode="simple"] .search-query-top #pico-input-panel,
-html[data-mode="simple"] .search-query-top #seed-input-panel {
-    display: none !important;
 }
 html[data-mode="simple"] body.simple-collecting #search-query-top {
     display: none !important;
@@ -6621,8 +6619,6 @@ body[data-guest="1"] .guest-fetch-note {
 /* Search */
 html[data-mode="simple"] details.advanced-details:has(#lexical-boost),
 html[data-mode="simple"] details.advanced-details:has(#lib-export-scope),
-html[data-mode="simple"] .input-method-toggle label:has(input[value="seed"]),
-html[data-mode="simple"] #seed-input-panel,
 html[data-mode="simple"] .sim-badge {
     display: none !important;
 }

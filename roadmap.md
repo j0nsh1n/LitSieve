@@ -109,7 +109,7 @@ popup, `static/js/search.js`).
     is half a day to a day and a half. Search state gains one `filters`
     shape that the chips draw from. PMID/DOI and study type move inside
     the abstract disclosure with the result chips.
-    Slice 3 is complete locally (2026-10-09); Slice 4 is next.
+    Slices 3 and 4 are complete locally (2026-10-09); Slice 5 is next.
   - Slice 9: Group by theme (2 to 3 days). Last fold before removal.
     First a throwaway prototype on a real library with screenshots, to
     settle layout and labels before the real build. Clustering runs
@@ -160,7 +160,8 @@ popup, `static/js/search.js`).
   `app/`, `static/`, `templates/`, or `tests/` except the helpdesk
   history column; spec.md describes one flow
 - Status: [ ] in progress. Slices 0 and 1 shipped; Slices 2 and 3 are
-  integrated and tested locally. Slice 4 (Search by) is next. No new work
+  integrated and tested locally, along with Slice 4 (Search by). Slice 5
+  (whole-library export) is next. No new work
   has been pushed, merged, or deployed.
 
 ## Backlog (unscheduled)

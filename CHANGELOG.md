@@ -27,6 +27,9 @@ and this project aims to follow Semantic Versioning for app version strings
   carries the operator identity, and polls for completion across the site restart.
 
 ### Added
+- 2026-10-09: Search by switches between a question, PICO fields, and a
+  paper already in the collection. Saved manual seed searches and More like
+  this searches restore their own behavior.
 - 2026-10-09: Simple Search gains reason chips in Set aside and the Not
   relevant Undo strip, source and sort chips, starred-paper ranking, and
   exact-word/PICO ranking options. Paper identifiers and study type appear
