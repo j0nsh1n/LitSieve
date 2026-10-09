@@ -38,7 +38,7 @@ def _search_js() -> str:
     return (
         _read("static", "js", "search.js")
         + _read("static", "js", "simple_tools.js")
-        + _read("static", "js", "data_management.js")
+        + _read("static", "js", "collect.js")
     )
 
 

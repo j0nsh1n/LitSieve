@@ -9,7 +9,7 @@
    Type: Source Serif 4 headings, Source Sans 3 body/UI (self-hosted WOFF2).
    Signature: clay fill, 8/14/18 radii, solid tiles on a tool edge.
    Chrome: solid fill + tool edge, not ink outlines. Compact
-   controls are pills. Layout unchanged: hero, Simple/Advanced, eight guides.
+   controls are pills. Layout unchanged: hero, single flow, eight guides.
    ============================================================ */
 
 @font-face {
@@ -221,7 +221,7 @@
     --wait-pct: 0%;
 }
 
-/* Looks: palette skins on the same Simple Search shell. Workshop is :root.
+/* Looks: palette skins on the same Search shell. Workshop is :root.
    Night is dark-first; the others follow the sun/moon toggle and system dark. */
 html[data-look="broadsheet"] {
     --bg: #f7f3ea;
@@ -919,10 +919,6 @@ body {
     #nav-links-panel::-webkit-scrollbar {
         display: none;
     }
-    /* Phase 10 broadsheet: segmented steps, no flow arrows at desktop. */
-    .nav-flow-arrow {
-        display: none !important;
-    }
     .nav-link {
         width: auto;
         border-bottom: none;
@@ -950,48 +946,12 @@ body {
         box-shadow: var(--sheen);
     }
     .navbar .nav-link.active,
-    .nav-link.active:hover,
-    .nav-link.active .nav-step-label,
-    .nav-link.active .nav-label-simple,
-    .nav-link.active .nav-label-advanced {
+    .nav-link.active:hover {
         color: var(--text);
-    }
-    .nav-link.active .nav-step-num {
-        background: var(--accent);
-        border-color: var(--accent);
-        color: var(--on-accent);
     }
     .nav-link.active:hover {
         background: color-mix(in srgb, var(--accent) 28%, transparent);
     }
-}
-
-/*
- * Connectors between workflow steps. Sized to the step badge so they
- * sit on the same midline as the numbered circles (not the full link
- * box, which includes underline gutter).
- */
-.nav-flow-arrow {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    align-self: center;
-    box-sizing: border-box;
-    width: 1.15rem;
-    height: 1.15rem; /* match .nav-step-num */
-    margin: 0 0;
-    padding: 0;
-    color: var(--text);
-    font-size: var(--fs-sm);
-    font-weight: 500;
-    line-height: 1;
-    opacity: 0.62;
-    user-select: none;
-    flex-shrink: 0;
-    pointer-events: none;
-    /* Optical: balance against link bottom border + underline space */
-    position: relative;
-    top: -1px;
 }
 
 .nav-link {
@@ -1015,28 +975,6 @@ body {
     flex-shrink: 0;
 }
 
-.nav-step-num {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 1.15rem;
-    height: 1.15rem;
-    border-radius: var(--radius-full);
-    border: 1px solid var(--rule);
-    font-size: var(--fs-xs);
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    line-height: 1;
-    color: var(--text-soft);
-    transition: background var(--dur-fast) var(--ease-soft),
-                border-color var(--dur-fast) var(--ease-soft),
-                color var(--dur-fast) var(--ease-soft);
-}
-
-.nav-step-label {
-    line-height: 1.2;
-}
-
 .nav-link::after {
     content: "";
     position: absolute;
@@ -1052,24 +990,13 @@ body {
 
 .nav-link:hover { color: var(--text); }
 .nav-link:hover::after { transform: scaleX(0.45); }
-.nav-link:hover .nav-step-num {
-    border-color: color-mix(in srgb, var(--text) 35%, var(--rule));
-    color: var(--text);
-}
-
 .nav-link.active {
     color: var(--text);
     border-bottom-color: transparent;
     font-weight: 600;
 }
 .nav-link.active::after { transform: scaleX(1); }
-.nav-link.active .nav-step-num {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: var(--on-accent);
-}
-
-/* Menu button: hidden on wide screens (inline steps visible) */
+/* Menu button: hidden on wide screens (the Search link is inline). */
 .nav-menu-toggle {
     display: none;
     align-items: center;
@@ -1186,7 +1113,7 @@ body {
 
 .nav-logout:hover { color: var(--accent); }
 
-/* Quiet extra in the tools cluster: same pill as Simple/Library, but
+/* Quiet extra in the tools cluster: the same pill as the theme and library, but
    ink from --text-soft so it does not compete with Search or Logout. */
 .nav-ask-help {
     font-size: var(--fs-sm);
@@ -1238,8 +1165,7 @@ body {
     display: none !important;
 }
 
-.theme-toggle,
-.mode-toggle {
+.theme-toggle {
     background: transparent;
     border: none;
     color: var(--text);
@@ -1258,22 +1184,6 @@ body {
                 transform var(--dur-med) var(--ease-out),
                 box-shadow var(--dur-fast) var(--ease-soft);
 }
-
-.mode-toggle {
-    font-family: var(--font-sans, inherit);
-    font-weight: 500;
-    font-size: var(--fs-sm);
-    letter-spacing: 0;
-    border: 1px solid var(--rule);
-    border-radius: var(--radius-full);
-    background: var(--surface);
-    box-shadow: var(--sheen);
-    min-width: 4.5rem;
-    min-height: 2.15rem;
-    padding: var(--space-2) var(--space-3);
-    white-space: nowrap;
-}
-
 .theme-toggle svg {
     width: 1.15rem;
     height: 1.15rem;
@@ -1304,18 +1214,6 @@ html[data-theme="dark"] .theme-toggle .icon-moon { display: block; }
 .theme-toggle:active {
     transform: rotate(-18deg) scale(0.95);
 }
-
-.mode-toggle:hover {
-    color: var(--accent);
-    background: var(--hover);
-}
-
-.mode-toggle.is-active {
-    color: var(--accent);
-    border-color: var(--accent);
-    background: var(--accent-soft);
-}
-
 /* === Layout === */
 .container {
     max-width: 880px;
@@ -4170,7 +4068,7 @@ dialog.simple-theme-tools::backdrop { background: var(--scrim); }
     border: 1px solid var(--rule);
     border-radius: var(--radius-md);
 }
-html[data-mode="simple"] body.simple-collecting #search-query-top {
+body.simple-collecting #search-query-top {
     display: none !important;
 }
 /* Phase 10 broadsheet: one-line query + Search, shared height, no inner chrome */
@@ -4246,13 +4144,13 @@ html[data-mode="simple"] body.simple-collecting #search-query-top {
     border-radius: var(--radius-full);
 }
 
-/* === Progressive disclosure (help + advanced) ===
+/* === Progressive disclosure (help + optional controls) ===
    Cards keep one plain lead sentence; the full explanation lives in a
    collapsed .help-details. .advanced-details wraps optional controls whose
    defaults already suit most users.
 
    Summaries are intentionally small and quiet — optional expanders, not
-   primary actions. Same look in Simple and Advanced. */
+   primary actions. Same look in all screens. */
 .help-details,
 .advanced-details {
     margin: 0 0 var(--space-2);
@@ -5466,10 +5364,6 @@ html, body {
         margin: 0;
     }
 
-    .nav-flow-arrow {
-        display: none !important;
-    }
-
     .nav-link {
         display: flex !important;
         width: 100%;
@@ -5493,18 +5387,6 @@ html, body {
         background: var(--hover);
         color: var(--text);
     }
-    .nav-link.active .nav-step-num {
-        background: var(--text);
-        border-color: var(--text);
-        color: var(--bg);
-    }
-    .nav-step-label {
-        max-width: none !important;
-        overflow: visible;
-        text-overflow: unset;
-        white-space: normal;
-    }
-
     .container {
         padding: var(--space-5) var(--space-4);
     }
@@ -5606,8 +5488,7 @@ html, body {
         padding: 0 var(--space-2);
         flex-shrink: 0;
     }
-    .theme-toggle,
-    .mode-toggle {
+    .theme-toggle {
         min-width: 2.75rem;
         min-height: 2.75rem;
         display: inline-flex;
@@ -5616,13 +5497,7 @@ html, body {
         padding: var(--space-1);
         font-size: var(--fs-sm);
     }
-    .mode-toggle {
-        min-width: 0;
-        font-size: var(--fs-xs);
-        padding: var(--space-1) var(--space-2);
-        letter-spacing: 0;
-    }
-    .nav-link {
+.nav-link {
         font-size: var(--fs-xs);
         padding: var(--space-3) var(--space-2);
         min-height: 2.9rem;
@@ -6165,8 +6040,7 @@ html, body {
         font-size: var(--fs-xs);
     }
     #nav-article-count { display: none; }
-    .mode-toggle { font-size: var(--fs-xs); padding: var(--space-1) var(--space-1); }
-    .nav-logout { font-size: var(--fs-xs); }
+.nav-logout { font-size: var(--fs-xs); }
     .container {
         padding: var(--space-3) var(--space-2) var(--space-5);
     }
@@ -6307,124 +6181,14 @@ html.js-ready body.page-exit .footer {
 }
 
 /* ============================================================
-   Simple mode — hide power-user surfaces (presentation only).
-   Toggle: #mode-toggle (persisted as localStorage.uiMode).
-   Hidden controls stay in the DOM and still submit.
+   Single Search flow presentation.
    ============================================================ */
 
-/* Phase 6 Simple nav: Get papers → Search only (Clusters + Clean up stay
-   reachable by URL and remain in Advanced). */
-html[data-mode="simple"] .nav-step-clusters,
-html[data-mode="simple"] .nav-flow-arrow-before-clusters,
-html[data-mode="simple"] .nav-step-statistics,
-html[data-mode="simple"] .nav-flow-arrow-before-statistics {
-    display: none !important;
-}
-/* Simple: one unnumbered Search tab. Get papers / Clusters / Clean up stay
-   off the bar (collect is still /search?collect=1 via Start over). */
-html[data-mode="simple"] .nav-step-data_management,
-html[data-mode="simple"] .nav-step-clusters,
-html[data-mode="simple"] .nav-step-statistics,
-html[data-mode="simple"] .nav-flow-arrow,
-html[data-mode="simple"] .nav-step-search .nav-step-num {
-    display: none !important;
-}
-@media (min-width: 901px) {
-    html[data-mode="simple"] .nav-menu-toggle {
-        display: none !important;
-    }
-    html[data-mode="simple"] .nav-links,
-    html[data-mode="simple"] #nav-links-panel {
-        display: flex !important;
-    }
-    html[data-mode="simple"] .nav-links,
-    html[data-mode="simple"] #nav-links-panel,
-    html[data-mode="simple"] .navbar.nav-open .nav-links,
-    html[data-mode="simple"] body.nav-menu-open #nav-links-panel {
-        border: none;
-        background: transparent;
-        box-shadow: none;
-        padding: 0;
-    }
-    html[data-mode="simple"] .nav-step-search {
-        min-height: 2.15rem;
-        padding: var(--space-1) var(--space-3);
-        border-radius: var(--radius-full);
-    }
-    html[data-mode="simple"] .navbar .nav-step-search.active {
-        background: color-mix(in srgb, var(--accent) 18%, var(--surface));
-        border: 1px solid var(--rule);
-        box-shadow: var(--sheen);
-        color: var(--text);
-    }
-}
-/* Simple phones: same collapsed bar as Advanced (brand + menu). */
-@media (max-width: 900px) {
-    html[data-mode="simple"] .nav-menu-toggle {
-        display: inline-flex !important;
-    }
-    html[data-mode="simple"] .nav-links,
-    html[data-mode="simple"] #nav-links-panel {
-        display: flex;
-        flex-direction: column;
-        width: 100%;
-        margin: 0;
-        padding: 0;
-        border: none;
-    }
-    html[data-mode="simple"] .nav-step-search {
-        width: 100%;
-        min-height: 2.75rem;
-        justify-content: flex-start;
-        border-bottom: 1px solid var(--rule);
-        padding: var(--space-3) var(--space-2);
-    }
-    html[data-mode="simple"] .nav-library-label {
-        display: none;
-    }
-    html[data-mode="simple"] .nav-library-wrap {
-        flex: 1 1 100%;
-        max-width: none;
-        min-height: 2.75rem;
-        margin: 0;
-        padding: 0;
-        display: flex;
-        justify-content: flex-start;
-        border: none;
-        background: transparent;
-    }
-    html[data-mode="simple"] .nav-library-select {
-        width: auto;
-        max-width: min(18rem, 100%);
-        min-width: 8rem;
-        min-height: 2.75rem;
-        padding: 0 var(--space-2);
-        border: 1px solid var(--rule);
-        border-radius: var(--radius-md);
-    }
-}
-/* Dual nav labels: Advanced names by default; Simple swaps in. */
-.nav-label-simple {
-    display: none !important;
-}
-html[data-mode="simple"] .nav-label-advanced {
-    display: none !important;
-}
-html[data-mode="simple"] .nav-label-simple {
-    display: inline !important;
-}
-html[data-mode="simple"] .nav-menu-current.nav-label-simple {
-    display: inline !important;
-}
-
 /* Data Management */
-html[data-mode="simple"] section.card:has(#source-option-grid),
-html[data-mode="simple"] section.card:has(#coverage-bars),
-/* Simple: fetch replace/add radios live in a dialog; keep DOM for Advanced. */
-html[data-mode="simple"] .form-row:has(input[name="fetch-mode"]) {
+.form-row:has(input[name="fetch-mode"]) {
     display: none !important;
 }
-/* Dense fetch report (Simple default collapsed via <details>). */
+/* Fetch report stays collapsed until opened. */
 .fetch-source-report-details {
     margin-top: var(--space-2);
 }
@@ -6455,109 +6219,64 @@ html[data-mode="simple"] .form-row:has(input[name="fetch-mode"]) {
     font-size: var(--fs-sm);
     color: var(--text-soft);
 }
-html[data-mode="simple"] details.advanced-details:has(#fetch-email),
-html[data-mode="simple"] details.advanced-details:has(#embedding-model) {
-    display: none !important;
-}
-
-/* Dual-mode labels (DM, prepare, search).
-   Default = Advanced only. Simple variants stay display:none unless data-mode is
-   simple. That way a missing attribute, partial CSS load, or stale cache never
-   double-renders both headings (the glitch that stacked “2. Fetch” + “3. Fetch”). */
+/* Former Simple headings are the single Search flow copy. */
 .dm-step-simple,
 .dm-sub-simple,
-.dm-btn-simple,
 .prepare-heading-simple,
 .prepare-lead-simple,
-.search-sub-simple,
-.search-title-simple,
-.search-help-simple {
-    display: none !important;
-}
-html[data-mode="simple"] .dm-step-advanced,
-html[data-mode="simple"] .dm-btn-advanced,
-html[data-mode="simple"] .dm-sub-advanced,
-html[data-mode="simple"] .prepare-heading-advanced,
-html[data-mode="simple"] .prepare-lead-advanced,
-html[data-mode="simple"] .search-sub-advanced,
-html[data-mode="simple"] .search-title-advanced,
-html[data-mode="simple"] .search-kicker-advanced,
-html[data-mode="simple"] .search-help-advanced {
-    display: none !important;
-}
-html[data-mode="simple"] .dm-step-simple,
-html[data-mode="simple"] .dm-sub-simple,
-html[data-mode="simple"] .prepare-heading-simple,
-html[data-mode="simple"] .prepare-lead-simple,
-html[data-mode="simple"] .search-title-simple {
+.search-title-simple {
     display: block !important;
 }
-html[data-mode="simple"] .dm-btn-simple {
+.dm-btn-simple {
     display: inline !important;
 }
-html[data-mode="simple"] .search-kicker-simple {
+.search-kicker-simple {
     display: block !important;
 }
-html[data-mode="simple"] .search-sub-simple {
+.search-sub-simple {
     display: none !important;
 }
-/* <details> is not a block paragraph — restore native display. */
-html[data-mode="simple"] .search-help-simple {
+.search-help-simple {
     display: block !important;
 }
 
-/* Duplicates / Clean up */
-html[data-mode="simple"] #source-breakdown-section,
-html[data-mode="simple"] #year-timeline-details,
-html[data-mode="simple"] .form-row:has(#threshold) {
-    display: none !important;
-}
-
-/* Phase 10: Simple Search is header + full-width query + results | rail */
-html[data-mode="simple"] .search-workbench {
+/* Search workbench uses a full-width query and results rail. */
+.search-workbench {
     grid-template-columns: minmax(0, 1fr) 16rem;
 }
-html[data-mode="simple"] #search-main {
+#search-main {
     grid-column: 1;
     grid-row: 1;
 }
-html[data-mode="simple"] #search-rail {
+#search-rail {
     grid-column: 2;
     grid-row: 1;
 }
-html[data-mode="simple"] #search-rail .search-rail-scroll {
+#search-rail .search-rail-scroll {
     display: none !important;
 }
-html[data-mode="simple"] .search-page-header .page-help-toolbar,
-html[data-mode="simple"] #search-rail .page-help-toolbar {
+.search-page-header .page-help-toolbar,
+#search-rail .page-help-toolbar {
     display: none;
 }
-html[data-mode="simple"] .study-type-meaning {
+.study-type-meaning {
     display: none !important;
 }
 .simple-result-chips {
     display: none;
 }
-html[data-mode="simple"] .simple-result-chips {
+.simple-result-chips {
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-2);
     margin-bottom: var(--space-3);
 }
-html[data-mode="simple"] .advanced-starred-filter {
-    display: none;
-}
 .lra-modal-section {
     margin: var(--space-3) 0 var(--space-2);
     font-size: var(--fs-md);
 }
-html[data-mode="simple"] body.simple-collecting #searchcard,
-html[data-mode="simple"] body.simple-collecting #search-query-top {
-    display: none !important;
-}
-
-/* Phase 6: screening card is Simple-only (Advanced keeps Clean up). */
-html:not([data-mode="simple"]) #simple-screening-card {
+body.simple-collecting #searchcard,
+body.simple-collecting #search-query-top {
     display: none !important;
 }
 
@@ -6638,48 +6357,19 @@ body[data-guest="1"] .guest-fetch-note {
 }
 
 /* Search */
-html[data-mode="simple"] details.advanced-details:has(#lexical-boost),
-html[data-mode="simple"] details.advanced-details:has(#lib-export-scope),
-html[data-mode="simple"] .sim-badge {
-    display: none !important;
-}
+
 .seed-banner-heading-simple {
-    display: none;
-}
-html[data-mode="simple"] .seed-banner-heading-advanced {
-    display: none !important;
-}
-html[data-mode="simple"] .seed-banner-heading-simple {
     display: block;
 }
-html:not([data-mode="simple"]) .more-like-this-btn {
-    display: none !important;
-}
-/* Score meter stays visible in Simple (numeric 0–1, not Low/Med/High). */
-html[data-mode="simple"] .score-meter {
+/* Show the numeric similarity score meter. */
+.score-meter {
     display: grid !important;
 }
-/* Simple / Advanced blurb inside Help panels */
-html[data-mode="simple"] .page-help .search-help-advanced,
-html[data-mode="simple"] .page-help .page-help-advanced {
-    display: none !important;
-}
-html:not([data-mode="simple"]) .page-help .search-help-simple,
-html:not([data-mode="simple"]) .page-help .page-help-simple {
-    display: none !important;
-}
-
-/* Phase 6/8: Simple export panel — Advanced never sees it.
-   Lives in the left query rail so Results uses the full main column. */
-html:not([data-mode="simple"]) .search-simple-panel,
-html:not([data-mode="simple"]) #search-simple-panel {
-    display: none !important;
-}
 /* Results column is full width of search-main (no third-column squeeze). */
-html[data-mode="simple"] .search-results-layout {
+.search-results-layout {
     display: block;
 }
-html[data-mode="simple"] .search-simple-panel:not([hidden]) {
+.search-simple-panel:not([hidden]) {
     display: block;
     flex: 0 0 auto;
     margin-top: var(--space-3);
@@ -6815,10 +6505,10 @@ html[data-mode="simple"] .search-simple-panel:not([hidden]) {
 /* --- Phase 6 small screens: screening card + search panel --- */
 @media (max-width: 900px) {
     /* Sticky side panel becomes a bottom bar so it can scroll with the phone. */
-    html[data-mode="simple"] .search-results-layout {
+    .search-results-layout {
         display: block;
     }
-    html[data-mode="simple"] .search-simple-panel:not([hidden]) {
+    .search-simple-panel:not([hidden]) {
         position: fixed;
         left: 0;
         right: 0;
@@ -6834,42 +6524,42 @@ html[data-mode="simple"] .search-simple-panel:not([hidden]) {
         overflow: auto;
     }
     /* Bottom bar is buttons only — title/lead/stats hide so the bar stays short. */
-    html[data-mode="simple"] .search-simple-panel-title,
-    html[data-mode="simple"] .search-simple-panel-lead,
-    html[data-mode="simple"] .rail-stats {
+    .search-simple-panel-title,
+    .search-simple-panel-lead,
+    .rail-stats {
         display: none;
     }
     /* Measured bar height (--simple-panel-h); 40vh fallback matches max-height. */
-    html[data-mode="simple"] #results-section.has-simple-panel {
+    #results-section.has-simple-panel {
         padding-bottom: var(--simple-panel-h, calc(40vh + env(safe-area-inset-bottom, 0px)));
     }
-    html[data-mode="simple"] .search-simple-panel-title {
+    .search-simple-panel-title {
         font-size: var(--fs-base);
     }
-    html[data-mode="simple"] .search-simple-panel .btn-block {
+    .search-simple-panel .btn-block {
         min-height: 2.75rem;
     }
 }
 
 @media (max-width: 640px) {
-    html[data-mode="simple"] body.simple-screen-ready #search-query-top {
+    body.simple-screen-ready #search-query-top {
         display: block !important;
         margin-top: var(--space-3);
     }
-    html[data-mode="simple"] .searchcard {
+    .searchcard {
         flex-direction: column;
         align-items: stretch;
         gap: var(--space-2);
         padding: var(--space-3);
     }
-    html[data-mode="simple"] .searchcard #query-text {
+    .searchcard #query-text {
         border-right: 1px solid var(--text);
         border-radius: var(--radius-sm);
         width: 100%;
         min-height: 2.75rem;
         font-size: var(--fs-base); /* >=16px: no iOS focus zoom */
     }
-    html[data-mode="simple"] .searchcard #search-btn {
+    .searchcard #search-btn {
         width: 100%;
         min-width: 0;
         border-radius: var(--radius-sm);
@@ -6899,7 +6589,7 @@ html[data-mode="simple"] .search-simple-panel:not([hidden]) {
         padding-left: var(--space-3);
         padding-right: var(--space-1);
     }
-    html[data-mode="simple"] .search-simple-panel:not([hidden]) {
+    .search-simple-panel:not([hidden]) {
         padding-left: var(--space-3);
         padding-right: var(--space-3);
     }
@@ -6947,25 +6637,21 @@ html[data-mode="simple"] .search-simple-panel:not([hidden]) {
 .collect-header-simple {
     display: none;
 }
-html[data-mode="simple"] #search-collect .collect-header-simple {
+#search-collect .collect-header-simple {
     display: block;
 }
-/* Advanced Search never shows collect; Simple never shows the Get-papers hop. */
-html:not([data-mode="simple"]) #search-collect {
+#search-empty-state {
     display: none !important;
 }
-html[data-mode="simple"] #search-empty-state {
+body.simple-collecting .search-page-header,
+body.simple-collecting #search-workbench {
     display: none !important;
 }
-html[data-mode="simple"] body.simple-collecting .search-page-header,
-html[data-mode="simple"] body.simple-collecting #search-workbench {
-    display: none !important;
-}
-html[data-mode="simple"] body.simple-buffering #search-collect,
-html[data-mode="simple"] body.simple-buffering .search-page-header,
-html[data-mode="simple"] body.simple-buffering #search-query-top,
-html[data-mode="simple"] body.simple-buffering #search-workbench,
-html[data-mode="simple"] body.simple-buffering .simple-screen-dock {
+body.simple-buffering #search-collect,
+body.simple-buffering .search-page-header,
+body.simple-buffering #search-query-top,
+body.simple-buffering #search-workbench,
+body.simple-buffering .simple-screen-dock {
     display: none !important;
 }
 .search-buffering {
@@ -7173,23 +6859,23 @@ html[data-mode="simple"] body.simple-buffering .simple-screen-dock {
         transform: none;
     }
 }
-/* Hide Search chrome until Narrow it down is applied or skipped. */
-html[data-mode="simple"] .search-page-header {
+/* Search chrome appears after Narrow it down is applied or skipped. */
+.search-page-header {
     display: none !important;
 }
-html[data-mode="simple"] body.simple-screen-ready .search-page-header {
+body.simple-screen-ready .search-page-header {
     display: block !important;
 }
-html[data-mode="simple"] body.simple-screen-ready #search-query-top {
+body.simple-screen-ready #search-query-top {
     display: block !important;
 }
-html[data-mode="simple"] body.simple-screen-pending .search-page-header,
-html[data-mode="simple"] body.simple-screen-pending #search-query-top,
-html[data-mode="simple"] body.simple-screen-pending #search-workbench {
+body.simple-screen-pending .search-page-header,
+body.simple-screen-pending #search-query-top,
+body.simple-screen-pending #search-workbench {
     display: none !important;
 }
 /* Gate is a page step — no gray wash over an empty page. */
-html[data-mode="simple"] body.simple-screen-pending .simple-screen-modal {
+body.simple-screen-pending .simple-screen-modal {
     position: relative;
     inset: auto;
     z-index: auto;
@@ -7197,33 +6883,33 @@ html[data-mode="simple"] body.simple-screen-pending .simple-screen-modal {
     padding: var(--space-6) var(--space-4) var(--space-8);
     max-height: none;
 }
-html[data-mode="simple"] body.simple-screen-pending .simple-screen-modal .lra-modal-backdrop {
+body.simple-screen-pending .simple-screen-modal .lra-modal-backdrop {
     display: none;
 }
-html[data-mode="simple"] body.simple-screen-pending .simple-screen-modal-card {
+body.simple-screen-pending .simple-screen-modal-card {
     margin: 0 auto;
     max-height: none;
     box-shadow: none;
 }
-/* Step 5: leftover collect chrome after papers exist (not start-over). */
-html[data-mode="simple"] #search-collect.has-papers #collect-topics-card,
-html[data-mode="simple"] #search-collect.has-papers #collect-sources-card,
-html[data-mode="simple"] #search-collect.has-papers #collect-coverage-card,
-html[data-mode="simple"] #search-collect.has-papers #getting-started-card,
-html[data-mode="simple"] #search-collect.has-papers #fetch-form,
-html[data-mode="simple"] #search-collect.has-papers #fetch-lead,
-html[data-mode="simple"] #search-collect.has-papers #fetch-source-report,
-html[data-mode="simple"] #search-collect #fetch-source-report {
+/* Hide collect chrome after papers exist, except when starting over. */
+#search-collect.has-papers #collect-topics-card,
+#search-collect.has-papers #collect-sources-card,
+#search-collect.has-papers #collect-coverage-card,
+#search-collect.has-papers #getting-started-card,
+#search-collect.has-papers #fetch-form,
+#search-collect.has-papers #fetch-lead,
+#search-collect.has-papers #fetch-source-report,
+#search-collect #fetch-source-report {
     display: none !important;
 }
-html[data-mode="simple"] body:has(#search-workbench) #simple-screen-goto,
-html[data-mode="simple"] body:has(#search-workbench) #fetch-next-step {
+body:has(#search-workbench) #simple-screen-goto,
+body:has(#search-workbench) #fetch-next-step {
     display: none !important;
 }
 .simple-tools-search-only {
     display: none;
 }
-html[data-mode="simple"] body:has(#search-workbench) .simple-tools-search-only {
+body:has(#search-workbench) .simple-tools-search-only {
     display: inline-flex;
 }
 .simple-screen-dock .btn-primary {
@@ -7654,7 +7340,7 @@ body.simple-screen-triage-open {
     text-decoration: none;
     cursor: default;
 }
-html[data-mode="simple"] body:has(#search-workbench) #simple-screen-dock-hint {
+body:has(#search-workbench) #simple-screen-dock-hint {
     display: none !important;
 }
 
@@ -7882,8 +7568,8 @@ html[data-mode="simple"] body:has(#search-workbench) #simple-screen-dock-hint {
 
 /* === UX m1: focused Simple Search (compact header, sticky query, card rail) === */
 
-/* Count beside the h1 reads as a quiet pill in Simple. */
-html[data-mode="simple"] #results-count-line {
+/* Count beside the heading reads as a quiet pill. */
+#results-count-line {
     padding: var(--space-1) var(--space-3);
     border-radius: var(--radius-full);
     background: var(--accent-soft);
@@ -7893,14 +7579,14 @@ html[data-mode="simple"] #results-count-line {
     text-transform: none;
 }
 
-/* Scope note: Advanced pins it open (summary hidden); Simple keeps it collapsed. */
+/* Scope note stays collapsed until opened. */
 .search-scope-note summary {
     display: none;
 }
-html[data-mode="simple"] .search-scope-note {
+.search-scope-note {
     margin: var(--space-2) 0 0;
 }
-html[data-mode="simple"] .search-scope-note summary {
+.search-scope-note summary {
     display: inline-flex;
     align-items: center;
     min-height: 44px;
@@ -7910,15 +7596,15 @@ html[data-mode="simple"] .search-scope-note summary {
     cursor: pointer;
     list-style: none;
 }
-html[data-mode="simple"] .search-scope-note summary::-webkit-details-marker {
+.search-scope-note summary::-webkit-details-marker {
     display: none;
 }
-html[data-mode="simple"] .search-scope-note[open] summary {
+.search-scope-note[open] summary {
     color: var(--accent);
 }
 
 /* Sticky query tile: query + Search stay reachable above the results. */
-html[data-mode="simple"] body.simple-screen-ready #search-query-top {
+body.simple-screen-ready #search-query-top {
     position: sticky;
     top: 5rem;
     z-index: 40;
@@ -7929,7 +7615,7 @@ html[data-mode="simple"] body.simple-screen-ready #search-query-top {
     box-shadow: var(--sheen);
 }
 /* No inner card chrome inside the query tile; one rounded query pill + Search. */
-html[data-mode="simple"] #search-query-top .searchcard {
+#search-query-top .searchcard {
     margin: 0;
     padding: 0;
     border: none;
@@ -7938,23 +7624,23 @@ html[data-mode="simple"] #search-query-top .searchcard {
     gap: var(--space-2);
     flex-wrap: wrap;
 }
-html[data-mode="simple"] #search-query-top .searchcard #query-text {
+#search-query-top .searchcard #query-text {
     flex: 1 1 14rem;
     min-width: 0;
     background: var(--surface);
 }
 @media (min-width: 641px) {
-    html[data-mode="simple"] .searchcard #query-text {
+    .searchcard #query-text {
         border-right: 1px solid var(--rule);
         border-radius: var(--radius-full);
     }
-    html[data-mode="simple"] .searchcard #search-btn {
+    .searchcard #search-btn {
         border-radius: var(--radius-full);
     }
 }
 
 /* Screening dock merges under the sticky tile: hairline, no second card. */
-html[data-mode="simple"] body.simple-screen-ready #search-query-top ~ #simple-screening-card #simple-screen-dock {
+body.simple-screen-ready #search-query-top ~ #simple-screening-card #simple-screen-dock {
     margin: 0 0 var(--space-3);
     padding: var(--space-3) 0 0;
     border: none;
@@ -7963,19 +7649,19 @@ html[data-mode="simple"] body.simple-screen-ready #search-query-top ~ #simple-sc
     background: transparent;
     box-shadow: none;
 }
-html[data-mode="simple"] body.simple-screen-ready:has(.guest-banner) #search-query-top {
+body.simple-screen-ready:has(.guest-banner) #search-query-top {
     top: 10.5rem;
 }
 /* Save your work parks below the sticky Search tile instead of sliding under it. */
-html[data-mode="simple"] body.simple-screen-ready .search-rail-sticky {
+body.simple-screen-ready .search-rail-sticky {
     top: var(--simple-rail-top, 10.25rem);
     max-height: calc(100vh - var(--simple-rail-top, 10.25rem) - 1rem);
 }
-html[data-mode="simple"] body.simple-screen-ready:has(.guest-banner) .search-rail-sticky {
+body.simple-screen-ready:has(.guest-banner) .search-rail-sticky {
     top: var(--simple-rail-top, 15.75rem);
     max-height: calc(100vh - var(--simple-rail-top, 15.75rem) - 1rem);
 }
-html[data-mode="simple"] body.simple-screen-ready #simple-tools-count:not([hidden]) {
+body.simple-screen-ready #simple-tools-count:not([hidden]) {
     text-decoration: none;
     padding: 0 var(--space-3);
     min-height: 44px;
@@ -7990,7 +7676,7 @@ html[data-mode="simple"] body.simple-screen-ready #simple-tools-count:not([hidde
 .simple-tools-more {
     position: relative;
 }
-html[data-mode="simple"] .simple-tools-more summary {
+.simple-tools-more summary {
     display: inline-flex;
     align-items: center;
     min-height: 44px;
@@ -8004,16 +7690,16 @@ html[data-mode="simple"] .simple-tools-more summary {
     cursor: pointer;
     list-style: none;
 }
-html[data-mode="simple"] .simple-tools-more summary::-webkit-details-marker {
+.simple-tools-more summary::-webkit-details-marker {
     display: none;
 }
-html[data-mode="simple"] .simple-tools-more[open] summary {
+.simple-tools-more[open] summary {
     background: var(--hover);
 }
-html[data-mode="simple"] .simple-tools-more:not([open]) .simple-tools-more-menu {
+.simple-tools-more:not([open]) .simple-tools-more-menu {
     display: none;
 }
-html[data-mode="simple"] .simple-tools-more[open] .simple-tools-more-menu {
+.simple-tools-more[open] .simple-tools-more-menu {
     position: absolute;
     top: calc(100% + var(--space-1));
     left: 0;
@@ -8027,7 +7713,7 @@ html[data-mode="simple"] .simple-tools-more[open] .simple-tools-more-menu {
     border-radius: var(--radius-md);
     box-shadow: var(--elev-2);
 }
-html[data-mode="simple"] .simple-tools-more-menu .btn {
+.simple-tools-more-menu .btn {
     display: flex;
     align-items: center;
     justify-content: flex-start;
@@ -8041,14 +7727,14 @@ html[data-mode="simple"] .simple-tools-more-menu .btn {
     font-size: var(--fs-sm);
     font-weight: 600;
 }
-html[data-mode="simple"] .simple-tools-more-menu .btn:hover:not(:disabled) {
+.simple-tools-more-menu .btn:hover:not(:disabled) {
     background: var(--hover);
     border-color: transparent;
     color: var(--text);
 }
 
 /* Simple result cards: content left, Star / Note / Not relevant rail right. */
-html[data-mode="simple"] .result-row {
+.result-row {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: var(--space-2);
@@ -8062,40 +7748,40 @@ html[data-mode="simple"] .result-row {
     from { opacity: 0; transform: translateY(16px) scale(0.985); }
     to { opacity: 1; transform: none; }
 }
-html[data-mode="simple"] .result-row::before {
+.result-row::before {
     display: none;
 }
 /* One row open at a time. Closed rows show only what you need to pick one:
    score, venue, title, byline. The open row is the full card. */
-html[data-mode="simple"] .result-row:not(.is-open) {
+.result-row:not(.is-open) {
     padding: var(--space-3) var(--space-4);
     margin-bottom: var(--space-2);
 }
-html[data-mode="simple"] .result-row:not(.is-open):hover {
+.result-row:not(.is-open):hover {
     transform: none;
     box-shadow: var(--elev-card);
     background: color-mix(in srgb, var(--accent) 5%, var(--surface));
 }
-html[data-mode="simple"] .result-row:not(.is-open) .result-row-body,
-html[data-mode="simple"] .result-row:not(.is-open) .result-row-rail,
-html[data-mode="simple"] .result-row:not(.is-open) .result-tags .study-type-wrap {
+.result-row:not(.is-open) .result-row-body,
+.result-row:not(.is-open) .result-row-rail,
+.result-row:not(.is-open) .result-tags .study-type-wrap {
     display: none;
 }
-html[data-mode="simple"] .result-row:not(.is-open) .result-row-title {
+.result-row:not(.is-open) .result-row-title {
     font-size: var(--fs-md);
     line-height: var(--lh-snug);
     margin: var(--space-1) 0;
 }
-html[data-mode="simple"] .result-row:not(.is-open) .result-byline { margin: 0; }
-html[data-mode="simple"] .result-row:not(.is-open) .result-row-head { margin-bottom: 0; }
-html[data-mode="simple"] .result-row.is-open {
+.result-row:not(.is-open) .result-byline { margin: 0; }
+.result-row:not(.is-open) .result-row-head { margin-bottom: 0; }
+.result-row.is-open {
     cursor: default;
     border-left-color: var(--accent);
     box-shadow: var(--elev-2);
     margin: var(--space-3) 0 var(--space-4);
 }
-html[data-mode="simple"] .result-row .result-row-head { padding-right: calc(var(--space-6) + var(--space-6)); }
-html[data-mode="simple"] .result-toggle {
+.result-row .result-row-head { padding-right: calc(var(--space-6) + var(--space-6)); }
+.result-toggle {
     position: absolute;
     right: var(--space-4);
     top: var(--space-3);
@@ -8111,22 +7797,22 @@ html[data-mode="simple"] .result-toggle {
     color: var(--text-soft);
     cursor: pointer;
 }
-html[data-mode="simple"] .result-row.is-open .result-toggle,
-html[data-mode="simple"] .result-toggle:hover,
-html[data-mode="simple"] .result-toggle:focus-visible {
+.result-row.is-open .result-toggle,
+.result-toggle:hover,
+.result-toggle:focus-visible {
     color: var(--accent);
 }
-html[data-mode="simple"] .result-toggle:hover,
-html[data-mode="simple"] .result-toggle:focus-visible {
+.result-toggle:hover,
+.result-toggle:focus-visible {
     background: var(--hover);
     outline: none;
     box-shadow: var(--focus-ring);
 }
-html[data-mode="simple"] .result-row.is-open .result-row-body {
+.result-row.is-open .result-row-body {
     animation: rowOpen 360ms var(--ease-spring) both;
     transform-origin: top;
 }
-html[data-mode="simple"] .result-row.is-open .result-row-rail {
+.result-row.is-open .result-row-rail {
     animation: rowOpen 360ms var(--ease-spring) 60ms both;
 }
 @keyframes rowOpen {
@@ -8134,17 +7820,17 @@ html[data-mode="simple"] .result-row.is-open .result-row-rail {
     to { opacity: 1; transform: none; }
 }
 /* Menus opened on a card must paint over the cards below it. */
-html[data-mode="simple"] .result-row:has(.study-aid[open]) {
+.result-row:has(.study-aid[open]) {
     z-index: 10;
 }
-html[data-mode="simple"] #simple-screen-dock:has(.simple-tools-more[open]) {
+#simple-screen-dock:has(.simple-tools-more[open]) {
     position: relative;
     z-index: 30;
 }
-html[data-mode="simple"] .result-row-main {
+.result-row-main {
     min-width: 0;
 }
-html[data-mode="simple"] .result-row-rail {
+.result-row-rail {
     display: flex;
     flex-direction: row;
     flex-wrap: wrap;
@@ -8152,9 +7838,9 @@ html[data-mode="simple"] .result-row-rail {
     padding-top: var(--space-3);
     border-top: 1px dashed var(--rule);
 }
-html[data-mode="simple"] .result-row-rail .star-btn,
-html[data-mode="simple"] .result-row-rail .note-toggle,
-html[data-mode="simple"] .result-row-rail .not-relevant-btn {
+.result-row-rail .star-btn,
+.result-row-rail .note-toggle,
+.result-row-rail .not-relevant-btn {
     display: inline-flex;
     flex-direction: row;
     align-items: center;
@@ -8178,9 +7864,9 @@ html[data-mode="simple"] .result-row-rail .not-relevant-btn {
     transition: transform 120ms var(--ease-settle), box-shadow 120ms var(--ease-settle),
                 background-color var(--dur-fast) var(--ease-soft), color var(--dur-fast) var(--ease-soft);
 }
-html[data-mode="simple"] .result-row-rail .star-btn:active,
-html[data-mode="simple"] .result-row-rail .note-toggle:active,
-html[data-mode="simple"] .result-row-rail .not-relevant-btn:active {
+.result-row-rail .star-btn:active,
+.result-row-rail .note-toggle:active,
+.result-row-rail .not-relevant-btn:active {
     transform: translateY(2px);
     border-bottom-width: 1px;
     box-shadow: none;
@@ -8193,9 +7879,9 @@ html[data-mode="simple"] .result-row-rail .not-relevant-btn:active {
    element rather than over its contents, so children keep their own clicks. */
 .btn:active:not(:disabled)::after,
 .topic-card:active::after,
-html[data-mode="simple"] .result-row-rail .star-btn:active::after,
-html[data-mode="simple"] .result-row-rail .note-toggle:active::after,
-html[data-mode="simple"] .result-row-rail .not-relevant-btn:active::after {
+.result-row-rail .star-btn:active::after,
+.result-row-rail .note-toggle:active::after,
+.result-row-rail .not-relevant-btn:active::after {
     content: "";
     position: absolute;
     left: 0;
@@ -8203,31 +7889,31 @@ html[data-mode="simple"] .result-row-rail .not-relevant-btn:active::after {
     bottom: 100%;
     height: 0.25rem;
 }
-html[data-mode="simple"] .result-row-rail .star-btn:hover,
-html[data-mode="simple"] .result-row-rail .note-toggle:hover,
-html[data-mode="simple"] .result-row-rail .not-relevant-btn:hover {
+.result-row-rail .star-btn:hover,
+.result-row-rail .note-toggle:hover,
+.result-row-rail .not-relevant-btn:hover {
     background: var(--hover);
     color: var(--text);
 }
-html[data-mode="simple"] .result-row-rail .star-btn.is-starred {
+.result-row-rail .star-btn.is-starred {
     background: var(--accent-soft);
     border-color: transparent;
     color: var(--accent);
 }
-html[data-mode="simple"] .result-row-rail .ico,
-html[data-mode="simple"] .result-row-rail .star-ico {
+.result-row-rail .ico,
+.result-row-rail .star-ico {
     width: 20px;
     height: 20px;
 }
-html[data-mode="simple"] .result-row-rail .result-rail-label {
+.result-row-rail .result-rail-label {
     display: block;
 }
 
 /* Collapsed abstract in Simple. */
-html[data-mode="simple"] .result-abstract {
+.result-abstract {
     margin-top: var(--space-2);
 }
-html[data-mode="simple"] .result-abstract summary {
+.result-abstract summary {
     display: inline-flex;
     align-items: center;
     min-height: 44px;
@@ -8237,28 +7923,28 @@ html[data-mode="simple"] .result-abstract summary {
     cursor: pointer;
     list-style: none;
 }
-html[data-mode="simple"] .result-abstract summary::-webkit-details-marker {
+.result-abstract summary::-webkit-details-marker {
     display: none;
 }
-html[data-mode="simple"] .result-abstract[open] summary {
+.result-abstract[open] summary {
     color: var(--text-soft);
 }
 
 /* Study aid: AI buttons collapse into a dropdown menu on Simple cards. */
-html[data-mode="simple"] .study-aid {
+.study-aid {
     position: relative;
     margin-top: var(--space-2);
 }
-html[data-mode="simple"] .study-aid summary {
+.study-aid summary {
     list-style: none;
 }
-html[data-mode="simple"] .study-aid summary::-webkit-details-marker {
+.study-aid summary::-webkit-details-marker {
     display: none;
 }
-html[data-mode="simple"] .study-aid:not([open]) .ai-actions {
+.study-aid:not([open]) .ai-actions {
     display: none;
 }
-html[data-mode="simple"] .study-aid[open] .ai-actions {
+.study-aid[open] .ai-actions {
     display: flex;
     position: absolute;
     top: calc(100% + var(--space-1));
@@ -8274,7 +7960,7 @@ html[data-mode="simple"] .study-aid[open] .ai-actions {
     box-shadow: var(--elev-2);
     min-width: 13rem;
 }
-html[data-mode="simple"] .study-aid[open] .ai-actions .btn {
+.study-aid[open] .ai-actions .btn {
     justify-content: flex-start;
     min-height: 44px;
     padding: 0 var(--space-3);
@@ -8284,28 +7970,28 @@ html[data-mode="simple"] .study-aid[open] .ai-actions .btn {
     box-shadow: none;
     font-weight: 600;
 }
-html[data-mode="simple"] .study-aid[open] .ai-actions .btn:hover:not(:disabled) {
+.study-aid[open] .ai-actions .btn:hover:not(:disabled) {
     background: var(--hover);
     border-color: transparent;
 }
 
 @media (max-width: 900px) {
-    html[data-mode="simple"] body.simple-screen-ready #search-query-top {
+    body.simple-screen-ready #search-query-top {
         position: static;
     }
-    html[data-mode="simple"] .result-row {
+    .result-row {
         grid-template-columns: minmax(0, 1fr);
     }
-    html[data-mode="simple"] .result-row-rail {
+    .result-row-rail {
         flex-direction: row;
         padding-left: 0;
         padding-top: var(--space-3);
         border-left: none;
         border-top: 1px solid var(--rule);
     }
-    html[data-mode="simple"] .result-row-rail .star-btn,
-    html[data-mode="simple"] .result-row-rail .note-toggle,
-    html[data-mode="simple"] .result-row-rail .not-relevant-btn {
+    .result-row-rail .star-btn,
+.result-row-rail .note-toggle,
+.result-row-rail .not-relevant-btn {
         flex: 1 1 auto;
         max-width: 110px;
     }
@@ -8435,21 +8121,21 @@ html[data-mode="simple"] .study-aid[open] .ai-actions .btn:hover:not(:disabled) 
 }
 
 /* === Simple collect: one guided column (Phase 14) === */
-html[data-mode="simple"] #search-collect {
+#search-collect {
     max-width: 52rem;
     margin: 0 auto;
 }
-html[data-mode="simple"] .collect-header-simple h1 {
+.collect-header-simple h1 {
     font-size: var(--fs-3xl);
     margin-bottom: var(--space-2);
 }
-html[data-mode="simple"] .collect-header-simple .subtitle {
+.collect-header-simple .subtitle {
     font-size: var(--fs-md);
     color: var(--text-body);
     margin: 0 0 var(--space-2);
 }
 /* The scope note stays, as one quiet line instead of a boxed notice. */
-html[data-mode="simple"] .collect-header-simple .site-disclaimer {
+.collect-header-simple .site-disclaimer {
     border: 0;
     background: transparent;
     box-shadow: none;
@@ -8458,43 +8144,43 @@ html[data-mode="simple"] .collect-header-simple .site-disclaimer {
     font-size: var(--fs-sm);
     color: var(--text-soft);
 }
-html[data-mode="simple"] .collect-header-simple .site-disclaimer .notice-label { display: none; }
-html[data-mode="simple"] .collect-header-simple .site-disclaimer strong { font-weight: 500; }
-html[data-mode="simple"] .getting-started-list,
-html[data-mode="simple"] #collect-fetch-card .form-group:has(#fetch-max) { display: none; }
-html[data-mode="simple"] #collect-topics-card,
-html[data-mode="simple"] #collect-fetch-card {
+.collect-header-simple .site-disclaimer .notice-label { display: none; }
+.collect-header-simple .site-disclaimer strong { font-weight: 500; }
+.getting-started-list,
+#collect-fetch-card .form-group:has(#fetch-max) { display: none; }
+#collect-topics-card,
+#collect-fetch-card {
     padding: var(--space-5) var(--space-6);
 }
-html[data-mode="simple"] .dm-step-heading.dm-step-simple {
+.dm-step-heading.dm-step-simple {
     font-size: var(--fs-xl);
     margin: 0 0 var(--space-2);
 }
-html[data-mode="simple"] #collect-topics-card .dm-sub-simple,
-html[data-mode="simple"] #collect-fetch-card .dm-sub-simple {
+#collect-topics-card .dm-sub-simple,
+#collect-fetch-card .dm-sub-simple {
     font-size: var(--fs-sm);
     color: var(--text-soft);
     margin: 0 0 var(--space-4);
 }
 /* The topic box waits until an area is picked, then arrives. A library that
    already has papers (Start over) shows it at once. */
-html[data-mode="simple"] #search-collect:not(.has-topic):not(.has-papers):not(.is-startover) #collect-fetch-card {
+#search-collect:not(.has-topic):not(.has-papers):not(.is-startover) #collect-fetch-card {
     display: none;
 }
-html[data-mode="simple"] .collect-next-row { margin: var(--space-4) 0 0; }
-html[data-mode="simple"] #collect-topics-next { min-height: 2.75rem; }
-html[data-mode="simple"] #collect-fetch-card .form-row { display: block; }
-html[data-mode="simple"] #collect-fetch-card .form-group.flex-2 { max-width: none; }
-html[data-mode="simple"] #fetch-query {
+.collect-next-row { margin: var(--space-4) 0 0; }
+#collect-topics-next { min-height: 2.75rem; }
+#collect-fetch-card .form-row { display: block; }
+#collect-fetch-card .form-group.flex-2 { max-width: none; }
+#fetch-query {
     font-size: var(--fs-md);
     min-height: 3.25rem;
 }
-html[data-mode="simple"] #collect-fetch-card .fetch-actions { margin-top: var(--space-3); }
-html[data-mode="simple"] #fetch-btn {
+#collect-fetch-card .fetch-actions { margin-top: var(--space-3); }
+#fetch-btn {
     min-height: 3rem;
     padding-inline: var(--space-6);
 }
-html[data-mode="simple"] #collect-fetch-card.scene-in {
+#collect-fetch-card.scene-in {
     animation: collectArrive 360ms var(--ease-out) both;
 }
 @keyframes collectArrive {
@@ -8690,29 +8376,29 @@ input:autofill:focus-visible {
 
 @media (max-width: 640px) {
     /* Search header: one title, the count inline, no kicker. */
-    html[data-mode="simple"] .search-page-header {
+    .search-page-header {
         margin-bottom: var(--space-3);
         padding-bottom: var(--space-2);
     }
-    html[data-mode="simple"] .search-page-header .search-kicker,
-    html[data-mode="simple"] .search-page-header .search-kicker-simple { display: none !important; }
-    html[data-mode="simple"] .search-page-header .pagehead h1 { font-size: var(--fs-xl); }
-    html[data-mode="simple"] .search-page-header .search-scope-note summary { font-size: var(--fs-xs); }
-    html[data-mode="simple"] #results-count-line { font-size: var(--fs-xs); }
+    .search-page-header .search-kicker,
+.search-page-header .search-kicker-simple { display: none !important; }
+    .search-page-header .pagehead h1 { font-size: var(--fs-xl); }
+    .search-page-header .search-scope-note summary { font-size: var(--fs-xs); }
+    #results-count-line { font-size: var(--fs-xs); }
 
     /* Query bar: the field and a round magnifier button on one row. */
-    html[data-mode="simple"] .searchcard {
+    .searchcard {
         flex-direction: row;
         align-items: center;
         gap: var(--space-2);
         padding: var(--space-2);
     }
-    html[data-mode="simple"] .searchcard #query-text {
+    .searchcard #query-text {
         min-height: 2.75rem;
         border-right: 1px solid var(--rule);
         border-radius: var(--radius-full);
     }
-    html[data-mode="simple"] .searchcard #search-btn {
+    .searchcard #search-btn {
         width: 2.75rem;
         min-width: 2.75rem;
         max-width: 2.75rem;
@@ -8720,14 +8406,14 @@ input:autofill:focus-visible {
         border-radius: var(--radius-full);
         flex: 0 0 auto;
     }
-    html[data-mode="simple"] .searchcard .search-btn-label { display: none; }
-    html[data-mode="simple"] .searchcard .search-btn-icon { display: inline-block; }
-    html[data-mode="simple"] .searchcard #search-btn.is-loading .search-btn-icon {
+    .searchcard .search-btn-label { display: none; }
+    .searchcard .search-btn-icon { display: inline-block; }
+    .searchcard #search-btn.is-loading .search-btn-icon {
         animation: spin 0.9s linear infinite;
     }
 
     /* The bar stays under the top bar while the list scrolls. */
-    html[data-mode="simple"] body.simple-screen-ready #search-query-top {
+    body.simple-screen-ready #search-query-top {
         position: sticky;
         top: var(--nav-h, 3.5rem);
         z-index: 30;
@@ -8738,13 +8424,13 @@ input:autofill:focus-visible {
     }
 
     /* Tools strip: count, Narrow it down, More on one row. */
-    html[data-mode="simple"] .simple-tools-strip,
-    html[data-mode="simple"] .simple-screen-dock {
+    .simple-tools-strip,
+.simple-screen-dock {
         flex-wrap: nowrap;
         gap: var(--space-2);
         padding: var(--space-2) var(--space-3);
     }
-    html[data-mode="simple"] .simple-tools-count {
+    .simple-tools-count {
         flex: 1 1 auto;
         min-width: 0;
         font-size: var(--fs-sm);
@@ -8752,27 +8438,27 @@ input:autofill:focus-visible {
         overflow: hidden;
         text-overflow: ellipsis;
     }
-    html[data-mode="simple"] .simple-screen-dock #simple-screen-open-btn {
+    .simple-screen-dock #simple-screen-open-btn {
         flex: 0 0 auto;
         width: auto;
         min-height: 2.5rem;
         padding: var(--space-1) var(--space-3);
         font-size: var(--fs-sm);
     }
-    html[data-mode="simple"] .simple-screen-dock .simple-tools-more { flex: 0 0 auto; }
+    .simple-screen-dock .simple-tools-more { flex: 0 0 auto; }
 
     /* Compact rows: one line of meta, a small ring, a thumb-sized Open. */
-    html[data-mode="simple"] .result-row:not(.is-open) .result-row-head {
+    .result-row:not(.is-open) .result-row-head {
         flex-wrap: nowrap;
         align-items: center;
         gap: var(--space-2);
     }
-    html[data-mode="simple"] .result-row:not(.is-open) .score-meter {
+    .result-row:not(.is-open) .score-meter {
         width: 2.25rem;
         height: 2.25rem;
         min-width: 2.25rem;
     }
-    html[data-mode="simple"] .result-row:not(.is-open) .result-venue {
+    .result-row:not(.is-open) .result-venue {
         flex: 1 1 auto;
         min-width: 0;
         white-space: nowrap;
@@ -8780,53 +8466,53 @@ input:autofill:focus-visible {
         text-overflow: ellipsis;
         font-size: var(--fs-xs);
     }
-    html[data-mode="simple"] .result-row:not(.is-open) .result-tags { display: none; }
-    html[data-mode="simple"] .result-toggle {
+    .result-row:not(.is-open) .result-tags { display: none; }
+    .result-toggle {
         top: var(--space-1);
         right: var(--space-1);
         min-height: 2.75rem;
         min-width: 2.75rem;
         padding: var(--space-2);
     }
-    html[data-mode="simple"] .result-row.is-open .result-row-head {
+    .result-row.is-open .result-row-head {
         flex-wrap: wrap;
         align-items: center;
         gap: var(--space-2);
     }
-    html[data-mode="simple"] .result-row.is-open .result-venue {
+    .result-row.is-open .result-venue {
         flex: 1 1 auto;
         min-width: 0;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
     }
-    html[data-mode="simple"] .result-row.is-open .result-tags {
+    .result-row.is-open .result-tags {
         flex: 1 1 100%;
         order: 3;
     }
-    html[data-mode="simple"] .result-row.is-open .result-row-rail .star-btn,
-    html[data-mode="simple"] .result-row.is-open .result-row-rail .note-toggle,
-    html[data-mode="simple"] .result-row.is-open .result-row-rail .not-relevant-btn {
+    .result-row.is-open .result-row-rail .star-btn,
+.result-row.is-open .result-row-rail .note-toggle,
+.result-row.is-open .result-row-rail .not-relevant-btn {
         flex: 1 1 0;
         max-width: none;
     }
 
     /* Collect: the Getting started card folds to one line. */
-    html[data-mode="simple"] #getting-started-card { padding: var(--space-3) var(--space-4); }
-    html[data-mode="simple"] #getting-started-card .getting-started-header h2 { font-size: var(--fs-base); }
-    html[data-mode="simple"] #getting-started-card .gs-lead,
-    html[data-mode="simple"] #getting-started-card .gs-sample-ask,
-    html[data-mode="simple"] #getting-started-card .gs-sample-note { display: none; }
-    html[data-mode="simple"] #getting-started-card .gs-sample-ask-short { display: inline; }
-    html[data-mode="simple"] #getting-started-card .gs-sample { margin-top: var(--space-2); }
-    html[data-mode="simple"] .collect-header-simple h1 { font-size: var(--fs-2xl); }
-    html[data-mode="simple"] .collect-header-simple .site-disclaimer {
+    #getting-started-card { padding: var(--space-3) var(--space-4); }
+    #getting-started-card .getting-started-header h2 { font-size: var(--fs-base); }
+    #getting-started-card .gs-lead,
+#getting-started-card .gs-sample-ask,
+#getting-started-card .gs-sample-note { display: none; }
+    #getting-started-card .gs-sample-ask-short { display: inline; }
+    #getting-started-card .gs-sample { margin-top: var(--space-2); }
+    .collect-header-simple h1 { font-size: var(--fs-2xl); }
+    .collect-header-simple .site-disclaimer {
         font-size: var(--fs-xs);
         line-height: var(--lh-snug);
     }
-    html[data-mode="simple"] #collect-topics-card,
-    html[data-mode="simple"] #collect-fetch-card { padding: var(--space-4) var(--space-4); }
-    html[data-mode="simple"] #collect-topics-next { width: 100%; }
+    #collect-topics-card,
+#collect-fetch-card { padding: var(--space-4) var(--space-4); }
+    #collect-topics-next { width: 100%; }
 
     /* Dialog fields stack; preset chips keep their row. */
     .lra-modal-fields { grid-template-columns: 1fr; }

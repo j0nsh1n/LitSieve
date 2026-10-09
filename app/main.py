@@ -1,5 +1,5 @@
 """
-FastAPI Application — LitSieve v5.5.0
+FastAPI Application — LitSieve v6.0.0
 Multi-user web interface for literature search and analysis.
 
 This module only wires the app together: configuration, static files, the
@@ -89,7 +89,7 @@ def _handle_rate_limit(request: Request, exc: Exception) -> Response:
 
 app = FastAPI(
     title="LitSieve",
-    version="5.5.0",
+    version="6.0.0",
     lifespan=lifespan,
 )
 app.state.limiter = core.limiter

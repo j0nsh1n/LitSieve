@@ -1,8 +1,7 @@
 """
 End-to-end smoke paths (no live network):
 
-  Advanced-shaped: register → sample → embeddings → cluster → search → export
-  Simple-shaped:   register → sample → embeddings → quick screen → search → export
+  One Search flow: register → sample → embeddings → screen → search → export
 
 Uses the real ASGI app under an isolated tmp working directory. Embedding model
 loads are stubbed so CI stays offline and fast.
@@ -156,36 +155,33 @@ def test_smoke_register_sample_cluster_search_export(app_module):
     assert report.status_code == 200, report.text
     assert "collected" in report.text.lower() or "included" in report.text.lower() or len(report.text) > 20
 
-    # App pages still render after the workflow (disclaimer + cache-bust smoke).
-    # New accounts seed Simple; /data-management?collect=1 must redirect.
+    # The former app pages permanently redirect to Search after the workflow.
     bounced = c.get("/data-management?collect=1", follow_redirects=False)
-    assert bounced.status_code in (301, 302, 303, 307, 308)
-    assert bounced.headers.get("location") == "/search?collect=1"
+    assert bounced.status_code == 301
+    assert bounced.headers.get("location") == "/search"
 
-    for path in ("/search?collect=1", "/clusters", "/statistics", "/search", "/account"):
+    for path in ("/search?collect=1", "/search", "/account"):
         page = c.get(path)
         assert page.status_code == 200, path
         assert "LitSieve" in page.text or "LitPilot" in page.text or "text/html" in page.headers.get("content-type", "")
 
-    # Collect UI lives on Search after the Simple redirect.
-    # Advanced surfaces still present in HTML (Simple only CSS-hides them).
+    # Collect and ranking controls share the Search page.
     dm = c.get("/search?collect=1")
     assert dm.status_code == 200
     assert "source-option-grid" in dm.text or "embedding-model" in dm.text
-    stats_page = c.get("/statistics")
-    assert stats_page.status_code == 200
-    assert "Clean up" in stats_page.text
-    assert "quick-screen" in stats_page.text
+    for old_path in ("/statistics", "/clusters"):
+        old_page = c.get(old_path, follow_redirects=False)
+        assert old_page.status_code == 301
+        assert old_page.headers.get("location") == "/search"
 
 
 def test_smoke_simple_path_quick_screen_search_export(app_module):
-    """Simple-mode workflow: prepare → Quick screen → search → export (no cluster)."""
+    """One-flow workflow: prepare → Quick screen → search → export."""
     main = app_module
     c = TestClient(main.app)
 
     _register(c, username="simple_smoke")
-    # New accounts seed Simple mode for the browser; cookie is set on register.
-    assert c.cookies.get("ui_mode_seed") == "simple"
+    assert c.cookies.get("ui_mode_seed") is None
 
     rows = core.user_db.conn.execute("SELECT id FROM users").fetchall()
     user_id = rows[0][0]
@@ -262,5 +258,7 @@ def test_smoke_simple_path_quick_screen_search_export(app_module):
     exp = c.get("/api/export/library?format=ris&scope=included")
     assert exp.status_code == 200, exp.text[:200]
 
-    # Simple nav still leaves /clusters reachable.
-    assert c.get("/clusters").status_code == 200
+    # Grouping remains available as an API; the former page URL redirects.
+    old_clusters = c.get("/clusters", follow_redirects=False)
+    assert old_clusters.status_code == 301
+    assert old_clusters.headers.get("location") == "/search"

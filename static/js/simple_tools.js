@@ -1,6 +1,6 @@
-// Simple-mode tools shared by Data Management and Search.
+// Collection and screening popups on Search.
 // Screening popup, re-prepare / start-over dialogs, Search tools strip,
-// and the one-page collect/search state. Search also loads data_management.js
+// and the one-page collect/search state. Search also loads collect.js
 // for fetch/topics (collect UI lives on /search).
 
 var _lastTotalArticles = (typeof _lastTotalArticles === 'number') ? _lastTotalArticles : 0;
@@ -13,7 +13,6 @@ function _isPipelineBusy() {
 
 /** Simple Search: collect (empty / unprepared / ?collect=1) vs rank/export. */
 function wantsSimpleCollectView(stats) {
- if (typeof isSimpleMode !== 'function' || !isSimpleMode()) return false;
  if (_collectQueryOn()) return true;
  if (window._preparingCorpus) return false;
  const ready = Number(stats && stats.articles_with_embeddings) || 0;
@@ -43,23 +42,20 @@ function setCollectQueryOnUrl() {
 function syncSimpleOnePageState(stats) {
  const collect = document.getElementById('search-collect');
  if (!collect) return;
- const simple = typeof isSimpleMode === 'function' && isSimpleMode();
  const ready = Number(stats && stats.articles_with_embeddings) || 0;
  _lastReadyEmbeddings = ready;
  const total = Number(stats && stats.total_articles) || _lastTotalArticles || 0;
- const showCollect = simple && wantsSimpleCollectView(stats);
- const forceCollect = simple && _collectQueryOn();
+ const showCollect = wantsSimpleCollectView(stats);
+ const forceCollect = _collectQueryOn();
  collect.hidden = !showCollect;
- collect.classList.toggle('has-papers', simple && total > 0 && !forceCollect);
+ collect.classList.toggle('has-papers', total > 0 && !forceCollect);
  collect.classList.toggle('is-startover', !!forceCollect);
  if (document.body) {
   document.body.classList.toggle('simple-collecting', showCollect);
  }
- if (typeof updateNavStepNumbers === 'function') updateNavStepNumbers();
  const empty = document.getElementById('search-empty-state');
  if (empty) {
-  // Advanced empty-state only. Simple uses collect.
-  if (simple) empty.hidden = true;
+  empty.hidden = true;
  }
  const work = document.getElementById('search-workbench');
  if (work) {
@@ -135,7 +131,6 @@ function _startWaitMessages() {
 }
 
 function showSimpleBuffering(phase) {
- if (typeof isSimpleMode === 'function' && !isSimpleMode()) return;
  const el = document.getElementById('search-preparing');
  if (!el) return;
  window._preparingCorpus = true;
@@ -242,8 +237,7 @@ function setNextStepVisible(visible) {
  }
  const el = document.getElementById('fetch-next-step');
  if (!el) return;
- const simple = typeof isSimpleMode === 'function' && isSimpleMode();
- const show = !!(visible && simple);
+ const show = !!(visible );
  el.hidden = !show;
  el.classList.toggle('u-hidden', !show);
 }
@@ -287,7 +281,6 @@ var _lastReadyEmbeddings = (typeof _lastReadyEmbeddings === 'number') ? _lastRea
 var _simpleScreenPending = (typeof _simpleScreenPending === 'undefined') ? null : _simpleScreenPending;
 
 function isSimpleScreenGatePending() {
- if (typeof isSimpleMode !== 'function' || !isSimpleMode()) return false;
  if (!_onSearchPage()) return false;
  if (typeof _collectQueryOn === 'function' && _collectQueryOn()) return false;
  // Unknown (null) must not hide the Search field — refresh will set true
@@ -1020,8 +1013,7 @@ function openSimpleScreenModal() {
 async function refreshSimpleScreeningCard() {
  const card = document.getElementById('simple-screening-card');
  if (!card) return;
- const simple = typeof isSimpleMode === 'function' && isSimpleMode();
- if (!simple || _isPipelineBusy()) {
+ if (_isPipelineBusy()) {
   card.hidden = true;
   return;
  }
@@ -1788,9 +1780,6 @@ function applyVerifiedResearchQuestion(query) {
  * query. Returns false if cancelled.
  */
 async function resolveSimplePrepareModeBeforeRequest() {
- if (typeof isSimpleMode !== 'function' || !isSimpleMode()) {
-  return null;
- }
  const models = _simplePrepareModelCatalog();
  if (!models.length) {
   showNotification('The embedding model list is unavailable. Reload Search and try again.', 'error');
@@ -1906,9 +1895,6 @@ function _simpleSelectedPrepareModel() {
 var FETCH_COUNT_PRESETS = [25, 50, 100, 200];
 
 async function resolveSimpleFetchModeBeforeRequest(opts) {
- if (typeof isSimpleMode !== 'function' || !isSimpleMode()) {
-  return true;
- }
  let total = Number(_lastTotalArticles) || 0;
  try {
   const stats = await apiCall('/api/statistics');
@@ -2084,7 +2070,6 @@ function _onSearchPage() {
 function updateSimpleToolsStrip(stats) {
  const strip = document.getElementById('simple-tools-strip') || document.getElementById('simple-screen-dock');
  if (!strip) return;
- const simple = typeof isSimpleMode === 'function' && isSimpleMode();
  const total = Number(stats && stats.total_articles) || 0;
  _lastTotalArticles = total;
  const sources = (stats && stats.sources) || {};
@@ -2101,7 +2086,7 @@ function updateSimpleToolsStrip(stats) {
    countEl.disabled = total <= 0;
   }
  }
- const show = !!(simple && total > 0 && !_collectQueryOn());
+ const show = !!(total > 0 && !_collectQueryOn());
  strip.hidden = !show;
 }
 
@@ -2333,7 +2318,7 @@ function wireSimpleToolsStrip() {
 
 document.addEventListener('DOMContentLoaded', () => {
  wireSimpleToolsStrip();
- if (typeof isSimpleMode === 'function' && isSimpleMode() && _onSearchPage()) {
+ if (_onSearchPage()) {
   apiCall('/api/statistics').then((stats) => {
    syncSimpleOnePageState(stats);
    updateSimpleToolsStrip(stats);
@@ -2342,16 +2327,5 @@ document.addEventListener('DOMContentLoaded', () => {
    }
   }).catch(() => { /* ignore */ });
  }
- const modeBtn = document.getElementById('mode-toggle');
- if (modeBtn) {
-  modeBtn.addEventListener('click', () => {
-   requestAnimationFrame(() => {
-    apiCall('/api/statistics').then((stats) => {
-     if (typeof syncSimpleOnePageState === 'function') syncSimpleOnePageState(stats);
-     updateSimpleToolsStrip(stats);
-     if (typeof refreshSimpleScreeningCard === 'function') refreshSimpleScreeningCard();
-    }).catch(() => {});
-   });
-  });
- }
+
 });

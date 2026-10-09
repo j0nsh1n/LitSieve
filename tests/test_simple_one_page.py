@@ -1,4 +1,4 @@
-"""Simple one-page: collect + search on /search; Simple /data-management redirects."""
+"""Single Search flow: collect and research tools share /search."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ def test_search_includes_collect_and_simple_tools():
     assert 'include "partials/collect_ui.html"' in html
     assert 'include "partials/simple_screening_card.html"' in html
     assert "simple_tools.js" in html
-    assert "data_management.js" in html
+    assert "collect.js" in html
     assert 'id="search-collect"' in html
     collect = _read("templates", "partials", "collect_ui.html")
     assert 'id="fetch-form"' in collect
@@ -62,7 +62,7 @@ def test_search_includes_collect_and_simple_tools():
     assert "clearSearchWorkspace" in reset_fn
     assert "setSimpleScreenSkipped(false)" in reset_fn
     assert "_resetAfterStartOver" in reset_fn
-    dm = _read("static", "js", "data_management.js")
+    dm = _read("static", "js", "collect.js")
     assert "_resetAfterStartOver" in dm
     search_js = _read("static", "js", "search.js")
     assert "function clearSearchWorkspace" in search_js
@@ -86,14 +86,9 @@ def test_search_includes_collect_and_simple_tools():
     assert "wantsSimpleCollectView" in boot
     assert "clearSearchWorkspace()" in boot
     css = _read("static", "css", "style.css")
-    assert 'html[data-mode="simple"] .result-row-ids' not in css
-    simple_hide = css[
-        css.index('html[data-mode="simple"] .study-type-meaning') : css.index(
-            "html[data-mode=\"simple\"] body.simple-collecting"
-        )
-    ]
-    assert ".key-points" not in simple_hide
-    assert ".ai-actions" not in simple_hide
+    assert "#search-collect.has-papers #collect-topics-card" in css
+    assert 'html[data-mode="simple"]' not in css
+    assert 'html:not([data-mode="simple"])' not in css
 
 
 def test_simple_search_asks_count_and_year_range():
@@ -111,8 +106,8 @@ def test_simple_search_asks_count_and_year_range():
     assert "year_max" in search_js[search_js.index("function promptSimpleSearchScope") :]
 
 
-def test_collect_query_on_data_management_redirects_to_search(tmp_path, monkeypatch):
-    """Simple ?collect=1 on Get papers lands on Search collect, not DM."""
+def test_legacy_collect_query_permanently_redirects_to_search(tmp_path, monkeypatch):
+    """Legacy query parameters are dropped by the permanent redirect."""
     from app import core
     from app.storage.user_db import UserDatabase
 
@@ -134,8 +129,8 @@ def test_collect_query_on_data_management_redirects_to_search(tmp_path, monkeypa
     assert r.status_code in (302, 303)
     client.cookies.set("ui_mode", "simple")
     bounced = client.get("/data-management?collect=1", follow_redirects=False)
-    assert bounced.status_code in (302, 303), bounced.text
-    assert bounced.headers.get("location") == "/search?collect=1"
+    assert bounced.status_code == 301, bounced.text
+    assert bounced.headers.get("location") == "/search"
 
     page = client.get("/search?collect=1", follow_redirects=False)
     assert page.status_code == 200
@@ -187,7 +182,7 @@ def test_simple_data_management_always_redirects_to_search(tmp_path, monkeypatch
         release_pipeline(rec["id"])
 
     bounced = client.get("/data-management", follow_redirects=False)
-    assert bounced.status_code in (302, 303), bounced.text
+    assert bounced.status_code == 301, bounced.text
     assert bounced.headers.get("location") == "/search"
 
     empty_user = TestClient(app)
@@ -202,7 +197,7 @@ def test_simple_data_management_always_redirects_to_search(tmp_path, monkeypatch
     )
     empty_user.cookies.set("ui_mode", "simple")
     empty_bounce = empty_user.get("/data-management", follow_redirects=False)
-    assert empty_bounce.status_code in (302, 303)
+    assert empty_bounce.status_code == 301
     assert empty_bounce.headers.get("location") == "/search"
     empty_search = empty_user.get("/search", follow_redirects=False)
     assert empty_search.status_code == 200
@@ -225,9 +220,9 @@ def test_simple_data_management_always_redirects_to_search(tmp_path, monkeypatch
         json={"clear_first": True},
         headers={"X-CSRF-Token": csrf or ""},
     )
-    stay_adv = adv.get("/data-management", follow_redirects=False)
-    assert stay_adv.status_code == 200
-    assert b"fetch-form" in stay_adv.content
+    legacy_bounce = adv.get("/data-management", follow_redirects=False)
+    assert legacy_bounce.status_code == 301
+    assert legacy_bounce.headers.get("location") == "/search"
 
 
 def test_simple_collect_url_stays_on_search():
@@ -241,9 +236,10 @@ def test_simple_collect_url_stays_on_search():
 
 def test_simple_css_hides_leftover_collect():
     css = _read("static", "css", "style.css")
-    assert 'html[data-mode="simple"] #search-collect.has-papers #collect-topics-card' in css
-    assert 'html[data-mode="simple"] #search-collect.has-papers #fetch-form' in css
-    assert 'html:not([data-mode="simple"]) #search-collect' in css
+    assert "#search-collect.has-papers #collect-topics-card" in css
+    assert "#search-collect.has-papers #fetch-form" in css
+    assert 'html[data-mode="simple"]' not in css
+    assert 'html:not([data-mode="simple"])' not in css
     js = _read("static", "js", "simple_tools.js")
     assert "has-papers" in js
     assert "simple-collecting" in js

@@ -22,7 +22,7 @@ def test_reprepare_cancel_is_inert_and_confirm_uses_catalog_and_simple_wait():
 _HARNESS = r"""
 const fs=require('node:fs'); const vm=require('node:vm'); const assert=require('node:assert/strict');
 const tools=fs.readFileSync('static/js/simple_tools.js','utf8');
-const data=fs.readFileSync('static/js/data_management.js','utf8');
+const data=fs.readFileSync('static/js/collect.js','utf8');
 function extract(src,name){let start=src.indexOf('async function '+name);if(start<0)start=src.indexOf('function '+name);if(start<0)throw Error('missing '+name);let i=src.indexOf('{',start),d=0;for(;i<src.length;i++){if(src[i]==='{')d++;else if(src[i]==='}'&&--d===0)return src.slice(start,i+1);}throw Error('unclosed '+name);}
 class Element {
  constructor(value='',tag='div'){this.value=value;this.tag=tag;this.id='';this.textContent='';this.checked=false;this.hidden=false;this.disabled=false;this.selected=false;this.options=[];this.children=[];this.listeners={};this.style={};this.classList={toggle(){}};}

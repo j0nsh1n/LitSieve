@@ -148,10 +148,10 @@ def test_unauthenticated_requests_are_rejected(app_module):
     # API rejects with 401...
     assert anon.get("/api/statistics").status_code == 401
 
-    # ...and protected pages redirect to /login instead of rendering.
+    # Former app pages always redirect to Search, even before login.
     resp = anon.get("/data-management", follow_redirects=False)
-    assert resp.status_code == 302
-    assert resp.headers["location"].endswith("/login")
+    assert resp.status_code == 301
+    assert resp.headers["location"] == "/search"
 
 
 def test_csrf_required_for_state_change(app_module):

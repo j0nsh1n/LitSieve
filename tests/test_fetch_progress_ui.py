@@ -26,17 +26,17 @@ def test_fetch_source_states_and_timeouts_via_node():
     ]
     assert out["reportTimeouts"] == 1
     assert out["reportErrors"] == 1
-    assert "timed out (1 paper)" in out["advanced"]
-    assert "1 papers" not in " ".join(out["live"]) + out["advanced"]
-    assert "✗ Bad [rate_limited]: temporary failure" in out["advanced"]
-    assert "1 timed out" in out["simple"]
-    assert "1 with an error" in out["simple"]
+    assert "timed out (1 paper)" in out["report"]
+    assert "1 papers" not in " ".join(out["live"]) + out["report"]
+    assert "✗ Bad [rate_limited]: temporary failure" in out["report"]
+    assert "1 timed out" in out["report"]
+    assert "1 with an error" in out["report"]
 
 
 _NODE_PROGRESS_SNIPPET = r"""
 import fs from 'fs';
 import vm from 'vm';
-const dm = fs.readFileSync('static/js/data_management.js', 'utf8');
+const dm = fs.readFileSync('static/js/collect.js', 'utf8');
 const host = { innerHTML: '' };
 const sandbox = {
   console,
@@ -87,14 +87,12 @@ const code = [
       source_progress: { timeout: { state: 'done', error_kind: 'timeout' } },
     };
     const model = buildFetchSourceReportModel(data, ['pubmed', 'timeout', 'Bad']);
-    const simple = renderFetchSourceReportHtml(model, { simple: true });
-    const advanced = renderFetchSourceReportHtml(model, { simple: false });
+    const report = renderFetchSourceReportHtml(model);
     console.log(JSON.stringify({
       live,
       reportTimeouts: model.timeouts.length,
       reportErrors: model.muted.filter((row) => !row.zero).length,
-      simple,
-      advanced,
+      report,
     }));
   `,
 ].join('\n');

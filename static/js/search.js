@@ -104,24 +104,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
  // Page Help toggle is wired in common.js (initPageHelp).
 
- const risBtn = document.getElementById('export-results-ris');
- if (risBtn) risBtn.addEventListener('click', () => doExportResults('ris'));
-
- // Phase 6 Simple side panel (same export path; Advanced never shows the panel).
- const simpleExportBtn = document.getElementById('simple-export-results-btn');
- if (simpleExportBtn) {
-  simpleExportBtn.addEventListener('click', () => promptSimpleExportScope());
- }
-
- document.querySelectorAll('[data-lib-export-format]').forEach(btn => {
- btn.addEventListener('click', () => {
- const format = btn.getAttribute('data-lib-export-format') || 'ris';
- const scopeEl = document.getElementById('lib-export-scope');
- const scope = scopeEl ? scopeEl.value : 'all';
- window.location.href =
- `/api/export/library?scope=${encodeURIComponent(scope)}&format=${encodeURIComponent(format)}`;
- });
- });
+ const exportBtn = document.getElementById('simple-export-results-btn');
+ if (exportBtn) exportBtn.addEventListener('click', () => promptSimpleExportScope());
 
  document.getElementById('query-text').addEventListener('keydown', (e) => {
  if (e.key === 'Enter' && !e.shiftKey) {
@@ -339,7 +323,7 @@ async function restoreSearchSession() {
  }
  const legacySimpleSeedReplay = state.mode === 'seed'
   && state.include_seed == null
-  && typeof isSimpleMode === 'function' && isSimpleMode();
+  ;
  if (state.mode === 'seed' && (state.include_seed === true || legacySimpleSeedReplay)) {
   const seedId = (state.seed_query || '').trim();
   if (!seedId) return;
@@ -392,7 +376,7 @@ function syncSearchFiltersFromForm() {
 
 function collectSearchFilters() {
  const { display, ...request } = searchState.filters;
- if (typeof isSimpleMode === 'function' && isSimpleMode() && !hasPicoText()) {
+ if (!hasPicoText()) {
   request.pico_boost = false;
  }
  return Object.assign({}, request, { source_filter: request.source_filter.slice() });
@@ -517,7 +501,7 @@ async function loadSearchEmptyState() {
   syncSimpleOnePageState(stats);
  }
  if (document.getElementById('simple-rail-stats')
-  && typeof isSimpleMode === 'function' && isSimpleMode()) {
+  ) {
   try {
    const report = await apiCall('/api/screening-report?format=json');
    fillSimpleRailStats(stats, report);
@@ -525,11 +509,8 @@ async function loadSearchEmptyState() {
    fillSimpleRailStats(stats, null);
   }
  }
- const simple = typeof isSimpleMode === 'function' && isSimpleMode();
- if (!simple && typeof applyEmptyState === 'function') {
- applyEmptyState('search-empty-state', stats, 'embeddings', 'search-empty-msg');
- }
- if (!simple || !wantsSimpleCollectView(stats)) {
+
+ if (!wantsSimpleCollectView(stats)) {
   updateSearchWorkVisibility(stats);
  }
  return stats;
@@ -545,7 +526,6 @@ async function loadSearchEmptyState() {
 async function waitIfPreparing(stats) {
  const banner = document.getElementById('search-preparing');
  const status = document.getElementById('search-preparing-status');
- const simple = typeof isSimpleMode === 'function' && isSimpleMode();
  const hide = () => {
   if (typeof hideSimpleBuffering === 'function') hideSimpleBuffering();
   else {
@@ -563,7 +543,7 @@ async function waitIfPreparing(stats) {
  const fetchJob = (progress && progress.fetch) || {};
  const embed = (progress && progress.embed) || {};
 
- if (simple && fetchJob.active && typeof showSimpleBuffering === 'function') {
+ if (fetchJob.active && typeof showSimpleBuffering === 'function') {
   showSimpleBuffering('fetch');
   if (typeof syncSimpleOnePageState === 'function') syncSimpleOnePageState(stats || {});
   if (typeof waitForJob === 'function') {
@@ -597,7 +577,7 @@ async function waitIfPreparing(stats) {
   hide();
   return stats;
  }
- if (simple && typeof showSimpleBuffering === 'function') {
+ if (typeof showSimpleBuffering === 'function') {
   showSimpleBuffering('prepare');
  } else {
   window._preparingCorpus = true;
@@ -611,15 +591,13 @@ async function waitIfPreparing(stats) {
   try {
    await waitForJob(
     'embed',
-    simple ? 'search-buffering-fill' : null,
-    simple ? 'search-buffering-label' : 'search-preparing-status',
-    simple ? 'search-buffering-progress' : null,
-    simple
-     ? (done, totalN, pct) => (
+    'search-buffering-fill',
+    'search-buffering-label',
+    'search-buffering-progress',
+    (done, totalN, pct) => (
       totalN > 0 ? `Getting papers ready… ${done} / ${totalN} (${pct}%)` : 'Getting your papers ready…'
-     )
-     : null,
-    simple && typeof simpleWaitMapOpts === 'function' ? simpleWaitMapOpts(60, 90) : undefined
+     ),
+    typeof simpleWaitMapOpts === 'function' ? simpleWaitMapOpts(60, 90) : undefined
    );
   } catch (e) {
    if (status) status.textContent = 'Could not finish preparing. Use Re-prepare.';
@@ -627,7 +605,7 @@ async function waitIfPreparing(stats) {
    return stats;
   }
  }
- if (simple && typeof holdSimpleWait === 'function') {
+ if (typeof holdSimpleWait === 'function') {
   holdSimpleWait();
   if (typeof refreshSimpleScreeningCard === 'function') {
    await refreshSimpleScreeningCard();
@@ -710,7 +688,7 @@ async function applyAvailableSources() {
  if (hint) {
  hint.textContent = anyAvailable
  ? ''
- : 'No articles yet - fetch some on the Data Management page first.';
+ : 'No articles yet - use More to get papers on Search.';
  }
 }
 
@@ -762,7 +740,6 @@ function escapeRegExp(s) {
 }
 
 async function promptSimpleSearchScope(kind = 'text') {
- if (typeof isSimpleMode !== 'function' || !isSimpleMode()) return true;
  if (typeof openSiteForm !== 'function') return true;
  const topkEl = document.getElementById('top-k');
  const yminEl = document.getElementById('year-min');
@@ -1257,7 +1234,7 @@ function starLabelHtml(on) {
   + '<span>' + (on ? 'Starred' : 'Star') + '</span>';
 }
 
-// Simple mode: rows render compact and one opens in place. The toggle is a
+// Rows render compact and one opens in place. The toggle is a
 // real button so the keyboard gets the same contract as a click on the row.
 function setResultRowOpen(card, open) {
  card.classList.toggle('is-open', open);
@@ -1313,14 +1290,13 @@ function buildResultCard(article, idx) {
  const authors = (article.authors || []).join('; ');
  const abstractHtml = highlightText(article.abstract || '', lastQueryTokens);
  const picoHtml = renderPicoBlock(article.pico);
- const simpleMode = document.documentElement.getAttribute('data-mode') === 'simple';
  const keyPointsHtml = typeof renderKeyPointsHtml === 'function'
  ? renderKeyPointsHtml(article.key_points, {
  articleId: article.article_id,
  source: article.source,
  origin: article.key_points_origin || 'extractive',
  abstractLen: String(article.abstract || '').length,
- compactAid: simpleMode,
+ compactAid: true,
  })
  : '';
  const studyTypeHtml = renderStudyTypeBadge(article);
@@ -1349,7 +1325,6 @@ function buildResultCard(article, idx) {
  <span class="result-venue">${venue}</span>
  <span class="result-tags">
   <span class="tag">${escapeHtml(getSourceName(article.source))}</span>
-  ${simpleMode ? '' : studyTypeHtml}
  </span>
  </div>
  <h3 class="article-title result-row-title">${escapeHtml(article.title || '')}</h3>
@@ -1362,7 +1337,7 @@ function buildResultCard(article, idx) {
  <button type="button" class="btn btn-sm btn-secondary note-save">Save note</button>
  </div>`;
 
- if (simpleMode) {
+ {
   card.innerHTML = `
   <div class="result-row-main">
   ${headHtml}
@@ -1392,29 +1367,6 @@ function buildResultCard(article, idx) {
   <button type="button" class="note-toggle" ${noteVal ? 'hidden' : ''}><span class="result-rail-label">Note</span></button>
   <button type="button" class="not-relevant-btn"
    data-tip="Screen this paper out as not about your topic"><span class="result-rail-label">Not relevant</span></button>
-  </div>
-  `;
- } else {
-  card.innerHTML = `
-  ${headHtml}
-  <div class="article-body result-row-body">
-  <div class="article-meta result-row-ids">
-  <span><strong>ID:</strong> ${idLink}</span>
-  ${clusterBit}
-  </div>
-  ${keyPointsHtml}
-  <div class="article-abstract">${abstractHtml}</div>
-  ${picoHtml}
-  <div class="article-actions-row">
-  ${openLink}
-  <button type="button" class="star-btn ${starred ? 'is-starred' : ''}" data-tip="${starred ? 'Remove star' : 'Star article'}" aria-label="${starred ? 'Remove star' : 'Star article'}" aria-pressed="${starred ? 'true' : 'false'}">${starLabelHtml(starred)}</button>
-  <button type="button" class="note-toggle" ${noteVal ? 'hidden' : ''}>Add note</button>
-  <button type="button" class="more-like-this-btn"
-   data-tip="Rank the rest of your collection by how similar they are to this paper">More like this</button>
-  <button type="button" class="not-relevant-btn"
-   data-tip="Screen this paper out as not about your topic">Not relevant</button>
-  </div>
-  ${noteRowHtml}
   </div>
   `;
  }
@@ -1528,7 +1480,7 @@ function buildResultCard(article, idx) {
  // Keep the strip returned for *this* row — never look up the first pending strip.
  const parent = card.parentNode;
  const nextSibling = card.nextSibling;
- const strip = replaceCardWithUndo(card, article, { pending: true, why: simpleMode });
+ const strip = replaceCardWithUndo(card, article, { pending: true, why: true });
  try {
  await apiCall('/api/screening', {
  method: 'POST',
@@ -1570,7 +1522,7 @@ function buildResultCard(article, idx) {
  });
  }
 
- if (simpleMode) {
+ {
   card.style.setProperty('--i', String(idx));
   const toggle = card.querySelector('.result-toggle');
   if (toggle) {
@@ -1921,7 +1873,7 @@ function renderResults(results) {
  } else {
  results.forEach((article, idx) => container.appendChild(buildResultCard(article, idx)));
  }
- if (document.documentElement.getAttribute('data-mode') === 'simple') {
+ {
   openResultRow(container.querySelector('.result-row'), false);
  }
 
@@ -1939,9 +1891,8 @@ function updateSimpleSearchPanel(hasResults) {
  const panel = document.getElementById('search-simple-panel');
  const resultsSec = document.getElementById('results-section');
  if (!panel) return;
- const simple = typeof isSimpleMode === 'function' && isSimpleMode();
  const hasLibraryPapers = Object.values(librarySourceCounts).some((n) => Number(n) > 0);
- const show = !!(simple && (hasResults || hasLibraryPapers));
+ const show = !!((hasResults || hasLibraryPapers));
  if (show) {
   panel.removeAttribute('hidden');
   panel.hidden = false;
@@ -2067,7 +2018,7 @@ function watchSimplePanelClearance() {
 function syncSimpleRailAnchor() {
  const root = document.documentElement;
  const query = document.getElementById('search-query-top');
- if (root.getAttribute('data-mode') !== 'simple' || !query || query.hidden) {
+ if (!query || query.hidden) {
   root.style.removeProperty('--simple-rail-top');
   return;
  }
@@ -2093,36 +2044,20 @@ function watchSimpleRailAnchor() {
  syncSimpleRailAnchor();
 }
 
-/** Simple keeps the scope note collapsed; Advanced pins it open (summary hidden). */
+/** The scope note stays collapsed until the reader asks for it. */
 function syncSearchScopeNote() {
  const note = document.querySelector('.search-scope-note');
  if (!note) return;
- const simple = document.documentElement.getAttribute('data-mode') === 'simple';
- if (simple) {
+ {
   note.removeAttribute('open');
- } else {
-  note.setAttribute('open', '');
  }
 }
 
-// If the user toggles Simple/Advanced after a search, re-show the panel.
 document.addEventListener('DOMContentLoaded', () => {
  watchSimplePanelClearance();
  watchSimpleRailAnchor();
  syncSearchScopeNote();
- const modeBtn = document.getElementById('mode-toggle');
- if (modeBtn) {
-  modeBtn.addEventListener('click', () => {
-   // common.js flips data-mode first in the same tick; re-evaluate after.
-   requestAnimationFrame(() => {
-    updateSimpleSearchPanel(!!(lastResults && lastResults.length));
-    syncSearchScopeNote();
-    if (typeof syncSimpleRailAnchor === 'function') syncSimpleRailAnchor();
-    // Result cards carry mode-specific markup: rebuild for the new mode.
-    if (lastResults && lastResults.length) showSearchResults();
-   });
-  });
- }
+
 });
 
 async function doExportResults(format, libraryId = '') {

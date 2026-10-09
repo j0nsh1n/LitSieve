@@ -164,24 +164,25 @@ def test_api_still_requires_auth_before_validation(app_module):
 
 # --- Drift guard -----------------------------------------------------------
 
-def test_ui_dropdown_matches_catalog():
-    """Every model the UI offers must be accepted, or users hit a 422."""
-    repo = pathlib.Path(__file__).resolve().parent.parent
-    html = (repo / "templates" / "data_management.html").read_text()
-    block = re.search(
-        r'id="embedding-model".*?</select>', html, re.S,
-    )
-    assert block, "embedding-model select not found; update this guard"
-    offered = set(re.findall(r'value="([^"]+)"', block.group(0)))
-    assert offered, "no options parsed from the embedding-model select"
-    unknown = offered - set(EmbeddingEngine.allowed_models())
-    assert not unknown, f"UI offers models the API will reject: {sorted(unknown)}"
+def test_ui_catalog_comes_from_allowed_models(app_module):
+    """The re-prepare popup receives exactly the models accepted by the API."""
+    import html
+    import json
+
+    client = TestClient(app_module.app)
+    _register(client, "modelcatalog")
+    page = client.get("/search")
+    assert page.status_code == 200
+    block = re.search(r"id=\"embedding-model-catalog\" data-models='([^']+)'", page.text)
+    assert block, "Search must supply the re-prepare catalog"
+    offered = json.loads(html.unescape(block.group(1)))
+    assert {model["value"] for model in offered} == set(EmbeddingEngine.allowed_models())
 
 
 def test_topic_recommendations_match_catalog():
     """The topic->model auto-selection must only recommend valid models."""
     repo = pathlib.Path(__file__).resolve().parent.parent
-    js = (repo / "static" / "js" / "data_management.js").read_text()
+    js = (repo / "static" / "js" / "collect.js").read_text()
     block = re.search(r"TOPIC_MODEL\s*=\s*\{(.*?)\}", js, re.S)
     assert block, "TOPIC_MODEL map not found; update this guard"
     recommended = set(re.findall(r":\s*'([a-z0-9_-]+)'", block.group(1)))

@@ -6,8 +6,8 @@
  <title>LitSieve</title>
     <link rel="icon" href="/static/favicon.ico?v=20260803a" sizes="32x32">
     <link rel="apple-touch-icon" href="/static/favicon.png?v=20260803a">
- <link rel="stylesheet" href="/static/css/style.css?v=20261009h">
- <script src="/static/js/theme-init.js?v=20260918h"></script>
+ <link rel="stylesheet" href="/static/css/style.css?v=20261009j">
+ <script src="/static/js/theme-init.js?v=20261009j"></script>
  <script src="/static/js/tooltips.js?v=20260923a" defer></script>
 </head>
 <body class="public-body">
@@ -23,11 +23,11 @@
  <p class="landing-tagline">
  Gather papers from 17 public research databases, prepare them automatically,
  then rank what you kept and export citations plus a screening report.
- Simple keeps collect, screen, and search on one page; Advanced keeps every control.
+ Search brings collecting, screening, ranking, and export together in one workspace.
  </p>
  <div class="landing-cta">
  {% if user %}
- <a href="/data-management" class="btn btn-primary">Open App</a>
+ <a href="/search" class="btn btn-primary">Open App</a>
  <a href="/logout" class="btn btn-secondary">Log Out ({{ user.username }})</a>
  {% else %}
  <a href="/login" class="btn btn-primary">Log In</a>
@@ -43,14 +43,14 @@
  <h2 class="landing-section-title">How it works</h2>
  <div class="landing-path-grid">
   <article class="landing-path-card">
-   <p class="public-kicker">Simple</p>
-   <h3>One Search page</h3>
-   <p class="landing-path-copy">Fetch by topic, wait while papers prepare, write your real question in Narrow it down, then rank and export — no stepper.</p>
+   <p class="public-kicker">Search</p>
+   <h3>One research workspace</h3>
+   <p class="landing-path-copy">Choose sources, fetch and prepare papers, screen the set, then rank, organize, and export from one place.</p>
   </article>
   <article class="landing-path-card">
-   <p class="public-kicker">Advanced</p>
-   <h3>Every control</h3>
-   <p class="landing-path-copy">Get papers → Clusters → Clean up → Search, plus source picks, seed paper, and ranking options.</p>
+   <p class="public-kicker">Your workflow</p>
+   <h3>Tools when you need them</h3>
+   <p class="landing-path-copy">Start with a topic, then open screening, duplicate checks, theme groups, or export tools as your collection grows.</p>
   </article>
  </div>
  </section>
@@ -65,7 +65,7 @@
  <a href="/learn/multi-source-search" class="feature-card">
  <span class="feature-index">01</span>
  <h3>Multi-source search</h3>
- <p>Pull articles from 17 databases at once — PubMed, Europe PMC, arXiv, OpenAlex, Semantic Scholar, and more. Simple collects on Search; Advanced uses Get papers.</p>
+ <p>Pull articles from 17 databases at once — PubMed, Europe PMC, arXiv, OpenAlex, Semantic Scholar, and more — with source and result controls in Search.</p>
  <span class="feature-more">Learn more →</span>
  </a>
  <a href="/learn/semantic-embeddings" class="feature-card">
@@ -77,25 +77,25 @@
  <a href="/learn/clustering-triage" class="feature-card">
  <span class="feature-index">03</span>
  <h3>Screening &amp; triage</h3>
- <p>Simple: Narrow it down opens after fetch (required before Search). Advanced: group by topic on Clusters, or Quick screen on Clean up. Search only ranks what you kept.</p>
+ <p>Narrow it down after a fetch, group papers by theme, or mark individual records Not relevant. Search ranks the papers you keep.</p>
  <span class="feature-more">Learn more →</span>
  </a>
  <a href="/learn/duplicate-resolution" class="feature-card">
  <span class="feature-index">04</span>
- <h3>Clean up</h3>
- <p>Remove near-duplicates across sources, optional Quick screen, and a screening report for hand-ins. Simple shows collected / dups / screened-out / kept on Search.</p>
+ <h3>Duplicate checks &amp; screening report</h3>
+ <p>Remove near-duplicates across sources, run an optional Quick screen, and export a screening report for hand-ins.</p>
  <span class="feature-more">Learn more →</span>
  </a>
  <a href="/learn/similarity-search" class="feature-card">
  <span class="feature-index">05</span>
  <h3>Similarity search</h3>
- <p>Rank by meaning plus exact words, mark Not relevant, export RIS for Zotero. Advanced adds seed paper and ranking options.</p>
+ <p>Rank by meaning plus exact words, use a seed paper or PICO query, mark Not relevant, and export RIS for Zotero.</p>
  <span class="feature-more">Learn more →</span>
  </a>
  <a href="/learn/private-workspace" class="feature-card">
  <span class="feature-index">06</span>
  <h3>Private workspace</h3>
- <p>Private accounts, named libraries, Simple/Advanced layout toggle, a guest demo, background jobs, and private notes and stars.</p>
+ <p>Private accounts, named libraries, a guest demo, background jobs, and private notes and stars.</p>
  <span class="feature-more">Learn more →</span>
  </a>
  <a href="/learn/finish-your-research" class="feature-card">
@@ -114,7 +114,7 @@
  </section>
 
  <footer class="public-footer">
- <p class="public-folio">LitSieve · v5.5.0</p>
+ <p class="public-folio">LitSieve · v6.0.0</p>
  {{ scope_footer(compact=true) }}
  </footer>
  </main>

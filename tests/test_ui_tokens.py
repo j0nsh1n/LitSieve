@@ -3,7 +3,7 @@
 Locks the type / spacing / radius scales in style.css so hand-tuned values
 cannot silently multiply again. Also covers the live per-source progress
 fields on the server (by_source / source_status) — client string greps alone
-are not enough. Simple/guest guards remain the proof of presentation-only flow.
+are not enough. Search/guest layout tests prove the single-flow presentation.
 """
 
 from __future__ import annotations
@@ -206,7 +206,7 @@ def test_fetch_live_sources_markup_and_renderer():
     """Waiting state: live per-source list is reserved and rendered from API data."""
     dm_html = (REPO / "templates" / "partials" / "collect_ui.html").read_text(encoding="utf-8")
     assert 'id="fetch-live-sources"' in dm_html
-    dm_js = (REPO / "static" / "js" / "data_management.js").read_text(encoding="utf-8")
+    dm_js = (REPO / "static" / "js" / "collect.js").read_text(encoding="utf-8")
     assert "function renderFetchLiveSources" in dm_js
     assert "by_source" in dm_js
     assert "source_status" in dm_js
@@ -706,7 +706,6 @@ def test_phase8_search_workbench_and_score_meter():
     search_html = (REPO / "templates" / "search.html").read_text(encoding="utf-8")
     assert "search-workbench" in search_html
     assert "search-rail" in search_html
-    assert 'id="page-help"' in search_html
     # Save-your-work panel sits in the rail (pinned under scroll) so Results is full width.
     rail = search_html[search_html.find("search-rail") : search_html.find("search-main")]
     main = search_html[search_html.find("search-main") :]
@@ -741,40 +740,46 @@ def test_phase8_search_workbench_and_score_meter():
     assert "white-space: nowrap" in meter
 
 
-def test_phase8_page_help_on_app_shell_pages():
-    """Help is one summonable panel on Search, DM, Clean up, Clusters, Account."""
+def test_phase8_page_help_remains_on_account():
+    """Account help remains available after Search absorbs the workflow."""
     common = (REPO / "static" / "js" / "common.js").read_text(encoding="utf-8")
     assert "function initPageHelp" in common
-    for name in (
-        "search.html",
-        "data_management.html",
-        "statistics.html",
-        "clusters.html",
-        "account.html",
-    ):
-        html = (REPO / "templates" / name).read_text(encoding="utf-8")
-        assert 'id="page-help-toggle"' in html, name
-        assert 'id="page-help"' in html, name
-        assert "page-help-body" in html, name
+    html = (REPO / "templates" / "account.html").read_text(encoding="utf-8")
+    assert 'id="page-help-toggle"' in html
+    assert 'id="page-help"' in html
+    assert "page-help-body" in html
 
 
-def test_phase8_workbench_shell_splits_workflow_and_tools():
-    """Direction B: shell-primary (steps) vs shell-tools (utilities)."""
+def test_phase8_workbench_shell_has_search_and_tools_without_mode_toggle():
+    """The shell keeps Search and library tools without a mode switch."""
     base = (REPO / "templates" / "base.html").read_text(encoding="utf-8")
     assert "app-shell" in base
     assert "shell-primary" in base
     assert "shell-tools" in base
     assert 'id="nav-links-panel"' in base
-    assert 'id="mode-toggle"' in base
-    # Workflow still lives under primary; tools under shell-tools.
+    assert 'id="mode-toggle"' not in base
+    assert 'href="/search"' in base
+    # Search remains under shell-primary; tools stay under shell-tools.
     primary = base[base.find("shell-primary") : base.find("shell-tools")]
     tools = base[base.find("shell-tools") :]
     assert "nav-links-panel" in primary
-    assert "mode-toggle" in tools
+    assert "mode-toggle" not in tools
     assert "nav-library-select" in tools
     css = CSS
     assert ".shell-primary" in css
     assert ".shell-tools" in css
+
+
+def test_stylesheet_has_no_ui_mode_gate_or_toggle():
+    for name in ("style.css", "ops.css"):
+        css = (REPO / "static" / "css" / name).read_text(encoding="utf-8")
+        assert "data-mode" not in css
+        assert "mode-toggle" not in css
+        assert "nav-step-" not in css
+        assert "nav-flow-arrow" not in css
+    assert ".advanced-details > summary" in CSS
+    assert "details.advanced-details:has(#fetch-email)" not in CSS
+    assert "details.advanced-details:has(#lexical-boost)" not in CSS
 
 
 # Variables the stylesheet reads but JS sets at runtime via

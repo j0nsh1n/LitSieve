@@ -17,11 +17,9 @@ def test_reader_button_lives_in_shared_ai_actions():
     assert "Explain this study" in chunk
 
 
-def test_reader_js_loaded_in_both_modes():
+def test_reader_js_loaded_in_search():
     search = (ROOT / "templates" / "search.html").read_text(encoding="utf-8")
-    clusters = (ROOT / "templates" / "clusters.html").read_text(encoding="utf-8")
     assert "reader.js?v=" in search
-    assert "reader.js?v=" in clusters
 
 
 def test_reader_js_avoids_overclaim_words():

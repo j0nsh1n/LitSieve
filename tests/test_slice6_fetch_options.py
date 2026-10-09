@@ -24,7 +24,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const assert = require('node:assert/strict');
 const simple = fs.readFileSync('static/js/simple_tools.js', 'utf8');
-const data = fs.readFileSync('static/js/data_management.js', 'utf8');
+const data = fs.readFileSync('static/js/collect.js', 'utf8');
 
 function extractFn(src, name) {
  const marker = 'async function ' + name;

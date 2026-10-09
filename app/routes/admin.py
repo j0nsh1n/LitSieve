@@ -265,7 +265,7 @@ async def api_admin_overview(request: Request):
         "ai": llm_svc.is_configured(),
         "quota_mb": round(cap / (1024 * 1024)) if cap else 0,
         "guest_auto_prepare": guest_prep not in ("0", "false", "no", "off"),
-        "version": "5.5.0",
+        "version": "6.0.0",
         "uptime_seconds": int(max(0, __import__("time").time() - core.PROCESS_STARTED)),
         "jobs": job_counts,
         "auth_events_1h": {str(k): int(v) for k, v in auth_hour},
@@ -1136,7 +1136,6 @@ async def api_admin_start_view(user_id: str, request: Request):
         student_id=user_id,
         student_username=rec["username"],
         reason=str(body.get("reason") or ""),
-        ui_mode=str(body.get("ui_mode") or "simple"),
         minutes=minutes,
         ip=client_bucket(request),
     )
@@ -1149,7 +1148,6 @@ async def api_admin_start_view(user_id: str, request: Request):
     response = JSONResponse({
         "status": "ok",
         "expires_at": view["expires_at"],
-        "ui_mode": view["ui_mode"],
         "redirect": "/search",
     })
     response.set_cookie(
@@ -1160,12 +1158,6 @@ async def api_admin_start_view(user_id: str, request: Request):
         samesite="lax",
         max_age=int(view["minutes"]) * 60,
     )
-    if view["ui_mode"] in ("simple", "advanced"):
-        response.set_cookie(
-            "ui_mode", view["ui_mode"], httponly=False,
-            secure=core.COOKIE_SECURE, samesite="lax",
-            max_age=int(view["minutes"]) * 60,
-        )
     return response
 
 

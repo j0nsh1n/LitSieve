@@ -25,7 +25,7 @@ router = APIRouter()
 async def api_start_over(request: Request):
     """Start over (option B): keep starred/noted papers; drop the rest.
 
-    Unlocks fetch in Simple mode by shrinking the library to annotated papers
+    Unlocks another fetch on Search by shrinking the library to annotated papers
     only. Guest accounts are read-only for this mutation.
     """
     user = current_user(request)

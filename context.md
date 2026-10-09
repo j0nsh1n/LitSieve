@@ -1,73 +1,41 @@
 # context.md — LitSieve
 
 ## Current State
-- App version **5.5.0** (`app/main.py`, `GET /health`). Product name **LitSieve**.
-- Example public deployment pattern: HTTPS at the edge (e.g. Cloudflare Tunnel)
-  → `uvicorn` HTTP on `127.0.0.1:7860` only. Operator sets `PUBLIC_BASE_URL` and
-  `DEBUG=false` with a real `SECRET_KEY` in gitignored `.env`.
-- Python **3.14** (Dockerfile, CI, Render, ruff `py314`).
-- Lint: `ruff check .` — partial select (E9/F63/F7/F82/F401/F541/E401/I).
-- Types: `pyright app` via `pyrightconfig.json` (basic); CI now blocks on
-  errors. Latest 2026-10-09 check: **0 errors, 1 optional Anthropic warning**.
-- Latest targeted ops/fetch checks (2026-10-09): **67 passed**.
-- Expanded ops/fetch/JavaScript/UI unit checks: **165 passed**; `ruff check .`,
-  JavaScript syntax, and diff checks passed.
-- Remaining-roadmap reliability batch: **910 passed, 13 xfailed**. Integrated
-  Slice 2/3 (2026-10-09): **931 passed, 8 xfailed**; lint and required 67-test
-  suite pass; upgraded temporary dependency audit is clean.
-- Follow-up verification (2026-10-09): Luna and main-agent required checks each
-  passed **67 tests** and lint. Actual browser rollback polling and Advanced
-  fetch progress passed with isolated data and synthetic dispatch/sources.
-  The timeout report fit at 375px; Simple wait and mobile Ship checks were
-  interrupted by the preview disconnect. Default live deploy history had no rows.
-- Tests: `SECRET_KEY=x DEBUG=true ./venv/bin/python -m pytest -q` — prefer
-  `./venv` for sqlcipher. Count drifts with the branch; re-run before release.
-- UI: Simple/Advanced via `localStorage.uiMode` + `data-mode` (theme-init pre-paint).
-  Simple: one `/search` page (empty collect vs papers). `/data-management`
-  redirects in Simple. Fetch asks for a topic; wait screen covers fetch +
-  prepare (animated sieve, rotating copy, no live source rows). Bar maps
-  fetch 0–60 and prepare 60–90; Narrow it down holds at 90% (apply or skip),
-  then a short finish leg into Search. After papers exist, topics/fetch hide;
-  Start over is a popup. Advanced: full steps including Clean up + Clusters;
-  its progress bars share Simple height/tokens, with counts on a detail line.
-  Workshop tokens (5.5.0): accent `#a8472a` (dark `#e39a73`), 8/14/18px
-  radii, solid surfaces on a `--edge` with a `--sheen`, no backdrop-filter,
-  gradient paper grain on `body::before`. Source Serif 4 headings, Source
-  Sans 3 body/UI (self-hosted). Per-account **look** (`users.look`, cookie
-  `ui_look`, `html[data-look]`): Workshop (default), Broadsheet, Lab, Night,
-  Catalog. After creating an account, Search opens a Look popup. Change it
-  in Account. Light/dark stays on the
-  sun/moon control. Simple results open in place (one row open,
-  `.result-toggle` with aria-expanded); Simple collect is one guided column
-  (question headings, topic chips with `icon_svg` from the catalog, Next
-  reveals the topic box). Sieve pan as favicon, nav mark, and empty-state
-  illustration. CSS cache-bust `style.css?v=20260918g`. Look JS cache-bust
-  `theme-init.js?v=20260918h`, `common.js` / `account.js` `?v=20260920a`.
-  Mobile app nav is a one-row brand + menu; steps and tools open in a drawer.
-- Reader Mode: **Explain this study** on Search/Clean up cards — structured
-  plain-language reading of one abstract, cached per
-  `(article_id, source, audience)` in the library DB, warnings-only verifier.
-- Final Simple nav is one unnumbered Search tab (no stepper; collect via Start over); that contract supersedes the original Phase 10 “Simple/guest tests pass unchanged” criterion.
-- Guest: `/guest` → sample corpus, auto-prepare (set `GUEST_AUTO_PREPARE=0` in
-  tests), multi-source fetch 403, purge after 30 minutes. Search treats an
-  empty source filter as “all sources” when no source chips are enabled.
-- Operator Ship: `/ops` (same `ADMIN_USERNAMES`). Staging worktree edits,
-  named actions (`tools/operator/*.py`), validate → commit → deploy with
-  auto-rollback on failed `/health`. Never edits the live checkout in place.
-  Unlock is timed (operator-chosen) with a manual Lock; Ask Grok holds the
-  unlock so the timer cannot expire mid-run.
-- Admin: `ADMIN_USERNAMES` unlocks `/admin`. Host snapshot, one-account lookup, unlock,
-  session revoke, emailed reset / one-time login, notes, action log.
-  Student-stuck tools: job queues, clear stale, retry fetch/prepare, set-email,
-  quota bump, one-library delete, read-only student view, soft-disable,
-  tickets, incident banner, versioned student-facing copy.
-  Restart after changing `.env`.
-- Ops: systemd user unit for uvicorn; optional backup + watchdog timers — see
-  `docs/SELFHOST.md` and `docs/DEPLOY.md` (generic operator runbooks).
-- Dev isolation: `./run_dev.sh 7861` → throwaway DB/data/log paths.
-- Known gaps: no dependency lockfile; live account cap and host AI settings
-  still open (Phase 4 partial). Temporary upgraded dependency audit is clean;
-  the production environment has not been changed.
+- App version **6.0.0** (`app/main.py`, `/health`, admin summary and footers),
+  completed locally on `fix/ops-rollback-and-fetch-deadline`; nothing deployed.
+- Python **3.14** (Dockerfile, CI, Render, Ruff target).
+- Latest full suite (2026-10-09): **966 passed**, no xfails. All 15 feature
+  parity rows pass. Required ops/fetch suite: **67 passed**.
+- `ruff check app tests` and `ruff check .` pass. `pyright app` has **0 errors,
+  1 optional Anthropic import warning**; CI blocks on errors.
+- The isolated upgraded dependency audit reports no known vulnerabilities;
+  custom ROCm torch/triton packages are un-auditable. Production dependencies
+  are unchanged. There is no dependency lockfile.
+- One `/search` workspace replaces the two UI modes. Old `/data-management`,
+  `/statistics`, and `/clusters` URLs return permanent 301 redirects to Search.
+  The mode toggle, preference writes, cookies and CSS gates are removed.
+  A read-only legacy preference check supplies a one-time layout notice.
+- Empty Search offers topic selection and fetch; source choices and optional
+  contact email are in the fetch popup. Fetch and preparation share one wait
+  screen, then Narrow it down offers apply/skip before Search.
+- Search by offers Question, PICO and a paper seed. Sort/source/starred chips
+  preserve the ranking query. More holds reports, duplicates, re-prepare,
+  Start over, Set aside and optional background Group by theme. Save your work
+  offers visible results or whole-library scope exports.
+- Result identifiers/study type are inside the abstract. Stars, notes,
+  Not relevant/reasons/Undo and one-paper AI study aids remain available.
+- Workshop, Broadsheet, Lab, Night and Catalog remain account looks; light/dark
+  remains a browser preference. Shared changed assets use `?v=20261009j`.
+- Guest sessions use sample papers, cannot fetch public sources and expire
+  after 30 minutes. Search includes all available sources when unset.
+- Ship rollback dispatches detached when supported, carries its actor, and
+  polls completion. Deploy history persistence has database-reopen tests.
+- Fetch sources share a configurable 90-second whole-source budget across
+  pagination, requests and retry waits. Completed pages survive timeout;
+  progress reports queued/running/done states and elapsed time per source.
+- New support-view/ticket records omit mode; old history remains readable.
+- Known host gaps: live account cap/AI configuration (Phase 4), actual detached
+  deployment history completion (Phase 11), and disconnected browser automation.
 
 ## Repo Landmarks
 | Path | Role |
@@ -80,7 +48,7 @@
 | `app/storage/` | database, libraries, shares, user_db, quota, dbconn, helpdesk, ops_audit |
 | `app/fetchers/` | 17 public sources + `base.py` |
 | `app/content/` | source_catalog, feature_guides, sample_corpus, ui_flags, looks |
-| `templates/` + `partials/` | Jinja shell + Simple/guest partials |
+| `templates/` + `partials/` | Jinja shell + Search/guest partials |
 | `static/` | vanilla JS/CSS (no npm); cache-bust `?v=` |
 | `tests/` | pytest; policy in `tests/README.md` |
 | `docs/` | DEPLOY, SELFHOST, plans, SCALE_NOTES |
@@ -97,7 +65,7 @@
 - **AI settings**: per account `{USER_DATA_DIR}/{user_id}/ai_settings.json`
   (keys encrypted). Host env is the deploy default. A student base URL
   never rides with the host API key.
-- **Jobs**: fetch / embed progress per user; bind to an explicit owned
+- **Jobs**: fetch / embed / cluster progress per user; bind to an explicit owned
   library id when the client sends one, otherwise the active library at start
 - **Quota**: disk under `user_data/<uid>/` vs `MAX_USER_STORAGE_MB`; optional
   per-account `quota_limit_mb` + `quota_limit_until` overlay (helpdesk bump)
@@ -111,77 +79,54 @@
 ```
 User 1---* Library 1---* Article
               |            +-- embeddings, screening, notes, key_points
-              +-- jobs (fetch/embed) bind explicit library_id or active
+              +-- jobs (fetch/embed/cluster) bind explicit library_id or active
 ShareCode *---1 Library (owner); redeem → clone Library for joiner
 Guest User (is_guest) → sample corpus only; purged by age
 ```
 
 ## Non-Obvious Decisions
-- Student **starting point** product: 17 free sources; CORE removed (rate limits)
-- Multi-library is the multi-collection story; clone codes are optional/power
-- AI optional; extractive key points default; one-article Refine/Ask only
-- Simple/Advanced is **client-only** (CSS + JS); Advanced must not lose capability
-- Phase 6: no auto-clustering; screening ranks vs research question (embeddings)
-- Guest accounts: reserved `guest_*` usernames; multi-source fetch 403
-- SQLCipher opt-in via `DB_ENCRYPTION_KEY`; plaintext refuses key without migrate
-- AI keys: AES-256-GCM `enc:v2:` (Fernet `enc:v1:` still decrypts)
-- Duplicate default match strictness **0.98**
-- Starred search **includes** starred papers in results (centroid ranking)
-- Public pages must not load `common.js` (401 redirect); do not extend base.html
-- Patch tests against `app.core.*`; enumerate routes via `conftest.route_paths`
-- Password hashing is async in routes so bcrypt does not block the single worker
-- Rate limiting keys IPv6 on the /64 (`core.client_bucket`)
-- Embedding models shared process-wide (`get_shared_model`); validated names
-  (`EXTRA_EMBEDDING_MODELS` escape hatch); CSP `style-src 'self'` → no style= in HTML
-- Host entry: `app.main:app` port 7860; Linux `./venv`
+- Student starting-point product: 17 free sources; CORE was removed for rate limits.
+- Multi-library is the multi-collection story; share codes clone rather than live-share.
+- AI is optional; extractive key points remain the default; study aids read one abstract.
+- Grouping is optional, runs in the background, and does not itself exclude papers.
+- Duplicate strictness: Strict **0.99**, Normal **0.98**, Loose **0.95**.
+  Duplicate/theme previews apply selected exclusions with Undo for those papers.
+- Guest usernames use `guest_*`; multi-source fetch returns 403.
+- SQLCipher is opt-in via `DB_ENCRYPTION_KEY`; wrong keys fail closed.
+- AI keys use AES-256-GCM `enc:v2:`; older Fernet `enc:v1:` still decrypts.
+- Starred centroid search includes the starred seeds in its results.
+- Public pages load theme-init without authenticated common.js APIs.
+- Password hashing runs asynchronously; IPv6 rate limits use a /64 bucket.
+- Shared embedding models are validated; `EXTRA_EMBEDDING_MODELS` is the
+  operator escape hatch. CSP blocks inline style attributes.
+- Pipeline references stay held during background jobs; LRU eviction retains
+  the owning user's progress while a referenced job is active.
 
 ## Session Handoff
 - **Date:** 2026-10-09. **Branch:** `fix/ops-rollback-and-fetch-deadline`.
-- Local commits: `5887f2c` detached rollback; `369882e` deploy-history
-  persistence tests and host checklist; `3f97f40` whole-source deadlines
-  and partial pages; `053b2a4` security/reliability backlog; `5090a61`
-  Simple Search slices 2/3 integration; `fc195c1` Search by. Nothing pushed or deployed.
-- Slice 4 adds Search by (Question / PICO / Start from a paper), accessible
-  field labels, and correct manual-seed versus More like this restoration.
-  Main review covered actual panel switching in the browser. A deliberate
-  visibility regression failed the new behavioral test in an isolated copy.
-- Latest working-tree verification, including uncommitted Slice 6:
-  **935 passed, 7 xfailed**; required ops/fetch **67 passed**; lint passed;
-  Pyright **0 errors, 1 optional Anthropic warning**. Shared stylesheet
-  versions agree across public and authenticated templates.
-- Slice 5 (`197325d`) whole-library and visible-result export is reviewed and tested with
-  page-library isolation, exact result order, cancellation, and error coverage.
-  Slice 6 is reviewed and tested: database
-  choices inside the fetch popup, conditional remembered contact email,
-  confirmed choices used by the fetch request, and cancellation without
-  preference mutations. Collection report/duplicate preview and theme UI are
-  implemented. Slice 7 source/year charts and duplicate preview are integrated;
-  root background clustering and reprepare review remain in progress.
-- Latest combined tests: **959 passed, 1 planned parity xfailed**; required
-  ops/fetch **67 passed**, lint passed. Stale reprepare assertions were updated
-  for the new form. The browser reconnected briefly, then disconnected during login.
-- Slices 5/6/7 are committed as `197325d`, `807d62e`, and `3270337`.
-  Reprepare model selection is captured before the modal closes; its regression
-  harness includes modal removal, cancellation, only-missing, and auto-chain choice.
-  Latest working-tree suite, including background clustering: **967 passed**;
-  required ops/fetch **67 passed**. No parity xfails remain in that working tree.
-- Slice 8 is committed as `76513b9`. Theme jobs are independently reviewed:
-  owned library capture, terminal results/errors, conflict checks, retained
-  pipeline references, and stale-job support. No paper is excluded by grouping.
-  The real-library prototype used a 53-paper isolated snapshot and four themes.
-- Jonathan approved 301 redirects to Search, version 6.0.0, the concrete
-  proposed one-flow spec rewrite at removal, and a real-library copy for
-  the isolated theme prototype. Luna through Codex remains approved for
-  bounded work with main review. The split-pane design was dropped.
-- Browser evidence for slices 2/3 covers real routes with fixture embeddings,
-  all five looks light/dark at 375px, selected-chip contrast at least 5.04:1,
-  keyboard focus, and desktop layout. Slice 4 browser progress was interrupted
-  by “No preview automation host is available”; fallback browser inventory
-  is empty. Its remaining visual checks are incomplete.
-- Unverified host items: actual detached deploy/rollback completion, live
-  account cap and AI configuration. Default live deploy history had no rows.
-  External APIs and real semantic-model quality were not exercised. Temporary
-  dependency audit is clean; production dependencies were not changed.
-- Artifacts: `/tmp/litsieve-roadmap-ovp9uE/`; approved spec draft:
-  `.handoff/roadmap/spec-proposed.md`. spec.md still describes two modes
-  and transitional Pyright until the approved removal rewrite is applied.
+- Original fixes: `5887f2c` detached rollback, `369882e` deploy-history
+  persistence tests/host checklist, `3f97f40` source deadlines/partial pages.
+- Reliability/security: `053b2a4`. Search migration: `5090a61` Slices 2/3,
+  `fc195c1` Search by, `197325d` scoped exports, `807d62e` fetch choices,
+  `3270337` reports/duplicates, `76513b9` re-prepare, `2e2f4f4` background themes.
+- Slice 10 completes the single Search flow, version 6.0.0, permanent legacy
+  redirects, historical support compatibility and the explicitly approved spec
+  rewrite. Luna through Codex provided bounded work/review; main reviewed it.
+- Final checks: full pytest **966 passed**; required ops/fetch **67 passed**;
+  Ruff, JavaScript syntax and diff checks pass; Pyright **0 errors / 1 warning**;
+  temporary environment dependency audit is clean with the custom-package skips.
+  Intentional regressions were detected in isolated copies, including notice
+  preference writes and historical support mode writes.
+- Browser evidence: earlier real-route checks cover Slices 2/3, five looks in
+  light/dark at 375px, keyboard focus and selected-chip contrast ≥5.04:1.
+  Later actual-helper/headless previews cover exports, fetch/report popups,
+  preparation, themes and the final collect template. All five final looks
+  light/dark fit at 375px; desktop fits at 1280px. Fonts fell back in headless
+  previews. Authenticated automation stopped with “No preview automation host
+  is available”; remaining real-route/mobile Ship checks are incomplete.
+- Theme prototype used a 53-paper isolated real-library snapshot (four groups);
+  external APIs, real model quality and host service actions were not exercised.
+- Phase 13 code is complete locally. Phase 4/11 host confirmations remain open;
+  conditional future backlog items remain unscheduled. Nothing pushed or deployed.
+- Artifacts/check logs: `/tmp/litsieve-roadmap-ovp9uE/`. The live checkout and
+  services are unchanged; the temporary preview used isolated data and stubs.

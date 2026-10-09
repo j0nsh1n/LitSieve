@@ -76,10 +76,10 @@ def test_why_button_skips_system_groups_and_reexcludes_with_the_chip():
     assert "'simple-set-aside-reason-undo')" in wiring
 
 
-def test_not_relevant_why_is_simple_only_and_the_line_stays_up():
+def test_not_relevant_why_is_available_and_the_line_stays_up():
     js = _read("static", "js", "search.js")
     handler = _between(js, "notRelBtn.addEventListener", "function fillWhyReasonChips")
-    assert "why: simpleMode" in handler
+    assert "why: true" in handler
     assert "showSearchResults()" not in handler
     assert "syncResultCountAfterScreen()" in handler
 

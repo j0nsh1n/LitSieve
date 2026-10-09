@@ -9,6 +9,10 @@ and this project aims to follow Semantic Versioning for app version strings
 ## [Unreleased]
 
 ### Fixed
+- 2026-10-09: Version 6.0.0 uses one Search workspace. Collection, screening,
+  themes, ranking, and export remain on Search; old page URLs permanently
+  redirect there. Removed the mode toggle and preference writes, preserved
+  historical helpdesk context, and added a one-time layout notice.
 - 2026-10-09: Raised dependency security floors for PyJWT, urllib3, AnyIO,
   and fsspec; verified an upgraded environment with no known audit findings.
 - 2026-10-09: Refine, Ask, and Explain treat paper text as evidence rather

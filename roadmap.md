@@ -119,7 +119,7 @@ popup, `static/js/search.js`).
     the button. Reuses the existing cluster endpoints. Preview and undo
     through the existing screening endpoints, same pattern as Narrow it
     down.
-  - Slice 10: remove Advanced in one pull request (about 2 days). Delete
+  - [x] Slice 10: mode removal completed locally 2026-10-09. Removed
     `/data-management`, `/statistics`, `/clusters` and their templates
     with a 301 to `/search`. Delete the `ui_mode` and `ui_mode_seed`
     cookies (`app/routes/auth.py`, `app/routes/pages.py`), the mode
@@ -143,28 +143,20 @@ popup, `static/js/search.js`).
   suite green. After merge: pull the live checkout and restart the
   service.
 - After slice 10: watch 301 hits for a week, then prune dead CSS.
-- Pending Jonathan (does not block slice 1):
-  - Old URLs: 301 to `/search` (recommended) or 404. From 2026-09-08 to
-    2026-09-24 the three pages got 38 requests and only 6 rendered; the
-    rest were redirects, so students have these links saved.
-  - Removal version: 6.0.0 proposed (three pages and a mode disappear)
-  - `spec.md` two-mode lines at removal (Required Behavior, User
-    Experience, Acceptance Criteria)
-- spec.md drift until the removal lands: the Simple / Advanced mode
-  bullet and its nav lines (Required Behavior), the Simple and Advanced
-  examples (User Experience), and the two-flow lines in Acceptance
-  Criteria still describe two modes
+- Jonathan approved permanent 301 redirects to Search, version 6.0.0,
+  and the concrete one-flow spec rewrite; that rewrite is applied.
 - Complete when: every function a student could reach only in Advanced
   is on the Search page under Simple's rules; the parity test is all
-  passing; no `data-mode`, `uiMode`, or `ui_mode` reference remains in
-  `app/`, `static/`, `templates/`, or `tests/` except the helpdesk
-  history column; spec.md describes one flow
-- Status: [ ] in progress. Slices 0 and 1 shipped; Slices 2 and 3 are
-  integrated and tested locally, along with Slice 4 (Search by) and Slice 5
-  (whole-library export), Slice 6 (fetch choices), and Slice 7 (collection
-  report and duplicates), Slice 8 (reprepare options), and Slice 9 (background
-  themes). Slice 10 mode removal is next. No new work
-  has been pushed, merged, or deployed.
+  passing; no active mode preference, cookie, or conditional layout remains.
+  Read-only legacy notice/history compatibility and regression assertions
+  remain; spec.md describes one flow
+- Status: [x] code complete locally 2026-10-09. Slices 2–10 are integrated,
+  independently reviewed, and tested. The final suite has 966 passing tests,
+  with all 15 parity rows passing and no xfails. Required ops/fetch checks
+  have 67 passing tests; Ruff and Pyright have no errors. Headless previews
+  cover all five looks light/dark at 375px and desktop at 1280px with fallback
+  fonts. Authenticated browser automation disconnected, so the remaining live
+  interaction review is incomplete. Nothing new is pushed, merged, or deployed.
 
 ## Backlog (unscheduled)
 - [x] Clear app type errors and make `pyright app` blocking in CI (2026-10-09)

@@ -49,7 +49,6 @@ class Element {
 }
 const elements = {};
 const el = (id) => elements[id] ??= new Element();
-let uiMode = 'simple';
 const method = new Element(); method.value = 'text';
 const boxes = ['pubmed', 'arxiv'].map((value) => Object.assign(new Element(), {value, checked: true}));
 const stored = new Map();
@@ -69,12 +68,11 @@ const sandbox = {
   addEventListener() {}, getElementById: el,
   querySelector: (s) => s.includes('input_method') ? method : null,
   querySelectorAll: (s) => s.includes('search-source') ? boxes : [],
-  documentElement: {getAttribute: () => uiMode},
+  documentElement: {getAttribute: () => null},
   createElement: () => new Element(), body: new Element(),
  },
  window: {}, Event: class {constructor(type) {this.type = type;}},
  sessionStorage: {getItem: (k) => stored.get(k), setItem: (k,v) => stored.set(k,v), removeItem: (k) => stored.delete(k)},
- isSimpleMode: () => uiMode === 'simple',
  setLoading() {}, updateRangeFill() {}, showNotification: (...args) => notices.push(args),
  escapeHtml: (s) => String(s), getSourceName: (s) => s,
  getArticleUrl: () => 'https://example.test/paper', withPageLibrary: (body) => body,
@@ -92,7 +90,7 @@ const sandbox = {
  },
  URL: {createObjectURL: () => 'blob:test', revokeObjectURL() {}},
  setTimeout() {},
- setMode: (v) => { uiMode = v; }, setStats: (v) => { stats = v; },
+ setStats: (v) => { stats = v; },
  setHits: (v) => { hits = v; }, setFailure: (v) => { failRequest = v; },
  holdRequest: () => { heldRequest = new Promise((resolve) => { releaseRequest = resolve; }); },
  releaseRequest: () => { heldRequest = null; releaseRequest(); },
@@ -289,9 +287,7 @@ assert.equal(await promptSimpleSearchScope(), false);
 assert.equal(JSON.stringify(searchState.filters), before);
 el('query-text').value = 'question'; await doSearch({skipOptions: true});
 assert.equal(requests.at(-1).body.pico_boost, false);
-setMode('advanced'); await doSearch({skipOptions: true});
-assert.equal(requests.at(-1).body.pico_boost, true);
-setMode('simple'); el('pico-outcome').value = ' outcome ';
+el('pico-outcome').value = ' outcome ';
 openSiteForm = async (form) => {
  assert.ok(!form.fields.some((f) => f.id === 'lexical_boost' || f.id === 'pico_boost'));
  return null;
@@ -392,7 +388,7 @@ clearSearchWorkspace(); assert.equal(readSearchSession(), null);
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js not installed")
-def test_simple_metadata_is_in_abstract_and_advanced_keeps_header_badge():
+def test_paper_identifiers_and_study_type_stay_in_the_abstract():
     run_search_js(r"""
 const article = {article_id: 'PMID-123', source: 'pubmed', title: 'Trial',
  abstract: 'The trial abstract', study_type: 'randomized_controlled_trial'};
@@ -403,7 +399,6 @@ const end = simple.indexOf('</details>', start);
 assert.ok(start > 0 && end > start);
 assert.ok(simple.indexOf('PMID-123') > start && simple.indexOf('PMID-123') < end);
 assert.ok(simple.indexOf('study-type-badge') > start && simple.indexOf('study-type-badge') < end);
-setMode('advanced');
-const advanced = buildResultCard(article, 0).innerHTML;
-assert.ok(advanced.indexOf('study-type-badge') < advanced.indexOf('article-body'));
+assert.equal((simple.match(/study-type-badge/g) || []).length, 1);
+assert.ok(!simple.slice(0, start).includes('PMID-123'));
 """)

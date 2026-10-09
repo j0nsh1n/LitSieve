@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+import json
+from types import SimpleNamespace
+
 from conftest import TEST_PASSWORD
 from fastapi.testclient import TestClient
 
+from app import core
 from app.main import app
+from app.storage import helpdesk
 
 
 def _admin_client(tmp_path, monkeypatch, username="opadmin"):
@@ -487,12 +492,25 @@ def test_support_view_read_only_and_expiry(tmp_path, monkeypatch):
 
     started = client.post(
         f"/api/admin/users/{uid}/view",
-        json={"reason": "reproduce search bug", "password": TEST_PASSWORD, "ui_mode": "simple"},
+        json={"reason": "reproduce search bug", "password": TEST_PASSWORD, "ui_mode": "advanced"},
         headers={"X-CSRF-Token": csrf or ""},
     )
     assert started.status_code == 200, started.text
     assert started.json().get("token") is None
+    assert "ui_mode" not in started.json()
+    assert "ui_mode=" not in started.headers.get("set-cookie", "")
+    view_id = db.conn.execute("SELECT id FROM support_views").fetchone()[0]
+    assert db.conn.execute(
+        "SELECT ui_mode FROM support_views WHERE id = ?", (view_id,),
+    ).fetchone()[0] is None
     assert client.cookies.get("support_view")
+    token = client.cookies.get("support_view")
+    db.conn.execute("UPDATE support_views SET ui_mode = 'advanced' WHERE id = ?", (view_id,))
+    db.conn.commit()
+    legacy = helpdesk.get_support_view_by_token(db, token)
+    assert legacy and legacy["ui_mode"] == "advanced"
+    synthesized = core._support_view_user(SimpleNamespace(cookies={"support_view": token}))
+    assert synthesized and "ui_mode" not in synthesized["support_view"]
     actions = [a["action"] for a in db.list_support_actions(uid)]
     assert "support-view-start" in actions
 
@@ -618,8 +636,28 @@ def test_ticket_privacy_and_banner_rollback(tmp_path, monkeypatch):
     ctx = created.json()["ticket"]["context"]
     assert "title" not in ctx
     assert "query" not in ctx
+    assert "ui_mode" not in ctx
     assert ctx.get("route") == "/search"
     assert "Secret" not in created.text
+    ticket_id = created.json()["ticket"]["id"]
+    stored_context = db.conn.execute(
+        "SELECT context_json FROM support_tickets WHERE id = ?", (ticket_id,),
+    ).fetchone()[0]
+    assert "ui_mode" not in json.loads(stored_context)
+    direct_ticket = helpdesk.create_ticket(
+        db, student_id=rec["id"], student_username=rec["username"],
+        body="Direct helper context test.", context={"route": "/search", "ui_mode": "advanced"},
+    )
+    assert "ui_mode" not in direct_ticket["context"]
+    assert "ui_mode" not in json.loads(db.conn.execute(
+        "SELECT context_json FROM support_tickets WHERE id = ?", (direct_ticket["id"],),
+    ).fetchone()[0])
+    db.conn.execute(
+        "UPDATE support_tickets SET context_json = ? WHERE id = ?",
+        (json.dumps({"route": "/search", "ui_mode": "advanced"}), ticket_id),
+    )
+    db.conn.commit()
+    assert helpdesk.get_ticket(db, ticket_id)["context"]["ui_mode"] == "advanced"
 
     guest_client = TestClient(app)
     guest_client.post("/guest", follow_redirects=False)

@@ -2,7 +2,7 @@
 
 There is no npm and no build step, so nothing else looks at these files: a
 stray brace ships straight to users while the entire Python suite stays green.
-A broken data_management.js would take out the whole fetch/prepare page.
+A broken collect.js would take out the whole fetch/prepare page.
 
 esprima only understands up to ES2019, so the few modern tokens the codebase
 uses (`?.`, `??`) are down-levelled before parsing. Everything structural —
@@ -48,9 +48,8 @@ def test_js_parses(path):
 def test_theme_init_stays_loadable_before_paint():
     """It must remain a plain classic script.
 
-    theme-init.js sets the theme and UI mode on <html> before first paint. As a
-    module or with defer it runs too late and users see a flash of the wrong
-    theme/layout, and inline would break the `script-src 'self'` CSP.
+    theme-init.js sets the theme on <html> before first paint. As a module or
+    with defer it runs too late and users see a flash of the wrong theme.
     """
     root = pathlib.Path(__file__).resolve().parent.parent
     for name in ("base.html", "login.html", "landing.html", "register.html", "feature_guide.html"):
@@ -130,41 +129,26 @@ def test_public_pages_have_theme_toggle_without_common_js():
 
 
 def test_count_bars_scale_to_series_max():
-    """Articles-by-source and papers-by-year bars use the chart's own max.
-
-    The longest bar is 100% of the track; shorter counts are count/max.
-    A fixed global scale (or always-full bars) makes small years/sources
-    look as large as the largest.
-    """
-    src = (JS_DIR / "statistics.js").read_text(encoding="utf-8")
-    assert "function renderCountBars" in src
-    assert "maxCount" in src
-    # Width is relative to this series max, not a hard-coded total.
-    assert "(row.count / maxCount) * 100" in src or "(count / maxCount) * 100" in src
-    assert "renderYearTimeline" in src
-    # Year chart reuses the same helper (one scale definition).
-    year_fn = src[src.find("function renderYearTimeline") :]
-    assert "renderCountBars" in year_fn[:800]
+    """Source and year bars in the collection report have separate maxima."""
+    src = (JS_DIR / "simple_collection_tools.js").read_text(encoding="utf-8")
+    assert "function renderCollectionCountBars" in src
+    assert "const seriesMax = Math.max(...rows.map((row) => row.count))" in src
+    assert "bar.max = seriesMax" in src
+    assert "bar.value = count" in src
+    assert "renderCollectionCountBars(sourceSection, sources, 'source')" in src
+    assert "renderCollectionCountBars(yearSection, years, 'year')" in src
+    assert "Year not listed" in src
 
 
 def test_count_bars_do_not_use_inline_style_attributes():
-    """CSP is style-src 'self' with no unsafe-inline — style="" is ignored.
-
-    Bar widths must be applied via CSS variables / CSSOM (setProperty), not
-    style=\"width:…\" in innerHTML, or every bar renders full-width.
-    """
-    stats = (JS_DIR / "statistics.js").read_text(encoding="utf-8")
-    dm = (JS_DIR / "data_management.js").read_text(encoding="utf-8")
-    bars_fn = stats[stats.find("function renderCountBars") : stats.find("function renderYearTimeline")]
-    # Forbid HTML style attributes; allow element.style.setProperty (CSSOM).
+    """Native progress bars avoid inline styles and labels use text nodes."""
+    src = (JS_DIR / "simple_collection_tools.js").read_text(encoding="utf-8")
+    bars_fn = src[src.find("function renderCollectionCountBars") : src.find("function renderCollectionReportData")]
+    assert "document.createElement('progress')" in bars_fn
+    assert "bar.max = seriesMax" in bars_fn and "bar.value = count" in bars_fn
+    assert "innerHTML" not in bars_fn
     assert 'style="' not in bars_fn and "style='" not in bars_fn
-    assert "setProperty" in bars_fn and "--bar-pct" in bars_fn
-    assert "source-bar-inner" in bars_fn
-    # Coverage map on Data Management uses the same CSP-safe pattern.
-    assert "--bar-pct" in dm
-    assert 'style="width:' not in dm and "style='width:" not in dm
-    css = (JS_DIR.parent / "css" / "style.css").read_text(encoding="utf-8")
-    assert "var(--bar-pct" in css
+    assert "appendText(item, 'span', '', label)" in bars_fn
 
 
 def test_account_uses_site_modals_not_browser_dialogs():
@@ -230,7 +214,7 @@ def test_mobile_nav_keeps_account_link_reachable():
 
 
 def test_mobile_nav_drawer_is_closed_by_default():
-    """≤900px must not keep steps and tools on screen until the menu is opened."""
+    """≤900px keeps navigation in its drawer until the menu is opened."""
     root = pathlib.Path(__file__).resolve().parent.parent
     base = (root / "templates" / "base.html").read_text(encoding="utf-8")
     assert 'id="nav-drawer"' in base
@@ -244,11 +228,7 @@ def test_mobile_nav_drawer_is_closed_by_default():
     assert ".nav-drawer" in tablet
     assert "display: none" in tablet
     assert ".navbar.nav-open .nav-drawer" in tablet
-    desktop = css.find("@media (min-width: 901px)")
-    hide_simple_toggle = css.find(
-        "html[data-mode=\"simple\"] .nav-menu-toggle {\n        display: none !important;"
-    )
-    assert hide_simple_toggle > desktop, "Simple must keep the menu button on phones"
+    assert 'data-mode="simple"' not in css
 
 
 def test_footers_center_version_and_disclaimer():
@@ -276,7 +256,7 @@ def test_stale_tab_reloads_and_mutations_send_library_id():
 
     search = (JS_DIR / "search.js").read_text(encoding="utf-8")
     assert search.count("withPageLibrary(") >= 4
-    dm = (JS_DIR / "data_management.js").read_text(encoding="utf-8")
+    dm = (JS_DIR / "collect.js").read_text(encoding="utf-8")
     fetch_call = dm[dm.find("/api/fetch-articles-multi") : dm.find("/api/fetch-articles-multi") + 400]
     assert "withPageLibrary" in fetch_call
     embed_idx = dm.find("/api/create-embeddings")

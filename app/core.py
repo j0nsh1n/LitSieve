@@ -685,7 +685,6 @@ def _support_view_user(request: Request) -> Optional[dict]:
             "reason": view["reason"],
             "started_at": view["started_at"],
             "expires_at": view["expires_at"],
-            "ui_mode": view.get("ui_mode") or "simple",
         },
     }
 

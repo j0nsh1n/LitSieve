@@ -726,7 +726,7 @@ class LiteratureSearchPipeline:
         if query_embedding.shape[-1] != article_embeddings.shape[1]:
             raise ValueError(
                 "Embedding dimension mismatch between the query and stored "
-                "articles. Re-create embeddings on the Data Management page."
+                "articles. Use Re-prepare under More on Search."
             )
 
         use_hybrid = bool(lexical_boost) and bool((query_text or "").strip())
@@ -798,7 +798,7 @@ class LiteratureSearchPipeline:
         if query_embedding.shape[-1] != article_embeddings.shape[1]:
             raise ValueError(
                 "Embedding dimension mismatch between the query and stored "
-                "articles. Re-create embeddings on the Data Management page."
+                "articles. Use Re-prepare under More on Search."
             )
 
         q = query_embedding.reshape(1, -1)

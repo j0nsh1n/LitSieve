@@ -45,8 +45,7 @@ def _ticket_context(request: Request, body: dict, user: dict) -> dict:
             break
     return {
         "route": raw.get("route") or request.headers.get("referer") or "",
-        "ui_mode": raw.get("ui_mode") or "",
-        "app_version": "5.4.0",
+        "app_version": "6.0.0",
         "user_agent": (raw.get("user_agent") or request.headers.get("user-agent") or "")[:160],
         "library_count": len((libs or {}).get("libraries") or []),
         "article_count": int(stats.get("total_articles") or 0),

@@ -18,7 +18,7 @@ JS = ROOT / "static" / "js"
 CSS = ROOT / "static" / "css" / "style.css"
 COMMON = (JS / "common.js").read_text(encoding="utf-8")
 DM = (JS / "simple_tools.js").read_text(encoding="utf-8") + "\n" + (
-    JS / "data_management.js"
+    JS / "collect.js"
 ).read_text(encoding="utf-8")
 STYLE = CSS.read_text(encoding="utf-8")
 
@@ -102,14 +102,15 @@ def test_build_fetch_source_report_model_top5_via_node():
     assert out["mutedZeros"] == 1  # Z no_results; Bad is error (not zero)
     assert out["simpleHasDetails"] is True
     assert out["simpleCollapsedTop"] == 5
-    assert out["advancedNoDetails"] is True
+    assert out["collapsed"] is True
+    assert out["allSuccesses"] == 7
     assert "escaped" in out and out["escaped"] is True
 
 
 _NODE_REPORT_SNIPPET = r"""
 import fs from 'fs';
 import vm from 'vm';
-const dm = fs.readFileSync('static/js/data_management.js','utf8');
+const dm = fs.readFileSync('static/js/collect.js','utf8');
 // Minimal stubs for browser globals the file may touch at parse time.
 const sandbox = {
   console,
@@ -148,15 +149,16 @@ const code =
   };
   const sources = ['A','B','C','D','E','F','G','Z','Bad'];
   const model = buildFetchSourceReportModel(data, sources);
-  const simpleHtml = renderFetchSourceReportHtml(model, { simple: true });
-  const advHtml = renderFetchSourceReportHtml(model, { simple: false });
+  const simpleHtml = renderFetchSourceReportHtml(model);
+  const summary = simpleHtml.split('</summary>')[0];
   const result = {
     successCount: model.successes.length,
     topNames: model.successes.slice(0,5).map(s => s.name),
     mutedZeros: model.muted.filter(m => m.zero).length,
     simpleHasDetails: simpleHtml.includes('<details'),
-    simpleCollapsedTop: (simpleHtml.match(/✓/g) || []).length >= 5 ? 5 : (simpleHtml.match(/✓/g) || []).length,
-    advancedNoDetails: !advHtml.includes('<details'),
+    simpleCollapsedTop: (summary.match(/✓/g) || []).length,
+    collapsed: !simpleHtml.includes('<details open') && !simpleHtml.includes('help-details" open'),
+    allSuccesses: (simpleHtml.split('</summary>')[1].match(/✓/g) || []).length,
     escaped: !simpleHtml.includes('<script') && simpleHtml.includes('✓'),
   };
   console.log(JSON.stringify(result));
@@ -222,14 +224,14 @@ def test_simple_fetch_cancel_returns_false_before_request():
     assert "if (!proceed) return" in do
 
 
-def test_fetch_mode_radios_still_in_template_for_advanced():
+def test_fetch_mode_backing_fields_still_in_template():
     html = (ROOT / "templates" / "partials" / "collect_ui.html").read_text(encoding="utf-8")
     assert 'name="fetch-mode"' in html
     assert 'value="replace"' in html
     assert 'value="append"' in html
-    # Simple hides radios via CSS, not by removing them.
+    # Popups update backing fields shared by the fetch request.
     assert 'input[name="fetch-mode"]' in STYLE
-    assert 'html[data-mode="simple"]' in STYLE
+    assert 'data-mode' not in STYLE
 
 
 # ── Re-prepare dialog ──────────────────────────────────────────────────────
@@ -259,7 +261,7 @@ def test_simple_prepare_dialog_not_on_auto_chain():
     fn = DM[DM.index("async function doCreateEmbeddings") :
             DM.index("async function doCreateEmbeddings") + 800]
     assert "fromAutoChain" in fn
-    assert "simple && !fromAutoChain" in fn
+    assert "if (!fromAutoChain)" in fn
 
 
 def test_reprepare_clears_low_relevance_for_pending_screening():
@@ -268,13 +270,11 @@ def test_reprepare_clears_low_relevance_for_pending_screening():
     assert "action: 'include'" in DM or 'action: "include"' in DM
 
 
-# ── Advanced unchanged (source-level) ──────────────────────────────────────
-
-def test_advanced_keeps_radios_and_full_report_path():
+def test_search_keeps_fetch_and_prepare_backing_fields_and_full_report():
     collect = (ROOT / "templates" / "partials" / "collect_ui.html").read_text(encoding="utf-8")
-    dm = (ROOT / "templates" / "data_management.html").read_text(encoding="utf-8")
+    search = (ROOT / "templates" / "search.html").read_text(encoding="utf-8")
     assert 'name="fetch-mode"' in collect
-    assert "only-missing" in dm
-    # Advanced report path does not force <details>.
-    assert "advancedNoDetails" in DM or "simple: false" in DM or "{ simple }" in DM
-    assert "renderFetchSourceReportHtml(model, { simple })" in DM or "simple }" in DM
+    assert 'id="only-missing"' in search
+    assert "renderFetchSourceReportHtml(model)" in DM
+    assert 'class="fetch-source-report-full"' in DM
+    assert 'Show all sources' in DM

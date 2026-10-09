@@ -142,7 +142,7 @@ def test_register_defaults_workshop_and_opens_look_prompt(tmp_path, monkeypatch)
     assert r.status_code in (302, 303), r.text
     assert "pickLook=1" in (r.headers.get("location") or "")
     assert r.cookies.get("ui_look") == "workshop"
-    assert r.cookies.get("ui_mode_seed") == "simple"
+    assert r.cookies.get("ui_mode_seed") is None
     assert r.cookies.get("ui_look_prompt") == "1"
     row = db.get_by_username("lookstudent")
     assert row is not None
@@ -194,7 +194,7 @@ def test_login_sets_look_cookie_from_account(tmp_path, monkeypatch):
     assert r2.status_code in (302, 303)
     assert "pickLook" not in (r2.headers.get("location") or "")
     assert r2.cookies.get("ui_look") == "catalog"
-    assert r2.cookies.get("ui_mode_seed") in (None, "")
+    assert r2.cookies.get("ui_mode_seed") is None
     assert r2.cookies.get("ui_look_prompt") in (None, "")
 
 

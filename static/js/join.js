@@ -98,9 +98,9 @@ async function doJoin() {
     });
     const name = (data.library && data.library.name) || 'library';
     const n = (data.counts && data.counts.articles) || 0;
-    setStatus('join-status', `Added "${name}" (${n} papers). Opening Data Management…`, 'success');
+    setStatus('join-status', `Added "${name}" (${n} papers). Opening Search…`, 'success');
     showNotification(`Added library: ${name}`, 'success');
-    window.location.href = '/data-management';
+    window.location.href = '/search';
   } catch (e) {
     setStatus('join-status', e.message, 'error');
     showNotification(e.message, 'error');

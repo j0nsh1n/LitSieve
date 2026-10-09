@@ -271,13 +271,13 @@ function applyEmptyState(cardId, stats, need, msgId) {
     let msg = '';
     if (need === 'articles' && total === 0) {
         show = true;
-        msg = 'No papers in your collection yet. Start on Data Management: pick topics, type a question, and fetch.';
+        msg = 'No papers in your collection yet. On Search, pick topics, name your topic, and fetch.';
     } else if (need === 'embeddings' && total === 0) {
         show = true;
-        msg = 'No papers yet. Fetch on Data Management first; preparing for search runs automatically afterward.';
+        msg = 'No papers yet. Fetch on Search first; preparing for search runs automatically afterward.';
     } else if (need === 'embeddings' && emb === 0) {
         show = true;
-        msg = `You have ${total} paper(s), but none are ready for search yet. Open Data Management and press "Re-prepare Papers" (or wait for a running job to finish).`;
+        msg = `You have ${total} paper(s), but none are ready for search yet. Open More on Search and choose "Re-prepare" (or wait for a running job to finish).`;
     }
     card.hidden = !show;
     const msgEl = msgId ? document.getElementById(msgId) : null;
@@ -1342,118 +1342,12 @@ function prefersReducedMotion() {
     return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
-// === Simple / Advanced UI mode (client preference, like theme) ===
-function isSimpleMode() {
-    return document.documentElement.getAttribute('data-mode') === 'simple';
-}
-
-function updateModeToggleButton() {
-    const btn = document.getElementById('mode-toggle');
-    if (!btn) return;
-    const simple = isSimpleMode();
-    // Highlight when Advanced is active (not Simple) — power mode reads as "on".
-    btn.setAttribute('aria-pressed', simple ? 'false' : 'true');
-    btn.classList.toggle('is-active', !simple);
-    btn.textContent = simple ? 'Simple' : 'Advanced';
-    const modeLabel = simple
-        ? 'Switch to Advanced mode — full controls'
-        : 'Switch to Simple mode — fewer options';
-    btn.dataset.tip = modeLabel;
-    btn.setAttribute('aria-label', modeLabel);
-}
-
 function _collectQueryOn() {
     try {
         return new URL(location.href).searchParams.get('collect') === '1';
     } catch (e) {
         return /[?&]collect=1(?:[&#]|$)/.test(location.search || '');
     }
-}
-
-function updateNavStepNumbers() {
-    const simple = isSimpleMode();
-    document.querySelectorAll('.nav-link[data-step-advanced]').forEach((a) => {
-        const num = a.querySelector('.nav-step-num');
-        if (!num) return;
-        const next = simple ? (a.getAttribute('data-step-simple') || '') : (a.getAttribute('data-step-advanced') || '');
-        if (next) {
-            num.textContent = next;
-            num.hidden = false;
-        } else if (simple) {
-            // Hidden Simple steps (Clusters, Clean up) — no number when opened by URL.
-            num.hidden = true;
-        } else {
-            num.hidden = false;
-            const adv = a.getAttribute('data-step-advanced') || '';
-            if (adv) num.textContent = adv;
-        }
-    });
-    const menuStep = document.querySelector('.nav-menu-step');
-    if (menuStep) {
-        const adv = menuStep.getAttribute('data-step-advanced') || '';
-        const sim = menuStep.getAttribute('data-step-simple') || '';
-        const next = simple ? sim : adv;
-        if (next) {
-            menuStep.textContent = next;
-            menuStep.hidden = false;
-        } else if (simple && !sim) {
-            // e.g. Clusters / Clean up opened by URL in Simple mode — no step number.
-            menuStep.hidden = true;
-        } else {
-            menuStep.hidden = false;
-            if (adv) menuStep.textContent = adv;
-        }
-    }
-    const getPapers = document.querySelector('.nav-step-data_management');
-    const searchLink = document.querySelector('.nav-step-search');
-    // Literals only — do not copy data-href-* from the DOM into href
-    // (CodeQL js/xss-through-dom). Simple collect is /search?collect=1.
-    if (getPapers) {
-        getPapers.setAttribute('href', simple ? '/search?collect=1' : '/data-management');
-    }
-    if (getPapers && searchLink) {
-        const path = location.pathname || '';
-        const collecting = simple && (
-            _collectQueryOn()
-            || !!(document.body && document.body.classList.contains('simple-collecting'))
-        );
-        if (simple) {
-            const onSearch = path.indexOf('/search') !== -1;
-            getPapers.classList.toggle('active', collecting);
-            searchLink.classList.toggle('active', onSearch && !collecting);
-            if (collecting) {
-                getPapers.setAttribute('aria-current', 'page');
-                searchLink.removeAttribute('aria-current');
-            } else if (onSearch) {
-                searchLink.setAttribute('aria-current', 'page');
-                getPapers.removeAttribute('aria-current');
-            }
-        } else {
-            getPapers.classList.toggle('active', path.indexOf('/data-management') !== -1);
-            searchLink.classList.toggle('active', path.indexOf('/search') !== -1);
-            if (path.indexOf('/data-management') !== -1) {
-                getPapers.setAttribute('aria-current', 'page');
-                searchLink.removeAttribute('aria-current');
-            } else if (path.indexOf('/search') !== -1) {
-                searchLink.setAttribute('aria-current', 'page');
-                getPapers.removeAttribute('aria-current');
-            }
-        }
-    }
-}
-
-function setUiMode(mode) {
-    const m = mode === 'simple' ? 'simple' : 'advanced';
-    const root = document.documentElement;
-    root.setAttribute('data-mode', m);
-    try {
-        localStorage.setItem('uiMode', m);
-    } catch (e) { /* private mode */ }
-    try {
-        document.cookie = 'ui_mode=' + m + '; Path=/; SameSite=Lax; Max-Age=31536000';
-    } catch (e2) { /* ignore */ }
-    updateModeToggleButton();
-    updateNavStepNumbers();
 }
 
 /** Phase 8: one summonable Help panel per page (`#page-help` + toggle). */
@@ -1469,18 +1363,35 @@ function initPageHelp() {
     });
 }
 
-document.addEventListener('DOMContentLoaded', function() {
-    const btn = document.getElementById('mode-toggle');
-    if (btn) {
-        // theme-init already set data-mode; sync chrome only.
-        updateModeToggleButton();
-        updateNavStepNumbers();
-        btn.addEventListener('click', function() {
-            setUiMode(isSimpleMode() ? 'advanced' : 'simple');
-        });
-    }
-    initPageHelp();
-});
+document.addEventListener('DOMContentLoaded', initPageHelp);
+
+function showOneFlowNotice() {
+    if (!document.getElementById('search-workbench')) return;
+    const marker = 'litsieve_one_flow_notice_v1';
+    try {
+        if (localStorage.getItem(marker)) return;
+        const previous = localStorage.getItem('uiMode');
+        localStorage.setItem(marker, '1');
+        if (previous === 'simple') return;
+    } catch (e) { /* Browser storage can be unavailable. */ }
+    const main = document.querySelector('main');
+    if (!main) return;
+    const notice = document.createElement('section');
+    notice.className = 'card';
+    notice.id = 'one-flow-notice';
+    notice.setAttribute('aria-label', 'Layout update');
+    const text = document.createElement('p');
+    text.textContent = 'All your tools now live on Search. Find collection tools under More, ranking choices in Search options, and exports in Save your work.';
+    const dismiss = document.createElement('button');
+    dismiss.type = 'button';
+    dismiss.className = 'btn btn-secondary btn-sm';
+    dismiss.textContent = 'Got it';
+    dismiss.addEventListener('click', () => notice.remove());
+    notice.append(text, dismiss);
+    main.prepend(notice);
+}
+
+document.addEventListener('DOMContentLoaded', showOneFlowNotice);
 
 // === Long-abstract clamp + expand (Search results, etc.) ===
 // Abstracts longer than this get a collapse with "Show full abstract".
@@ -1656,7 +1567,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (typeof openSiteForm !== 'function') return;
             const vals = await openSiteForm({
                 title: 'Ask for help',
-                message: 'Describe what is stuck. We attach only safe diagnostics (page, mode, counts) — not paper titles or passwords.',
+                message: 'Describe what is stuck. We attach only safe diagnostics (page and counts) — not paper titles or passwords.',
                 confirmLabel: 'Send',
                 fields: [
                     { id: 'body', label: 'What happened?', type: 'text', value: '', placeholder: 'I cannot prepare papers…' },
@@ -1671,7 +1582,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         body: vals.body,
                         context: {
                             route: location.pathname,
-                            ui_mode: document.body.getAttribute('data-mode') || localStorage.getItem('uiMode') || '',
                             user_agent: (navigator.userAgent || '').slice(0, 160),
                         },
                     },
