@@ -924,37 +924,24 @@ class LiteratureSearchPipeline:
 
         return duplicates
 
-    def resolve_duplicates(self, threshold: float = 0.98) -> Dict:
-        """
-        Auto-resolve duplicate groups: keep the best copy, exclude the rest.
+    def preview_duplicate_resolution(self, threshold: float = 0.98) -> Dict:
+        """Propose exact redundant copies using the same rule as auto-resolve.
 
-        Duplicate pairs are grouped transitively (union-find). Within each group
-        the winner is the LONGEST ABSTRACT, then preferred SOURCE_PRIORITY
-        (PubMed before secondary databases), then stable ids. Losers are marked
-        excluded reason='duplicate' (hidden from search/detection; reversible).
-
-        Returns:
-            {'groups': n_groups_resolved, 'excluded': n_articles_excluded}
+        No screening is written; the caller can inspect every proposed copy
+        and apply only the keys they confirmed.
         """
         duplicates = self.detect_duplicates(threshold=threshold)
-        if not duplicates:
-            return {'groups': 0, 'excluded': 0}
-
-        # Union-find over (article_id, source) keys.
         parent = {}
 
-        def find(k):
-            parent.setdefault(k, k)
-            while parent[k] != k:
-                parent[k] = parent[parent[k]]
-                k = parent[k]
-            return k
+        def find(key):
+            parent.setdefault(key, key)
+            while parent[key] != key:
+                parent[key] = parent[parent[key]]
+                key = parent[key]
+            return key
 
-        def union(a, b):
-            parent[find(a)] = find(b)
-
-        for id1, id2, _sim in duplicates:
-            union(id1, id2)
+        for first, second, _similarity in duplicates:
+            parent[find(first)] = find(second)
 
         groups: Dict = {}
         for key in list(parent):
@@ -962,24 +949,39 @@ class LiteratureSearchPipeline:
 
         articles = self.db.get_all_articles_with_clusters()
         from app.utils import duplicate_quality_key
-        losers = []
-        n_groups = 0
+        candidates = []
+        resolved_groups = 0
         for members in groups.values():
+            members = [key for key in members if key in articles]
             if len(members) < 2:
                 continue
-            n_groups += 1
-            # Longest abstract wins; preferred source (PubMed > …) breaks ties.
-            keeper = max(
-                members,
-                key=lambda k: duplicate_quality_key(articles.get(k), k),
-            )
-            losers.extend(k for k in members if k != keeper)
+            keeper = max(members, key=lambda key: duplicate_quality_key(articles[key], key))
+            keeper_row = articles[keeper]
+            resolved_groups += 1
+            for key in members:
+                if key == keeper:
+                    continue
+                row = articles[key]
+                candidate = {field: row.get(field) for field in (
+                    'article_id', 'source', 'title', 'abstract', 'year', 'authors', 'journal',
+                )}
+                candidate['keeper'] = {
+                    'article_id': keeper[0], 'source': keeper[1],
+                    'title': keeper_row.get('title', ''),
+                }
+                candidates.append(candidate)
+        return {'groups': resolved_groups, 'excluded': len(candidates), 'candidates': candidates}
 
-        self.db.exclude_articles(losers, reason='duplicate')
-        self.invalidate_corpus_cache()
+    def resolve_duplicates(self, threshold: float = 0.98) -> Dict:
+        """Keep the longest abstract, then preferred source, in each group."""
+        plan = self.preview_duplicate_resolution(threshold=threshold)
+        losers = [(item['article_id'], item['source']) for item in plan['candidates']]
+        if losers:
+            self.db.exclude_articles(losers, reason='duplicate')
+            self.invalidate_corpus_cache()
         logger.info("Resolved %d duplicate groups: excluded %d redundant copies",
-                    n_groups, len(losers))
-        return {'groups': n_groups, 'excluded': len(losers)}
+                    plan['groups'], len(losers))
+        return {'groups': plan['groups'], 'excluded': len(losers)}
 
     def search_by_seed(
         self,

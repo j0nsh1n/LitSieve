@@ -155,7 +155,8 @@ Guest User (is_guest) → sample corpus only; purged by age
   choices inside the fetch popup, conditional remembered contact email,
   confirmed choices used by the fetch request, and cancellation without
   preference mutations. Collection report/duplicate preview and theme UI are
-  implemented, with root integration and background clustering still in progress.
+  implemented. Slice 7 source/year charts and duplicate preview are integrated;
+  root background clustering and reprepare review remain in progress.
 - Latest combined tests: **959 passed, 1 planned parity xfailed**; required
   ops/fetch **67 passed**, lint passed. Stale reprepare assertions were updated
   for the new form. The browser reconnected briefly, then disconnected during login.

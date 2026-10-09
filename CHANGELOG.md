@@ -27,6 +27,9 @@ and this project aims to follow Semantic Versioning for app version strings
   carries the operator identity, and polls for completion across the site restart.
 
 ### Added
+- 2026-10-09: What we fetched shows source/year counts and refreshable
+  coverage. Duplicate checking offers Strict, Normal, and Loose previews,
+  applies selected copies, and can undo exactly those copies.
 - 2026-10-09: The fetch popup includes database choices and a remembered
   contact email when PubMed or Europe PMC is selected. Cancel leaves choices unchanged.
 - 2026-10-09: Save your work offers visible results, all papers, kept papers,

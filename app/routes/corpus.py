@@ -419,12 +419,15 @@ async def api_get_cluster_articles(cluster_id: int, request: Request):
 
 
 @router.get("/api/statistics")
-async def api_statistics(request: Request):
+async def api_statistics(request: Request, library_id: Optional[str] = None):
     user = current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
     uid = user["user_id"]
-    p = get_pipeline(uid)
+    try:
+        p = get_owned_pipeline(uid, library_id)
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"detail": str(e)})
     try:
         stats = p.get_statistics()
         # Storage usage is account-wide (all libraries), so the UI can warn
@@ -434,7 +437,7 @@ async def api_statistics(request: Request):
     except Exception as e:
         return server_error()
     finally:
-        release_pipeline(uid)
+        release_pipeline(uid, library_id)
 
 
 @router.post("/api/detect-duplicates")
@@ -510,7 +513,9 @@ async def api_screening(req: ScreeningRequest, request: Request):
 
 
 @router.get("/api/screening/excluded")
-async def api_screening_excluded(request: Request, reason: Optional[str] = None):
+async def api_screening_excluded(
+    request: Request, reason: Optional[str] = None, library_id: Optional[str] = None,
+):
     """Papers set aside, with title, year, and reason.
 
     No ``reason`` (or ``all``) lists every reason, grouped, for the Simple
@@ -521,7 +526,10 @@ async def api_screening_excluded(request: Request, reason: Optional[str] = None)
     if not user:
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
     uid = user["user_id"]
-    p = get_pipeline(uid)
+    try:
+        p = get_owned_pipeline(uid, library_id)
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"detail": str(e)})
     try:
         code = None if not reason or reason == "all" else normalize_reason(reason, default="low_relevance")
         items = p.db.get_excluded_items(code)
@@ -545,7 +553,7 @@ async def api_screening_excluded(request: Request, reason: Optional[str] = None)
     except Exception as e:
         return server_error()
     finally:
-        release_pipeline(uid)
+        release_pipeline(uid, library_id)
 
 
 @router.post("/api/screening/quick-preview")
@@ -664,14 +672,18 @@ async def api_resolve_duplicates(req: ResolveDuplicatesRequest, request: Request
     if csrf_failed(request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
     uid = user["user_id"]
-    p = get_pipeline(uid)
     try:
-        result = await run_in_thread(p.resolve_duplicates, threshold=req.threshold)
+        p = get_owned_pipeline(uid, req.library_id)
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"detail": str(e)})
+    try:
+        action = p.preview_duplicate_resolution if req.preview else p.resolve_duplicates
+        result = await run_in_thread(action, threshold=req.threshold)
         return {"status": "success", **result}
     except Exception as e:
         return server_error()
     finally:
-        release_pipeline(uid)
+        release_pipeline(uid, req.library_id)
 
 
 @router.post("/api/coverage")
@@ -681,7 +693,10 @@ async def api_coverage(req: CoverageRequest, request: Request):
     if not user:
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
     uid = user["user_id"]
-    p = get_pipeline(uid)
+    try:
+        p = get_owned_pipeline(uid, req.library_id)
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"detail": str(e)})
     try:
         stats = p.get_statistics()
         sources = stats.get("sources") or {}
@@ -696,4 +711,4 @@ async def api_coverage(req: CoverageRequest, request: Request):
     except Exception as e:
         return server_error()
     finally:
-        release_pipeline(uid)
+        release_pipeline(uid, req.library_id)

@@ -2059,6 +2059,7 @@ function updateSimpleToolsStrip(stats) {
 }
 
 function openSimpleSourceReport(stats) {
+ if (typeof openCollectionReport === 'function') return openCollectionReport();
  const sources = (stats && stats.sources) || {};
  const lines = Object.keys(sources)
   .filter((id) => (Number(sources[id]) || 0) > 0)

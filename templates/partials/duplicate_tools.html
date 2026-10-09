@@ -1,0 +1,32 @@
+<section class="set-aside-group" aria-labelledby="simple-duplicate-tools-title">
+ <div class="set-aside-group-head">
+  <div>
+   <h3 class="screen-triage-group-title" id="simple-duplicate-tools-title">Duplicate copies</h3>
+   <p class="help-text">Review the proposed copies first. You choose which ones to set aside.</p>
+  </div>
+  <button type="button" class="btn btn-secondary btn-sm"
+   data-set-aside-check-duplicates>Check again</button>
+ </div>
+ <fieldset class="set-aside-reason-chips" aria-label="Match strictness">
+  <legend class="help-text">Match strictness</legend>
+  <label class="btn btn-secondary btn-sm">
+   <input type="radio" name="simple-duplicate-threshold" value="0.99"> Strict
+  </label>
+  <label class="btn btn-secondary btn-sm">
+   <input type="radio" name="simple-duplicate-threshold" value="0.98" checked> Normal
+  </label>
+  <label class="btn btn-secondary btn-sm">
+   <input type="radio" name="simple-duplicate-threshold" value="0.95"> Loose
+  </label>
+ </fieldset>
+ <div id="simple-duplicate-status" class="status-indicator" aria-live="polite"></div>
+ <div id="simple-duplicate-preview" class="set-aside-groups" hidden></div>
+ <div class="lra-modal-actions">
+  <button type="button" class="btn btn-primary" id="simple-duplicate-apply" hidden>
+   Set aside selected copies
+  </button>
+  <button type="button" class="btn btn-secondary" id="simple-duplicate-undo" hidden>
+   Undo duplicate check
+  </button>
+ </div>
+</section>

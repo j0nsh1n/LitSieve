@@ -121,17 +121,17 @@ def test_contact_email_shown_only_for_pubmed_and_europepmc():
 
 # Slice 7 -------------------------------------------------------------------
 
-@later
 def test_what_we_fetched_popup_has_sources_years_and_coverage():
-    assert 'id="simple-what-we-fetched"' in _search_templates()
-    assert "/api/coverage" in _read("static", "js", "simple_tools.js")
+    js = _read("static", "js", "simple_collection_tools.js")
+    assert "host.id = 'simple-what-we-fetched'" in js
+    assert "/api/coverage" in js
 
 
-@later
 def test_check_for_duplicates_from_set_aside_popup():
-    assert "data-set-aside-check-duplicates" in _card()
-    js = _read("static", "js", "simple_tools.js")
-    assert "Strict" in js and "Loose" in js
+    assert 'include "partials/duplicate_tools.html"' in _card()
+    partial = _read("templates", "partials", "duplicate_tools.html")
+    assert "data-set-aside-check-duplicates" in partial
+    assert "Strict" in partial and "Loose" in partial
 
 
 # Slice 8 -------------------------------------------------------------------

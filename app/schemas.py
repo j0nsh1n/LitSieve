@@ -157,6 +157,7 @@ class AISettingsUpdate(BaseModel):
 
 class CoverageRequest(BaseModel):
     topics: Optional[List[str]] = None
+    library_id: Optional[str] = Field(default=None, max_length=128)
 
 
 class ClusterRequest(BaseModel):
@@ -214,6 +215,8 @@ class LibrarySwitchRequest(BaseModel):
 
 class ResolveDuplicatesRequest(BaseModel):
     threshold: float = Field(default=0.98, ge=0.5, le=1.0)
+    preview: bool = False
+    library_id: Optional[str] = Field(default=None, max_length=128)
 
 
 class DeleteAccountRequest(BaseModel):
