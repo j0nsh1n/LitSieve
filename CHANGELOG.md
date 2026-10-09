@@ -9,6 +9,15 @@ and this project aims to follow Semantic Versioning for app version strings
 ## [Unreleased]
 
 ### Fixed
+- 2026-10-09: Raised dependency security floors for PyJWT, urllib3, AnyIO,
+  and fsspec; verified an upgraded environment with no known audit findings.
+- 2026-10-09: Refine, Ask, and Explain treat paper text as evidence rather
+  than instructions. Explain regenerates cached answers under the new prompt.
+- 2026-10-09: Startup warns when the retired global AI settings file exists
+  without host AI configuration, without reading the file or its secrets.
+- 2026-10-09: Cleared the app's type-checking errors and made Pyright blocking
+  in CI. A regression check now catches disagreement between the look lists.
+- 2026-10-09: A timed-out source with one retained article says "1 paper".
 - 2026-10-09: Fetch sources share a configurable 90-second budget across
   pages, requests, and retry waits. Completed pages survive a timeout, and
   progress identifies queued, running, completed, and timed-out sources.

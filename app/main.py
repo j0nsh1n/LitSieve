@@ -11,12 +11,14 @@ import logging
 import os
 import threading
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from dotenv import load_dotenv
 
 load_dotenv()
 
-from fastapi import FastAPI  # noqa: E402
+from fastapi import FastAPI, Request  # noqa: E402
+from fastapi.responses import Response  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 from slowapi import _rate_limit_exceeded_handler  # noqa: E402
 from slowapi.errors import RateLimitExceeded  # noqa: E402
@@ -45,9 +47,31 @@ configure_logging()
 logger = logging.getLogger(__name__)
 
 
+def _warn_legacy_ai_settings() -> None:
+    """Warn when an unused global AI settings file may contain old config."""
+    data_dir = Path(os.environ.get("USER_DATA_DIR", "user_data"))
+    legacy_settings = data_dir / "ai_settings.json"
+    if not legacy_settings.exists():
+        return
+
+    if any(
+        os.environ.get(name, "").strip()
+        for name in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "OLLAMA_MODEL")
+    ):
+        return
+
+    logger.warning(
+        "Legacy global AI settings file exists at %s and is ignored; configure "
+        "a host provider with OPENAI_API_KEY, ANTHROPIC_API_KEY, or OLLAMA_MODEL, "
+        "or set up AI in an account. The file was not read.",
+        legacy_settings,
+    )
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     """Startup/shutdown hook (replaces the deprecated on_event decorator)."""
+    _warn_legacy_ai_settings()
     # UMAP's first fit pays ~8s of numba JIT; absorb it at boot in a daemon
     # thread so the first Generate Clusters click stays ~1s (bench_scale.py).
     from app.services.clustering import warm_density_reducer
@@ -57,13 +81,19 @@ async def lifespan(_app: FastAPI):
     # warm-up thread is a daemon.
 
 
+def _handle_rate_limit(request: Request, exc: Exception) -> Response:
+    if not isinstance(exc, RateLimitExceeded):
+        raise exc
+    return _rate_limit_exceeded_handler(request, exc)
+
+
 app = FastAPI(
     title="LitSieve",
     version="5.5.0",
     lifespan=lifespan,
 )
 app.state.limiter = core.limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_exception_handler(RateLimitExceeded, _handle_rate_limit)
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(SupportViewMiddleware)
 

@@ -17,7 +17,7 @@ class EuropePMCFetcher(BaseFetcher):
     SOURCE_NAME = "europepmc"
     BASE_URL = "https://www.ebi.ac.uk/europepmc/webservices/rest"
 
-    def __init__(self, email: str = None, **kwargs):
+    def __init__(self, email: Optional[str] = None, **kwargs):
         self.email = email
 
         self.http = HttpClient(delay=0.3)

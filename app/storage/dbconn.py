@@ -19,6 +19,7 @@ from __future__ import annotations
 import logging
 import os
 import sqlite3
+from importlib import import_module
 
 logger = logging.getLogger(__name__)
 
@@ -43,13 +44,12 @@ def _driver():
     if not encryption_enabled():
         return sqlite3
     try:
-        import sqlcipher3
+        return import_module("sqlcipher3.dbapi2")
     except ImportError as exc:  # pragma: no cover - depends on optional wheel
         raise DatabaseKeyError(
             f"{ENV_KEY} is set but sqlcipher3 is not installed. "
             "Install it with: pip install sqlcipher3-binary"
         ) from exc
-    return sqlcipher3.dbapi2
 
 
 def integrity_errors() -> tuple:

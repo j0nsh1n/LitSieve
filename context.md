@@ -7,12 +7,18 @@
   `DEBUG=false` with a real `SECRET_KEY` in gitignored `.env`.
 - Python **3.14** (Dockerfile, CI, Render, ruff `py314`).
 - Lint: `ruff check .` — partial select (E9/F63/F7/F82/F401/F541/E401/I).
-- Types: `pyright app` via `pyrightconfig.json` (basic); CI **continue-on-error**
-  (report-only). Compared with `main` on 2026-10-09: **61 errors, 1 warning**
-  in both snapshots, with no new deadline/progress diagnostics.
+- Types: `pyright app` via `pyrightconfig.json` (basic); CI now blocks on
+  errors. Latest 2026-10-09 check: **0 errors, 1 optional Anthropic warning**.
 - Latest targeted ops/fetch checks (2026-10-09): **67 passed**.
 - Expanded ops/fetch/JavaScript/UI unit checks: **165 passed**; `ruff check .`,
   JavaScript syntax, and diff checks passed.
+- Remaining-roadmap baseline and reliability batch (2026-10-09): **910 passed,
+  13 xfailed**, lint passed, upgraded temporary dependency audit clean.
+- Follow-up verification (2026-10-09): Luna and main-agent required checks each
+  passed **67 tests** and lint. Actual browser rollback polling and Advanced
+  fetch progress passed with isolated data and synthetic dispatch/sources.
+  The timeout report fit at 375px; Simple wait and mobile Ship checks were
+  interrupted by the preview disconnect. Default live deploy history had no rows.
 - Tests: `SECRET_KEY=x DEBUG=true ./venv/bin/python -m pytest -q` — prefer
   `./venv` for sqlcipher. Count drifts with the branch; re-run before release.
 - UI: Simple/Advanced via `localStorage.uiMode` + `data-mode` (theme-init pre-paint).
@@ -58,8 +64,9 @@
 - Ops: systemd user unit for uvicorn; optional backup + watchdog timers — see
   `docs/SELFHOST.md` and `docs/DEPLOY.md` (generic operator runbooks).
 - Dev isolation: `./run_dev.sh 7861` → throwaway DB/data/log paths.
-- Known gaps: no dependency lockfile; pyright not green/blocking; account cap
-  still open (Phase 4 partial).
+- Known gaps: no dependency lockfile; live account cap and host AI settings
+  still open (Phase 4 partial). Temporary upgraded dependency audit is clean;
+  the production environment has not been changed.
 
 ## Repo Landmarks
 | Path | Role |
@@ -129,24 +136,32 @@ Guest User (is_guest) → sample corpus only; purged by age
 
 ## Session Handoff
 - **Date:** 2026-10-09. **Branch:** `fix/ops-rollback-and-fetch-deadline`.
-- Task 1 (`5887f2c`): detached rollback with actor and dispatch ID, receipt
-  audit, in-flight refusal, and polling that ignores stale records. Synchronous
-  fallback remains. Rollback already used `_finish_deploy` through `_do_deploy`.
-- Task 2 (`369882e`): direct `_finish_deploy` tests reopen temporary `USERS_DB`
-  files and prove exactly one `ok` or `rolled_back` row with both SHAs and actor.
-  The host checklist is in `docs/SELFHOST.md`; live host confirmation stays open.
-- Task 3: `LITSIEVE_FETCH_SOURCE_TIMEOUT` defaults to 90 seconds per source,
-  including pagination and retry waits. Requests use remaining time; completed
-  pages are inserted on timeout. Progress gives source states, timestamps, and
-  elapsed seconds; the UI labels waits and timeouts. Cancel closes source rows.
-- Required `ruff check app tests` and five-file pytest checks passed with
-  `DEBUG=true` (47, 49, and 67 tests for Tasks 1, 2, and 3). Additional HTTP,
-  report, JavaScript, and UI contract checks are recorded in Current State.
-- GPT-6-Luna through Codex implemented fetcher/UI slices. The main agent reviewed
-  those diffs; Luna reviewed the main-agent paths and the two corrected regressions.
-- Unverified: real systemd dispatch, service restart, live history, external APIs,
-  and browser appearance. All checks used temporary databases and mocked calls.
-- Budget limit: blocking Entrez calls and slow-trickling HTTP responses stop only
-  when control returns. The existing deploy-style check/dispatch has no atomic
-  reservation against concurrent requests; review inferred that race, without
-  reproducing it. No host operations, push, PR, or merge occurred.
+- Original ops/fetch fixes: `5887f2c` detached rollback, `369882e` reopened
+  deploy-history tests and host checklist, `3f97f40` whole-source deadlines,
+  partial-page retention, and per-source progress. Nothing pushed or deployed.
+- Remaining-roadmap work is now authorized: security/reliability first, then
+  Phase 13. Jonathan chose to drop the reverted split-pane design and approved
+  GPT-6-Luna through Codex for bounded implementation and test runs.
+- Security/reliability batch: raised vulnerable dependency floors; upgraded
+  only a temporary environment; audit reports no known vulnerabilities.
+  All three AI prompts treat source text as data, and Reader cache is v2.
+  Startup warns for ignored global AI settings without reading its contents.
+  Look-list drift is tested, one-paper timeout wording is fixed, and app type
+  errors are cleared so CI now blocks on Pyright. The old split-pane CSS was
+  already fully removed by its revert; no cleanup was needed.
+- Verification: full suite **910 passed, 13 xfailed**; required ops/fetch
+  suite **67 passed**; lint passed; Pyright **0 errors, 1 warning** for the
+  optional Anthropic package. Actual browser timeout report at 375px says
+  "timed out (1 paper)" and has no horizontal overflow, with synthetic sources
+  and isolated temporary data. Artifacts: `/tmp/litsieve-roadmap-ovp9uE/`.
+- Next: reconcile existing Slice 2 commit and uncommitted Slice 3 into this
+  isolated branch without altering their source worktrees; then continue
+  Phase 13 slices 4–10. The legacy source worktrees remain untouched.
+- Unverified: real systemd dispatch/restart, live completion, external APIs,
+  live account cap and host AI configuration. The default live deploy-history
+  table had no rows. No live services may be restarted in this task.
+- Limits: Entrez blocking calls and slow-trickling HTTP responses cooperate
+  only when control returns; deploy check/dispatch has no atomic reservation.
+  spec.md still describes transitional Pyright/two modes; do not edit it
+  without explicit approval. No push, PR, merge, branch deletion, or host
+  configuration change occurred.

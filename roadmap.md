@@ -46,11 +46,12 @@ follow-up audits of 2026-09-12 and 2026-09-17 (session record).
 ## Phase 12 — UX round 2 leftovers
 Presentation items from the 2026-09-17 audit of the airy glass restyle.
 - Tasks:
-  - Decide whether to revive m2 split-pane triage (reverted on
-    `feat/ux2-m2-split-pane`, `57b7624` to `41fa5b9`) or drop it
+  - [x] Drop m2 split-pane triage (Jonathan's decision, 2026-10-09).
+    The design was reverted from `57b7624` by `41fa5b9`; no matching local
+    branch remains, and a read-only remote heads check found none either.
 - Complete when: the decision is recorded and the branch is merged or
   deleted
-- Status: [ ] open
+- Status: [x] complete 2026-10-09
 
 ## Phase 13 — One flow: fold Advanced into Simple, then remove Advanced mode
 Simple's rules apply to every moved function: one URL, popups only on
@@ -161,16 +162,16 @@ popup, `static/js/search.js`).
   chips) is next. Nothing waits on the pending calls until slice 6.
 
 ## Backlog (unscheduled)
-- Make `pyright app` blocking in CI after clearing the current error backlog
-  (56 errors, 6 warnings on 2026-09-12)
-- Tell all three AI prompts (`_REFINE_SYSTEM`, `_ASK_SYSTEM`, Reader) that the
-  abstract is data, not instructions; one change covering all three
-- Startup warning when `user_data/ai_settings.json` exists and no AI env is set
-- Prune CSS left by the reverted split-pane work (stylesheet is 8,396 lines
-  on 2026-09-20)
-- A test that parses the look list in `app/content/looks.py`,
+- [x] Clear app type errors and make `pyright app` blocking in CI (2026-10-09)
+- [x] Tell all three AI prompts (`_REFINE_SYSTEM`, `_ASK_SYSTEM`, Reader) that
+  source text is data, not instructions (2026-10-09)
+- [x] Startup warning for legacy global AI settings without host configuration
+  (2026-10-09)
+- [x] Audit CSS left by the reverted split-pane work: `41fa5b9` already
+  removed the full 149-line block; no split-pane selectors remain (2026-10-09)
+- [x] A test that parses the look list in `app/content/looks.py`,
   `static/js/theme-init.js`, and `templates/partials/look_picker.html` and
-  fails when they differ; today the three match only by hand
+  fails when they differ (2026-10-09)
 - Looks beyond palette: per-look structure changes (`app/content/looks.py`
   calls this a later job)
 - Dependency lockfile (pip-tools / uv) if reproducibility becomes a priority

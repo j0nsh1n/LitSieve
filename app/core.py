@@ -22,7 +22,7 @@ import time
 from collections import OrderedDict
 from datetime import datetime, timezone
 from functools import partial
-from typing import Optional
+from typing import Any, Optional, cast
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
@@ -547,7 +547,7 @@ def start_user_job(uid: str, task: str, fn, /, **kwargs) -> bool:
     that was active when the job started. library_id is not forwarded to fn.
     """
     lib_id = owned_library_id(uid, kwargs.pop("library_id", None))
-    extra = {"library_id": lib_id}
+    extra: dict[str, Any] = {"library_id": lib_id}
     if task == "fetch":
         extra["last_fetch"] = {
             "query": kwargs.get("query") or "",
@@ -596,7 +596,7 @@ def current_user(request: Request) -> Optional[dict]:
     """
     cached = getattr(request.state, "_current_user", _MISSING)
     if cached is not _MISSING:
-        return cached
+        return cast(Optional[dict], cached)
 
     view_user = _support_view_user(request)
     if view_user is not None:

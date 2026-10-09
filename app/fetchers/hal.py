@@ -17,7 +17,7 @@ class HALFetcher(BaseFetcher):
     SOURCE_NAME = "hal"
     BASE_URL = "https://api.archives-ouvertes.fr/search/"
 
-    def __init__(self, email: str = None):
+    def __init__(self, email: Optional[str] = None):
         self.http = HttpClient(
             delay=0.35,
             user_agent=f"LiteratureResearchAide/4.0 ({email or 'research@example.com'})",

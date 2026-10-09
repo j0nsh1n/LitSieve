@@ -6,7 +6,7 @@ Free API, no authentication required
 
 import logging
 import re
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from app.fetchers.base import BaseFetcher, FetchError, HttpClient, reraise_fetch_error
 
@@ -17,7 +17,7 @@ class ZenodoFetcher(BaseFetcher):
     SOURCE_NAME = 'zenodo'
     BASE_URL = 'https://zenodo.org/api/records'
 
-    def __init__(self, email: str = None):
+    def __init__(self, email: Optional[str] = None):
         self.http = HttpClient(
             delay=0.3,
             user_agent=f'LiteratureResearchAide/3.7 ({email or "research@example.com"})',
@@ -62,7 +62,7 @@ class ZenodoFetcher(BaseFetcher):
 
         return articles[:max_results]
 
-    def _parse_record(self, record: Dict) -> Dict:
+    def _parse_record(self, record: Dict) -> Optional[Dict]:
         try:
             meta = record.get('metadata', {})
             title = (meta.get('title') or '').strip()

@@ -43,7 +43,7 @@ class _RxivFetcher(BaseFetcher):
     PAGE_SIZE = 100
     MAX_PAGES = 12  # scan at most ~1200 recent records per request
 
-    def __init__(self, email: str = None):
+    def __init__(self, email: Optional[str] = None):
         self.http = HttpClient(
             delay=0.35,
             user_agent=f"LiteratureResearchAide/4.0 ({email or 'research@example.com'})",

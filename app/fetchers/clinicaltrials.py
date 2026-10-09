@@ -17,7 +17,7 @@ class ClinicalTrialsFetcher(BaseFetcher):
     SOURCE_NAME = "clinicaltrials"
     BASE_URL = "https://clinicaltrials.gov/api/v2"
 
-    def __init__(self, email: str = None, **kwargs):
+    def __init__(self, email: Optional[str] = None, **kwargs):
         self.email = email
 
         self.http = HttpClient(delay=0.3)

@@ -18,7 +18,7 @@ class DBLPFetcher(BaseFetcher):
     SOURCE_NAME = "dblp"
     BASE_URL = "https://dblp.org/search/publ/api"
 
-    def __init__(self, email: str = None):
+    def __init__(self, email: Optional[str] = None):
         self.http = HttpClient(
             delay=0.4,
             user_agent=f"LiteratureResearchAide/4.0 ({email or 'research@example.com'})",

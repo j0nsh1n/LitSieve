@@ -5,9 +5,11 @@ Groups similar articles by embedding and labels each group.
 
 import logging
 from collections import Counter
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 import numpy as np
+from numpy.typing import NDArray
+from scipy.sparse import csr_matrix
 from sklearn.cluster import HDBSCAN, AgglomerativeClustering, KMeans
 from sklearn.decomposition import PCA
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -81,7 +83,8 @@ class ArticleClusterer:
 
     def _build_model(self, k: int):
         if self.method == 'kmeans':
-            return KMeans(n_clusters=k, random_state=42, n_init=10)
+            # sklearn accepts an integer here; its current stub only permits "auto".
+            return KMeans(n_clusters=k, random_state=42, n_init=cast(Any, 10))
         elif self.method == 'hierarchical':
             return AgglomerativeClustering(n_clusters=k, linkage='ward')
         raise ValueError(f"Unknown method: {self.method}")
@@ -107,7 +110,7 @@ class ArticleClusterer:
                 n_components=target, n_neighbors=n_neighbors,
                 min_dist=0.0, metric='cosine', random_state=42,
             )
-            return reducer.fit_transform(embeddings)
+            return cast(np.ndarray, reducer.fit_transform(embeddings))
         except Exception as e:
             logger.info("Density reduce: PCA fallback (%s)", type(e).__name__)
             max_comp = min(n_samples, n_features)
@@ -120,7 +123,7 @@ class ArticleClusterer:
             # Re-normalise: restores the cosine/angular separation HDBSCAN needs
             # (raw PCA output collapses to ~2 clusters on real corpora).
             from sklearn.preprocessing import normalize
-            return normalize(reduced)
+            return cast(np.ndarray, normalize(reduced))
 
     def _fit_density(self, embeddings: np.ndarray) -> np.ndarray:
         """HDBSCAN density clustering: finds the cluster count itself and marks
@@ -304,8 +307,8 @@ class ClusterLabeler:
             token_pattern=r"(?u)\b[A-Za-z][A-Za-z][A-Za-z]+\b",
         )
         try:
-            tfidf = vectorizer.fit_transform(docs)  # rows = clusters
-            feature_names = vectorizer.get_feature_names_out()
+            tfidf = cast(csr_matrix, vectorizer.fit_transform(docs))  # rows = clusters
+            feature_names = cast(NDArray[np.str_], vectorizer.get_feature_names_out())
         except Exception as e:
             logger.exception("Error generating cluster labels: %s", e)
             return fallback
@@ -337,7 +340,7 @@ class ClusterLabeler:
                 while cursor[cid] < len(ranking):
                     idx = ranking[cursor[cid]]
                     cursor[cid] += 1
-                    term = feature_names[idx]
+                    term = str(feature_names[int(idx)])
                     if scores[row][idx] <= 0:
                         cursor[cid] = len(ranking)  # nothing meaningful left
                         break

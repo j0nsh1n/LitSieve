@@ -21,7 +21,7 @@ class ArXivFetcher(BaseFetcher):
     SOURCE_NAME = 'arxiv'
     BASE_URL = 'https://export.arxiv.org/api/query'
 
-    def __init__(self, email: str = None):
+    def __init__(self, email: Optional[str] = None):
         self.email = email
 
         self.http = HttpClient(delay=0.3)
@@ -47,7 +47,7 @@ class ArXivFetcher(BaseFetcher):
                     break
                 for entry in entries:
                     id_el = entry.find('a:id', ns)
-                    if id_el is not None:
+                    if id_el is not None and id_el.text:
                         ids.append(id_el.text.split('/abs/')[-1].strip())
                 if len(entries) < n:
                     break
@@ -85,7 +85,7 @@ class ArXivFetcher(BaseFetcher):
     def _parse_entry(self, entry, ns) -> Optional[Dict]:
         try:
             id_el = entry.find('a:id', ns)
-            if id_el is None:
+            if id_el is None or not id_el.text:
                 return None
             arxiv_id = id_el.text.split('/abs/')[-1].strip()
 

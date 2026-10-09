@@ -22,7 +22,7 @@ from app.services.summarize import parse_structured_abstract
 
 logger = logging.getLogger(__name__)
 
-READER_PROMPT_VERSION = "reader_v1"
+READER_PROMPT_VERSION = "reader_v2"
 AUDIENCES = ("high_school", "general_reader")
 MIN_ABSTRACT_LEN = 40
 NOT_REPORTED = "Not reported in the abstract."

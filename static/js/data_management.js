@@ -957,7 +957,7 @@ function renderFetchLiveSources(p) {
    detail = `waiting on ${src} (${elapsed}s)`;
    rowClass += ' is-pending';
   } else if (errorKind === 'timeout' || kind === 'timeout') {
-   detail = count > 0 ? `timed out (${count} papers)` : 'timed out';
+   detail = count > 0 ? `timed out (${count} paper${count === 1 ? '' : 's'})` : 'timed out';
    rowClass += ' is-failed';
   } else if (!done) {
    detail = 'searching…';
@@ -1168,7 +1168,7 @@ function buildFetchSourceReportModel(data, sources) {
   const source = sourceProgress[src] || {};
   const kind = source.error_kind || kinds[src] || '';
   if (kind === 'timeout') {
-   const partial = count > 0 ? ` (${count} papers)` : '';
+   const partial = count > 0 ? ` (${count} paper${count === 1 ? '' : 's'})` : '';
    timeouts.push({
     src,
     name,

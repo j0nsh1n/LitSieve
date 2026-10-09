@@ -22,11 +22,12 @@ def test_fetch_source_states_and_timeouts_via_node():
         "queued",
         "waiting on openaire (62s)",
         "7 papers",
-        "timed out (3 papers)",
+        "timed out (1 paper)",
     ]
     assert out["reportTimeouts"] == 1
     assert out["reportErrors"] == 1
-    assert "timed out (3 papers)" in out["advanced"]
+    assert "timed out (1 paper)" in out["advanced"]
+    assert "1 papers" not in " ".join(out["live"]) + out["advanced"]
     assert "✗ Bad [rate_limited]: temporary failure" in out["advanced"]
     assert "1 timed out" in out["simple"]
     assert "1 with an error" in out["simple"]
@@ -69,7 +70,7 @@ const code = [
   `
     renderFetchLiveSources({
       sources: ['queued', 'openaire', 'pubmed', 'timeout'],
-      by_source: { pubmed: 7, timeout: 3 },
+      by_source: { pubmed: 7, timeout: 1 },
       source_status: { pubmed: 'ok', timeout: 'timeout' },
       source_progress: {
         queued: { state: 'queued', elapsed_seconds: 0 },
@@ -80,7 +81,7 @@ const code = [
     });
     const live = [...host.innerHTML.matchAll(/<span class="fetch-live-detail">(.*?)<\\/span>/g)].map((m) => m[1]);
     const data = {
-      by_source: { pubmed: 7, timeout: 3 },
+      by_source: { pubmed: 7, timeout: 1 },
       errors: { timeout: 'deadline exceeded', Bad: 'temporary failure' },
       error_kinds: { timeout: 'timeout', Bad: 'rate_limited' },
       source_progress: { timeout: { state: 'done', error_kind: 'timeout' } },

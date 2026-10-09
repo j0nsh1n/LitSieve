@@ -106,7 +106,7 @@ def account_limit_bytes(user_id: str, rec: Optional[dict] = None) -> int:
     """Effective ceiling for one account (live bump, else host default)."""
     base = limit_bytes()
     data = rec if rec is not None else _lookup_account(user_id)
-    if not override_is_active(data):
+    if data is None or not override_is_active(data):
         return base
     return int(data["quota_limit_mb"]) * 1024 * 1024
 

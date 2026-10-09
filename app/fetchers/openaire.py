@@ -51,7 +51,7 @@ class OpenAIREFetcher(BaseFetcher):
     SOURCE_NAME = "openaire"
     BASE_URL = "https://api.openaire.eu/search/publications"
 
-    def __init__(self, email: str = None):
+    def __init__(self, email: Optional[str] = None):
         self.http = HttpClient(
             delay=0.45,
             timeout=45,

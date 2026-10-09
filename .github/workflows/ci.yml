@@ -35,11 +35,7 @@ jobs:
         run: ruff check .
 
       - name: Pyright
-        # Template requires pyright. Full strict pass is still a backlog
-        # (61 errors / 6 warnings under app/); report without blocking green CI
-        # until cleaned.
         run: pyright app
-        continue-on-error: true
 
       - name: Dependency audit (pip-audit)
         # Replaces the CVE-watching half of Dependabot, which was removed

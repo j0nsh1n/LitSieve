@@ -17,7 +17,7 @@ class OpenAlexFetcher(BaseFetcher):
     SOURCE_NAME = "openalex"
     BASE_URL = "https://api.openalex.org"
 
-    def __init__(self, email: str = None, **kwargs):
+    def __init__(self, email: Optional[str] = None, **kwargs):
         """Email is optional but gets you into the polite pool"""
         self.email = email
 

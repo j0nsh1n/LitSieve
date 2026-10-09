@@ -857,6 +857,8 @@ async def api_admin_quota_bump(user_id: str, request: Request):
     if bad:
         return bad
     raw_limit = body.get("limit_mb")
+    if raw_limit is None:
+        return JSONResponse(status_code=400, content={"detail": "limit_mb must be a whole number of megabytes."})
     try:
         limit_mb = int(raw_limit)
     except (TypeError, ValueError):

@@ -5,7 +5,7 @@ Free API, no authentication required
 """
 
 import logging
-from typing import Dict, List
+from typing import Dict, List, Optional
 from urllib.parse import quote
 
 from app.fetchers.base import BaseFetcher, FetchError, HttpClient, reraise_fetch_error
@@ -17,7 +17,7 @@ class DOAJFetcher(BaseFetcher):
     SOURCE_NAME = 'doaj'
     BASE_URL = 'https://doaj.org/api/v3/search/articles'
 
-    def __init__(self, email: str = None):
+    def __init__(self, email: Optional[str] = None):
         self.http = HttpClient(
             delay=0.3,
             user_agent=f'LiteratureResearchAide/3.7 ({email or "research@example.com"})',
@@ -55,7 +55,7 @@ class DOAJFetcher(BaseFetcher):
 
         return articles[:max_results]
 
-    def _parse_result(self, result: Dict) -> Dict:
+    def _parse_result(self, result: Dict) -> Optional[Dict]:
         try:
             bib = result.get('bibjson', {})
             title = (bib.get('title') or '').strip()

@@ -528,7 +528,8 @@ class LiteratureSearchPipeline:
         """Return (ids, matrix), reusing the last load until cache invalidation."""
         with self._corpus_cache_lock:
             gen = self._corpus_cache_gen
-            if self._cached_emb_gen == gen and self._cached_emb_ids is not None:
+            if (self._cached_emb_gen == gen and self._cached_emb_ids is not None
+                    and self._cached_emb_matrix is not None):
                 return self._cached_emb_ids, self._cached_emb_matrix
         ids, matrix = self.db.get_all_embeddings()
         with self._corpus_cache_lock:

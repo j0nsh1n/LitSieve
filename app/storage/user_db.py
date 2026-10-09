@@ -1055,7 +1055,11 @@ class UserDatabase:
                 "WHERE owner_user_id = ? ORDER BY created_at DESC",
                 (owner_user_id,),
             ).fetchall()
-        return [self._share_row(r) for r in rows if r]
+        return [
+            share
+            for row in rows
+            if (share := self._share_row(row)) is not None
+        ]
 
     def revoke_share(self, share_id: str, owner_user_id: str) -> bool:
         """Revoke a share if owned by owner_user_id. Returns True if revoked."""
