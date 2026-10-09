@@ -236,11 +236,10 @@ def test_fetch_mode_radios_still_in_template_for_advanced():
 
 def test_simple_prepare_resolver_exists():
     assert "function resolveSimplePrepareModeBeforeRequest" in DM
-    assert "Only new papers" in DM
+    assert "Only missing papers" in DM
     assert "only_missing" in DM
-    # Research question lives in the same re-prepare popup (withInput).
     assert "function applyVerifiedResearchQuestion" in DM
-    assert "withInput: true" in DM or "withInput:true" in DM
+    assert "id: 'research_question'" in DM or "id: 'research_question'".replace("id: ", "id:") in DM
     assert "Your research question" in DM
 
 
@@ -248,14 +247,11 @@ def test_simple_prepare_prompt_is_inside_same_popup():
     """Question field is in the re-prepare dialog, not a separate first modal."""
     fn = DM[DM.index("async function resolveSimplePrepareModeBeforeRequest") :
             DM.index("async function doCreateEmbeddings")]
-    assert "withInput" in fn
-    assert "openSiteChoice" in fn
+    assert "research_question" in fn
+    assert "openSiteForm" in fn
     assert "applyVerifiedResearchQuestion" in fn
     # No separate openSitePrompt step before the scope dialog.
     assert "openSitePrompt" not in fn
-    common = (ROOT / "static" / "js" / "common.js").read_text(encoding="utf-8")
-    assert "o.withInput" in common
-    assert "mode === 'choice' && o.withInput" in common or 'mode === "choice" && o.withInput' in common
 
 
 def test_simple_prepare_dialog_not_on_auto_chain():

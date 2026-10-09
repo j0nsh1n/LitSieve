@@ -160,6 +160,11 @@ Guest User (is_guest) → sample corpus only; purged by age
 - Latest combined tests: **959 passed, 1 planned parity xfailed**; required
   ops/fetch **67 passed**, lint passed. Stale reprepare assertions were updated
   for the new form. The browser reconnected briefly, then disconnected during login.
+- Slices 5/6/7 are committed as `197325d`, `807d62e`, and `3270337`.
+  Reprepare model selection is captured before the modal closes; its regression
+  harness includes modal removal, cancellation, only-missing, and auto-chain choice.
+  Latest working-tree suite, including background clustering: **967 passed**;
+  required ops/fetch **67 passed**. No parity xfails remain in that working tree.
 - Jonathan approved 301 redirects to Search, version 6.0.0, the concrete
   proposed one-flow spec rewrite at removal, and a real-library copy for
   the isolated theme prototype. Luna through Codex remains approved for

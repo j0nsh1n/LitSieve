@@ -509,7 +509,10 @@ function renderSourceGrid() {
  });
 }
 
-function saveFetchPrefs() {
+function saveFetchPrefs(overrides) {
+ overrides = overrides || {};
+ let previous = {};
+ try { previous = JSON.parse(localStorage.getItem(FETCH_PREFS_KEY) || '{}') || {}; } catch (e) { previous = {}; }
  const sources = Array.from(
  document.querySelectorAll('#source-option-grid input[type="checkbox"]:checked')
  ).map(cb => cb.value);
@@ -521,11 +524,36 @@ function saveFetchPrefs() {
  sources,
  mode,
  topics: [...selectedTopics],
- model: (document.getElementById('embedding-model') || {}).value,
+ model: Object.prototype.hasOwnProperty.call(overrides, 'model')
+  ? overrides.model
+  : ((document.getElementById('embedding-model') || {}).value || previous.model),
  modelManual,
- onlyMissing: !!(document.getElementById('only-missing') || {}).checked,
+ onlyMissing: Object.prototype.hasOwnProperty.call(overrides, 'onlyMissing')
+  ? !!overrides.onlyMissing
+  : !!(document.getElementById('only-missing') || {}).checked,
  };
  try { localStorage.setItem(FETCH_PREFS_KEY, JSON.stringify(prefs)); } catch (e) { /* ignore */ }
+}
+
+function setConfirmedSimplePreparePreferences(model, onlyMissing) {
+ const catalog = document.getElementById('embedding-model-catalog');
+ let allowed = [];
+ try {
+  const raw = catalog && (catalog.getAttribute('data-models') || (catalog.dataset && catalog.dataset.models));
+  const parsed = JSON.parse(raw || '[]');
+  if (Array.isArray(parsed)) allowed = parsed.map((item) => String(item && item.value || ''));
+ } catch (e) { /* checked against the existing select below */ }
+ const modelSelect = document.getElementById('embedding-model');
+ if (modelSelect && modelSelect.options && !allowed.length) {
+  allowed = Array.from(modelSelect.options).map((option) => String(option.value || ''));
+ }
+ const value = String(model || '');
+ if (!allowed.includes(value)) return false;
+ if (modelSelect) modelSelect.value = value;
+ modelManual = true;
+ if (typeof updateModelHint === 'function') updateModelHint();
+ saveFetchPrefs({model: value, onlyMissing: !!onlyMissing});
+ return true;
 }
 
 function restoreFetchPrefs() {
@@ -1585,19 +1613,33 @@ async function doCreateEmbeddings(opts) {
  const fromAutoChain = !!(opts && opts.fromAutoChain === true);
  const simple = typeof isSimpleMode === 'function' && isSimpleMode();
  const modelEl = document.getElementById('embedding-model');
- const model = (modelEl && modelEl.value) || 'general';
+ let prepareOptions = null;
  // Simple manual re-prepare: dialog before reading only_missing.
  // Auto-chain after fetch keeps the radio-driven only-missing state (no dialog).
  if (simple && !fromAutoChain) {
-  const ok = await resolveSimplePrepareModeBeforeRequest();
-  if (!ok) return;
+  prepareOptions = await resolveSimplePrepareModeBeforeRequest();
+  if (!prepareOptions) return null;
  }
- const onlyMissing = document.getElementById('only-missing')?.checked || false;
+ // Read the model only after the confirmed Simple popup has closed.
+ let model = (prepareOptions && prepareOptions.model) || (modelEl && modelEl.value) || '';
+ if (!model && simple && typeof _simplePrepareModelCatalog === 'function') {
+  const catalog = _simplePrepareModelCatalog();
+  if (catalog.length && typeof _simplePreferredPrepareModel === 'function') {
+   model = _simplePreferredPrepareModel(catalog);
+  }
+ }
+ if (!model) model = 'general';
+ const onlyMissing = prepareOptions
+  ? !!prepareOptions.onlyMissing
+  : !!document.getElementById('only-missing')?.checked;
  const btn = document.getElementById('embeddings-btn');
- saveFetchPrefs();
+ saveFetchPrefs(prepareOptions ? {model, onlyMissing} : undefined);
  setLoading(btn, true);
- // Auto-chain: Simple uses the buffering screen; Advanced stays on the fetch bar.
- const useBuffer = simple && fromAutoChain && document.getElementById('search-buffering-fill');
+ // Every Simple prepare shares the same wait screen; Advanced keeps its bar.
+ const useBuffer = simple && document.getElementById('search-buffering-fill');
+ if (useBuffer && !fromAutoChain && typeof showSimpleBuffering === 'function') {
+  showSimpleBuffering('prepare');
+ }
  const progressFill = useBuffer ? 'search-buffering-fill'
   : fromAutoChain ? 'fetch-progress-fill' : 'embed-progress-fill';
  const progressLabel = useBuffer ? 'search-buffering-label'
@@ -1638,7 +1680,7 @@ async function doCreateEmbeddings(opts) {
   ? { label: `Down to the fine grains`, detail: `${done} / ${total} articles (${pct}%)` }
   : { label: `Down to the fine grains`, detail: 'Loading model…' };
  },
- useBuffer ? simpleWaitMapOpts(60, 90) : undefined
+ useBuffer ? simpleWaitMapOpts(fromAutoChain ? 60 : 0, 90) : undefined
  );
  }
  // If the 202 body already had a final payload (wait=true legacy), use it.
@@ -1694,12 +1736,15 @@ async function doCreateEmbeddings(opts) {
  const startOverReset = typeof _resetAfterStartOver !== 'undefined' && _resetAfterStartOver;
  if (simple && (!fromAutoChain || startOverReset)) {
   try {
-   const excl = await apiCall('/api/screening/excluded?reason=low_relevance');
+   const libraryId = typeof pageLibraryId === 'function' ? pageLibraryId() : '';
+   const excludedPath = '/api/screening/excluded?reason=low_relevance'
+    + (libraryId ? '&library_id=' + encodeURIComponent(libraryId) : '');
+   const excl = await apiCall(excludedPath);
    const items = (excl && excl.items) || [];
    if (items.length) {
     await apiCall('/api/screening', {
      method: 'POST',
-     body: { items, action: 'include', reason: 'low_relevance' },
+     body: withPageLibrary({ items, action: 'include', reason: 'low_relevance' }),
     });
    }
    setSimpleScreenSkipped(false);
@@ -1717,6 +1762,9 @@ async function doCreateEmbeddings(opts) {
  await loadPageData();
  if (simple && fromAutoChain && typeof holdSimpleWait === 'function') {
   holdSimpleWait();
+ }
+ if (simple && !fromAutoChain && useBuffer && typeof hideSimpleBuffering === 'function') {
+  hideSimpleBuffering();
  }
  // Manual re-prepare (and auto-chain) must refresh Narrow it down so the
  // confirm-your-question box appears without a full page reload.
@@ -1743,6 +1791,9 @@ async function doCreateEmbeddings(opts) {
  }
  return data;
  } catch (e) {
+ if (simple && !fromAutoChain && typeof hideSimpleBuffering === 'function') {
+  hideSimpleBuffering();
+ }
  const msg = e.message || '';
  if (msg.toLowerCase().includes('storage limit')) {
   setStatus('embeddings-status', msg, 'warning');

@@ -136,7 +136,6 @@ def test_check_for_duplicates_from_set_aside_popup():
 
 # Slice 8 -------------------------------------------------------------------
 
-@later
 def test_reprepare_popup_has_model_disclosure():
     assert 'id="simple-reprepare-model"' in _search_templates() or (
         "simple-reprepare-model" in _search_js()

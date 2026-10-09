@@ -283,5 +283,5 @@ def test_stale_tab_reloads_and_mutations_send_library_id():
     embed_call = dm[embed_idx : embed_idx + 250]
     assert "withPageLibrary" in embed_call
     tools = (JS_DIR / "simple_tools.js").read_text(encoding="utf-8")
-    tools_embed = tools[tools.find("/api/create-embeddings") : tools.find("/api/create-embeddings") + 250]
-    assert "withPageLibrary" in tools_embed
+    reprepare = tools[tools.find("async function simpleToolsReprepare") :]
+    assert "doCreateEmbeddings" in reprepare

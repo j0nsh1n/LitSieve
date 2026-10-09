@@ -1789,69 +1789,116 @@ function applyVerifiedResearchQuestion(query) {
  */
 async function resolveSimplePrepareModeBeforeRequest() {
  if (typeof isSimpleMode !== 'function' || !isSimpleMode()) {
-  return true;
+  return null;
  }
- let ready = 0;
- let total = Number(_lastTotalArticles) || 0;
- try {
-  const stats = await apiCall('/api/statistics');
-  ready = Number(stats.articles_with_embeddings) || 0;
-  total = Number(stats.total_articles) || total;
-  _lastTotalArticles = total;
- } catch (err) {
-  console.warn('Could not load prepare counts for dialog:', err);
+ const models = _simplePrepareModelCatalog();
+ if (!models.length) {
+  showNotification('The embedding model list is unavailable. Reload Search and try again.', 'error');
+  return false;
  }
- const box = document.getElementById('only-missing');
  const current = getResearchQuestionCandidate();
-
- // Always open a re-prepare dialog with the research question field visible.
- // When nothing is prepared yet, only Continue / Cancel (no scope choice).
- if (typeof openSiteChoice !== 'function') {
-  if (ready <= 0 && box) box.checked = true;
-  return true;
- }
-
- const allLabel = total > 0 ? `Redo all ${total}` : 'Redo all papers';
- const choices = ready <= 0
-  ? [
-   { label: 'Continue', value: 'missing', primary: true },
-   { label: 'Cancel', value: null, cancel: true },
-  ]
-  : [
-   { label: 'Only new papers', value: 'missing', primary: true },
-   { label: allLabel, value: 'all' },
-   { label: 'Cancel', value: null, cancel: true },
-  ];
-
- const result = await openSiteChoice({
+ let selectedModel = _simplePreferredPrepareModel(models);
+ if (typeof openSiteForm !== 'function') return false;
+ const result = await openSiteForm({
   title: 'Re-prepare papers for search',
-  message: ready <= 0
-   ? 'Check that this research question is still what you want. Edit if needed — Narrow it down will use it next.'
-   : 'Check that this research question is still what you want, then choose how much to re-prepare. Only new papers need this most of the time.',
-  withInput: true,
-  inputLabel: 'Your research question',
-  defaultValue: current,
-  placeholder: 'e.g., climate change effects on ecosystems',
-  requireNonEmpty: true,
-  emptyMessage: 'Please confirm your research question before re-preparing.',
-  selectAll: !current,
-  choices,
+  message: 'Keep your research question, choose which papers to prepare, and optionally change the embedding model.',
+  confirmLabel: 'Re-prepare',
+  cancelLabel: 'Cancel',
+  fields: [
+   {id: 'research_question', label: 'Your research question', type: 'text', value: current, placeholder: 'e.g., climate change effects on ecosystems'},
+   {id: 'prepare_scope', label: 'Papers to prepare', type: 'choice', value: 'only_missing', options: [
+    {value: 'only_missing', label: 'Only missing papers', hint: 'Recommended'},
+    {value: 'all', label: 'Redo all papers'},
+   ]},
+  ],
+  onReady: (root) => {
+   const fields = root.querySelector('.lra-modal-fields');
+   if (!fields) return;
+   const disclosure = document.createElement('details');
+   disclosure.className = 'advanced-details lra-modal-choice';
+   disclosure.id = 'simple-reprepare-model-options';
+   const summary = document.createElement('summary');
+   summary.textContent = 'Embedding model';
+   const body = document.createElement('div');
+   body.className = 'advanced-body';
+   const label = document.createElement('label');
+   label.htmlFor = 'simple-prepare-model';
+   label.textContent = 'Analysis model';
+   const select = document.createElement('select');
+   select.id = 'simple-prepare-model';
+   select.className = 'lra-modal-input';
+   models.forEach((model) => {
+    const option = document.createElement('option');
+    option.value = model.value;
+    option.textContent = model.label;
+    if (model.value === selectedModel) option.selected = true;
+    select.append(option);
+   });
+   body.append(label, select);
+   disclosure.append(summary, body);
+   fields.append(disclosure);
+  },
+  validate: (values) => {
+   if (!String(values.research_question || '').trim()) return 'Please confirm your research question before re-preparing.';
+   const chosen = _simpleSelectedPrepareModel();
+   if (!models.some((model) => model.value === chosen)) return 'Choose an available embedding model.';
+   // openSiteForm removes its dialog before resolving the promise, so capture
+   // the selection while validation still has access to the live field.
+   selectedModel = chosen;
+   return '';
+  },
  });
  if (result == null) return false;
-
- // withInput → { value, input }; bare string if modal helper is older.
- let scope = result;
- let question = current;
- if (result && typeof result === 'object' && 'value' in result) {
-  scope = result.value;
-  question = result.input;
+ const question = String(result.research_question || '').trim();
+ const model = selectedModel;
+ const onlyMissing = result.prepare_scope !== 'all';
+ applyVerifiedResearchQuestion(question);
+ const box = document.getElementById('only-missing');
+ if (box) box.checked = onlyMissing;
+ _simpleOnlyMissing = onlyMissing;
+ if (typeof setConfirmedSimplePreparePreferences === 'function') {
+  setConfirmedSimplePreparePreferences(model, onlyMissing);
  }
- if (scope == null) return false;
+ return {model, onlyMissing, question};
+}
 
- applyVerifiedResearchQuestion(String(question || '').trim());
- if (box) box.checked = scope !== 'all';
- _simpleOnlyMissing = scope !== 'all';
- return true;
+function _simplePrepareModelCatalog() {
+ let injected = [];
+ const catalog = document.getElementById('embedding-model-catalog');
+ try {
+  const raw = catalog && (catalog.getAttribute('data-models') || (catalog.dataset && catalog.dataset.models));
+  const parsed = JSON.parse(raw || '[]');
+  if (Array.isArray(parsed)) injected = parsed;
+ } catch (e) { /* the rendered select remains a catalog-backed fallback */ }
+ const select = document.getElementById('embedding-model');
+ const fromSelect = select && select.options ? Array.from(select.options).map((option) => ({
+  value: String(option.value || ''), label: String(option.textContent || option.label || option.value || ''),
+ })) : [];
+ const list = injected.length ? injected : fromSelect;
+ const seen = new Set();
+ return list.filter((model) => {
+  if (!model || !String(model.value || '').trim() || seen.has(String(model.value))) return false;
+  seen.add(String(model.value));
+  return true;
+ }).map((model) => ({value: String(model.value), label: String(model.label || model.value)}));
+}
+
+function _simplePreferredPrepareModel(models) {
+ const current = document.getElementById('embedding-model');
+ let preferred = current && current.value;
+ if (!preferred) {
+  try {
+   const prefs = JSON.parse(localStorage.getItem(FETCH_PREFS_KEY) || 'null');
+   if (prefs && prefs.modelManual && prefs.model) preferred = prefs.model;
+  } catch (e) { /* use topic recommendation below */ }
+ }
+ if (!preferred && typeof recommendModel === 'function') preferred = recommendModel();
+ return models.some((model) => model.value === preferred) ? preferred : models[0].value;
+}
+
+function _simpleSelectedPrepareModel() {
+ const select = document.getElementById('simple-prepare-model');
+ return select ? String(select.value || '') : '';
 }
 
 // Per-database cap presets for the Simple pre-fetch dialog. 100 is the
@@ -2078,39 +2125,18 @@ function openSimpleSourceReport(stats) {
 }
 
 async function simpleToolsReprepare() {
- if (typeof resolveSimplePrepareModeBeforeRequest === 'function') {
-  const ok = await resolveSimplePrepareModeBeforeRequest();
-  if (!ok) return;
- }
  const status = document.getElementById('simple-tools-status');
  const btn = document.getElementById('simple-tools-reprepare-btn');
  if (status) status.textContent = 'Preparing papers…';
  if (btn) btn.disabled = true;
  try {
-  const onlyMissing = _simpleOnlyMissing !== false;
-  const started = await apiCall('/api/create-embeddings', {
-   method: 'POST',
-   body: withPageLibrary({ model: 'general', only_missing: onlyMissing }),
-  });
-  if (started && started.status === 'started' && typeof waitForJob === 'function') {
-   await waitForJob('embed', null, null, null, null);
-  } else if (started && started.status === 'started') {
-   await _waitForEmbedJob();
-  }
-  if (status) status.textContent = 'Papers are ready.';
-  showNotification('Papers are ready for search.', 'success');
-  if (typeof refreshSimpleScreeningCard === 'function') {
-   await refreshSimpleScreeningCard();
-  }
-  if (typeof loadPageData === 'function') {
-   await loadPageData();
-  } else {
-   const stats = await apiCall('/api/statistics');
-   updateSimpleToolsStrip(stats);
-  }
+  if (typeof doCreateEmbeddings !== 'function') throw new Error('Prepare action is unavailable. Reload Search and try again.');
+  const result = await doCreateEmbeddings({ fromSimpleReprepare: true });
+  if (!result && status) status.textContent = '';
  } catch (e) {
   if (status) status.textContent = '';
-  showNotification(`Could not re-prepare: ${e.message}`, 'error');
+  // doCreateEmbeddings already reports its own errors.
+  if (typeof doCreateEmbeddings !== 'function') showNotification(`Could not re-prepare: ${e.message}`, 'error');
  } finally {
   if (btn) btn.disabled = false;
  }

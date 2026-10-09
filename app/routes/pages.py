@@ -135,7 +135,12 @@ async def search_page(request: Request):
     user = current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=302)
-    return templates.TemplateResponse(request, "search.html", context={"active_page": "search", "user": user})
+    from app.services.embeddings import EmbeddingEngine
+
+    models = [{"value": name, "label": f"{name} ({path})"} for name, path in EmbeddingEngine.allowed_models().items()]
+    return templates.TemplateResponse(request, "search.html", context={
+        "active_page": "search", "user": user, "embedding_models": models,
+    })
 
 
 def _cookie_wants_simple(request: Request) -> bool:
