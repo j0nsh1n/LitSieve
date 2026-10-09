@@ -101,9 +101,9 @@ def test_search_by_switch_question_pico_paper():
 
 # Slice 5 -------------------------------------------------------------------
 
-@later
 def test_export_whole_library_from_save_your_work():
-    assert 'id="simple-export-scope"' in _search_templates()
+    assert "actions.id = 'simple-export-scope'" in _search_js()
+    assert 'id="simple-export-results-btn"' in _search_templates()
 
 
 # Slice 6 -------------------------------------------------------------------

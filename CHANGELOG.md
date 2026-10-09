@@ -27,6 +27,8 @@ and this project aims to follow Semantic Versioning for app version strings
   carries the operator identity, and polls for completion across the site restart.
 
 ### Added
+- 2026-10-09: Save your work offers visible results, all papers, kept papers,
+  set-aside papers, or starred papers. Downloads stay bound to the page's library.
 - 2026-10-09: Search by switches between a question, PICO fields, and a
   paper already in the collection. Saved manual seed searches and More like
   this searches restore their own behavior.

@@ -140,7 +140,7 @@ Guest User (is_guest) → sample corpus only; purged by age
 - Local commits: `5887f2c` detached rollback; `369882e` deploy-history
   persistence tests and host checklist; `3f97f40` whole-source deadlines
   and partial pages; `053b2a4` security/reliability backlog; `5090a61`
-  Simple Search slices 2/3 integration. Nothing pushed or deployed.
+  Simple Search slices 2/3 integration; `fc195c1` Search by. Nothing pushed or deployed.
 - Slice 4 adds Search by (Question / PICO / Start from a paper), accessible
   field labels, and correct manual-seed versus More like this restoration.
   Main review covered actual panel switching in the browser. A deliberate
@@ -149,10 +149,13 @@ Guest User (is_guest) → sample corpus only; purged by age
   **935 passed, 7 xfailed**; required ops/fetch **67 passed**; lint passed;
   Pyright **0 errors, 1 optional Anthropic warning**. Shared stylesheet
   versions agree across public and authenticated templates.
-- Slice 6 is implemented and awaiting its separate review/commit: database
+- Slice 5 whole-library and visible-result export is reviewed and tested with
+  page-library isolation, exact result order, cancellation, and error coverage.
+  Slice 6 is implemented and awaiting its separate review/commit: database
   choices inside the fetch popup, conditional remembered contact email,
   confirmed choices used by the fetch request, and cancellation without
-  preference mutations. Next ordered work is Slice 5 whole-library export.
+  preference mutations. Collection report/duplicate preview and theme UI are
+  implemented, with root integration and background clustering still in progress.
 - Jonathan approved 301 redirects to Search, version 6.0.0, the concrete
   proposed one-flow spec rewrite at removal, and a real-library copy for
   the isolated theme prototype. Luna through Codex remains approved for

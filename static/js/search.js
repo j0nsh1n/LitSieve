@@ -110,7 +110,7 @@ document.addEventListener('DOMContentLoaded', () => {
  // Phase 6 Simple side panel (same export path; Advanced never shows the panel).
  const simpleExportBtn = document.getElementById('simple-export-results-btn');
  if (simpleExportBtn) {
-  simpleExportBtn.addEventListener('click', () => doExportResults('ris'));
+  simpleExportBtn.addEventListener('click', () => promptSimpleExportScope());
  }
 
  document.querySelectorAll('[data-lib-export-format]').forEach(btn => {
@@ -704,6 +704,7 @@ async function applyAvailableSources() {
  });
  syncSearchFiltersFromForm();
  syncSimpleResultChips();
+ updateSimpleSearchPanel(!!(lastResults && lastResults.length));
 
  const hint = document.getElementById('source-availability-hint');
  if (hint) {
@@ -1939,7 +1940,8 @@ function updateSimpleSearchPanel(hasResults) {
  const resultsSec = document.getElementById('results-section');
  if (!panel) return;
  const simple = typeof isSimpleMode === 'function' && isSimpleMode();
- const show = !!(simple && hasResults);
+ const hasLibraryPapers = Object.values(librarySourceCounts).some((n) => Number(n) > 0);
+ const show = !!(simple && (hasResults || hasLibraryPapers));
  if (show) {
   panel.removeAttribute('hidden');
   panel.hidden = false;
@@ -1949,6 +1951,89 @@ function updateSimpleSearchPanel(hasResults) {
  }
  if (resultsSec) resultsSec.classList.toggle('has-simple-panel', show);
  syncSimplePanelClearance();
+}
+
+async function promptSimpleExportScope() {
+ const pageLibrary = typeof pageLibraryId === 'function' ? pageLibraryId() : '';
+ if (!pageLibrary) {
+  showNotification('Reload this page before exporting your library.', 'error');
+  return;
+ }
+ const hasResults = visibleResults().length > 0;
+ const scopes = [];
+ if (hasResults) scopes.push({ value: 'results', label: 'These visible results', primary: true });
+ scopes.push(
+  { value: 'all', label: 'All library papers' },
+  { value: 'included', label: 'Kept papers' },
+  { value: 'excluded', label: 'Set-aside papers' },
+  { value: 'starred', label: 'Starred papers' },
+  { value: null, label: 'Cancel', cancel: true },
+ );
+ const scope = await openSiteChoice({
+  title: 'Save your work',
+  message: 'Choose which papers to export.',
+  choices: scopes,
+  cancelLabel: 'Cancel',
+  onReady: (root) => {
+   const actions = root.querySelector('.lra-modal-actions');
+   if (actions) actions.id = 'simple-export-scope';
+  },
+ });
+ if (!scope) return;
+ const formats = scope === 'results'
+  ? ['ris', 'bibtex', 'csv', 'txt']
+  : ['ris', 'bibtex', 'csv', 'txt', 'apa'];
+ const format = await openSiteChoice({
+  title: 'Export format',
+  message: 'Choose a file format.',
+  choices: [...formats.map((value, index) => ({
+   value, label: value === 'bibtex' ? 'BibTeX' : value.toUpperCase(), primary: index === 0,
+  })), { value: null, label: 'Cancel', cancel: true }],
+  cancelLabel: 'Cancel',
+ });
+ if (!format) return;
+ const currentLibrary = typeof pageLibraryId === 'function' ? pageLibraryId() : '';
+ if (pageLibrary && currentLibrary !== pageLibrary) {
+  const status = document.getElementById('simple-export-status');
+  if (status) status.textContent = 'Your library changed. Reload this page before exporting.';
+  showNotification('Your library changed. Reload this page before exporting.', 'error');
+  return;
+ }
+ if (scope === 'results') {
+  await doExportResults(format, pageLibrary);
+ } else {
+  await doExportLibrary(scope, format, pageLibrary);
+ }
+}
+
+async function doExportLibrary(scope, format, libraryId) {
+ const status = document.getElementById('simple-export-status');
+ if (status) status.textContent = 'Preparing download…';
+ try {
+  const params = new URLSearchParams({ scope, format });
+  if (libraryId) params.set('library_id', libraryId);
+  const response = await fetch(`/api/export/library?${params.toString()}`, {
+   credentials: 'same-origin',
+  });
+  if (!response.ok) {
+   const err = await response.json().catch(() => ({ detail: response.statusText }));
+   throw new Error(err.detail || 'Export failed');
+  }
+  const blob = await response.blob();
+  const cd = response.headers.get('Content-Disposition') || '';
+  const match = /filename="?([^";]+)"?/i.exec(cd);
+  const fallback = `library_${scope}.${format === 'bibtex' ? 'bib' : format === 'apa' ? 'txt' : format}`;
+  const filename = (match && match[1]) || fallback;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  if (status) status.textContent = `Downloaded ${filename}.`;
+  showNotification(`Downloaded ${filename}`, 'success');
+ } catch (e) {
+  if (status) status.textContent = e.message || 'Export failed';
+  showNotification(`Export failed: ${e.message}`, 'error');
+ }
 }
 
 function syncSimplePanelClearance() {
@@ -2040,7 +2125,7 @@ document.addEventListener('DOMContentLoaded', () => {
  }
 });
 
-async function doExportResults(format) {
+async function doExportResults(format, libraryId = '') {
  const exportRows = visibleResults();
  if (!exportRows.length) {
   showNotification('Run a search first, then export the results shown on screen.', 'error');
@@ -2065,7 +2150,8 @@ async function doExportResults(format) {
   if (typeof getCsrfToken === 'function') {
    headers['X-CSRF-Token'] = getCsrfToken();
   }
-  const response = await fetch('/api/export/selection', {
+  const endpoint = libraryId ? `/api/export/selection?${new URLSearchParams({ library_id: libraryId })}` : '/api/export/selection';
+  const response = await fetch(endpoint, {
    method: 'POST',
    headers,
    credentials: 'same-origin',
