@@ -1,11 +1,8 @@
-"""Phase 13, slice 0: one row per Advanced-only feature and its Simple home.
+"""One row per former Advanced-only feature and its Search home.
 
-Every row names the Simple control (an element id or a JS function) that
-replaces an Advanced feature, and checks that it exists. Rows for slices not
-built yet are ``xfail(strict=True)``: they fail today, and the moment a slice
-adds the control the row starts passing and pytest fails until the ``xfail``
-is removed. Removing Advanced (slice 10) may not merge while any row is
-still expected to fail.
+Every row names the Search control (an element id or a JS function) that
+replaces an Advanced feature, and checks that it exists. All migration rows
+now pass; none is deferred or expected to fail.
 
 A later slice may rename a control, but must then change the row to the new
 name in the same PR. A row must never be deleted: if the feature is dropped,
@@ -15,8 +12,6 @@ Jonathan records the drop in roadmap.md and the row asserts the drop note.
 from __future__ import annotations
 
 from pathlib import Path
-
-import pytest
 
 REPO = Path(__file__).resolve().parents[1]
 
@@ -34,6 +29,7 @@ def _search_templates() -> str:
         _read("templates", "search.html")
         + _read("templates", "partials", "collect_ui.html")
         + _read("templates", "partials", "simple_search_panel.html")
+        + _read("templates", "partials", "theme_tools.html")
         + _card()
     )
 
@@ -44,9 +40,6 @@ def _search_js() -> str:
         + _read("static", "js", "simple_tools.js")
         + _read("static", "js", "data_management.js")
     )
-
-
-later = pytest.mark.xfail(strict=True, reason="Phase 13 slice not built yet")
 
 
 # Slice 1 -------------------------------------------------------------------
@@ -144,10 +137,9 @@ def test_reprepare_popup_has_model_disclosure():
 
 # Slice 9 -------------------------------------------------------------------
 
-@later
 def test_group_by_theme_popup():
     assert 'id="simple-group-by-theme"' in _search_templates()
-    assert "/api/create-clusters" in _read("static", "js", "simple_tools.js")
+    assert "/api/create-clusters" in _read("static", "js", "simple_themes.js")
 
 
 # Already in Simple; stays where it is ----------------------------------------

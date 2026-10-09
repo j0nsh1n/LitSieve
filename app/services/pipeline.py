@@ -460,13 +460,15 @@ class LiteratureSearchPipeline:
         n = self._generate_key_points(articles=None, only_missing=only_missing)
         return {"key_points_created": n, "only_missing": only_missing}
 
-    def cluster_articles(self, n_clusters: Optional[int] = None, method: str = 'kmeans'):
+    def cluster_articles(self, n_clusters: Optional[int] = None, method: str = 'kmeans', progress_callback=None):
         """Step 3: Cluster articles.
 
         n_clusters=None (or <= 0) auto-selects the count by silhouette score.
         Returns (labels, cluster_labels, articles_by_cluster, resolved_n_clusters).
         """
         logger.info("\n=== Step 3: Clustering Articles ===")
+        if progress_callback:
+            progress_callback(0, 3, "Reading prepared papers")
 
         article_ids, embeddings = self.db.get_all_embeddings()
         if len(article_ids) == 0:
@@ -476,6 +478,8 @@ class LiteratureSearchPipeline:
         # ArticleClusterer handles auto-selection (None) and clamping to the
         # number of samples internally.
         clusterer = ArticleClusterer(n_clusters=n_clusters, method=method)
+        if progress_callback:
+            progress_callback(1, 3, "Finding themes")
         labels = clusterer.fit(embeddings)
         resolved_n = clusterer.resolved_n_clusters
 
@@ -497,6 +501,8 @@ class LiteratureSearchPipeline:
 
         # Generate cluster labels + a representative (most central) title each.
         logger.info("Generating cluster labels...")
+        if progress_callback:
+            progress_callback(2, 3, "Naming themes")
         cluster_labels = ClusterLabeler.generate_tfidf_labels(articles_by_cluster)
         cluster_titles = ClusterLabeler.pick_representative_titles(
             article_ids, embeddings, labels, title_by_key
@@ -515,6 +521,8 @@ class LiteratureSearchPipeline:
             cluster_assignments[aid] = (cluster_id, cluster_label)
 
         self.db.insert_clusters(cluster_assignments, cluster_titles)
+        if progress_callback:
+            progress_callback(3, 3, "Themes ready")
 
         logger.info(f"Clustered articles into {resolved_n} clusters")
         logger.info("\nCluster labels:")

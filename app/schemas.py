@@ -165,7 +165,9 @@ class ClusterRequest(BaseModel):
     n_clusters: Optional[int] = None
     # Density (HDBSCAN) is the default: it finds the topic count itself and sets
     # outliers aside, which beats a guessed/auto k on real corpora.
-    method: str = "hdbscan"
+    method: str = Field(default="hdbscan", pattern="^(hdbscan|kmeans|hierarchical)$")
+    library_id: Optional[str] = Field(default=None, max_length=128)
+    wait: bool = True
 
 
 class DuplicateRequest(BaseModel):

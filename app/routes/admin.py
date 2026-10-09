@@ -708,8 +708,8 @@ async def api_admin_clear_job(user_id: str, request: Request):
     if bad:
         return bad
     task = str(body.get("task") or "").strip()
-    if task not in ("fetch", "embed"):
-        return JSONResponse(status_code=400, content={"detail": "task must be fetch or embed"})
+    if task not in core.JOB_TASKS:
+        return JSONResponse(status_code=400, content={"detail": "task must be fetch, embed or cluster"})
     ok, detail = core.clear_stale_job(user_id, task)
     if not ok:
         return JSONResponse(status_code=409, content={"detail": detail})

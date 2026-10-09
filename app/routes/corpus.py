@@ -352,6 +352,18 @@ async def api_create_embeddings(req: EmbeddingsRequest, request: Request):
         release_pipeline(uid)
 
 
+def _run_create_clusters(p, *, uid, n_clusters, method):
+    def on_progress(done, total, message):
+        update_progress(uid, 'cluster', done=done, total=total, message=message)
+
+    result = p.cluster_articles(n_clusters=n_clusters, method=method, progress_callback=on_progress)
+    return {
+        "status": "success", "clusters": p.db.get_all_clusters(),
+        "resolved_n_clusters": result[3] if result else 0,
+        "auto": n_clusters is None or n_clusters <= 0,
+    }
+
+
 @router.post("/api/create-clusters")
 async def api_create_clusters(req: ClusterRequest, request: Request):
     user = current_user(request)
@@ -360,31 +372,45 @@ async def api_create_clusters(req: ClusterRequest, request: Request):
     if csrf_failed(request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
     uid = user["user_id"]
-    p = get_pipeline(uid)
     try:
-        result = await run_in_thread(p.cluster_articles, n_clusters=req.n_clusters, method=req.method)
-        # cluster_articles returns (labels, cluster_labels, by_cluster, resolved_n)
-        # or None when there are no embeddings yet.
-        resolved_n = result[3] if result else 0
-        return {
-            "status": "success",
-            "clusters": p.db.get_all_clusters(),
-            "resolved_n_clusters": resolved_n,
-            "auto": req.n_clusters is None or req.n_clusters <= 0,
-        }
+        lib_id = owned_library_id(uid, req.library_id)
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"detail": str(e)})
+    kwargs = dict(uid=uid, n_clusters=req.n_clusters, method=req.method)
+    if not req.wait:
+        try:
+            started = start_user_job(uid, 'cluster', _run_create_clusters, library_id=lib_id, **kwargs)
+        except Exception:
+            return server_error()
+        if not started:
+            return JSONResponse(status_code=409, content={"detail": "Theme grouping is already running"})
+        return JSONResponse(status_code=202, content={"status": "started"})
+    if not try_begin_user_job(uid, 'cluster', library_id=lib_id):
+        return JSONResponse(status_code=409, content={"detail": "Theme grouping is already running"})
+    p = None
+    try:
+        p = get_pipeline(uid, lib_id)
+        result = await run_in_thread(_run_create_clusters, p, **kwargs)
+        update_progress(uid, 'cluster', active=False, result=result, error=None)
+        return result
     except Exception as e:
+        update_progress(uid, 'cluster', active=False, result=None, error=core.safe_error_text(e))
         return server_error()
     finally:
-        release_pipeline(uid)
+        if p is not None:
+            release_pipeline(uid, lib_id)
 
 
 @router.get("/api/clusters")
-async def api_get_clusters(request: Request):
+async def api_get_clusters(request: Request, library_id: Optional[str] = None):
     user = current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
     uid = user["user_id"]
-    p = get_pipeline(uid)
+    try:
+        p = get_owned_pipeline(uid, library_id)
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"detail": str(e)})
     try:
         clusters = p.db.get_all_clusters()
         briefings = await run_in_thread(p.get_cluster_briefings)
@@ -395,27 +421,33 @@ async def api_get_clusters(request: Request):
     except Exception as e:
         return server_error()
     finally:
-        release_pipeline(uid)
+        release_pipeline(uid, library_id)
 
 
 @router.get("/api/clusters/{cluster_id}/articles")
-async def api_get_cluster_articles(cluster_id: int, request: Request):
+async def api_get_cluster_articles(
+    cluster_id: int, request: Request, library_id: Optional[str] = None, include_abstract: bool = False,
+):
     user = current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
     uid = user["user_id"]
-    p = get_pipeline(uid)
+    try:
+        p = get_owned_pipeline(uid, library_id)
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"detail": str(e)})
     try:
         articles = p.db.get_articles_by_cluster(cluster_id)
         label = articles[0].get('cluster_label', f'Cluster {cluster_id}') if articles else f'Cluster {cluster_id}'
         attach_key_points(articles, p)
-        for a in articles:
-            a.pop('abstract', None)
+        if not include_abstract:
+            for a in articles:
+                a.pop('abstract', None)
         return {"cluster_id": cluster_id, "cluster_label": label, "articles": articles}
     except Exception as e:
         return server_error()
     finally:
-        release_pipeline(uid)
+        release_pipeline(uid, library_id)
 
 
 @router.get("/api/statistics")

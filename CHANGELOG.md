@@ -27,6 +27,9 @@ and this project aims to follow Semantic Versioning for app version strings
   carries the operator identity, and polls for completion across the site restart.
 
 ### Added
+- 2026-10-09: Group by theme runs as a background job with progress, then
+  opens an accessible theme browser with abstracts. Preview selected papers
+  before setting them aside, with an Undo limited to those papers.
 - 2026-10-09: Re-prepare keeps the research question, defaults to missing
   papers, and offers the allowed analysis models in a disclosure. Manual
   and automatic preparation share the wait screen and remembered model choice.

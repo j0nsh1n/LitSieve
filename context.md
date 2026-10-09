@@ -165,6 +165,10 @@ Guest User (is_guest) → sample corpus only; purged by age
   harness includes modal removal, cancellation, only-missing, and auto-chain choice.
   Latest working-tree suite, including background clustering: **967 passed**;
   required ops/fetch **67 passed**. No parity xfails remain in that working tree.
+- Slice 8 is committed as `76513b9`. Theme jobs are independently reviewed:
+  owned library capture, terminal results/errors, conflict checks, retained
+  pipeline references, and stale-job support. No paper is excluded by grouping.
+  The real-library prototype used a 53-paper isolated snapshot and four themes.
 - Jonathan approved 301 redirects to Search, version 6.0.0, the concrete
   proposed one-flow spec rewrite at removal, and a real-library copy for
   the isolated theme prototype. Luna through Codex remains approved for

@@ -220,7 +220,7 @@ function renderDetail(d) {
  const jobList = document.getElementById('helpdesk-jobs');
  if (jobList) {
   const jobs = d.jobs || {};
-  jobList.innerHTML = ['fetch', 'embed'].map((k) => {
+  jobList.innerHTML = ['fetch', 'embed', 'cluster'].map((k) => {
    const j = jobs[k] || {};
    const state = j.state || (j.active ? 'active' : (j.error ? 'failed' : 'idle'));
    const bits = [

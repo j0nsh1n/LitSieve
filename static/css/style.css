@@ -2498,6 +2498,27 @@ body.lra-modal-open {
     inset: 0;
     background: var(--scrim);
 }
+dialog.simple-theme-tools {
+    width: min(48rem, calc(100vw - 2rem));
+    max-height: calc(100dvh - 2rem);
+    overflow: auto;
+    margin: auto;
+    color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--rule);
+}
+dialog.simple-theme-tools::backdrop { background: var(--scrim); }
+.simple-theme-tools { overflow-wrap: anywhere; }
+.simple-theme-row, .simple-theme-paper {
+    border-top: 1px solid var(--rule);
+    padding-top: var(--space-3);
+    margin-top: var(--space-3);
+}
+.simple-theme-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.simple-theme-select-row { display: block; margin-block: var(--space-3); }
+.simple-theme-select-row .help-text { display: block; }
+.simple-collection-report progress { max-width: 100%; margin-inline: var(--space-2); }
+.simple-collection-last-fetch { white-space: pre-wrap; overflow-wrap: anywhere; }
 .lra-modal-card {
     position: relative;
     z-index: 1;
