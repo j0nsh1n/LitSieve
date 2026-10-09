@@ -149,13 +149,16 @@ Guest User (is_guest) → sample corpus only; purged by age
   **935 passed, 7 xfailed**; required ops/fetch **67 passed**; lint passed;
   Pyright **0 errors, 1 optional Anthropic warning**. Shared stylesheet
   versions agree across public and authenticated templates.
-- Slice 5 whole-library and visible-result export is reviewed and tested with
+- Slice 5 (`197325d`) whole-library and visible-result export is reviewed and tested with
   page-library isolation, exact result order, cancellation, and error coverage.
-  Slice 6 is implemented and awaiting its separate review/commit: database
+  Slice 6 is reviewed and tested: database
   choices inside the fetch popup, conditional remembered contact email,
   confirmed choices used by the fetch request, and cancellation without
   preference mutations. Collection report/duplicate preview and theme UI are
   implemented, with root integration and background clustering still in progress.
+- Latest combined tests: **959 passed, 1 planned parity xfailed**; required
+  ops/fetch **67 passed**, lint passed. Stale reprepare assertions were updated
+  for the new form. The browser reconnected briefly, then disconnected during login.
 - Jonathan approved 301 redirects to Search, version 6.0.0, the concrete
   proposed one-flow spec rewrite at removal, and a real-library copy for
   the isolated theme prototype. Luna through Codex remains approved for

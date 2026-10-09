@@ -108,17 +108,15 @@ def test_export_whole_library_from_save_your_work():
 
 # Slice 6 -------------------------------------------------------------------
 
-@later
 def test_choose_databases_in_fetch_dialog():
-    assert 'id="simple-fetch-databases"' in _search_templates()
+    assert "disclosure.id = 'simple-fetch-databases'" in _search_js()
 
 
-@later
 def test_contact_email_shown_only_for_pubmed_and_europepmc():
     js = _search_js()
     assert "simple-fetch-databases" in js and "fetch-email" in js
     assert "europepmc" in js.lower() and "pubmed" in js.lower()
-    assert 'id="simple-fetch-databases"' in _search_templates()
+    assert "disclosure.id = 'simple-fetch-databases'" in js
 
 
 # Slice 7 -------------------------------------------------------------------

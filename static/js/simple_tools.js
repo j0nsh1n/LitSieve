@@ -1888,6 +1888,22 @@ async function resolveSimpleFetchModeBeforeRequest(opts) {
  const maxEl = document.getElementById('fetch-max');
  const current = parseInt(maxEl && maxEl.value, 10) || 100;
  const preset = FETCH_COUNT_PRESETS.includes(current) ? String(current) : '';
+ const sourceCheckboxes = Array.from(
+  document.querySelectorAll('#source-option-grid input[type="checkbox"]')
+ );
+ const sourceOptions = sourceCheckboxes.map((checkbox) => {
+  const card = checkbox.closest('.source-option');
+  const name = card && card.querySelector('.source-name-label');
+  const description = card && card.querySelector('.source-desc');
+  return {
+   value: checkbox.value,
+   label: (name && name.textContent.trim()) || checkbox.value,
+   hint: description && description.textContent.trim(),
+  };
+ });
+ const selectedSources = sourceCheckboxes.filter((checkbox) => checkbox.checked)
+  .map((checkbox) => checkbox.value);
+ const fetchEmail = document.getElementById('fetch-email');
  const fields = [
   {
    id: 'count',
@@ -1926,11 +1942,51 @@ async function resolveSimpleFetchModeBeforeRequest(opts) {
    ],
   });
  }
+ fields.push(
+  {
+   id: 'sources',
+   type: 'multi-choice',
+   label: 'Databases to search',
+   value: selectedSources,
+   options: sourceOptions,
+  },
+  {
+   id: 'contact_email',
+   type: 'email',
+   label: 'Contact email for PubMed and Europe PMC (optional)',
+   value: fetchEmail ? fetchEmail.value : '',
+   placeholder: 'you@example.edu',
+  }
+ );
  const choice = await openSiteForm({
   title: 'Before we fetch',
   message: 'Each database returns up to this many papers. More takes longer to fetch and prepare, and leaves more to screen.',
   confirmLabel: 'Find articles',
   fields,
+  onReady: (root) => {
+   const fieldsRoot = root.querySelector('.lra-modal-fields');
+   const sourcesField = root.querySelector('[data-field="sources"]');
+   const emailField = root.querySelector('[data-field="contact_email"]');
+   if (!fieldsRoot || !sourcesField || !emailField) return;
+   const disclosure = document.createElement('details');
+   disclosure.id = 'simple-fetch-databases';
+   disclosure.className = 'advanced-details lra-modal-choice';
+   const summary = document.createElement('summary');
+   summary.textContent = 'Databases';
+   disclosure.append(summary, sourcesField, emailField);
+   fieldsRoot.append(disclosure);
+
+   const syncEmailVisibility = () => {
+    const selected = Array.from(
+     sourcesField.querySelectorAll('input[type="checkbox"]:checked')
+    ).map((input) => input.value);
+    emailField.hidden = !selected.includes('pubmed') && !selected.includes('europepmc');
+   };
+   sourcesField.querySelectorAll('input[type="checkbox"]').forEach((input) => {
+    input.addEventListener('change', syncEmailVisibility);
+   });
+   syncEmailVisibility();
+  },
   validate: (vals) => {
    const custom = String(vals.custom || '').trim();
    if (custom) {
@@ -1940,6 +1996,9 @@ async function resolveSimpleFetchModeBeforeRequest(opts) {
     return 'Pick how many papers from each database, or write your own number.';
    }
    if (askMode && !vals.mode) return 'Choose what happens to the papers you already have.';
+   if (!Array.isArray(vals.sources) || vals.sources.length === 0) {
+    return 'Choose at least one database to search.';
+   }
    return '';
   },
  });
@@ -1947,11 +2006,26 @@ async function resolveSimpleFetchModeBeforeRequest(opts) {
  const custom = String(choice.custom || '').trim();
  const count = custom ? parseInt(custom, 10) : parseInt(choice.count, 10);
  if (maxEl && Number.isFinite(count)) maxEl.value = String(count);
+ const pickedSources = new Set(
+  Array.isArray(choice.sources) ? choice.sources.map((source) => String(source)) : []
+ );
+ sourceCheckboxes.forEach((checkbox) => {
+  checkbox.checked = pickedSources.has(checkbox.value);
+ });
+ sourceCheckboxes.forEach((checkbox) => {
+  checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+ });
+ if (fetchEmail && typeof choice.contact_email === 'string') {
+  fetchEmail.value = choice.contact_email;
+  fetchEmail.dispatchEvent(new Event('input', { bubbles: true }));
+  fetchEmail.dispatchEvent(new Event('change', { bubbles: true }));
+ }
  if (askMode) {
   const picked = choice.mode === 'append' ? 'append' : 'replace';
   setMode(picked);
   _persistFetchMode(picked);
  }
+ if (typeof saveFetchPrefs === 'function') saveFetchPrefs();
  return true;
 }
 

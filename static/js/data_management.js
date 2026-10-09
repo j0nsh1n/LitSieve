@@ -1375,11 +1375,7 @@ async function doFetch() {
   showNotification('This collection already has papers. Use Start over if you want to fetch again.', 'info');
   return;
  }
- const sources = Array.from(
- document.querySelectorAll('#source-option-grid input[type="checkbox"]:checked')
- ).map(cb => cb.value);
  const query = ((document.getElementById('fetch-query') || {}).value || '').trim();
- const email = ((document.getElementById('fetch-email') || {}).value || '').trim();
 
  setNextStepVisible(false);
  if (!query) {
@@ -1391,8 +1387,6 @@ async function doFetch() {
   showNotification('Pick at least one general area first. That chooses which sources we search.', 'error');
   return;
  }
- if (sources.length === 0) { showNotification('Please select at least one source.', 'error'); return; }
-
  // Simple: dialog (or skip when empty) must run BEFORE reading fetch-mode.
  // Unlock already ran that dialog — do not ask twice.
  let proceed = true;
@@ -1403,6 +1397,11 @@ async function doFetch() {
   proceed = await resolveSimpleFetchModeBeforeRequest();
  }
  if (!proceed) return;
+ const sources = Array.from(
+  document.querySelectorAll('#source-option-grid input[type="checkbox"]:checked')
+ ).map(cb => cb.value);
+ if (sources.length === 0) { showNotification('Please select at least one source.', 'error'); return; }
+ const selectedEmail = ((document.getElementById('fetch-email') || {}).value || '').trim();
  // Read the per-database cap after the dialog: Simple sets it there.
  const maxResults = parseInt((document.getElementById('fetch-max') || {}).value, 10) || 100;
 
@@ -1452,7 +1451,7 @@ async function doFetch() {
  sources,
  query,
  max_results: maxResults,
- email: email || null,
+ email: selectedEmail || null,
  clear_first: clearFirst,
  }),
  });
