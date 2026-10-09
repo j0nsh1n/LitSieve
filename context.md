@@ -12,8 +12,9 @@
 - Latest targeted ops/fetch checks (2026-10-09): **67 passed**.
 - Expanded ops/fetch/JavaScript/UI unit checks: **165 passed**; `ruff check .`,
   JavaScript syntax, and diff checks passed.
-- Remaining-roadmap baseline and reliability batch (2026-10-09): **910 passed,
-  13 xfailed**, lint passed, upgraded temporary dependency audit clean.
+- Remaining-roadmap reliability batch: **910 passed, 13 xfailed**. Integrated
+  Slice 2/3 (2026-10-09): **931 passed, 8 xfailed**; lint and required 67-test
+  suite pass; upgraded temporary dependency audit is clean.
 - Follow-up verification (2026-10-09): Luna and main-agent required checks each
   passed **67 tests** and lint. Actual browser rollback polling and Advanced
   fetch progress passed with isolated data and synthetic dispatch/sources.
@@ -154,9 +155,15 @@ Guest User (is_guest) → sample corpus only; purged by age
   optional Anthropic package. Actual browser timeout report at 375px says
   "timed out (1 paper)" and has no horizontal overflow, with synthetic sources
   and isolated temporary data. Artifacts: `/tmp/litsieve-roadmap-ovp9uE/`.
-- Next: reconcile existing Slice 2 commit and uncommitted Slice 3 into this
-  isolated branch without altering their source worktrees; then continue
-  Phase 13 slices 4–10. The legacy source worktrees remain untouched.
+- Slice 2 (`af2cdc7`) and the uncommitted Slice 3 work have been replayed
+  into this branch, preserving newer fetch asset versions. Source worktrees
+  are untouched. Integration tests: **931 passed, 8 xfailed**, required
+  suite **67 passed**, lint passed, types **0 errors, 1 warning**.
+  Real browser routes with fixture embeddings covered sort/persistence,
+  sources, starred ranking, reasons, and Undo. All five looks light/dark fit
+  at 375px; selected-chip text contrast is at least **5.04:1**. Keyboard
+  focus remains visible on a selected modal chip. Desktop also fits.
+- Next: continue Phase 13 slices 4–10; Slice 4 is the Search by switch.
 - Unverified: real systemd dispatch/restart, live completion, external APIs,
   live account cap and host AI configuration. The default live deploy-history
   table had no rows. No live services may be restarted in this task.

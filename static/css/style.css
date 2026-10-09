@@ -2652,7 +2652,6 @@ body.lra-modal-open {
     line-height: 1.2;
 }
 .lra-modal-choice .lra-choice-chip:hover { border-color: var(--accent); }
-.lra-modal-choice .lra-choice-chip:has(input:focus-visible) { box-shadow: var(--focus-ring); }
 .lra-modal-choice .lra-choice-chip:has(input:checked) {
     background: var(--accent);
     border-color: color-mix(in srgb, var(--accent) 60%, #000);
@@ -2661,6 +2660,7 @@ body.lra-modal-open {
     border-bottom-width: 1px;
     box-shadow: none;
 }
+.lra-modal-choice .lra-choice-chip:has(input:focus-visible) { box-shadow: var(--focus-ring); }
 .lra-modal-choice .lra-choice-chip:has(input:checked) .lra-choice-chip-hint { color: var(--on-accent); }
 .lra-modal-input-group {
     margin: var(--space-3) 0 0;
@@ -6513,9 +6513,24 @@ html[data-mode="simple"] .search-page-header .page-help-toolbar,
 html[data-mode="simple"] #search-rail .page-help-toolbar {
     display: none;
 }
-html[data-mode="simple"] .result-row-ids,
 html[data-mode="simple"] .study-type-meaning {
     display: none !important;
+}
+.simple-result-chips {
+    display: none;
+}
+html[data-mode="simple"] .simple-result-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+}
+html[data-mode="simple"] .advanced-starred-filter {
+    display: none;
+}
+.lra-modal-section {
+    margin: var(--space-3) 0 var(--space-2);
+    font-size: var(--fs-md);
 }
 html[data-mode="simple"] body.simple-collecting #searchcard,
 html[data-mode="simple"] body.simple-collecting #search-query-top {
@@ -7228,6 +7243,34 @@ html[data-mode="simple"] body:has(#search-workbench) .simple-tools-search-only {
     gap: var(--space-3);
     align-items: center;
     padding: var(--space-2) 0;
+}
+.set-aside-row-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    justify-content: flex-end;
+}
+.set-aside-reasons {
+    margin-top: var(--space-3);
+}
+.set-aside-reason-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+}
+.set-aside-reason-chip[aria-pressed="true"],
+.set-aside-reason-chip[aria-pressed="true"]:hover {
+    background: var(--accent);
+    color: var(--on-accent);
+    border-color: var(--accent);
+    box-shadow: none;
+}
+.set-aside-reason-chip[aria-pressed="true"]:focus-visible {
+    box-shadow: var(--focus-ring);
+}
+.not-relevant-undo .why-reason-chips {
+    flex-basis: 100%;
 }
 .simple-screen-modal-card .simple-screen-actions {
     flex-wrap: wrap;

@@ -496,6 +496,8 @@ let _setAsideModalOpener = null;
 let _setAsideModalKey = null;
 let _setAsideItems = [];
 let _setAsideLastRestore = null;
+let _setAsideReasonTarget = null;
+let _setAsideReasonUndo = null;
 
 function isSimpleSetAsideOpen() {
  const modal = document.getElementById('simple-set-aside-modal');
@@ -538,8 +540,11 @@ async function openSimpleSetAsideModal() {
  }
  modal.hidden = false;
  _setAsideLastRestore = null;
+ _setAsideReasonTarget = null;
  const again = document.getElementById('simple-set-aside-again');
  if (again) again.hidden = true;
+ const reasons = document.getElementById('simple-set-aside-reasons');
+ if (reasons) reasons.hidden = true;
  const status = document.getElementById('simple-set-aside-status');
  if (status) {
   status.textContent = '';
@@ -548,7 +553,7 @@ async function openSimpleSetAsideModal() {
  const card = modal.querySelector('[data-site-modal-card]') || modal;
  const focusable = () => Array.from(card.querySelectorAll(
   'button:not([disabled]), [href], input:not([disabled]), [tabindex]:not([tabindex="-1"])'
- ));
+ )).filter((el) => !el.closest('[hidden]'));
  _setAsideModalKey = (ev) => {
   if (ev.key === 'Escape') {
    ev.preventDefault();
@@ -586,6 +591,7 @@ async function loadSimpleSetAsideList() {
   const data = await apiCall('/api/screening/excluded');
   _setAsideItems = (data && data.items) || [];
   renderSimpleSetAsideGroups(_setAsideItems, (data && data.groups) || []);
+  syncSetAsideReasonChrome();
  } catch (e) {
   host.innerHTML = '';
   setStatus('simple-set-aside-status', `Could not load the list: ${e.message}`, 'error');
@@ -606,14 +612,20 @@ function renderSimpleSetAsideGroups(items, groups) {
  host.innerHTML = groups.map((g) => {
   const rows = (byReason[g.reason] || []).map((it) => {
    const meta = [it.year, it.source].filter(Boolean).join(' · ');
+   const whyBtn = setAsideCanChooseReason(it.reason)
+    ? `<button type="button" class="btn btn-secondary btn-sm" data-set-aside-why="${escapeAttr(it.article_id)}|${escapeAttr(it.source)}">Why?</button>`
+    : '';
    return `<li><div class="set-aside-row">
     <div class="screen-triage-row-body">
      <span class="screen-triage-row-title">${escapeHtml(it.title || it.article_id)}</span>
      <span class="screen-triage-row-meta">${escapeHtml(meta)}</span>
     </div>
-    <button type="button" class="btn btn-secondary btn-sm"
-     data-set-aside-restore="${escapeAttr(it.article_id)}|${escapeAttr(it.source)}"
-     data-set-aside-reason="${escapeAttr(it.reason)}">Restore</button>
+    <div class="set-aside-row-actions">
+     ${whyBtn}
+     <button type="button" class="btn btn-secondary btn-sm"
+      data-set-aside-restore="${escapeAttr(it.article_id)}|${escapeAttr(it.source)}"
+      data-set-aside-reason="${escapeAttr(it.reason)}">Restore</button>
+    </div>
    </div></li>`;
   }).join('');
   const n = (byReason[g.reason] || []).length;
@@ -633,6 +645,15 @@ function renderSimpleSetAsideGroups(items, groups) {
 }
 
 function onSetAsideListClick(ev) {
+ const why = ev.target.closest('[data-set-aside-why]');
+ if (why) {
+  const parts = (why.getAttribute('data-set-aside-why') || '').split('|');
+  const articleId = parts[0];
+  const source = parts.slice(1).join('|');
+  const item = _setAsideItems.find((it) => it.article_id === articleId && it.source === source);
+  if (item && setAsideCanChooseReason(item.reason)) showSetAsideReasons(item);
+  return;
+ }
  const one = ev.target.closest('[data-set-aside-restore]');
  const group = ev.target.closest('[data-set-aside-restore-group]');
  if (one) {
@@ -692,6 +713,130 @@ async function doSetAsideAgain() {
  } finally {
   setLoading(btn, false);
  }
+}
+
+/** Narrow it down, duplicates, and theme groups keep the reason the app wrote.
+ *  Changing one would take that paper out of its own Undo. */
+function setAsideCanChooseReason(reason) {
+ return reason !== 'low_relevance' && reason !== 'duplicate' && reason !== 'cluster';
+}
+
+function showSetAsideReasons(item) {
+ const panel = document.getElementById('simple-set-aside-reasons');
+ if (!panel || !item) return;
+ _setAsideReasonTarget = {
+  article_id: item.article_id,
+  source: item.source,
+  reason: item.reason,
+  title: item.title || item.article_id,
+ };
+ const lead = document.getElementById('simple-set-aside-reasons-lead');
+ if (lead) {
+  lead.textContent = `Why set aside "${_setAsideReasonTarget.title}"? It stays out of your searches.`;
+ }
+ panel.querySelectorAll('[data-reason]').forEach((btn) => {
+  const on = btn.getAttribute('data-reason') === item.reason;
+  btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+ });
+ panel.hidden = false;
+ const undo = document.getElementById('simple-set-aside-reason-undo');
+ if (undo) undo.hidden = !_setAsideReasonUndo;
+ panel.scrollIntoView({ block: 'nearest' });
+}
+
+function onSetAsideReasonClick(ev) {
+ const chip = ev.target.closest('[data-reason]');
+ if (!chip || chip.disabled) return;
+ ev.preventDefault();
+ applySetAsideReason(chip.getAttribute('data-reason'));
+}
+
+async function applySetAsideReason(reason) {
+ const target = _setAsideReasonTarget;
+ if (!target || !reason || reason === target.reason) return;
+ if (!setAsideCanChooseReason(reason)) return;
+ const panel = document.getElementById('simple-set-aside-reasons');
+ const buttons = panel ? Array.from(panel.querySelectorAll('[data-reason]')) : [];
+ buttons.forEach((btn) => { btn.disabled = true; });
+ try {
+  await apiCall('/api/screening', {
+   method: 'POST',
+   body: withPageLibrary({
+    items: [{ article_id: target.article_id, source: target.source }],
+    action: 'exclude',
+    reason: reason,
+   }),
+  });
+  _setAsideReasonUndo = {
+   article_id: target.article_id,
+   source: target.source,
+   reason: target.reason,
+  };
+  const chip = buttons.find((btn) => btn.getAttribute('data-reason') === reason);
+  const label = chip ? chip.textContent.trim() : reason;
+  setStatus('simple-set-aside-status', `Reason saved: ${label}.`, 'success');
+  await loadSimpleSetAsideList();
+  const updated = _setAsideItems.find((it) => it.article_id === target.article_id && it.source === target.source);
+  if (updated) showSetAsideReasons(updated);
+ } catch (e) {
+  setStatus('simple-set-aside-status', `Could not save the reason: ${e.message}`, 'error');
+ } finally {
+  buttons.forEach((btn) => { btn.disabled = false; });
+ }
+}
+
+async function undoSetAsideReason() {
+ const last = _setAsideReasonUndo;
+ const btn = document.getElementById('simple-set-aside-reason-undo');
+ if (!last) return;
+ const still = _setAsideItems.find((it) => it.article_id === last.article_id && it.source === last.source);
+ if (!still) {
+  _setAsideReasonUndo = null;
+  if (btn) btn.hidden = true;
+  setStatus('simple-set-aside-status', 'That paper is back in your searches.', 'info');
+  return;
+ }
+ setLoading(btn, true);
+ try {
+  await apiCall('/api/screening', {
+   method: 'POST',
+   body: withPageLibrary({
+    items: [{ article_id: last.article_id, source: last.source }],
+    action: 'exclude',
+    reason: last.reason,
+   }),
+  });
+  _setAsideReasonUndo = null;
+  if (btn) btn.hidden = true;
+  setStatus('simple-set-aside-status', 'Put the old reason back.', 'success');
+  await loadSimpleSetAsideList();
+  const updated = _setAsideItems.find((it) => it.article_id === last.article_id && it.source === last.source);
+  const panel = document.getElementById('simple-set-aside-reasons');
+  if (updated && panel && !panel.hidden) showSetAsideReasons(updated);
+ } catch (e) {
+  setStatus('simple-set-aside-status', `Could not put the old reason back: ${e.message}`, 'error');
+ } finally {
+  setLoading(btn, false);
+ }
+}
+
+function syncSetAsideReasonChrome() {
+ if (_setAsideReasonTarget) {
+  const still = _setAsideItems.find((it) =>
+   it.article_id === _setAsideReasonTarget.article_id && it.source === _setAsideReasonTarget.source);
+  if (!still) {
+   const panel = document.getElementById('simple-set-aside-reasons');
+   if (panel) panel.hidden = true;
+   _setAsideReasonTarget = null;
+  }
+ }
+ if (_setAsideReasonUndo) {
+  const stillUndo = _setAsideItems.find((it) =>
+   it.article_id === _setAsideReasonUndo.article_id && it.source === _setAsideReasonUndo.source);
+  if (!stillUndo) _setAsideReasonUndo = null;
+ }
+ const undo = document.getElementById('simple-set-aside-reason-undo');
+ if (undo) undo.hidden = !_setAsideReasonUndo;
 }
 
 let _simpleScreenWired = false;
@@ -2080,6 +2225,8 @@ function wireSimpleToolsStrip() {
   });
  });
  once(document.getElementById('simple-set-aside-groups'), onSetAsideListClick);
+ once(document.getElementById('simple-set-aside-reasons'), onSetAsideReasonClick);
+ once(document.getElementById('simple-set-aside-reason-undo'), undoSetAsideReason);
  once(document.getElementById('simple-set-aside-again'), doSetAsideAgain);
 }
 

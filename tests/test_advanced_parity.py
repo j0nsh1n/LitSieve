@@ -62,7 +62,6 @@ def test_restore_any_set_aside_paper_from_simple():
 
 # Slice 2 -------------------------------------------------------------------
 
-@later
 def test_choose_an_exclusion_reason():
     """Clusters reason select → reason chips in the Set aside popup."""
     assert 'id="simple-set-aside-reasons"' in _card()
@@ -70,22 +69,18 @@ def test_choose_an_exclusion_reason():
 
 # Slice 3 -------------------------------------------------------------------
 
-@later
 def test_sort_chip():
     assert 'id="simple-sort-chip"' in _search_templates()
 
 
-@later
 def test_sources_chip():
     assert 'id="simple-sources-chip"' in _search_templates()
 
 
-@later
 def test_more_like_my_starred_from_starred_chip():
     assert 'id="simple-starred-chip"' in _search_templates()
 
 
-@later
 def test_ranking_options_in_search_options_popup():
     """Exact-word and PICO boosts join the count and year fields."""
     fn = _search_js()

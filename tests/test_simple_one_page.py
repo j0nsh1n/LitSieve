@@ -86,8 +86,9 @@ def test_search_includes_collect_and_simple_tools():
     assert "wantsSimpleCollectView" in boot
     assert "clearSearchWorkspace()" in boot
     css = _read("static", "css", "style.css")
+    assert 'html[data-mode="simple"] .result-row-ids' not in css
     simple_hide = css[
-        css.find('html[data-mode="simple"] .result-row-ids') : css.find(
+        css.index('html[data-mode="simple"] .study-type-meaning') : css.index(
             "html[data-mode=\"simple\"] body.simple-collecting"
         )
     ]

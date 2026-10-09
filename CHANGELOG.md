@@ -27,6 +27,10 @@ and this project aims to follow Semantic Versioning for app version strings
   carries the operator identity, and polls for completion across the site restart.
 
 ### Added
+- 2026-10-09: Simple Search gains reason chips in Set aside and the Not
+  relevant Undo strip, source and sort chips, starred-paper ranking, and
+  exact-word/PICO ranking options. Paper identifiers and study type appear
+  inside the abstract disclosure. Existing Slice 2/3 work is integrated locally.
 - Set aside papers: a popup on Search (More, or the funnel's "See set-aside
   papers") that lists every paper left out of your searches, grouped by why
   (marked not relevant, set aside by Narrow it down, duplicate copies, and so

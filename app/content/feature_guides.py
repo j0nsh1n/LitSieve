@@ -230,7 +230,9 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "Hybrid ranking blends embedding similarity with TF-IDF word overlap "
             "so rare terms in your query still surface.",
             "Results show key points, a collapsible abstract, and PICO snippets "
-            "when detected. Use Not relevant to screen out one paper as off-topic.",
+            "when detected. Use Not relevant to screen out one paper. In Simple, "
+            "Why? on that line records a reason such as wrong population, "
+            "wrong study type, language, or too little information.",
             "Star papers and add private notes for your study log. Saved AI key "
             "points (Refine → Save) stay on that paper until you replace the "
             "library.",

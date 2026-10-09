@@ -98,7 +98,7 @@ popup, `static/js/search.js`).
     ask `/api/screening/excluded?reason=low_relevance` on purpose; they
     must restore only Narrow it down's group, never duplicates or Not
     relevant.
-  - Slice 2: exclusion reason chips (about half a day). Simple sets only
+  - [x] Slice 2: exclusion reason chips (completed locally 2026-10-09). Simple sets only
     `off_topic` (Not relevant) and `low_relevance` (Narrow it down) today,
     so a Simple student's screening report has two categories; the chips
     add the PRISMA-style ones (wrong population, wrong study type,
@@ -109,6 +109,7 @@ popup, `static/js/search.js`).
     is half a day to a day and a half. Search state gains one `filters`
     shape that the chips draw from. PMID/DOI and study type move inside
     the abstract disclosure with the result chips.
+    Slice 3 is complete locally (2026-10-09); Slice 4 is next.
   - Slice 9: Group by theme (2 to 3 days). Last fold before removal.
     First a throwaway prototype on a real library with screenshots, to
     settle layout and labels before the real build. Clustering runs
@@ -158,8 +159,9 @@ popup, `static/js/search.js`).
   passing; no `data-mode`, `uiMode`, or `ui_mode` reference remains in
   `app/`, `static/`, `templates/`, or `tests/` except the helpdesk
   history column; spec.md describes one flow
-- Status: [ ] in progress. Slices 0 and 1 shipped; slice 2 (reason
-  chips) is next. Nothing waits on the pending calls until slice 6.
+- Status: [ ] in progress. Slices 0 and 1 shipped; Slices 2 and 3 are
+  integrated and tested locally. Slice 4 (Search by) is next. No new work
+  has been pushed, merged, or deployed.
 
 ## Backlog (unscheduled)
 - [x] Clear app type errors and make `pyright app` blocking in CI (2026-10-09)

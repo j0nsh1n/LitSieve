@@ -87,9 +87,21 @@
    <h2 id="simple-set-aside-title" class="lra-modal-title">Set aside papers</h2>
    <p class="info-text">These papers stay in your collection but are left out of your searches.
     Restore any you want back.</p>
+   <div id="simple-set-aside-reasons" class="set-aside-reasons" hidden>
+    <p class="help-text" id="simple-set-aside-reasons-lead">Why is this paper set aside? It stays out of your searches.</p>
+    <div class="set-aside-reason-chips" role="group" aria-label="Reason">
+     <button type="button" class="btn btn-secondary set-aside-reason-chip" data-reason="off_topic" aria-pressed="false">Not relevant</button>
+     <button type="button" class="btn btn-secondary set-aside-reason-chip" data-reason="wrong_population" aria-pressed="false">Wrong population</button>
+     <button type="button" class="btn btn-secondary set-aside-reason-chip" data-reason="wrong_study_type" aria-pressed="false">Wrong study type</button>
+     <button type="button" class="btn btn-secondary set-aside-reason-chip" data-reason="language" aria-pressed="false">Language</button>
+     <button type="button" class="btn btn-secondary set-aside-reason-chip" data-reason="insufficient_info" aria-pressed="false">Too little information</button>
+     <button type="button" class="btn btn-secondary set-aside-reason-chip" data-reason="other" aria-pressed="false">Other</button>
+    </div>
+   </div>
    <div id="simple-set-aside-groups" class="set-aside-groups"></div>
    <div id="simple-set-aside-status" class="status-indicator" aria-live="polite"></div>
    <div class="lra-modal-actions">
+    <button type="button" class="btn btn-secondary" id="simple-set-aside-reason-undo" hidden>Put the old reason back</button>
     <button type="button" class="btn btn-secondary" id="simple-set-aside-again" hidden>Set them aside again</button>
     <button type="button" class="btn btn-secondary" id="simple-set-aside-close" data-set-aside-close>Close</button>
    </div>

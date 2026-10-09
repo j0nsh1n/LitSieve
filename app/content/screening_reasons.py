@@ -34,6 +34,18 @@ USER_SELECTABLE_REASONS: List[str] = [
     "other",
 ]
 
+# Simple Why? chips. "manual" stays on the Clusters select only: it is the
+# Advanced default for an Exclude button that does not say why, and Simple
+# already has Not relevant for that. System reasons are never chips.
+REASON_CHIPS: List[tuple[str, str]] = [
+    ("off_topic", "Not relevant"),
+    ("wrong_population", "Wrong population"),
+    ("wrong_study_type", "Wrong study type"),
+    ("language", "Language"),
+    ("insufficient_info", "Too little information"),
+    ("other", "Other"),
+]
+
 # System-assigned reasons (UI must not offer these as free student choices).
 SYSTEM_REASONS = frozenset({"cluster", "duplicate", "low_relevance"})
 

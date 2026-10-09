@@ -476,15 +476,20 @@ function openSiteModal(opts) {
             fieldHtml = `<div class="lra-modal-fields">${formFields.map((f) => {
                 const fid = escapeAttr(safeDomId(f.id));
                 const label = escapeHtml(String(f.label || f.id || ''));
-                if (f.type === 'choice') {
+                const section = f.section
+                    ? `<h3 class="lra-modal-section">${escapeHtml(String(f.section))}</h3>` : '';
+                if (f.type === 'choice' || f.type === 'multi-choice') {
                     // Preset chips: one radio per option, the checked one reads as pressed.
                     const chips = (Array.isArray(f.options) ? f.options : []).map((opt) => {
                         const val = escapeAttr(String(opt.value));
-                        const checked = f.value != null && String(f.value) === String(opt.value) ? ' checked' : '';
+                        const multiple = f.type === 'multi-choice';
+                        const selected = multiple ? (Array.isArray(f.value) && f.value.includes(String(opt.value)))
+                            : f.value != null && String(f.value) === String(opt.value);
+                        const checked = selected ? ' checked' : '';
                         const hint = opt.hint ? `<small class="lra-choice-chip-hint">${escapeHtml(String(opt.hint))}</small>` : '';
-                        return `<label class="lra-choice-chip"><input type="radio" name="site-modal-field-${fid}" value="${val}"${checked}><span class="lra-choice-chip-label">${escapeHtml(String(opt.label))}</span>${hint}</label>`;
+                        return `<label class="lra-choice-chip"><input type="${multiple ? 'checkbox' : 'radio'}" name="site-modal-field-${fid}" value="${val}"${checked}><span class="lra-choice-chip-label">${escapeHtml(String(opt.label))}</span>${hint}</label>`;
                     }).join('');
-                    return `<fieldset class="form-group lra-modal-input-group lra-modal-choice" data-field="${fid}">
+                    return `${section}<fieldset class="form-group lra-modal-input-group lra-modal-choice" data-field="${fid}">
               <legend class="help-text">${label}</legend>
               <div class="lra-choice-chips">${chips}</div>
             </fieldset>`;
@@ -494,7 +499,7 @@ function openSiteModal(opts) {
                 const min = f.min != null ? ` min="${escapeAttr(String(f.min))}"` : '';
                 const max = f.max != null ? ` max="${escapeAttr(String(f.max))}"` : '';
                 const step = f.step != null ? ` step="${escapeAttr(String(f.step))}"` : '';
-                return `<div class="form-group lra-modal-input-group" data-field="${fid}">
+                return `${section}<div class="form-group lra-modal-input-group" data-field="${fid}">
               <label class="help-text" for="site-modal-field-${fid}">${label}</label>
               <input id="site-modal-field-${fid}" class="lra-modal-input" type="${typ}"
                 placeholder="${ph}"${min}${max}${step} autocomplete="off">
@@ -679,6 +684,10 @@ function openSiteModal(opts) {
                 if (isForm) {
                     const values = {};
                     formFields.forEach((f) => {
+                        if (f.type === 'multi-choice') {
+                            values[f.id] = Array.from(root.querySelectorAll('input[name="site-modal-field-' + safeDomId(f.id) + '"]:checked')).map((el) => el.value);
+                            return;
+                        }
                         if (f.type === 'choice') {
                             const on = root.querySelector('input[name="site-modal-field-' + safeDomId(f.id) + '"]:checked');
                             values[f.id] = on ? on.value : '';
