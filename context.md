@@ -10,6 +10,7 @@
 - Types: `pyright app` via `pyrightconfig.json` (basic); CI **continue-on-error**
   (report-only). Last recorded: **60 errors, 6 warnings** (2026-09-17). The
   previously cited baseline was 56/6.
+- Latest targeted ops/fetch checks (2026-10-09): **47 passed**.
 - Tests: `SECRET_KEY=x DEBUG=true ./venv/bin/python -m pytest -q` — prefer
   `./venv` for sqlcipher. Count drifts with the branch; re-run before release.
 - UI: Simple/Advanced via `localStorage.uiMode` + `data-mode` (theme-init pre-paint).
@@ -125,28 +126,15 @@ Guest User (is_guest) → sample corpus only; purged by age
 - Host entry: `app.main:app` port 7860; Linux `./venv`
 
 ## Session Handoff
-- **Date:** 2026-09-25
-- **State:** one landing PR combined four branches: Phase 13 slices 0 and 1
-  (parity test, Set aside list), the account cap and per-student AI
-  buttons (Grok), inline form validation messages (ChatGPT), and the
-  Phase 13 roadmap review. Version **5.5.0**; `style.css?v=20260925b`.
-- **Set aside list:** `GET /api/screening/excluded` with no reason lists
-  every reason with title, year, and a plain-words label, plus ordered
-  `groups`. The popup (`#simple-set-aside-modal`) opens from the More menu
-  and from the funnel's "See set-aside papers"; wired in
-  `wireSimpleToolsStrip` so it works before papers are prepared. Restore
-  posts `include`; "Set them aside again" re-excludes with the same reason.
-- **Parity test:** `tests/test_advanced_parity.py`, one row per Advanced
-  feature, `xfail(strict=True)` until its slice lands. A slice that adds a
-  control must remove that row's xfail in the same PR.
-- **Account cap:** `MAX_TOTAL_ACCOUNTS`, checked in `UserDatabase.create_user`
-  under the lock; guests exempt; unset means no cap. Not set on the host yet.
-- **AI buttons:** `/api/ui-flags` folds in `llm.student_can_get_ai(uid)` for
-  signed-in students; the Account card stays with `#ai-unavailable-note`.
-- **Permissions (host, 2026-09-24):** `users.db` and sidecars,
-  `mailersend-smtp.txt`, and `secrets/` are 600; `user_data/` is `go-rwx`.
-- **Tunnels:** LitSieve has one tunnel, `cloudflared-litpilot-token.service`
-  (tunnel `8f98295a…`). The other `cloudflared` (tunnel `6ede11dd…`,
-  127.0.0.1:3773) is T3 Code's remote access; leave it.
-- **Next:** Phase 13 slice 2 (reason chips in the Set aside popup); set
-  `MAX_TOTAL_ACCOUNTS` and the Ollama variables in `.env`.
+- **Date:** 2026-10-09. **Branch:** `fix/ops-rollback-and-fetch-deadline`.
+- Task 1 complete locally. Rollback dispatches to a transient unit with the
+  actor, audits the receipt, and polls deploy state. The synchronous fallback
+  still writes route-side history. `_do_deploy` already passes the actor to
+  `_finish_deploy`; a unit test confirms rollback reaches it.
+- Verified `ruff check app tests`, JavaScript syntax, and the requested five-file
+  pytest command with `DEBUG=true`: 47 passed. The initial run without DEBUG
+  failed existing auth tests because TestClient uses HTTP and cookies were Secure.
+- Real service restarts and host rollback were not exercised. Browser behavior
+  was unit-tested in Node with mocked responses; no browser session was run.
+- Next work is Task 2, direct `_finish_deploy` persistence and host checklist,
+  followed by Task 3, whole-source fetch deadlines and progress.

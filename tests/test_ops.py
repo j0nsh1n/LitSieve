@@ -6,7 +6,9 @@ import os
 import re
 import subprocess
 from pathlib import Path
+from unittest.mock import Mock
 
+import pytest
 from conftest import TEST_PASSWORD
 from fastapi.testclient import TestClient
 
@@ -777,6 +779,147 @@ def test_deploy_state_endpoint_reports_progress_and_requires_operator(tmp_path, 
     done = client.get("/api/ops/deploy-state").json()
     assert done["in_flight"] is False
     assert done["record"]["result"] == "ok"
+
+
+@pytest.mark.parametrize("sha", ["a" * 40, ""])
+def test_rollback_dispatches_and_leaves_deploy_history_to_the_worker(tmp_path, monkeypatch, sha):
+    from app.operator import deploy_state, runner
+    from app.routes import ops
+    from app.storage import ops_audit
+
+    client, db = _ops_client(tmp_path, monkeypatch)
+    _reauth(client)
+    monkeypatch.setattr(runner, "detached_supported", lambda: True)
+    monkeypatch.setattr(deploy_state, "interrupted", lambda: None)
+    monkeypatch.setattr(ops.uuid, "uuid4", lambda: "dispatch-fixture")
+    unit = f"litsieve-rollback-{sha[:12] or 'prev'}"
+    dispatch = Mock(return_value={"ok": True, "dispatched": True, "unit": unit})
+    sync = Mock(side_effect=AssertionError("rollback ran in the web process"))
+    add_deploy = Mock(side_effect=AssertionError("route wrote deploy history"))
+    monkeypatch.setattr(runner, "run_action_detached", dispatch)
+    monkeypatch.setattr(ops, "run_action", sync)
+    monkeypatch.setattr(ops_audit, "add_deploy", add_deploy)
+
+    resp = client.post("/api/ops/rollback", json={"sha": sha}, headers=_csrf(client))
+    assert resp.status_code == 202, resp.text
+    assert resp.json() == {"ok": True, "dispatched": True, "unit": unit, "sha": sha, "dispatch_id": "dispatch-fixture"}
+    dispatch.assert_called_once_with(
+        "rollback", [sha] if sha else [], unit_name=unit,
+        extra_env={"LITSIEVE_DEPLOY_ACTOR": "opadmin", "LITSIEVE_DEPLOY_ID": "dispatch-fixture"},
+    )
+    sync.assert_not_called()
+    add_deploy.assert_not_called()
+    rows = [r for r in ops_audit.list_audit(db) if r["action"] == "rollback"]
+    assert len(rows) == 1
+    assert rows[0]["result"] == "dispatched"
+    assert rows[0]["sha"] == sha
+    assert rows[0]["actor_username"] == "opadmin"
+
+
+def test_rollback_refuses_an_in_flight_deploy(tmp_path, monkeypatch):
+    from app.operator import deploy_state, runner
+
+    client, _db = _ops_client(tmp_path, monkeypatch)
+    _reauth(client)
+    monkeypatch.setattr(runner, "detached_supported", lambda: True)
+    stuck = {"sha": "a" * 40, "phase": "restarting"}
+    monkeypatch.setattr(deploy_state, "interrupted", lambda: stuck)
+    dispatch = Mock()
+    monkeypatch.setattr(runner, "run_action_detached", dispatch)
+    resp = client.post("/api/ops/rollback", json={}, headers=_csrf(client))
+    assert resp.status_code == 409, resp.text
+    assert resp.json()["deploy_state"] == stuck
+    dispatch.assert_not_called()
+
+
+@pytest.mark.parametrize("ok", [True, False])
+def test_rollback_synchronous_fallback_keeps_its_verdict_and_history(tmp_path, monkeypatch, ok):
+    from app.operator import runner
+    from app.routes import ops
+    from app.storage import ops_audit
+
+    client, db = _ops_client(tmp_path, monkeypatch)
+    _reauth(client)
+    monkeypatch.setattr(runner, "detached_supported", lambda: False)
+    result = {"ok": ok, "sha": "a" * 40, "previous_sha": "b" * 40}
+    sync = Mock(return_value=result)
+    dispatch = Mock()
+    monkeypatch.setattr(ops, "run_action", sync)
+    monkeypatch.setattr(runner, "run_action_detached", dispatch)
+    resp = client.post("/api/ops/rollback", json={"sha": result["sha"]}, headers=_csrf(client))
+    assert resp.status_code == (200 if ok else 400), resp.text
+    assert resp.json() == result
+    sync.assert_called_once_with("rollback", [result["sha"]])
+    dispatch.assert_not_called()
+    rows = ops_audit.list_deploys(db)
+    assert len(rows) == 1
+    assert rows[0]["result"] == ("ok" if ok else "failed")
+    assert rows[0]["actor_username"] == "opadmin"
+
+
+def test_rollback_browser_waits_for_the_detached_verdict():
+    script = Path(__file__).resolve().parents[1] / "static" / "js" / "ops.js"
+    harness = r"""
+const fs = require('fs');
+const vm = require('vm');
+const assert = require('assert');
+const status = {textContent: ''};
+const calls = [];
+const notices = [];
+const states = [
+ {in_flight: false, record: {phase: 'done', result: 'ok', dispatch_id: 'old'}},
+ {in_flight: true, record: {phase: 'health', dispatch_id: 'new'}},
+ {in_flight: false, record: {phase: 'done', result: 'ok', dispatch_id: 'new'}},
+];
+const ctx = {
+ document: {addEventListener() {}, getElementById: () => status},
+ setTimeout: (fn) => fn(),
+ apiCall: async (url) => {
+  calls.push(url);
+  if (url === '/api/ops/rollback') return {dispatched: true, sha: 'aaaaaaaa', unit: 'unit', dispatch_id: 'new'};
+  if (url === '/api/ops/deploy-state') return states.shift();
+  throw new Error('unexpected request ' + url);
+ },
+ showNotification: (message) => notices.push(message),
+};
+vm.createContext(ctx);
+vm.runInContext(fs.readFileSync(process.argv[1], 'utf8'), ctx);
+vm.runInContext('appendOutput = () => {}; loadStatus = async () => {};', ctx);
+(async () => {
+ await ctx.rollbackTo('aaaaaaaa');
+ assert.deepStrictEqual(calls, ['/api/ops/rollback', '/api/ops/deploy-state', '/api/ops/deploy-state', '/api/ops/deploy-state']);
+ assert.deepStrictEqual(notices, ['Rolled back.']);
+ assert.strictEqual(status.textContent, 'rollback aaaaaaaa — done');
+})().catch((e) => { console.error(e); process.exitCode = 1; });
+"""
+    proc = subprocess.run(["node", "-e", harness, str(script)], capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+def test_rollback_reaches_finish_deploy_with_the_detached_actor(tmp_path, monkeypatch):
+    from app.operator import actions, gitutil
+
+    sha, previous = "a" * 40, "b" * 40
+    monkeypatch.setenv("LITSIEVE_LIVE", str(tmp_path))
+    monkeypatch.setenv("LITSIEVE_DEPLOY_ACTOR", "someone")
+    monkeypatch.setenv("LITSIEVE_DEPLOY_ID", "dispatch-fixture")
+    monkeypatch.setattr(gitutil, "is_git_repo", lambda _root: True)
+    monkeypatch.setattr(gitutil, "tracked_dirty", lambda _root: [])
+    monkeypatch.setattr(gitutil, "rev_parse", lambda _root, ref="HEAD": sha if ref == sha else previous)
+    monkeypatch.setattr(gitutil, "reset_hard", Mock())
+    monkeypatch.setattr(actions, "_sync_deps", Mock())
+    monkeypatch.setattr(actions, "_restart_service", Mock())
+    monkeypatch.setattr(actions, "_poll_health", lambda: True)
+    finish = Mock(side_effect=lambda result, **_kw: result)
+    monkeypatch.setattr(actions, "_finish_deploy", finish)
+    monkeypatch.setattr(actions, "_json_out", lambda _result, code=0: code)
+
+    assert actions.cmd_rollback([sha]) == 0
+    assert actions.deploy_state.read()["dispatch_id"] == "dispatch-fixture"
+    finish.assert_called_once_with(
+        {"ok": True, "sha": sha, "previous_sha": previous, "rolled_back": False, "action": "rollback"},
+        actor="someone",
+    )
 
 
 # --- A05: operator work must not stall the single web worker ------------------

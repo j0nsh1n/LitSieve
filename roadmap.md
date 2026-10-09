@@ -33,7 +33,7 @@ follow-up audits of 2026-09-12 and 2026-09-17 (session record).
 - Tasks:
   - Confirm on the host that a detached deploy writes its `operator_deploys`
     row to the live `users.db` (the fix is in code; not yet confirmed on the host)
-  - Run rollback detached like deploy. `POST /api/ops/rollback` runs as a
+  - [x] Run rollback detached like deploy. `POST /api/ops/rollback` runs as a
     child of the web service through `run_action`, and the unit sets no
     `KillMode`, so the `systemctl --user restart` inside `_do_deploy` stops
     it before `_finish_deploy`; the record is left interrupted and no audit
