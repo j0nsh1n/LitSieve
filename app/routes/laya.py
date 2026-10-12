@@ -7,15 +7,18 @@ recommended databases. The student always decides; with Laya off this returns
 """
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
 from app.content.source_catalog import TOPIC_META
 from app.core import csrf_failed, current_user, limiter, run_in_thread
-from app.schemas import TopicAreaRequest
+from app.schemas import TopicAreaFeedback, TopicAreaRequest
 from app.services import laya_client
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 MIN_BEST = 0.5        # below this Laya is unsure; suggest nothing
 SECOND_RATIO = 0.5    # include the runner-up when it has at least half the best's probability
@@ -49,3 +52,24 @@ async def api_topic_area(req: TopicAreaRequest, request: Request):
     if csrf_failed(request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
     return await run_in_thread(suggest_topic_areas, req.topic.strip())
+
+
+@router.post("/api/topic-area/feedback")
+@limiter.limit("30/minute")
+async def api_topic_area_feedback(req: TopicAreaFeedback, request: Request):
+    """Log Laya's pick against the areas actually searched, to tune MIN_BEST.
+
+    Only topic-area ids are recorded, never the topic text or the user.
+    """
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    suggested = sorted({t for t in req.suggested if t in TOPIC_META})
+    final = sorted({t for t in req.final if t in TOPIC_META})
+    if not suggested:
+        return {"ok": False}
+    logger.info("laya topic-area feedback suggested=%s final=%s kept=%s opened=%s",
+                ",".join(suggested), ",".join(final), set(suggested) <= set(final), req.opened)
+    return {"ok": True}

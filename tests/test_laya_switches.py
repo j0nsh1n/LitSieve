@@ -283,3 +283,31 @@ def test_topic_route_validates_length(app_module):  # noqa: F811
     c = TestClient(app_module.app)
     h = _register(c, "layalen")
     assert c.post("/api/topic-area", json={"topic": "x"}, headers=h).status_code == 422
+
+
+# --- topic-area feedback ---------------------------------------------------------
+
+def test_feedback_requires_auth_and_csrf(app_module):  # noqa: F811
+    c = TestClient(app_module.app)
+    assert c.post("/api/topic-area/feedback", json={"suggested": ["biology"], "final": ["biology"]}).status_code == 401
+    _register(c, "fbcsrf")
+    assert c.post("/api/topic-area/feedback", json={"suggested": ["biology"], "final": ["biology"]}).status_code == 403
+
+
+def test_feedback_logs_area_ids_only(app_module, caplog):  # noqa: F811
+    c = TestClient(app_module.app)
+    h = _register(c, "fblog")
+    with caplog.at_level("INFO", logger="app.routes.laya"):
+        r = c.post("/api/topic-area/feedback", headers=h,
+                   json={"suggested": ["psychology", "not-an-area"], "final": ["education", "psychology", "health"], "opened": True})
+    assert r.json() == {"ok": True}
+    line = next(m for m in caplog.messages if "topic-area feedback" in m)
+    assert "suggested=psychology" in line and "final=education,health,psychology" in line
+    assert "kept=True" in line and "opened=True" in line and "not-an-area" not in line
+
+
+def test_feedback_without_a_known_suggestion_is_ignored(app_module):  # noqa: F811
+    c = TestClient(app_module.app)
+    h = _register(c, "fbnone")
+    assert c.post("/api/topic-area/feedback", headers=h, json={"suggested": ["nope"], "final": []}).json() == {"ok": False}
+    assert c.post("/api/topic-area/feedback", headers=h, json={"suggested": ["a", "b", "c", "d"], "final": []}).status_code == 422

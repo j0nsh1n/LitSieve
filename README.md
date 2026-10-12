@@ -113,8 +113,9 @@ Then open <http://localhost:7860>. Public landing and `/learn/…` guides need n
 account. **Try the demo** (`/guest`) loads sample papers without registering.
 Register/login for a private workspace, then:
 
-1. **Search** (`/search`) — pick topics, name a topic, review database choices,
-   and fetch. One wait screen covers fetch and prepare. Apply or skip **Narrow
+1. **Search** (`/search`) — name a topic, check the areas (the optional Laya
+   model picks them from the topic; Change opens the full list), review
+   database choices, and fetch. One wait screen covers fetch and prepare. Apply or skip **Narrow
    it down**, then rank by Question, PICO, or a paper already in your library.
 2. **More** opens collection report, duplicates, Quick screen, re-prepare,
    Start over, and background grouping. **Search options** adjusts ranking.

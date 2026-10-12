@@ -12,9 +12,15 @@ and this project aims to follow Semantic Versioning for app version strings
 - Optional Laya switches. With the local Laya sidecar running and
   `LITSIEVE_LAYA_URL` set, study-type tags the wording patterns were unsure of
   are settled by Laya when it is at least 85% sure (the tooltip says so), and
-  the collect step suggests a topic area once a topic is typed ("Sounds like
-  Biology. Add Biology"). Search ranking is unchanged. With Laya off, slow or
-  unsure, everything behaves as before.
+  the collect step picks the areas from the typed topic. Search ranking is
+  unchanged. With Laya off, slow or unsure, everything behaves as before.
+
+### Changed
+- Get papers asks for the topic first. The areas that choose the databases
+  sit under it: when Laya picks them they show as one line ("Searching
+  Psychology databases · picked from your topic") with Change to open every
+  area; a hand choice always wins. The Next button is gone. Pressing Find
+  before an area is picked asks Laya first, then opens the areas.
 
 ## [6.0.0] - 2026-10-11
 

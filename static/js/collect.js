@@ -189,9 +189,7 @@ document.addEventListener('DOMContentLoaded', () => {
  if (embeddingsBtn) embeddingsBtn.addEventListener('click', doCreateEmbeddings);
  const coverageBtn = document.getElementById('coverage-refresh');
  if (coverageBtn) coverageBtn.addEventListener('click', refreshCoverage);
- const topicsNext = document.getElementById('collect-topics-next');
- if (topicsNext) topicsNext.addEventListener('click', () => revealCollectStep(true));
- initTopicAreaSuggest();
+ initAreaPicker();
  const dismissGs = document.getElementById('dismiss-getting-started');
  if (dismissGs) dismissGs.addEventListener('click', () => {
  if (typeof dismissGettingStarted === 'function') dismissGettingStarted();
@@ -269,37 +267,62 @@ function renderTopicGrid() {
  card.addEventListener('click', () => toggleTopic(topic.id, card));
  grid.appendChild(card);
  });
- syncCollectStep();
+ renderAreaState();
 }
 
-/** Simple collect is one guided column: pick areas, press Next, name the topic.
- * The Next button appears once an area is picked and disappears once the
- * topic box is open; a returning student with saved areas skips the gate. */
-function syncCollectStep() {
- const collect = document.getElementById('search-collect');
- if (!collect) return;
- const next = document.getElementById('collect-topics-next');
- const revealed = collect.classList.contains('has-topic');
- if (next) next.hidden = !(selectedTopics.size > 0 && !revealed);
+/* Areas: the topic comes first; the areas below it decide which databases we
+ * search. areasSource says who chose them: 'none', 'manual' (the student),
+ * 'saved' (last visit) or 'laya' (picked from the topic by the optional local
+ * Laya model). A Laya or saved choice is shown as one line with Change; the
+ * grid stays open whenever nothing is picked or the student is choosing. */
+let areasSource = 'none';
+let areasExpanded = true;
+let lastLayaPick = [];
+let areasPickerOpened = false;
+
+function renderAreaState() {
+ const summary = document.getElementById('collect-areas-summary');
+ const picker = document.getElementById('collect-areas-picker');
+ const text = document.getElementById('collect-areas-summary-text');
+ if (!summary || !picker || !text) return;
+ const names = [...selectedTopics].map(id => (TOPICS.find(t => t.id === id) || {}).name || id);
+ const collapsed = !areasExpanded && names.length > 0;
+ summary.hidden = !collapsed;
+ picker.hidden = collapsed;
+ if (!collapsed) return;
+ text.textContent = '';
+ text.append('Searching ');
+ names.forEach((n, i) => {
+  if (i) text.append(i === names.length - 1 ? ' and ' : ', ');
+  const b = document.createElement('strong');
+  b.textContent = n;
+  text.append(b);
+ });
+ text.append(' databases');
+ const note = document.createElement('span');
+ note.className = 'collect-areas-note';
+ note.textContent = areasSource === 'laya' ? ' · picked from your topic' : (areasSource === 'saved' ? ' · your saved areas' : '');
+ text.append(note);
 }
 
-function revealCollectStep(focus) {
- const collect = document.getElementById('search-collect');
- if (!collect || collect.classList.contains('has-topic')) return;
- collect.classList.add('has-topic');
- syncCollectStep();
- const card = document.getElementById('collect-fetch-card');
- if (card) {
-  card.classList.remove('scene-in');
-  void card.offsetWidth;
-  card.classList.add('scene-in');
-  if (focus) {
-   const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-   card.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
-   const q = document.getElementById('fetch-query');
-   if (q) q.focus({ preventScroll: true });
-  }
- }
+/** Replace the selected areas (Laya or saved prefs), keeping the grid in sync. */
+function setAreas(ids, source) {
+ selectedTopics = new Set(ids);
+ document.querySelectorAll('#topic-grid .topic-card').forEach(card => {
+  card.classList.toggle('selected', selectedTopics.has(card.dataset.topicId));
+ });
+ areasSource = source;
+ updateRecommendedSources();
+ applyModelRecommendation();
+ saveFetchPrefs();
+ refreshCoverage();
+ updateGettingStartedChecklist();
+}
+
+function openAreaPicker() {
+ areasExpanded = true;
+ areasPickerOpened = true;
+ renderAreaState();
 }
 
 function renderTopicPacks() {
@@ -351,7 +374,9 @@ function applyTopicPack(packId) {
  saveFetchPrefs();
  refreshCoverage();
  updateGettingStartedChecklist();
- syncCollectStep();
+ areasSource = 'manual';
+ areasExpanded = true;
+ renderAreaState();
  showNotification(`Applied pack: ${pack.name}`, 'success');
 }
 
@@ -367,7 +392,8 @@ function toggleTopic(topicId, card) {
  applyModelRecommendation();
  saveFetchPrefs();
  refreshCoverage();
- syncCollectStep();
+ areasSource = 'manual';
+ renderAreaState();
 }
 
 /** Model that best matches the selected topics ('general' when mixed or none). */
@@ -572,8 +598,8 @@ function restoreFetchPrefs() {
  if (card) card.classList.add('selected');
  });
  updateRecommendedSources();
- if (prefs.topics.length) revealCollectStep(false);
- syncCollectStep();
+ if (prefs.topics.length) { areasSource = 'saved'; areasExpanded = false; }
+ renderAreaState();
  }
  if (Array.isArray(prefs.sources) && prefs.sources.length) {
  Object.keys(ALL_SOURCES).forEach(id => {
@@ -1384,9 +1410,17 @@ async function doFetch() {
   return;
  }
  if (selectedTopics.size === 0) {
-  showNotification('Pick at least one general area first. That chooses which sources we search.', 'error');
+  // A fast typist can press Find before the debounced Laya pick lands.
+  await pickAreasFromTopic(query);
+ }
+ if (selectedTopics.size === 0) {
+  openAreaPicker();
+  const grid = document.getElementById('topic-grid');
+  if (grid) grid.scrollIntoView({ block: 'center' });
+  showNotification('Pick at least one area. That chooses which databases we search.', 'error');
   return;
  }
+ sendAreaFeedback();
  // Simple: dialog (or skip when empty) must run BEFORE reading fetch-mode.
  // Unlock already ran that dialog — do not ask twice.
  let proceed = true;
@@ -1747,55 +1781,54 @@ async function doCreateEmbeddings(opts) {
 }
 
 
-/* Optional Laya switch: once the student has typed a topic, ask which topic
- * area it belongs to and offer any area they have not picked. The areas decide
- * which databases are recommended; the student still chooses. With Laya off,
- * slow or unsure, the server answers {available:false} or no topics and this
- * stays hidden. */
-let _topicSuggestTimer = null;
-let _topicSuggestSeq = 0;
-function initTopicAreaSuggest() {
+/* Optional Laya switch: once a topic is typed, ask which areas it belongs to
+ * and, unless the student chose areas by hand, select them and collapse the
+ * grid into one line with Change. With Laya off, slow or unsure, the server
+ * answers {available:false} or no topics and the grid stays open as before. */
+let _areaPickTimer = null;
+let _areaPickSeq = 0;
+function initAreaPicker() {
  const input = document.getElementById('fetch-query');
- const box = document.getElementById('topic-area-suggest');
- if (!input || !box) return;
+ const change = document.getElementById('collect-areas-change');
+ if (change) change.addEventListener('click', openAreaPicker);
+ if (!input) return;
  input.addEventListener('input', () => {
-  clearTimeout(_topicSuggestTimer);
+  clearTimeout(_areaPickTimer);
   const topic = input.value.trim();
-  if (topic.length < 8) { box.hidden = true; return; }
-  _topicSuggestTimer = setTimeout(() => suggestTopicAreas(topic), 700);
+  if (topic.length < 8 || areasSource === 'manual') return;
+  _areaPickTimer = setTimeout(() => pickAreasFromTopic(topic), 700);
  });
 }
 
-async function suggestTopicAreas(topic) {
- const box = document.getElementById('topic-area-suggest');
- if (!box) return;
- const seq = ++_topicSuggestSeq;
+async function pickAreasFromTopic(topic) {
+ if (!topic || topic.length < 3 || areasSource === 'manual') return false;
+ const seq = ++_areaPickSeq;
  let data;
  try {
   data = await apiCall('/api/topic-area', { method: 'POST', body: { topic } });
  } catch (e) {
-  box.hidden = true;
-  return;
+  return false;
  }
  const current = ((document.getElementById('fetch-query') || {}).value || '').trim();
- if (seq !== _topicSuggestSeq || current !== topic) return;
- const missing = ((data && data.topics) || []).filter(t => !selectedTopics.has(t.id));
- if (!data || !data.available || !missing.length) { box.hidden = true; return; }
- box.textContent = '';
- const names = missing.map(t => t.name).join(' or ');
- box.append(`Sounds like ${names}. `);
- missing.forEach(t => {
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'btn btn-secondary topic-area-suggest-btn';
-  btn.textContent = `Add ${t.name}`;
-  btn.addEventListener('click', () => {
-   const card = document.querySelector(`.topic-card[data-topic-id="${t.id}"]`);
-   if (card && !selectedTopics.has(t.id)) toggleTopic(t.id, card);
-   btn.remove();
-   if (!box.querySelector('button')) box.hidden = true;
-  });
-  box.append(btn);
- });
- box.hidden = false;
+ if (seq !== _areaPickSeq || current !== topic || areasSource === 'manual') return false;
+ const ids = ((data && data.topics) || []).map(t => t.id).filter(id => TOPICS.some(t => t.id === id));
+ if (!data || !data.available || !ids.length) {
+  if (!selectedTopics.size) { areasExpanded = true; renderAreaState(); }
+  return false;
+ }
+ lastLayaPick = ids;
+ setAreas(ids, 'laya');
+ areasExpanded = false;
+ renderAreaState();
+ return true;
+}
+
+/** Tell the server how Laya's pick compared with the areas actually searched
+ * (area ids only, never the topic), so its confidence cut-off can be tuned. */
+function sendAreaFeedback() {
+ if (!lastLayaPick.length) return;
+ apiCall('/api/topic-area/feedback', {
+  method: 'POST',
+  body: { suggested: lastLayaPick, final: [...selectedTopics], opened: areasPickerOpened },
+ }).catch(() => {});
 }

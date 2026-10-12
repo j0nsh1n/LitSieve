@@ -158,6 +158,29 @@ popup, `static/js/search.js`).
   fonts. Authenticated browser automation disconnected, so the remaining live
   interaction review is incomplete. Nothing new is pushed, merged, or deployed.
 
+## Phase 14 — Looks: more choice and finer control
+New look designs are coming from ChatGPT (Astro) mock-ups; the five current
+looks (Workshop, Broadsheet, Lab, Night, Catalog) stay.
+- Tasks:
+  - Bring the new designs in as looks once they are ready
+  - Let a student adjust a look (accent colour, text size, density) on top of
+    the preset, stored on the account
+- Complete when: the new looks are selectable in Account and after sign-up,
+  per-look adjustments persist across devices, and contrast stays at or above
+  4.5:1 in light and dark
+- Status: [ ] open
+
+## Phase 15 — Laya switches: calibrate on real use
+- Tasks:
+  - Read `laya topic-area feedback` log lines after a few weeks and set
+    `MIN_BEST` / `SECOND_RATIO` (app/routes/laya.py) from how often students
+    kept Laya's areas
+  - Spot-check Laya-tagged study types on real libraries before lowering
+    `LAYA_MIN_P` (0.85)
+- Complete when: both cut-offs are set from logged use, not the 2026-10-12
+  sample evaluation
+- Status: [ ] open
+
 ## Backlog (unscheduled)
 - [x] Clear app type errors and make `pyright app` blocking in CI (2026-10-09)
 - [x] Tell all three AI prompts (`_REFINE_SYSTEM`, `_ASK_SYSTEM`, Reader) that

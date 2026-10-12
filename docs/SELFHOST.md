@@ -87,8 +87,8 @@ After a detached deploy from **Ship** finishes, check its receipt and history.
 ## Optional: Laya sidecar
 
 Laya is a small local typed-decision model. LitSieve uses it only as a switch:
-picking a study-type tag when the wording patterns are unsure, and suggesting a
-topic area while collecting. It never ranks search results (on the sample
+picking a study-type tag when the wording patterns are unsure, and picking the
+topic areas from the typed topic while collecting (shown as one line with Change). It never ranks search results (on the sample
 library it ranked worse than the current embeddings + word-match blend).
 
 It runs as its own service from Laya's interpreter, so LitSieve's venv never

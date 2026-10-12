@@ -998,30 +998,37 @@ def test_search_results_open_in_place_one_at_a_time():
 
 
 def test_simple_collect_is_one_guided_column():
-    """Topics first as chips with line icons; the topic box waits for a first pick.
+    """Topic first; the areas sit under it and decide the databases.
 
-    A library that already has papers (Start over) must not hide the box, or
-    the unlock button inside it becomes unreachable.
+    With the optional Laya model the areas are picked from the topic and shown
+    as one line with Change; the grid stays open when nothing is picked. The
+    topic box is never hidden, so Start over keeps its unlock button reachable.
     """
     js = _read("static", "js", "collect.js")
-    grid = js[js.index("function renderTopicGrid") : js.index("function syncCollectStep")]
+    grid = js[js.index("function renderTopicGrid") : js.index("function renderTopicPacks")]
     assert "topic.icon_svg" in grid
     assert 'stroke="currentColor"' in grid
-    sync = js[js.index("function syncCollectStep") : js.index("function revealCollectStep")]
-    assert "next.hidden = !(selectedTopics.size > 0 && !revealed)" in sync
-    reveal = js[js.index("function revealCollectStep") : js.index("function renderTopicPacks")]
-    assert "collect.classList.add('has-topic')" in reveal
-    assert "q.focus(" in reveal
-    assert "topicsNext.addEventListener('click', () => revealCollectStep(true))" in js
+    assert "renderAreaState();" in grid
+    state = js[js.index("function renderAreaState") : js.index("function setAreas")]
+    assert "const collapsed = !areasExpanded && names.length > 0;" in state
+    assert "picker.hidden = collapsed;" in state
     toggle = js[js.index("function toggleTopic") : js.index("function recommendModel")]
-    assert "syncCollectStep();" in toggle
-    restore = js[js.index("function restoreFetchPrefs") : js.index("function restoreFetchPrefs") + 2200]
-    assert "revealCollectStep(false)" in restore
+    assert "areasSource = 'manual';" in toggle  # a hand choice wins over Laya
+    pick = js[js.index("async function pickAreasFromTopic") : js.index("function sendAreaFeedback")]
+    assert "areasSource === 'manual'" in pick and "setAreas(ids, 'laya');" in pick
+    assert "areasExpanded = false;" in pick
+    restore = js[js.index("function restoreFetchPrefs") : js.index("function restoreFetchPrefs") + 2400]
+    assert "areasSource = 'saved'; areasExpanded = false;" in restore
+    assert "await pickAreasFromTopic(query);" in js  # Find before the debounce still gets areas
+    assert "openAreaPicker();" in js
+    for gone in ("syncCollectStep", "revealCollectStep", "collect-topics-next"):
+        assert gone not in js
     html = _read("templates", "partials", "collect_ui.html")
-    assert 'id="collect-topics-next"' in html
-    assert "Next: name your topic" in html
+    assert html.index('id="fetch-query"') < html.index('id="collect-areas-summary"') < html.index('id="topic-grid"') < html.index('id="fetch-btn"')
+    assert 'id="collect-areas-change"' in html
+    assert "Next: name your topic" not in html
     css = _read("static", "css", "style.css")
-    assert '#search-collect:not(.has-topic):not(.has-papers):not(.is-startover) #collect-fetch-card' in css
+    assert ":not(.has-topic)" not in css
     assert ".topic-grid {\n    display: flex;" in css
     assert ".topic-icon svg {" in css
     from app.content.source_catalog import list_topics_for_api

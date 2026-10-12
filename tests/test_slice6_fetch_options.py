@@ -163,6 +163,8 @@ async function run(cancel) {
    email: controls['fetch-email'].value,
   }),
   withPageLibrary: (body) => body,
+  // Area picker (Laya switch): topics are already selected here, so these stay idle.
+  pickAreasFromTopic: async () => false, openAreaPicker() {}, sendAreaFeedback() {},
  };
  vm.runInNewContext(
   extractFn(simple, 'resolveSimpleFetchModeBeforeRequest') + '\n' +

@@ -264,3 +264,10 @@ class SetEmailRequest(BaseModel):
 class TopicAreaRequest(BaseModel):
     """A student's typed research topic, for the optional Laya topic-area switch."""
     topic: str = Field(..., min_length=3, max_length=300)
+
+
+class TopicAreaFeedback(BaseModel):
+    """How Laya's topic-area pick compared with the areas a student searched (ids only)."""
+    suggested: List[str] = Field(default_factory=list, max_length=3)
+    final: List[str] = Field(default_factory=list, max_length=13)
+    opened: bool = False

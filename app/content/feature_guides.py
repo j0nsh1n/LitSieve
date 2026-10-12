@@ -43,12 +43,15 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "authors, years, and journals into your private collection."
         ),
         "how_it_works": [
-            "On Search, choose academic topics (e.g. Education, Health); the "
-            "recommended databases update to fit those topics.",
+            "On Search, enter a topic for the database query. Save your full "
+            "research question for Narrow it down and Search.",
+            "Below the topic, the areas (e.g. Education, Health) decide which "
+            "databases are recommended. When the host runs the optional Laya model, "
+            "it picks the areas from your topic and shows them as one line; press "
+            "Change to see every area and pick your own. Without Laya you pick them "
+            "yourself.",
             "Review the source choices in the Databases disclosure and select "
             "which databases to search.",
-            "Enter a topic for the database query. Save your full research question "
-            "for Narrow it down and Search.",
             "Choose the result limit for each database and whether to start fresh "
             "or add results to the active library.",
             "Fetch runs sources in parallel in the background; when papers arrive, "
@@ -226,6 +229,10 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "Process counts for hand-ins are available in the Search screening report.",
         ],
         "tips": [
+            "Study-type tags (trial, review, survey...) are guesses from the wording "
+            "of the title and abstract. When those patterns are unsure and the host "
+            "runs the optional Laya model, Laya picks the tag, but only when it is at "
+            "least 85% sure; hover the tag to see which one tagged it.",
             "Search only ranks papers already in your collection (from public "
             "databases you fetched). It is not Google Scholar and not a full library "
             "search. Use it to prioritise candidates, then verify in original sources.",
