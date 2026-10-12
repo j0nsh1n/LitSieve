@@ -8148,7 +8148,6 @@ body.simple-screen-ready #simple-tools-count:not([hidden]) {
 .collect-header-simple .site-disclaimer strong { font-weight: 500; }
 .getting-started-list,
 #collect-fetch-card .form-group:has(#fetch-max) { display: none; }
-#collect-topics-card,
 #collect-fetch-card {
     padding: var(--space-5) var(--space-6);
 }
@@ -8156,19 +8155,11 @@ body.simple-screen-ready #simple-tools-count:not([hidden]) {
     font-size: var(--fs-xl);
     margin: 0 0 var(--space-2);
 }
-#collect-topics-card .dm-sub-simple,
 #collect-fetch-card .dm-sub-simple {
     font-size: var(--fs-sm);
     color: var(--text-soft);
     margin: 0 0 var(--space-4);
 }
-/* The topic box waits until an area is picked, then arrives. A library that
-   already has papers (Start over) shows it at once. */
-#search-collect:not(.has-topic):not(.has-papers):not(.is-startover) #collect-fetch-card {
-    display: none;
-}
-.collect-next-row { margin: var(--space-4) 0 0; }
-#collect-topics-next { min-height: 2.75rem; }
 #collect-fetch-card .form-row { display: block; }
 #collect-fetch-card .form-group.flex-2 { max-width: none; }
 #fetch-query {
@@ -8510,9 +8501,7 @@ input:autofill:focus-visible {
         font-size: var(--fs-xs);
         line-height: var(--lh-snug);
     }
-    #collect-topics-card,
-#collect-fetch-card { padding: var(--space-4) var(--space-4); }
-    #collect-topics-next { width: 100%; }
+    #collect-fetch-card { padding: var(--space-4) var(--space-4); }
 
     /* Dialog fields stack; preset chips keep their row. */
     .lra-modal-fields { grid-template-columns: 1fr; }
@@ -8523,3 +8512,13 @@ input:autofill:focus-visible {
         font-size: var(--fs-sm);
     }
 }
+
+/* Areas under the collect topic box: one line when picked (Laya or saved), the
+   grid when the student is choosing. */
+.collect-areas { margin: var(--space-4) 0; }
+.collect-areas-heading { font-size: var(--fs-md); margin: 0 0 var(--space-1); }
+.collect-areas-help { margin: 0 0 var(--space-3); }
+.collect-areas-summary { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: 0; }
+.collect-areas-summary[hidden], #collect-areas-picker[hidden] { display: none; }
+.collect-areas-note { color: var(--text-soft); }
+.collect-areas-change { padding: var(--space-1) var(--space-3); font-size: var(--fs-sm); }

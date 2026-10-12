@@ -1209,9 +1209,9 @@ function renderStudyTypeBadge(article) {
  const formal = article.study_type_label_formal || '';
  const disc = article.study_type_disclaimer
  || 'Automated guess from title and abstract only. May be wrong.';
- const matched = article.study_type_matched
- ? ` Matched: “${article.study_type_matched}”.`
- : '';
+ const matched = article.study_type_source === 'laya'
+ ? ' Tagged by Laya, a local AI model, because the wording patterns were unsure.'
+ : (article.study_type_matched ? ` Matched: “${article.study_type_matched}”.` : '');
  const formalBit = formal && formal !== label ? ` Formal name: ${formal}.` : '';
  const title = `${disc}${formalBit}${matched}${warn ? ' ' + warn : ''} Confidence: ${conf}.`;
  const warnMark = (band === 'high') ? '' : ' <span class="study-type-warn" aria-hidden="true">!</span>';

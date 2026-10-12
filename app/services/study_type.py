@@ -13,7 +13,10 @@ Default labels are plain-language for younger students, with a short
 
 from __future__ import annotations
 
+import hashlib
 import re
+import threading
+from collections import OrderedDict
 from typing import Any, Dict, List, Optional, Tuple
 
 # Student-facing type id -> short plain-language label (default UI).
@@ -274,3 +277,83 @@ def attach_study_types(articles: List[dict]) -> None:
         a["study_type_matched"] = info["matched_phrase"]
         a["study_type_warning"] = info["warning"]
         a["study_type_disclaimer"] = info["disclaimer"]
+        a["study_type_source"] = "pattern"
+
+
+# ---------------------------------------------------------------------------
+# Laya as a switch (optional). The pattern tagger above stays first; only when
+# it is unsure does a local Laya model pick among the same type ids, and its
+# answer is used only when it is confident. Measured on the 28-paper sample
+# library (2026-10-12): patterns alone tagged 11 papers (10 right); with this
+# gate 13 papers, all right. Laya alone was right on only 15 of 28, so it never
+# overrides a confident pattern and never shows a guess below LAYA_MIN_P.
+# ---------------------------------------------------------------------------
+PATTERN_KEEP = 0.75   # pattern confidence at or above this is kept as is
+LAYA_MIN_P = 0.85     # Laya's answer is used only at or above this probability
+_LAYA_TYPES = ["synthesis", "trial", "observational", "survey", "qualitative", "methods", "narrative_review", "opinion"]
+_CACHE_MAX = 4096
+_cache: "OrderedDict[str, Optional[Tuple[str, float]]]" = OrderedDict()
+_cache_lock = threading.Lock()
+
+
+def _cache_key(a: dict) -> str:
+    text = f"{a.get('title') or ''}\n{a.get('abstract') or ''}"
+    return hashlib.sha1(text.encode("utf-8", "ignore")).hexdigest()
+
+
+def refine_study_types_with_laya(articles: List[dict]) -> int:
+    """After attach_study_types: ask Laya (one batch) about papers the patterns were unsure of.
+
+    Returns how many tags Laya changed. With Laya off or unavailable, nothing changes.
+    """
+    from app.services import laya_client
+
+    if not laya_client.enabled():
+        return 0
+    unsure = [a for a in articles or []
+              if float(a.get("study_type_confidence") or 0) < PATTERN_KEEP
+              and len(f"{a.get('title') or ''}{a.get('abstract') or ''}") >= 80]
+    if not unsure:
+        return 0
+    keys = [_cache_key(a) for a in unsure]
+    with _cache_lock:
+        missing = [(k, a) for k, a in zip(keys, unsure) if k not in _cache]
+    if missing:
+        answers = laya_client.choice(
+            "What kind of study is this paper?",
+            {t: STUDY_TYPE_MEANINGS[t] for t in _LAYA_TYPES},
+            [f"{a.get('title') or ''}. {a.get('abstract') or ''}" for _, a in missing],
+        )
+        if answers is None:
+            return 0  # do not cache failures; try again on a later search
+        with _cache_lock:
+            for (k, _), ans in zip(missing, answers):
+                _cache[k] = (ans["choice"], ans["p"]) if ans["p"] >= LAYA_MIN_P else None
+                _cache.move_to_end(k)
+            while len(_cache) > _CACHE_MAX:
+                _cache.popitem(last=False)
+    changed = 0
+    for k, a in zip(keys, unsure):
+        with _cache_lock:
+            hit = _cache.get(k)
+        if not hit:
+            continue
+        type_id, p = hit
+        info = _result(type_id, p, None)
+        a["study_type"] = info["study_type"]
+        a["study_type_label"] = info["study_type_label"]
+        a["study_type_label_formal"] = info["study_type_label_formal"]
+        a["study_type_meaning"] = info["study_type_meaning"]
+        a["study_type_confidence"] = info["confidence"]
+        a["study_type_confidence_band"] = info["confidence_band"]
+        a["study_type_matched"] = None
+        a["study_type_warning"] = info["warning"]
+        a["study_type_disclaimer"] = info["disclaimer"]
+        a["study_type_source"] = "laya"
+        changed += 1
+    return changed
+
+
+def _clear_laya_cache_for_tests() -> None:
+    with _cache_lock:
+        _cache.clear()

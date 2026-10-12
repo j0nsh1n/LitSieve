@@ -18,6 +18,8 @@ os.environ.setdefault("GUEST_AUTO_PREPARE", "0")
 # (run_dev.sh sets one) cannot leak in; child processes inherit it too. pytest
 # still captures log records for any failing test.
 os.environ["LOG_FILE"] = ""
+# Laya is an optional local sidecar; a developer's exported URL must not leak into tests.
+os.environ.pop("LITSIEVE_LAYA_URL", None)
 
 # Fixture credentials for HTTP / auth tests. Meet min length; not real secrets.
 # Import these instead of scattering password-looking string literals in tests.

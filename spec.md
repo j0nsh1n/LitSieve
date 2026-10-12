@@ -76,8 +76,9 @@ a substitute for school library databases.
 - Local run: `./run_dev.sh` → http://127.0.0.1:7860  
   Or: `DEBUG=true SECRET_KEY=… ./venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 7860 --reload`
   Dev isolation (preferred): `./run_dev.sh 7861` uses separate DB/data/log paths.
-- Example: register or **Try the demo** → Search (empty: topics →
-  fetch by **topic** → wait screen for fetch + prepare, sieve + rotating
+- Example: register or **Try the demo** → Search (empty: **topic** →
+  areas (picked by the optional Laya model and shown as one line, or chosen
+  by hand) → fetch → wait screen for fetch + prepare, sieve + rotating
   copy, hold at 90% → required Narrow it down apply or skip → finish leg →
   rank + export). Re-prepare / Start over stay on the Search strip.
 - Type: Source Serif 4 headings, Source Sans 3 body/UI, self-hosted WOFF2
@@ -160,7 +161,7 @@ a substitute for school library databases.
 
 ## Acceptance Criteria
 - [ ] Student can complete a literature pass on public sources only:
-      topics → fetch → auto-prepare wait → required Narrow it down → search
+      topic → areas → fetch → auto-prepare wait → required Narrow it down → search
       → export RIS; optional duplicate checking, Quick screen, and theme grouping
       remain reachable on Search
 - [ ] Guest demo loads sample papers without multi-source fetch and does not

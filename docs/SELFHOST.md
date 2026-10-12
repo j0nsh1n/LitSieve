@@ -84,6 +84,28 @@ After a detached deploy from **Ship** finishes, check its receipt and history.
 4. Check `/api/ops/deploy-state` while signed in as the operator. The matching
    record has phase `done`, `in_flight: false`, and the same final result.
 
+## Optional: Laya sidecar
+
+Laya is a small local typed-decision model. LitSieve uses it only as a switch:
+picking a study-type tag when the wording patterns are unsure, and picking the
+topic areas from the typed topic while collecting (shown as one line with Change). It never ranks search results (on the sample
+library it ranked worse than the current embeddings + word-match blend).
+
+It runs as its own service from Laya's interpreter, so LitSieve's venv never
+imports torch for it, and a crash cannot take the site down. LitSieve calls it
+with a 1.2 s read timeout and falls back to today's behaviour on any error.
+
+```bash
+cp deploy/litsieve-laya.service ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now litsieve-laya.service
+curl -s http://127.0.0.1:7880/health      # {"ok": true, "loaded": true, "device": "cuda"}
+echo 'LITSIEVE_LAYA_URL=http://127.0.0.1:7880' >> .env
+systemctl --user restart litsieve-uvicorn.service
+```
+
+Turn it off by removing `LITSIEVE_LAYA_URL` from `.env` and restarting the app.
+
 ## Cloudflare Tunnel
 
 1. Install `cloudflared` (package or binary).

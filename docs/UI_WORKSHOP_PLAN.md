@@ -43,7 +43,9 @@ asks one question at a time.
   open after a search. The Open button is real (`aria-expanded`,
   `aria-controls`) so Enter and Space work; a click on the row body opens it
   too. The action rail is a row under the open card.
-- Simple collect: header, scope note as one quiet line, "Which areas does
+- Simple collect (superseded on feat/laya-switches, 2026-10-12: the topic
+  box comes first and the areas sit under it, collapsed when Laya picks
+  them): header, scope note as one quiet line, "Which areas does
   your topic belong to?" with topic chips, a "Next: name your topic" button
   once an area is picked, then "What topic do you want papers about?" with
   the topic box focused. Max results and fetch-mode radios stay hidden in

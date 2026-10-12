@@ -1,0 +1,18 @@
+[Unit]
+Description=Laya typed-decision sidecar for LitSieve (127.0.0.1:7880)
+Documentation=file://%h/HealthDatabaseAccess/docs/SELFHOST.md
+After=network.target
+
+[Service]
+WorkingDirectory=%h/HealthDatabaseAccess
+# Laya's own interpreter has torch (ROCm) and the cached checkpoint; LitSieve's
+# venv never imports Laya. Offline: the checkpoint is already cached.
+Environment=HF_HUB_OFFLINE=1
+ExecStart=%h/.local/share/laya/bin/python tools/laya_worker.py --port 7880
+Restart=on-failure
+RestartSec=5
+SyslogIdentifier=litsieve-laya
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target
