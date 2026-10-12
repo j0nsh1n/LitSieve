@@ -8523,3 +8523,8 @@ input:autofill:focus-visible {
         font-size: var(--fs-sm);
     }
 }
+
+/* Laya topic-area suggestion under the collect topic box (optional switch). */
+.topic-area-suggest { margin-top: var(--space-2); display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.topic-area-suggest[hidden] { display: none; }
+.topic-area-suggest-btn { padding: var(--space-1) var(--space-3); font-size: var(--fs-sm); }

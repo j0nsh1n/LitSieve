@@ -191,6 +191,7 @@ document.addEventListener('DOMContentLoaded', () => {
  if (coverageBtn) coverageBtn.addEventListener('click', refreshCoverage);
  const topicsNext = document.getElementById('collect-topics-next');
  if (topicsNext) topicsNext.addEventListener('click', () => revealCollectStep(true));
+ initTopicAreaSuggest();
  const dismissGs = document.getElementById('dismiss-getting-started');
  if (dismissGs) dismissGs.addEventListener('click', () => {
  if (typeof dismissGettingStarted === 'function') dismissGettingStarted();
@@ -1743,4 +1744,58 @@ async function doCreateEmbeddings(opts) {
  } finally {
  setLoading(btn, false);
  }
+}
+
+
+/* Optional Laya switch: once the student has typed a topic, ask which topic
+ * area it belongs to and offer any area they have not picked. The areas decide
+ * which databases are recommended; the student still chooses. With Laya off,
+ * slow or unsure, the server answers {available:false} or no topics and this
+ * stays hidden. */
+let _topicSuggestTimer = null;
+let _topicSuggestSeq = 0;
+function initTopicAreaSuggest() {
+ const input = document.getElementById('fetch-query');
+ const box = document.getElementById('topic-area-suggest');
+ if (!input || !box) return;
+ input.addEventListener('input', () => {
+  clearTimeout(_topicSuggestTimer);
+  const topic = input.value.trim();
+  if (topic.length < 8) { box.hidden = true; return; }
+  _topicSuggestTimer = setTimeout(() => suggestTopicAreas(topic), 700);
+ });
+}
+
+async function suggestTopicAreas(topic) {
+ const box = document.getElementById('topic-area-suggest');
+ if (!box) return;
+ const seq = ++_topicSuggestSeq;
+ let data;
+ try {
+  data = await apiCall('/api/topic-area', { method: 'POST', body: { topic } });
+ } catch (e) {
+  box.hidden = true;
+  return;
+ }
+ const current = ((document.getElementById('fetch-query') || {}).value || '').trim();
+ if (seq !== _topicSuggestSeq || current !== topic) return;
+ const missing = ((data && data.topics) || []).filter(t => !selectedTopics.has(t.id));
+ if (!data || !data.available || !missing.length) { box.hidden = true; return; }
+ box.textContent = '';
+ const names = missing.map(t => t.name).join(' or ');
+ box.append(`Sounds like ${names}. `);
+ missing.forEach(t => {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'btn btn-secondary topic-area-suggest-btn';
+  btn.textContent = `Add ${t.name}`;
+  btn.addEventListener('click', () => {
+   const card = document.querySelector(`.topic-card[data-topic-id="${t.id}"]`);
+   if (card && !selectedTopics.has(t.id)) toggleTopic(t.id, card);
+   btn.remove();
+   if (!box.querySelector('button')) box.hidden = true;
+  });
+  box.append(btn);
+ });
+ box.hidden = false;
 }

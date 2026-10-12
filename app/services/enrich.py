@@ -74,8 +74,10 @@ def attach_study_types(results: List[dict]) -> None:
     from app.content.ui_flags import get_ui_flags
     if not get_ui_flags().get("show_study_type_tags", True):
         return
-    from app.services.study_type import attach_study_types
+    from app.services.study_type import attach_study_types, refine_study_types_with_laya
     attach_study_types(results)
+    # Optional: a local Laya model settles the tags the patterns were unsure of.
+    refine_study_types_with_laya(results)
 
 
 def enrich_search_results(results: List[dict], p, *, query_text: str = "", pico_boost: bool = False) -> None:

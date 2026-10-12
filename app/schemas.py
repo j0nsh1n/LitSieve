@@ -259,3 +259,8 @@ class SetEmailRequest(BaseModel):
     their own address."""
     email: str = Field(..., min_length=3, max_length=254)
     current_password: str
+
+
+class TopicAreaRequest(BaseModel):
+    """A student's typed research topic, for the optional Laya topic-area switch."""
+    topic: str = Field(..., min_length=3, max_length=300)
