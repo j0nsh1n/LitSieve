@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from test_looks import _rule_body
+from test_looks import DARK_FIRST_LOOKS, LIGHT_FIRST_LOOKS, _rule_body
 from test_ui_tokens import _css_block_tokens, _theme_token_blocks, _wcag_contrast
 
 REPO = Path(__file__).resolve().parents[1]
@@ -20,18 +20,19 @@ LIST_SELECT = "select:not([multiple]):not([size])"
 def _all_token_blocks() -> list[tuple[str, dict[str, str]]]:
     """Workshop (the :root theme) plus every look, in each theme it defines."""
     blocks = list(_theme_token_blocks())
-    for look in ("broadsheet", "lab", "catalog"):
+    for look in LIGHT_FIRST_LOOKS:
         for label, needle in (
             (f"{look} light", f'html[data-look="{look}"] {{'),
             (f"{look} dark", f'html[data-look="{look}"][data-theme="dark"] {{'),
             (f"{look} prefers-dark", f'html[data-look="{look}"]:not([data-theme="light"]) {{'),
         ):
             blocks.append((label, _css_block_tokens(_rule_body(CSS, needle))))
-    blocks.append(("night dark", _css_block_tokens(_rule_body(CSS, 'html[data-look="night"] {'))))
-    blocks.append(
-        ("night light", _css_block_tokens(_rule_body(CSS, 'html[data-look="night"][data-theme="light"] {')))
-    )
-    assert len(blocks) == 14
+    for look in DARK_FIRST_LOOKS:
+        blocks.append((f"{look} dark", _css_block_tokens(_rule_body(CSS, f'html[data-look="{look}"] {{'))))
+        blocks.append(
+            (f"{look} light", _css_block_tokens(_rule_body(CSS, f'html[data-look="{look}"][data-theme="light"] {{')))
+        )
+    assert len(blocks) == 3 + 3 * len(LIGHT_FIRST_LOOKS) + 2 * len(DARK_FIRST_LOOKS)
     return blocks
 
 

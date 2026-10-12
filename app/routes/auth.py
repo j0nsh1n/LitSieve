@@ -18,6 +18,7 @@ from app.auth import (
     validate_new_username,
     verify_password_async,
 )
+from app.content.appearance import effective, parse_overrides
 from app.content.looks import DEFAULT_LOOK, LOOKS, normalize_look, parse_look
 from app.core import (
     _evict_pipeline,
@@ -35,11 +36,12 @@ from app.core import (
 from app.schemas import (
     ChangePasswordRequest,
     DeleteAccountRequest,
+    SetAppearanceRequest,
     SetEmailRequest,
     SetLookRequest,
 )
 from app.services import mailer
-from app.storage.user_db import AccountCapExceeded
+from app.storage.user_db import AccountCapExceeded, LookChanged
 
 logger = logging.getLogger(__name__)
 
@@ -146,7 +148,7 @@ async def login_submit(
     )
     response = RedirectResponse(url=next_url, status_code=302)
     _set_auth_cookies(response, token)
-    _set_look_cookie(response, user.get("look"))
+    _set_look_cookie(response, user.get("look"), appearance=user.get("appearance"))
     return response
 
 
@@ -195,7 +197,7 @@ async def login_once(request: Request, token: str = ""):
     )
     response = RedirectResponse(url="/search", status_code=302)
     _set_auth_cookies(response, jwt_token)
-    _set_look_cookie(response, rec.get("look"))
+    _set_look_cookie(response, rec.get("look"), appearance=rec.get("appearance"))
     return response
 
 
@@ -380,7 +382,7 @@ async def register_submit(
     )
     response = RedirectResponse(url="/search?pickLook=1", status_code=302)
     _set_auth_cookies(response, token)
-    _set_look_cookie(response, user.get("look"))
+    _set_look_cookie(response, user.get("look"), appearance=user.get("appearance"))
     # One-shot: Search opens the Look picker once after register, then clears it.
     response.set_cookie(
         "ui_look_prompt",
@@ -487,9 +489,46 @@ async def set_account_look(request: Request, body: SetLookRequest):
     saved = core.user_db.set_look(user["user_id"], parsed)
     if not saved:
         return JSONResponse(status_code=400, content={"detail": "Unknown look"})
-    response = JSONResponse({"look": saved})
-    _set_look_cookie(response, saved)
+    response = JSONResponse({"look": saved, "appearance": {}})
+    _set_look_cookie(response, saved, max_age=_look_cookie_age(user))
     return response
+
+
+@router.get("/api/account/appearance")
+async def get_account_appearance(request: Request):
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    look = normalize_look(user.get("look"))
+    overrides = parse_overrides(user.get("appearance") or {}, look)
+    return {"look": look, "appearance": overrides, "effective": effective(look, overrides)}
+
+
+@router.post("/api/account/appearance")
+async def set_account_appearance(request: Request, body: SetAppearanceRequest):
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    try:
+        stored = core.user_db.set_appearance(user["user_id"], body.appearance, expected_look=body.look)
+    except LookChanged:
+        return JSONResponse(
+            status_code=409,
+            content={"detail": "Your look was changed in another tab. Showing it now."},
+        )
+    if stored is None:
+        return JSONResponse(status_code=404, content={"detail": "Account not found"})
+    look, saved = stored
+    response = JSONResponse({"look": look, "appearance": saved, "effective": effective(look, saved)})
+    _set_look_cookie(response, look, appearance=saved, max_age=_look_cookie_age(user))
+    return response
+
+
+def _look_cookie_age(user: dict) -> Optional[int]:
+    """A guest's look lasts as long as the guest session, not a year."""
+    return core.GUEST_MAX_AGE_MINUTES * 60 if user.get("is_guest") else None
 
 
 @router.get("/logout")
@@ -497,6 +536,9 @@ async def logout():
     response = RedirectResponse(url="/login", status_code=302)
     response.delete_cookie("access_token")
     response.delete_cookie("csrf_token")
+    # The next person at this computer starts from the default look, not the
+    # last student's (a cookie, so it also overrides the stored copy).
+    _set_look_cookie(response, DEFAULT_LOOK)
     return response
 
 

@@ -24,8 +24,9 @@
   offers visible results or whole-library scope exports.
 - Result identifiers/study type are inside the abstract. Stars, notes,
   Not relevant/reasons/Undo and one-paper AI study aids remain available.
-- Workshop, Broadsheet, Lab, Night and Catalog remain account looks; light/dark
-  remains a browser preference. Shared changed assets use `?v=20261009j`.
+- Seven account looks (Workshop, Broadsheet, Lab, Night, Catalog,
+  Observatory, Reading room), each a preset students fine-tune; light/dark
+  remains a browser preference. Shared changed assets use `?v=20261012s`.
 - Guest sessions use sample papers, cannot fetch public sources and expire
   after 30 minutes. Search includes all available sources when unset.
 - Ship rollback dispatches detached when supported, carries its actor, and
@@ -57,6 +58,7 @@
 ## Domain Model
 - **User** (`users.db`): username, password hash, token_version; optional recovery
   email; `is_guest` + created_at for demo accounts; `look` (workshop default)
+  and `appearance` (JSON of settings changed on top of the look)
 - **Library**: named collection; meta in `libraries.json`; SQLite
   `user_data/<uid>/libraries/<lib_id>/articles.db`
 - **Article** key `(article_id, source)`: title, abstract, year, authors, journal
@@ -103,30 +105,21 @@ Guest User (is_guest) → sample corpus only; purged by age
   the owning user's progress while a referenced job is active.
 
 ## Session Handoff
-- **Date:** 2026-10-09. **Branch:** `fix/ops-rollback-and-fetch-deadline`.
-- Original fixes: `5887f2c` detached rollback, `369882e` deploy-history
-  persistence tests/host checklist, `3f97f40` source deadlines/partial pages.
-- Reliability/security: `053b2a4`. Search migration: `5090a61` Slices 2/3,
-  `fc195c1` Search by, `197325d` scoped exports, `807d62e` fetch choices,
-  `3270337` reports/duplicates, `76513b9` re-prepare, `2e2f4f4` background themes.
-- Slice 10 completes the single Search flow, version 6.0.0, permanent legacy
-  redirects, historical support compatibility and the explicitly approved spec
-  rewrite. Luna through Codex provided bounded work/review; main reviewed it.
-- Final checks: full pytest **966 passed**; required ops/fetch **67 passed**;
-  Ruff, JavaScript syntax and diff checks pass; Pyright **0 errors / 1 warning**;
-  temporary environment dependency audit is clean with the custom-package skips.
-  Intentional regressions were detected in isolated copies, including notice
-  preference writes and historical support mode writes.
-- Browser evidence: earlier real-route checks cover Slices 2/3, five looks in
-  light/dark at 375px, keyboard focus and selected-chip contrast ≥5.04:1.
-  Later actual-helper/headless previews cover exports, fetch/report popups,
-  preparation, themes and the final collect template. All five final looks
-  light/dark fit at 375px; desktop fits at 1280px. Fonts fell back in headless
-  previews. Authenticated automation stopped with “No preview automation host
-  is available”; remaining real-route/mobile Ship checks are incomplete.
-- Theme prototype used a 53-paper isolated real-library snapshot (four groups);
-  external APIs, real model quality and host service actions were not exercised.
-- Phase 13 code is complete locally. Phase 4/11 host confirmations remain open;
-  conditional future backlog items remain unscheduled. Nothing pushed or deployed.
-- Artifacts/check logs: `/tmp/litsieve-roadmap-ovp9uE/`. The live checkout and
-  services are unchanged; the temporary preview used isolated data and stubs.
+- **Date:** 2026-10-12. **Release:** 6.0.0 (finalized), with the seven-looks work:
+  Observatory and Reading room, a results layout for every look, fine-tune
+  settings saved on the account, the Adjust look panel on Search, the pinned
+  Search bar with a page-matched strip and soft blurred edge, the compacted
+  phone search bar, and five fixes (system-dark Night and Observatory, the
+  focus ring, dialog scroll, logout look, and after-search scroll).
+- The appearance registry lives in `app/content/appearance.py` (SETTINGS,
+  the nine-setting allowlist; PRESETS, each look's values). `theme-init.js`
+  mirrors both so pages paint before CSS loads; `tests/test_appearance.py`
+  keeps the copies equal. Only settings that differ from the preset are
+  stored, in `users.appearance`, mirrored to the readable `ui_appearance`
+  cookie and applied pre-paint as `data-*` on `<html>`.
+- The preview server at `/home/jonathans/litsieve-preview-seven-looks`
+  (port 7872) can be deleted.
+- Still open: Phase 14 polish (Broadsheet and Catalog dark palettes, star
+  and note markers on closed rows, the More like this banner, the Save note
+  timing, Narrow it down after Skip), Phase 15 Laya calibration, and the
+  Phase 4 and 11 host checks.

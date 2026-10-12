@@ -56,10 +56,13 @@
 
  <section class="card" id="account-look">
   <h2>Look</h2>
-  <p class="info-text">Colours and type for this account. Light and dark stay on the sun/moon control.</p>
+  <p class="info-text">Colours, type and how results are laid out for this account. Light and dark stay on the sun/moon control.</p>
   {% set current_look = user.look %}
   {% include "partials/look_picker.html" %}
   <div id="look-status" class="status-indicator"></div>
+  <h3 class="appearance-heading">Fine-tune</h3>
+  <p class="help-text">Each look sets all of these. Change any of them here or from More on Search; choosing a look again starts it fresh.</p>
+  {% include "partials/appearance_controls.html" %}
  </section>
 
  <section class="card" id="account-libraries">
@@ -314,5 +317,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/account.js?v=20261012a"></script>
+<script src="/static/js/account.js?v=20261012k"></script>
 {% endblock %}

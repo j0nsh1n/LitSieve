@@ -41,12 +41,17 @@ a substitute for school library databases.
     preview before apply and offer undo. Clustering runs as a background job.
   - `/data-management`, `/statistics`, and `/clusters` permanently redirect
     to `/search`. Old mode preferences receive a one-time layout notice.
-- **Look** (per-account preference): Workshop (default), Broadsheet, Lab,
-  Night, or Catalog, stored in `users.look`, mirrored to a readable
-  `ui_look` cookie, and applied pre-paint as `data-look` on `<html>`.
-  Colour, type, and a little chrome; the layout is the same in every look.
-  Offered once after registration; changed on Account. Light/dark stays a
-  separate browser preference.
+- **Look** (per-account preference): one of seven looks, Workshop (default),
+  Broadsheet, Lab, Night, Catalog, Observatory, or Reading room. Each look is
+  a preset of colour plus nine settings (results layout, text size, reading
+  width, title face, abstract face, accent, spacing, corners, edges); the
+  paper actions are the same in every layout. Any setting can be changed on
+  top of the look, from Account or from More → Adjust look on Search. Only
+  changed settings are stored, in `users.appearance` (the look in
+  `users.look`), mirrored to readable `ui_look` / `ui_appearance` cookies and
+  applied pre-paint as `data-look` / `data-*` on `<html>`. Choosing a look
+  starts its settings fresh. Offered once after registration. Night and
+  Observatory are dark-first; light/dark stays a separate browser preference.
 - **Screening / triage** on Search (exclude/restore with reason codes):
   - Near-duplicates with preferred-source resolution and selectable strictness;
     **Quick screen** ranks against the research question and applies only on

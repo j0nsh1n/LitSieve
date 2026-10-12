@@ -8,61 +8,32 @@ and this project aims to follow Semantic Versioning for app version strings
 
 ## [Unreleased]
 
+## [6.0.0] - 2026-10-12
+
 ### Added
 - Optional Laya switches. With the local Laya sidecar running and
   `LITSIEVE_LAYA_URL` set, study-type tags the wording patterns were unsure of
   are settled by Laya when it is at least 85% sure (the tooltip says so), and
   the collect step picks the areas from the typed topic. Search ranking is
   unchanged. With Laya off, slow or unsure, everything behaves as before.
-
-### Changed
-- Get papers asks for the topic first. The areas that choose the databases
-  sit under it: when Laya picks them they show as one line ("Searching
-  Psychology databases · picked from your topic") with Change to open every
-  area; a hand choice always wins. The Next button is gone. Pressing Find
-  before an area is picked asks Laya first, then opens the areas.
-
-## [6.0.0] - 2026-10-11
-
-### Fixed
-- Version 6.0.0 uses one Search workspace. Collection, screening,
-  themes, ranking, and export remain on Search; old page URLs permanently
-  redirect there. Removed the mode toggle and preference writes, preserved
-  historical helpdesk context, and added a one-time layout notice.
-- Raised dependency security floors for PyJWT, urllib3, AnyIO,
-  and fsspec; verified an upgraded environment with no known audit findings.
-- Refine, Ask, and Explain treat paper text as evidence rather
-  than instructions. Explain regenerates cached answers under the new prompt.
-- Startup warns when the retired global AI settings file exists
-  without host AI configuration, without reading the file or its secrets.
-- Cleared the app's type-checking errors and made Pyright blocking
-  in CI. A regression check now catches disagreement between the look lists.
-- A timed-out source with one retained article says "1 paper".
-- Fetch sources share a configurable 90-second budget across
-  pages, requests, and retry waits. Completed pages survive a timeout, and
-  progress identifies queued, running, completed, and timed-out sources.
-- Detached deploy completion is covered by database-reopen tests
-  for successful deploys and automatic rollbacks, with a host verification checklist.
-- Operator rollback runs in a detached unit when available,
-  carries the operator identity, and polls for completion across the site restart.
-- Checkboxes and radio buttons are sized to their label's text instead of a
-  fixed 20px, so they no longer dwarf small print like Show passwords
-  (14px beside 12px text); touch screens keep a 20px box for thumbs. The
-  Change password and Delete My Account buttons no longer touch the
-  checkbox above them.
-- Selected text is readable in dark mode. It was white on a light accent,
-  below 2:1 in Night dark; it is now the normal text colour on a soft
-  accent tint, 7:1 or better in every look.
-- A press in the top edge of a button, topic card, or result action now
-  registers. They dip 2px while pressed, so the release landed above them
-  and the click was lost.
-- Account Look showed the heading with no colour choices. The picker now
-  lists the five looks in the page itself, so a running server that has
-  not reloaded Python still draws the cards.
-- Look is no longer a section on the register form. After Create Account,
-  Search opens a dialog with the five choices. Login does not reopen it.
-
-### Added
+- Two more looks join Workshop, Broadsheet, Lab, Night, and Catalog:
+  Observatory, deep blue with a green signal and a year, title, and source
+  register; and Reading room, quiet blue on white with a book serif and a
+  wide reading column.
+- Every look now lays the results out its own way: Workshop keeps its cards,
+  Broadsheet sets a lead paper beside editorial columns, Lab rules results
+  into a source and year table, Night is a quiet ruled list, Catalog lays out
+  index cards with source tabs, Observatory keeps a register, and Reading
+  room sets a wide reading column.
+- Fine-tune any look on Account: results layout, text size, reading width,
+  title face, abstract face, accent, spacing, corners, and edges. Changed
+  settings save to your account; picking a look again starts it fresh.
+- More on Search gains Adjust look: a side panel where the results change as
+  you pick a look or a setting, and the changes save to your account.
+- The Columns and Index cards layouts open a paper in a side reading panel
+  beside the results while its place in the grid keeps a Reading
+  placeholder. Click the placeholder, Close, or press Escape to put the
+  paper back.
 - Group by theme runs as a background job with progress, then
   opens an accessible theme browser with abstracts. Preview selected papers
   before setting them aside, with an Undo limited to those papers.
@@ -98,6 +69,16 @@ and this project aims to follow Semantic Versioning for app version strings
   it later in Account. The choice is stored on the account and follows login.
 
 ### Changed
+- Get papers asks for the topic first. The areas that choose the databases
+  sit under it: when Laya picks them they show as one line ("Searching
+  Psychology databases · picked from your topic") with Change to open every
+  area; a hand choice always wins. The Next button is gone. Pressing Find
+  before an area is picked asks Laya first, then opens the areas.
+- The Search bar stays pinned while results scroll. A strip matching the
+  page behind it fills from the top of the window to just under the bar,
+  with a soft blurred edge, so results soften and disappear beneath it.
+- On phones the pinned Search bar is one query row and one row of modes, so
+  results keep most of the screen.
 - Refine, Explain, and Ask appear only when the student can get an answer:
   their own saved API key, the host's key, or a configured built-in model.
   Before, the buttons showed and then failed. The Account study-aid card
@@ -153,6 +134,54 @@ and this project aims to follow Semantic Versioning for app version strings
   on wide screens the panel stays beside the results while you scroll.
   Toasts, the screening triage overlay, and its detail pane were anchored
   the same wrong way and are fixed by the same change.
+
+### Fixed
+- Night and Observatory used Workshop's dark palette when the system was set
+  to dark; they now paint their own dark colours.
+- Buttons show the keyboard focus ring again; a button's own pressed edge no
+  longer covers it.
+- Site dialogs open at their heading instead of scrolled down to their
+  buttons.
+- Logging out resets the look on that computer, so the next person starts
+  from the default look, not the last student's.
+- A new search or More like this starts at the top of the results, even when
+  you asked for it from far down the old list.
+- Version 6.0.0 uses one Search workspace. Collection, screening,
+  themes, ranking, and export remain on Search; old page URLs permanently
+  redirect there. Removed the mode toggle and preference writes, preserved
+  historical helpdesk context, and added a one-time layout notice.
+- Raised dependency security floors for PyJWT, urllib3, AnyIO,
+  and fsspec; verified an upgraded environment with no known audit findings.
+- Refine, Ask, and Explain treat paper text as evidence rather
+  than instructions. Explain regenerates cached answers under the new prompt.
+- Startup warns when the retired global AI settings file exists
+  without host AI configuration, without reading the file or its secrets.
+- Cleared the app's type-checking errors and made Pyright blocking
+  in CI. A regression check now catches disagreement between the look lists.
+- A timed-out source with one retained article says "1 paper".
+- Fetch sources share a configurable 90-second budget across
+  pages, requests, and retry waits. Completed pages survive a timeout, and
+  progress identifies queued, running, completed, and timed-out sources.
+- Detached deploy completion is covered by database-reopen tests
+  for successful deploys and automatic rollbacks, with a host verification checklist.
+- Operator rollback runs in a detached unit when available,
+  carries the operator identity, and polls for completion across the site restart.
+- Checkboxes and radio buttons are sized to their label's text instead of a
+  fixed 20px, so they no longer dwarf small print like Show passwords
+  (14px beside 12px text); touch screens keep a 20px box for thumbs. The
+  Change password and Delete My Account buttons no longer touch the
+  checkbox above them.
+- Selected text is readable in dark mode. It was white on a light accent,
+  below 2:1 in Night dark; it is now the normal text colour on a soft
+  accent tint, 7:1 or better in every look.
+- A press in the top edge of a button, topic card, or result action now
+  registers. They dip 2px while pressed, so the release landed above them
+  and the click was lost.
+- Account Look showed the heading with no colour choices. The picker now
+  lists the five looks in the page itself, so a running server that has
+  not reloaded Python still draws the cards.
+- Look is no longer a section on the register form. After Create Account,
+  Search opens a dialog with the five choices. Login does not reopen it.
 
 ## [5.5.0] - 2026-09-17
 

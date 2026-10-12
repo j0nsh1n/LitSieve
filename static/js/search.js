@@ -1236,12 +1236,54 @@ function starLabelHtml(on) {
 
 // Rows render compact and one opens in place. The toggle is a
 // real button so the keyboard gets the same contract as a click on the row.
+// In the grid layouts the open paper reads in a side panel instead, and a
+// placeholder keeps its cell, so the grid never reflows under the reader.
+function resultsUseReaderPanel() {
+ return ['columns', 'index'].includes(document.documentElement.getAttribute('data-layout'));
+}
+
 function setResultRowOpen(card, open) {
+ // Measured while the card still sits in its grid cell.
+ const cell = card.getBoundingClientRect();
  card.classList.toggle('is-open', open);
+ const prev = card.previousElementSibling;
+ const ghost = prev && prev.classList.contains('result-ghost') ? prev : null;
+ if (!open && ghost) ghost.remove();
+ if (!open) card.classList.remove('is-reading-left');
+ if (open && !ghost && resultsUseReaderPanel()) {
+  // The panel opens on the side away from the paper, so its placeholder
+  // stays in view.
+  card.classList.toggle('is-reading-left', cell.left + cell.width / 2 > window.innerWidth / 2);
+  const holder = document.createElement('button');
+  holder.type = 'button';
+  holder.className = 'result-ghost';
+  const title = card.querySelector('.result-row-title');
+  holder.innerHTML = '<span class="result-ghost-label">Reading</span>'
+   + `<span class="result-ghost-title">${escapeHtml(title ? title.textContent : '')}</span>`
+   + '<span class="result-ghost-hint">Close</span>';
+  // Exactly the cell the paper left, so nothing around it moves.
+  if (cell.height) holder.style.setProperty('min-height', `${Math.round(cell.height)}px`);
+  holder.addEventListener('click', () => {
+   setResultRowOpen(card, false);
+   const toggle = card.querySelector('.result-toggle');
+   if (toggle) toggle.focus({ preventScroll: true });
+  });
+  card.before(holder);
+ }
  const toggle = card.querySelector('.result-toggle');
  if (toggle) {
   toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
   toggle.textContent = open ? 'Close' : 'Open';
+ }
+ // The reading column opens a paper straight to its whole abstract.
+ if (open && document.documentElement.getAttribute('data-layout') === 'reading') {
+  const abstract = card.querySelector('.result-abstract');
+  if (abstract) abstract.open = true;
+  card.querySelectorAll('.abstract-wrap:not(.is-expanded)').forEach((wrap) => {
+   wrap.classList.add('is-expanded');
+   const text = wrap.querySelector('.article-abstract');
+   if (text && typeof _syncAbstractClamp === 'function') _syncAbstractClamp(text);
+  });
  }
 }
 
@@ -1251,11 +1293,48 @@ function openResultRow(card, scrollIntoView) {
   if (row !== card) setResultRowOpen(row, false);
  });
  setResultRowOpen(card, true);
+ if (resultsUseReaderPanel()) {
+  card.scrollTop = 0;
+  const toggle = card.querySelector('.result-toggle');
+  if (toggle && scrollIntoView) toggle.focus({ preventScroll: true });
+  return;
+ }
  if (scrollIntoView) {
   const top = card.getBoundingClientRect().top;
+  const clear = searchTileClearance();
   const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if (top < 96) window.scrollBy({ top: top - 96, behavior: reduce ? 'auto' : 'smooth' });
+  if (top < clear) window.scrollBy({ top: top - clear, behavior: reduce ? 'auto' : 'smooth' });
  }
+}
+
+document.addEventListener('keydown', (e) => {
+ if (e.key !== 'Escape' || e.defaultPrevented) return;
+ if (e.target.closest && e.target.closest('input, textarea, select, .appearance-panel, dialog')) return;
+ if (document.querySelector('.appearance-panel:not([hidden])')) return;
+ if (document.body.classList.contains('lra-modal-open') || document.querySelector('dialog[open]')) return;
+ const open = document.querySelector('#results-list .result-row.is-open');
+ if (!open) return;
+ setResultRowOpen(open, false);
+ const toggle = open.querySelector('.result-toggle');
+ if (toggle) toggle.focus({ preventScroll: true });
+});
+
+// A layout change never leaves a paper in a panel the student did not open
+// there, nor a placeholder for a panel that is gone.
+function watchLayoutForOpenPapers() {
+ if (typeof MutationObserver !== 'function') return;
+ new MutationObserver(() => {
+  const list = document.getElementById('results-list');
+  if (!list) return;
+  if (resultsUseReaderPanel()) {
+   list.querySelectorAll('.result-row.is-open').forEach((row) => {
+    const prev = row.previousElementSibling;
+    if (!prev || !prev.classList.contains('result-ghost')) setResultRowOpen(row, false);
+   });
+  } else {
+   list.querySelectorAll('.result-ghost').forEach((ghost) => ghost.remove());
+  }
+ }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-layout'] });
 }
 
 function toggleResultRow(card) {
@@ -1268,6 +1347,8 @@ function buildResultCard(article, idx) {
  const card = document.createElement('article');
  card.className = 'article-card result-row';
  card.dataset.resultIndex = String(idx);
+ // Catalog draws its index tab from this; it is the real source, not a topic.
+ card.dataset.sourceName = getSourceName(article.source);
 
  const sim = Number(article.similarity_score) || 0;
  const simPct = Math.max(0, Math.min(100, Math.round(sim * 1000) / 10));
@@ -1316,6 +1397,13 @@ function buildResultCard(article, idx) {
   ? `${escapeHtml(authors)}${journal ? ' — ' + journal : ''}`
   : journal;
 
+ // A short opening for layouts that lead with one paper; the full abstract
+ // is always one click away in the open paper.
+ const abstractText = String(article.abstract || '').replace(/\s+/g, ' ').trim();
+ const teaser = abstractText.length > 320
+  ? `${abstractText.slice(0, 320).replace(/\s+\S*$/, '')}\u2026`
+  : abstractText;
+
  const headHtml = `
  <div class="result-row-head result-row-meta">
  <div class="score-meter" role="img" aria-label="Similarity ${simLabel} of 1. Higher is a closer match to your query." data-tip="${escapeHtml(scoreHelp)}">
@@ -1323,12 +1411,14 @@ function buildResultCard(article, idx) {
   <span class="score-meter-track"><span class="score-meter-fill"></span></span>
  </div>
  <span class="result-venue">${venue}</span>
+ <span class="result-year">${year}</span>
  <span class="result-tags">
   <span class="tag">${escapeHtml(getSourceName(article.source))}</span>
  </span>
  </div>
  <h3 class="article-title result-row-title">${escapeHtml(article.title || '')}</h3>
- <div class="byline result-byline">${byline}</div>`;
+ <div class="byline result-byline">${byline}</div>
+ ${teaser ? `<p class="result-teaser">${escapeHtml(teaser)}</p>` : ''}`;
 
  const noteRowHtml = `
  <div class="note-row" ${noteVal ? '' : 'hidden'}>
@@ -1528,6 +1618,14 @@ function buildResultCard(article, idx) {
   if (toggle) {
    toggle.addEventListener('click', (e) => { e.stopPropagation(); toggleResultRow(card); });
   }
+  // Tabbing past the reading panel's last control moves on to the next
+  // paper, which would sit hidden under the panel: close it instead.
+  card.addEventListener('focusout', (e) => {
+   const next = e.relatedTarget;
+   if (!next || !card.classList.contains('is-open') || !resultsUseReaderPanel()) return;
+   if (card.contains(next) || !next.closest('#results-list') || next.classList.contains('result-ghost')) return;
+   setResultRowOpen(card, false);
+  });
   card.addEventListener('click', (e) => {
    if (card.classList.contains('is-open')) return;
    if (e.target.closest('button, a, summary, textarea, input, select, details[open]')) return;
@@ -1574,6 +1672,7 @@ function syncResultCountAfterScreen() {
 function replaceCardWithUndo(cardEl, article, opts) {
  const parent = cardEl.parentNode;
  if (!parent) return null;
+ setResultRowOpen(cardEl, false);
  const pending = !!(opts && opts.pending);
  const why = !!(opts && opts.why);
  const whyBtnHtml = why
@@ -1732,7 +1831,8 @@ function visibleResults() {
 }
 
 function showSearchResults(fullList) {
- if (Array.isArray(fullList)) lastResults = fullList;
+ const fresh = Array.isArray(fullList);
+ if (fresh) lastResults = fullList;
  const bar = document.getElementById('display-filters');
  const hasHits = !!(lastResults && lastResults.length);
  if (bar) bar.hidden = !hasHits;
@@ -1768,6 +1868,32 @@ function showSearchResults(fullList) {
   exportSec.style.display = shown.length ? 'block' : 'none';
  }
  updateSimpleSearchPanel(hasHits);
+ // A new ranking (a search, More like this) starts at its top, even when the
+ // student asked for it from far down the old list.
+ if (fresh && hasHits) scrollToFreshRanking();
+}
+
+/** Bring the top of a new ranking into view, under the pinned tile. A dialog
+ * (Search options) pins the page while it is open and scrolls it back to the
+ * old spot when it closes, so wait until it has let go. */
+function scrollToFreshRanking() {
+ const list = document.getElementById('results-list');
+ if (!list || typeof list.getBoundingClientRect !== 'function') return;
+ if (document.body.classList.contains('lra-modal-open')) {
+  if (typeof window.requestAnimationFrame === 'function') window.requestAnimationFrame(scrollToFreshRanking);
+  return;
+ }
+ const target = list.getBoundingClientRect().top + window.scrollY - searchTileClearance();
+ if (target < window.scrollY) window.scrollTo({ top: Math.max(0, target), behavior: 'auto' });
+}
+
+/** Pixels from the window top that the pinned Search tile and its soft edge
+ * cover; what is scrolled into view lands below this. */
+function searchTileClearance() {
+ const band = typeof getComputedStyle === 'function'
+  ? Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--search-band-h'))
+  : 0;
+ return (band || 96) + 40;
 }
 
 function syncDisplayFilterSourceChips() {
@@ -1864,7 +1990,10 @@ function renderResults(results) {
  container.innerHTML = '';
 
  if (results.length === 0) {
- container.innerHTML = '<p class="info-text">No results found. Try a different query or check that embeddings have been created.</p>';
+ // Filters that hide every paper already say so in the filter bar.
+ if (!(lastResults && lastResults.length)) {
+  container.innerHTML = '<p class="info-text">No results found. Try a different query or check that embeddings have been created.</p>';
+ }
  return;
  }
 
@@ -1873,7 +2002,8 @@ function renderResults(results) {
  } else {
  results.forEach((article, idx) => container.appendChild(buildResultCard(article, idx)));
  }
- {
+ // The grid layouts start closed: an open paper there is a side panel.
+ if (!resultsUseReaderPanel()) {
   openResultRow(container.querySelector('.result-row'), false);
  }
 
@@ -2053,9 +2183,67 @@ function syncSearchScopeNote() {
  }
 }
 
+/** While the Search tile is pinned, a strip of the page backdrop fills from
+ * the top of the window to just under it, edge to edge, then fades over a
+ * blur, so results scrolling up soften and disappear beneath it instead of
+ * showing in the gap above or beside it. */
+function watchSearchTileScroll() {
+ const tile = document.getElementById('search-query-top');
+ if (!tile || watchSearchTileScroll._wired) return;
+ watchSearchTileScroll._wired = true;
+ const marker = document.createElement('div');
+ marker.setAttribute('aria-hidden', 'true');
+ tile.before(marker);
+ const band = document.createElement('div');
+ band.className = 'search-band';
+ band.setAttribute('aria-hidden', 'true');
+ const blur = document.createElement('div');
+ blur.className = 'search-band-blur';
+ blur.setAttribute('aria-hidden', 'true');
+ document.body.append(blur, band);
+ let queued = false;
+
+ function update() {
+  queued = false;
+  const style = window.getComputedStyle(tile);
+  const stickyTop = Number.parseFloat(style.top) || 0;
+  const pinned = !tile.hidden && style.position === 'sticky'
+   && marker.getBoundingClientRect().top < stickyTop
+   && tile.getBoundingClientRect().top <= stickyTop + 0.5;
+  tile.classList.toggle('is-stuck', pinned);
+  band.classList.toggle('is-on', pinned);
+  blur.classList.toggle('is-on', pinned);
+  const root = document.documentElement;
+  if (pinned) {
+   const gap = 12;
+   root.style.setProperty('--search-band-h', `${Math.ceil(stickyTop + tile.offsetHeight + gap)}px`);
+  } else {
+   root.style.removeProperty('--search-band-h');
+  }
+  // The grid reading panel starts under whatever is on top: the nav (and any
+  // banner above it) or the Search tile while it is on screen.
+  const nav = document.getElementById('site-navbar');
+  const tileRect = tile.getBoundingClientRect();
+  const tileBottom = !tile.hidden && tileRect.height && tileRect.bottom > 0 ? tileRect.bottom : 0;
+  const navBottom = nav ? nav.getBoundingClientRect().bottom : 0;
+  root.style.setProperty('--reader-top', `${Math.ceil(Math.max(navBottom, tileBottom) + 12)}px`);
+ }
+ window.addEventListener('scroll', () => {
+  if (!queued) {
+   queued = true;
+   window.requestAnimationFrame(update);
+  }
+ }, { passive: true });
+ window.addEventListener('resize', update);
+ if (typeof ResizeObserver === 'function') new ResizeObserver(update).observe(tile);
+ update();
+}
+
 document.addEventListener('DOMContentLoaded', () => {
  watchSimplePanelClearance();
  watchSimpleRailAnchor();
+ watchSearchTileScroll();
+ watchLayoutForOpenPapers();
  syncSearchScopeNote();
 
 });

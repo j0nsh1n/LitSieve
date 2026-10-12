@@ -90,7 +90,9 @@ async function apiCall(url, options = {}) {
             throw new Error('Not authenticated');
         }
         const error = await response.json().catch(() => ({ detail: response.statusText }));
-        throw new Error(error.detail || 'Request failed');
+        const failure = new Error(error.detail || 'Request failed');
+        failure.status = response.status;
+        throw failure;
     }
     return response.json();
 }
@@ -578,7 +580,9 @@ function openSiteModal(opts) {
             delete document.body.dataset.lraScrollY;
             root.remove();
             document.removeEventListener('keydown', onKey, true);
-            window.scrollTo(0, y);
+            // Instant: the page never visibly moved, and a smooth ramp from 0
+            // would still be running when the next view (new results) paints.
+            window.scrollTo({ top: y, behavior: 'instant' });
             if (opener && typeof opener.focus === 'function') {
                 try {
                     opener.focus({ preventScroll: true });
@@ -769,7 +773,8 @@ function openSiteModal(opts) {
             setTimeout(() => {
                 const list = getFocusable();
                 const preferred = root.querySelector('.btn-primary') || list[0];
-                if (preferred) preferred.focus();
+                // The dialog opens at its heading; focus must not scroll it to the buttons.
+                if (preferred) preferred.focus({ preventScroll: true });
             }, 30);
         }
     });
@@ -1101,7 +1106,7 @@ function promptLookIfNeeded() {
             btn.appendChild(text);
             btn.addEventListener('click', () => {
                 chosen = card.id;
-                if (typeof window.applyUiLook === 'function') window.applyUiLook(card.id);
+                if (typeof window.applyUiLook === 'function') window.applyUiLook(card.id, { preview: true });
                 else document.documentElement.setAttribute('data-look', card.id);
                 picker.querySelectorAll('[data-look-pick]').forEach((other) => {
                     const on = other.getAttribute('data-look-pick') === card.id;
@@ -1132,7 +1137,7 @@ function promptLookIfNeeded() {
         },
     }).then((ok) => {
         if (!ok) {
-            if (typeof window.applyUiLook === 'function') window.applyUiLook(original);
+            if (typeof window.applyUiLook === 'function') window.applyUiLook(original, { preview: true });
             else document.documentElement.setAttribute('data-look', original);
             return;
         }
@@ -1147,6 +1152,189 @@ function promptLookIfNeeded() {
         });
     });
 }
+
+// === Appearance: fine-tuning on top of the account look ===
+// theme-init.js paints <html data-*>; these controls read it back, repaint on
+// each pick, and save. Look and settings saves share one queue: they run one
+// at a time, in order, and each endpoint sends only its newest state, so
+// quick clicks cannot land out of order. A look save clears settings on the
+// server, so settings queued before it are dropped and ones after it follow.
+const appearanceSave = { running: false, pending: new Map(), confirmed: null };
+
+// Last state the server confirmed. A failed save repaints it, and every
+// confirmed save repaints the server's answer, so page, cookie and account
+// cannot drift apart.
+function paintConfirmedAppearance() {
+    const confirmed = appearanceSave.confirmed;
+    if (!confirmed) return;
+    if (confirmed.look !== document.documentElement.getAttribute('data-look')) {
+        window.applyUiLook(confirmed.look);
+    }
+    window.applyUiAppearance(confirmed.appearance);
+    syncAppearanceControls();
+}
+
+function appearanceOverrides() {
+    const root = document.documentElement;
+    const preset = window.lraAppearancePreset(root.getAttribute('data-look'));
+    const out = {};
+    Object.keys(window.LRA_APPEARANCE || {}).forEach((key) => {
+        const value = root.getAttribute(`data-${key}`);
+        if (value && value !== preset[key]) out[key] = value;
+    });
+    return out;
+}
+
+function syncAppearanceControls() {
+    const root = document.documentElement;
+    document.querySelectorAll('[data-appearance-controls] [data-setting]').forEach((group) => {
+        const current = root.getAttribute(`data-${group.getAttribute('data-setting')}`);
+        group.querySelectorAll('[data-value]').forEach((btn) => {
+            btn.setAttribute('aria-pressed', btn.getAttribute('data-value') === current ? 'true' : 'false');
+        });
+    });
+    const look = root.getAttribute('data-look');
+    document.querySelectorAll('.appearance-panel [data-look-pick]').forEach((card) => {
+        const on = card.getAttribute('data-look-pick') === look;
+        card.classList.toggle('is-selected', on);
+        card.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+}
+
+function setAppearanceStatus(message, type) {
+    document.querySelectorAll('[data-appearance-status]').forEach((el) => {
+        el.textContent = message;
+        el.className = `status-indicator ${type || ''}`.trim();
+    });
+}
+
+function saveAppearance(url, body) {
+    const pending = appearanceSave.pending;
+    if (url === '/api/account/look') pending.delete('/api/account/appearance');
+    const waiters = pending.has(url) ? pending.get(url).waiters : [];
+    const done = new Promise((resolve, reject) => waiters.push({ resolve, reject }));
+    pending.set(url, { body, waiters });
+    if (!appearanceSave.running) drainAppearanceSaves();
+    return done;
+}
+
+async function drainAppearanceSaves() {
+    const pending = appearanceSave.pending;
+    appearanceSave.running = true;
+    try {
+        while (pending.size) {
+            const [url, { body, waiters }] = pending.entries().next().value;
+            pending.delete(url);
+            try {
+                const data = await apiCall(url, { method: 'POST', body, keepalive: true });
+                appearanceSave.confirmed = { look: data.look, appearance: data.appearance || {} };
+                if (!pending.size) {
+                    paintConfirmedAppearance();
+                    setAppearanceStatus('Saved.', 'success');
+                }
+                waiters.forEach((w) => w.resolve(data));
+            } catch (e) {
+                if (e.status === 409) {
+                    // Another tab changed the look: show what the account has now.
+                    try {
+                        const current = await apiCall('/api/account/appearance');
+                        appearanceSave.confirmed = { look: current.look, appearance: current.appearance || {} };
+                    } catch (_) { /* keep the last confirmed state */ }
+                }
+                setAppearanceStatus(`Not saved: ${e.message}`, 'error');
+                if (typeof showNotification === 'function') showNotification(`Look not saved: ${e.message}`, 'error');
+                if (!pending.size) paintConfirmedAppearance();
+                waiters.forEach((w) => w.reject(e));
+            }
+        }
+    } finally {
+        appearanceSave.running = false;
+    }
+}
+window.saveAppearance = saveAppearance;
+
+function wireAppearanceControls() {
+    if (typeof window.applyUiAppearance !== 'function') return;
+    appearanceSave.confirmed = {
+        look: document.documentElement.getAttribute('data-look'),
+        appearance: appearanceOverrides(),
+    };
+    const readOnly = document.body.getAttribute('data-support-view') === '1';
+    document.querySelectorAll('[data-appearance-controls]').forEach((box) => {
+        box.querySelectorAll('[data-setting] [data-value]').forEach((btn) => {
+            btn.disabled = readOnly;
+            btn.addEventListener('click', () => {
+                const key = btn.closest('[data-setting]').getAttribute('data-setting');
+                const next = { ...appearanceOverrides(), [key]: btn.getAttribute('data-value') };
+                const painted = window.applyUiAppearance(next);
+                syncAppearanceControls();
+                saveAppearance('/api/account/appearance', { appearance: painted.overrides, look: document.documentElement.getAttribute('data-look') }).catch(() => {});
+            });
+        });
+        const reset = box.querySelector('[data-appearance-reset]');
+        if (reset) {
+            reset.disabled = readOnly;
+            reset.addEventListener('click', () => {
+                window.applyUiAppearance({});
+                syncAppearanceControls();
+                saveAppearance('/api/account/appearance', { appearance: {}, look: document.documentElement.getAttribute('data-look') }).catch(() => {});
+            });
+        }
+    });
+    // Look cards inside the Search panel; Account wires its own in account.js.
+    document.querySelectorAll('.appearance-panel [data-look-pick]').forEach((card) => {
+        card.disabled = readOnly;
+        card.addEventListener('click', () => {
+            // The current look again would only wipe the student's settings.
+            if (card.getAttribute('data-look-pick') === document.documentElement.getAttribute('data-look')) return;
+            const look = window.applyUiLook(card.getAttribute('data-look-pick'));
+            syncAppearanceControls();
+            saveAppearance('/api/account/look', { look }).catch(() => {});
+        });
+    });
+    const panel = document.getElementById('appearance-panel');
+    const opener = document.getElementById('simple-adjust-look-btn');
+    if (panel && opener) {
+        const more = opener.closest('details');
+        const close = () => {
+            panel.hidden = true;
+            opener.setAttribute('aria-expanded', 'false');
+            // The opener sits in the More menu, closed by now; its summary takes focus.
+            const back = more ? more.querySelector('summary') : opener;
+            if (back) back.focus({ preventScroll: true });
+        };
+        opener.setAttribute('aria-expanded', 'false');
+        opener.addEventListener('click', () => {
+            if (more) more.open = false;
+            panel.hidden = false;
+            opener.setAttribute('aria-expanded', 'true');
+            syncAppearanceControls();
+            const first = panel.querySelector('button');
+            if (first) first.focus();
+        });
+        panel.querySelector('[data-appearance-close]').addEventListener('click', close);
+        panel.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape') return;
+            e.stopPropagation();
+            close();
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape' || panel.hidden || e.defaultPrevented) return;
+            if (document.body.classList.contains('lra-modal-open')) return;
+            e.preventDefault();
+            close();
+        });
+        document.addEventListener('pointerdown', (e) => {
+            if (panel.hidden || panel.contains(e.target) || opener.contains(e.target)) return;
+            if (e.target.closest && e.target.closest('.lra-modal-root, #site-modal-root, .more-menu, details[open]')) return;
+            close();
+        });
+    }
+    syncAppearanceControls();
+}
+window.syncAppearanceControls = syncAppearanceControls;
+
+document.addEventListener('DOMContentLoaded', wireAppearanceControls);
 
 // === Multi-library switcher (nav) ===
 async function initLibrarySwitcher() {

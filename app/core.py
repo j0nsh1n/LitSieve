@@ -31,6 +31,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from app.auth import get_current_user
+from app.content.appearance import PRESETS, SETTINGS, cookie_value, parse_overrides
 from app.content.looks import DEFAULT_LOOK, LOOK_CARDS, normalize_look
 from app.services.pipeline import LiteratureSearchPipeline
 from app.storage.libraries import (
@@ -69,6 +70,8 @@ def _template_context(request: Request) -> dict:
         "known_issues": site.get("known_issues") or "",
         "support_links": site.get("support_links") or [],
         "look_cards": LOOK_CARDS,
+        "appearance_settings": SETTINGS,
+        "appearance_presets": PRESETS,
         "default_look": DEFAULT_LOOK,
     }
 
@@ -653,6 +656,7 @@ def current_user(request: Request) -> Optional[dict]:
         "is_admin": (not guest) and is_admin_username(username),
         "created_at": record.get("created_at"),
         "look": normalize_look(record.get("look")),
+        "appearance": record.get("appearance") or {},
     }
     request.state._current_user = result
     return result
@@ -678,6 +682,7 @@ def _support_view_user(request: Request) -> Optional[dict]:
         "is_admin": False,
         "created_at": record.get("created_at"),
         "look": normalize_look(record.get("look")),
+        "appearance": record.get("appearance") or {},
         "support_view": {
             "id": view["id"],
             "admin_username": view["admin_username"],
@@ -782,18 +787,28 @@ def _set_auth_cookies(response, token: str, max_age: Optional[int] = None):
     )
 
 
-def _set_look_cookie(response, look: Optional[str], max_age: Optional[int] = None):
-    """Readable cookie so theme-init can paint the account look before CSS."""
+def _set_look_cookie(
+    response,
+    look: Optional[str],
+    max_age: Optional[int] = None,
+    appearance: Optional[dict] = None,
+):
+    """Readable cookies so theme-init can paint the account look and its
+    changed settings before CSS."""
     age = 365 * 24 * 3600 if max_age is None else int(max_age)
-    response.set_cookie(
-        "ui_look",
-        normalize_look(look),
-        httponly=False,
-        secure=COOKIE_SECURE,
-        samesite="lax",
-        max_age=age,
-        path="/",
-    )
+    for name, value in (
+        ("ui_look", normalize_look(look)),
+        ("ui_appearance", cookie_value(parse_overrides(appearance or {}, look))),
+    ):
+        response.set_cookie(
+            name,
+            value,
+            httponly=False,
+            secure=COOKIE_SECURE,
+            samesite="lax",
+            max_age=age,
+            path="/",
+        )
 
 
 def csrf_failed(request: Request) -> bool:
