@@ -158,16 +158,17 @@ popup, `static/js/search.js`).
   fonts. Authenticated browser automation disconnected, so the remaining live
   interaction review is incomplete. Nothing new is pushed, merged, or deployed.
 
-## Phase 14 — Looks: more choice and finer control
-New look designs are coming from ChatGPT (Astro) mock-ups; the five current
-looks (Workshop, Broadsheet, Lab, Night, Catalog) stay.
+## Phase 14 — Looks: polish
+
 - Tasks:
-  - Bring the new designs in as looks once they are ready
-  - Let a student adjust a look (accent colour, text size, density) on top of
-    the preset, stored on the account
-- Complete when: the new looks are selectable in Account and after sign-up,
-  per-look adjustments persist across devices, and contrast stays at or above
-  4.5:1 in light and dark
+  - Tune the dark palettes of Broadsheet and Catalog
+  - Closed result rows show no star or note marker
+  - More like this shows no visible banner after re-ranking
+  - Save note says Saved before the request finishes
+  - The Narrow it down step returns after Skip
+- Complete when: every item above is fixed and checked in the browser in the
+  looks it touches, light and dark, with ink contrast still at or above
+  4.5:1 where colour changes
 - Status: [ ] open
 
 ## Phase 15 — Laya switches: calibrate on real use
