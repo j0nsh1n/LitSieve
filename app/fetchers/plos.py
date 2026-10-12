@@ -10,14 +10,14 @@ from __future__ import annotations
 import re
 from typing import Dict, List, Optional
 
-from app.fetchers.base import BaseFetcher, FetchError, HttpClient
+from app.fetchers.base import BaseFetcher, FetchError, HttpClient, reraise_fetch_error
 
 
 class PLOSFetcher(BaseFetcher):
     SOURCE_NAME = "plos"
     BASE_URL = "https://api.plos.org/search"
 
-    def __init__(self, email: str = None):
+    def __init__(self, email: Optional[str] = None):
         self.http = HttpClient(
             delay=0.35,
             user_agent=f"LiteratureResearchAide/4.0 ({email or 'research@example.com'})",
@@ -45,8 +45,8 @@ class PLOSFetcher(BaseFetcher):
                     },
                 )
                 docs = (r.json().get("response") or {}).get("docs") or []
-            except FetchError:
-                raise
+            except FetchError as e:
+                reraise_fetch_error(e, articles)
             except Exception as e:
                 raise FetchError(f"PLOS request failed: {e}", kind="network") from e
 

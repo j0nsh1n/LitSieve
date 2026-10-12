@@ -344,7 +344,10 @@ def _do_deploy(sha: str) -> Dict[str, Any]:
     # _restart_service() below can kill this process, and once the checkout has
     # moved, `prev` in memory is the only thing that knows where to go back to.
     actor = (os.getenv("LITSIEVE_DEPLOY_ACTOR") or "").strip()
-    deploy_state.begin(sha=sha, previous_sha=prev, actor_username=actor)
+    deploy_state.begin(
+        sha=sha, previous_sha=prev, actor_username=actor,
+        dispatch_id=(os.getenv("LITSIEVE_DEPLOY_ID") or "").strip(),
+    )
     try:
         gitutil.reset_hard(live, sha)
     except gitutil.GitError as exc:

@@ -69,14 +69,14 @@ router = APIRouter()
 def _safe_next_url(raw: Optional[str]) -> str:
     """Allow only same-origin relative paths (open-redirect safe)."""
     if not raw:
-        return "/data-management"
+        return "/search"
     path = unquote(raw).strip()
     if not path.startswith("/") or path.startswith("//"):
-        return "/data-management"
+        return "/search"
     if any(c in path for c in ("\n", "\r", "\\")):
-        return "/data-management"
+        return "/search"
     if "://" in path:
-        return "/data-management"
+        return "/search"
     return path
 
 
@@ -87,7 +87,7 @@ async def login_page(request: Request):
         return RedirectResponse(url=next_url, status_code=302)
     return templates.TemplateResponse(
         request, "login.html",
-        context={"error": "", "info": "", "next": next_url if next_url != "/data-management" else ""},
+        context={"error": "", "info": "", "next": next_url if next_url != "/search" else ""},
     )
 
 
@@ -202,7 +202,7 @@ async def login_once(request: Request, token: str = ""):
 @router.get("/register")
 async def register_page(request: Request):
     if current_user(request):
-        return RedirectResponse(url="/data-management", status_code=302)
+        return RedirectResponse(url="/search", status_code=302)
     return templates.TemplateResponse(
         request, "register.html",
         context=_register_ctx(error=core.user_db.registration_closed_reason() or ""),
@@ -226,7 +226,7 @@ def _reset_codes_in_response() -> bool:
 @router.get("/reset-password")
 async def reset_password_page(request: Request):
     if current_user(request):
-        return RedirectResponse(url="/data-management", status_code=302)
+        return RedirectResponse(url="/search", status_code=302)
     return templates.TemplateResponse(
         request, "reset_password.html",
         context={"error": "", "info": "", "username": "", "reset_code": ""},
@@ -381,18 +381,6 @@ async def register_submit(
     response = RedirectResponse(url="/search?pickLook=1", status_code=302)
     _set_auth_cookies(response, token)
     _set_look_cookie(response, user.get("look"))
-    # One-shot seed: theme-init reads this when localStorage.uiMode is unset,
-    # sets Simple mode for brand-new accounts, then clears the cookie.
-    # Existing accounts never get this cookie (login path only sets auth).
-    response.set_cookie(
-        "ui_mode_seed",
-        "simple",
-        httponly=False,
-        secure=core.COOKIE_SECURE,
-        samesite="lax",
-        max_age=600,
-        path="/",
-    )
     # One-shot: Search opens the Look picker once after register, then clears it.
     response.set_cookie(
         "ui_look_prompt",
@@ -422,7 +410,7 @@ async def _start_guest_session(request: Request) -> RedirectResponse:
     # Already signed in: just go to the app (do not replace a real account).
     # Expired guests already returned None from current_user above path.
     if current_user(request):
-        return RedirectResponse(url="/data-management", status_code=302)
+        return RedirectResponse(url="/search", status_code=302)
 
     from app.content.sample_corpus import get_sample_articles
 
@@ -461,16 +449,6 @@ async def _start_guest_session(request: Request) -> RedirectResponse:
         response, token, max_age=core.GUEST_MAX_AGE_MINUTES * 60,
     )
     _set_look_cookie(response, DEFAULT_LOOK, max_age=core.GUEST_MAX_AGE_MINUTES * 60)
-    # Guests start in Simple mode (same seed as new registrations).
-    response.set_cookie(
-        "ui_mode_seed",
-        "simple",
-        httponly=False,
-        secure=core.COOKIE_SECURE,
-        samesite="lax",
-        max_age=600,
-        path="/",
-    )
     return response
 
 

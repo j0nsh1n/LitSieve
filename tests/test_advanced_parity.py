@@ -1,11 +1,8 @@
-"""Phase 13, slice 0: one row per Advanced-only feature and its Simple home.
+"""One row per former Advanced-only feature and its Search home.
 
-Every row names the Simple control (an element id or a JS function) that
-replaces an Advanced feature, and checks that it exists. Rows for slices not
-built yet are ``xfail(strict=True)``: they fail today, and the moment a slice
-adds the control the row starts passing and pytest fails until the ``xfail``
-is removed. Removing Advanced (slice 10) may not merge while any row is
-still expected to fail.
+Every row names the Search control (an element id or a JS function) that
+replaces an Advanced feature, and checks that it exists. All migration rows
+now pass; none is deferred or expected to fail.
 
 A later slice may rename a control, but must then change the row to the new
 name in the same PR. A row must never be deleted: if the feature is dropped,
@@ -15,8 +12,6 @@ Jonathan records the drop in roadmap.md and the row asserts the drop note.
 from __future__ import annotations
 
 from pathlib import Path
-
-import pytest
 
 REPO = Path(__file__).resolve().parents[1]
 
@@ -34,6 +29,7 @@ def _search_templates() -> str:
         _read("templates", "search.html")
         + _read("templates", "partials", "collect_ui.html")
         + _read("templates", "partials", "simple_search_panel.html")
+        + _read("templates", "partials", "theme_tools.html")
         + _card()
     )
 
@@ -42,11 +38,8 @@ def _search_js() -> str:
     return (
         _read("static", "js", "search.js")
         + _read("static", "js", "simple_tools.js")
-        + _read("static", "js", "data_management.js")
+        + _read("static", "js", "collect.js")
     )
-
-
-later = pytest.mark.xfail(strict=True, reason="Phase 13 slice not built yet")
 
 
 # Slice 1 -------------------------------------------------------------------
@@ -62,7 +55,6 @@ def test_restore_any_set_aside_paper_from_simple():
 
 # Slice 2 -------------------------------------------------------------------
 
-@later
 def test_choose_an_exclusion_reason():
     """Clusters reason select → reason chips in the Set aside popup."""
     assert 'id="simple-set-aside-reasons"' in _card()
@@ -70,22 +62,18 @@ def test_choose_an_exclusion_reason():
 
 # Slice 3 -------------------------------------------------------------------
 
-@later
 def test_sort_chip():
     assert 'id="simple-sort-chip"' in _search_templates()
 
 
-@later
 def test_sources_chip():
     assert 'id="simple-sources-chip"' in _search_templates()
 
 
-@later
 def test_more_like_my_starred_from_starred_chip():
     assert 'id="simple-starred-chip"' in _search_templates()
 
 
-@later
 def test_ranking_options_in_search_options_popup():
     """Exact-word and PICO boosts join the count and year fields."""
     fn = _search_js()
@@ -97,51 +85,50 @@ def test_ranking_options_in_search_options_popup():
 
 # Slice 4 -------------------------------------------------------------------
 
-@later
 def test_search_by_switch_question_pico_paper():
-    assert 'id="simple-search-by"' in _search_templates()
+    html = _search_templates()
+    assert 'id="input-method-toggle"' in html
+    assert 'aria-label="Search by"' in html
+    assert 'value="seed"> Start from a paper' in html
 
 
 # Slice 5 -------------------------------------------------------------------
 
-@later
 def test_export_whole_library_from_save_your_work():
-    assert 'id="simple-export-scope"' in _search_templates()
+    assert "actions.id = 'simple-export-scope'" in _search_js()
+    assert 'id="simple-export-results-btn"' in _search_templates()
 
 
 # Slice 6 -------------------------------------------------------------------
 
-@later
 def test_choose_databases_in_fetch_dialog():
-    assert 'id="simple-fetch-databases"' in _search_templates()
+    assert "disclosure.id = 'simple-fetch-databases'" in _search_js()
 
 
-@later
 def test_contact_email_shown_only_for_pubmed_and_europepmc():
     js = _search_js()
     assert "simple-fetch-databases" in js and "fetch-email" in js
     assert "europepmc" in js.lower() and "pubmed" in js.lower()
-    assert 'id="simple-fetch-databases"' in _search_templates()
+    assert "disclosure.id = 'simple-fetch-databases'" in js
 
 
 # Slice 7 -------------------------------------------------------------------
 
-@later
 def test_what_we_fetched_popup_has_sources_years_and_coverage():
-    assert 'id="simple-what-we-fetched"' in _search_templates()
-    assert "/api/coverage" in _read("static", "js", "simple_tools.js")
+    js = _read("static", "js", "simple_collection_tools.js")
+    assert "host.id = 'simple-what-we-fetched'" in js
+    assert "/api/coverage" in js
 
 
-@later
 def test_check_for_duplicates_from_set_aside_popup():
-    assert "data-set-aside-check-duplicates" in _card()
-    js = _read("static", "js", "simple_tools.js")
-    assert "Strict" in js and "Loose" in js
+    assert 'include "partials/duplicate_tools.html"' in _card()
+    partial = _read("templates", "partials", "duplicate_tools.html")
+    assert "data-set-aside-check-duplicates" in partial
+    assert "Strict" in partial and "Loose" in partial
 
 
 # Slice 8 -------------------------------------------------------------------
 
-@later
 def test_reprepare_popup_has_model_disclosure():
     assert 'id="simple-reprepare-model"' in _search_templates() or (
         "simple-reprepare-model" in _search_js()
@@ -150,10 +137,9 @@ def test_reprepare_popup_has_model_disclosure():
 
 # Slice 9 -------------------------------------------------------------------
 
-@later
 def test_group_by_theme_popup():
     assert 'id="simple-group-by-theme"' in _search_templates()
-    assert "/api/create-clusters" in _read("static", "js", "simple_tools.js")
+    assert "/api/create-clusters" in _read("static", "js", "simple_themes.js")
 
 
 # Already in Simple; stays where it is ----------------------------------------

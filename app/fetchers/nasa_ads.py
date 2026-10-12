@@ -6,7 +6,7 @@ Requires API token (free at https://ui.adsabs.harvard.edu/user/settings/token)
 
 import logging
 import os
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from app.fetchers.base import BaseFetcher, HttpClient, reraise_fetch_error
 
@@ -17,7 +17,7 @@ class NASAADSFetcher(BaseFetcher):
     SOURCE_NAME = 'nasa_ads'
     BASE_URL = 'https://api.adsabs.harvard.edu/v1/search/query'
 
-    def __init__(self, email: str = None):
+    def __init__(self, email: Optional[str] = None):
         self.token = os.getenv('NASA_ADS_TOKEN', '').strip()
 
         headers = {}
@@ -60,13 +60,13 @@ class NASAADSFetcher(BaseFetcher):
                     break
                 start += len(docs)
             except Exception as e:
-                reraise_fetch_error(e)
+                reraise_fetch_error(e, articles)
                 logger.exception("NASA ADS fetch error: %s", e)
                 break
 
         return articles[:max_results]
 
-    def _parse_doc(self, doc: Dict) -> Dict:
+    def _parse_doc(self, doc: Dict) -> Optional[Dict]:
         try:
             title_list = doc.get('title') or []
             title = (title_list[0] if title_list else '').strip()

@@ -1,4 +1,4 @@
-# LitSieve 📚 — v5.5.0
+# LitSieve 📚 — v6.0.0
 
 A multi-user web app for **students** to fetch, screen, and rank research papers
 across public academic databases as a **research starting point**. Semantic
@@ -24,10 +24,9 @@ Built with **FastAPI**, sentence-transformers, FAISS, and scikit-learn.
   bioRxiv, medRxiv, DBLP, OpenAIRE, PLOS, HAL)
   — replace or append; **background jobs** with progress, cancel, retries, and
   per-source error classes; **auto prepare-for-search** after a successful fetch
-- 🧭 **Simple / Advanced** UI mode (client preference): Simple is one Search
-  page (fetch by **topic**, choosing how many papers per database → wait screen
-  → required **Narrow it down** → rank, with results that open in place);
-  Advanced keeps Clean up, Clusters, and full controls
+- 🧭 **One Search workspace**: fetch by topic, review database choices, wait for
+  fetch and prepare, then Narrow it down before ranking. More opens collection
+  tools, Search options adjusts ranking, and Save your work exports results.
 - 🎨 **Looks**: Workshop (default), Broadsheet, Lab, Night, and Catalog restyle
   the same pages. The choice is saved on the account and follows login; light
   and dark stay a per-browser toggle
@@ -39,11 +38,11 @@ Built with **FastAPI**, sentence-transformers, FAISS, and scikit-learn.
   medically verified. Hidden with `HIDE_AI_BUTTONS`. Not a bulk rewrite.
 - 🎯 Hybrid similarity search (meaning + exact words), **year range**, plain text /
   PICO / **seed paper** / **more like my starred**, highlights & private notes;
-  paginated result lists; Simple sticky export / screening-report panel
-- 🧹 **Clean up** (`/statistics`, Advanced nav): near-duplicates, preferred-source
-  auto-resolve, **Quick screen**, screening report
-- 🧩 Clustering (Advanced): Density (HDBSCAN), K-Means, Hierarchical — topic
-  triage on Clusters (paginated lists); not auto-run after fetch
+  paginated result lists; export and screening-report popups
+- 🧹 Duplicate preview with Strict / Normal / Loose matching, preferred-source
+  resolution, Quick screen, and screening report on Search
+- 🧩 Background Group by theme: Density (HDBSCAN), K-Means, Hierarchical;
+  preview and optional group exclusions with Undo; not auto-run after fetch
 - 📋 **Screening report** (collected / excluded by reason / included / by year)
 - 📈 Coverage map, papers-by-year timeline, and per-source breakdown
 - 💾 Per-user SQLite, JWT + bcrypt, CSRF, **per-user rate limits**, change password
@@ -70,7 +69,7 @@ Built with **FastAPI**, sentence-transformers, FAISS, and scikit-learn.
 ├── static/                 # CSS + page JavaScript
 ├── tests/                  # pytest suite
 ├── tools/                  # backup, watchdog, bench_scale, encrypt_databases
-├── docs/                   # deploy / self-host + Simple-mode plans
+├── docs/                   # deploy / self-host + Search migration plans
 │   ├── DEPLOY.md           # Host checklist (SECRET_KEY, SMTP, quota, smoke)
 │   └── SELFHOST.md         # Everyday systemd / tunnel commands
 ├── run_dev.sh              # Local dev with --reload
@@ -114,21 +113,14 @@ Then open <http://localhost:7860>. Public landing and `/learn/…` guides need n
 account. **Try the demo** (`/guest`) loads sample papers without registering.
 Register/login for a private workspace, then:
 
-**Simple mode (default for new accounts)**
-
-1. **Search** (`/search`) — empty library: pick topics, type a **topic** (not
-   your full question), **Fetch**. A wait screen covers fetch + prepare. Then
-   **Narrow it down** (required: apply or skip) before ranking. After that:
-   rank, Show chips, export RIS. **Re-prepare** and **Start over** stay on
-   the Search strip.
-
-**Advanced mode** (toggle in the nav)
-
-1. **Data Management** → topics/sources, **Fetch** (auto-prepare; optional re-prepare).
-2. **Clean up** → duplicates + Quick screen + screening report.
-3. **Clusters** → Density / K-Means / Hierarchical; exclude off-topic groups or papers.
-4. **Search** → text / PICO / seed / more-like-starred; notes/stars; export.
-5. **Account** → change password (other sessions sign out) or delete account.
+1. **Search** (`/search`) — pick topics, name a topic, review database choices,
+   and fetch. One wait screen covers fetch and prepare. Apply or skip **Narrow
+   it down**, then rank by Question, PICO, or a paper already in your library.
+2. **More** opens collection report, duplicates, Quick screen, re-prepare,
+   Start over, and background grouping. **Search options** adjusts ranking.
+3. **Save your work** exports visible results or a whole-library scope.
+4. **Account** manages your look, password, and account. Former Data Management,
+   Clean up, and Clusters URLs permanently redirect to Search.
 
 ### Running it for real (self-hosted)
 
@@ -323,7 +315,7 @@ search (slower on large corpora). Install `faiss-cpu` to re-enable it.
 the source is skipped when the token is unset.
 
 **No search results** — make sure you fetched articles *and* created embeddings
-first; check counts on the Duplicates (statistics) page.
+first; check counts in the collection report on Search.
 
 ## License
 

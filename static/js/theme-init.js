@@ -1,9 +1,7 @@
-// Applies the saved theme / UI mode to <html> BEFORE first paint.
+// Applies the saved theme to <html> before first paint.
 //
 // Must stay a plain blocking <script src> in <head> — no defer, no async, no
-// module. Deferring it means the browser paints the default theme first and a
-// dark-mode user sees a white flash on every page load. Same for data-mode:
-// without a pre-paint set, Simple-mode users flash Advanced layout.
+// module. A dark-theme user would otherwise see a white flash on every page load.
 //
 // Lives in a file (not inline) so the CSP can be `script-src 'self'` with no
 // 'unsafe-inline'. Auth/landing pages load only this; they must not load
@@ -14,35 +12,7 @@
         var saved = localStorage.getItem('theme');
         if (saved) root.setAttribute('data-theme', saved);
 
-        // uiMode: "simple" | "advanced". Unset → advanced (existing accounts
-        // keep today's full UI). New registrations set a one-shot cookie
-        // ui_mode_seed=simple so first paint is Simple, then we persist.
-        var mode = localStorage.getItem('uiMode');
-        if (mode !== 'simple' && mode !== 'advanced') {
-            mode = null;
-            var seed = document.cookie.match(/(?:^|;\s*)ui_mode_seed=([^;]*)/);
-            if (seed && decodeURIComponent(seed[1]) === 'simple') {
-                mode = 'simple';
-                try {
-                    localStorage.setItem('uiMode', 'simple');
-                } catch (e2) { /* ignore */ }
-                // Clear the one-shot seed so later visits use localStorage only.
-                document.cookie = 'ui_mode_seed=; Max-Age=0; Path=/; SameSite=Lax'
-                    + (location.protocol === 'https:' ? '; Secure' : '');
-            } else {
-                mode = 'advanced';
-            }
-        }
-        root.setAttribute('data-mode', mode);
-        try {
-            var secure = location.protocol === 'https:' ? '; Secure' : '';
-            document.cookie = 'ui_mode=' + mode + '; Path=/; SameSite=Lax; Max-Age=31536000' + secure;
-        } catch (e3) { /* ignore */ }
-    } catch (e) {
-        // localStorage can throw in private mode / with cookies blocked.
-        // Falling back to the default theme/mode is fine; never break the page.
-        root.setAttribute('data-mode', 'advanced');
-    }
+    } catch (e) { /* Browser storage can be unavailable. */ }
 
     // Cookie wins so a just-signed-in account is not stuck with the previous
     // visitor's localStorage look on a shared computer.

@@ -22,7 +22,7 @@ import time
 from collections import OrderedDict
 from datetime import datetime, timezone
 from functools import partial
-from typing import Optional
+from typing import Any, Optional, cast
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
@@ -147,6 +147,7 @@ _job_futures: dict = {}
 _job_sync: dict = {}
 JOB_STALE_SECONDS = 300
 JOB_QUEUE_CAP = 25
+JOB_TASKS = ('fetch', 'embed', 'cluster')
 
 
 def get_pipeline(
@@ -247,7 +248,7 @@ def _evict_pipeline(user_id: str) -> None:
                         )
     with _progress_lock:
         _all_progress.pop(user_id, None)
-        for task in ('fetch', 'embed'):
+        for task in JOB_TASKS:
             _release_job_markers(user_id, task)
 
 
@@ -262,18 +263,18 @@ def _empty_job_slot(task: str) -> dict:
         'started_at': None, 'updated_at': None, 'library_id': None,
     }
     if task == 'fetch':
-        slot.update(sources=[], by_source={}, source_status={})
+        slot.update(sources=[], by_source={}, source_status={}, source_progress={})
     return slot
 
 
 def _has_live_job(user_id: str) -> bool:
-    """True if this account still has a fetch/embed worker. Call under _progress_lock."""
+    """True if this account still has a fetch/embed/cluster worker. Call under _progress_lock."""
     rec = _all_progress.get(user_id)
     if rec:
-        for task in ('fetch', 'embed'):
+        for task in JOB_TASKS:
             if rec.get(task, {}).get('active'):
                 return True
-    for task in ('fetch', 'embed'):
+    for task in JOB_TASKS:
         if _job_sync.get((user_id, task)):
             return True
         fut = _job_futures.get((user_id, task))
@@ -282,18 +283,18 @@ def _has_live_job(user_id: str) -> bool:
     return False
 
 
-def _evict_idle_progress() -> None:
+def _evict_idle_progress(*, keep_user: Optional[str] = None) -> None:
     """Drop oldest idle progress rows until at cap. Never drop a live job."""
     while len(_all_progress) > MAX_CACHED_USERS:
         victim = None
         for uid in _all_progress:
-            if not _has_live_job(uid):
+            if uid != keep_user and not _has_live_job(uid):
                 victim = uid
                 break
         if victim is None:
             break
         _all_progress.pop(victim, None)
-        for task in ('fetch', 'embed'):
+        for task in JOB_TASKS:
             _job_futures.pop((victim, task), None)
             _job_sync.pop((victim, task), None)
 
@@ -304,11 +305,12 @@ def _ensure_progress(user_id: str) -> dict:
         _all_progress[user_id] = {
             'fetch': _empty_job_slot('fetch'),
             'embed': _empty_job_slot('embed'),
+            'cluster': _empty_job_slot('cluster'),
         }
-        _evict_idle_progress()
+        _evict_idle_progress(keep_user=user_id)
     _all_progress.move_to_end(user_id)
     # Backfill keys if an older in-memory entry lacks them.
-    for task in ('fetch', 'embed'):
+    for task in JOB_TASKS:
         slot = _all_progress[user_id].setdefault(task, _empty_job_slot(task))
         slot.setdefault('result', None)
         slot.setdefault('error', None)
@@ -322,6 +324,7 @@ def _ensure_progress(user_id: str) -> dict:
             slot.setdefault('sources', [])
             slot.setdefault('by_source', {})
             slot.setdefault('source_status', {})
+            slot.setdefault('source_progress', {})
     return _all_progress[user_id]
 
 
@@ -410,7 +413,7 @@ def safe_error_text(raw, *, limit: int = 240) -> str:
 
 
 def job_view(user_id: str, task: str, slot: dict) -> dict:
-    """Helpdesk-safe snapshot of one fetch/embed slot."""
+    """Helpdesk-safe snapshot of one job slot."""
     _res = slot.get('result')
     result = _res if isinstance(_res, dict) else {}
     status = result.get('status') if result else None
@@ -446,7 +449,7 @@ def job_view(user_id: str, task: str, slot: dict) -> dict:
             'max_results': last_fetch.get('max_results'),
             'clear_first': bool(last_fetch.get('clear_first')),
         } if last_fetch else None,
-        'can_cancel': active and alive,
+        'can_cancel': task != 'cluster' and active and alive,
         'can_clear': active and not alive,
         'can_retry': task == 'embed' and not active,
         'can_retry_fetch': (
@@ -477,7 +480,7 @@ def list_job_queue(limit: int = JOB_QUEUE_CAP, *, state: Optional[str] = None) -
     for uid, tasks in reversed(items):
         if not isinstance(tasks, dict):
             continue
-        for task in ('fetch', 'embed'):
+        for task in JOB_TASKS:
             slot = tasks.get(task)
             if not isinstance(slot, dict):
                 continue
@@ -498,9 +501,11 @@ def clear_stale_job(user_id: str, task: str) -> tuple:
 
     Returns (ok, detail).
     """
-    if task not in ('fetch', 'embed'):
-        return False, "task must be fetch or embed"
+    if task not in JOB_TASKS:
+        return False, "task must be fetch, embed or cluster"
     if job_worker_alive(user_id, task):
+        if task == 'cluster':
+            return False, "Theme grouping is still running. Wait for it to finish."
         return False, "That job is still running. Cancel it instead of clearing."
     with _progress_lock:
         slot = _ensure_progress(user_id)[task]
@@ -527,11 +532,8 @@ def try_begin_user_job(uid: str, task: str, **extra) -> bool:
         fut = _job_futures.get((uid, task))
         if _job_sync.get((uid, task)) or (fut is not None and not fut.done()):
             return False
-        slot = {
-            'active': True, 'done': 0, 'total': 0, 'result': None, 'error': None,
-            'cancel': False, 'articles_so_far': 0, 'message': '',
-            'started_at': now, 'updated_at': now, 'library_id': extra.get('library_id'),
-        }
+        slot = _empty_job_slot(task)
+        slot.update(active=True, started_at=now, updated_at=now, library_id=extra.get('library_id'))
         slot.update(extra)
         slot['started_at'] = extra.get('started_at') or now
         slot['updated_at'] = now
@@ -549,7 +551,7 @@ def start_user_job(uid: str, task: str, fn, /, **kwargs) -> bool:
     that was active when the job started. library_id is not forwarded to fn.
     """
     lib_id = owned_library_id(uid, kwargs.pop("library_id", None))
-    extra = {"library_id": lib_id}
+    extra: dict[str, Any] = {"library_id": lib_id}
     if task == "fetch":
         extra["last_fetch"] = {
             "query": kwargs.get("query") or "",
@@ -560,13 +562,21 @@ def start_user_job(uid: str, task: str, fn, /, **kwargs) -> bool:
     if not try_begin_user_job(uid, task, **extra):
         return False
 
-    pipe = get_pipeline(uid, lib_id)
-    loop = asyncio.get_running_loop()
-
+    try:
+        pipe = get_pipeline(uid, lib_id)
+    except Exception as exc:
+        update_progress(uid, task, active=False, result=None, error=safe_error_text(exc))
+        raise
     def worker():
         return fn(pipe, **kwargs)
 
-    future = loop.run_in_executor(None, worker)
+    try:
+        loop = asyncio.get_running_loop()
+        future = loop.run_in_executor(None, worker)
+    except Exception as exc:
+        update_progress(uid, task, active=False, result=None, error=safe_error_text(exc))
+        release_pipeline(uid, lib_id)
+        raise
     with _progress_lock:
         _job_futures[(uid, task)] = future
 
@@ -598,7 +608,7 @@ def current_user(request: Request) -> Optional[dict]:
     """
     cached = getattr(request.state, "_current_user", _MISSING)
     if cached is not _MISSING:
-        return cached
+        return cast(Optional[dict], cached)
 
     view_user = _support_view_user(request)
     if view_user is not None:
@@ -675,7 +685,6 @@ def _support_view_user(request: Request) -> Optional[dict]:
             "reason": view["reason"],
             "started_at": view["started_at"],
             "expires_at": view["expires_at"],
-            "ui_mode": view.get("ui_mode") or "simple",
         },
     }
 

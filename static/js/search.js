@@ -4,13 +4,37 @@ let lastSearchParams = null;
 let lastQueryTokens = [];
 /** Last on-screen result list (export “these results” uses this exact order). */
 let lastResults = [];
-/** Client-side Show chips: filter the current hit list without a new search. */
-const displayFilterState = {
- starred: false,
- noted: false,
- recent: false,
- sources: {},
+const searchState = {
+ requestPending: false,
+ filters: {
+  top_k: 10, sort_by: 'similarity', pico_boost: false, lexical_boost: true,
+  source_filter: [], year_min: null, year_max: null,
+  display: { starred: false, noted: false, recent: false, sources: {} },
+ },
 };
+const displayFilterState = searchState.filters.display;
+let librarySourceCounts = {};
+let libraryStarredCount = 0;
+let lastSuccessfulSession = null;
+
+function applySearchInputMethod(mode) {
+ const active = ['text', 'pico', 'seed'].includes(mode) ? mode : 'text';
+ const textPanel = document.getElementById('text-input-panel');
+ const picoPanel = document.getElementById('pico-input-panel');
+ const seedPanel = document.getElementById('seed-input-panel');
+ const card = document.getElementById('searchcard');
+ [
+  [textPanel, active === 'text', 'flex'],
+  [picoPanel, active === 'pico', 'block'],
+  [seedPanel, active === 'seed', 'block'],
+ ].forEach(([panel, visible, display]) => {
+  if (!panel) return;
+  panel.classList.toggle('u-hidden', !visible);
+  panel.style.display = visible ? display : 'none';
+ });
+ if (card) card.classList.toggle('is-alt-method', active !== 'text');
+}
+
 function displayRecentYear() {
  return new Date().getFullYear() - 5;
 }
@@ -21,6 +45,7 @@ const SEARCH_SESSION_KEY = 'lra_search_session_v1';
 let _restoringSearch = false;
 
 document.addEventListener('DOMContentLoaded', () => {
+ wireSearchFilterAdapters();
  // Empty state + hide search UI until papers are prepared; only then restore.
  loadSearchEmptyState()
   .then((stats) => waitIfPreparing(stats))
@@ -60,14 +85,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
  document.querySelectorAll('input[name="input_method"]').forEach(radio => {
  radio.addEventListener('change', () => {
- const v = radio.value;
- document.getElementById('text-input-panel').style.display = v === 'text' ? 'block' : 'none';
- document.getElementById('pico-input-panel').style.display = v === 'pico' ? 'block' : 'none';
- document.getElementById('seed-input-panel').style.display = v === 'seed' ? 'block' : 'none';
- const card = document.getElementById('searchcard');
- if (card) card.classList.toggle('is-alt-method', v !== 'text');
+ if (radio.checked) applySearchInputMethod(radio.value);
  });
  });
+ const initialMethod = document.querySelector('input[name="input_method"]:checked');
+ applySearchInputMethod(initialMethod ? initialMethod.value : 'text');
 
  const topkSlider = document.getElementById('top-k');
  const topkDisplay = document.getElementById('topk-display');
@@ -82,24 +104,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
  // Page Help toggle is wired in common.js (initPageHelp).
 
- const risBtn = document.getElementById('export-results-ris');
- if (risBtn) risBtn.addEventListener('click', () => doExportResults('ris'));
-
- // Phase 6 Simple side panel (same export path; Advanced never shows the panel).
- const simpleExportBtn = document.getElementById('simple-export-results-btn');
- if (simpleExportBtn) {
-  simpleExportBtn.addEventListener('click', () => doExportResults('ris'));
- }
-
- document.querySelectorAll('[data-lib-export-format]').forEach(btn => {
- btn.addEventListener('click', () => {
- const format = btn.getAttribute('data-lib-export-format') || 'ris';
- const scopeEl = document.getElementById('lib-export-scope');
- const scope = scopeEl ? scopeEl.value : 'all';
- window.location.href =
- `/api/export/library?scope=${encodeURIComponent(scope)}&format=${encodeURIComponent(format)}`;
- });
- });
+ const exportBtn = document.getElementById('simple-export-results-btn');
+ if (exportBtn) exportBtn.addEventListener('click', () => promptSimpleExportScope());
 
  document.getElementById('query-text').addEventListener('keydown', (e) => {
  if (e.key === 'Enter' && !e.shiftKey) {
@@ -132,7 +138,7 @@ async function resolveLibraryId() {
  }
 }
 
-function captureSearchSession(kind) {
+function captureSearchSession(kind, opts = {}) {
  // kind: 'text' | 'pico' | 'seed' | 'starred'
  const mode = (kind === 'starred' || kind === 'seed')
   ? kind
@@ -142,6 +148,7 @@ function captureSearchSession(kind) {
   v: 1,
   library_id: activeLibraryId(),
   mode,
+  include_seed: mode === 'seed' && opts.include_seed === true,
   query_text: (document.getElementById('query-text') || {}).value || '',
   pico_population: (document.getElementById('pico-population') || {}).value || '',
   pico_intervention: (document.getElementById('pico-intervention') || {}).value || '',
@@ -155,6 +162,7 @@ function captureSearchSession(kind) {
   source_filter: filters.source_filter,
   year_min: filters.year_min,
   year_max: filters.year_max,
+  filters: JSON.parse(JSON.stringify(searchState.filters)),
   saved_at: Date.now(),
  };
 }
@@ -162,7 +170,10 @@ function captureSearchSession(kind) {
 async function saveSearchSession(kind) {
  if (_restoringSearch) return;
  try {
-  const state = captureSearchSession(kind);
+  const state = lastSuccessfulSession
+   ? Object.assign({}, lastSuccessfulSession, collectSearchFilters(), {
+    filters: JSON.parse(JSON.stringify(searchState.filters)), saved_at: Date.now(),
+   }) : captureSearchSession(kind);
   if (!state.library_id) {
    state.library_id = await resolveLibraryId();
   }
@@ -191,12 +202,11 @@ function setInputMethod(mode) {
 
 function applySearchSessionToForm(state) {
  if (!state) return;
+ state = Object.assign({}, state, state.filters || {});
  _restoringSearch = true;
  try {
   if (state.mode === 'text' || state.mode === 'pico' || state.mode === 'seed') {
-   const keepSimpleQuery = state.mode === 'seed'
-    && typeof isSimpleMode === 'function' && isSimpleMode();
-   if (!keepSimpleQuery) setInputMethod(state.mode);
+   setInputMethod(state.mode);
   }
   const qt = document.getElementById('query-text');
   if (qt && state.query_text != null) qt.value = state.query_text;
@@ -234,6 +244,24 @@ function applySearchSessionToForm(state) {
     cb.checked = want.has(cb.value);
    });
   }
+  syncSearchFiltersFromForm();
+  const savedFilters = state.filters;
+  const savedSources = savedFilters ? savedFilters.source_filter : state.source_filter;
+  if (Array.isArray(savedSources)) {
+   const available = Object.keys(librarySourceCounts);
+   searchState.filters.source_filter = available.length
+    ? savedSources.filter((id) => available.includes(id)) : savedSources.slice();
+   const legacyAllSources = !savedSources.length && !enabledSearchSourceBoxes().length;
+   if (legacyAllSources) {
+    searchState.filters.source_filter = available;
+   }
+  }
+  if (savedFilters && savedFilters.display) {
+   Object.assign(displayFilterState, savedFilters.display, {
+    sources: Object.assign({}, savedFilters.display.sources || {}),
+   });
+  }
+  syncSearchFilterControls();
  } finally {
   _restoringSearch = false;
  }
@@ -246,6 +274,7 @@ function clearSearchWorkspace() {
  lastSearchParams = null;
  lastQueryTokens = [];
  lastResults = [];
+ lastSuccessfulSession = null;
  const qt = document.getElementById('query-text');
  if (qt) qt.value = '';
  ['pico-population', 'pico-intervention', 'pico-comparison', 'pico-outcome', 'seed-query']
@@ -292,7 +321,10 @@ async function restoreSearchSession() {
   await doStarredSearch({ fromRestore: true });
   return;
  }
- if (state.mode === 'seed' && typeof isSimpleMode === 'function' && isSimpleMode()) {
+ const legacySimpleSeedReplay = state.mode === 'seed'
+  && state.include_seed == null
+  ;
+ if (state.mode === 'seed' && (state.include_seed === true || legacySimpleSeedReplay)) {
   const seedId = (state.seed_query || '').trim();
   if (!seedId) return;
   await doMoreLikeThisPaper({ article_id: seedId }, { fromRestore: true });
@@ -316,7 +348,7 @@ function enabledSearchSourceBoxes() {
   .filter((cb) => !cb.disabled);
 }
 
-function collectSearchFilters() {
+function syncSearchFiltersFromForm() {
  const topK = parseInt(document.getElementById('top-k').value, 10);
  const sortBy = document.getElementById('sort-by').value;
  const picoBoost = document.getElementById('pico-boost').checked;
@@ -328,20 +360,64 @@ function collectSearchFilters() {
  const selectedSources = enabled
   .filter((cb) => cb.checked)
   .map((cb) => cb.value);
- return {
+ const extraSources = searchState.filters.source_filter.filter((id) =>
+  !Array.from(document.querySelectorAll('input[name="search-source"]')).some((cb) => cb.value === id)
+  && Number(librarySourceCounts[id]) > 0);
+ Object.assign(searchState.filters, {
  top_k: topK,
  sort_by: sortBy,
  pico_boost: picoBoost,
  lexical_boost: lexicalBoost,
- source_filter: selectedSources,
+ source_filter: selectedSources.concat(extraSources),
  year_min: parseOptionalYear('year-min'),
  year_max: parseOptionalYear('year-max'),
- };
+ });
+}
+
+function collectSearchFilters() {
+ const { display, ...request } = searchState.filters;
+ if (!hasPicoText()) {
+  request.pico_boost = false;
+ }
+ return Object.assign({}, request, { source_filter: request.source_filter.slice() });
+}
+
+function hasPicoText() {
+ return ['pico-population', 'pico-intervention', 'pico-comparison', 'pico-outcome']
+  .some((id) => String(document.getElementById(id)?.value || '').trim());
+}
+
+function syncSearchFilterControls() {
+ const filters = searchState.filters;
+ document.getElementById('sort-by').value = filters.sort_by;
+ document.querySelectorAll('input[name="search-source"]').forEach((cb) => {
+  cb.checked = !cb.disabled && filters.source_filter.includes(cb.value);
+ });
+ syncSimpleResultChips();
+}
+
+function wireSearchFilterAdapters() {
+ const ids = ['top-k', 'sort-by', 'pico-boost', 'lexical-boost', 'year-min', 'year-max'];
+ ids.forEach((id) => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('change', () => {
+   syncSearchFiltersFromForm();
+   if (id === 'sort-by' && lastResults.length) showSearchResults();
+   saveSearchSession();
+  });
+ });
+ document.querySelectorAll('input[name="search-source"]').forEach((cb) => {
+  cb.addEventListener('change', syncSearchFiltersFromForm);
+ });
+ syncSearchFiltersFromForm();
+ document.getElementById('simple-sort-chip')?.addEventListener('click', promptSimpleSort);
+ document.getElementById('simple-sources-chip')?.addEventListener('click', promptSimpleSources);
+ document.getElementById('simple-starred-chip')?.addEventListener('click', promptSimpleStarred);
 }
 
 function requireSelectedSources(filters, fromRestore) {
- const enabled = enabledSearchSourceBoxes();
- if (enabled.length === 0) return true;
+ if (Object.keys(librarySourceCounts).length === 0 && enabledSearchSourceBoxes().length === 0) return true;
  if (filters.source_filter.length === 0) {
   if (!fromRestore) showNotification('Please select at least one source.', 'error');
   return false;
@@ -425,7 +501,7 @@ async function loadSearchEmptyState() {
   syncSimpleOnePageState(stats);
  }
  if (document.getElementById('simple-rail-stats')
-  && typeof isSimpleMode === 'function' && isSimpleMode()) {
+  ) {
   try {
    const report = await apiCall('/api/screening-report?format=json');
    fillSimpleRailStats(stats, report);
@@ -433,11 +509,8 @@ async function loadSearchEmptyState() {
    fillSimpleRailStats(stats, null);
   }
  }
- const simple = typeof isSimpleMode === 'function' && isSimpleMode();
- if (!simple && typeof applyEmptyState === 'function') {
- applyEmptyState('search-empty-state', stats, 'embeddings', 'search-empty-msg');
- }
- if (!simple || !wantsSimpleCollectView(stats)) {
+
+ if (!wantsSimpleCollectView(stats)) {
   updateSearchWorkVisibility(stats);
  }
  return stats;
@@ -453,7 +526,6 @@ async function loadSearchEmptyState() {
 async function waitIfPreparing(stats) {
  const banner = document.getElementById('search-preparing');
  const status = document.getElementById('search-preparing-status');
- const simple = typeof isSimpleMode === 'function' && isSimpleMode();
  const hide = () => {
   if (typeof hideSimpleBuffering === 'function') hideSimpleBuffering();
   else {
@@ -471,7 +543,7 @@ async function waitIfPreparing(stats) {
  const fetchJob = (progress && progress.fetch) || {};
  const embed = (progress && progress.embed) || {};
 
- if (simple && fetchJob.active && typeof showSimpleBuffering === 'function') {
+ if (fetchJob.active && typeof showSimpleBuffering === 'function') {
   showSimpleBuffering('fetch');
   if (typeof syncSimpleOnePageState === 'function') syncSimpleOnePageState(stats || {});
   if (typeof waitForJob === 'function') {
@@ -505,7 +577,7 @@ async function waitIfPreparing(stats) {
   hide();
   return stats;
  }
- if (simple && typeof showSimpleBuffering === 'function') {
+ if (typeof showSimpleBuffering === 'function') {
   showSimpleBuffering('prepare');
  } else {
   window._preparingCorpus = true;
@@ -519,15 +591,13 @@ async function waitIfPreparing(stats) {
   try {
    await waitForJob(
     'embed',
-    simple ? 'search-buffering-fill' : null,
-    simple ? 'search-buffering-label' : 'search-preparing-status',
-    simple ? 'search-buffering-progress' : null,
-    simple
-     ? (done, totalN, pct) => (
+    'search-buffering-fill',
+    'search-buffering-label',
+    'search-buffering-progress',
+    (done, totalN, pct) => (
       totalN > 0 ? `Getting papers ready… ${done} / ${totalN} (${pct}%)` : 'Getting your papers ready…'
-     )
-     : null,
-    simple && typeof simpleWaitMapOpts === 'function' ? simpleWaitMapOpts(60, 90) : undefined
+     ),
+    typeof simpleWaitMapOpts === 'function' ? simpleWaitMapOpts(60, 90) : undefined
    );
   } catch (e) {
    if (status) status.textContent = 'Could not finish preparing. Use Re-prepare.';
@@ -535,7 +605,7 @@ async function waitIfPreparing(stats) {
    return stats;
   }
  }
- if (simple && typeof holdSimpleWait === 'function') {
+ if (typeof holdSimpleWait === 'function') {
   holdSimpleWait();
   if (typeof refreshSimpleScreeningCard === 'function') {
    await refreshSimpleScreeningCard();
@@ -547,6 +617,8 @@ async function waitIfPreparing(stats) {
 }
 
 function refreshStarredCount(known) {
+ libraryStarredCount = Math.max(0, Math.trunc(Number(known) || 0));
+ syncSimpleResultChips();
  const el = document.getElementById('starred-count');
  if (!el) return;
  const n = Number(known);
@@ -558,6 +630,8 @@ function refreshStarredCount(known) {
 }
 
 function bumpStarredCount(delta) {
+ libraryStarredCount = Math.max(0, libraryStarredCount + delta);
+ syncSimpleResultChips();
  const el = document.getElementById('starred-count');
  if (!el) return;
  const cur = parseInt(el.textContent, 10);
@@ -573,16 +647,22 @@ async function applyAvailableSources() {
  try {
  const stats = await apiCall('/api/statistics');
  sources = stats.sources || {};
+ refreshStarredCount(stats.starred);
  } catch (e) {
  return;
  }
+ const previous = Object.keys(librarySourceCounts);
+ const includedAll = previous.every((id) => searchState.filters.source_filter.includes(id));
+ librarySourceCounts = Object.fromEntries(Object.entries(sources).filter(([, n]) => Number(n) > 0));
+ searchState.filters.source_filter = includedAll ? Object.keys(librarySourceCounts)
+  : searchState.filters.source_filter.filter((id) => id in librarySourceCounts);
 
  let anyAvailable = Object.values(sources).some((n) => Number(n) > 0);
  document.querySelectorAll('input[name="search-source"]').forEach(cb => {
  const count = sources[cb.value] || 0;
  const label = cb.closest('.radio-label');
  cb.disabled = count === 0;
- cb.checked = count > 0;
+ cb.checked = count > 0 && searchState.filters.source_filter.includes(cb.value);
  if (count > 0) anyAvailable = true;
 
  if (label) {
@@ -600,12 +680,15 @@ async function applyAvailableSources() {
  }
  }
  });
+ syncSearchFiltersFromForm();
+ syncSimpleResultChips();
+ updateSimpleSearchPanel(!!(lastResults && lastResults.length));
 
  const hint = document.getElementById('source-availability-hint');
  if (hint) {
  hint.textContent = anyAvailable
  ? ''
- : 'No articles yet - fetch some on the Data Management page first.';
+ : 'No articles yet - use More to get papers on Search.';
  }
 }
 
@@ -656,15 +739,15 @@ function escapeRegExp(s) {
  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-async function promptSimpleSearchScope() {
- if (typeof isSimpleMode !== 'function' || !isSimpleMode()) return true;
+async function promptSimpleSearchScope(kind = 'text') {
  if (typeof openSiteForm !== 'function') return true;
  const topkEl = document.getElementById('top-k');
  const yminEl = document.getElementById('year-min');
  const ymaxEl = document.getElementById('year-max');
  const result = await openSiteForm({
   title: 'Search options',
-  message: 'How many papers should we show? You can also limit the years.',
+  message: kind === 'starred' ? 'Choose how many papers to show and the years.'
+   : 'Choose how many papers to show, the years, and how to rank them.',
   confirmLabel: 'Search',
   fields: [
    {
@@ -696,6 +779,17 @@ async function promptSimpleSearchScope() {
     max: 2100,
     step: 1,
    },
+   ...(kind !== 'starred' ? [{
+    id: 'lexical_boost', section: 'Ranking', label: 'Prefer exact words', type: 'choice',
+    value: searchState.filters.lexical_boost ? 'on' : 'off',
+    options: [{ value: 'on', label: 'On', hint: 'Blend meaning with matching words' },
+     { value: 'off', label: 'Off', hint: 'Rank by meaning' }],
+   }] : []),
+   ...(kind !== 'starred' && kind !== 'seed' && hasPicoText() ? [{
+     id: 'pico_boost', label: 'Prefer PICO matches', type: 'choice',
+     value: searchState.filters.pico_boost ? 'on' : 'off',
+     options: [{ value: 'on', label: 'On' }, { value: 'off', label: 'Off' }],
+    }] : []),
   ],
   validate: (vals) => {
    const n = parseInt(vals.count, 10);
@@ -724,26 +818,112 @@ async function promptSimpleSearchScope() {
  }
  if (yminEl) yminEl.value = String(result.year_min || '').trim();
  if (ymaxEl) ymaxEl.value = String(result.year_max || '').trim();
+ if (result.lexical_boost != null) document.getElementById('lexical-boost').checked = result.lexical_boost === 'on';
+ if (result.pico_boost != null) document.getElementById('pico-boost').checked = result.pico_boost === 'on';
+ syncSearchFiltersFromForm();
  return true;
 }
 
+const SIMPLE_SORT_LABELS = {
+ similarity: 'Similarity', year: 'Newest first', journal: 'Journal A–Z', title: 'Title A–Z',
+};
+
+function syncSimpleResultChips() {
+ ['simple-sort-chip', 'simple-sources-chip', 'simple-starred-chip'].forEach((id) => {
+  const chip = document.getElementById(id);
+  if (chip) chip.disabled = searchState.requestPending;
+ });
+ const sort = document.getElementById('simple-sort-chip');
+ if (sort) sort.textContent = `Sort: ${SIMPLE_SORT_LABELS[searchState.filters.sort_by] || 'Similarity'}`;
+ const sources = document.getElementById('simple-sources-chip');
+ if (sources) {
+  const all = Object.keys(librarySourceCounts).length;
+  const selected = searchState.filters.source_filter.length;
+  sources.textContent = selected === all ? 'Sources: All' : `Sources: ${selected} of ${all}`;
+ }
+ const starred = document.getElementById('simple-starred-chip');
+ if (starred) {
+  starred.classList.toggle('is-on', displayFilterState.starred);
+  starred.setAttribute('aria-pressed', String(displayFilterState.starred));
+ }
+}
+
+async function promptSimpleSort() {
+ if (searchState.requestPending) return;
+ const values = await openSiteForm({
+  title: 'Sort papers', confirmLabel: 'Apply', fields: [{
+   id: 'sort', label: 'Order these results', type: 'choice', value: searchState.filters.sort_by,
+   options: Object.entries(SIMPLE_SORT_LABELS).map(([value, label]) => ({ value, label })),
+  }],
+ });
+ if (!values || searchState.requestPending) return;
+ searchState.filters.sort_by = values.sort;
+ syncSearchFilterControls();
+ showSearchResults();
+ await saveSearchSession();
+}
+
+async function promptSimpleSources() {
+ if (searchState.requestPending) return;
+ const ids = Object.keys(librarySourceCounts).sort((a, b) => getSourceName(a).localeCompare(getSourceName(b)));
+ const values = await openSiteForm({
+  title: 'Sources', message: 'Counts are papers in your library, including papers set aside or not yet prepared. Search uses the selected sources before ranking.',
+  confirmLabel: 'Search these sources', fields: [{
+   id: 'sources', label: 'Include sources', type: 'multi-choice', value: searchState.filters.source_filter,
+   options: ids.map((value) => ({ value, label: getSourceName(value), hint: `${librarySourceCounts[value]} papers in your library` })),
+  }], validate: (vals) => vals.sources.length ? null : 'Please select at least one source.',
+ });
+ if (!values || searchState.requestPending) return;
+ searchState.filters.source_filter = values.sources;
+ syncSearchFilterControls();
+ if (!lastSearchParams) return;
+ const replay = { skipOptions: true, replay: true };
+ if (lastSearchParams.mode === 'starred') await doStarredSearch(replay);
+ else if (lastSearchParams.mode === 'seed' && lastSearchParams.include_seed) {
+  await doMoreLikeThisPaper({ article_id: lastSearchParams.query_text }, replay);
+ } else await doSearch(replay);
+}
+
+async function promptSimpleStarred() {
+ if (searchState.requestPending) return;
+ const choices = [{ label: displayFilterState.starred ? 'Show all current hits' : 'Show starred current hits', value: 'show' }];
+ if (libraryStarredCount > 0) choices.push({ label: 'Find more like these', value: 'find', primary: true });
+ choices.push({ label: 'Cancel', value: null, cancel: true });
+ const value = await openSiteChoice({
+  title: 'Starred papers', message: libraryStarredCount > 0
+   ? 'Show starred papers among the current hits, or rank your library by your starred papers. Starred papers stay in the ranked list.'
+   : 'Show starred papers among the current hits. Star a paper to find more like it.', choices,
+ });
+ if (searchState.requestPending) return;
+ if (value === 'find') {
+  await doStarredSearch({ clearStarred: true });
+ } else if (value === 'show') {
+  displayFilterState.starred = !displayFilterState.starred;
+  showSearchResults();
+  await saveSearchSession();
+ }
+}
+
 async function doSearch(opts) {
+ if (searchState.requestPending) return;
  const fromRestore = !!(opts && opts.fromRestore);
- const method = document.querySelector('input[name="input_method"]:checked').value;
- const queryText = buildQueryText();
+ const method = opts?.replay ? lastSearchParams.mode : document.querySelector('input[name="input_method"]:checked').value;
+ const queryText = opts?.replay ? lastSearchParams.query_text : buildQueryText();
  if (!queryText) {
  if (!fromRestore) {
   showNotification(method === 'seed' ? 'Enter a seed id or title.' : 'Please enter a search query.', 'error');
  }
  return;
  }
- if (!fromRestore) {
-  const scoped = await promptSimpleSearchScope();
+ if (!fromRestore && !opts?.skipOptions) {
+  const scoped = await promptSimpleSearchScope(method);
   if (!scoped) return;
  }
 
  const filters = collectSearchFilters();
+ if (searchState.requestPending) return;
  if (!requireSelectedSources(filters, fromRestore)) return;
+ setSearchRequestPending(true);
  const btn = document.getElementById('search-btn');
  setLoading(btn, true);
  const resultsSec = document.getElementById('results-section');
@@ -753,7 +933,7 @@ async function doSearch(opts) {
  }
  showResultSkeletons(6);
 
- lastSearchParams = {
+ const searchParams = {
  query_text: queryText,
  top_k: filters.top_k,
  sort_by: filters.sort_by,
@@ -764,6 +944,7 @@ async function doSearch(opts) {
  year_max: filters.year_max,
  mode: method,
  };
+ const session = opts?.replay ? lastSuccessfulSession : captureSearchSession(method);
  lastQueryTokens = tokensFromQuery(queryText);
 
  try {
@@ -789,9 +970,6 @@ async function doSearch(opts) {
  `Starting from “${seed.title || seed.article_id}” (${getSourceName(seed.source)} · ${seed.year || 'n.d.'}). Showing papers most like this one.`;
  lastQueryTokens = tokensFromQuery(`${seed.title || ''} ${seed.abstract || ''}`);
  }
- if (filters.sort_by !== 'similarity') {
- data.results = clientSort(data.results || [], filters.sort_by);
- }
  } else {
  document.getElementById('seed-banner').style.display = 'none';
  data = await apiCall('/api/search', {
@@ -799,7 +977,7 @@ async function doSearch(opts) {
  body: {
  query_text: queryText,
  top_k: filters.top_k,
- sort_by: filters.sort_by,
+ sort_by: 'similarity',
  source_filter: filters.source_filter,
  pico_boost: filters.pico_boost,
  lexical_boost: filters.lexical_boost,
@@ -810,6 +988,8 @@ async function doSearch(opts) {
  }
 
  const results = data.results || [];
+ lastSearchParams = searchParams;
+ lastSuccessfulSession = session;
  lastResults = results;
  showSearchResults(results);
  // Persist query + filters so a browser refresh restores this search.
@@ -819,18 +999,22 @@ async function doSearch(opts) {
  // Drop loading skeletons so a failed search does not look stuck mid-load.
  clearResultSkeletonsOnError(fromRestore);
  } finally {
+ setSearchRequestPending(false);
  setLoading(btn, false);
  }
 }
 
 async function doStarredSearch(opts) {
+ if (searchState.requestPending) return;
  const fromRestore = !!(opts && opts.fromRestore);
- if (!fromRestore) {
-  const scoped = await promptSimpleSearchScope();
+ if (!fromRestore && !opts?.skipOptions) {
+  const scoped = await promptSimpleSearchScope('starred');
   if (!scoped) return;
  }
  const filters = collectSearchFilters();
+ if (searchState.requestPending) return;
  if (!requireSelectedSources(filters, fromRestore)) return;
+ setSearchRequestPending(true);
  const btn = document.getElementById('starred-search-btn');
  setLoading(btn, true);
  const resultsSec = document.getElementById('results-section');
@@ -839,7 +1023,7 @@ async function doStarredSearch(opts) {
   resultsSec.style.display = 'block';
  }
  showResultSkeletons(6);
- lastSearchParams = {
+ const searchParams = {
  query_text: '',
  top_k: filters.top_k,
  sort_by: filters.sort_by,
@@ -850,6 +1034,7 @@ async function doStarredSearch(opts) {
  year_max: filters.year_max,
  mode: 'starred',
  };
+ const session = opts?.replay ? lastSuccessfulSession : captureSearchSession('starred');
  lastQueryTokens = [];
  try {
  document.getElementById('seed-banner').style.display = 'none';
@@ -870,10 +1055,10 @@ async function doStarredSearch(opts) {
  `More like your starred papers (${data.seed_count || 0} star${(data.seed_count || 0) === 1 ? '' : 's'}). Starred papers stay in the list (usually near the top).`;
  }
  let results = data.results || [];
- if (filters.sort_by !== 'similarity') {
- results = clientSort(results, filters.sort_by);
- }
+ lastSearchParams = searchParams;
+ lastSuccessfulSession = session;
  lastResults = results;
+ if (opts?.clearStarred) displayFilterState.starred = false;
  showSearchResults(results);
  refreshStarredCount(data.seed_count);
  await saveSearchSession('starred');
@@ -881,22 +1066,26 @@ async function doStarredSearch(opts) {
  if (!fromRestore) showNotification(`Starred search failed: ${e.message}`, 'error');
  clearResultSkeletonsOnError(fromRestore);
  } finally {
+ setSearchRequestPending(false);
  setLoading(btn, false);
  }
 }
 
 async function doMoreLikeThisPaper(article, opts) {
+ if (searchState.requestPending) return;
  const fromRestore = !!(opts && opts.fromRestore);
  const seedId = article && article.article_id ? String(article.article_id).trim() : '';
  if (!seedId) return;
- if (!fromRestore) {
-  const scoped = await promptSimpleSearchScope();
+ if (!fromRestore && !opts?.skipOptions) {
+  const scoped = await promptSimpleSearchScope('seed');
   if (!scoped) return;
  }
  const filters = collectSearchFilters();
+ if (searchState.requestPending) return;
  if (!requireSelectedSources(filters, fromRestore)) return;
+ setSearchRequestPending(true);
  const seedField = document.getElementById('seed-query');
- if (seedField) seedField.value = seedId;
+ if (seedField && !opts?.replay) seedField.value = seedId;
  const btn = document.getElementById('search-btn');
  setLoading(btn, true);
  const resultsSec = document.getElementById('results-section');
@@ -905,7 +1094,7 @@ async function doMoreLikeThisPaper(article, opts) {
   resultsSec.style.display = 'block';
  }
  showResultSkeletons(6);
- lastSearchParams = {
+ const searchParams = {
  query_text: seedId,
  top_k: filters.top_k,
  sort_by: filters.sort_by,
@@ -915,7 +1104,9 @@ async function doMoreLikeThisPaper(article, opts) {
  year_min: filters.year_min,
  year_max: filters.year_max,
  mode: 'seed',
+ include_seed: true,
  };
+ const session = opts?.replay ? lastSuccessfulSession : captureSearchSession('seed', { include_seed: true });
  lastQueryTokens = tokensFromQuery(`${article.title || ''} ${article.abstract || ''}`);
  try {
  const data = await apiCall('/api/search/seed', {
@@ -941,16 +1132,8 @@ async function doMoreLikeThisPaper(article, opts) {
  lastQueryTokens = tokensFromQuery(`${seed.title || ''} ${seed.abstract || ''}`);
  }
  let results = data.results || [];
- const sid = String(seed.article_id || '');
- const src = String(seed.source || '');
- const hasSeed = results.some((row) => String(row.article_id) === sid && String(row.source || '') === src);
- if (!hasSeed && sid) {
- results = [Object.assign({}, seed, { similarity_score: 1 })].concat(results);
- if (filters.top_k) results = results.slice(0, filters.top_k);
- }
- if (filters.sort_by !== 'similarity') {
- results = clientSort(results, filters.sort_by);
- }
+ lastSearchParams = searchParams;
+ lastSuccessfulSession = session;
  lastResults = results;
  showSearchResults(results);
  await saveSearchSession('seed');
@@ -958,8 +1141,14 @@ async function doMoreLikeThisPaper(article, opts) {
  if (!fromRestore) showNotification(`Search failed: ${e.message}`, 'error');
  clearResultSkeletonsOnError(fromRestore);
  } finally {
+ setSearchRequestPending(false);
  setLoading(btn, false);
  }
+}
+
+function setSearchRequestPending(pending) {
+ searchState.requestPending = pending;
+ syncSimpleResultChips();
 }
 
 function clientSort(results, sortBy) {
@@ -1045,7 +1234,7 @@ function starLabelHtml(on) {
   + '<span>' + (on ? 'Starred' : 'Star') + '</span>';
 }
 
-// Simple mode: rows render compact and one opens in place. The toggle is a
+// Rows render compact and one opens in place. The toggle is a
 // real button so the keyboard gets the same contract as a click on the row.
 function setResultRowOpen(card, open) {
  card.classList.toggle('is-open', open);
@@ -1093,7 +1282,6 @@ function buildResultCard(article, idx) {
  const idLink = url
  ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" class="article-link">${idText}</a>`
  : idText;
- // Simple mode hides the raw-ID row, so the actions row carries the real link.
  const openLink = url
  ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" class="result-open-link"
   data-tip="Open this paper at its source (new tab)">View paper \u2197</a>`
@@ -1102,14 +1290,13 @@ function buildResultCard(article, idx) {
  const authors = (article.authors || []).join('; ');
  const abstractHtml = highlightText(article.abstract || '', lastQueryTokens);
  const picoHtml = renderPicoBlock(article.pico);
- const simpleMode = document.documentElement.getAttribute('data-mode') === 'simple';
  const keyPointsHtml = typeof renderKeyPointsHtml === 'function'
  ? renderKeyPointsHtml(article.key_points, {
  articleId: article.article_id,
  source: article.source,
  origin: article.key_points_origin || 'extractive',
  abstractLen: String(article.abstract || '').length,
- compactAid: simpleMode,
+ compactAid: true,
  })
  : '';
  const studyTypeHtml = renderStudyTypeBadge(article);
@@ -1138,7 +1325,6 @@ function buildResultCard(article, idx) {
  <span class="result-venue">${venue}</span>
  <span class="result-tags">
   <span class="tag">${escapeHtml(getSourceName(article.source))}</span>
-  ${studyTypeHtml}
  </span>
  </div>
  <h3 class="article-title result-row-title">${escapeHtml(article.title || '')}</h3>
@@ -1151,19 +1337,20 @@ function buildResultCard(article, idx) {
  <button type="button" class="btn btn-sm btn-secondary note-save">Save note</button>
  </div>`;
 
- if (simpleMode) {
+ {
   card.innerHTML = `
   <div class="result-row-main">
   ${headHtml}
   <button type="button" class="result-toggle" aria-expanded="false" aria-controls="result-body-${idx}">Open</button>
   <div class="article-body result-row-body" id="result-body-${idx}">
+  ${keyPointsHtml}
+  <details class="result-abstract">
+  <summary>Show abstract</summary>
   <div class="article-meta result-row-ids">
   <span><strong>ID:</strong> ${idLink}</span>
   ${clusterBit}
   </div>
-  ${keyPointsHtml}
-  <details class="result-abstract">
-  <summary>Show abstract</summary>
+  ${studyTypeHtml}
   <div class="article-abstract">${abstractHtml}</div>
   </details>
   ${picoHtml}
@@ -1180,29 +1367,6 @@ function buildResultCard(article, idx) {
   <button type="button" class="note-toggle" ${noteVal ? 'hidden' : ''}><span class="result-rail-label">Note</span></button>
   <button type="button" class="not-relevant-btn"
    data-tip="Screen this paper out as not about your topic"><span class="result-rail-label">Not relevant</span></button>
-  </div>
-  `;
- } else {
-  card.innerHTML = `
-  ${headHtml}
-  <div class="article-body result-row-body">
-  <div class="article-meta result-row-ids">
-  <span><strong>ID:</strong> ${idLink}</span>
-  ${clusterBit}
-  </div>
-  ${keyPointsHtml}
-  <div class="article-abstract">${abstractHtml}</div>
-  ${picoHtml}
-  <div class="article-actions-row">
-  ${openLink}
-  <button type="button" class="star-btn ${starred ? 'is-starred' : ''}" data-tip="${starred ? 'Remove star' : 'Star article'}" aria-label="${starred ? 'Remove star' : 'Star article'}" aria-pressed="${starred ? 'true' : 'false'}">${starLabelHtml(starred)}</button>
-  <button type="button" class="note-toggle" ${noteVal ? 'hidden' : ''}>Add note</button>
-  <button type="button" class="more-like-this-btn"
-   data-tip="Rank the rest of your collection by how similar they are to this paper">More like this</button>
-  <button type="button" class="not-relevant-btn"
-   data-tip="Screen this paper out as not about your topic">Not relevant</button>
-  </div>
-  ${noteRowHtml}
   </div>
   `;
  }
@@ -1316,7 +1480,7 @@ function buildResultCard(article, idx) {
  // Keep the strip returned for *this* row — never look up the first pending strip.
  const parent = card.parentNode;
  const nextSibling = card.nextSibling;
- const strip = replaceCardWithUndo(card, article, { pending: true });
+ const strip = replaceCardWithUndo(card, article, { pending: true, why: true });
  try {
  await apiCall('/api/screening', {
  method: 'POST',
@@ -1334,12 +1498,18 @@ function buildResultCard(article, idx) {
    undoBtn.disabled = false;
    undoBtn.removeAttribute('aria-disabled');
   }
+  const whyBtn = strip.querySelector('.why-not-relevant');
+  if (whyBtn) {
+   whyBtn.disabled = false;
+   whyBtn.removeAttribute('aria-disabled');
+  }
  }
  showNotification('Marked not relevant (screened out).', 'success');
  lastResults = lastResults.filter(
  (a) => !(a.article_id === article.article_id && a.source === article.source)
  );
- showSearchResults();
+ // Leave the undo strip in place. Rebuilding the list would remove Why? and Undo.
+ syncResultCountAfterScreen();
  } catch (err) {
  if (strip && parent && strip.parentNode === parent) {
   parent.replaceChild(card, strip);
@@ -1352,7 +1522,7 @@ function buildResultCard(article, idx) {
  });
  }
 
- if (simpleMode) {
+ {
   card.style.setProperty('--i', String(idx));
   const toggle = card.querySelector('.result-toggle');
   if (toggle) {
@@ -1367,18 +1537,59 @@ function buildResultCard(article, idx) {
  return card;
 }
 
+/** One list of reasons: the chips in #simple-set-aside-reasons. */
+function fillWhyReasonChips(host) {
+ const src = document.getElementById('simple-set-aside-reasons');
+ if (!src || !host) return;
+ src.querySelectorAll('[data-reason]').forEach((btn) => {
+  const reason = btn.getAttribute('data-reason');
+  if (!reason || reason === 'low_relevance' || reason === 'duplicate' || reason === 'cluster') return;
+  const copy = document.createElement('button');
+  copy.type = 'button';
+  copy.className = btn.className;
+  copy.setAttribute('data-reason', reason);
+  const current = reason === 'off_topic';
+  copy.setAttribute('aria-pressed', current ? 'true' : 'false');
+  copy.textContent = btn.textContent.trim();
+  host.appendChild(copy);
+ });
+}
+
+/** Keep the result count honest without rebuilding the list (that would drop the undo strip). */
+function syncResultCountAfterScreen() {
+ const hasHits = !!(lastResults && lastResults.length);
+ const countEl = document.getElementById('result-count');
+ if (countEl && !displayFiltersActive()) {
+  countEl.textContent = String(hasHits ? lastResults.length : 0);
+ }
+ const exportSec = document.getElementById('export-results-section');
+ if (exportSec && !displayFiltersActive()) {
+  exportSec.hidden = !hasHits;
+  exportSec.style.display = hasHits ? 'block' : 'none';
+ }
+ if (typeof updateSimpleSearchPanel === 'function') updateSimpleSearchPanel(hasHits);
+}
+
 /** Swap a result card for a short-lived undo strip after Not relevant. Returns the strip. */
 function replaceCardWithUndo(cardEl, article, opts) {
  const parent = cardEl.parentNode;
  if (!parent) return null;
  const pending = !!(opts && opts.pending);
+ const why = !!(opts && opts.why);
+ const whyBtnHtml = why
+  ? ` <button type="button" class="btn btn-sm btn-secondary why-not-relevant"${
+   pending ? ' disabled aria-disabled="true"' : ''
+  }>Why?</button>`
+  : '';
  const strip = document.createElement('div');
  strip.className = 'article-card not-relevant-undo' + (pending ? ' is-pending' : '');
  strip.innerHTML =
  `<span class="info-text">Screened out: <em>${escapeHtml(article.title || 'paper')}</em></span>`
+ + whyBtnHtml
  + ` <button type="button" class="btn btn-sm btn-secondary undo-not-relevant"${
   pending ? ' disabled aria-disabled="true"' : ''
- }>Undo</button>`;
+ }>Undo</button>`
+ + (why ? '<div class="set-aside-reason-chips why-reason-chips" hidden></div>' : '');
  parent.replaceChild(strip, cardEl);
  const undoBtn = strip.querySelector('.undo-not-relevant');
  undoBtn.addEventListener('click', async (e) => {
@@ -1404,12 +1615,60 @@ function replaceCardWithUndo(cardEl, article, opts) {
  )) {
  lastResults.push(article);
  }
- showSearchResults();
+ syncResultCountAfterScreen();
  } catch (err) {
  undoBtn.disabled = false;
  showNotification(`Undo failed: ${err.message}`, 'error');
  }
  });
+ if (why) {
+  const whyButton = strip.querySelector('.why-not-relevant');
+  const chips = strip.querySelector('.why-reason-chips');
+  whyButton.addEventListener('click', (e) => {
+   e.preventDefault();
+   if (strip.classList.contains('is-pending') || whyButton.disabled) return;
+   if (!chips.childElementCount) fillWhyReasonChips(chips);
+   if (!chips.childElementCount) {
+    showNotification('Could not load reasons.', 'error');
+    return;
+   }
+   chips.hidden = !chips.hidden;
+   if (!chips.hidden) {
+    const current = chips.querySelector('[aria-pressed="true"]') || chips.querySelector('button');
+    if (current) current.focus();
+   }
+  });
+  chips.addEventListener('click', async (e) => {
+   const chip = e.target.closest('[data-reason]');
+   if (!chip || chip.disabled) return;
+   e.preventDefault();
+   const reason = chip.getAttribute('data-reason');
+   if (!reason || reason === 'low_relevance' || reason === 'duplicate' || reason === 'cluster') return;
+   const buttons = chips.querySelectorAll('button');
+   buttons.forEach((b) => { b.disabled = true; });
+   try {
+    await apiCall('/api/screening', {
+     method: 'POST',
+     body: withPageLibrary({
+      items: [{ article_id: article.article_id, source: article.source }],
+      action: 'exclude',
+      reason: reason,
+     }),
+    });
+    buttons.forEach((b) => {
+     b.setAttribute('aria-pressed', b === chip ? 'true' : 'false');
+    });
+    const info = strip.querySelector('.info-text');
+    if (info) {
+     info.innerHTML = `Screened out (${escapeHtml(chip.textContent.trim())}): <em>${escapeHtml(article.title || 'paper')}</em>`;
+    }
+   } catch (err) {
+    showNotification(`Could not save the reason: ${err.message}`, 'error');
+   } finally {
+    buttons.forEach((b) => { b.disabled = false; });
+   }
+  });
+ }
  return strip;
 }
 
@@ -1463,13 +1722,13 @@ function visibleResults() {
   (k) => displayFilterState.sources[k]
  );
  const recentYear = displayRecentYear();
- return (lastResults || []).filter((a) => {
+ return clientSort((lastResults || []).filter((a) => {
   if (displayFilterState.starred && !a.starred) return false;
   if (displayFilterState.noted && !String(a.note || '').trim()) return false;
   if (displayFilterState.recent && parseYear(a.year) < recentYear) return false;
   if (srcOn.length && srcOn.indexOf(a.source) === -1) return false;
   return true;
- });
+ }), searchState.filters.sort_by);
 }
 
 function showSearchResults(fullList) {
@@ -1479,6 +1738,7 @@ function showSearchResults(fullList) {
  if (bar) bar.hidden = !hasHits;
  syncDisplayFilterSourceChips();
  syncDisplayFilterChipState();
+ syncSimpleResultChips();
  const shown = visibleResults();
  renderResults(shown);
  const countEl = document.getElementById('result-count');
@@ -1586,6 +1846,7 @@ function wireDisplayFilters() {
    displayFilterState[key] = !displayFilterState[key];
   }
   showSearchResults();
+  saveSearchSession();
  });
 }
 
@@ -1612,7 +1873,7 @@ function renderResults(results) {
  } else {
  results.forEach((article, idx) => container.appendChild(buildResultCard(article, idx)));
  }
- if (document.documentElement.getAttribute('data-mode') === 'simple') {
+ {
   openResultRow(container.querySelector('.result-row'), false);
  }
 
@@ -1630,8 +1891,8 @@ function updateSimpleSearchPanel(hasResults) {
  const panel = document.getElementById('search-simple-panel');
  const resultsSec = document.getElementById('results-section');
  if (!panel) return;
- const simple = typeof isSimpleMode === 'function' && isSimpleMode();
- const show = !!(simple && hasResults);
+ const hasLibraryPapers = Object.values(librarySourceCounts).some((n) => Number(n) > 0);
+ const show = !!((hasResults || hasLibraryPapers));
  if (show) {
   panel.removeAttribute('hidden');
   panel.hidden = false;
@@ -1641,6 +1902,89 @@ function updateSimpleSearchPanel(hasResults) {
  }
  if (resultsSec) resultsSec.classList.toggle('has-simple-panel', show);
  syncSimplePanelClearance();
+}
+
+async function promptSimpleExportScope() {
+ const pageLibrary = typeof pageLibraryId === 'function' ? pageLibraryId() : '';
+ if (!pageLibrary) {
+  showNotification('Reload this page before exporting your library.', 'error');
+  return;
+ }
+ const hasResults = visibleResults().length > 0;
+ const scopes = [];
+ if (hasResults) scopes.push({ value: 'results', label: 'These visible results', primary: true });
+ scopes.push(
+  { value: 'all', label: 'All library papers' },
+  { value: 'included', label: 'Kept papers' },
+  { value: 'excluded', label: 'Set-aside papers' },
+  { value: 'starred', label: 'Starred papers' },
+  { value: null, label: 'Cancel', cancel: true },
+ );
+ const scope = await openSiteChoice({
+  title: 'Save your work',
+  message: 'Choose which papers to export.',
+  choices: scopes,
+  cancelLabel: 'Cancel',
+  onReady: (root) => {
+   const actions = root.querySelector('.lra-modal-actions');
+   if (actions) actions.id = 'simple-export-scope';
+  },
+ });
+ if (!scope) return;
+ const formats = scope === 'results'
+  ? ['ris', 'bibtex', 'csv', 'txt']
+  : ['ris', 'bibtex', 'csv', 'txt', 'apa'];
+ const format = await openSiteChoice({
+  title: 'Export format',
+  message: 'Choose a file format.',
+  choices: [...formats.map((value, index) => ({
+   value, label: value === 'bibtex' ? 'BibTeX' : value.toUpperCase(), primary: index === 0,
+  })), { value: null, label: 'Cancel', cancel: true }],
+  cancelLabel: 'Cancel',
+ });
+ if (!format) return;
+ const currentLibrary = typeof pageLibraryId === 'function' ? pageLibraryId() : '';
+ if (pageLibrary && currentLibrary !== pageLibrary) {
+  const status = document.getElementById('simple-export-status');
+  if (status) status.textContent = 'Your library changed. Reload this page before exporting.';
+  showNotification('Your library changed. Reload this page before exporting.', 'error');
+  return;
+ }
+ if (scope === 'results') {
+  await doExportResults(format, pageLibrary);
+ } else {
+  await doExportLibrary(scope, format, pageLibrary);
+ }
+}
+
+async function doExportLibrary(scope, format, libraryId) {
+ const status = document.getElementById('simple-export-status');
+ if (status) status.textContent = 'Preparing download…';
+ try {
+  const params = new URLSearchParams({ scope, format });
+  if (libraryId) params.set('library_id', libraryId);
+  const response = await fetch(`/api/export/library?${params.toString()}`, {
+   credentials: 'same-origin',
+  });
+  if (!response.ok) {
+   const err = await response.json().catch(() => ({ detail: response.statusText }));
+   throw new Error(err.detail || 'Export failed');
+  }
+  const blob = await response.blob();
+  const cd = response.headers.get('Content-Disposition') || '';
+  const match = /filename="?([^";]+)"?/i.exec(cd);
+  const fallback = `library_${scope}.${format === 'bibtex' ? 'bib' : format === 'apa' ? 'txt' : format}`;
+  const filename = (match && match[1]) || fallback;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  if (status) status.textContent = `Downloaded ${filename}.`;
+  showNotification(`Downloaded ${filename}`, 'success');
+ } catch (e) {
+  if (status) status.textContent = e.message || 'Export failed';
+  showNotification(`Export failed: ${e.message}`, 'error');
+ }
 }
 
 function syncSimplePanelClearance() {
@@ -1674,7 +2018,7 @@ function watchSimplePanelClearance() {
 function syncSimpleRailAnchor() {
  const root = document.documentElement;
  const query = document.getElementById('search-query-top');
- if (root.getAttribute('data-mode') !== 'simple' || !query || query.hidden) {
+ if (!query || query.hidden) {
   root.style.removeProperty('--simple-rail-top');
   return;
  }
@@ -1700,39 +2044,23 @@ function watchSimpleRailAnchor() {
  syncSimpleRailAnchor();
 }
 
-/** Simple keeps the scope note collapsed; Advanced pins it open (summary hidden). */
+/** The scope note stays collapsed until the reader asks for it. */
 function syncSearchScopeNote() {
  const note = document.querySelector('.search-scope-note');
  if (!note) return;
- const simple = document.documentElement.getAttribute('data-mode') === 'simple';
- if (simple) {
+ {
   note.removeAttribute('open');
- } else {
-  note.setAttribute('open', '');
  }
 }
 
-// If the user toggles Simple/Advanced after a search, re-show the panel.
 document.addEventListener('DOMContentLoaded', () => {
  watchSimplePanelClearance();
  watchSimpleRailAnchor();
  syncSearchScopeNote();
- const modeBtn = document.getElementById('mode-toggle');
- if (modeBtn) {
-  modeBtn.addEventListener('click', () => {
-   // common.js flips data-mode first in the same tick; re-evaluate after.
-   requestAnimationFrame(() => {
-    updateSimpleSearchPanel(!!(lastResults && lastResults.length));
-    syncSearchScopeNote();
-    if (typeof syncSimpleRailAnchor === 'function') syncSimpleRailAnchor();
-    // Result cards carry mode-specific markup: rebuild for the new mode.
-    if (lastResults && lastResults.length) showSearchResults();
-   });
-  });
- }
+
 });
 
-async function doExportResults(format) {
+async function doExportResults(format, libraryId = '') {
  const exportRows = visibleResults();
  if (!exportRows.length) {
   showNotification('Run a search first, then export the results shown on screen.', 'error');
@@ -1757,7 +2085,8 @@ async function doExportResults(format) {
   if (typeof getCsrfToken === 'function') {
    headers['X-CSRF-Token'] = getCsrfToken();
   }
-  const response = await fetch('/api/export/selection', {
+  const endpoint = libraryId ? `/api/export/selection?${new URLSearchParams({ library_id: libraryId })}` : '/api/export/selection';
+  const response = await fetch(endpoint, {
    method: 'POST',
    headers,
    credentials: 'same-origin',

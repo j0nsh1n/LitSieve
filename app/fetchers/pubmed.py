@@ -5,7 +5,7 @@ Fetches research articles from PubMed using the Entrez API
 
 import logging
 import socket
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, cast
 
 from Bio import Entrez
 
@@ -47,7 +47,7 @@ class PubMedFetcher(BaseFetcher):
                 retmax=max_results,
                 sort="relevance"
             )
-            record = Entrez.read(handle)
+            record = cast(Dict[str, List[str]], Entrez.read(handle))
             handle.close()
 
             pmids = record["IdList"]
@@ -73,7 +73,7 @@ class PubMedFetcher(BaseFetcher):
                     rettype="xml",
                     retmode="xml"
                 )
-                records = Entrez.read(handle)
+                records = cast(Dict[str, List[Dict]], Entrez.read(handle))
                 handle.close()
 
                 for record in records['PubmedArticle']:
@@ -84,7 +84,7 @@ class PubMedFetcher(BaseFetcher):
                 polite_sleep(0.5)
 
             except Exception as e:
-                reraise_fetch_error(e)
+                reraise_fetch_error(e, articles)
                 logger.exception("Error fetching batch: %s", e)
                 continue
 

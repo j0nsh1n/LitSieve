@@ -265,7 +265,7 @@ async def api_admin_overview(request: Request):
         "ai": llm_svc.is_configured(),
         "quota_mb": round(cap / (1024 * 1024)) if cap else 0,
         "guest_auto_prepare": guest_prep not in ("0", "false", "no", "off"),
-        "version": "5.5.0",
+        "version": "6.0.0",
         "uptime_seconds": int(max(0, __import__("time").time() - core.PROCESS_STARTED)),
         "jobs": job_counts,
         "auth_events_1h": {str(k): int(v) for k, v in auth_hour},
@@ -708,8 +708,8 @@ async def api_admin_clear_job(user_id: str, request: Request):
     if bad:
         return bad
     task = str(body.get("task") or "").strip()
-    if task not in ("fetch", "embed"):
-        return JSONResponse(status_code=400, content={"detail": "task must be fetch or embed"})
+    if task not in core.JOB_TASKS:
+        return JSONResponse(status_code=400, content={"detail": "task must be fetch, embed or cluster"})
     ok, detail = core.clear_stale_job(user_id, task)
     if not ok:
         return JSONResponse(status_code=409, content={"detail": detail})
@@ -857,6 +857,8 @@ async def api_admin_quota_bump(user_id: str, request: Request):
     if bad:
         return bad
     raw_limit = body.get("limit_mb")
+    if raw_limit is None:
+        return JSONResponse(status_code=400, content={"detail": "limit_mb must be a whole number of megabytes."})
     try:
         limit_mb = int(raw_limit)
     except (TypeError, ValueError):
@@ -1134,7 +1136,6 @@ async def api_admin_start_view(user_id: str, request: Request):
         student_id=user_id,
         student_username=rec["username"],
         reason=str(body.get("reason") or ""),
-        ui_mode=str(body.get("ui_mode") or "simple"),
         minutes=minutes,
         ip=client_bucket(request),
     )
@@ -1147,7 +1148,6 @@ async def api_admin_start_view(user_id: str, request: Request):
     response = JSONResponse({
         "status": "ok",
         "expires_at": view["expires_at"],
-        "ui_mode": view["ui_mode"],
         "redirect": "/search",
     })
     response.set_cookie(
@@ -1158,12 +1158,6 @@ async def api_admin_start_view(user_id: str, request: Request):
         samesite="lax",
         max_age=int(view["minutes"]) * 60,
     )
-    if view["ui_mode"] in ("simple", "advanced"):
-        response.set_cookie(
-            "ui_mode", view["ui_mode"], httponly=False,
-            secure=core.COOKIE_SECURE, samesite="lax",
-            max_age=int(view["minutes"]) * 60,
-        )
     return response
 
 

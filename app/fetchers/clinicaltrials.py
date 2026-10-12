@@ -17,7 +17,7 @@ class ClinicalTrialsFetcher(BaseFetcher):
     SOURCE_NAME = "clinicaltrials"
     BASE_URL = "https://clinicaltrials.gov/api/v2"
 
-    def __init__(self, email: str = None, **kwargs):
+    def __init__(self, email: Optional[str] = None, **kwargs):
         self.email = email
 
         self.http = HttpClient(delay=0.3)
@@ -98,7 +98,7 @@ class ClinicalTrialsFetcher(BaseFetcher):
                     break
 
             except Exception as e:
-                reraise_fetch_error(e)
+                reraise_fetch_error(e, articles)
                 logger.exception("Error fetching from ClinicalTrials.gov: %s", e)
                 break
 
@@ -120,7 +120,7 @@ class ClinicalTrialsFetcher(BaseFetcher):
                 if parsed:
                     articles.append(parsed)
             except Exception as e:
-                reraise_fetch_error(e)
+                reraise_fetch_error(e, articles)
                 logger.exception("Error fetching %s: %s", nct_id, e)
 
         logger.info("Successfully fetched %s studies", len(articles))

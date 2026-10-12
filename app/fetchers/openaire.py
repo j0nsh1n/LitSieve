@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List, Optional
 
-from app.fetchers.base import BaseFetcher, FetchError, HttpClient
+from app.fetchers.base import BaseFetcher, FetchError, HttpClient, reraise_fetch_error
 
 
 def _node_text(node: Any) -> str:
@@ -51,7 +51,7 @@ class OpenAIREFetcher(BaseFetcher):
     SOURCE_NAME = "openaire"
     BASE_URL = "https://api.openaire.eu/search/publications"
 
-    def __init__(self, email: str = None):
+    def __init__(self, email: Optional[str] = None):
         self.http = HttpClient(
             delay=0.45,
             timeout=45,
@@ -77,8 +77,8 @@ class OpenAIREFetcher(BaseFetcher):
                     },
                 )
                 data = r.json()
-            except FetchError:
-                raise
+            except FetchError as e:
+                reraise_fetch_error(e, articles)
             except Exception as e:
                 raise FetchError(f"OpenAIRE request failed: {e}", kind="network") from e
 

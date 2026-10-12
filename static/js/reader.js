@@ -1,4 +1,4 @@
-/** Reader Mode: Explain this study panel (Search + Clean up). */
+/** Reader Mode: Explain this study panel (Search). */
 
 (function () {
     const STATUS_COPY = {

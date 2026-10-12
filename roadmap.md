@@ -33,7 +33,7 @@ follow-up audits of 2026-09-12 and 2026-09-17 (session record).
 - Tasks:
   - Confirm on the host that a detached deploy writes its `operator_deploys`
     row to the live `users.db` (the fix is in code; not yet confirmed on the host)
-  - Run rollback detached like deploy. `POST /api/ops/rollback` runs as a
+  - [x] Run rollback detached like deploy. `POST /api/ops/rollback` runs as a
     child of the web service through `run_action`, and the unit sets no
     `KillMode`, so the `systemctl --user restart` inside `_do_deploy` stops
     it before `_finish_deploy`; the record is left interrupted and no audit
@@ -46,11 +46,12 @@ follow-up audits of 2026-09-12 and 2026-09-17 (session record).
 ## Phase 12 — UX round 2 leftovers
 Presentation items from the 2026-09-17 audit of the airy glass restyle.
 - Tasks:
-  - Decide whether to revive m2 split-pane triage (reverted on
-    `feat/ux2-m2-split-pane`, `57b7624` to `41fa5b9`) or drop it
+  - [x] Drop m2 split-pane triage (Jonathan's decision, 2026-10-09).
+    The design was reverted from `57b7624` by `41fa5b9`; no matching local
+    branch remains, and a read-only remote heads check found none either.
 - Complete when: the decision is recorded and the branch is merged or
   deleted
-- Status: [ ] open
+- Status: [x] complete 2026-10-09
 
 ## Phase 13 — One flow: fold Advanced into Simple, then remove Advanced mode
 Simple's rules apply to every moved function: one URL, popups only on
@@ -97,7 +98,7 @@ popup, `static/js/search.js`).
     ask `/api/screening/excluded?reason=low_relevance` on purpose; they
     must restore only Narrow it down's group, never duplicates or Not
     relevant.
-  - Slice 2: exclusion reason chips (about half a day). Simple sets only
+  - [x] Slice 2: exclusion reason chips (completed locally 2026-10-09). Simple sets only
     `off_topic` (Not relevant) and `low_relevance` (Narrow it down) today,
     so a Simple student's screening report has two categories; the chips
     add the PRISMA-style ones (wrong population, wrong study type,
@@ -108,7 +109,8 @@ popup, `static/js/search.js`).
     is half a day to a day and a half. Search state gains one `filters`
     shape that the chips draw from. PMID/DOI and study type move inside
     the abstract disclosure with the result chips.
-  - Slice 9: Group by theme (2 to 3 days). Last fold before removal.
+    Slices 3 to 8 are complete locally (2026-10-09).
+  - [x] Slice 9: Group by theme (completed locally 2026-10-09). Last fold before removal.
     First a throwaway prototype on a real library with screenshots, to
     settle layout and labels before the real build. Clustering runs
     inside the request today (`api_create_clusters` awaits
@@ -117,7 +119,7 @@ popup, `static/js/search.js`).
     the button. Reuses the existing cluster endpoints. Preview and undo
     through the existing screening endpoints, same pattern as Narrow it
     down.
-  - Slice 10: remove Advanced in one pull request (about 2 days). Delete
+  - [x] Slice 10: mode removal completed locally 2026-10-09. Removed
     `/data-management`, `/statistics`, `/clusters` and their templates
     with a 301 to `/search`. Delete the `ui_mode` and `ui_mode_seed`
     cookies (`app/routes/auth.py`, `app/routes/pages.py`), the mode
@@ -141,36 +143,32 @@ popup, `static/js/search.js`).
   suite green. After merge: pull the live checkout and restart the
   service.
 - After slice 10: watch 301 hits for a week, then prune dead CSS.
-- Pending Jonathan (does not block slice 1):
-  - Old URLs: 301 to `/search` (recommended) or 404. From 2026-09-08 to
-    2026-09-24 the three pages got 38 requests and only 6 rendered; the
-    rest were redirects, so students have these links saved.
-  - Removal version: 6.0.0 proposed (three pages and a mode disappear)
-  - `spec.md` two-mode lines at removal (Required Behavior, User
-    Experience, Acceptance Criteria)
-- spec.md drift until the removal lands: the Simple / Advanced mode
-  bullet and its nav lines (Required Behavior), the Simple and Advanced
-  examples (User Experience), and the two-flow lines in Acceptance
-  Criteria still describe two modes
+- Jonathan approved permanent 301 redirects to Search, version 6.0.0,
+  and the concrete one-flow spec rewrite; that rewrite is applied.
 - Complete when: every function a student could reach only in Advanced
   is on the Search page under Simple's rules; the parity test is all
-  passing; no `data-mode`, `uiMode`, or `ui_mode` reference remains in
-  `app/`, `static/`, `templates/`, or `tests/` except the helpdesk
-  history column; spec.md describes one flow
-- Status: [ ] in progress. Slices 0 and 1 shipped; slice 2 (reason
-  chips) is next. Nothing waits on the pending calls until slice 6.
+  passing; no active mode preference, cookie, or conditional layout remains.
+  Read-only legacy notice/history compatibility and regression assertions
+  remain; spec.md describes one flow
+- Status: [x] code complete locally 2026-10-09. Slices 2–10 are integrated,
+  independently reviewed, and tested. The final suite has 966 passing tests,
+  with all 15 parity rows passing and no xfails. Required ops/fetch checks
+  have 67 passing tests; Ruff and Pyright have no errors. Headless previews
+  cover all five looks light/dark at 375px and desktop at 1280px with fallback
+  fonts. Authenticated browser automation disconnected, so the remaining live
+  interaction review is incomplete. Nothing new is pushed, merged, or deployed.
 
 ## Backlog (unscheduled)
-- Make `pyright app` blocking in CI after clearing the current error backlog
-  (56 errors, 6 warnings on 2026-09-12)
-- Tell all three AI prompts (`_REFINE_SYSTEM`, `_ASK_SYSTEM`, Reader) that the
-  abstract is data, not instructions; one change covering all three
-- Startup warning when `user_data/ai_settings.json` exists and no AI env is set
-- Prune CSS left by the reverted split-pane work (stylesheet is 8,396 lines
-  on 2026-09-20)
-- A test that parses the look list in `app/content/looks.py`,
+- [x] Clear app type errors and make `pyright app` blocking in CI (2026-10-09)
+- [x] Tell all three AI prompts (`_REFINE_SYSTEM`, `_ASK_SYSTEM`, Reader) that
+  source text is data, not instructions (2026-10-09)
+- [x] Startup warning for legacy global AI settings without host configuration
+  (2026-10-09)
+- [x] Audit CSS left by the reverted split-pane work: `41fa5b9` already
+  removed the full 149-line block; no split-pane selectors remain (2026-10-09)
+- [x] A test that parses the look list in `app/content/looks.py`,
   `static/js/theme-init.js`, and `templates/partials/look_picker.html` and
-  fails when they differ; today the three match only by hand
+  fails when they differ (2026-10-09)
 - Looks beyond palette: per-look structure changes (`app/content/looks.py`
   calls this a later job)
 - Dependency lockfile (pip-tools / uv) if reproducibility becomes a priority

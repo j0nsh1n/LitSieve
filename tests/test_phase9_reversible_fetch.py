@@ -18,7 +18,7 @@ from app.storage.database import ArticleDatabase
 
 REPO = Path(__file__).resolve().parents[1]
 DM = (REPO / "static" / "js" / "simple_tools.js").read_text(encoding="utf-8") + "\n" + (
-    REPO / "static" / "js" / "data_management.js"
+    REPO / "static" / "js" / "collect.js"
 ).read_text(encoding="utf-8")
 
 
@@ -47,17 +47,18 @@ def test_sample_corpus_loads_rows_before_clearing():
     assert "Sample corpus is empty" in fn
 
 
-def test_advanced_replace_consequence_is_inline_not_a_modal():
-    """Advanced: live line next to the radio. Simple already hides that row."""
+def test_replace_backing_fields_are_hidden_and_preview_names_student_work():
+    """The popup owns confirmation; backing fields stay out of the page flow."""
     html = (REPO / "templates" / "partials" / "collect_ui.html").read_text(encoding="utf-8")
     assert 'id="fetch-replace-consequence"' in html
     assert 'name="fetch-mode"' in html
     css = (REPO / "static" / "css" / "style.css").read_text(encoding="utf-8")
-    assert 'html[data-mode="simple"] .form-row:has(input[name="fetch-mode"])' in css
+    assert '.form-row:has(input[name="fetch-mode"])' in css
+    assert 'data-mode' not in css
 
     assert "function updateReplaceConsequence" in DM
     assert "fetch-replace-consequence" in DM
-    # Must not introduce a confirm/choice around Advanced radios.
+    # The backing-field updater must not open a second confirmation.
     vis = DM[
         DM.index("function updateReplaceConsequence") : DM.index(
             "function updatePrepareSectionVisibility"

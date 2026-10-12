@@ -24,32 +24,37 @@ a substitute for school library databases.
   per-source errors); skip abstract-less records
 - Prepare papers (embeddings) as a background job after a successful fetch
   (auto-chain; optional re-prepare); extractive key points default
-- **Simple / Advanced UI mode** (client preference: `localStorage.uiMode` +
-  `data-mode` on `<html>`, applied pre-paint, mirrored to a `ui_mode`
-  cookie so server pages can redirect; a one-shot `ui_mode_seed` cookie
-  starts new and guest accounts in Simple). Simple does not remove
-  Advanced capability; Advanced keeps every control
-  - **Simple nav:** one page (`/search`) with an empty collect state (topics +
-    fetch) and a papers-present search state (rank, Show chips, export).
-    Fetch + prepare use one wait screen (animated sieve, rotating status;
+- **One Search flow** at `/search`: an empty collect state (topics + fetch)
+  and a papers-present state (rank, filter, screen, group, and export).
+  - One unnumbered Search tab, plus Account and operator tools when authorized.
+  - Fetch + prepare use one wait screen (animated sieve, rotating status;
     no live source rows). The bar maps fetch to 0–60 and prepare to 60–90;
-    **Narrow it down** holds at 90% (apply or skip), then a short finish
-    leg opens Search. Screening, re-prepare, start over, and the source
-    report are popups. `/data-management` in Simple redirects to `/search`.
-  - **Advanced nav:** Data Management → Clean up → Clusters → Search (plus Account)
+    **Narrow it down** holds at 90% (apply or skip), then a short finish leg
+    opens Search. Screening, re-prepare, start over, source reports, duplicate
+    checking, and grouping by theme open only when requested.
+  - Every former Advanced capability remains reachable on Search. PICO and
+    paper-seed inputs use Search by; sorting, sources, and starred ranking
+    use chips; whole-library export is in Save your work; source choices and
+    optional contact email sit inside the fetch popup's Databases disclosure.
+  - Set aside lists every exclusion reason and supports reason selection,
+    restoring one paper, a group, or all. Duplicate and theme exclusions
+    preview before apply and offer undo. Clustering runs as a background job.
+  - `/data-management`, `/statistics`, and `/clusters` permanently redirect
+    to `/search`. Old mode preferences receive a one-time layout notice.
 - **Look** (per-account preference): Workshop (default), Broadsheet, Lab,
   Night, or Catalog, stored in `users.look`, mirrored to a readable
   `ui_look` cookie, and applied pre-paint as `data-look` on `<html>`.
   Colour, type, and a little chrome; the layout is the same in every look.
   Offered once after registration; changed on Account. Light/dark stays a
   separate browser preference.
-- **Screening / triage** (exclude/restore with reason codes), not only on Clusters:
-  - Clean up (`/statistics`): near-duplicates, preferred-source auto-resolve,
-    **Quick screen** (rank vs research question; apply only on confirm;
-    `low_relevance` is a system reason), screening report
-  - Clusters: density / k-means / hierarchical group triage (exclude/restore);
-    not auto-run after fetch
-  - Search: per-result **Not relevant** (`off_topic`); export / report panel
+- **Screening / triage** on Search (exclude/restore with reason codes):
+  - Near-duplicates with preferred-source resolution and selectable strictness;
+    **Quick screen** ranks against the research question and applies only on
+    confirm (`low_relevance` is a system reason); screening report export.
+  - Group by theme offers density, k-means, and hierarchical grouping, with
+    exclude/restore; grouping is optional and never auto-runs after fetch.
+  - Per-result **Not relevant** (`off_topic`), optional reasons, and Undo.
+- Search: per-result **Not relevant** (`off_topic`); export / report panel
 - Search: hybrid rank (semantic + optional lexical), year/source filters, seed
   paper, **more like starred** (starred papers **remain** in the result list),
   notes/stars, export on-screen results as RIS
@@ -71,20 +76,17 @@ a substitute for school library databases.
 - Local run: `./run_dev.sh` → http://127.0.0.1:7860  
   Or: `DEBUG=true SECRET_KEY=… ./venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 7860 --reload`
   Dev isolation (preferred): `./run_dev.sh 7861` uses separate DB/data/log paths.
-- Example (Simple): register or **Try the demo** → Search (empty: topics →
+- Example: register or **Try the demo** → Search (empty: topics →
   fetch by **topic** → wait screen for fetch + prepare, sieve + rotating
   copy, hold at 90% → required Narrow it down apply or skip → finish leg →
   rank + export). Re-prepare / Start over stay on the Search strip.
 - Type: Source Serif 4 headings, Source Sans 3 body/UI, self-hosted WOFF2
-  (CSP `font-src 'self'`). Empty Search / Clean up / Clusters states show a
+  (CSP `font-src 'self'`). Empty Search states show a
   static empty pan, not text alone.
-- Example (Advanced): log in → Data Management (topics/sources → Fetch →
-  auto-prepare) → Clean up (dedup / Quick screen / report) → optional Clusters →
-  Search → Download RIS
-- **Explain this study** sits in the shared AI row on Search and Clean up cards
+- **Explain this study** sits in the shared AI row on Search cards
   (`renderKeyPointsHtml`). The panel does not replace the abstract. Hidden when
   the abstract is under 40 characters.
-- Health: `GET /health` → `{"status":"healthy","version":"5.5.0"}` (version as of
+- Health: `GET /health` → `{"status":"healthy","version":"6.0.0"}` (version as of
   this writing; bump when releasing)
 
 ## Architecture
@@ -135,10 +137,8 @@ a substitute for school library databases.
 ## Validation & Tooling
 - Lint: `ruff check .` — must pass (partial rule set in `pyproject.toml`:
   E9/F63/F7/F82/F401/F541/E401/I; E501/UP/E402 deferred).
-- Types: `pyright app` (`pyrightconfig.json`, basic mode). **Transitional:**
-  CI runs pyright with `continue-on-error: true` until the app/ error backlog
-  is cleared; do not block merges on pyright green yet. Report new errors you
-  introduce when practical.
+- Types: `pyright app` (`pyrightconfig.json`, basic mode). CI blocks on
+  errors; optional-package warnings are reported.
 - Tests:  
   `SECRET_KEY=x DEBUG=true ./venv/bin/python -m pytest -q`  
   Prefer `./venv`. Install deps: `./venv/bin/pip install -r requirements.txt`
@@ -160,8 +160,9 @@ a substitute for school library databases.
 
 ## Acceptance Criteria
 - [ ] Student can complete a literature pass on public sources only:
-      Simple: topics → fetch → auto-prepare wait → required Narrow it down → search → export RIS;
-      Advanced: same plus Clean up (dedup / Quick screen) and optional Clusters
+      topics → fetch → auto-prepare wait → required Narrow it down → search
+      → export RIS; optional duplicate checking, Quick screen, and theme grouping
+      remain reachable on Search
 - [ ] Guest demo loads sample papers without multi-source fetch and does not
       hijack an existing signed-in session
 - [ ] Libraries isolate data; clone codes do not grant live write access

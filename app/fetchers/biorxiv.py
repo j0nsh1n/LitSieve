@@ -14,7 +14,7 @@ import re
 from datetime import date, timedelta
 from typing import Dict, List, Optional
 
-from app.fetchers.base import BaseFetcher, FetchError, HttpClient
+from app.fetchers.base import BaseFetcher, FetchError, HttpClient, reraise_fetch_error
 
 
 def _tokens(query: str) -> List[str]:
@@ -43,7 +43,7 @@ class _RxivFetcher(BaseFetcher):
     PAGE_SIZE = 100
     MAX_PAGES = 12  # scan at most ~1200 recent records per request
 
-    def __init__(self, email: str = None):
+    def __init__(self, email: Optional[str] = None):
         self.http = HttpClient(
             delay=0.35,
             user_agent=f"LiteratureResearchAide/4.0 ({email or 'research@example.com'})",
@@ -61,8 +61,8 @@ class _RxivFetcher(BaseFetcher):
             try:
                 r = self.http.get(url)
                 data = r.json()
-            except FetchError:
-                raise
+            except FetchError as e:
+                reraise_fetch_error(e, articles)
             except Exception as e:
                 raise FetchError(f"{self.SOURCE_NAME} request failed: {e}", kind="network") from e
 

@@ -2,7 +2,7 @@
 Single source of truth for public academic sources.
 
 - Student tips: what each database is good for / what it misses
-- Topic → recommended sources (coverage map + Data Management grid)
+- Topic → recommended sources (coverage map + Search database choices)
 - HS unit packs
 - Duplicate-resolution priority
 
@@ -440,7 +440,7 @@ def eligible_for_coverage_suggestion(source_id: str) -> bool:
 
 
 def list_sources_for_api() -> List[Dict[str, Any]]:
-    """Stable list for Data Management / Search UI."""
+    """Stable list for Search UI."""
     # Sort by display name for grids; priority available for dupes elsewhere.
     items = []
     for sid, meta in SOURCE_CATALOG.items():

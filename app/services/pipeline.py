@@ -5,6 +5,7 @@ Orchestrates the complete workflow from data fetching to visualization
 
 import logging
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Optional, Tuple
 
@@ -149,11 +150,19 @@ class LiteratureSearchPipeline:
         Fetch from multiple sources concurrently; insert each source as it completes.
 
         progress_callback: callable(done, total, **extra) — extra may include
-            articles_so_far, source, source_count, error_kind.
+            articles_so_far, source, source_count, error_kind, source_state,
+            source_progress (states and timing for every requested source).
         cancel_check: optional zero-arg callable returning True if the job
             should stop between sources.
         """
-        from app.fetchers.base import FetchError, classify_error, set_cancel_check
+        from app.fetchers.base import (
+            FetchError,
+            check_fetch_deadline,
+            classify_error,
+            set_cancel_check,
+            set_fetch_deadline,
+            source_fetch_budget,
+        )
 
         logger.info(f"\n=== Fetching from {len(sources)} sources in parallel ===")
         lock = threading.Lock()
@@ -161,28 +170,60 @@ class LiteratureSearchPipeline:
         articles_so_far = [0]
         total = len(sources)
         cancelled = [False]
+        budget = source_fetch_budget()
+        source_progress = {
+            src: {"state": "queued", "started_at": None, "finished_at": None,
+                  "elapsed_seconds": 0, "error_kind": None}
+            for src in sources
+        }
+        started = {}
+
+        def publish(source, state, *, count=0, error_kind=None):
+            with lock:
+                item = source_progress[source]
+                item["state"] = state
+                if state == "running":
+                    item["started_at"] = time.time()
+                    started[source] = time.monotonic()
+                else:
+                    item["finished_at"] = time.time()
+                    item["elapsed_seconds"] = max(0, time.monotonic() - started[source]) if source in started else 0
+                    item["error_kind"] = error_kind
+                    completed[0] += 1
+                    articles_so_far[0] += count
+                if progress_callback:
+                    progress_callback(
+                        completed[0], total,
+                        articles_so_far=articles_so_far[0], source=source,
+                        source_count=count, error_kind=error_kind, source_state=state,
+                        source_progress={src: dict(row) for src, row in source_progress.items()},
+                    )
 
         def fetch_one(source):
+            publish(source, "running")
             if cancel_check and cancel_check():
                 return (source, [], "Cancelled", "cancelled")
             fetcher_cls = FETCHERS.get(source)
             if not fetcher_cls:
                 return (source, [], "Unknown source", "error")
             set_cancel_check(cancel_check)
+            set_fetch_deadline(time.monotonic() + budget)
             try:
                 fetcher = fetcher_cls(email=email)
                 articles = fetcher.search_and_fetch(query, max_results) or []
+                check_fetch_deadline()
                 if not articles:
                     return (source, [], None, "no_results")
                 return (source, articles, None, None)
             except FetchError as e:
                 logger.error("Error fetching %s: %s", source, e)
-                return (source, [], str(e), e.kind)
+                return (source, e.articles, str(e), e.kind)
             except Exception as e:
                 logger.error("Error fetching %s: %s", source, e)
                 return (source, [], str(e), classify_error(e))
             finally:
                 set_cancel_check(None)
+                set_fetch_deadline(None)
 
         results = {}
         with ThreadPoolExecutor(max_workers=min(len(sources), 6)) as executor:
@@ -194,7 +235,10 @@ class LiteratureSearchPipeline:
                     for f in futures:
                         f.cancel()
 
-                source, articles, error, error_kind = future.result()
+                if future.cancelled():
+                    source, articles, error, error_kind = futures[future], [], "Cancelled", "cancelled"
+                else:
+                    source, articles, error, error_kind = future.result()
                 # Insert immediately so a hung source does not block others' data.
                 inserted = 0
                 skipped_dups = 0
@@ -231,22 +275,7 @@ class LiteratureSearchPipeline:
                     source, count, error_kind or "ok",
                 )
 
-                with lock:
-                    completed[0] += 1
-                    articles_so_far[0] += count
-                    done = completed[0]
-                    total_arts = articles_so_far[0]
-                if progress_callback:
-                    progress_callback(
-                        done, total,
-                        articles_so_far=total_arts,
-                        source=source,
-                        source_count=count,
-                        error_kind=error_kind,
-                    )
-
-                if cancelled[0]:
-                    break
+                publish(source, "done", count=count, error_kind=error_kind)
 
         # Ensure every requested source appears in the report
         for src in sources:
@@ -431,13 +460,15 @@ class LiteratureSearchPipeline:
         n = self._generate_key_points(articles=None, only_missing=only_missing)
         return {"key_points_created": n, "only_missing": only_missing}
 
-    def cluster_articles(self, n_clusters: Optional[int] = None, method: str = 'kmeans'):
+    def cluster_articles(self, n_clusters: Optional[int] = None, method: str = 'kmeans', progress_callback=None):
         """Step 3: Cluster articles.
 
         n_clusters=None (or <= 0) auto-selects the count by silhouette score.
         Returns (labels, cluster_labels, articles_by_cluster, resolved_n_clusters).
         """
         logger.info("\n=== Step 3: Clustering Articles ===")
+        if progress_callback:
+            progress_callback(0, 3, "Reading prepared papers")
 
         article_ids, embeddings = self.db.get_all_embeddings()
         if len(article_ids) == 0:
@@ -447,6 +478,8 @@ class LiteratureSearchPipeline:
         # ArticleClusterer handles auto-selection (None) and clamping to the
         # number of samples internally.
         clusterer = ArticleClusterer(n_clusters=n_clusters, method=method)
+        if progress_callback:
+            progress_callback(1, 3, "Finding themes")
         labels = clusterer.fit(embeddings)
         resolved_n = clusterer.resolved_n_clusters
 
@@ -468,6 +501,8 @@ class LiteratureSearchPipeline:
 
         # Generate cluster labels + a representative (most central) title each.
         logger.info("Generating cluster labels...")
+        if progress_callback:
+            progress_callback(2, 3, "Naming themes")
         cluster_labels = ClusterLabeler.generate_tfidf_labels(articles_by_cluster)
         cluster_titles = ClusterLabeler.pick_representative_titles(
             article_ids, embeddings, labels, title_by_key
@@ -486,6 +521,8 @@ class LiteratureSearchPipeline:
             cluster_assignments[aid] = (cluster_id, cluster_label)
 
         self.db.insert_clusters(cluster_assignments, cluster_titles)
+        if progress_callback:
+            progress_callback(3, 3, "Themes ready")
 
         logger.info(f"Clustered articles into {resolved_n} clusters")
         logger.info("\nCluster labels:")
@@ -499,7 +536,8 @@ class LiteratureSearchPipeline:
         """Return (ids, matrix), reusing the last load until cache invalidation."""
         with self._corpus_cache_lock:
             gen = self._corpus_cache_gen
-            if self._cached_emb_gen == gen and self._cached_emb_ids is not None:
+            if (self._cached_emb_gen == gen and self._cached_emb_ids is not None
+                    and self._cached_emb_matrix is not None):
                 return self._cached_emb_ids, self._cached_emb_matrix
         ids, matrix = self.db.get_all_embeddings()
         with self._corpus_cache_lock:
@@ -688,7 +726,7 @@ class LiteratureSearchPipeline:
         if query_embedding.shape[-1] != article_embeddings.shape[1]:
             raise ValueError(
                 "Embedding dimension mismatch between the query and stored "
-                "articles. Re-create embeddings on the Data Management page."
+                "articles. Use Re-prepare under More on Search."
             )
 
         use_hybrid = bool(lexical_boost) and bool((query_text or "").strip())
@@ -760,7 +798,7 @@ class LiteratureSearchPipeline:
         if query_embedding.shape[-1] != article_embeddings.shape[1]:
             raise ValueError(
                 "Embedding dimension mismatch between the query and stored "
-                "articles. Re-create embeddings on the Data Management page."
+                "articles. Use Re-prepare under More on Search."
             )
 
         q = query_embedding.reshape(1, -1)
@@ -894,37 +932,24 @@ class LiteratureSearchPipeline:
 
         return duplicates
 
-    def resolve_duplicates(self, threshold: float = 0.98) -> Dict:
-        """
-        Auto-resolve duplicate groups: keep the best copy, exclude the rest.
+    def preview_duplicate_resolution(self, threshold: float = 0.98) -> Dict:
+        """Propose exact redundant copies using the same rule as auto-resolve.
 
-        Duplicate pairs are grouped transitively (union-find). Within each group
-        the winner is the LONGEST ABSTRACT, then preferred SOURCE_PRIORITY
-        (PubMed before secondary databases), then stable ids. Losers are marked
-        excluded reason='duplicate' (hidden from search/detection; reversible).
-
-        Returns:
-            {'groups': n_groups_resolved, 'excluded': n_articles_excluded}
+        No screening is written; the caller can inspect every proposed copy
+        and apply only the keys they confirmed.
         """
         duplicates = self.detect_duplicates(threshold=threshold)
-        if not duplicates:
-            return {'groups': 0, 'excluded': 0}
-
-        # Union-find over (article_id, source) keys.
         parent = {}
 
-        def find(k):
-            parent.setdefault(k, k)
-            while parent[k] != k:
-                parent[k] = parent[parent[k]]
-                k = parent[k]
-            return k
+        def find(key):
+            parent.setdefault(key, key)
+            while parent[key] != key:
+                parent[key] = parent[parent[key]]
+                key = parent[key]
+            return key
 
-        def union(a, b):
-            parent[find(a)] = find(b)
-
-        for id1, id2, _sim in duplicates:
-            union(id1, id2)
+        for first, second, _similarity in duplicates:
+            parent[find(first)] = find(second)
 
         groups: Dict = {}
         for key in list(parent):
@@ -932,24 +957,39 @@ class LiteratureSearchPipeline:
 
         articles = self.db.get_all_articles_with_clusters()
         from app.utils import duplicate_quality_key
-        losers = []
-        n_groups = 0
+        candidates = []
+        resolved_groups = 0
         for members in groups.values():
+            members = [key for key in members if key in articles]
             if len(members) < 2:
                 continue
-            n_groups += 1
-            # Longest abstract wins; preferred source (PubMed > …) breaks ties.
-            keeper = max(
-                members,
-                key=lambda k: duplicate_quality_key(articles.get(k), k),
-            )
-            losers.extend(k for k in members if k != keeper)
+            keeper = max(members, key=lambda key: duplicate_quality_key(articles[key], key))
+            keeper_row = articles[keeper]
+            resolved_groups += 1
+            for key in members:
+                if key == keeper:
+                    continue
+                row = articles[key]
+                candidate = {field: row.get(field) for field in (
+                    'article_id', 'source', 'title', 'abstract', 'year', 'authors', 'journal',
+                )}
+                candidate['keeper'] = {
+                    'article_id': keeper[0], 'source': keeper[1],
+                    'title': keeper_row.get('title', ''),
+                }
+                candidates.append(candidate)
+        return {'groups': resolved_groups, 'excluded': len(candidates), 'candidates': candidates}
 
-        self.db.exclude_articles(losers, reason='duplicate')
-        self.invalidate_corpus_cache()
+    def resolve_duplicates(self, threshold: float = 0.98) -> Dict:
+        """Keep the longest abstract, then preferred source, in each group."""
+        plan = self.preview_duplicate_resolution(threshold=threshold)
+        losers = [(item['article_id'], item['source']) for item in plan['candidates']]
+        if losers:
+            self.db.exclude_articles(losers, reason='duplicate')
+            self.invalidate_corpus_cache()
         logger.info("Resolved %d duplicate groups: excluded %d redundant copies",
-                    n_groups, len(losers))
-        return {'groups': n_groups, 'excluded': len(losers)}
+                    plan['groups'], len(losers))
+        return {'groups': plan['groups'], 'excluded': len(losers)}
 
     def search_by_seed(
         self,

@@ -515,6 +515,32 @@ async def api_ops_rollback(request: Request):
     body = await _read_json(request)
     sha = str(body.get("sha") or "").strip()
     argv = [sha] if sha else []
+    if runner.detached_supported():
+        stuck = deploy_state.interrupted()
+        if stuck:
+            return JSONResponse(status_code=409, content={
+                "detail": (
+                    f"A deploy of {str(stuck.get('sha') or '')[:8]} is still in flight "
+                    f"(phase {stuck.get('phase')}). Wait for it or clear it on the host."
+                ),
+                "deploy_state": stuck,
+            })
+        dispatch_id = str(uuid.uuid4())
+        receipt = runner.run_action_detached(
+            "rollback", argv,
+            unit_name=f"litsieve-rollback-{sha[:12] or 'prev'}",
+            extra_env={"LITSIEVE_DEPLOY_ACTOR": user["username"], "LITSIEVE_DEPLOY_ID": dispatch_id},
+        )
+        ops_audit.add(
+            core.user_db, actor_id=user["user_id"], actor_username=user["username"],
+            action="rollback", result="dispatched" if receipt.get("ok") else "fail",
+            sha=sha, previous_sha="", detail=receipt.get("detail") or "",
+            ip=client_bucket(request),
+        )
+        if not receipt.get("ok"):
+            return JSONResponse(status_code=400, content=receipt)
+        return JSONResponse(status_code=202, content={**receipt, "sha": sha, "dispatch_id": dispatch_id})
+
     result = await run_in_thread(run_action, "rollback", argv)
     ok = bool(result.get("ok"))
     ops_audit.add(

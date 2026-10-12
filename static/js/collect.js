@@ -128,7 +128,6 @@ async function loadSourceCatalog() {
 }
 
 // Which analysis model suits each topic. Mixed categories fall back to
-// 'general' (fast and neutral). Advanced dropdown always overrides.
 const TOPIC_MODEL = {
  health: 'pubmedbert', biology: 'pubmedbert', psychology: 'pubmedbert',
  chemistry: 'specter', physics: 'specter', math: 'specter', cs: 'specter', earth: 'specter',
@@ -147,15 +146,9 @@ const MODEL_LABELS = {
 };
 
 let selectedTopics = new Set();
-let modelManual = false; // true once the user picks a model under Advanced
+let modelManual = false; // A confirmed model choice overrides topic recommendations.
 
 document.addEventListener('DOMContentLoaded', () => {
- // Simple home is /search. Do not bounce when collect already lives on Search.
- if (typeof isSimpleMode === 'function' && isSimpleMode()
-  && location.pathname.indexOf('/data-management') !== -1
-  && !/[#?&]collect=1(?:&|$)/.test(location.search)) {
-  window.location.replace('/search');
- }
  // Catalog first so tips/topics match source_catalog.py (Phase R4).
  loadSourceCatalog().finally(() => {
  renderTopicGrid();
@@ -168,16 +161,7 @@ document.addEventListener('DOMContentLoaded', () => {
  refreshCoverage();
  });
  // Simple: hide optional prepare card until the library has papers.
- // Re-evaluate when the mode toggle flips (common.js sets data-mode first).
- const modeBtn = document.getElementById('mode-toggle');
- if (modeBtn) {
-  modeBtn.addEventListener('click', () => {
-   requestAnimationFrame(() => {
-    updatePrepareSectionVisibility(_lastTotalArticles);
-    refreshSimpleScreeningCard();
-   });
-  });
- }
+
  // Start hidden until stats load (avoids a flash of prepare on empty libs).
  updatePrepareSectionVisibility(0);
  // Phase 6: derive screening card visibility from corpus after stats load.
@@ -423,9 +407,9 @@ function updateModelHint() {
  });
  hint.append(reset, '.');
  } else if (selectedTopics.size) {
- hint.append(`Analysis model for your topics: ${current}. Change it under Advanced if you want.`);
+ hint.append(`Analysis model for your topics: ${current}. Change it in Re-prepare if you want.`);
  } else {
- hint.append(`Analysis model: ${current}. Select topics above to pick one automatically, or change it under Advanced.`);
+ hint.append(`Analysis model: ${current}. Select topics above to pick one automatically, or change it in Re-prepare.`);
  }
  // Note when prepared papers use a different model (re-prepare will re-embed all).
  if (corpus && corpus !== sel.value) {
@@ -509,7 +493,10 @@ function renderSourceGrid() {
  });
 }
 
-function saveFetchPrefs() {
+function saveFetchPrefs(overrides) {
+ overrides = overrides || {};
+ let previous = {};
+ try { previous = JSON.parse(localStorage.getItem(FETCH_PREFS_KEY) || '{}') || {}; } catch (e) { previous = {}; }
  const sources = Array.from(
  document.querySelectorAll('#source-option-grid input[type="checkbox"]:checked')
  ).map(cb => cb.value);
@@ -521,11 +508,36 @@ function saveFetchPrefs() {
  sources,
  mode,
  topics: [...selectedTopics],
- model: (document.getElementById('embedding-model') || {}).value,
+ model: Object.prototype.hasOwnProperty.call(overrides, 'model')
+  ? overrides.model
+  : ((document.getElementById('embedding-model') || {}).value || previous.model),
  modelManual,
- onlyMissing: !!(document.getElementById('only-missing') || {}).checked,
+ onlyMissing: Object.prototype.hasOwnProperty.call(overrides, 'onlyMissing')
+  ? !!overrides.onlyMissing
+  : !!(document.getElementById('only-missing') || {}).checked,
  };
  try { localStorage.setItem(FETCH_PREFS_KEY, JSON.stringify(prefs)); } catch (e) { /* ignore */ }
+}
+
+function setConfirmedSimplePreparePreferences(model, onlyMissing) {
+ const catalog = document.getElementById('embedding-model-catalog');
+ let allowed = [];
+ try {
+  const raw = catalog && (catalog.getAttribute('data-models') || (catalog.dataset && catalog.dataset.models));
+  const parsed = JSON.parse(raw || '[]');
+  if (Array.isArray(parsed)) allowed = parsed.map((item) => String(item && item.value || ''));
+ } catch (e) { /* checked against the existing select below */ }
+ const modelSelect = document.getElementById('embedding-model');
+ if (modelSelect && modelSelect.options && !allowed.length) {
+  allowed = Array.from(modelSelect.options).map((option) => String(option.value || ''));
+ }
+ const value = String(model || '');
+ if (!allowed.includes(value)) return false;
+ if (modelSelect) modelSelect.value = value;
+ modelManual = true;
+ if (typeof updateModelHint === 'function') updateModelHint();
+ saveFetchPrefs({model: value, onlyMissing: !!onlyMissing});
+ return true;
 }
 
 function restoreFetchPrefs() {
@@ -574,7 +586,7 @@ function restoreFetchPrefs() {
 /** Last known article count — declared in simple_tools.js (shared). */
 /** Papers with embeddings (ready for search). Optional prepare card gates on this. */
 let _lastReadyArticles = 0;
-/** Student-authored rows used by the Advanced replace-consequence line. */
+/** Student-authored rows included in replace-fetch warnings. */
 let _lastNotesCount = 0;
 let _lastStarredCount = 0;
 let _lastAiKeyPoints = 0;
@@ -597,15 +609,14 @@ let _pipelineBusy = false;
  * search (embeddings exist). Never mid-fetch / mid-auto-chain.
  * forceShow: reveal after a failed auto-prepare so Re-prepare is reachable.
  */
-/** Show "Go to Search" once screening is applied or skipped (Simple only).
+/** Show "Go to Search" once screening is applied or skipped.
  *
  * Hidden again whenever a new fetch starts.
  */
 function setNextStepVisible(visible) {
  const el = document.getElementById('fetch-next-step');
  if (!el) return;
- const simple = typeof isSimpleMode === 'function' && isSimpleMode();
- const show = !!(visible && simple);
+ const show = !!(visible );
  el.hidden = !show;
  el.classList.toggle('u-hidden', !show);
 }
@@ -618,11 +629,10 @@ function isGuestSession() {
 
 /**
  * Simple + this library already has papers: hide Fetch Articles unless the
- * student explicitly unlocked via Start over. Advanced and empty libraries
+ * student explicitly unlocked via Start over. Empty libraries
  * stay unchanged. Guests never see the fetch form (CSS + server 403).
  */
 function isSimpleFetchLocked() {
- if (typeof isSimpleMode !== 'function' || !isSimpleMode()) return false;
  if (isGuestSession()) return false;
  if (_pipelineBusy) return false;
  if (_simpleFetchUnlocked) return false;
@@ -653,7 +663,6 @@ function updateSimpleFetchLock() {
 }
 
 async function unlockSimpleFetch() {
- if (typeof isSimpleMode !== 'function' || !isSimpleMode()) return;
  if (isGuestSession()) return;
  const proceed = await resolveSimpleFetchModeBeforeRequest();
  if (!proceed) return;
@@ -668,7 +677,7 @@ async function unlockSimpleFetch() {
 }
 
 /**
- * Advanced only (Simple hides the radio row): live line next to Replace
+ * Update the backing replacement warning without opening another popup.
  * when this library is non-empty. No modal — the radios stay the control.
  */
 function updateReplaceConsequence() {
@@ -705,7 +714,6 @@ function updatePrepareSectionVisibility(totalArticles, opts) {
   _lastReadyArticles = opts.readyArticles;
  }
  const forceShow = !!(opts && opts.forceShow);
- // Busy (fetch or auto-chain): never show the re-prepare card (Simple or Advanced).
  if (_pipelineBusy) {
   sec.hidden = true;
   updateSimpleFetchLock();
@@ -934,18 +942,32 @@ function renderFetchLiveSources(p) {
  const sources = Array.isArray(p && p.sources) ? p.sources : [];
  const by = (p && p.by_source) || {};
  const status = (p && p.source_status) || {};
+ const progress = (p && p.source_progress) || {};
  if (!sources.length) {
   hosts.forEach((host) => { host.innerHTML = ''; });
   return;
  }
  const rows = sources.map((src) => {
   const name = typeof getSourceName === 'function' ? getSourceName(src) : src;
-  const done = Object.prototype.hasOwnProperty.call(by, src);
+  const done = (progress[src] && progress[src].state === 'done')
+   || Object.prototype.hasOwnProperty.call(by, src);
   const count = done ? Number(by[src]) || 0 : null;
   const kind = status[src] || '';
+  const source = progress[src] || {};
+  const errorKind = source.error_kind || '';
   let detail;
   let rowClass = 'fetch-live-row';
-  if (!done) {
+  if (source.state === 'queued') {
+   detail = 'queued';
+   rowClass += ' is-pending';
+  } else if (source.state === 'running') {
+   const elapsed = Math.max(0, Math.floor(Number(source.elapsed_seconds) || 0));
+   detail = `waiting on ${src} (${elapsed}s)`;
+   rowClass += ' is-pending';
+  } else if (errorKind === 'timeout' || kind === 'timeout') {
+   detail = count > 0 ? `timed out (${count} paper${count === 1 ? '' : 's'})` : 'timed out';
+   rowClass += ' is-failed';
+  } else if (!done) {
    detail = 'searching…';
    rowClass += ' is-pending';
   } else if (kind && kind !== 'ok' && kind !== 'no_results') {
@@ -1136,19 +1158,33 @@ function buildFetchSourceReportModel(data, sources) {
  const counts = (data && data.by_source) || {};
  const errors = (data && data.errors) || {};
  const kinds = (data && data.error_kinds) || {};
+ const sourceProgress = (data && data.source_progress) || {};
  const used = new Set(sources || []);
  Object.keys(counts).forEach((s) => used.add(s));
  Object.keys(errors).forEach((s) => used.add(s));
  Object.keys(kinds).forEach((s) => used.add(s));
+ Object.keys(sourceProgress).forEach((s) => used.add(s));
 
  const successes = [];
+ const timeouts = [];
  const muted = []; // no results / soft failures (not alarming)
 
  used.forEach((src) => {
   const name = typeof getSourceName === 'function' ? getSourceName(src) : src;
   const count = Number(counts[src]) || 0;
   const err = errors[src];
-  const kind = kinds[src] || '';
+  const source = sourceProgress[src] || {};
+  const kind = source.error_kind || kinds[src] || '';
+  if (kind === 'timeout') {
+   const partial = count > 0 ? ` (${count} paper${count === 1 ? '' : 's'})` : '';
+   timeouts.push({
+    src,
+    name,
+    count,
+    line: `◷ ${name}: timed out${partial}`,
+   });
+   return;
+  }
   if (err) {
    const kindBit = kind ? ` [${kind}]` : '';
    muted.push({
@@ -1177,6 +1213,7 @@ function buildFetchSourceReportModel(data, sources) {
  });
 
  successes.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+ timeouts.sort((a, b) => a.name.localeCompare(b.name));
  muted.sort((a, b) => a.name.localeCompare(b.name));
 
  // Classroom notes for tricky sources (preprints / DBLP abstracts).
@@ -1195,18 +1232,17 @@ function buildFetchSourceReportModel(data, sources) {
   tipLines.push('Note: arXiv items are preprints and may not be peer-reviewed yet.');
  }
 
- return { successes, muted, tipLines };
+ return { successes, timeouts, muted, tipLines };
 }
 
 /**
  * Render the final source report HTML.
- * Simple: <details> collapsed by default — top 5 successes + summary of the rest.
- * Advanced: full list expanded (open attribute).
+ * Collapsed by default: top 5 successes and a summary, with all sources inside.
  * All dynamic strings go through escapeHtml.
  */
-function renderFetchSourceReportHtml(model, opts) {
- const simple = !!(opts && opts.simple);
+function renderFetchSourceReportHtml(model) {
  const successes = (model && model.successes) || [];
+ const timeouts = (model && model.timeouts) || [];
  const muted = (model && model.muted) || [];
  const tipLines = (model && model.tipLines) || [];
  const topN = 5;
@@ -1228,12 +1264,16 @@ function renderFetchSourceReportHtml(model, opts) {
    otherMuted === 1 ? '1 with an error' : `${otherMuted} with errors`
   );
  }
+ if (timeouts.length) {
+  summaryBits.push(timeouts.length === 1 ? '1 timed out' : `${timeouts.length} timed out`);
+ }
  const summaryLine = summaryBits.length
   ? `<div class="fetch-source-report-summary-line">${escapeHtml('and ' + summaryBits.join(' · '))}</div>`
   : '';
 
  const fullLines = [
   ...successes.map((s) => s.line),
+  ...timeouts.map((s) => s.line),
   ...muted.map((m) => m.line),
  ];
  const fullHtml = fullLines.map((ln) => escapeHtml(ln)).join('<br>');
@@ -1241,15 +1281,10 @@ function renderFetchSourceReportHtml(model, opts) {
   ? `<div class="fetch-source-tips">${tipLines.map(escapeHtml).join('<br>')}</div>`
   : '';
 
- if (!simple) {
-  // Advanced: full list always visible (no collapse).
-  return `<div class="fetch-source-report-full">${fullHtml}${tipHtml}</div>`;
- }
 
- // Simple: collapsed default — show top successes + one summary line.
+
  const collapsedBody = (topHtml || escapeHtml('(no sources returned papers)')) + summaryLine;
- const openAttr = ''; // collapsed by default
- return `<details class="fetch-source-report-details help-details"${openAttr}>
+ return `<details class="fetch-source-report-details help-details">
   <summary>${collapsedBody}<span class="help-text"> · Show all sources</span></summary>
   <div class="fetch-source-report-full">${fullHtml}${tipHtml}</div>
  </details>`;
@@ -1269,9 +1304,9 @@ function applyFetchResult(data, sources) {
  if (progressWrap) progressWrap.style.display = 'none';
 
  const model = buildFetchSourceReportModel(data, sources);
- const simple = typeof isSimpleMode === 'function' && isSimpleMode();
  const reportLines = [
   ...((model && model.successes) || []).map((s) => s.line),
+  ...((model && model.timeouts) || []).map((s) => s.line),
   ...((model && model.muted) || []).map((m) => m.line),
   ...((model && model.tipLines) || []),
  ].filter(Boolean);
@@ -1280,10 +1315,11 @@ function applyFetchResult(data, sources) {
  if (report) {
   report.style.display = 'block';
   report.classList.remove('u-hidden');
-  report.innerHTML = renderFetchSourceReportHtml(model, { simple });
+  report.innerHTML = renderFetchSourceReportHtml(model);
  }
 
- const errorCount = Object.keys(data.errors || {}).length;
+ const timeoutCount = (model.timeouts || []).length;
+ const errorCount = (model.muted || []).filter((source) => !source.zero).length;
  const breakdown = Object.entries(data.by_source || {})
  .map(([src, count]) => `${getSourceName(src)}: ${count}`)
  .join(' · ');
@@ -1315,15 +1351,20 @@ function applyFetchResult(data, sources) {
    : `Fetch cancelled (${data.total_fetched || 0} papers kept).`,
   'warning'
  );
- } else if (errorCount === 0) {
+ } else if (errorCount === 0 && timeoutCount === 0) {
  setStatus('fetch-status', `Fetched ${data.total_fetched} articles - ${breakdown}`, 'success');
  showNotification(`Fetched ${data.total_fetched} articles!`, 'success');
- } else if (errorCount < sources.length) {
- setStatus('fetch-status', `Fetched ${data.total_fetched} articles with some source errors (see list).`, 'warning');
- showNotification(`Fetched ${data.total_fetched} articles with some errors.`, 'warning');
+ } else if (errorCount + timeoutCount < sources.length) {
+ const issues = [
+  timeoutCount ? `${timeoutCount} source${timeoutCount === 1 ? '' : 's'} timed out` : '',
+  errorCount ? `${errorCount} source${errorCount === 1 ? '' : 's'} had errors` : '',
+ ].filter(Boolean).join(' and ');
+ setStatus('fetch-status', `Fetched ${data.total_fetched} articles; ${issues} (see list).`, 'warning');
+ showNotification(`Fetched ${data.total_fetched} articles; ${issues}.`, 'warning');
  } else {
- setStatus('fetch-status', 'All fetches failed.', 'error');
- showNotification('Fetch failed for all selected sources.', 'error');
+ const allTimedOut = timeoutCount === sources.length;
+ setStatus('fetch-status', allTimedOut ? 'All sources timed out.' : 'All fetches failed.', 'error');
+ showNotification(allTimedOut ? 'All sources timed out.' : 'Fetch failed for all selected sources.', 'error');
  }
 }
 
@@ -1334,24 +1375,17 @@ async function doFetch() {
   showNotification('This collection already has papers. Use Start over if you want to fetch again.', 'info');
   return;
  }
- const sources = Array.from(
- document.querySelectorAll('#source-option-grid input[type="checkbox"]:checked')
- ).map(cb => cb.value);
  const query = ((document.getElementById('fetch-query') || {}).value || '').trim();
- const email = ((document.getElementById('fetch-email') || {}).value || '').trim();
 
  setNextStepVisible(false);
  if (!query) {
-  const simpleEmpty = typeof isSimpleMode === 'function' && isSimpleMode();
-  showNotification(simpleEmpty ? 'Please enter a topic.' : 'Please enter a search query.', 'error');
+  showNotification('Please enter a topic.', 'error');
   return;
  }
- if (typeof isSimpleMode === 'function' && isSimpleMode() && selectedTopics.size === 0) {
+ if (selectedTopics.size === 0) {
   showNotification('Pick at least one general area first. That chooses which sources we search.', 'error');
   return;
  }
- if (sources.length === 0) { showNotification('Please select at least one source.', 'error'); return; }
-
  // Simple: dialog (or skip when empty) must run BEFORE reading fetch-mode.
  // Unlock already ran that dialog — do not ask twice.
  let proceed = true;
@@ -1362,6 +1396,11 @@ async function doFetch() {
   proceed = await resolveSimpleFetchModeBeforeRequest();
  }
  if (!proceed) return;
+ const sources = Array.from(
+  document.querySelectorAll('#source-option-grid input[type="checkbox"]:checked')
+ ).map(cb => cb.value);
+ if (sources.length === 0) { showNotification('Please select at least one source.', 'error'); return; }
+ const selectedEmail = ((document.getElementById('fetch-email') || {}).value || '').trim();
  // Read the per-database cap after the dialog: Simple sets it there.
  const maxResults = parseInt((document.getElementById('fetch-max') || {}).value, 10) || 100;
 
@@ -1387,19 +1426,14 @@ async function doFetch() {
  }
  const hideReport = document.getElementById('fetch-source-report');
  if (hideReport) hideReport.style.display = 'none';
- const simple = typeof isSimpleMode === 'function' && isSimpleMode();
  setStatus(
  'fetch-status',
- simple
- ? (clearFirst
+ (clearFirst
   ? `Starting fresh: clearing collection, then fetching from ${sources.length} source(s)…`
-  : `Adding to collection from ${sources.length} source(s)…`)
- : (clearFirst
-  ? `Starting fresh — scooping from ${sources.length} source(s)…`
-  : `Adding to your collection from ${sources.length} source(s)…`),
+  : `Adding to collection from ${sources.length} source(s)…`),
  'info'
  );
- const useBuffer = simple && typeof showSimpleBuffering === 'function'
+ const useBuffer = typeof showSimpleBuffering === 'function'
   && document.getElementById('search-preparing');
  if (useBuffer) showSimpleBuffering('fetch');
 
@@ -1411,7 +1445,7 @@ async function doFetch() {
  sources,
  query,
  max_results: maxResults,
- email: email || null,
+ email: selectedEmail || null,
  clear_first: clearFirst,
  }),
  });
@@ -1437,7 +1471,6 @@ async function doFetch() {
  );
  }
  applyFetchResult(data, sources);
- // Auto-chain prepare after every successful fetch (Simple and Advanced).
  // Never start prepare on zero papers / cancel / quota stop. Never auto-cluster.
  const totalFetched = Number(data.total_fetched) || 0
   || Object.values(data.by_source || {}).reduce((s, n) => s + (Number(n) || 0), 0);
@@ -1456,14 +1489,12 @@ async function doFetch() {
  }
  setStatus(
  'fetch-status',
- simple
-  ? `Fetched ${totalFetched} paper(s). Getting them ready for search…`
-  : `Scooped ${totalFetched} paper(s). Down to the fine grains…`,
+ `Fetched ${totalFetched} paper(s). Getting them ready for search…`,
  'info'
  );
  setStatus(
   'embeddings-status',
-  simple ? 'Getting your papers ready…' : 'Down to the fine grains',
+  'Getting your papers ready…',
   'info'
  );
  try {
@@ -1474,9 +1505,7 @@ async function doFetch() {
  console.warn('Auto-prepare after fetch failed:', chainErr);
  setStatus(
  'fetch-status',
- simple
-  ? `Fetched ${totalFetched} paper(s), but prepare did not finish. Use Re-prepare if needed.`
-  : `Scooped ${totalFetched} paper(s), but prepare did not finish. Use Re-prepare if needed.`,
+ `Fetched ${totalFetched} paper(s), but prepare did not finish. Use Re-prepare if needed.`,
  'warning'
  );
  }
@@ -1543,21 +1572,33 @@ async function silentResolveDuplicatesAfterPrepare() {
 async function doCreateEmbeddings(opts) {
  // Button click passes a DOM Event; only treat real option bags as auto-chain.
  const fromAutoChain = !!(opts && opts.fromAutoChain === true);
- const simple = typeof isSimpleMode === 'function' && isSimpleMode();
  const modelEl = document.getElementById('embedding-model');
- const model = (modelEl && modelEl.value) || 'general';
+ let prepareOptions = null;
  // Simple manual re-prepare: dialog before reading only_missing.
  // Auto-chain after fetch keeps the radio-driven only-missing state (no dialog).
- if (simple && !fromAutoChain) {
-  const ok = await resolveSimplePrepareModeBeforeRequest();
-  if (!ok) return;
+ if (!fromAutoChain) {
+  prepareOptions = await resolveSimplePrepareModeBeforeRequest();
+  if (!prepareOptions) return null;
  }
- const onlyMissing = document.getElementById('only-missing')?.checked || false;
+ // Read the model only after the confirmed Simple popup has closed.
+ let model = (prepareOptions && prepareOptions.model) || (modelEl && modelEl.value) || '';
+ if (!model && typeof _simplePrepareModelCatalog === 'function') {
+  const catalog = _simplePrepareModelCatalog();
+  if (catalog.length && typeof _simplePreferredPrepareModel === 'function') {
+   model = _simplePreferredPrepareModel(catalog);
+  }
+ }
+ if (!model) model = 'general';
+ const onlyMissing = prepareOptions
+  ? !!prepareOptions.onlyMissing
+  : !!document.getElementById('only-missing')?.checked;
  const btn = document.getElementById('embeddings-btn');
- saveFetchPrefs();
+ saveFetchPrefs(prepareOptions ? {model, onlyMissing} : undefined);
  setLoading(btn, true);
- // Auto-chain: Simple uses the buffering screen; Advanced stays on the fetch bar.
- const useBuffer = simple && fromAutoChain && document.getElementById('search-buffering-fill');
+ const useBuffer = document.getElementById('search-buffering-fill');
+ if (useBuffer && !fromAutoChain && typeof showSimpleBuffering === 'function') {
+  showSimpleBuffering('prepare');
+ }
  const progressFill = useBuffer ? 'search-buffering-fill'
   : fromAutoChain ? 'fetch-progress-fill' : 'embed-progress-fill';
  const progressLabel = useBuffer ? 'search-buffering-label'
@@ -1566,16 +1607,12 @@ async function doCreateEmbeddings(opts) {
   : fromAutoChain ? 'fetch-progress-wrap' : 'embed-progress-wrap';
  setStatus(
  fromAutoChain ? 'fetch-status' : 'embeddings-status',
- simple
-  ? 'Getting your papers ready… this may take a few minutes on large collections.'
-  : 'Down to the fine grains — this can take a few minutes on large collections.',
+ 'Getting your papers ready… this may take a few minutes on large collections.',
  'info'
  );
  setStatus(
  'embeddings-status',
- (simple || fromAutoChain)
-  ? 'Getting your papers ready…'
-  : 'Preparing papers for search (embeddings)…',
+ 'Getting your papers ready…',
  'info'
  );
 
@@ -1588,29 +1625,20 @@ async function doCreateEmbeddings(opts) {
  if (started && started.status === 'started') {
  data = await waitForJob(
  'embed', progressFill, progressLabel, progressWrap,
- (done, total, pct) => {
- if (simple || fromAutoChain) {
- return total > 0
+ (done, total, pct) => total > 0
   ? `Getting papers ready… ${done} / ${total} (${pct}%)`
-  : 'Getting your papers ready…';
- }
- return total > 0
-  ? { label: `Down to the fine grains`, detail: `${done} / ${total} articles (${pct}%)` }
-  : { label: `Down to the fine grains`, detail: 'Loading model…' };
- },
- useBuffer ? simpleWaitMapOpts(60, 90) : undefined
+  : 'Getting your papers ready…',
+ useBuffer ? simpleWaitMapOpts(fromAutoChain ? 60 : 0, 90) : undefined
  );
  }
  // If the 202 body already had a final payload (wait=true legacy), use it.
  if (data && data.status === 'started' && !data.articles_processed) {
   throw new Error('Prepare job did not return a result. Try Re-prepare Papers.');
  }
- const secs = data.seconds != null ? `${data.seconds}s` : '?';
- const device = data.device || 'cpu';
  const created = data.embeddings_created ?? data.articles_processed;
  const skipped = data.skipped_existing || 0;
  const preparedCount = data.articles_processed != null ? data.articles_processed : created;
- if (simple || fromAutoChain) {
+ {
  setStatus(
  'embeddings-status',
  `Ready: ${created} paper(s) prepared`
@@ -1621,30 +1649,16 @@ async function doCreateEmbeddings(opts) {
  let fetchLine =
   `Fetched and prepared ${preparedCount} paper(s) for search.`;
  // Phase 6: Simple auto-flow removes duplicates silently after prepare.
- // Advanced is unchanged — students still use Clean up for dedup.
- if (fromAutoChain && simple) {
+ if (fromAutoChain) {
   const dedupLine = await silentResolveDuplicatesAfterPrepare();
   if (dedupLine) fetchLine = `${fetchLine} ${dedupLine}`;
  }
  setStatus('fetch-status', fetchLine, 'success');
  showNotification(
-  simple
-   ? 'Your papers are ready — narrow them down, then Search.'
-   : 'Your papers are ready — next: Clean up, then Search.',
+  'Your papers are ready — narrow them down, then Search.',
   'success'
  );
- // Simple: screening card (not Go to Search yet). Advanced: no next-step bar.
- if (!simple) {
-  setNextStepVisible(false);
- }
- } else {
- const n = data.articles_processed;
- setStatus(
- 'embeddings-status',
- `Done. ${created} prepared, ${skipped} already ready. Model ${model} on ${device} in ${secs}. Ready for search: ${n}.`,
- 'success'
- );
- showNotification('Your papers are ready.', 'success');
+
  }
  // Manual Simple re-prepare: clear low_relevance exclusions so screening
  // returns to *pending* via corpus state (not a JS flag) and survives reload.
@@ -1652,14 +1666,17 @@ async function doCreateEmbeddings(opts) {
  // auto-chain — replace-fetch can otherwise restore the old set-asides.
  // Uses existing POST /api/screening include — no new endpoint.
  const startOverReset = typeof _resetAfterStartOver !== 'undefined' && _resetAfterStartOver;
- if (simple && (!fromAutoChain || startOverReset)) {
+ if ((!fromAutoChain || startOverReset)) {
   try {
-   const excl = await apiCall('/api/screening/excluded?reason=low_relevance');
+   const libraryId = typeof pageLibraryId === 'function' ? pageLibraryId() : '';
+   const excludedPath = '/api/screening/excluded?reason=low_relevance'
+    + (libraryId ? '&library_id=' + encodeURIComponent(libraryId) : '');
+   const excl = await apiCall(excludedPath);
    const items = (excl && excl.items) || [];
    if (items.length) {
     await apiCall('/api/screening', {
      method: 'POST',
-     body: { items, action: 'include', reason: 'low_relevance' },
+     body: withPageLibrary({ items, action: 'include', reason: 'low_relevance' }),
     });
    }
    setSimpleScreenSkipped(false);
@@ -1668,20 +1685,22 @@ async function doCreateEmbeddings(opts) {
    console.warn('Could not reset screening after re-prepare:', screenErr);
   }
  }
- // Always drop the flag after the screening reset, even on Advanced DM
  // (no #search-collect). Leaving it true would treat the next auto-chain
  // prepare as another Start over and restore every low_relevance set-aside.
  if (startOverReset) {
   _resetAfterStartOver = false;
  }
  await loadPageData();
- if (simple && fromAutoChain && typeof holdSimpleWait === 'function') {
+ if (fromAutoChain && typeof holdSimpleWait === 'function') {
   holdSimpleWait();
+ }
+ if (!fromAutoChain && useBuffer && typeof hideSimpleBuffering === 'function') {
+  hideSimpleBuffering();
  }
  // Manual re-prepare (and auto-chain) must refresh Narrow it down so the
  // confirm-your-question box appears without a full page reload.
  await refreshSimpleScreeningCard();
- if (simple && document.getElementById('search-collect')) {
+ if (document.getElementById('search-collect')) {
   clearCollectQueryFromUrl();
   if (startOverReset && typeof clearSearchWorkspace === 'function') {
    clearSearchWorkspace();
@@ -1693,7 +1712,7 @@ async function doCreateEmbeddings(opts) {
     await loadSearchEmptyState();
    }
   } catch (e) { /* stay on collect if stats fail */ }
- } else if (simple) {
+ } else {
   const card = document.getElementById('simple-screening-card');
   if (card && !card.hidden) {
    try {
@@ -1703,6 +1722,9 @@ async function doCreateEmbeddings(opts) {
  }
  return data;
  } catch (e) {
+ if (!fromAutoChain && typeof hideSimpleBuffering === 'function') {
+  hideSimpleBuffering();
+ }
  const msg = e.message || '';
  if (msg.toLowerCase().includes('storage limit')) {
   setStatus('embeddings-status', msg, 'warning');
@@ -1713,7 +1735,7 @@ async function doCreateEmbeddings(opts) {
  } else {
  setStatus('embeddings-status', `Error: ${msg}`, 'error');
  showNotification(
-  (simple || fromAutoChain) ? `Could not prepare papers: ${msg}` : `Embeddings failed: ${msg}`,
+  `Could not prepare papers: ${msg}`,
   'error'
  );
  }

@@ -1,10 +1,17 @@
-{# Shared collect UI: topics, sources, fetch, coverage.
-   Data Management (Advanced) and Search (Simple empty / start-over). #}
+{# Collection controls and the backing fields used by their popups. #}
 <section class="page-header collect-header-simple">
+ <div class="sieve-anim sieve-still empty-state-card" aria-hidden="true">
+  <svg class="sieve-svg" viewBox="0 0 120 100" focusable="false">
+   <g class="sieve-body">
+    <path class="sieve-pan" d="M26 44 L94 44 L82 62 L38 62 Z"/>
+    <g class="sieve-mesh">
+     <path d="M32 50 H88 M36 56 H84 M37 44 L45 62 M48 44 L52 62 M60 44 L60 62 M72 44 L68 62 M83 44 L75 62"/>
+    </g>
+    <path class="sieve-rim" d="M22 44 H98"/>
+   </g>
+  </svg>
+ </div>
  <h1>Get papers</h1>
- <p class="subtitle dm-sub-advanced">Narrow your lens to the general areas that fit, then find
-  papers by <strong>topic</strong>. Save your actual research question for later,
-  when you search the collection.</p>
  <p class="subtitle dm-sub-simple">Pick the areas your topic belongs to, then name the topic.</p>
  {% from "macros/disclaimers.html" import scope_fetch %}
  {{ scope_fetch() }}
@@ -30,9 +37,7 @@
 
 <!-- Step 1: Topics / general areas -->
 <section class="card" id="collect-topics-card">
- <h2 class="dm-step-heading dm-step-advanced">1. Select Topics</h2>
  <h2 class="dm-step-heading dm-step-simple">Which areas does your topic belong to?</h2>
- <p class="info-text dm-sub-advanced">Choose the academic areas you care about - we use them to recommend sources.</p>
  <p class="info-text dm-sub-simple">Pick one or more. This chooses which databases we search.</p>
  <div class="topic-grid" id="topic-grid"></div>
  <p class="dm-step-simple collect-next-row">
@@ -41,20 +46,17 @@
 </section>
 
 <!-- Step 2: Sources -->
-<section class="card" id="collect-sources-card">
+<section class="card" id="collect-sources-card" hidden>
  <h2>2. Choose Sources</h2>
  <p class="info-text" id="source-hint">Select topics above to see recommended sources, or choose manually below.</p>
  <div class="source-option-grid" id="source-option-grid"></div>
 </section>
 
-<!-- Fetch: Advanced step 3 (sources is 2); Simple step 2 (sources hidden). -->
+<!-- Fetch controls -->
 <section class="card" id="collect-fetch-card">
- <h2 class="dm-step-heading dm-step-advanced">3. Fetch Articles</h2>
  <h2 class="dm-step-heading dm-step-simple">What topic do you want papers about?</h2>
  <div id="fetch-lead">
-  <p class="info-text dm-sub-advanced">Searches every selected source at once and saves the papers
-   to your private collection. Preparing for search starts automatically after a successful fetch.</p>
-  <p class="info-text dm-sub-simple">A subject, not your full research question. Save the question for
+   <p class="info-text dm-sub-simple">A subject, not your full research question. Save the question for
    Search. Preparing for search starts on its own after the fetch.</p>
  </div>
  {% include "partials/guest_fetch_note.html" %}
@@ -64,20 +66,19 @@
    search again.</p>
   <button type="button" id="simple-fetch-unlock-btn" class="btn btn-secondary">Start over or add papers</button>
  </div>
- <form id="fetch-form" action="/data-management" method="get">
+ <form id="fetch-form" action="/search" method="get">
  <div class="form-row">
  <div class="form-group flex-2">
- <label for="fetch-query" class="dm-step-advanced">Search Query</label>
  <label for="fetch-query" class="dm-step-simple">Topic</label>
  <input type="text" id="fetch-query" name="fetch-query"
   placeholder="e.g., school start times and adolescent sleep" autocomplete="off">
  </div>
- <div class="form-group">
+ <div class="form-group" hidden>
  <label for="fetch-max">Max Results per Source</label>
  <input type="number" id="fetch-max" name="fetch-max" value="100" min="10" max="2000" step="10">
  </div>
  </div>
- <div class="form-row">
+ <div class="form-row" hidden>
  <div class="form-group">
  <label class="radio-label">
  <input type="radio" name="fetch-mode" value="replace" checked>
@@ -90,8 +91,8 @@
  <p class="help-text" id="fetch-replace-consequence" hidden></p>
  </div>
  </div>
- <details class="advanced-details">
-  <summary>Advanced fetch options</summary>
+ <details class="advanced-details" hidden>
+  <summary>Contact email</summary>
   <div class="advanced-body">
    <div class="form-group">
    <label for="fetch-email">Email <span class="help-text">(optional - PubMed and Europe PMC ask for a contact email)</span></label>
@@ -101,7 +102,6 @@
  </details>
  <div class="form-row fetch-actions">
  <button type="submit" id="fetch-btn" class="btn btn-primary" data-keep-content>
-  <span class="dm-btn-advanced">Fetch Articles</span>
   <span class="dm-btn-simple">Find articles on your topic</span>
  </button>
  <button type="button" id="fetch-cancel-btn" class="btn btn-secondary" hidden>Cancel fetch</button>
@@ -119,7 +119,7 @@
 </section>
 
 <!-- Coverage map (health check after a fetch) -->
-<section class="card" id="collect-coverage-card">
+<section class="card" id="collect-coverage-card" hidden>
  <h2>Coverage map</h2>
  <p class="info-text">A quick health check after a fetch: papers per source, and which recommended
  sources are still empty.</p>

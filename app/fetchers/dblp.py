@@ -11,14 +11,14 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional
 
-from app.fetchers.base import BaseFetcher, FetchError, HttpClient
+from app.fetchers.base import BaseFetcher, FetchError, HttpClient, reraise_fetch_error
 
 
 class DBLPFetcher(BaseFetcher):
     SOURCE_NAME = "dblp"
     BASE_URL = "https://dblp.org/search/publ/api"
 
-    def __init__(self, email: str = None):
+    def __init__(self, email: Optional[str] = None):
         self.http = HttpClient(
             delay=0.4,
             user_agent=f"LiteratureResearchAide/4.0 ({email or 'research@example.com'})",
@@ -42,8 +42,8 @@ class DBLPFetcher(BaseFetcher):
                     },
                 )
                 data = r.json()
-            except FetchError:
-                raise
+            except FetchError as e:
+                reraise_fetch_error(e, articles)
             except Exception as e:
                 raise FetchError(f"DBLP request failed: {e}", kind="network") from e
 

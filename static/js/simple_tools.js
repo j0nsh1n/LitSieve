@@ -1,6 +1,6 @@
-// Simple-mode tools shared by Data Management and Search.
+// Collection and screening popups on Search.
 // Screening popup, re-prepare / start-over dialogs, Search tools strip,
-// and the one-page collect/search state. Search also loads data_management.js
+// and the one-page collect/search state. Search also loads collect.js
 // for fetch/topics (collect UI lives on /search).
 
 var _lastTotalArticles = (typeof _lastTotalArticles === 'number') ? _lastTotalArticles : 0;
@@ -13,7 +13,6 @@ function _isPipelineBusy() {
 
 /** Simple Search: collect (empty / unprepared / ?collect=1) vs rank/export. */
 function wantsSimpleCollectView(stats) {
- if (typeof isSimpleMode !== 'function' || !isSimpleMode()) return false;
  if (_collectQueryOn()) return true;
  if (window._preparingCorpus) return false;
  const ready = Number(stats && stats.articles_with_embeddings) || 0;
@@ -43,23 +42,20 @@ function setCollectQueryOnUrl() {
 function syncSimpleOnePageState(stats) {
  const collect = document.getElementById('search-collect');
  if (!collect) return;
- const simple = typeof isSimpleMode === 'function' && isSimpleMode();
  const ready = Number(stats && stats.articles_with_embeddings) || 0;
  _lastReadyEmbeddings = ready;
  const total = Number(stats && stats.total_articles) || _lastTotalArticles || 0;
- const showCollect = simple && wantsSimpleCollectView(stats);
- const forceCollect = simple && _collectQueryOn();
+ const showCollect = wantsSimpleCollectView(stats);
+ const forceCollect = _collectQueryOn();
  collect.hidden = !showCollect;
- collect.classList.toggle('has-papers', simple && total > 0 && !forceCollect);
+ collect.classList.toggle('has-papers', total > 0 && !forceCollect);
  collect.classList.toggle('is-startover', !!forceCollect);
  if (document.body) {
   document.body.classList.toggle('simple-collecting', showCollect);
  }
- if (typeof updateNavStepNumbers === 'function') updateNavStepNumbers();
  const empty = document.getElementById('search-empty-state');
  if (empty) {
-  // Advanced empty-state only. Simple uses collect.
-  if (simple) empty.hidden = true;
+  empty.hidden = true;
  }
  const work = document.getElementById('search-workbench');
  if (work) {
@@ -135,7 +131,6 @@ function _startWaitMessages() {
 }
 
 function showSimpleBuffering(phase) {
- if (typeof isSimpleMode === 'function' && !isSimpleMode()) return;
  const el = document.getElementById('search-preparing');
  if (!el) return;
  window._preparingCorpus = true;
@@ -242,8 +237,7 @@ function setNextStepVisible(visible) {
  }
  const el = document.getElementById('fetch-next-step');
  if (!el) return;
- const simple = typeof isSimpleMode === 'function' && isSimpleMode();
- const show = !!(visible && simple);
+ const show = !!(visible );
  el.hidden = !show;
  el.classList.toggle('u-hidden', !show);
 }
@@ -287,7 +281,6 @@ var _lastReadyEmbeddings = (typeof _lastReadyEmbeddings === 'number') ? _lastRea
 var _simpleScreenPending = (typeof _simpleScreenPending === 'undefined') ? null : _simpleScreenPending;
 
 function isSimpleScreenGatePending() {
- if (typeof isSimpleMode !== 'function' || !isSimpleMode()) return false;
  if (!_onSearchPage()) return false;
  if (typeof _collectQueryOn === 'function' && _collectQueryOn()) return false;
  // Unknown (null) must not hide the Search field — refresh will set true
@@ -496,6 +489,8 @@ let _setAsideModalOpener = null;
 let _setAsideModalKey = null;
 let _setAsideItems = [];
 let _setAsideLastRestore = null;
+let _setAsideReasonTarget = null;
+let _setAsideReasonUndo = null;
 
 function isSimpleSetAsideOpen() {
  const modal = document.getElementById('simple-set-aside-modal');
@@ -538,8 +533,11 @@ async function openSimpleSetAsideModal() {
  }
  modal.hidden = false;
  _setAsideLastRestore = null;
+ _setAsideReasonTarget = null;
  const again = document.getElementById('simple-set-aside-again');
  if (again) again.hidden = true;
+ const reasons = document.getElementById('simple-set-aside-reasons');
+ if (reasons) reasons.hidden = true;
  const status = document.getElementById('simple-set-aside-status');
  if (status) {
   status.textContent = '';
@@ -548,7 +546,7 @@ async function openSimpleSetAsideModal() {
  const card = modal.querySelector('[data-site-modal-card]') || modal;
  const focusable = () => Array.from(card.querySelectorAll(
   'button:not([disabled]), [href], input:not([disabled]), [tabindex]:not([tabindex="-1"])'
- ));
+ )).filter((el) => !el.closest('[hidden]'));
  _setAsideModalKey = (ev) => {
   if (ev.key === 'Escape') {
    ev.preventDefault();
@@ -586,6 +584,7 @@ async function loadSimpleSetAsideList() {
   const data = await apiCall('/api/screening/excluded');
   _setAsideItems = (data && data.items) || [];
   renderSimpleSetAsideGroups(_setAsideItems, (data && data.groups) || []);
+  syncSetAsideReasonChrome();
  } catch (e) {
   host.innerHTML = '';
   setStatus('simple-set-aside-status', `Could not load the list: ${e.message}`, 'error');
@@ -606,14 +605,20 @@ function renderSimpleSetAsideGroups(items, groups) {
  host.innerHTML = groups.map((g) => {
   const rows = (byReason[g.reason] || []).map((it) => {
    const meta = [it.year, it.source].filter(Boolean).join(' · ');
+   const whyBtn = setAsideCanChooseReason(it.reason)
+    ? `<button type="button" class="btn btn-secondary btn-sm" data-set-aside-why="${escapeAttr(it.article_id)}|${escapeAttr(it.source)}">Why?</button>`
+    : '';
    return `<li><div class="set-aside-row">
     <div class="screen-triage-row-body">
      <span class="screen-triage-row-title">${escapeHtml(it.title || it.article_id)}</span>
      <span class="screen-triage-row-meta">${escapeHtml(meta)}</span>
     </div>
-    <button type="button" class="btn btn-secondary btn-sm"
-     data-set-aside-restore="${escapeAttr(it.article_id)}|${escapeAttr(it.source)}"
-     data-set-aside-reason="${escapeAttr(it.reason)}">Restore</button>
+    <div class="set-aside-row-actions">
+     ${whyBtn}
+     <button type="button" class="btn btn-secondary btn-sm"
+      data-set-aside-restore="${escapeAttr(it.article_id)}|${escapeAttr(it.source)}"
+      data-set-aside-reason="${escapeAttr(it.reason)}">Restore</button>
+    </div>
    </div></li>`;
   }).join('');
   const n = (byReason[g.reason] || []).length;
@@ -633,6 +638,15 @@ function renderSimpleSetAsideGroups(items, groups) {
 }
 
 function onSetAsideListClick(ev) {
+ const why = ev.target.closest('[data-set-aside-why]');
+ if (why) {
+  const parts = (why.getAttribute('data-set-aside-why') || '').split('|');
+  const articleId = parts[0];
+  const source = parts.slice(1).join('|');
+  const item = _setAsideItems.find((it) => it.article_id === articleId && it.source === source);
+  if (item && setAsideCanChooseReason(item.reason)) showSetAsideReasons(item);
+  return;
+ }
  const one = ev.target.closest('[data-set-aside-restore]');
  const group = ev.target.closest('[data-set-aside-restore-group]');
  if (one) {
@@ -692,6 +706,130 @@ async function doSetAsideAgain() {
  } finally {
   setLoading(btn, false);
  }
+}
+
+/** Narrow it down, duplicates, and theme groups keep the reason the app wrote.
+ *  Changing one would take that paper out of its own Undo. */
+function setAsideCanChooseReason(reason) {
+ return reason !== 'low_relevance' && reason !== 'duplicate' && reason !== 'cluster';
+}
+
+function showSetAsideReasons(item) {
+ const panel = document.getElementById('simple-set-aside-reasons');
+ if (!panel || !item) return;
+ _setAsideReasonTarget = {
+  article_id: item.article_id,
+  source: item.source,
+  reason: item.reason,
+  title: item.title || item.article_id,
+ };
+ const lead = document.getElementById('simple-set-aside-reasons-lead');
+ if (lead) {
+  lead.textContent = `Why set aside "${_setAsideReasonTarget.title}"? It stays out of your searches.`;
+ }
+ panel.querySelectorAll('[data-reason]').forEach((btn) => {
+  const on = btn.getAttribute('data-reason') === item.reason;
+  btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+ });
+ panel.hidden = false;
+ const undo = document.getElementById('simple-set-aside-reason-undo');
+ if (undo) undo.hidden = !_setAsideReasonUndo;
+ panel.scrollIntoView({ block: 'nearest' });
+}
+
+function onSetAsideReasonClick(ev) {
+ const chip = ev.target.closest('[data-reason]');
+ if (!chip || chip.disabled) return;
+ ev.preventDefault();
+ applySetAsideReason(chip.getAttribute('data-reason'));
+}
+
+async function applySetAsideReason(reason) {
+ const target = _setAsideReasonTarget;
+ if (!target || !reason || reason === target.reason) return;
+ if (!setAsideCanChooseReason(reason)) return;
+ const panel = document.getElementById('simple-set-aside-reasons');
+ const buttons = panel ? Array.from(panel.querySelectorAll('[data-reason]')) : [];
+ buttons.forEach((btn) => { btn.disabled = true; });
+ try {
+  await apiCall('/api/screening', {
+   method: 'POST',
+   body: withPageLibrary({
+    items: [{ article_id: target.article_id, source: target.source }],
+    action: 'exclude',
+    reason: reason,
+   }),
+  });
+  _setAsideReasonUndo = {
+   article_id: target.article_id,
+   source: target.source,
+   reason: target.reason,
+  };
+  const chip = buttons.find((btn) => btn.getAttribute('data-reason') === reason);
+  const label = chip ? chip.textContent.trim() : reason;
+  setStatus('simple-set-aside-status', `Reason saved: ${label}.`, 'success');
+  await loadSimpleSetAsideList();
+  const updated = _setAsideItems.find((it) => it.article_id === target.article_id && it.source === target.source);
+  if (updated) showSetAsideReasons(updated);
+ } catch (e) {
+  setStatus('simple-set-aside-status', `Could not save the reason: ${e.message}`, 'error');
+ } finally {
+  buttons.forEach((btn) => { btn.disabled = false; });
+ }
+}
+
+async function undoSetAsideReason() {
+ const last = _setAsideReasonUndo;
+ const btn = document.getElementById('simple-set-aside-reason-undo');
+ if (!last) return;
+ const still = _setAsideItems.find((it) => it.article_id === last.article_id && it.source === last.source);
+ if (!still) {
+  _setAsideReasonUndo = null;
+  if (btn) btn.hidden = true;
+  setStatus('simple-set-aside-status', 'That paper is back in your searches.', 'info');
+  return;
+ }
+ setLoading(btn, true);
+ try {
+  await apiCall('/api/screening', {
+   method: 'POST',
+   body: withPageLibrary({
+    items: [{ article_id: last.article_id, source: last.source }],
+    action: 'exclude',
+    reason: last.reason,
+   }),
+  });
+  _setAsideReasonUndo = null;
+  if (btn) btn.hidden = true;
+  setStatus('simple-set-aside-status', 'Put the old reason back.', 'success');
+  await loadSimpleSetAsideList();
+  const updated = _setAsideItems.find((it) => it.article_id === last.article_id && it.source === last.source);
+  const panel = document.getElementById('simple-set-aside-reasons');
+  if (updated && panel && !panel.hidden) showSetAsideReasons(updated);
+ } catch (e) {
+  setStatus('simple-set-aside-status', `Could not put the old reason back: ${e.message}`, 'error');
+ } finally {
+  setLoading(btn, false);
+ }
+}
+
+function syncSetAsideReasonChrome() {
+ if (_setAsideReasonTarget) {
+  const still = _setAsideItems.find((it) =>
+   it.article_id === _setAsideReasonTarget.article_id && it.source === _setAsideReasonTarget.source);
+  if (!still) {
+   const panel = document.getElementById('simple-set-aside-reasons');
+   if (panel) panel.hidden = true;
+   _setAsideReasonTarget = null;
+  }
+ }
+ if (_setAsideReasonUndo) {
+  const stillUndo = _setAsideItems.find((it) =>
+   it.article_id === _setAsideReasonUndo.article_id && it.source === _setAsideReasonUndo.source);
+  if (!stillUndo) _setAsideReasonUndo = null;
+ }
+ const undo = document.getElementById('simple-set-aside-reason-undo');
+ if (undo) undo.hidden = !_setAsideReasonUndo;
 }
 
 let _simpleScreenWired = false;
@@ -875,8 +1013,7 @@ function openSimpleScreenModal() {
 async function refreshSimpleScreeningCard() {
  const card = document.getElementById('simple-screening-card');
  if (!card) return;
- const simple = typeof isSimpleMode === 'function' && isSimpleMode();
- if (!simple || _isPipelineBusy()) {
+ if (_isPipelineBusy()) {
   card.hidden = true;
   return;
  }
@@ -1643,70 +1780,114 @@ function applyVerifiedResearchQuestion(query) {
  * query. Returns false if cancelled.
  */
 async function resolveSimplePrepareModeBeforeRequest() {
- if (typeof isSimpleMode !== 'function' || !isSimpleMode()) {
-  return true;
+ const models = _simplePrepareModelCatalog();
+ if (!models.length) {
+  showNotification('The embedding model list is unavailable. Reload Search and try again.', 'error');
+  return false;
  }
- let ready = 0;
- let total = Number(_lastTotalArticles) || 0;
- try {
-  const stats = await apiCall('/api/statistics');
-  ready = Number(stats.articles_with_embeddings) || 0;
-  total = Number(stats.total_articles) || total;
-  _lastTotalArticles = total;
- } catch (err) {
-  console.warn('Could not load prepare counts for dialog:', err);
- }
- const box = document.getElementById('only-missing');
  const current = getResearchQuestionCandidate();
-
- // Always open a re-prepare dialog with the research question field visible.
- // When nothing is prepared yet, only Continue / Cancel (no scope choice).
- if (typeof openSiteChoice !== 'function') {
-  if (ready <= 0 && box) box.checked = true;
-  return true;
- }
-
- const allLabel = total > 0 ? `Redo all ${total}` : 'Redo all papers';
- const choices = ready <= 0
-  ? [
-   { label: 'Continue', value: 'missing', primary: true },
-   { label: 'Cancel', value: null, cancel: true },
-  ]
-  : [
-   { label: 'Only new papers', value: 'missing', primary: true },
-   { label: allLabel, value: 'all' },
-   { label: 'Cancel', value: null, cancel: true },
-  ];
-
- const result = await openSiteChoice({
+ let selectedModel = _simplePreferredPrepareModel(models);
+ if (typeof openSiteForm !== 'function') return false;
+ const result = await openSiteForm({
   title: 'Re-prepare papers for search',
-  message: ready <= 0
-   ? 'Check that this research question is still what you want. Edit if needed — Narrow it down will use it next.'
-   : 'Check that this research question is still what you want, then choose how much to re-prepare. Only new papers need this most of the time.',
-  withInput: true,
-  inputLabel: 'Your research question',
-  defaultValue: current,
-  placeholder: 'e.g., climate change effects on ecosystems',
-  requireNonEmpty: true,
-  emptyMessage: 'Please confirm your research question before re-preparing.',
-  selectAll: !current,
-  choices,
+  message: 'Keep your research question, choose which papers to prepare, and optionally change the embedding model.',
+  confirmLabel: 'Re-prepare',
+  cancelLabel: 'Cancel',
+  fields: [
+   {id: 'research_question', label: 'Your research question', type: 'text', value: current, placeholder: 'e.g., climate change effects on ecosystems'},
+   {id: 'prepare_scope', label: 'Papers to prepare', type: 'choice', value: 'only_missing', options: [
+    {value: 'only_missing', label: 'Only missing papers', hint: 'Recommended'},
+    {value: 'all', label: 'Redo all papers'},
+   ]},
+  ],
+  onReady: (root) => {
+   const fields = root.querySelector('.lra-modal-fields');
+   if (!fields) return;
+   const disclosure = document.createElement('details');
+   disclosure.className = 'advanced-details lra-modal-choice';
+   disclosure.id = 'simple-reprepare-model-options';
+   const summary = document.createElement('summary');
+   summary.textContent = 'Embedding model';
+   const body = document.createElement('div');
+   body.className = 'advanced-body';
+   const label = document.createElement('label');
+   label.htmlFor = 'simple-prepare-model';
+   label.textContent = 'Analysis model';
+   const select = document.createElement('select');
+   select.id = 'simple-prepare-model';
+   select.className = 'lra-modal-input';
+   models.forEach((model) => {
+    const option = document.createElement('option');
+    option.value = model.value;
+    option.textContent = model.label;
+    if (model.value === selectedModel) option.selected = true;
+    select.append(option);
+   });
+   body.append(label, select);
+   disclosure.append(summary, body);
+   fields.append(disclosure);
+  },
+  validate: (values) => {
+   if (!String(values.research_question || '').trim()) return 'Please confirm your research question before re-preparing.';
+   const chosen = _simpleSelectedPrepareModel();
+   if (!models.some((model) => model.value === chosen)) return 'Choose an available embedding model.';
+   // openSiteForm removes its dialog before resolving the promise, so capture
+   // the selection while validation still has access to the live field.
+   selectedModel = chosen;
+   return '';
+  },
  });
  if (result == null) return false;
-
- // withInput → { value, input }; bare string if modal helper is older.
- let scope = result;
- let question = current;
- if (result && typeof result === 'object' && 'value' in result) {
-  scope = result.value;
-  question = result.input;
+ const question = String(result.research_question || '').trim();
+ const model = selectedModel;
+ const onlyMissing = result.prepare_scope !== 'all';
+ applyVerifiedResearchQuestion(question);
+ const box = document.getElementById('only-missing');
+ if (box) box.checked = onlyMissing;
+ _simpleOnlyMissing = onlyMissing;
+ if (typeof setConfirmedSimplePreparePreferences === 'function') {
+  setConfirmedSimplePreparePreferences(model, onlyMissing);
  }
- if (scope == null) return false;
+ return {model, onlyMissing, question};
+}
 
- applyVerifiedResearchQuestion(String(question || '').trim());
- if (box) box.checked = scope !== 'all';
- _simpleOnlyMissing = scope !== 'all';
- return true;
+function _simplePrepareModelCatalog() {
+ let injected = [];
+ const catalog = document.getElementById('embedding-model-catalog');
+ try {
+  const raw = catalog && (catalog.getAttribute('data-models') || (catalog.dataset && catalog.dataset.models));
+  const parsed = JSON.parse(raw || '[]');
+  if (Array.isArray(parsed)) injected = parsed;
+ } catch (e) { /* the rendered select remains a catalog-backed fallback */ }
+ const select = document.getElementById('embedding-model');
+ const fromSelect = select && select.options ? Array.from(select.options).map((option) => ({
+  value: String(option.value || ''), label: String(option.textContent || option.label || option.value || ''),
+ })) : [];
+ const list = injected.length ? injected : fromSelect;
+ const seen = new Set();
+ return list.filter((model) => {
+  if (!model || !String(model.value || '').trim() || seen.has(String(model.value))) return false;
+  seen.add(String(model.value));
+  return true;
+ }).map((model) => ({value: String(model.value), label: String(model.label || model.value)}));
+}
+
+function _simplePreferredPrepareModel(models) {
+ const current = document.getElementById('embedding-model');
+ let preferred = current && current.value;
+ if (!preferred) {
+  try {
+   const prefs = JSON.parse(localStorage.getItem(FETCH_PREFS_KEY) || 'null');
+   if (prefs && prefs.modelManual && prefs.model) preferred = prefs.model;
+  } catch (e) { /* use topic recommendation below */ }
+ }
+ if (!preferred && typeof recommendModel === 'function') preferred = recommendModel();
+ return models.some((model) => model.value === preferred) ? preferred : models[0].value;
+}
+
+function _simpleSelectedPrepareModel() {
+ const select = document.getElementById('simple-prepare-model');
+ return select ? String(select.value || '') : '';
 }
 
 // Per-database cap presets for the Simple pre-fetch dialog. 100 is the
@@ -1714,9 +1895,6 @@ async function resolveSimplePrepareModeBeforeRequest() {
 var FETCH_COUNT_PRESETS = [25, 50, 100, 200];
 
 async function resolveSimpleFetchModeBeforeRequest(opts) {
- if (typeof isSimpleMode !== 'function' || !isSimpleMode()) {
-  return true;
- }
  let total = Number(_lastTotalArticles) || 0;
  try {
   const stats = await apiCall('/api/statistics');
@@ -1743,6 +1921,22 @@ async function resolveSimpleFetchModeBeforeRequest(opts) {
  const maxEl = document.getElementById('fetch-max');
  const current = parseInt(maxEl && maxEl.value, 10) || 100;
  const preset = FETCH_COUNT_PRESETS.includes(current) ? String(current) : '';
+ const sourceCheckboxes = Array.from(
+  document.querySelectorAll('#source-option-grid input[type="checkbox"]')
+ );
+ const sourceOptions = sourceCheckboxes.map((checkbox) => {
+  const card = checkbox.closest('.source-option');
+  const name = card && card.querySelector('.source-name-label');
+  const description = card && card.querySelector('.source-desc');
+  return {
+   value: checkbox.value,
+   label: (name && name.textContent.trim()) || checkbox.value,
+   hint: description && description.textContent.trim(),
+  };
+ });
+ const selectedSources = sourceCheckboxes.filter((checkbox) => checkbox.checked)
+  .map((checkbox) => checkbox.value);
+ const fetchEmail = document.getElementById('fetch-email');
  const fields = [
   {
    id: 'count',
@@ -1781,11 +1975,51 @@ async function resolveSimpleFetchModeBeforeRequest(opts) {
    ],
   });
  }
+ fields.push(
+  {
+   id: 'sources',
+   type: 'multi-choice',
+   label: 'Databases to search',
+   value: selectedSources,
+   options: sourceOptions,
+  },
+  {
+   id: 'contact_email',
+   type: 'email',
+   label: 'Contact email for PubMed and Europe PMC (optional)',
+   value: fetchEmail ? fetchEmail.value : '',
+   placeholder: 'you@example.edu',
+  }
+ );
  const choice = await openSiteForm({
   title: 'Before we fetch',
   message: 'Each database returns up to this many papers. More takes longer to fetch and prepare, and leaves more to screen.',
   confirmLabel: 'Find articles',
   fields,
+  onReady: (root) => {
+   const fieldsRoot = root.querySelector('.lra-modal-fields');
+   const sourcesField = root.querySelector('[data-field="sources"]');
+   const emailField = root.querySelector('[data-field="contact_email"]');
+   if (!fieldsRoot || !sourcesField || !emailField) return;
+   const disclosure = document.createElement('details');
+   disclosure.id = 'simple-fetch-databases';
+   disclosure.className = 'advanced-details lra-modal-choice';
+   const summary = document.createElement('summary');
+   summary.textContent = 'Databases';
+   disclosure.append(summary, sourcesField, emailField);
+   fieldsRoot.append(disclosure);
+
+   const syncEmailVisibility = () => {
+    const selected = Array.from(
+     sourcesField.querySelectorAll('input[type="checkbox"]:checked')
+    ).map((input) => input.value);
+    emailField.hidden = !selected.includes('pubmed') && !selected.includes('europepmc');
+   };
+   sourcesField.querySelectorAll('input[type="checkbox"]').forEach((input) => {
+    input.addEventListener('change', syncEmailVisibility);
+   });
+   syncEmailVisibility();
+  },
   validate: (vals) => {
    const custom = String(vals.custom || '').trim();
    if (custom) {
@@ -1795,6 +2029,9 @@ async function resolveSimpleFetchModeBeforeRequest(opts) {
     return 'Pick how many papers from each database, or write your own number.';
    }
    if (askMode && !vals.mode) return 'Choose what happens to the papers you already have.';
+   if (!Array.isArray(vals.sources) || vals.sources.length === 0) {
+    return 'Choose at least one database to search.';
+   }
    return '';
   },
  });
@@ -1802,11 +2039,26 @@ async function resolveSimpleFetchModeBeforeRequest(opts) {
  const custom = String(choice.custom || '').trim();
  const count = custom ? parseInt(custom, 10) : parseInt(choice.count, 10);
  if (maxEl && Number.isFinite(count)) maxEl.value = String(count);
+ const pickedSources = new Set(
+  Array.isArray(choice.sources) ? choice.sources.map((source) => String(source)) : []
+ );
+ sourceCheckboxes.forEach((checkbox) => {
+  checkbox.checked = pickedSources.has(checkbox.value);
+ });
+ sourceCheckboxes.forEach((checkbox) => {
+  checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+ });
+ if (fetchEmail && typeof choice.contact_email === 'string') {
+  fetchEmail.value = choice.contact_email;
+  fetchEmail.dispatchEvent(new Event('input', { bubbles: true }));
+  fetchEmail.dispatchEvent(new Event('change', { bubbles: true }));
+ }
  if (askMode) {
   const picked = choice.mode === 'append' ? 'append' : 'replace';
   setMode(picked);
   _persistFetchMode(picked);
  }
+ if (typeof saveFetchPrefs === 'function') saveFetchPrefs();
  return true;
 }
 
@@ -1818,7 +2070,6 @@ function _onSearchPage() {
 function updateSimpleToolsStrip(stats) {
  const strip = document.getElementById('simple-tools-strip') || document.getElementById('simple-screen-dock');
  if (!strip) return;
- const simple = typeof isSimpleMode === 'function' && isSimpleMode();
  const total = Number(stats && stats.total_articles) || 0;
  _lastTotalArticles = total;
  const sources = (stats && stats.sources) || {};
@@ -1835,11 +2086,12 @@ function updateSimpleToolsStrip(stats) {
    countEl.disabled = total <= 0;
   }
  }
- const show = !!(simple && total > 0 && !_collectQueryOn());
+ const show = !!(total > 0 && !_collectQueryOn());
  strip.hidden = !show;
 }
 
 function openSimpleSourceReport(stats) {
+ if (typeof openCollectionReport === 'function') return openCollectionReport();
  const sources = (stats && stats.sources) || {};
  const lines = Object.keys(sources)
   .filter((id) => (Number(sources[id]) || 0) > 0)
@@ -1858,39 +2110,18 @@ function openSimpleSourceReport(stats) {
 }
 
 async function simpleToolsReprepare() {
- if (typeof resolveSimplePrepareModeBeforeRequest === 'function') {
-  const ok = await resolveSimplePrepareModeBeforeRequest();
-  if (!ok) return;
- }
  const status = document.getElementById('simple-tools-status');
  const btn = document.getElementById('simple-tools-reprepare-btn');
  if (status) status.textContent = 'Preparing papers…';
  if (btn) btn.disabled = true;
  try {
-  const onlyMissing = _simpleOnlyMissing !== false;
-  const started = await apiCall('/api/create-embeddings', {
-   method: 'POST',
-   body: withPageLibrary({ model: 'general', only_missing: onlyMissing }),
-  });
-  if (started && started.status === 'started' && typeof waitForJob === 'function') {
-   await waitForJob('embed', null, null, null, null);
-  } else if (started && started.status === 'started') {
-   await _waitForEmbedJob();
-  }
-  if (status) status.textContent = 'Papers are ready.';
-  showNotification('Papers are ready for search.', 'success');
-  if (typeof refreshSimpleScreeningCard === 'function') {
-   await refreshSimpleScreeningCard();
-  }
-  if (typeof loadPageData === 'function') {
-   await loadPageData();
-  } else {
-   const stats = await apiCall('/api/statistics');
-   updateSimpleToolsStrip(stats);
-  }
+  if (typeof doCreateEmbeddings !== 'function') throw new Error('Prepare action is unavailable. Reload Search and try again.');
+  const result = await doCreateEmbeddings({ fromSimpleReprepare: true });
+  if (!result && status) status.textContent = '';
  } catch (e) {
   if (status) status.textContent = '';
-  showNotification(`Could not re-prepare: ${e.message}`, 'error');
+  // doCreateEmbeddings already reports its own errors.
+  if (typeof doCreateEmbeddings !== 'function') showNotification(`Could not re-prepare: ${e.message}`, 'error');
  } finally {
   if (btn) btn.disabled = false;
  }
@@ -2080,12 +2311,14 @@ function wireSimpleToolsStrip() {
   });
  });
  once(document.getElementById('simple-set-aside-groups'), onSetAsideListClick);
+ once(document.getElementById('simple-set-aside-reasons'), onSetAsideReasonClick);
+ once(document.getElementById('simple-set-aside-reason-undo'), undoSetAsideReason);
  once(document.getElementById('simple-set-aside-again'), doSetAsideAgain);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
  wireSimpleToolsStrip();
- if (typeof isSimpleMode === 'function' && isSimpleMode() && _onSearchPage()) {
+ if (_onSearchPage()) {
   apiCall('/api/statistics').then((stats) => {
    syncSimpleOnePageState(stats);
    updateSimpleToolsStrip(stats);
@@ -2094,16 +2327,5 @@ document.addEventListener('DOMContentLoaded', () => {
    }
   }).catch(() => { /* ignore */ });
  }
- const modeBtn = document.getElementById('mode-toggle');
- if (modeBtn) {
-  modeBtn.addEventListener('click', () => {
-   requestAnimationFrame(() => {
-    apiCall('/api/statistics').then((stats) => {
-     if (typeof syncSimpleOnePageState === 'function') syncSimpleOnePageState(stats);
-     updateSimpleToolsStrip(stats);
-     if (typeof refreshSimpleScreeningCard === 'function') refreshSimpleScreeningCard();
-    }).catch(() => {});
-   });
-  });
- }
+
 });

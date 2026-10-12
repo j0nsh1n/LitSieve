@@ -1,6 +1,10 @@
 # Core dependencies
 biopython>=1.84
 requests>=2.32.0
+# Security floors for transitive HTTP/async and model-download dependencies.
+urllib3>=2.8.0
+anyio>=4.14.2
+fsspec>=2026.6.0
 numpy>=2.0.0
 
 # NLP and embeddings
@@ -22,7 +26,7 @@ jinja2>=3.1.4
 python-multipart>=0.0.18
 
 # Authentication
-PyJWT>=2.9.0
+PyJWT>=2.15.1
 # Encrypts provider API keys at rest in user_data/ai_settings.json.
 # Floor raised for CVE-2026-69247 (fixed in 50.0.0); also backs AES-256-GCM
 # encryption of AI keys and SQLCipher key derivation.

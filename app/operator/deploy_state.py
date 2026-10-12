@@ -101,13 +101,14 @@ def clear() -> None:
         pass
 
 
-def begin(*, sha: str, previous_sha: str, actor_username: str = "") -> Dict[str, Any]:
+def begin(*, sha: str, previous_sha: str, actor_username: str = "", dispatch_id: str = "") -> Dict[str, Any]:
     """Open a record before the live checkout is touched."""
     clear()
     return write(
         sha=sha,
         previous_sha=previous_sha,
         actor_username=actor_username,
+        dispatch_id=dispatch_id,
         phase=PHASE_STARTED,
         result="",
         detail="",

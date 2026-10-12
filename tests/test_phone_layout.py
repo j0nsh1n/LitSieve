@@ -54,16 +54,16 @@ def test_phone_search_bar_is_one_row_with_an_icon_button():
     assert 'class="search-btn-label"' in btn
     assert 'class="search-btn-icon"' in btn
     phone = _block(PHONE, "max-width: 640px")
-    card = re.search(r'html\[data-mode="simple"\] \.searchcard \{([^}]+)\}', phone)
+    card = re.search(r'\.searchcard \{([^}]+)\}', phone)
     assert card and "flex-direction: row" in card.group(1)
-    assert "html[data-mode=\"simple\"] .searchcard .search-btn-label { display: none; }" in phone
-    btn_rule = re.search(r'html\[data-mode="simple"\] \.searchcard #search-btn \{([^}]+)\}', phone)
+    assert ".searchcard .search-btn-label { display: none; }" in phone
+    btn_rule = re.search(r'\.searchcard #search-btn \{([^}]+)\}', phone)
     assert btn_rule and "min-width: 2.75rem" in btn_rule.group(1)
 
 
 def test_phone_query_bar_sticks_once_results_exist():
     phone = _block(PHONE, "max-width: 640px")
-    rule = re.search(r'html\[data-mode="simple"\] body\.simple-screen-ready #search-query-top \{([^}]+)\}', phone)
+    rule = re.search(r'body\.simple-screen-ready #search-query-top \{([^}]+)\}', phone)
     assert rule, "sticky query bar rule missing"
     assert "position: sticky" in rule.group(1)
     assert "z-index: 30" in rule.group(1)
@@ -74,18 +74,18 @@ def test_phone_query_bar_sticks_once_results_exist():
 
 def test_phone_compact_rows_have_thumb_sized_open_button():
     phone = _block(PHONE, "max-width: 640px")
-    toggle = re.search(r'html\[data-mode="simple"\] \.result-toggle \{([^}]+)\}', phone)
+    toggle = re.search(r'\.result-toggle \{([^}]+)\}', phone)
     assert toggle and "min-height: 2.75rem" in toggle.group(1) and "min-width: 2.75rem" in toggle.group(1)
-    assert 'html[data-mode="simple"] .result-row:not(.is-open) .result-tags { display: none; }' in phone
-    venue = re.search(r'html\[data-mode="simple"\] \.result-row:not\(\.is-open\) \.result-venue \{([^}]+)\}', phone)
+    assert '.result-row:not(.is-open) .result-tags { display: none; }' in phone
+    venue = re.search(r'\.result-row:not\(\.is-open\) \.result-venue \{([^}]+)\}', phone)
     assert venue and "text-overflow: ellipsis" in venue.group(1)
 
 
 def test_phone_tools_strip_stays_on_one_row():
     phone = _block(PHONE, "max-width: 640px")
-    strip = re.search(r'html\[data-mode="simple"\] \.simple-tools-strip,\s*html\[data-mode="simple"\] \.simple-screen-dock \{([^}]+)\}', phone)
+    strip = re.search(r'\.simple-tools-strip,\s*\.simple-screen-dock \{([^}]+)\}', phone)
     assert strip and "flex-wrap: nowrap" in strip.group(1)
-    narrow = re.search(r'html\[data-mode="simple"\] \.simple-screen-dock #simple-screen-open-btn \{([^}]+)\}', phone)
+    narrow = re.search(r'\.simple-screen-dock #simple-screen-open-btn \{([^}]+)\}', phone)
     assert narrow and "width: auto" in narrow.group(1)
 
 
@@ -95,8 +95,8 @@ def test_phone_getting_started_folds_to_one_line():
     assert 'class="gs-sample-note"' in html
     assert 'class="info-text gs-lead"' in html
     phone = _block(PHONE, "max-width: 640px")
-    assert 'html[data-mode="simple"] #getting-started-card .gs-sample-ask-short { display: inline; }' in phone
-    hidden = re.search(r'html\[data-mode="simple"\] #getting-started-card \.gs-lead,\s*html\[data-mode="simple"\] #getting-started-card \.gs-sample-ask,\s*html\[data-mode="simple"\] #getting-started-card \.gs-sample-note \{ display: none; \}', phone)
+    assert '#getting-started-card .gs-sample-ask-short { display: inline; }' in phone
+    hidden = re.search(r'#getting-started-card \.gs-lead,\s*#getting-started-card \.gs-sample-ask,\s*#getting-started-card \.gs-sample-note \{ display: none; \}', phone)
     assert hidden
 
 
@@ -164,7 +164,7 @@ def test_simple_panel_is_anchored_while_scrolling():
     desktop. The rail is a grid item under align-items: start, so it needs
     align-self: stretch or its sticky child has no room to travel."""
     phone = _block(CSS[CSS.index("/* --- Phase 6 small screens") :], "max-width: 900px")
-    panel = re.search(r'html\[data-mode="simple"\] \.search-simple-panel:not\(\[hidden\]\) \{([^}]+)\}', phone)
+    panel = re.search(r'\.search-simple-panel:not\(\[hidden\]\) \{([^}]+)\}', phone)
     assert panel, "phone bottom bar rule missing"
     assert "position: fixed" in panel.group(1)
     assert "bottom: 0" in panel.group(1)
@@ -175,7 +175,7 @@ def test_simple_panel_is_anchored_while_scrolling():
     assert sticky and "position: sticky" in sticky.group(1)
     assert "var(--simple-rail-top" in sticky.group(1)
     rail_ready = re.search(
-        r'html\[data-mode="simple"\] body\.simple-screen-ready \.search-rail-sticky \{([^}]+)\}',
+        r'body\.simple-screen-ready \.search-rail-sticky \{([^}]+)\}',
         CSS,
     )
     assert rail_ready, "desktop Save panel must park below the Search tile"

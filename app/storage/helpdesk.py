@@ -203,10 +203,10 @@ def create_support_view(
     student_id: str,
     student_username: str,
     reason: str,
-    ui_mode: str = "",
     minutes: int = SUPPORT_VIEW_MINUTES,
     ip: str = "",
 ) -> Dict[str, Any]:
+    """Create a read-only view without recording a layout preference."""
     minutes = max(5, min(int(minutes or SUPPORT_VIEW_MINUTES), SUPPORT_VIEW_MAX_MINUTES))
     token = secrets.token_urlsafe(24)
     now = datetime.now(timezone.utc)
@@ -214,9 +214,6 @@ def create_support_view(
     view_id = str(uuid.uuid4())
     started = now.strftime("%Y-%m-%d %H:%M:%S")
     expires_s = expires.strftime("%Y-%m-%d %H:%M:%S")
-    mode = (ui_mode or "").strip().lower()
-    if mode not in ("simple", "advanced"):
-        mode = "simple"
     with db._lock:
         db.conn.execute(
             "UPDATE support_views SET ended_at = ?, end_reason = 'superseded' "
@@ -226,11 +223,11 @@ def create_support_view(
         db.conn.execute(
             "INSERT INTO support_views "
             "(id, token_hash, admin_id, admin_username, student_id, "
-            "student_username, reason, ui_mode, started_at, expires_at, ip) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "student_username, reason, started_at, expires_at, ip) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 view_id, _hash(token), admin_id, admin_username, student_id,
-                student_username, reason.strip(), mode, started, expires_s, ip,
+                student_username, reason.strip(), started, expires_s, ip,
             ),
         )
         db.conn.commit()
@@ -240,7 +237,6 @@ def create_support_view(
         "started_at": started,
         "expires_at": expires_s,
         "minutes": minutes,
-        "ui_mode": mode,
         "student_username": student_username,
         "admin_username": admin_username,
         "reason": reason.strip(),
@@ -382,6 +378,7 @@ def create_ticket(db, *, student_id: str, student_username: str, body: str, cont
     now = _now()
     ticket_id = str(uuid.uuid4())
     ctx = sanitize_ticket_context(context)
+    ctx.pop("ui_mode", None)
     with db._lock:
         db.conn.execute(
             "INSERT INTO support_tickets "

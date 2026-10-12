@@ -208,7 +208,7 @@ def test_narrow_it_down_undo_and_start_over_still_touch_only_low_relevance():
     ):
         fn = _between(js, start, end)
         assert "/api/screening/excluded?reason=low_relevance" in fn, start
-    dm = _read("static", "js", "data_management.js")
+    dm = _read("static", "js", "collect.js")
     assert "/api/screening/excluded?reason=low_relevance" in dm
     assert "apiCall('/api/screening/excluded')" not in dm
 

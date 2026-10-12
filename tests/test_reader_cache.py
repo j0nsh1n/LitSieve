@@ -114,7 +114,9 @@ def test_prompt_version_bump_invalidates(tmp_path, monkeypatch):
     db = _db(tmp_path)
     try:
         reader_mode.explain_article(db, PAPER, "general_reader")
-        monkeypatch.setattr(reader_mode, "READER_PROMPT_VERSION", "reader_v2")
+        monkeypatch.setattr(
+            reader_mode, "READER_PROMPT_VERSION", reader_mode.READER_PROMPT_VERSION + "-next",
+        )
         reader_mode.explain_article(db, PAPER, "general_reader")
         assert calls["n"] == 2
     finally:

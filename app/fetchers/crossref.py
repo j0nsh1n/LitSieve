@@ -6,7 +6,7 @@ Free API, no authentication required (mailto improves rate limits)
 
 import logging
 import re
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from app.fetchers.base import BaseFetcher, HttpClient, reraise_fetch_error
 
@@ -20,7 +20,7 @@ class CrossRefFetcher(BaseFetcher):
     SOURCE_NAME = 'crossref'
     BASE_URL = 'https://api.crossref.org/works'
 
-    def __init__(self, email: str = None):
+    def __init__(self, email: Optional[str] = None):
         self.email = email
         # Polite Pool UA improves rate limits when mailto is present.
         ua = (
@@ -60,13 +60,13 @@ class CrossRefFetcher(BaseFetcher):
                     break
                 offset += n
             except Exception as e:
-                reraise_fetch_error(e)
+                reraise_fetch_error(e, articles)
                 logger.exception("CrossRef fetch error: %s", e)
                 break
 
         return articles[:max_results]
 
-    def _parse_item(self, item: Dict) -> Dict:
+    def _parse_item(self, item: Dict) -> Optional[Dict]:
         try:
             doi = item.get('DOI', '').strip()
             titles = item.get('title', [])

@@ -8,7 +8,67 @@ and this project aims to follow Semantic Versioning for app version strings
 
 ## [Unreleased]
 
+## [6.0.0] - 2026-10-11
+
+### Fixed
+- Version 6.0.0 uses one Search workspace. Collection, screening,
+  themes, ranking, and export remain on Search; old page URLs permanently
+  redirect there. Removed the mode toggle and preference writes, preserved
+  historical helpdesk context, and added a one-time layout notice.
+- Raised dependency security floors for PyJWT, urllib3, AnyIO,
+  and fsspec; verified an upgraded environment with no known audit findings.
+- Refine, Ask, and Explain treat paper text as evidence rather
+  than instructions. Explain regenerates cached answers under the new prompt.
+- Startup warns when the retired global AI settings file exists
+  without host AI configuration, without reading the file or its secrets.
+- Cleared the app's type-checking errors and made Pyright blocking
+  in CI. A regression check now catches disagreement between the look lists.
+- A timed-out source with one retained article says "1 paper".
+- Fetch sources share a configurable 90-second budget across
+  pages, requests, and retry waits. Completed pages survive a timeout, and
+  progress identifies queued, running, completed, and timed-out sources.
+- Detached deploy completion is covered by database-reopen tests
+  for successful deploys and automatic rollbacks, with a host verification checklist.
+- Operator rollback runs in a detached unit when available,
+  carries the operator identity, and polls for completion across the site restart.
+- Checkboxes and radio buttons are sized to their label's text instead of a
+  fixed 20px, so they no longer dwarf small print like Show passwords
+  (14px beside 12px text); touch screens keep a 20px box for thumbs. The
+  Change password and Delete My Account buttons no longer touch the
+  checkbox above them.
+- Selected text is readable in dark mode. It was white on a light accent,
+  below 2:1 in Night dark; it is now the normal text colour on a soft
+  accent tint, 7:1 or better in every look.
+- A press in the top edge of a button, topic card, or result action now
+  registers. They dip 2px while pressed, so the release landed above them
+  and the click was lost.
+- Account Look showed the heading with no colour choices. The picker now
+  lists the five looks in the page itself, so a running server that has
+  not reloaded Python still draws the cards.
+- Look is no longer a section on the register form. After Create Account,
+  Search opens a dialog with the five choices. Login does not reopen it.
+
 ### Added
+- Group by theme runs as a background job with progress, then
+  opens an accessible theme browser with abstracts. Preview selected papers
+  before setting them aside, with an Undo limited to those papers.
+- Re-prepare keeps the research question, defaults to missing
+  papers, and offers the allowed analysis models in a disclosure. Manual
+  and automatic preparation share the wait screen and remembered model choice.
+- What we fetched shows source/year counts and refreshable
+  coverage. Duplicate checking offers Strict, Normal, and Loose previews,
+  applies selected copies, and can undo exactly those copies.
+- The fetch popup includes database choices and a remembered
+  contact email when PubMed or Europe PMC is selected. Cancel leaves choices unchanged.
+- Save your work offers visible results, all papers, kept papers,
+  set-aside papers, or starred papers. Downloads stay bound to the page's library.
+- Search by switches between a question, PICO fields, and a
+  paper already in the collection. Saved manual seed searches and More like
+  this searches restore their own behavior.
+- Simple Search gains reason chips in Set aside and the Not
+  relevant Undo strip, source and sort chips, starred-paper ranking, and
+  exact-word/PICO ranking options. Paper identifiers and study type appear
+  inside the abstract disclosure. Existing Slice 2/3 work is integrated locally.
 - Set aside papers: a popup on Search (More, or the funnel's "See set-aside
   papers") that lists every paper left out of your searches, grouped by why
   (marked not relevant, set aside by Narrow it down, duplicate copies, and so
@@ -58,23 +118,6 @@ and this project aims to follow Semantic Versioning for app version strings
 - The Collect help page explains the per-database paper count asked before a
   Simple fetch, and the Account help page explains that your look is saved
   on your account.
-- New look, Workshop: warm sand paper with a clay accent in light, warm
-  wood tones in dark, and every card, button, chip, and the query tile
-  sitting on a solid edge that presses down when you click. No blur
-  anywhere; a faint paper grain sits over the page. Both themes keep every
-  ink above 4.5:1.
-- Simple search results open in place. Rows show score, venue, title, and
-  byline; the top result opens by default and any row opens on click or
-  with its Open button (Enter or Space), closing the one before. Star,
-  Note, and Not relevant sit in one row under the open card.
-- Simple collect is one guided column: three questions instead of numbered
-  steps, topic areas as chips with line icons, a Next button that reveals
-  the topic box and focuses it, and Max results and fetch mode kept out of
-  the way. Advanced keeps its numbered steps and every control.
-- Motion: results settle in with a spring, chips bounce when picked,
-  starring a paper pops once, the wait screen's sieve shakes harder over a
-  striped bar and each status line rises in, and the open row slides open.
-  Reduced motion turns all of it off.
 - Pressing Find articles on your topic in Simple opens one dialog first:
   how many papers from each database, as preset chips (25, 50, 100, 200)
   or a number you write yourself (10 to 2000), and, when the collection
@@ -97,23 +140,9 @@ and this project aims to follow Semantic Versioning for app version strings
   Toasts, the screening triage overlay, and its detail pane were anchored
   the same wrong way and are fixed by the same change.
 
+## [5.5.0] - 2026-09-17
+
 ### Fixed
-- Checkboxes and radio buttons are sized to their label's text instead of a
-  fixed 20px, so they no longer dwarf small print like Show passwords
-  (14px beside 12px text); touch screens keep a 20px box for thumbs. The
-  Change password and Delete My Account buttons no longer touch the
-  checkbox above them.
-- Selected text is readable in dark mode. It was white on a light accent,
-  below 2:1 in Night dark; it is now the normal text colour on a soft
-  accent tint, 7:1 or better in every look.
-- A press in the top edge of a button, topic card, or result action now
-  registers. They dip 2px while pressed, so the release landed above them
-  and the click was lost.
-- Account Look showed the heading with no colour choices. The picker now
-  lists the five looks in the page itself, so a running server that has
-  not reloaded Python still draws the cards.
-- Look is no longer a section on the register form. After Create Account,
-  Search opens a dialog with the five choices. Login does not reopen it.
 - Light success green meets 4.5:1 contrast on the page wash.
 - The phone top bar shows the full LitSieve wordmark.
 - Frosted surfaces stay solid when the browser cannot blur.
@@ -122,6 +151,25 @@ and this project aims to follow Semantic Versioning for app version strings
 - A source that failed during fetch is marked as failed, not as empty.
 - Detached operator deploys start in the live checkout with its `.env`, so
   the audit row writes to the live accounts database.
+
+### Changed
+- New look, Workshop: warm sand paper with a clay accent in light, warm
+  wood tones in dark, and every card, button, chip, and the query tile
+  sitting on a solid edge that presses down when you click. No blur
+  anywhere; a faint paper grain sits over the page. Both themes keep every
+  ink above 4.5:1.
+- Simple search results open in place. Rows show score, venue, title, and
+  byline; the top result opens by default and any row opens on click or
+  with its Open button (Enter or Space), closing the one before. Star,
+  Note, and Not relevant sit in one row under the open card.
+- Simple collect is one guided column: three questions instead of numbered
+  steps, topic areas as chips with line icons, a Next button that reveals
+  the topic box and focuses it, and Max results and fetch mode kept out of
+  the way. Advanced keeps its numbered steps and every control.
+- Motion: results settle in with a spring, chips bounce when picked,
+  starring a paper pops once, the wait screen's sieve shakes harder over a
+  striped bar and each status line rises in, and the open row slides open.
+  Reduced motion turns all of it off.
 
 ## [5.4.0] - 2026-09-13
 

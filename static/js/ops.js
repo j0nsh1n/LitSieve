@@ -866,7 +866,7 @@ async function commit() {
  * few seconds — a failed poll is not a failed deploy and must not be reported
  * as one. Only a terminal record, or running out of attempts, ends the wait.
  */
-async function followDeploy(sha, status) {
+async function followDeploy(sha, status, action = 'deploy', dispatchId = '') {
  const PHASES = {
   started: 'preparing',
   reset: 'updating checkout',
@@ -884,39 +884,40 @@ async function followDeploy(sha, status) {
    state = await apiCall('/api/ops/deploy-state');
   } catch (e) {
    // Expected while the worker is down. Keep waiting.
-   if (status) status.textContent = 'deploy ' + shortSha(sha) + ' — site restarting…';
+   if (status) status.textContent = action + ' ' + shortSha(sha) + ' — site restarting…';
    continue;
   }
   const rec = state && state.record;
   if (!rec) continue;
+  if (dispatchId && rec.dispatch_id !== dispatchId) continue;
   const phase = String(rec.phase || '');
   if (phase && phase !== lastPhase) {
    lastPhase = phase;
    const label = PHASES[phase] || phase;
-   if (status) status.textContent = 'deploy ' + shortSha(sha) + ' — ' + label;
-   appendOutput('deploy ' + shortSha(sha) + ': ' + label);
+   if (status) status.textContent = action + ' ' + shortSha(sha) + ' — ' + label;
+   appendOutput(action + ' ' + shortSha(sha) + ': ' + label);
   }
   if (!state.in_flight && phase === 'done') {
    const result = String(rec.result || '');
    const detail = String(rec.detail || '');
    if (result === 'ok') {
-    if (status) status.textContent = 'deploy ' + shortSha(sha) + ' — done';
-    showNotification('Deployed.', 'success');
+    if (status) status.textContent = action + ' ' + shortSha(sha) + ' — done';
+    showNotification(action === 'rollback' ? 'Rolled back.' : 'Deployed.', 'success');
    } else if (result === 'rolled_back') {
-    if (status) status.textContent = 'deploy ' + shortSha(sha) + ' — rolled back';
+    if (status) status.textContent = action + ' ' + shortSha(sha) + ' — rolled back';
     showNotification(detail || 'Health check failed; previous commit restored.', 'warning');
    } else {
-    if (status) status.textContent = 'deploy ' + shortSha(sha) + ' — failed';
-    showNotification(detail || 'Deploy failed.', 'error');
+    if (status) status.textContent = action + ' ' + shortSha(sha) + ' — failed';
+    showNotification(detail || (action === 'rollback' ? 'Rollback failed.' : 'Deploy failed.'), 'error');
    }
-   appendOutput('deploy ' + shortSha(sha) + ': ' + (result || 'finished') + (detail ? ' — ' + detail : ''));
+   appendOutput(action + ' ' + shortSha(sha) + ': ' + (result || 'finished') + (detail ? ' — ' + detail : ''));
    return;
   }
  }
  // Timed out watching. The deploy owns its own outcome, so say that plainly
  // rather than claiming it failed.
- if (status) status.textContent = 'deploy ' + shortSha(sha) + ' — still running';
- showNotification('Still deploying. Check Ship history or the host journal.', 'warning');
+ if (status) status.textContent = action + ' ' + shortSha(sha) + ' — still running';
+ showNotification('Still running. Check Ship history or the host journal.', 'warning');
 }
 
 async function deploy() {
@@ -1044,8 +1045,13 @@ async function rollbackTo(sha) {
  const status = document.getElementById('ops-ship-status');
  try {
   const data = await apiCall('/api/ops/rollback', { method: 'POST', body: { sha } });
-  if (status) status.textContent = `rollback ${shortSha(data.sha)}`;
-  appendOutput('rollback ' + shortSha(data.sha));
+  if (data && data.dispatched) {
+   appendOutput('rollback ' + shortSha(data.sha) + ' dispatched to ' + (data.unit || 'unit'));
+   await followDeploy(data.sha, status, 'rollback', data.dispatch_id);
+  } else {
+   if (status) status.textContent = `rollback ${shortSha(data.sha)}`;
+   appendOutput('rollback ' + shortSha(data.sha));
+  }
   await loadStatus();
  } catch (e) {
   if (status) status.textContent = e.message || 'Rollback failed';

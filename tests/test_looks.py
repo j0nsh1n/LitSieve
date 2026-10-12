@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import pytest
 from conftest import TEST_PASSWORD
 from fastapi.testclient import TestClient
 
@@ -58,6 +59,24 @@ def _rule_body(css: str, needle: str) -> str:
             if depth == 0:
                 return css[brace + 1 : j]
     raise AssertionError(f"unbalanced {needle}")
+
+
+def _theme_look_ids(theme_source: str) -> set[str]:
+    match = re.search(r"var LOOKS = \{([^}]*)\};", theme_source)
+    assert match, "theme-init.js must define its look allowlist"
+    return set(re.findall(r"([a-z][a-z0-9_-]*)\s*:", match.group(1)))
+
+
+def _picker_look_ids(html: str) -> set[str]:
+    return set(re.findall(r'data-look-pick="([^"]+)"', html))
+
+
+def _assert_look_ids_agree(app_ids, theme_source: str, picker_html: str) -> None:
+    app_ids = set(app_ids)
+    theme_ids = _theme_look_ids(theme_source)
+    picker_ids = _picker_look_ids(picker_html)
+    assert theme_ids == app_ids, f"theme-init look IDs differ: {theme_ids ^ app_ids}"
+    assert picker_ids == app_ids, f"look picker IDs differ: {picker_ids ^ app_ids}"
 
 
 def _srgb_channel(value: float) -> float:
@@ -123,7 +142,7 @@ def test_register_defaults_workshop_and_opens_look_prompt(tmp_path, monkeypatch)
     assert r.status_code in (302, 303), r.text
     assert "pickLook=1" in (r.headers.get("location") or "")
     assert r.cookies.get("ui_look") == "workshop"
-    assert r.cookies.get("ui_mode_seed") == "simple"
+    assert r.cookies.get("ui_mode_seed") is None
     assert r.cookies.get("ui_look_prompt") == "1"
     row = db.get_by_username("lookstudent")
     assert row is not None
@@ -175,7 +194,7 @@ def test_login_sets_look_cookie_from_account(tmp_path, monkeypatch):
     assert r2.status_code in (302, 303)
     assert "pickLook" not in (r2.headers.get("location") or "")
     assert r2.cookies.get("ui_look") == "catalog"
-    assert r2.cookies.get("ui_mode_seed") in (None, "")
+    assert r2.cookies.get("ui_mode_seed") is None
     assert r2.cookies.get("ui_look_prompt") in (None, "")
 
 
@@ -252,6 +271,20 @@ def test_theme_init_applies_look_from_cookie_before_local_storage():
     assert "window.applyUiLook" in INIT
     for look_id in LOOKS:
         assert look_id in INIT
+
+
+def test_look_ids_match_app_theme_and_rendered_picker():
+    from jinja2 import Environment, FileSystemLoader
+
+    env = Environment(loader=FileSystemLoader(str(REPO / "templates")), autoescape=True)
+    picker_html = env.get_template("partials/look_picker.html").render()
+    _assert_look_ids_agree(LOOKS, INIT, picker_html)
+
+    # A copied, deliberately drifted theme allowlist must be rejected by the
+    # same comparison, without changing the shared source file.
+    drifted_theme = INIT.replace("catalog:1", "catalogue:1", 1)
+    with pytest.raises(AssertionError, match="theme-init look IDs differ"):
+        _assert_look_ids_agree(LOOKS, drifted_theme, picker_html)
 
 
 def test_look_prompt_opens_after_register_not_login():

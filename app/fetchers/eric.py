@@ -6,9 +6,9 @@ Free API, no authentication required
 """
 
 import logging
-from typing import Dict, List
+from typing import Dict, List, Optional
 
-from app.fetchers.base import BaseFetcher, FetchError, HttpClient
+from app.fetchers.base import BaseFetcher, FetchError, HttpClient, reraise_fetch_error
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +17,7 @@ class ERICFetcher(BaseFetcher):
     SOURCE_NAME = 'eric'
     BASE_URL = 'https://api.ies.ed.gov/eric/'
 
-    def __init__(self, email: str = None):
+    def __init__(self, email: Optional[str] = None):
         self.email = email
         self.http = HttpClient(delay=0.3)
 
@@ -51,14 +51,14 @@ class ERICFetcher(BaseFetcher):
                 start += len(docs)
             except FetchError as e:
                 logger.exception("ERIC fetch error: %s", e)
-                raise
+                reraise_fetch_error(e, articles)
             except Exception as e:
                 logger.exception("ERIC fetch error: %s", e)
                 break
 
         return articles[:max_results]
 
-    def _parse_doc(self, doc: Dict) -> Dict:
+    def _parse_doc(self, doc: Dict) -> Optional[Dict]:
         try:
             title = (doc.get('title') or '').strip()
             abstract = (doc.get('description') or '').strip()

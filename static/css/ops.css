@@ -76,8 +76,7 @@ html[data-theme="light"] body.ops-workbench {
 }
 body.ops-workbench .navbar,
 body.ops-workbench .footer,
-html[data-mode="simple"] body.ops-workbench .navbar,
-html[data-mode="simple"] body.ops-workbench .app-shell {
+body.ops-workbench .app-shell {
     display: none !important;
 }
 body.ops-workbench #page-main.ops-page {

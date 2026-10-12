@@ -216,7 +216,7 @@ def ensure_libraries(user_id: str) -> Dict:
             meta = _migrate_legacy_unlocked(user_id)
             libs = {L["id"]: L for L in meta["libraries"]}
             active = meta["active_id"]
-        if active not in libs:
+        if active is None or active not in libs:
             active = next(iter(libs))
             meta["active_id"] = active
             _write_meta_unlocked(user_id, meta)

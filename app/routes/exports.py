@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from app.core import (
     csrf_failed,
     current_user,
+    get_owned_pipeline,
     get_pipeline,
     limiter,
     release_pipeline,
@@ -71,7 +72,7 @@ def _format_ranked_export(results: List[dict], fmt: str):
 
 @router.post("/api/export/selection")
 @limiter.limit("30/minute")
-async def api_export_selection(req: ExportSelectionRequest, request: Request):
+async def api_export_selection(req: ExportSelectionRequest, request: Request, library_id: str = ""):
     """Export the exact ordered list of papers shown in Search (what you see is what you get)."""
     user = current_user(request)
     if not user:
@@ -90,7 +91,10 @@ async def api_export_selection(req: ExportSelectionRequest, request: Request):
     if len(items) > 2000:
         return JSONResponse(status_code=400, content={"detail": "Too many papers (max 2000)."})
     uid = user["user_id"]
-    p = get_pipeline(uid)
+    try:
+        p = get_owned_pipeline(uid, library_id or None)
+    except ValueError:
+        return JSONResponse(status_code=400, content={"detail": "Invalid library"})
     try:
         def _load():
             rows = []
@@ -115,7 +119,7 @@ async def api_export_selection(req: ExportSelectionRequest, request: Request):
     except Exception as e:
         return server_error()
     finally:
-        release_pipeline(uid)
+        release_pipeline(uid, library_id or None)
 
 
 def _library_rows_to_csv(rows: List[dict]) -> str:
@@ -150,6 +154,7 @@ async def api_export_library(
     request: Request,
     scope: str = "all",
     format: str = "csv",
+    library_id: str = "",
 ):
     """Export the collection with cluster membership and exclusion reasons.
 
@@ -165,7 +170,10 @@ async def api_export_library(
     if fmt not in ("csv", "txt", "ris", "bibtex", "apa"):
         return JSONResponse(status_code=400, content={"detail": "Invalid format"})
     uid = user["user_id"]
-    p = get_pipeline(uid)
+    try:
+        p = get_owned_pipeline(uid, library_id or None)
+    except ValueError:
+        return JSONResponse(status_code=400, content={"detail": "Invalid library"})
     try:
         rows = p.db.get_library_export_rows(scope=scope)
         if fmt == "ris":
@@ -209,7 +217,7 @@ async def api_export_library(
     except Exception as e:
         return server_error()
     finally:
-        release_pipeline(uid)
+        release_pipeline(uid, library_id or None)
 
 
 @router.get("/api/screening-report")

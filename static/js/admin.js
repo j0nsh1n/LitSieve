@@ -220,7 +220,7 @@ function renderDetail(d) {
  const jobList = document.getElementById('helpdesk-jobs');
  if (jobList) {
   const jobs = d.jobs || {};
-  jobList.innerHTML = ['fetch', 'embed'].map((k) => {
+  jobList.innerHTML = ['fetch', 'embed', 'cluster'].map((k) => {
    const j = jobs[k] || {};
    const state = j.state || (j.active ? 'active' : (j.error ? 'failed' : 'idle'));
    const bits = [
@@ -598,7 +598,6 @@ async function startStudentView() {
   {
    fields: [
     { id: 'password', label: 'Your admin password', type: 'password', value: '' },
-    { id: 'ui_mode', label: 'UI mode (simple or advanced)', type: 'text', value: 'simple' },
    ],
    validate: (v) => (String(v.password || '') ? null : 'Password is required.'),
   },
@@ -611,7 +610,6 @@ async function startStudentView() {
    body: {
     reason: body.reason,
     password: body.password,
-    ui_mode: body.ui_mode || 'simple',
    },
   });
   if (status) status.textContent = 'Opening student view…';

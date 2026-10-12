@@ -276,7 +276,7 @@ async function doShareLibrary(lib) {
    'To use the code:',
    '1) Log in → Account → Optional: copy a library via code (or open /join).',
    '2) Switch to the new library in the nav Library menu.',
-   '3) Clean up → Search; export RIS as needed. (Advanced: Clusters optional.)',
+   '3) Open Search to screen, rank, and export papers.',
    '',
    'Starting point only (public databases) — verify important papers elsewhere.',
   ].join('\n');
@@ -369,7 +369,7 @@ function renderSharesList(shares) {
      'Steps:',
      '1. Log in → Account → Optional: copy a library via code (or open /join).',
      '2. Switch to the new library in the nav Library menu.',
-     '3. Clean up → Search; export RIS if needed. (Advanced: Clusters optional.)',
+     '3. Open Search to screen, rank, and export papers.',
      '',
      'Starting point only (public databases) — verify important papers elsewhere.',
     ].join('\n');
@@ -472,9 +472,9 @@ async function doAccountJoin() {
  try {
   const data = await apiCall('/api/shares/join', { method: 'POST', body: { code } });
   const name = (data.library && data.library.name) || 'library';
-  setStatus('account-join-status', `Added "${name}". Opening Data Management…`, 'success');
+  setStatus('account-join-status', `Added "${name}". Opening Search…`, 'success');
   showNotification(`Added library: ${name}`, 'success');
-  window.location.href = '/data-management';
+  window.location.href = '/search';
  } catch (e) {
   setStatus('account-join-status', e.message, 'error');
   showNotification(e.message, 'error');
@@ -494,7 +494,7 @@ async function doCreateLibrary() {
  setStatus('library-manage-status', 'Library created and set as active.', 'success');
  showNotification('Library created.', 'success');
  if (typeof refreshLibrarySwitcher === 'function') await refreshLibrarySwitcher();
- // New library is active and empty; reload so Data Management reflects it.
+ // New library is active and empty; reload so Search reflects it.
  window.location.reload();
  } catch (e) {
  setStatus('library-manage-status', e.message, 'error');
