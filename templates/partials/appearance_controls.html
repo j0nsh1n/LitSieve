@@ -1,0 +1,20 @@
+{# Fine-tuning on top of the account look. Buttons start unpressed; common.js
+   presses the painted values from <html data-*> on load. #}
+{% set settings = appearance_settings if appearance_settings is defined and appearance_settings else {} %}
+<div class="appearance-controls" data-appearance-controls>
+ {% for key, spec in settings.items() %}
+ <fieldset class="appearance-setting" data-setting="{{ key }}">
+  <legend>{{ spec[0] }}</legend>
+  <div class="appearance-options">
+   {% for value, label in spec[1] %}
+   <button type="button" class="appearance-option{% if key == 'accent' %} appearance-option--swatch appearance-swatch--{{ value }}{% endif %}"
+     data-value="{{ value }}" aria-pressed="false">{{ label }}</button>
+   {% endfor %}
+  </div>
+ </fieldset>
+ {% endfor %}
+ <div class="appearance-actions">
+  <button type="button" class="btn btn-secondary btn-sm" data-appearance-reset>Reset to this look</button>
+  <span class="status-indicator" data-appearance-status role="status"></span>
+ </div>
+</div>

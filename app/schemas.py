@@ -1,6 +1,6 @@
 """Pydantic request models for the HTTP API."""
 
-from typing import List, Literal, Optional
+from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -251,6 +251,13 @@ class ShareJoinRequest(BaseModel):
 
 class SetLookRequest(BaseModel):
     look: str = Field(..., min_length=1, max_length=32)
+
+
+class SetAppearanceRequest(BaseModel):
+    appearance: Dict[str, str] = Field(default_factory=dict, max_length=16)
+    # The look the student made these changes on; a different stored look
+    # means another tab changed it, and the request is refused.
+    look: Optional[str] = Field(default=None, max_length=32)
 
 
 class SetEmailRequest(BaseModel):

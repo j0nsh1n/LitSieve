@@ -694,7 +694,9 @@ def test_paper_grain_is_gradients_not_svg():
     assert "html::before" in CSS
     grain = re.search(r"body::before \{([^}]+)\}", CSS)
     assert grain, "body::before grain missing"
-    assert "radial-gradient(var(--grain-ink)" in grain.group(1)
+    assert "var(--page-grain)" in grain.group(1)
+    page_grain = re.search(r"--page-grain:([^;]+);", CSS)
+    assert page_grain and "radial-gradient(var(--grain-ink)" in page_grain.group(1)
     assert "pointer-events: none" in grain.group(1)
     body = CSS[CSS.find("\nbody {") : CSS.find("\n::selection")]
     assert "background-image" not in body
@@ -788,6 +790,8 @@ RUNTIME_SET_VARS = {
     "--score-pct",       # search.js: score ring + fill
     "--bar-pct",         # statistics.js: source / year bars
     "--simple-panel-h",  # search.js: measured bottom-bar clearance
+    "--search-band-h",   # search.js: strip behind the pinned Search tile
+    "--reader-top",      # search.js: top edge for the grid reading panel
     "--range-fill",      # range input progress
     "--wait-pct",        # simple wait bar fill
     "--funnel-kept-pct",     # search.js: simple screening funnel
@@ -818,9 +822,13 @@ def test_no_css_var_falls_back_to_a_hardcoded_colour():
     )
 
 
-def test_no_backdrop_filter_anywhere():
-    """Workshop surfaces are solid. A blur rule means someone brought frost back."""
-    assert "backdrop-filter" not in _css_without_comments()
+def test_no_backdrop_filter_on_surfaces():
+    """Surfaces are solid. A blur rule means someone brought frost back. The
+    one exception is the soft edge where results slide under the pinned
+    Search tile, which the product owner asked for."""
+    css = _css_without_comments()
+    rules = re.findall(r"([^{}]+)\{[^{}]*backdrop-filter", css)
+    assert [r.strip() for r in rules] == [".search-band-blur"], rules
 
 
 def test_workshop_motion_hooks_are_wired():

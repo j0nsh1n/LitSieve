@@ -5,6 +5,7 @@ per-user article data.
 """
 
 import hashlib
+import json
 import os
 import secrets
 import threading
@@ -12,6 +13,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple
 
+from app.content.appearance import parse_overrides
 from app.content.looks import DEFAULT_LOOK, normalize_look, parse_look
 from app.storage import dbconn
 
@@ -52,6 +54,14 @@ def users_db_path() -> str:
     ``LOG_FILE``; see run_dev.sh, which sets all three.
     """
     return (os.getenv("USERS_DB") or "").strip() or DEFAULT_USERS_DB
+
+
+class LookChanged(Exception):
+    """Settings were made on a look the account no longer has."""
+
+    def __init__(self, current_look: str):
+        super().__init__(current_look)
+        self.current_look = current_look
 
 
 class UserDatabase:
@@ -221,6 +231,10 @@ class UserDatabase:
             self.conn.execute(
                 "ALTER TABLE users ADD COLUMN look TEXT NOT NULL DEFAULT 'workshop'"
             )
+        if "appearance" not in extra:
+            self.conn.execute(
+                "ALTER TABLE users ADD COLUMN appearance TEXT NOT NULL DEFAULT ''"
+            )
         self.conn.execute("""
             CREATE TABLE IF NOT EXISTS support_notes (
                 id              TEXT PRIMARY KEY,
@@ -333,6 +347,7 @@ class UserDatabase:
             "token_version": 0,
             "is_guest": bool(guest),
             "look": look,
+            "appearance": {},
         }
 
     def registration_closed_reason(self) -> Optional[str]:
@@ -356,14 +371,38 @@ class UserDatabase:
         if parsed is None:
             return None
         with self._lock:
+            # A look is a preset: choosing one starts its settings fresh.
             cur = self.conn.execute(
-                "UPDATE users SET look = ? WHERE id = ?",
+                "UPDATE users SET look = ?, appearance = '' WHERE id = ?",
                 (parsed, user_id),
             )
             self.conn.commit()
             if cur.rowcount == 0:
                 return None
         return parsed
+
+    def set_appearance(
+        self, user_id: str, overrides: Dict[str, str], expected_look: Optional[str] = None
+    ) -> Optional[Tuple[str, Dict[str, str]]]:
+        """Persist settings changed on top of the account's look. Returns the
+        look they were stored against and the stored overrides, or None if the
+        id is unknown. Raises LookChanged if expected_look is given and the
+        stored look differs."""
+        with self._lock:
+            row = self.conn.execute(
+                "SELECT COALESCE(look, 'workshop') FROM users WHERE id = ?", (user_id,)
+            ).fetchone()
+            if not row:
+                return None
+            if expected_look is not None and normalize_look(expected_look) != normalize_look(row[0]):
+                raise LookChanged(normalize_look(row[0]))
+            parsed = parse_overrides(overrides, row[0])
+            self.conn.execute(
+                "UPDATE users SET appearance = ? WHERE id = ?",
+                (json.dumps(parsed, sort_keys=True) if parsed else "", user_id),
+            )
+            self.conn.commit()
+        return normalize_look(row[0]), parsed
 
     _USER_COLS = (
         "id, username, hashed_password, token_version, email, email_verified, "
@@ -372,7 +411,7 @@ class UserDatabase:
         "password_changed_at, COALESCE(storage_bytes, 0), "
         "quota_limit_mb, quota_limit_until, "
         "disabled_until, disabled_message, disabled_at, "
-        "COALESCE(look, 'workshop')"
+        "COALESCE(look, 'workshop'), COALESCE(appearance, '')"
     )
 
     @staticmethod
@@ -403,6 +442,7 @@ class UserDatabase:
             "disabled_message": row[17],
             "disabled_at": row[18],
             "look": normalize_look(row[19] if len(row) > 19 else None),
+            "appearance": parse_overrides(row[20] if len(row) > 20 else "", row[19] if len(row) > 19 else None),
         }
 
     def get_by_username(self, username: str) -> Optional[Dict]:

@@ -113,7 +113,8 @@
     --radius-full: 999px;
 
     /* Surfaces: solid paper with a tool edge under cards and buttons, a
-       highlight on top, and a faint grain over the page. No blur anywhere. */
+       highlight on top, and a faint grain over the page. No blur, except the
+       soft edge where results slide under the pinned Search tile. */
     --edge: #cbbba4;
     --sheen: inset 0 1px 0 rgba(255, 255, 255, 0.7);
     --scrim: rgba(42, 33, 24, 0.35);
@@ -244,11 +245,6 @@ html[data-look="broadsheet"] {
     --elev-2: none;
     --elev-card: none;
     --grain-opacity: 0;
-    --radius-sm: 0;
-    --radius-md: 0;
-    --radius-lg: 0;
-    --font-sans: Georgia, "Iowan Old Style", "Times New Roman", serif;
-    --font-serif: Georgia, "Iowan Old Style", "Times New Roman", serif;
 }
 html[data-look="broadsheet"][data-theme="dark"] {
     --bg: #1c1a15;
@@ -287,11 +283,6 @@ html[data-look="lab"] {
     --elev-2: 0 8px 24px rgba(14, 21, 36, 0.1);
     --elev-card: 0 1px 2px rgba(14, 21, 36, 0.06);
     --grain-opacity: 0;
-    --radius-sm: 6px;
-    --radius-md: 8px;
-    --radius-lg: 10px;
-    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    --font-serif: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 html[data-look="lab"][data-theme="dark"] {
     --bg: #0f1320;
@@ -312,6 +303,8 @@ html[data-look="lab"][data-theme="dark"] {
     --elev-2: 0 12px 28px rgba(0, 0, 0, 0.5);
     --elev-card: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
+/* The :not() form outranks the system-dark Workshop palette on :root. */
+html[data-look="night"]:not([data-theme="light"]),
 html[data-look="night"] {
     --bg: #12141b;
     --surface: #181b24;
@@ -333,11 +326,6 @@ html[data-look="night"] {
     --elev-2: 0 14px 36px rgba(0, 0, 0, 0.5);
     --elev-card: 0 8px 24px rgba(0, 0, 0, 0.35);
     --grain-opacity: 0;
-    --radius-sm: 8px;
-    --radius-md: 10px;
-    --radius-lg: 12px;
-    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    --font-serif: Georgia, "Iowan Old Style", serif;
     --lamp: rgba(226, 166, 92, 0.07);
 }
 html[data-look="night"][data-theme="dark"] {
@@ -399,11 +387,6 @@ html[data-look="catalog"] {
     --elev-2: 2px 4px 0 #d9cbae, 6px 8px 14px rgba(60, 50, 30, 0.12);
     --elev-card: 1px 2px 0 #d9cbae, 3px 4px 8px rgba(60, 50, 30, 0.08);
     --grain-opacity: 0;
-    --radius-sm: 3px;
-    --radius-md: 4px;
-    --radius-lg: 4px;
-    --font-sans: Georgia, "Iowan Old Style", serif;
-    --font-serif: Georgia, "Iowan Old Style", serif;
     --row-lines: repeating-linear-gradient(180deg, transparent 0 1.55rem, #b9c8d8 1.55rem calc(1.55rem + 1px));
 }
 html[data-look="catalog"][data-theme="dark"] {
@@ -487,13 +470,16 @@ html[data-look="broadsheet"] .navbar,
 html[data-look="broadsheet"] .public-nav {
     border-bottom: 3px double var(--text);
 }
+/* The lamp hangs over the window, not the top of the document. Night's body
+   paints its own ground, so the shared glow never shows there. */
+html[data-look="night"] {
+    --page-lamp: radial-gradient(60rem 28rem at 72% -8%, var(--lamp, transparent), transparent);
+    --page-glow: linear-gradient(transparent, transparent);
+}
 html[data-look="night"] body {
     background-color: var(--bg);
-    background-image: radial-gradient(60rem 28rem at 72% -8%, var(--lamp, transparent), transparent);
-}
-html[data-look="catalog"] .result-row {
-    border-top: 2px solid var(--accent);
-    background-image: var(--row-lines);
+    background-image: var(--page-lamp);
+    background-attachment: fixed;
 }
 
 /* Theme toggle: View Transitions circular wipe when the API exists.
@@ -610,18 +596,26 @@ html {
     color-scheme: light dark;
     background: var(--bg);
 }
+/* The page backdrop, as layers anything pinned to the window can repaint
+   (the strip behind the pinned Search tile) and line up exactly. */
+html {
+    --page-glow:
+        radial-gradient(ellipse 90% 55% at 8% -8%,
+            color-mix(in srgb, var(--accent) 12%, transparent), transparent 58%),
+        radial-gradient(ellipse 70% 45% at 100% 0%,
+            color-mix(in srgb, #e8b98a 14%, transparent), transparent 52%);
+    --page-lamp: linear-gradient(transparent, transparent);
+    --page-grain:
+        radial-gradient(var(--grain-ink) 0.6px, transparent 0.7px),
+        radial-gradient(var(--grain-light) 0.5px, transparent 0.6px);
+}
 html::before {
     content: "";
     position: fixed;
     inset: 0;
     z-index: -1;
     pointer-events: none;
-    background:
-        radial-gradient(ellipse 90% 55% at 8% -8%,
-            color-mix(in srgb, var(--accent) 12%, transparent), transparent 58%),
-        radial-gradient(ellipse 70% 45% at 100% 0%,
-            color-mix(in srgb, #e8b98a 14%, transparent), transparent 52%),
-        var(--bg);
+    background: var(--page-glow), var(--bg);
 }
 
 /* Paper grain: two dot lattices at low opacity, drawn with gradients so no
@@ -634,9 +628,7 @@ body::before {
     z-index: 0;
     pointer-events: none;
     opacity: var(--grain-opacity);
-    background-image:
-        radial-gradient(var(--grain-ink) 0.6px, transparent 0.7px),
-        radial-gradient(var(--grain-light) 0.5px, transparent 0.6px);
+    background-image: var(--page-grain);
     background-size: 7px 7px, 11px 11px;
     background-position: 0 0, 3px 5px;
 }
@@ -772,11 +764,12 @@ body {
     color: var(--text);
 }
 
-/* Accessible focus — visible only for keyboard nav */
+/* Accessible focus — visible only for keyboard nav. An outline, so a
+   control's own box-shadow (pressed edges, cards) can never erase it. */
 :focus { outline: none; }
 :focus-visible {
-    outline: none;
-    box-shadow: var(--focus-ring);
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
 }
 
 /* === Navigation — Phase 8 B Workbench shell ===
@@ -1204,6 +1197,11 @@ html[data-theme="dark"] .theme-toggle .icon-moon { display: block; }
     :root:not([data-theme="light"]) .theme-toggle .icon-sun { display: none; }
     :root:not([data-theme="light"]) .theme-toggle .icon-moon { display: block; }
 }
+/* data-tone is the tone as painted, which also covers the dark-first looks. */
+html[data-tone="dark"] .theme-toggle .icon-sun { display: none; }
+html[data-tone="dark"] .theme-toggle .icon-moon { display: block; }
+html[data-tone="light"] .theme-toggle .icon-sun { display: block; }
+html[data-tone="light"] .theme-toggle .icon-moon { display: none; }
 
 .theme-toggle:hover {
     color: var(--accent);
@@ -1472,6 +1470,7 @@ textarea { resize: vertical; border-radius: var(--radius-md); }
     cursor: pointer;
     padding: var(--space-1) var(--space-3);
     border: 1px solid var(--rule);
+    border-radius: var(--radius-sm);
     background: var(--surface);
     transition:
         border-color var(--dur-fast) var(--ease-soft),
@@ -4410,6 +4409,8 @@ body.simple-collecting #search-query-top {
 .look-card-swatch--lab { background: linear-gradient(#f6f7f9 62%, #2457e6 62%); }
 .look-card-swatch--night { background: linear-gradient(#12141b 62%, #e2a65c 62%); }
 .look-card-swatch--catalog { background: linear-gradient(#eee4cf 62%, #8a3033 62%); }
+.look-card-swatch--observatory { background: linear-gradient(#111c2a 62%, #b8f287 62%); }
+.look-card-swatch--reading { background: linear-gradient(#f5f7fa 62%, #275a8f 62%); }
 .look-card-text {
     display: flex;
     flex-direction: column;
@@ -8522,3 +8523,975 @@ input:autofill:focus-visible {
 .collect-areas-summary[hidden], #collect-areas-picker[hidden] { display: none; }
 .collect-areas-note { color: var(--text-soft); }
 .collect-areas-change { padding: var(--space-1) var(--space-3); font-size: var(--fs-sm); }
+
+/* ==========================================================================
+   Seven looks: each one lays the result list out its own way. The paper
+   actions, Open/Close, notes, stars and Not relevant are the same markup in
+   every look; only presentation changes. Closed rows carry the layout; an
+   open row is always the full card, across the whole list width.
+   ========================================================================== */
+@font-face {
+    font-family: "Caladea";
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url("/static/fonts/caladea-latin.woff2?v=20261012a") format("woff2");
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* Observatory: dark first, like Night. A light variant on the sun toggle. */
+/* The :not() form outranks the system-dark Workshop palette on :root. */
+html[data-look="observatory"]:not([data-theme="light"]),
+html[data-look="observatory"] {
+    --bg: #111c2a;
+    --surface: #172535;
+    --text: #e7f0ef;
+    --text-soft: #adbfca;
+    --rule: #46576b;
+    --hover: rgba(184, 242, 135, 0.08);
+    --accent: #b8f287;
+    --accent-hover: #cdf7a8;
+    --accent-soft: color-mix(in srgb, var(--accent) 14%, transparent);
+    --ok: #8fd39a;
+    --warn: #e0b56a;
+    --err: #ef8f86;
+    --on-accent: #14251b;
+    --edge: #0b131d;
+    --sheen: none;
+    --nav-bg: #111c2a;
+    --elev-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --elev-2: 0 12px 28px rgba(0, 0, 0, 0.5);
+    --elev-card: none;
+    --grain-opacity: 0;
+}
+html[data-look="observatory"][data-theme="dark"] {
+    --bg: #111c2a;
+    --surface: #172535;
+    --text: #e7f0ef;
+    --text-soft: #adbfca;
+    --rule: #46576b;
+    --hover: rgba(184, 242, 135, 0.08);
+    --accent: #b8f287;
+    --accent-hover: #cdf7a8;
+    --ok: #8fd39a;
+    --warn: #e0b56a;
+    --err: #ef8f86;
+    --on-accent: #14251b;
+    --edge: #0b131d;
+    --nav-bg: #111c2a;
+}
+html[data-look="observatory"][data-theme="light"] {
+    --bg: #eef3f4;
+    --surface: #ffffff;
+    --text: #172c37;
+    --text-soft: #51636b;
+    --rule: #c6d2d6;
+    --hover: rgba(53, 98, 69, 0.07);
+    --accent: #356245;
+    --accent-hover: #284c35;
+    --ok: #137537;
+    --warn: #8a5a12;
+    --err: #a33b35;
+    --on-accent: #ffffff;
+    --edge: #c6d2d6;
+    --nav-bg: #eef3f4;
+    --elev-1: 0 1px 2px rgba(23, 44, 55, 0.08);
+    --elev-2: 0 10px 26px rgba(23, 44, 55, 0.12);
+}
+
+/* Reading room: light first; follows the toggle and system dark. */
+html[data-look="reading"] {
+    --bg: #f5f7fa;
+    --surface: #ffffff;
+    --text: #27394a;
+    --text-soft: #607186;
+    --rule: #bfccd9;
+    --hover: rgba(39, 90, 143, 0.07);
+    --accent: #275a8f;
+    --accent-hover: #1e4870;
+    --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
+    --ok: #137537;
+    --warn: #8a5a12;
+    --err: #a33b35;
+    --on-accent: #ffffff;
+    --edge: #bfccd9;
+    --sheen: none;
+    --nav-bg: #f5f7fa;
+    --elev-1: 0 1px 2px rgba(39, 57, 74, 0.06);
+    --elev-2: 0 10px 26px rgba(39, 57, 74, 0.1);
+    --elev-card: none;
+    --grain-opacity: 0;
+}
+html[data-look="reading"][data-theme="dark"] {
+    --bg: #17202c;
+    --surface: #202b39;
+    --text: #e4ebf3;
+    --text-soft: #b0bed0;
+    --rule: #435166;
+    --hover: rgba(168, 191, 220, 0.09);
+    --accent: #a8bfdc;
+    --accent-hover: #c2d3e8;
+    --ok: #8fd39a;
+    --warn: #e0b56a;
+    --err: #ef8f86;
+    --on-accent: #17202c;
+    --edge: #435166;
+    --nav-bg: #17202c;
+    --elev-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --elev-2: 0 12px 28px rgba(0, 0, 0, 0.5);
+}
+@media (prefers-color-scheme: dark) {
+    html[data-look="reading"]:not([data-theme="light"]) {
+        --bg: #17202c;
+        --surface: #202b39;
+        --text: #e4ebf3;
+        --text-soft: #b0bed0;
+        --rule: #435166;
+        --hover: rgba(168, 191, 220, 0.09);
+        --accent: #a8bfdc;
+        --accent-hover: #c2d3e8;
+        --ok: #8fd39a;
+        --warn: #e0b56a;
+        --err: #ef8f86;
+        --on-accent: #17202c;
+        --edge: #435166;
+        --nav-bg: #17202c;
+        --elev-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+        --elev-2: 0 12px 28px rgba(0, 0, 0, 0.5);
+    }
+}
+
+/* --- Appearance settings ------------------------------------------------
+   theme-init.js puts every setting on <html> as data-*: the look's preset,
+   with the student's changes on top. Looks own colour; these own the rest. */
+html {
+    --font-ui: "Source Sans 3", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --font-reading: var(--font-ui);
+    --measure: 66ch;
+    --row-y: var(--space-4);
+}
+html[data-text="small"] { font-size: 93.75%; }
+html[data-text="large"] { font-size: 112.5%; }
+html[data-text="larger"] { font-size: 125%; }
+
+html[data-measure="narrow"] { --measure: 56ch; }
+html[data-measure="wide"] { --measure: 76ch; }
+
+html[data-titles="sans"] { --font-serif: var(--font-ui); }
+html[data-titles="serif"] { --font-serif: "Source Serif 4", Georgia, "Times New Roman", serif; }
+html[data-titles="book"] { --font-serif: "Caladea", Georgia, "Times New Roman", serif; }
+html[data-reading="sans"] { --font-reading: var(--font-ui); }
+html[data-reading="serif"] { --font-reading: "Source Serif 4", Georgia, "Times New Roman", serif; }
+html[data-reading="book"] { --font-reading: "Caladea", Georgia, "Times New Roman", serif; }
+/* Caladea ships one weight; draw it as it is rather than smearing a fake bold. */
+html:is([data-titles="book"], [data-reading="book"]) { font-synthesis: style; }
+html[data-titles="book"] .result-row-title { font-weight: 400; letter-spacing: 0; }
+
+html[data-density="compact"] { --row-y: var(--space-3); }
+html[data-density="roomy"] { --row-y: var(--space-5); }
+
+html[data-corners="square"] { --radius-sm: 0; --radius-md: 0; --radius-lg: 0; --radius-full: 0; }
+html[data-corners="small"] { --radius-sm: 2px; --radius-md: 3px; --radius-lg: 4px; --radius-full: 4px; }
+html[data-corners="medium"] { --radius-sm: 5px; --radius-md: 7px; --radius-lg: 9px; --radius-full: 10px; }
+html[data-corners="round"] { --radius-sm: 8px; --radius-md: 14px; --radius-lg: 18px; --radius-full: 999px; }
+
+html[data-edges="hairline"] {
+    --row-border: var(--rule);
+    --row-bottom: 1px solid var(--rule);
+    --row-shadow: none;
+    --row-shadow-open: none;
+    --panel-shadow: var(--elev-2);
+}
+html[data-edges="bordered"] {
+    --row-border: var(--rule);
+    --row-bottom: 3px solid var(--edge);
+    --row-shadow: var(--elev-card);
+    --row-shadow-open: var(--elev-2);
+    --panel-shadow: var(--elev-2), 0 3px 0 var(--edge);
+}
+html[data-edges="offset"] {
+    --row-border: var(--text-soft);
+    --row-bottom: 1px solid var(--text-soft);
+    --row-shadow: 3px 3px 0 var(--rule);
+    --row-shadow-open: 4px 4px 0 var(--rule);
+    --panel-shadow: 6px 6px 0 var(--rule);
+}
+
+/* Accent swatches. Each pair clears 4.5:1 on every look's grounds in its
+   tone (tests/test_looks.py measures them). */
+html[data-accent="green"][data-tone="light"] { --accent: #356245; --accent-hover: #284c35; --on-accent: #ffffff; }
+html[data-accent="green"][data-tone="dark"] { --accent: #b8f287; --accent-hover: #cdf7a8; --on-accent: #14251b; }
+html[data-accent="blue"][data-tone="light"] { --accent: #275a8f; --accent-hover: #1e4870; --on-accent: #ffffff; }
+html[data-accent="blue"][data-tone="dark"] { --accent: #a8bfdc; --accent-hover: #c2d3e8; --on-accent: #17202c; }
+html[data-accent="clay"][data-tone="light"] { --accent: #a3432a; --accent-hover: #8f3b22; --on-accent: #ffffff; }
+html[data-accent="clay"][data-tone="dark"] { --accent: #e39a73; --accent-hover: #f0b08e; --on-accent: #1b1712; }
+html[data-accent="teal"][data-tone="light"] { --accent: #2a5f6e; --accent-hover: #1f4a56; --on-accent: #ffffff; }
+html[data-accent="teal"][data-tone="dark"] { --accent: #7eb8c4; --accent-hover: #9ecdd6; --on-accent: #1c1a15; }
+html[data-accent="ochre"][data-tone="light"] { --accent: #7f571a; --accent-hover: #684714; --on-accent: #ffffff; }
+html[data-accent="ochre"][data-tone="dark"] { --accent: #e2a65c; --accent-hover: #f0bc7a; --on-accent: #1a150c; }
+html[data-accent="maroon"][data-tone="light"] { --accent: #8a3033; --accent-hover: #6e2427; --on-accent: #ffffff; }
+html[data-accent="maroon"][data-tone="dark"] { --accent: #d6877f; --accent-hover: #e3a29b; --on-accent: #1a1214; }
+
+/* --- Results layouts ----------------------------------------------------
+   The paper actions, Open/Close, notes, stars and Not relevant are the same
+   markup in every layout. Closed rows carry the layout; an open row is the
+   full card across the whole list width. */
+.result-year,
+.result-teaser { display: none; }
+.results-columns { display: none; }
+#results-list > .result-row.is-open,
+#results-list > :is(.show-more-btn, .info-text) {
+    grid-column: 1 / -1;
+}
+.result-ghost { display: none; }
+.result-row .article-abstract {
+    font-family: var(--font-reading);
+    max-width: var(--measure);
+}
+html[data-edges] .result-row {
+    border: 1px solid var(--row-border);
+    border-bottom: var(--row-bottom);
+    box-shadow: var(--row-shadow);
+}
+html[data-edges] .result-row:not(.is-open) {
+    padding-top: var(--row-y);
+    padding-bottom: var(--row-y);
+}
+html[data-edges] .result-row.is-open {
+    border-left: 4px solid var(--accent);
+    box-shadow: var(--row-shadow-open);
+}
+
+/* Ruled layouts: closed rows are lines on the page, not cards. */
+html:is([data-layout="list"], [data-layout="reading"], [data-layout="register"], [data-layout="table"], [data-layout="columns"]) .result-row:not(.is-open) {
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid var(--rule);
+    border-radius: 0;
+    box-shadow: none;
+    margin: 0;
+    padding-left: 0;
+    padding-right: 0;
+    animation: none;
+}
+html:is([data-layout="list"], [data-layout="reading"], [data-layout="register"], [data-layout="table"], [data-layout="columns"]) .result-row:not(.is-open):hover {
+    background: var(--hover);
+    box-shadow: none;
+}
+html:is([data-layout="list"], [data-layout="reading"], [data-layout="register"], [data-layout="table"], [data-layout="columns"]) .result-row.is-open {
+    margin: var(--space-3) 0;
+}
+
+/* Open sits level with the meta line and at the row's edge in every layout. */
+html[data-edges] .result-row:not(.is-open) .result-toggle {
+    top: var(--row-y);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-sm);
+}
+html:is([data-layout="list"], [data-layout="reading"]) .result-row:not(.is-open) .result-toggle {
+    right: 0;
+}
+html:is([data-layout="list"], [data-layout="reading"], [data-layout="register"], [data-layout="table"], [data-layout="columns"]) .result-row:not(.is-open):hover {
+    box-shadow: inset 3px 0 0 var(--accent);
+}
+
+/* Cards: the stack Workshop has always had. */
+html[data-layout="cards"] .result-row:not(.is-open) {
+    margin-bottom: var(--space-2);
+}
+
+/* Ruled list and Reading column: a quiet line per paper. */
+html:is([data-layout="list"], [data-layout="reading"]) .result-row:not(.is-open) .result-row-title {
+    font-size: var(--fs-lg);
+    line-height: 1.3;
+}
+html:is([data-layout="list"], [data-layout="reading"]) .result-row:not(.is-open) .result-venue {
+    letter-spacing: 0.04em;
+    text-transform: none;
+    font-size: var(--fs-sm);
+}
+html:is([data-layout="list"], [data-layout="reading"]) .result-row.is-open .article-abstract {
+    font-size: var(--fs-lg);
+    line-height: 1.7;
+}
+
+/* Reading column: the whole list sits in one centred reading measure. */
+html[data-layout="reading"] #results-list {
+    max-width: calc(var(--measure) + var(--space-7) * 2);
+    margin-inline: auto;
+}
+html[data-layout="reading"] .result-row.is-open {
+    padding: var(--space-6) clamp(var(--space-4), 4vw, var(--space-7));
+}
+html[data-layout="reading"] .result-row.is-open .result-row-title {
+    font-size: var(--fs-3xl);
+    line-height: 1.16;
+    margin: var(--space-3) 0;
+}
+html[data-layout="reading"] .result-row.is-open .result-abstract > summary { display: none; }
+html[data-layout="reading"] .result-row.is-open .key-points {
+    border-left: 2px solid var(--accent);
+    padding-left: var(--space-3);
+}
+
+/* Register: year | title, byline, source | match | Open. */
+html[data-layout="register"] .result-row:not(.is-open) {
+    display: block;
+}
+html[data-layout="register"] .result-row:not(.is-open) .result-row-main {
+    display: grid;
+    grid-template-columns: 3.25rem minmax(0, 1fr) auto 4.5rem;
+    grid-template-areas:
+        "year title score toggle"
+        "year byline score toggle"
+        "year tags score toggle";
+    column-gap: var(--space-3);
+    align-items: start;
+}
+html[data-layout="register"] .result-row:not(.is-open) .result-row-head { display: contents; }
+html[data-layout="register"] .result-row:not(.is-open) .result-year {
+    display: block;
+    grid-area: year;
+    padding-top: var(--space-1);
+    color: var(--text-soft);
+    font-size: var(--fs-sm);
+    font-variant-numeric: tabular-nums;
+}
+html[data-layout="register"] .result-row:not(.is-open) .result-venue { display: none; }
+html[data-layout="register"] .result-row:not(.is-open) .score-meter {
+    grid-area: score;
+    align-self: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    min-width: 2.75rem;
+}
+html[data-layout="register"] .result-row:not(.is-open) .result-row-title {
+    grid-area: title;
+    margin: 0 0 var(--space-1);
+    font-size: var(--fs-lg);
+    line-height: 1.3;
+}
+html[data-layout="register"] .result-row:not(.is-open) .result-byline { grid-area: byline; }
+html[data-layout="register"] .result-row:not(.is-open) .result-tags {
+    display: flex;
+    grid-area: tags;
+    margin: var(--space-1) 0 0;
+    justify-content: flex-start;
+}
+
+/* Table: Paper | Source | Year | Match | Open, under a header row. */
+html[data-layout="table"] {
+    --table-columns: minmax(0, 1fr) 9.5rem 3.5rem 3rem 4.5rem;
+}
+html[data-layout="table"] .results-columns:has(+ #results-list > .result-row) {
+    display: grid;
+    grid-template-columns: var(--table-columns);
+    column-gap: var(--space-3);
+    padding: var(--space-2) 0;
+    border-bottom: 1px solid var(--text-soft);
+    color: var(--text-soft);
+    font-size: var(--fs-xs);
+    font-weight: 600;
+}
+html[data-layout="table"] .results-columns span:nth-child(4) { grid-column: 4 / span 2; }
+html[data-layout="table"] .result-row:not(.is-open) {
+    display: block;
+}
+html[data-layout="table"] .result-row:not(.is-open) .result-row-main {
+    display: grid;
+    grid-template-columns: var(--table-columns);
+    grid-template-areas:
+        "title source year score toggle"
+        "byline source year score toggle";
+    column-gap: var(--space-3);
+    align-items: start;
+}
+html[data-layout="table"] .result-row:not(.is-open) .result-row-head { display: contents; }
+html[data-layout="table"] .result-row:not(.is-open) .result-venue { display: none; }
+html[data-layout="table"] .result-row:not(.is-open) .result-row-title {
+    grid-area: title;
+    margin: 0 0 var(--space-1);
+    font-size: var(--fs-md);
+    line-height: 1.35;
+}
+html[data-layout="table"] .result-row:not(.is-open) .result-byline { grid-area: byline; font-size: var(--fs-xs); }
+html[data-layout="table"] .result-row:not(.is-open) .result-tags {
+    display: flex;
+    grid-area: source;
+    margin: 0;
+    justify-content: flex-start;
+}
+html[data-layout="table"] .result-row:not(.is-open) .result-tags .tag {
+    overflow-wrap: anywhere;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--text);
+    font-size: var(--fs-sm);
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+}
+html[data-layout="table"] .result-row:not(.is-open) .result-year {
+    display: block;
+    grid-area: year;
+    font-size: var(--fs-sm);
+    font-variant-numeric: tabular-nums;
+}
+html[data-layout="table"] .result-row:not(.is-open) .score-meter {
+    grid-area: score;
+    width: 2.75rem;
+    height: 2.75rem;
+    min-width: 2.75rem;
+}
+
+/* Register and Table: Open is a real cell, not a corner overlay. */
+html:is([data-layout="register"], [data-layout="table"]) .result-row:not(.is-open) .result-toggle {
+    grid-area: toggle;
+    position: static;
+    align-self: center;
+    min-height: 44px;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-sm);
+}
+
+/* Columns and Index cards: grids that take any number of papers. */
+html[data-layout="columns"] #results-list {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr 1fr;
+    column-gap: var(--space-5);
+    border-top: 1px solid var(--text);
+}
+html[data-layout="index"] #results-list {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-6) var(--space-4);
+    padding-top: var(--space-6);
+}
+/* In a grid cell the meta wraps instead of squeezing beside the ring, and
+   Open sits under the byline where it can't cover the source. */
+html:is([data-layout="columns"], [data-layout="index"]) .result-row:not(.is-open) .result-row-head {
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1) var(--space-2);
+    padding-right: 0;
+}
+html:is([data-layout="columns"], [data-layout="index"]) .result-row:not(.is-open) .score-meter {
+    width: 2.75rem;
+    height: 2.75rem;
+    min-width: 2.75rem;
+}
+html:is([data-layout="columns"], [data-layout="index"]) .result-row:not(.is-open) .result-venue {
+    flex: 1 1 8rem;
+    min-width: 0;
+    padding-top: 0;
+    letter-spacing: 0.04em;
+    text-transform: none;
+    font-size: var(--fs-xs);
+}
+html:is([data-layout="columns"], [data-layout="index"]) .result-row:not(.is-open) .result-row-title {
+    flex: 0 0 auto;
+}
+html:is([data-layout="columns"], [data-layout="index"]) .result-row:not(.is-open) .result-toggle {
+    position: static;
+    align-self: flex-start;
+    margin-top: auto;
+    padding-left: 0;
+}
+html[data-layout="columns"] .result-row:not(.is-open) {
+    display: flex;
+    flex-direction: column;
+}
+html[data-layout="columns"] .result-row:not(.is-open) .result-row-main {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+}
+html[data-layout="columns"] .result-row:not(.is-open) .result-row-title {
+    font-size: var(--fs-lg);
+    line-height: 1.25;
+}
+/* The lead is the first paper in the current order, whatever that order is. */
+html[data-layout="columns"] #results-list > .result-row:first-child:not(.is-open) {
+    grid-row: span 2;
+    padding-right: var(--space-5);
+    border-right: 1px solid var(--rule);
+    border-bottom: 0;
+}
+html[data-layout="columns"] #results-list > .result-row:first-child:not(.is-open) .result-row-title {
+    font-size: var(--fs-2xl);
+    line-height: 1.13;
+}
+
+html[data-layout="index"] .result-row {
+    margin: 0;
+    animation: none;
+}
+html[data-layout="index"] .result-row:not(.is-open) {
+    display: flex;
+    flex-direction: column;
+    min-height: 11rem;
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
+}
+html[data-layout="index"] .result-row:not(.is-open) .result-row-main {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+}
+html[data-layout="index"] .result-row:not(.is-open):hover {
+    background: var(--surface);
+    border-color: var(--accent);
+}
+html[data-layout="index"] .result-row::before {
+    display: block;
+    content: attr(data-source-name);
+    position: absolute;
+    left: var(--space-2);
+    top: auto;
+    bottom: 100%;
+    width: auto;
+    max-width: calc(100% - var(--space-5));
+    overflow: hidden;
+    padding: var(--space-1) var(--space-3);
+    border: 1px solid var(--row-border, var(--rule));
+    border-bottom: 0;
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    background: var(--surface);
+    color: var(--accent);
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+html[data-layout="index"] .result-row:not(.is-open) .result-row-head {
+    padding-bottom: var(--space-2);
+    border-bottom: 1px solid var(--rule);
+}
+/* The tab already names the source. */
+html[data-layout="index"] .result-row .result-tags { display: none; }
+html[data-layout="index"] .result-row:not(.is-open) .result-row-title {
+    font-size: var(--fs-lg);
+    line-height: 1.25;
+    margin-top: var(--space-2);
+}
+
+/* Titles in the restructured layouts read as links on hover, so it is
+   plain that a row opens. */
+html:is([data-layout="register"], [data-layout="table"], [data-layout="columns"], [data-layout="index"]) .result-row:not(.is-open):hover .result-row-title {
+    color: var(--accent);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.2em;
+}
+
+/* The Columns lead fills its double height with the paper's opening lines. */
+html[data-layout="columns"] #results-list > .result-row:first-child:not(.is-open) .result-teaser {
+    display: block;
+    margin: var(--space-3) 0 var(--space-2);
+    font-family: var(--font-reading);
+    font-size: var(--fs-md);
+    line-height: 1.55;
+    color: var(--text);
+}
+
+/* Columns and Index cards: the open paper reads in a side panel. Its cell
+   keeps a "Reading" placeholder, so the grid stays where the student left
+   it. Clicking the placeholder, Close or Escape puts the paper back. */
+html:is([data-layout="columns"], [data-layout="index"]) #results-list > .result-row.is-open {
+    position: fixed;
+    /* Under whatever is on top: the nav, a banner, or the Search tile. */
+    top: var(--reader-top, calc(var(--nav-h, 4rem) + var(--space-3)));
+    right: var(--space-4);
+    /* Clear of the fixed Export dock where there is one. */
+    bottom: calc(var(--simple-panel-h, 0px) + var(--space-4));
+    z-index: 50;
+    width: min(44rem, calc(100vw - var(--space-6)));
+    margin: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    background: var(--surface);
+    border: 1px solid var(--row-border, var(--rule));
+    border-bottom: var(--row-bottom, 1px solid var(--rule));
+    border-left: 4px solid var(--accent);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--panel-shadow, var(--elev-2));
+    padding: var(--space-5) var(--space-5) var(--space-6);
+    align-content: start;
+    /* No held transform (hover lift, a "both" fill), even an identity one:
+       it would make the panel the frame for its fixed Close button. */
+    transform: none;
+    animation: readerIn var(--dur-med) var(--ease-out) backwards;
+}
+html[data-layout="index"] #results-list > .result-row.is-open::before { display: none; }
+/* Close stays in reach however far the paper is scrolled. */
+html:is([data-layout="columns"], [data-layout="index"]) #results-list > .result-row.is-open .result-toggle {
+    position: fixed;
+    top: calc(var(--reader-top, calc(var(--nav-h, 4rem) + var(--space-3))) + var(--space-3));
+    right: calc(var(--space-4) + var(--space-4));
+    z-index: 1;
+    width: 4.5rem;
+    text-align: center;
+    border: 1px solid var(--rule);
+    background: var(--surface);
+}
+/* The header row leaves room for the panel's pinned Close. */
+html:is([data-layout="columns"], [data-layout="index"]) #results-list > .result-row.is-open .result-row-head {
+    padding-right: calc(var(--space-8) + var(--space-5));
+}
+/* A paper in the right half reads in a panel on the left. */
+html:is([data-layout="columns"], [data-layout="index"]) #results-list > .result-row.is-open.is-reading-left {
+    right: auto;
+    left: var(--space-4);
+}
+html:is([data-layout="columns"], [data-layout="index"]) #results-list > .result-row.is-open.is-reading-left .result-toggle {
+    right: auto;
+    /* Mirrors the right-hand panel: the panel's right edge, inset by the
+       same 1rem, minus the button's own 4.5rem. */
+    left: calc(min(44rem, 100vw - var(--space-6)) - 4.5rem);
+}
+/* Opening the lead keeps its double cell, so the grid does not reflow. */
+html[data-layout="columns"] #results-list > .result-ghost:first-child {
+    grid-row: span 2;
+}
+@keyframes readerIn {
+    from { opacity: 0; transform: translateX(var(--space-5)); }
+    to { opacity: 1; transform: none; }
+}
+html:is([data-layout="columns"], [data-layout="index"]) .result-ghost {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-1);
+    min-height: 8rem;
+    padding: var(--row-y) var(--space-4);
+    border: 1px dashed var(--accent);
+    border-radius: var(--radius-lg);
+    background: var(--accent-soft);
+    color: var(--text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+.result-ghost-label {
+    color: var(--accent);
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+.result-ghost-title {
+    font-family: var(--font-serif);
+    font-size: var(--fs-md);
+    line-height: 1.3;
+}
+.result-ghost-hint {
+    margin-top: auto;
+    color: var(--text-soft);
+    font-size: var(--fs-sm);
+}
+
+/* Catalog stock: ruled lines in the notebook. */
+html[data-look="catalog"] .note-field {
+    background-image: var(--row-lines);
+    line-height: 1.55rem;
+}
+
+/* --- Widths ------------------------------------------------------------- */
+@media (max-width: 1049px) {
+    html[data-layout="columns"] #results-list { grid-template-columns: 1.15fr 1fr; }
+    html[data-layout="index"] #results-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    html[data-layout="table"] { --table-columns: minmax(0, 1fr) 7rem 3.25rem 3rem 4.5rem; }
+}
+/* Phone: the app's own 640px step, so these never fight its compact rows. */
+@media (max-width: 640px) {
+    html[data-layout="columns"] #results-list,
+    html[data-layout="index"] #results-list { grid-template-columns: minmax(0, 1fr); }
+    html[data-layout="columns"] #results-list > .result-row:first-child:not(.is-open) {
+        grid-row: auto;
+        padding-right: 0;
+        border-right: 0;
+        border-bottom: 1px solid var(--rule);
+    }
+    html[data-layout="columns"] #results-list > .result-row:first-child:not(.is-open) .result-row-title { font-size: var(--fs-xl); }
+    html[data-layout="index"] .result-row:not(.is-open) { min-height: 0; }
+    /* The source column leaves the table; the opened paper still names it. */
+    html[data-layout="table"] { --table-columns: minmax(0, 1fr) 3rem 2.75rem 3rem; }
+    html[data-layout="table"] .results-columns span:nth-child(2),
+    html[data-layout="table"] .result-row:not(.is-open) .result-tags { display: none; }
+    html[data-layout="table"] .results-columns span:nth-child(4) { grid-column: 3 / span 2; }
+    html[data-layout="table"] .result-row:not(.is-open) .result-row-main {
+        grid-template-areas:
+            "title year score toggle"
+            "byline year score toggle";
+        column-gap: var(--space-2);
+    }
+    html[data-layout="table"] .result-row:not(.is-open) .result-year { font-size: var(--fs-xs); }
+    html:is([data-layout="register"], [data-layout="table"]) .result-row:not(.is-open) .result-toggle {
+        min-width: 2.75rem;
+        padding: var(--space-1);
+    }
+    html[data-layout="register"] .result-row:not(.is-open) .result-row-main {
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+            "year score"
+            "title score"
+            "byline score"
+            "tags tags"
+            "toggle toggle";
+        row-gap: var(--space-1);
+    }
+    html[data-layout="register"] .result-row:not(.is-open) .result-year { font-size: var(--fs-xs); }
+    html[data-layout="register"] .result-row:not(.is-open) .result-toggle { justify-self: start; }
+    html[data-layout="reading"] .result-row.is-open { padding: var(--space-5) var(--space-4); }
+    html[data-layout="table"] .results-columns:has(+ #results-list > .result-row) { column-gap: var(--space-2); }
+    /* Phone: thumb-sized paper actions and pagination. */
+    .result-row-rail .star-btn,
+    .result-row-rail .note-toggle,
+    .result-row-rail .not-relevant-btn,
+    .note-row .note-save,
+    #results-list > .show-more-btn { min-height: 44px; }
+    /* Phone: the pinned tile is one query row and one row of modes, so the
+       results keep most of the screen. */
+    body.simple-screen-ready #search-query-top .searchcard {
+        flex-direction: row;
+        align-items: stretch;
+    }
+    body.simple-screen-ready #search-query-top .searchcard #search-btn {
+        width: auto;
+        flex: 0 0 auto;
+        padding: 0 var(--space-3);
+    }
+    body.simple-screen-ready #search-query-top .input-method-toggle {
+        flex-direction: row;
+        flex-wrap: nowrap;
+        gap: var(--space-1);
+        margin: var(--space-2) 0 0;
+    }
+    body.simple-screen-ready #search-query-top label.radio-label {
+        flex: 1 1 auto;
+        width: auto;
+        min-height: 44px;
+        justify-content: center;
+        padding: var(--space-1) var(--space-2);
+        font-size: var(--fs-xs);
+        text-align: center;
+    }
+    /* PICO and paper modes are forms, not a bar: they scroll with the page. */
+    body.simple-screen-ready #search-query-top:has(.searchcard.is-alt-method) { position: static; }
+    /* Settings sheet: looks as a compact two-column grid. */
+    html .appearance-panel .look-picker { grid-template-columns: 1fr 1fr; }
+    .appearance-panel .look-card-blurb { display: none; }
+    html:is([data-layout="columns"], [data-layout="index"]) #results-list > .result-row.is-open .result-toggle,
+    html:is([data-layout="columns"], [data-layout="index"]) #results-list > .result-row.is-open.is-reading-left .result-toggle {
+        top: calc(var(--nav-h, 3.5rem) + var(--space-2));
+        left: auto;
+        right: var(--space-3);
+    }
+    html:is([data-layout="columns"], [data-layout="index"]) #results-list > .result-row.is-open,
+    html:is([data-layout="columns"], [data-layout="index"]) #results-list > .result-row.is-open.is-reading-left {
+        top: var(--nav-h, 3.5rem);
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: auto;
+        border-left-width: 1px;
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+        padding: var(--space-4) var(--space-4) var(--space-6);
+    }
+    /* The ring keeps room for a three-decimal score. */
+    .result-row:not(.is-open) .score-meter,
+    html[data-layout] .result-row:not(.is-open) .score-meter {
+        width: 2.75rem;
+        height: 2.75rem;
+        min-width: 2.75rem;
+    }
+}
+
+/* --- Search bar: stays pinned; results disappear under it -------------- */
+/* A focused result lands below the pinned tile, not under it. */
+#results-list .result-row,
+#results-list .result-row *,
+#results-section *,
+#simple-screening-card * {
+    scroll-margin-top: calc(var(--search-band-h, var(--nav-h, 4rem)) + var(--space-6) + var(--space-2));
+    scroll-margin-bottom: calc(var(--simple-panel-h, 0px) + var(--space-3));
+}
+/* A dialog pins the page under it; the strip would be an empty hole. */
+body.lra-modal-open .search-band,
+body.lra-modal-open .search-band-blur { visibility: hidden; }
+/* Once the tile pins, a strip of the page's own backdrop fills from the
+   window top to just under it, edge to edge, so results disappear beneath
+   it instead of showing around its corners. */
+.search-band,
+.search-band-blur {
+    position: fixed;
+    left: 0;
+    right: 0;
+    pointer-events: none;
+    visibility: hidden;
+}
+.search-band {
+    --search-fade: var(--space-6);
+    top: 0;
+    height: calc(var(--search-band-h, 0px) + var(--search-fade));
+    /* Under the pinned tile at every width (30 on phones, 40 on desktop). */
+    z-index: 29;
+    background: var(--page-lamp), var(--page-glow), var(--bg);
+    background-size: 100% 100vh;
+    background-repeat: no-repeat;
+    /* Solid down to just under the tile, then fades over the blur below. */
+    mask-image: linear-gradient(to bottom, #000 calc(100% - var(--search-fade)), transparent);
+}
+.search-band-blur {
+    top: var(--search-band-h, 0px);
+    height: var(--space-6);
+    z-index: 28;
+    backdrop-filter: blur(6px);
+    mask-image: linear-gradient(to bottom, #000, transparent);
+}
+.search-band-blur.is-on { visibility: visible; }
+/* What the strip hides cannot be clicked through it. */
+.search-band.is-on { pointer-events: auto; }
+/* Save your work stays crisp above the soft edge. */
+body.simple-screen-ready .search-rail-sticky { z-index: 31; }
+.search-band::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    opacity: var(--grain-opacity);
+    background-image: var(--page-grain);
+    background-size: 7px 7px, 11px 11px;
+    background-position: 0 0, 3px 5px;
+}
+.search-band.is-on { visibility: visible; }
+
+body.simple-screen-ready #search-query-top.is-stuck {
+    box-shadow: var(--sheen), var(--elev-1);
+}
+
+/* --- Fine-tune controls (Account and the Search panel) ----------------- */
+.appearance-heading { margin: var(--space-5) 0 var(--space-1); font-size: var(--fs-md); }
+.appearance-controls {
+    display: grid;
+    gap: var(--space-3);
+    margin-top: var(--space-3);
+}
+.appearance-setting {
+    min-width: 0;
+    border: 0;
+    padding: 0;
+}
+.appearance-setting legend {
+    margin-bottom: var(--space-1);
+    color: var(--text-soft);
+    font-size: var(--fs-sm);
+    font-weight: 600;
+}
+.appearance-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+}
+.appearance-option {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 44px;
+    padding: 0 var(--space-3);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-full);
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: var(--fs-sm);
+    cursor: pointer;
+}
+.appearance-option:hover { background: var(--hover); }
+.appearance-option:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.appearance-option[aria-pressed="true"] {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: var(--on-accent);
+    font-weight: 600;
+}
+.appearance-option:disabled { opacity: 0.6; cursor: not-allowed; }
+.appearance-option--swatch::before {
+    content: "";
+    width: 0.9rem;
+    height: 0.9rem;
+    border-radius: 50%;
+    border: 1px solid var(--rule);
+    background: var(--swatch, conic-gradient(var(--accent) 0 50%, var(--text-soft) 0));
+}
+.appearance-option--swatch[aria-pressed="true"]::before {
+    border-color: var(--on-accent);
+    box-shadow: 0 0 0 1px var(--on-accent);
+}
+.appearance-swatch--green { --swatch: #356245; }
+.appearance-swatch--blue { --swatch: #275a8f; }
+.appearance-swatch--clay { --swatch: #a3432a; }
+.appearance-swatch--teal { --swatch: #2a5f6e; }
+.appearance-swatch--ochre { --swatch: #7f571a; }
+.appearance-swatch--maroon { --swatch: #8a3033; }
+html[data-tone="dark"] .appearance-swatch--green { --swatch: #b8f287; }
+html[data-tone="dark"] .appearance-swatch--blue { --swatch: #a8bfdc; }
+html[data-tone="dark"] .appearance-swatch--clay { --swatch: #e39a73; }
+html[data-tone="dark"] .appearance-swatch--teal { --swatch: #7eb8c4; }
+html[data-tone="dark"] .appearance-swatch--ochre { --swatch: #e2a65c; }
+html[data-tone="dark"] .appearance-swatch--maroon { --swatch: #d6877f; }
+.appearance-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+/* Search: a side sheet, so the results stay in view while picking. */
+.appearance-panel {
+    position: fixed;
+    top: var(--space-4);
+    right: var(--space-4);
+    bottom: var(--space-4);
+    z-index: 120;
+    width: min(26rem, calc(100vw - var(--space-6)));
+    overflow-y: auto;
+    padding: var(--space-4) var(--space-5) var(--space-5);
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--elev-2);
+}
+.appearance-panel[hidden] { display: none; }
+.appearance-panel {
+    overscroll-behavior: contain;
+}
+/* Done stays in reach however far the settings are scrolled. */
+.appearance-panel-head {
+    position: sticky;
+    top: calc(-1 * var(--space-4));
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    margin: calc(-1 * var(--space-4)) calc(-1 * var(--space-5)) var(--space-1);
+    padding: var(--space-4) var(--space-5) var(--space-2);
+    background: var(--surface);
+}
+.appearance-panel-head h2 { font-size: var(--fs-lg); margin: 0; }
+.appearance-panel .look-picker {
+    grid-template-columns: 1fr;
+    margin: var(--space-3) 0;
+}
+@media (max-width: 640px) {
+    .appearance-panel {
+        top: auto;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: auto;
+        max-height: 75vh;
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    }
+}

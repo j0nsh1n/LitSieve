@@ -121,6 +121,7 @@ function wireLookPicker() {
    ? window.applyUiLook(look)
    : look;
   document.documentElement.setAttribute('data-look', saved);
+  if (typeof window.syncAppearanceControls === 'function') window.syncAppearanceControls();
   cards.forEach((other) => {
    const on = other.getAttribute('data-look-pick') === saved;
    other.classList.toggle('is-selected', on);
@@ -130,10 +131,13 @@ function wireLookPicker() {
  }
  cards.forEach((card) => {
   card.addEventListener('click', async () => {
+   // The current look again would only wipe the student's settings.
+   if (card.getAttribute('data-look-pick') === document.documentElement.getAttribute('data-look')) return;
    const look = paintLook(card.getAttribute('data-look-pick'));
    try {
-    const data = await apiCall('/api/account/look', { method: 'POST', body: { look } });
-    paintLook(data.look);
+    // Same queue as the fine-tune controls, so a setting picked right after
+    // a look is never cleared by the look's reply ('/api/account/look').
+    await window.saveAppearance('/api/account/look', { look });
     setStatus('look-status', 'Saved.', 'success');
    } catch (e) {
     setStatus('look-status', e.message, 'error');

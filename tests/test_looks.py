@@ -103,7 +103,7 @@ def test_look_allowlist_rejects_unknown():
     assert parse_look("nope") is None
     assert parse_look("") is None
     assert normalize_look("nope") == DEFAULT_LOOK
-    assert LOOKS == ("workshop", "broadsheet", "lab", "night", "catalog")
+    assert LOOKS == ("workshop", "broadsheet", "lab", "night", "catalog", "observatory", "reading")
 
 
 def test_create_user_stores_look_and_defaults_workshop(tmp_path):
@@ -233,7 +233,7 @@ def test_account_look_get_and_post(tmp_path, monkeypatch):
     page = client.get("/account")
     assert page.status_code == 200
     assert 'id="account-look"' in page.text
-    assert page.text.count('data-look-pick="') == 5
+    assert page.text.count('data-look-pick="') == len(LOOKS)
     assert 'data-look-pick="night"' in page.text
     assert 'aria-pressed="true"' in page.text
 
@@ -243,13 +243,13 @@ def test_look_picker_renders_without_app_context():
 
     env = Environment(loader=FileSystemLoader(str(REPO / "templates")), autoescape=True)
     html = env.get_template("partials/look_picker.html").render()
-    assert html.count('data-look-pick="') == 5
+    assert html.count('data-look-pick="') == len(LOOKS)
     for look_id, title, blurb in LOOK_CARDS:
         assert f'data-look-pick="{look_id}"' in html
         assert title in html
         assert blurb in html
     empty = env.get_template("partials/look_picker.html").render(look_cards=())
-    assert empty.count('data-look-pick="') == 5
+    assert empty.count('data-look-pick="') == len(LOOKS)
 
 
 def test_look_card_css_keeps_a_visible_hit_target():
@@ -322,8 +322,12 @@ def test_account_js_saves_look_without_inline_style():
     assert "style=" not in fn
 
 
+LIGHT_FIRST_LOOKS = ("broadsheet", "lab", "catalog", "reading")
+DARK_FIRST_LOOKS = ("night", "observatory")
+
+
 def test_each_look_has_light_and_dark_token_blocks():
-    for look_id in ("broadsheet", "lab", "catalog"):
+    for look_id in LIGHT_FIRST_LOOKS:
         light = _rule_body(CSS, f'html[data-look="{look_id}"] {{')
         dark = _rule_body(CSS, f'html[data-look="{look_id}"][data-theme="dark"] {{')
         pref = _rule_body(CSS, f'html[data-look="{look_id}"]:not([data-theme="light"]) {{')
@@ -334,15 +338,16 @@ def test_each_look_has_light_and_dark_token_blocks():
         for key in ("--bg", "--accent"):
             assert dark_tok[key] == pref_tok[key], f"{look_id} dark/prefers drifted on {key}"
             assert light_tok[key] != dark_tok[key], f"{look_id} light and dark share {key}"
-    night = _rule_body(CSS, 'html[data-look="night"] {')
-    night_light = _rule_body(CSS, 'html[data-look="night"][data-theme="light"] {')
-    assert _css_block_tokens(night)["--bg"] != _css_block_tokens(night_light)["--bg"]
+    for look_id in DARK_FIRST_LOOKS:
+        dark = _rule_body(CSS, f'html[data-look="{look_id}"] {{')
+        light = _rule_body(CSS, f'html[data-look="{look_id}"][data-theme="light"] {{')
+        assert _css_block_tokens(dark)["--bg"] != _css_block_tokens(light)["--bg"]
 
 
 def test_look_inks_meet_wcag_aa_on_page_grounds():
     failures = []
     blocks = []
-    for look_id in ("broadsheet", "lab", "catalog"):
+    for look_id in LIGHT_FIRST_LOOKS:
         blocks.append((f"{look_id} light", _rule_body(CSS, f'html[data-look="{look_id}"] {{')))
         blocks.append(
             (f"{look_id} dark", _rule_body(CSS, f'html[data-look="{look_id}"][data-theme="dark"] {{'))
@@ -353,10 +358,11 @@ def test_look_inks_meet_wcag_aa_on_page_grounds():
                 _rule_body(CSS, f'html[data-look="{look_id}"]:not([data-theme="light"]) {{'),
             )
         )
-    blocks.append(("night dark", _rule_body(CSS, 'html[data-look="night"] {')))
-    blocks.append(
-        ("night light", _rule_body(CSS, 'html[data-look="night"][data-theme="light"] {'))
-    )
+    for look_id in DARK_FIRST_LOOKS:
+        blocks.append((f"{look_id} dark", _rule_body(CSS, f'html[data-look="{look_id}"] {{')))
+        blocks.append(
+            (f"{look_id} light", _rule_body(CSS, f'html[data-look="{look_id}"][data-theme="light"] {{'))
+        )
     for label, body in blocks:
         tokens = _css_block_tokens(body)
         for name in _CONTRAST_INKS:
