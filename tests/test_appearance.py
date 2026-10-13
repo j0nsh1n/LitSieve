@@ -253,6 +253,7 @@ def test_every_app_page_offers_the_account_panel_but_account_itself(tmp_path, mo
     client, _db = _client(tmp_path, monkeypatch)
     _register(client, "paneluser")
     search = client.get("/search").text
-    assert 'id="settings-panel"' in search and 'data-src="/account?embed=1"' in search
+    assert 'id="settings-panel"' in search and 'class="settings-panel-frame"' in search
+    assert "const ACCOUNT_EMBED = '/account?embed=1';" in _read("static", "js", "common.js")
     assert 'data-settings-open=""' in search  # the account link in the nav
     assert 'id="settings-panel"' not in client.get("/account").text

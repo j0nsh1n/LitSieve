@@ -1330,9 +1330,13 @@ function wireSettingsPanel() {
         new MutationObserver(mirror).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
     }
 
-    const showSection = (id) => {
+    // The frame only ever loads the embedded Account page; a section is a
+    // plain id or nothing, never text taken from the page as a URL.
+    const ACCOUNT_EMBED = '/account?embed=1';
+    const showSection = (rawId) => {
+        const id = /^[a-z][a-z0-9-]*$/.test(rawId || '') ? rawId : '';
         if (!frame.getAttribute('src')) {
-            frame.setAttribute('src', frame.getAttribute('data-src') + (id ? '#' + id : ''));
+            frame.src = ACCOUNT_EMBED + (id ? '#' + id : '');
             return;
         }
         if (!id) return;

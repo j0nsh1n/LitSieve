@@ -1,5 +1,5 @@
 {# Account settings in a panel over the current page. The frame loads the real
-   Account page (/account?embed=1) on first open; common.js wires the dock
+   Account page (/account?embed=1, set in common.js) on first open; common.js wires the dock
    buttons and closing. The dock choice is the appearance setting "panel". #}
 <aside class="settings-panel" id="settings-panel" aria-labelledby="settings-panel-title" hidden>
  <div class="settings-panel-head">
@@ -18,5 +18,5 @@
   <a class="settings-panel-full" href="/account">Full page</a>
   <button type="button" class="btn btn-secondary btn-sm" data-settings-close>Done</button>
  </div>
- <iframe class="settings-panel-frame" aria-label="Account settings" data-src="/account?embed=1"></iframe>
+ <iframe class="settings-panel-frame" aria-label="Account settings"></iframe>
 </aside>
