@@ -52,9 +52,18 @@
         accent: ['look', 'green', 'blue', 'clay', 'teal', 'ochre', 'maroon'],
         density: ['compact', 'standard', 'roomy'],
         corners: ['square', 'small', 'medium', 'round'],
-        edges: ['hairline', 'bordered', 'offset']
+        edges: ['hairline', 'bordered', 'offset'],
+        panel: ['right', 'left', 'bottom']
     };
-    var BASE = {text: 'standard', measure: 'standard', accent: 'look', density: 'standard'};
+    var BASE = {text: 'standard', measure: 'standard', accent: 'look', density: 'standard', panel: 'right'};
+    // Workspace choices a new look or Reset leaves alone (KEEP_ACROSS_LOOKS).
+    var KEEP = ['panel'];
+    function kept(o) {
+        var out = {};
+        KEEP.forEach(function (k) { if (o && o[k]) out[k] = o[k]; });
+        return out;
+    }
+    window.lraKeptAcrossLooks = kept;
     var PRESETS = {
         workshop: {layout: 'cards', titles: 'serif', reading: 'sans', corners: 'round', edges: 'bordered'},
         broadsheet: {layout: 'columns', titles: 'serif', reading: 'serif', corners: 'square', edges: 'hairline'},
@@ -121,9 +130,28 @@
         var text = cookieText(overrides);
         try { localStorage.setItem('uiAppearance', text); } catch (eStore) { /* ignore */ }
         writeCookie('ui_appearance', text);
+        var outer = host && host();
+        if (outer && outer.lraPaintFromPanel) outer.lraPaintFromPanel(root.getAttribute('data-look'), overrides);
         return {overrides: overrides, effective: paintAppearance()};
     }
+    // Called by the account panel inside this page: paint what it chose.
+    window.lraPaintFromPanel = function (id, next) {
+        if (LOOKS[id] && id !== root.getAttribute('data-look')) root.setAttribute('data-look', id);
+        overrides = cleanOverrides(next, root.getAttribute('data-look'));
+        paintAppearance();
+        if (window.syncAppearanceControls) window.syncAppearanceControls();
+    };
     window.applyUiAppearance = applyUiAppearance;
+
+    // The account page also opens inside a panel on other pages. A look or
+    // setting picked in there repaints the page around it too.
+    function host() {
+        try {
+            if (window.parent !== window && window.parent.location.origin === location.origin) return window.parent;
+        } catch (eHost) { /* another origin: leave it alone */ }
+        return null;
+    }
+    window.lraHostPage = host;
     window.lraAppearancePreset = preset;
 
     // A look is a preset: choosing one starts its settings fresh. A preview
@@ -138,7 +166,7 @@
         }
         try { localStorage.setItem('uiLook', id); } catch (eApply) { /* ignore */ }
         writeCookie('ui_look', id);
-        applyUiAppearance({});
+        applyUiAppearance(kept(overrides));
         return id;
     }
     window.applyUiLook = applyUiLook;

@@ -11,6 +11,11 @@ and this project aims to follow Semantic Versioning for app version strings
 ## [6.0.0] - 2026-10-12
 
 ### Added
+- Account opens as a panel over any page, from the account link in the top
+  bar or from More → Adjust look on Search. Dock it right, left, or bottom;
+  the choice saves to your account and stays when you change looks. Phones
+  get a bottom sheet, and each look or setting you pick repaints the page as
+  you go.
 - Optional Laya switches. With the local Laya sidecar running and
   `LITSIEVE_LAYA_URL` set, study-type tags the wording patterns were unsure of
   are settled by Laya when it is at least 85% sure (the tooltip says so), and

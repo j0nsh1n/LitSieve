@@ -163,7 +163,11 @@ async def account_page(request: Request):
     user = current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=302)
-    return templates.TemplateResponse(request, "account.html", context={"active_page": "account", "user": user})
+    # ?embed=1 is the same page inside the account panel on other pages.
+    embed = request.query_params.get("embed") == "1"
+    return templates.TemplateResponse(
+        request, "account.html", context={"active_page": "account", "user": user, "embed": embed}
+    )
 
 
 @router.get("/join")

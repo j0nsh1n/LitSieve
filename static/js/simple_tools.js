@@ -976,6 +976,9 @@ function openSimpleScreenModal() {
  });
  _simpleScreenModalKey = (ev) => {
   if (isSimpleScreenTriageOpen()) return;
+  // The account panel sits beside this step, not under it: leave its keys alone.
+  const settings = document.getElementById('settings-panel');
+  if (settings && !settings.hidden && (settings.contains(document.activeElement) || ev.key === 'Escape')) return;
   if (ev.key === 'Escape') {
    ev.preventDefault();
    ev.stopPropagation();

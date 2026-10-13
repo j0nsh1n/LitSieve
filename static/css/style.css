@@ -9279,9 +9279,7 @@ html[data-look="catalog"] .note-field {
     }
     /* PICO and paper modes are forms, not a bar: they scroll with the page. */
     body.simple-screen-ready #search-query-top:has(.searchcard.is-alt-method) { position: static; }
-    /* Settings sheet: looks as a compact two-column grid. */
-    html .appearance-panel .look-picker { grid-template-columns: 1fr 1fr; }
-    .appearance-panel .look-card-blurb { display: none; }
+
     html:is([data-layout="columns"], [data-layout="index"]) #results-list > .result-row.is-open .result-toggle,
     html:is([data-layout="columns"], [data-layout="index"]) #results-list > .result-row.is-open.is-reading-left .result-toggle {
         top: calc(var(--nav-h, 3.5rem) + var(--space-2));
@@ -9447,51 +9445,122 @@ html[data-tone="dark"] .appearance-swatch--maroon { --swatch: #d6877f; }
     gap: var(--space-3);
 }
 
-/* Search: a side sheet, so the results stay in view while picking. */
-.appearance-panel {
+/* Account settings panel: the Account page, framed, docked over any page.
+   Right is the default; html[data-panel] moves it left or to the bottom. */
+html { --settings-sheet-h: min(60vh, 40rem); }
+.settings-panel {
     position: fixed;
-    top: var(--space-4);
+    top: calc(var(--nav-h, 4rem) + var(--space-3));
     right: var(--space-4);
     bottom: var(--space-4);
     z-index: 120;
-    width: min(26rem, calc(100vw - var(--space-6)));
-    overflow-y: auto;
-    padding: var(--space-4) var(--space-5) var(--space-5);
+    display: flex;
+    flex-direction: column;
+    width: min(34rem, calc(100vw - var(--space-6)));
+    overflow: hidden;
     background: var(--surface);
     border: 1px solid var(--rule);
     border-radius: var(--radius-lg);
     box-shadow: var(--elev-2);
 }
-.appearance-panel[hidden] { display: none; }
-.appearance-panel {
-    overscroll-behavior: contain;
+.settings-panel[hidden] { display: none; }
+html[data-panel="left"] .settings-panel {
+    right: auto;
+    left: var(--space-4);
 }
-/* Done stays in reach however far the settings are scrolled. */
-.appearance-panel-head {
-    position: sticky;
-    top: calc(-1 * var(--space-4));
-    z-index: 1;
+html[data-panel="bottom"] .settings-panel {
+    top: auto;
+    left: var(--space-4);
+    right: var(--space-4);
+    bottom: 0;
+    width: auto;
+    height: var(--settings-sheet-h);
+    border-bottom: 0;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+.settings-panel-head {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: var(--space-3);
-    margin: calc(-1 * var(--space-4)) calc(-1 * var(--space-5)) var(--space-1);
-    padding: var(--space-4) var(--space-5) var(--space-2);
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--rule);
+}
+.settings-panel-head h2 {
+    margin: 0 auto 0 0;
+    font-size: var(--fs-lg);
+}
+.settings-panel-full {
+    color: var(--text-soft);
+    font-size: var(--fs-sm);
+}
+.settings-dock {
+    display: inline-flex;
+    gap: var(--space-1);
+}
+.settings-dock-btn {
+    display: inline-grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-sm);
     background: var(--surface);
+    color: var(--text-soft);
+    cursor: pointer;
 }
-.appearance-panel-head h2 { font-size: var(--fs-lg); margin: 0; }
-.appearance-panel .look-picker {
-    grid-template-columns: 1fr;
-    margin: var(--space-3) 0;
+.settings-dock-btn svg {
+    width: 22px;
+    height: 22px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.4;
 }
+.settings-dock-btn .settings-dock-fill { fill: currentColor; stroke: none; opacity: 0.55; }
+.settings-dock-btn:hover { background: var(--hover); color: var(--text); }
+.settings-dock-btn[aria-pressed="true"] {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+.settings-dock-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.settings-panel-frame {
+    flex: 1 1 auto;
+    width: 100%;
+    border: 0;
+    background: var(--bg);
+}
+/* Phones: always a sheet from the bottom, whatever the dock says. */
 @media (max-width: 640px) {
-    .appearance-panel {
-        top: auto;
+    .settings-panel,
+    html[data-panel] .settings-panel {
+        top: calc(var(--nav-h, 3.5rem) + var(--space-2));
         left: 0;
         right: 0;
         bottom: 0;
         width: auto;
-        max-height: 75vh;
+        height: auto;
+        border-bottom: 0;
         border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     }
+    .settings-dock,
+    .settings-panel-full { display: none; }
+}
+
+/* The Account page inside the panel: no shell around it, the section tabs
+   stick to the very top (there is no nav above them), a jump lands below
+   them, and scrolling to the end never moves the page behind. */
+html:has(> body[data-embed="1"]) { overscroll-behavior: contain; }
+body[data-embed="1"] #page-main { padding-top: var(--space-3); }
+body[data-embed="1"] .page-header { display: none; }
+body[data-embed="1"] .account-sidenav { top: 0; }
+body[data-embed="1"] .account-content > section { scroll-margin-top: calc(var(--space-7) + var(--space-3)); }
+body[data-embed="1"] .account-content > .card {
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
+}
+.settings-panel,
+.settings-panel-frame { overscroll-behavior: contain; }
+/* Docked at the bottom, the page can still scroll its last rows into view. */
+@media (min-width: 641px) {
+    html[data-panel="bottom"] body.settings-panel-open { padding-bottom: var(--settings-sheet-h); }
 }

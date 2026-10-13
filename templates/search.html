@@ -250,24 +250,14 @@
 
  </div>
 </div>
-<aside class="appearance-panel" id="appearance-panel" aria-labelledby="appearance-panel-title" hidden>
- <div class="appearance-panel-head">
-  <h2 id="appearance-panel-title">Adjust look</h2>
-  <button type="button" class="btn btn-secondary btn-sm" data-appearance-close>Done</button>
- </div>
- <p class="help-text">Changes show on your results as you pick them and save to your account.</p>
- {% set current_look = user.look if user is defined and user else "" %}
- {% include "partials/look_picker.html" %}
- {% include "partials/appearance_controls.html" %}
-</aside>
 {% endblock %}
 
 {% block scripts %}
 <div id="embedding-model-catalog" data-models='{{ embedding_models | tojson }}' hidden></div>
-<script src="/static/js/simple_tools.js?v=20261012a"></script>
+<script src="/static/js/simple_tools.js?v=20261012v"></script>
 <script src="/static/js/simple_collection_tools.js?v=20261009a"></script>
 <script src="/static/js/simple_themes.js?v=20261009a"></script>
 <script src="/static/js/collect.js?v=20261012a"></script>
 <script src="/static/js/reader.js?v=20261012a"></script>
-<script src="/static/js/search.js?v=20261012r"></script>
+<script src="/static/js/search.js?v=20261012t"></script>
 {% endblock %}
