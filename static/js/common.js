@@ -1330,20 +1330,28 @@ function wireSettingsPanel() {
         new MutationObserver(mirror).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
     }
 
-    // The frame only ever loads the embedded Account page; a section is a
-    // plain id or nothing, never text taken from the page as a URL.
+    // The frame only ever loads this one constant URL. A section to open at
+    // is scrolled to once the page is there, never put into the URL.
     const ACCOUNT_EMBED = '/account?embed=1';
-    const showSection = (rawId) => {
-        const id = /^[a-z][a-z0-9-]*$/.test(rawId || '') ? rawId : '';
-        if (!frame.getAttribute('src')) {
-            frame.src = ACCOUNT_EMBED + (id ? '#' + id : '');
-            return;
-        }
+    let pendingSection = '';
+    const scrollToSection = (id) => {
         if (!id) return;
         try {
             const el = frame.contentWindow.document.getElementById(id);
             if (el) el.scrollIntoView({ block: 'start' });
         } catch (_) { /* not loaded yet */ }
+    };
+    frame.addEventListener('load', () => {
+        scrollToSection(pendingSection);
+        pendingSection = '';
+    });
+    const showSection = (id) => {
+        if (!frame.getAttribute('src')) {
+            pendingSection = id || '';
+            frame.src = ACCOUNT_EMBED;
+            return;
+        }
+        scrollToSection(id);
     };
     const open = (id) => {
         // Visible first: a hidden frame cannot scroll to a section.
