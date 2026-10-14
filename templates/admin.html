@@ -1,9 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Admin - LitSieve{% endblock %}
+{% block container_mod %}container-wide{% endblock %}
 {% block content %}
 <section class="page-header">
  <h1>Admin</h1>
- <p class="subtitle">Your operator console: host snapshot, look up an account, unblock it, leave a note.</p>
+ <p class="subtitle">Operator console: what needs you, one account at a time, the site’s banner and copy, and this host.</p>
 </section>
 
 <div class="page-help-toolbar">
@@ -15,148 +16,196 @@
  <div class="page-help-body">
   <p class="info-text">The snapshot is counts only (no full roster). Search by username, email, or account id. Queues are short lists: locked, unverified, over quota, recent failed sign-ins, and stuck fetch/prepare jobs.</p>
   <p class="info-text">Password reset and one-time sign-in links are <strong>emailed</strong> to a verified address. Changing an email sends a new verification link; this console never marks the address verified, and it never shows codes or tokens.</p>
-  <p class="info-text">Destructive actions ask you to type the username and a reason. Every action is logged on that account’s timeline. Job retry runs on the student’s library, not yours.</p>
+  <p class="info-text">Every action asks for a reason and lands on that account’s timeline. Actions that change access or delete data also ask you to type the username; publishing or taking down the banner asks you to type <strong>publish</strong>. Job retry runs on the student’s library, not yours.</p>
  </div>
 </aside>
 
-<section class="card" id="admin-overview">
- <h2>This host</h2>
- <dl class="admin-stats" id="admin-overview-stats">
-  <div><dt>Accounts</dt><dd id="ov-accounts">…</dd></div>
-  <div><dt>Guests</dt><dd id="ov-guests">…</dd></div>
-  <div><dt>Locked</dt><dd id="ov-locked">…</dd></div>
-  <div><dt>Unverified</dt><dd id="ov-unverified">…</dd></div>
-  <div><dt>Email</dt><dd id="ov-smtp">…</dd></div>
-  <div><dt>Refine AI</dt><dd id="ov-ai">…</dd></div>
-  <div><dt>Quota</dt><dd id="ov-quota">…</dd></div>
-  <div><dt>Version</dt><dd id="ov-version">…</dd></div>
-  <div><dt>Uptime</dt><dd id="ov-uptime">…</dd></div>
-  <div><dt>Jobs</dt><dd id="ov-jobs">…</dd></div>
- </dl>
- <p class="help-text" id="admin-overview-status"></p>
- <p class="help-text" id="admin-source-health"></p>
+<div class="tabs" role="tablist" aria-label="Admin sections" id="admin-tabs">
+ <button type="button" class="tab" role="tab" id="tab-overview" data-tab="overview" aria-controls="panel-overview" aria-selected="true">Overview</button>
+ <button type="button" class="tab" role="tab" id="tab-accounts" data-tab="accounts" aria-controls="panel-accounts" aria-selected="false">Accounts</button>
+ <button type="button" class="tab" role="tab" id="tab-site" data-tab="site" aria-controls="panel-site" aria-selected="false">Site</button>
+ <button type="button" class="tab" role="tab" id="tab-host" data-tab="host" aria-controls="panel-host" aria-selected="false">Host</button>
+</div>
+
+<section class="tab-panel" role="tabpanel" id="panel-overview" aria-labelledby="tab-overview">
+ <div class="card" id="admin-overview">
+  <h2>What needs you</h2>
+  <ul class="admin-tiles" id="admin-tiles">
+   <li><a href="#accounts/locked" data-queue-link="locked">Locked out <span class="admin-tile-count" data-count="locked">…</span></a></li>
+   <li><a href="#accounts/unverified" data-queue-link="unverified">Unverified email <span class="admin-tile-count" data-count="unverified">…</span></a></li>
+   <li><a href="#accounts/jobs-stalled" data-queue-link="jobs-stalled">Stalled jobs <span class="admin-tile-count" data-count="stalled">…</span></a></li>
+   <li><a href="#accounts/jobs-failed" data-queue-link="jobs-failed">Failed jobs <span class="admin-tile-count" data-count="failed">…</span></a></li>
+   <li><a href="#accounts/jobs-active" data-queue-link="jobs-active">Active jobs <span class="admin-tile-count" data-count="active">…</span></a></li>
+   <li><a href="#accounts/tickets" data-queue-link="tickets">Open tickets <span class="admin-tile-count" data-count="tickets">…</span></a></li>
+  </ul>
+  <dl class="admin-stats">
+   <div><dt>Accounts</dt><dd id="ov-accounts">…</dd></div>
+   <div><dt>Guests</dt><dd id="ov-guests">…</dd></div>
+  </dl>
+  <p class="help-text" id="admin-overview-status"></p>
+ </div>
 </section>
 
-<section class="card">
- <h2>Accounts</h2>
- <form id="helpdesk-search-form" class="library-create-row">
-  <div class="form-group flex-2">
-   <label for="helpdesk-q">Username, email, or account id</label>
-   <input type="search" id="helpdesk-q" autocomplete="off" placeholder="exact match first">
+<section class="tab-panel" role="tabpanel" id="panel-accounts" aria-labelledby="tab-accounts" hidden>
+ <div class="admin-split">
+  <div class="card admin-finder">
+   <h2>Accounts</h2>
+   <form id="helpdesk-search-form" class="library-create-row">
+    <div class="form-group flex-2">
+     <label for="helpdesk-q">Username, email, or account id</label>
+     <input type="search" id="helpdesk-q" autocomplete="off" placeholder="exact match first">
+    </div>
+    <button type="submit" class="btn btn-primary" id="helpdesk-search-btn">Search</button>
+   </form>
+   <div class="admin-chips" role="group" aria-label="Queues">
+    <button type="button" class="admin-chip" data-queue="locked">Locked out</button>
+    <button type="button" class="admin-chip" data-queue="unverified">Unverified email</button>
+    <button type="button" class="admin-chip" data-queue="quota">Over quota</button>
+    <button type="button" class="admin-chip" data-queue="errors">Sign-in errors (1h)</button>
+    <button type="button" class="admin-chip" data-queue="jobs">Stuck jobs</button>
+    <button type="button" class="admin-chip" data-queue="jobs-active">Active jobs</button>
+    <button type="button" class="admin-chip" data-queue="jobs-stalled">Stalled jobs</button>
+    <button type="button" class="admin-chip" data-queue="jobs-failed">Failed jobs</button>
+    <button type="button" class="admin-chip" data-queue="disabled">Disabled</button>
+    <button type="button" class="admin-chip" data-queue="tickets">Open tickets</button>
+   </div>
+   <ul class="library-manage-list" id="helpdesk-results">
+    <li class="info-text">Search or pick a queue to open one account.</li>
+   </ul>
+   <div id="helpdesk-list-status" class="status-indicator"></div>
   </div>
-  <button type="submit" class="btn btn-primary" id="helpdesk-search-btn">Search</button>
- </form>
- <p class="help-text">Queues:</p>
- <div class="library-create-row">
-  <button type="button" class="btn btn-secondary btn-sm" data-queue="locked">Locked out</button>
-  <button type="button" class="btn btn-secondary btn-sm" data-queue="unverified">Unverified email</button>
-  <button type="button" class="btn btn-secondary btn-sm" data-queue="quota">Over quota</button>
-  <button type="button" class="btn btn-secondary btn-sm" data-queue="errors">Sign-in errors (1h)</button>
-  <button type="button" class="btn btn-secondary btn-sm" data-queue="jobs">Stuck jobs</button>
-  <button type="button" class="btn btn-secondary btn-sm" data-queue="jobs-active">Active jobs</button>
-  <button type="button" class="btn btn-secondary btn-sm" data-queue="jobs-stalled">Stalled jobs</button>
-  <button type="button" class="btn btn-secondary btn-sm" data-queue="jobs-failed">Failed jobs</button>
-  <button type="button" class="btn btn-secondary btn-sm" data-queue="disabled">Disabled</button>
-  <button type="button" class="btn btn-secondary btn-sm" data-queue="tickets">Open tickets</button>
+
+  <div class="card admin-detail" id="helpdesk-detail" hidden>
+   <div class="admin-detail-head">
+    <h2 id="helpdesk-title">Account</h2>
+    <span class="admin-badges" id="helpdesk-badges"></span>
+   </div>
+   <p class="info-text" id="helpdesk-identity"></p>
+   <div id="helpdesk-action-status" class="status-indicator"></div>
+
+   <h3 class="admin-subhead">Access</h3>
+   <dl class="admin-stats" id="helpdesk-access"></dl>
+   <p class="help-text" id="helpdesk-last-error"></p>
+   <div class="admin-actions">
+    {% for a in actions if a.group == 'access' %}
+    <button type="button" class="btn btn-secondary btn-sm" data-action="{{ a.name }}"{% if a.destructive %} data-destructive="1"{% endif %}>{{ a.label }}</button>
+    {% endfor %}
+   </div>
+
+   <h3 class="admin-subhead">Jobs</h3>
+   <p class="info-text" id="helpdesk-current-library"></p>
+   <p class="help-text" id="helpdesk-quota-stopped" hidden>Mid-fetch hit the storage cap (507 / quota_stopped).</p>
+   <ul class="library-manage-list" id="helpdesk-jobs"></ul>
+   <div class="admin-actions">
+    {% for a in actions if a.group == 'jobs' %}
+     {% if a.per_task %}
+      {% for task, word in task_words %}
+    <button type="button" class="btn btn-secondary btn-sm" data-action="{{ a.name }}" data-task="{{ task }}"{% if a.destructive %} data-destructive="1"{% endif %}>{{ a.label }} {{ word }}</button>
+      {% endfor %}
+     {% else %}
+    <button type="button" class="btn btn-secondary btn-sm" data-action="{{ a.name }}"{% if a.destructive %} data-destructive="1"{% endif %}>{{ a.label }}</button>
+     {% endif %}
+    {% endfor %}
+   </div>
+
+   <h3 class="admin-subhead">Storage</h3>
+   <p class="info-text" id="helpdesk-resources"></p>
+   <ul class="library-manage-list" id="helpdesk-libraries"></ul>
+   <div class="admin-actions">
+    {% for a in actions if a.group == 'storage' %}
+    <button type="button" class="btn btn-secondary btn-sm" data-action="{{ a.name }}"{% if a.destructive %} data-destructive="1"{% endif %}>{{ a.label }}</button>
+    {% endfor %}
+   </div>
+
+   <h3 class="admin-subhead">Account</h3>
+   <div class="admin-actions">
+    {% for a in actions if a.group == 'account' %}
+    <button type="button" class="btn btn-secondary btn-sm" data-action="{{ a.name }}"{% if a.destructive %} data-destructive="1"{% endif %}>{{ a.label }}</button>
+    {% endfor %}
+    <a class="btn btn-secondary btn-sm" id="hd-packet" href="#">Download support packet</a>
+   </div>
+
+   <h3 class="admin-subhead">Notes</h3>
+   <div class="form-group">
+    <label for="helpdesk-note">Add a note</label>
+    <textarea id="helpdesk-note" rows="2" maxlength="2000" placeholder="What you checked and what you did…"></textarea>
+   </div>
+   <button type="button" class="btn btn-primary btn-sm" id="hd-note">Save note</button>
+   <ul class="library-manage-list" id="helpdesk-notes"></ul>
+   <button type="button" class="btn btn-secondary btn-sm admin-more" data-more="notes" hidden>Show 25 more</button>
+
+   <h3 class="admin-subhead">Tickets</h3>
+   <ul class="library-manage-list" id="helpdesk-tickets"></ul>
+   <button type="button" class="btn btn-secondary btn-sm" id="hd-ticket-reply">Reply to latest ticket</button>
+
+   <h3 class="admin-subhead">Sign-in events</h3>
+   <ul class="library-manage-list" id="helpdesk-activity"></ul>
+   <button type="button" class="btn btn-secondary btn-sm admin-more" data-more="activity" hidden>Show 25 more</button>
+
+   <h3 class="admin-subhead">Timeline</h3>
+   <ul class="library-manage-list" id="helpdesk-timeline"></ul>
+   <button type="button" class="btn btn-secondary btn-sm admin-more" data-more="timeline" hidden>Show 25 more</button>
+  </div>
  </div>
- <ul class="library-manage-list" id="helpdesk-results">
-  <li class="info-text">Search to open one account.</li>
- </ul>
- <div id="helpdesk-list-status" class="status-indicator"></div>
 </section>
 
-<section class="card" id="helpdesk-detail" hidden>
- <h2 id="helpdesk-title">Account</h2>
- <p class="info-text" id="helpdesk-identity"></p>
- <dl class="admin-stats" id="helpdesk-access"></dl>
- <h3 class="ai-settings-subhead">Activity</h3>
- <ul class="library-manage-list" id="helpdesk-activity"></ul>
- <p class="help-text" id="helpdesk-last-error"></p>
- <p class="help-text" id="helpdesk-quota-stopped" hidden>Mid-fetch hit the storage cap (507 / quota_stopped).</p>
- <h3 class="ai-settings-subhead">Jobs</h3>
- <p class="info-text" id="helpdesk-current-library"></p>
- <ul class="library-manage-list" id="helpdesk-jobs"></ul>
- <div class="library-create-row">
-  <button type="button" class="btn btn-secondary" id="hd-cancel-fetch" data-job-task="fetch" data-job-act="cancel-job">Cancel fetch</button>
-  <button type="button" class="btn btn-secondary" id="hd-cancel-embed" data-job-task="embed" data-job-act="cancel-job">Cancel prepare</button>
-  <button type="button" class="btn btn-secondary" id="hd-clear-fetch" data-job-task="fetch" data-job-act="clear-job">Clear stale fetch</button>
-  <button type="button" class="btn btn-secondary" id="hd-clear-embed" data-job-task="embed" data-job-act="clear-job">Clear stale prepare</button>
-  <button type="button" class="btn btn-secondary" id="hd-retry-embed">Retry prepare</button>
-  <button type="button" class="btn btn-secondary" id="hd-retry-fetch">Retry fetch</button>
+<section class="tab-panel" role="tabpanel" id="panel-site" aria-labelledby="tab-site" hidden>
+ <div class="admin-grid">
+  <div class="card" id="admin-banner">
+   <h2>Incident banner</h2>
+   <p class="info-text" id="banner-current">No published banner.</p>
+   <div class="form-group">
+    <label for="banner-body">Draft text (plain text only)</label>
+    <textarea id="banner-body" rows="3" maxlength="800"></textarea>
+   </div>
+   <div class="admin-actions">
+    <button type="button" class="btn btn-secondary btn-sm" id="banner-save">Save draft</button>
+    <button type="button" class="btn btn-primary btn-sm" id="banner-publish">Publish</button>
+    <button type="button" class="btn btn-secondary btn-sm" id="banner-disable">Take down</button>
+    <button type="button" class="btn btn-secondary btn-sm" id="banner-rollback">Roll back last</button>
+   </div>
+   <p class="help-text" id="banner-status"></p>
+  </div>
+
+  <div class="card" id="admin-content">
+   <h2>Student-facing copy</h2>
+   <p class="info-text">Support links, help text, topic preset labels, and known-issue notices. Plain text / JSON only — no HTML.</p>
+   <div class="form-group">
+    <label for="content-key">Key</label>
+    <select id="content-key">
+     <option value="known_issues">known_issues</option>
+     <option value="help_text">help_text</option>
+     <option value="support_links">support_links</option>
+     <option value="topic_presets">topic_presets</option>
+    </select>
+   </div>
+   <div class="form-group">
+    <label for="content-body">Body</label>
+    <textarea id="content-body" rows="5" maxlength="4000"></textarea>
+   </div>
+   <button type="button" class="btn btn-primary btn-sm" id="content-save">Save copy</button>
+   <p class="help-text" id="content-status"></p>
+  </div>
  </div>
- <h3 class="ai-settings-subhead">Quota</h3>
- <p class="info-text" id="helpdesk-resources"></p>
- <ul class="library-manage-list" id="helpdesk-libraries"></ul>
- <div class="library-create-row">
-  <button type="button" class="btn btn-secondary" id="hd-quota-bump">Temporary quota bump</button>
-  <button type="button" class="btn btn-secondary" id="hd-delete-library">Delete one library</button>
- </div>
- <h3 class="ai-settings-subhead">Actions</h3>
- <div class="library-create-row">
-  <button type="button" class="btn btn-secondary" id="hd-view">View as student</button>
-  <button type="button" class="btn btn-secondary" id="hd-disable">Disable account</button>
-  <button type="button" class="btn btn-secondary" id="hd-enable">Re-enable account</button>
-  <button type="button" class="btn btn-secondary" id="hd-unlock">Unlock account</button>
-  <button type="button" class="btn btn-secondary" id="hd-revoke">Revoke all sessions</button>
-  <button type="button" class="btn btn-secondary" id="hd-set-email">Set email + send verification</button>
-  <button type="button" class="btn btn-secondary" id="hd-verify">Resend verification</button>
-  <button type="button" class="btn btn-secondary" id="hd-reset">Email password reset</button>
-  <button type="button" class="btn btn-secondary" id="hd-otl">Email one-time sign-in</button>
-  <button type="button" class="btn btn-secondary" id="hd-mfa">Reset MFA</button>
-  <a class="btn btn-secondary" id="hd-packet" href="#">Download support packet</a>
- </div>
- <div id="helpdesk-action-status" class="status-indicator"></div>
- <h3 class="ai-settings-subhead">Notes</h3>
- <div class="form-group">
-  <label for="helpdesk-note">Add a note</label>
-  <textarea id="helpdesk-note" rows="3" maxlength="2000" placeholder="What you checked and what you did…"></textarea>
- </div>
- <button type="button" class="btn btn-primary" id="hd-note">Save note</button>
- <ul class="library-manage-list" id="helpdesk-notes"></ul>
- <h3 class="ai-settings-subhead">Tickets</h3>
- <ul class="library-manage-list" id="helpdesk-tickets"></ul>
- <button type="button" class="btn btn-secondary" id="hd-ticket-reply">Reply to latest ticket</button>
- <h3 class="ai-settings-subhead">Timeline</h3>
- <ul class="library-manage-list" id="helpdesk-timeline"></ul>
 </section>
 
-<section class="card" id="admin-banner">
- <h2>Incident banner</h2>
- <p class="info-text" id="banner-current">No published banner.</p>
- <div class="form-group">
-  <label for="banner-body">Draft text (plain text only)</label>
-  <textarea id="banner-body" rows="3" maxlength="800"></textarea>
+<section class="tab-panel" role="tabpanel" id="panel-host" aria-labelledby="tab-host" hidden>
+ <div class="card" id="admin-host">
+  <h2>This host</h2>
+  <dl class="admin-stats">
+   <div><dt>Version</dt><dd id="ov-version">…</dd></div>
+   <div><dt>Uptime</dt><dd id="ov-uptime">…</dd></div>
+   <div><dt>Email</dt><dd id="ov-smtp">…</dd></div>
+   <div><dt>Refine AI</dt><dd id="ov-ai">…</dd></div>
+   <div><dt>Quota</dt><dd id="ov-quota">…</dd></div>
+   <div><dt>Jobs</dt><dd id="ov-jobs">…</dd></div>
+  </dl>
+  <p class="help-text" id="admin-source-health"></p>
+  <p class="help-text"><a href="/ops">Open Ship</a> to edit, check and deploy the staging checkout.</p>
  </div>
- <div class="library-create-row">
-  <button type="button" class="btn btn-secondary" id="banner-save">Save draft</button>
-  <button type="button" class="btn btn-secondary" id="banner-publish">Publish</button>
-  <button type="button" class="btn btn-secondary" id="banner-disable">Disable</button>
-  <button type="button" class="btn btn-secondary" id="banner-rollback">Rollback last</button>
- </div>
- <p class="help-text" id="banner-status"></p>
-</section>
-
-<section class="card" id="admin-content">
- <h2>Student-facing copy</h2>
- <p class="info-text">Support links, help text, topic preset labels, and known-issue notices. Plain text / JSON only — no HTML.</p>
- <div class="form-group">
-  <label for="content-key">Key</label>
-  <select id="content-key">
-   <option value="known_issues">known_issues</option>
-   <option value="help_text">help_text</option>
-   <option value="support_links">support_links</option>
-   <option value="topic_presets">topic_presets</option>
-  </select>
- </div>
- <div class="form-group">
-  <label for="content-body">Body</label>
-  <textarea id="content-body" rows="5" maxlength="4000"></textarea>
- </div>
- <button type="button" class="btn btn-secondary" id="content-save">Save copy</button>
- <p class="help-text" id="content-status"></p>
 </section>
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/admin.js?v=20261012a"></script>
+<script src="/static/js/admin.js?v=20261014a"></script>
 {% endblock %}

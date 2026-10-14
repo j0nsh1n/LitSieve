@@ -1,7 +1,10 @@
-"""Operator admin console: site snapshot, one-account lookup, unblock, note.
+"""Operator admin console: what needs attention, one account at a time,
+tickets, the site's banner and copy, and the host.
 
 Reuses ADMIN_USERNAMES / is_admin_user. No roster export, bulk delete,
-promote/demote, or writable global settings from this page.
+promote/demote, or writable global settings from this page. Every account
+action is an entry in ACTIONS: the template draws its button from the entry,
+and _begin_action enforces the same reason and confirm rule for its route.
 """
 
 from __future__ import annotations
@@ -10,6 +13,7 @@ import json
 import logging
 import os
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -45,10 +49,45 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-_DESTRUCTIVE = frozenset({
-    "revoke-sessions", "send-reset", "send-login-link", "cancel-job",
-    "clear-job", "set-email", "quota-bump", "delete-library",
-})
+@dataclass(frozen=True)
+class AdminAction:
+    """One account action: its route suffix, button, and confirm rule."""
+
+    name: str
+    label: str
+    group: str
+    destructive: bool = False
+    per_task: bool = False
+    guest_message: Optional[str] = None
+
+
+ACTIONS: tuple[AdminAction, ...] = (
+    AdminAction("unlock", "Unlock account", "access"),
+    AdminAction("resend-verification", "Resend verification", "access"),
+    AdminAction("set-email", "Set email + send verification", "access", destructive=True,
+                guest_message="Guest demos cannot change email. They must register."),
+    AdminAction("send-reset", "Email password reset", "access", destructive=True,
+                guest_message="Guest demos have no password."),
+    AdminAction("send-login-link", "Email one-time sign-in", "access", destructive=True,
+                guest_message="Guest demos cannot use a login link."),
+    AdminAction("revoke-sessions", "Revoke all sessions", "access", destructive=True),
+    AdminAction("cancel-job", "Cancel", "jobs", destructive=True, per_task=True),
+    AdminAction("clear-job", "Clear stale", "jobs", destructive=True, per_task=True),
+    AdminAction("retry-embed", "Retry prepare", "jobs"),
+    AdminAction("retry-fetch", "Retry fetch", "jobs",
+                guest_message="Guest demos cannot fetch."),
+    AdminAction("quota-bump", "Temporary quota bump", "storage", destructive=True),
+    AdminAction("delete-library", "Delete one library", "storage", destructive=True),
+    AdminAction("view", "View as student", "account"),
+    AdminAction("disable", "Disable account", "account", destructive=True,
+                guest_message="Guest demos cannot be disabled. They expire on their own."),
+    AdminAction("enable", "Re-enable account", "account"),
+)
+ACTION_BY_NAME = {a.name: a for a in ACTIONS}
+TASK_WORDS = (("fetch", "fetch"), ("embed", "prepare"))
+BANNER_CONFIRM = "publish"
+HISTORY_KINDS = ("timeline", "notes", "activity")
+HISTORY_PAGE = 25
 _QUOTA_BUMP_MAX_MB = 10 * 1024
 _QUOTA_BUMP_MAX_DAYS = 90
 _QUEUE_KINDS = frozenset({
@@ -85,6 +124,53 @@ def _require_admin(request: Request):
     return user, None
 
 
+@dataclass(frozen=True)
+class AdminPost:
+    admin: dict
+    body: dict
+
+
+@dataclass(frozen=True)
+class ActionCall:
+    admin: dict
+    rec: dict
+    body: dict
+
+
+async def _begin_post(request: Request, *, confirm: Optional[str] = None):
+    """Auth, CSRF, body and the reason (and confirm word) for a site-wide admin POST."""
+    admin, err = _require_admin(request)
+    if err or not admin:
+        return err or JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    body = await _read_json(request)
+    bad = _require_reason(body, confirm=confirm)
+    if bad:
+        return bad
+    return AdminPost(admin=admin, body=body)
+
+
+async def _begin_action(request: Request, user_id: str, name: str):
+    """The same checks for an account action, with the confirm rule from ACTIONS."""
+    action = ACTION_BY_NAME[name]
+    admin, err = _require_admin(request)
+    if err or not admin:
+        return err or JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    rec, missing = _load_account(user_id)
+    if missing or not rec:
+        return missing or JSONResponse(status_code=404, content={"detail": "Account not found"})
+    if action.guest_message and rec.get("is_guest"):
+        return JSONResponse(status_code=400, content={"detail": action.guest_message})
+    body = await _read_json(request)
+    bad = _require_reason(body, confirm=rec["username"] if action.destructive else None)
+    if bad:
+        return bad
+    return ActionCall(admin=admin, rec=rec, body=body)
+
+
 def _public(rec: dict) -> dict:
     """Account fields safe for the admin UI. Never includes password hashes."""
     locked = core.user_db.is_locked(rec)
@@ -112,7 +198,6 @@ def _public(rec: dict) -> dict:
         "disabled": core.user_db.is_disabled(rec),
         "disabled_until": rec.get("disabled_until"),
         "disabled_message": rec.get("disabled_message") or "",
-        "mfa": "not_available",
         "class_section": None,
         "display_name": rec["username"],
     }
@@ -126,7 +211,7 @@ async def _read_json(request: Request) -> dict:
         return {}
 
 
-def _require_reason(body: dict, *, confirm: Optional[str] = None, username: str = "") -> Optional[JSONResponse]:
+def _require_reason(body: dict, *, confirm: Optional[str] = None) -> Optional[JSONResponse]:
     reason = str(body.get("reason") or "").strip()
     if len(reason) < 3:
         return JSONResponse(
@@ -224,7 +309,8 @@ async def admin_page(request: Request):
     if not is_admin_user(user):
         return RedirectResponse(url="/account", status_code=302)
     return templates.TemplateResponse(
-        request, "admin.html", context={"active_page": "admin", "user": user}
+        request, "admin.html",
+        context={"active_page": "admin", "user": user, "actions": ACTIONS, "task_words": TASK_WORDS},
     )
 
 
@@ -372,9 +458,9 @@ async def api_admin_user_detail(user_id: str, request: Request):
         elif slot.get("quota_stopped"):
             last_job_error = "Fetch stopped at the storage cap (507 / quota_stopped)."
     active_lib = next((row for row in library_rows if row.get("active")), None)
-    auth_ev = core.user_db.list_auth_events(user_id, limit=20)
-    notes = core.user_db.list_support_notes(user_id, limit=50)
-    timeline = core.user_db.list_support_actions(user_id, limit=50)
+    auth_ev = core.user_db.list_auth_events(user_id, limit=HISTORY_PAGE)
+    notes = core.user_db.list_support_notes(user_id, limit=HISTORY_PAGE)
+    timeline = core.user_db.list_support_actions(user_id, limit=HISTORY_PAGE)
     return {
         **_public(rec),
         "quota": report,
@@ -401,6 +487,33 @@ async def api_admin_user_detail(user_id: str, request: Request):
         "tickets": helpdesk.list_tickets(core.user_db, student_id=user_id, limit=25),
         "support_views": helpdesk.list_support_views_for_student(core.user_db, user_id, limit=10),
     }
+
+
+@router.get("/api/admin/users/{user_id}/history")
+@limiter.limit("60/minute")
+async def api_admin_user_history(user_id: str, request: Request):
+    """One page of an account's timeline, notes or auth events, oldest last."""
+    _admin, err = _require_admin(request)
+    if err:
+        return err
+    rec, missing = _load_account(user_id)
+    if missing or not rec:
+        return missing or JSONResponse(status_code=404, content={"detail": "Account not found"})
+    kind = str(request.query_params.get("kind") or "timeline")
+    if kind not in HISTORY_KINDS:
+        return JSONResponse(status_code=400, content={"detail": "Unknown history kind."})
+    try:
+        offset = max(0, int(request.query_params.get("offset") or 0))
+        limit = max(1, min(int(request.query_params.get("limit") or HISTORY_PAGE), 50))
+    except ValueError:
+        return JSONResponse(status_code=400, content={"detail": "offset and limit must be numbers."})
+    query = {
+        "timeline": core.user_db.list_support_actions,
+        "notes": core.user_db.list_support_notes,
+        "activity": core.user_db.list_auth_events,
+    }[kind]
+    rows = query(rec["id"], limit=limit + 1, offset=offset)
+    return {"kind": kind, "offset": offset, "items": rows[:limit], "more": len(rows) > limit}
 
 
 @router.post("/api/admin/users/{user_id}/note")
@@ -439,21 +552,11 @@ async def api_admin_note(user_id: str, request: Request):
 @router.post("/api/admin/users/{user_id}/unlock")
 @limiter.limit("20/minute")
 async def api_admin_unlock(user_id: str, request: Request):
-    admin, err = _require_admin(request)
-    if err or not admin:
-        return err or JSONResponse(status_code=401, content={"detail": "Not authenticated"})
-    if csrf_failed(request):
-        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
-    rec, missing = _load_account(user_id)
-    if missing or not rec:
-        return missing or JSONResponse(
-            status_code=404, content={"detail": "Account not found"}
-        )
+    call = await _begin_action(request, user_id, "unlock")
+    if isinstance(call, JSONResponse):
+        return call
+    admin, rec, body = call.admin, call.rec, call.body
     user_id = rec["id"]
-    body = await _read_json(request)
-    bad = _require_reason(body)
-    if bad:
-        return bad
     old = rec.get("locked_until") or ""
     core.user_db.unlock_account(user_id)
     core.user_db.add_support_action(
@@ -471,21 +574,11 @@ async def api_admin_unlock(user_id: str, request: Request):
 @router.post("/api/admin/users/{user_id}/revoke-sessions")
 @limiter.limit("20/minute")
 async def api_admin_revoke(user_id: str, request: Request):
-    admin, err = _require_admin(request)
-    if err or not admin:
-        return err or JSONResponse(status_code=401, content={"detail": "Not authenticated"})
-    if csrf_failed(request):
-        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
-    rec, missing = _load_account(user_id)
-    if missing or not rec:
-        return missing or JSONResponse(
-            status_code=404, content={"detail": "Account not found"}
-        )
+    call = await _begin_action(request, user_id, "revoke-sessions")
+    if isinstance(call, JSONResponse):
+        return call
+    admin, rec, body = call.admin, call.rec, call.body
     user_id = rec["id"]
-    body = await _read_json(request)
-    bad = _require_reason(body, confirm=rec["username"], username=rec["username"])
-    if bad:
-        return bad
     old = str(rec.get("token_version") or 0)
     core.user_db.bump_sessions(user_id)
     fresh = core.user_db.get_by_id(user_id)
@@ -505,21 +598,11 @@ async def api_admin_revoke(user_id: str, request: Request):
 @router.post("/api/admin/users/{user_id}/resend-verification")
 @limiter.limit("12/minute")
 async def api_admin_resend_verify(user_id: str, request: Request):
-    admin, err = _require_admin(request)
-    if err or not admin:
-        return err or JSONResponse(status_code=401, content={"detail": "Not authenticated"})
-    if csrf_failed(request):
-        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
-    rec, missing = _load_account(user_id)
-    if missing or not rec:
-        return missing or JSONResponse(
-            status_code=404, content={"detail": "Account not found"}
-        )
+    call = await _begin_action(request, user_id, "resend-verification")
+    if isinstance(call, JSONResponse):
+        return call
+    admin, rec, body = call.admin, call.rec, call.body
     user_id = rec["id"]
-    body = await _read_json(request)
-    bad = _require_reason(body)
-    if bad:
-        return bad
     email = (rec.get("email") or "").strip()
     if not email:
         return JSONResponse(status_code=400, content={"detail": "This account has no email on file."})
@@ -548,23 +631,11 @@ async def api_admin_resend_verify(user_id: str, request: Request):
 @limiter.limit("12/minute")
 async def api_admin_send_reset(user_id: str, request: Request):
     """Email a password-reset code. Never returns the code to the helpdesk."""
-    admin, err = _require_admin(request)
-    if err or not admin:
-        return err or JSONResponse(status_code=401, content={"detail": "Not authenticated"})
-    if csrf_failed(request):
-        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
-    rec, missing = _load_account(user_id)
-    if missing or not rec:
-        return missing or JSONResponse(
-            status_code=404, content={"detail": "Account not found"}
-        )
+    call = await _begin_action(request, user_id, "send-reset")
+    if isinstance(call, JSONResponse):
+        return call
+    admin, rec, body = call.admin, call.rec, call.body
     user_id = rec["id"]
-    if rec.get("is_guest"):
-        return JSONResponse(status_code=400, content={"detail": "Guest demos have no password."})
-    body = await _read_json(request)
-    bad = _require_reason(body, confirm=rec["username"])
-    if bad:
-        return bad
     verified = core.user_db.get_verified_email(rec["username"])
     if not verified:
         return JSONResponse(
@@ -597,23 +668,11 @@ async def api_admin_send_reset(user_id: str, request: Request):
 @limiter.limit("12/minute")
 async def api_admin_send_login_link(user_id: str, request: Request):
     """Email a 15-minute one-time sign-in link. Token is not shown to helpdesk."""
-    admin, err = _require_admin(request)
-    if err or not admin:
-        return err or JSONResponse(status_code=401, content={"detail": "Not authenticated"})
-    if csrf_failed(request):
-        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
-    rec, missing = _load_account(user_id)
-    if missing or not rec:
-        return missing or JSONResponse(
-            status_code=404, content={"detail": "Account not found"}
-        )
+    call = await _begin_action(request, user_id, "send-login-link")
+    if isinstance(call, JSONResponse):
+        return call
+    admin, rec, body = call.admin, call.rec, call.body
     user_id = rec["id"]
-    if rec.get("is_guest"):
-        return JSONResponse(status_code=400, content={"detail": "Guest demos cannot use a login link."})
-    body = await _read_json(request)
-    bad = _require_reason(body, confirm=rec["username"])
-    if bad:
-        return bad
     verified = core.user_db.get_verified_email(rec["username"])
     if not verified:
         return JSONResponse(
@@ -642,36 +701,14 @@ async def api_admin_send_login_link(user_id: str, request: Request):
     return {"status": "sent", "emailed_to": verified}
 
 
-@router.post("/api/admin/users/{user_id}/reset-mfa")
-@limiter.limit("12/minute")
-async def api_admin_reset_mfa(user_id: str, request: Request):
-    admin, err = _require_admin(request)
-    if err or not admin:
-        return err or JSONResponse(status_code=401, content={"detail": "Not authenticated"})
-    return JSONResponse(
-        status_code=400,
-        content={"detail": "This host does not use MFA or trusted devices."},
-    )
-
-
 @router.post("/api/admin/users/{user_id}/cancel-job")
 @limiter.limit("30/minute")
 async def api_admin_cancel_job(user_id: str, request: Request):
-    admin, err = _require_admin(request)
-    if err or not admin:
-        return err or JSONResponse(status_code=401, content={"detail": "Not authenticated"})
-    if csrf_failed(request):
-        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
-    rec, missing = _load_account(user_id)
-    if missing or not rec:
-        return missing or JSONResponse(
-            status_code=404, content={"detail": "Account not found"}
-        )
+    call = await _begin_action(request, user_id, "cancel-job")
+    if isinstance(call, JSONResponse):
+        return call
+    admin, rec, body = call.admin, call.rec, call.body
     user_id = rec["id"]
-    body = await _read_json(request)
-    bad = _require_reason(body, confirm=rec["username"])
-    if bad:
-        return bad
     task = str(body.get("task") or "").strip()
     if task not in ("fetch", "embed"):
         return JSONResponse(status_code=400, content={"detail": "task must be fetch or embed"})
@@ -693,21 +730,11 @@ async def api_admin_cancel_job(user_id: str, request: Request):
 @limiter.limit("30/minute")
 async def api_admin_clear_job(user_id: str, request: Request):
     """Clear a slot that still says running after the worker is gone."""
-    admin, err = _require_admin(request)
-    if err or not admin:
-        return err or JSONResponse(status_code=401, content={"detail": "Not authenticated"})
-    if csrf_failed(request):
-        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
-    rec, missing = _load_account(user_id)
-    if missing or not rec:
-        return missing or JSONResponse(
-            status_code=404, content={"detail": "Account not found"}
-        )
+    call = await _begin_action(request, user_id, "clear-job")
+    if isinstance(call, JSONResponse):
+        return call
+    admin, rec, body = call.admin, call.rec, call.body
     user_id = rec["id"]
-    body = await _read_json(request)
-    bad = _require_reason(body, confirm=rec["username"])
-    if bad:
-        return bad
     task = str(body.get("task") or "").strip()
     if task not in core.JOB_TASKS:
         return JSONResponse(status_code=400, content={"detail": "task must be fetch, embed or cluster"})
@@ -726,21 +753,11 @@ async def api_admin_clear_job(user_id: str, request: Request):
 @limiter.limit("12/minute")
 async def api_admin_retry_embed(user_id: str, request: Request):
     """Start prepare (embed, only_missing) on the student's current library."""
-    admin, err = _require_admin(request)
-    if err or not admin:
-        return err or JSONResponse(status_code=401, content={"detail": "Not authenticated"})
-    if csrf_failed(request):
-        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
-    rec, missing = _load_account(user_id)
-    if missing or not rec:
-        return missing or JSONResponse(
-            status_code=404, content={"detail": "Account not found"}
-        )
+    call = await _begin_action(request, user_id, "retry-embed")
+    if isinstance(call, JSONResponse):
+        return call
+    admin, rec, body = call.admin, call.rec, call.body
     user_id = rec["id"]
-    body = await _read_json(request)
-    bad = _require_reason(body)
-    if bad:
-        return bad
     try:
         quota.check_quota(user_id)
     except quota.QuotaExceeded as exc:
@@ -773,26 +790,11 @@ async def api_admin_retry_embed(user_id: str, request: Request):
 @limiter.limit("12/minute")
 async def api_admin_set_email(user_id: str, request: Request):
     """Replace the recovery email and send verification. Never auto-verifies."""
-    admin, err = _require_admin(request)
-    if err or not admin:
-        return err or JSONResponse(status_code=401, content={"detail": "Not authenticated"})
-    if csrf_failed(request):
-        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
-    rec, missing = _load_account(user_id)
-    if missing or not rec:
-        return missing or JSONResponse(
-            status_code=404, content={"detail": "Account not found"}
-        )
+    call = await _begin_action(request, user_id, "set-email")
+    if isinstance(call, JSONResponse):
+        return call
+    admin, rec, body = call.admin, call.rec, call.body
     user_id = rec["id"]
-    if rec.get("is_guest"):
-        return JSONResponse(
-            status_code=400,
-            content={"detail": "Guest demos cannot change email. They must register."},
-        )
-    body = await _read_json(request)
-    bad = _require_reason(body, confirm=rec["username"])
-    if bad:
-        return bad
     email_error = validate_email(str(body.get("email") or ""))
     if email_error:
         return JSONResponse(status_code=400, content={"detail": email_error})
@@ -842,21 +844,11 @@ async def api_admin_set_email(user_id: str, request: Request):
 @limiter.limit("12/minute")
 async def api_admin_quota_bump(user_id: str, request: Request):
     """Time-boxed per-account cap. Host default stays for everyone else."""
-    admin, err = _require_admin(request)
-    if err or not admin:
-        return err or JSONResponse(status_code=401, content={"detail": "Not authenticated"})
-    if csrf_failed(request):
-        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
-    rec, missing = _load_account(user_id)
-    if missing or not rec:
-        return missing or JSONResponse(
-            status_code=404, content={"detail": "Account not found"}
-        )
+    call = await _begin_action(request, user_id, "quota-bump")
+    if isinstance(call, JSONResponse):
+        return call
+    admin, rec, body = call.admin, call.rec, call.body
     user_id = rec["id"]
-    body = await _read_json(request)
-    bad = _require_reason(body, confirm=rec["username"])
-    if bad:
-        return bad
     raw_limit = body.get("limit_mb")
     if raw_limit is None:
         return JSONResponse(status_code=400, content={"detail": "limit_mb must be a whole number of megabytes."})
@@ -896,21 +888,11 @@ async def api_admin_quota_bump(user_id: str, request: Request):
 @limiter.limit("12/minute")
 async def api_admin_delete_library(user_id: str, request: Request):
     """Delete one named library. Never wipes the whole account."""
-    admin, err = _require_admin(request)
-    if err or not admin:
-        return err or JSONResponse(status_code=401, content={"detail": "Not authenticated"})
-    if csrf_failed(request):
-        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
-    rec, missing = _load_account(user_id)
-    if missing or not rec:
-        return missing or JSONResponse(
-            status_code=404, content={"detail": "Account not found"}
-        )
+    call = await _begin_action(request, user_id, "delete-library")
+    if isinstance(call, JSONResponse):
+        return call
+    admin, rec, body = call.admin, call.rec, call.body
     user_id = rec["id"]
-    body = await _read_json(request)
-    bad = _require_reason(body, confirm=rec["username"])
-    if bad:
-        return bad
     libs = list_libraries(user_id)
     library_id = str(body.get("library_id") or "").strip()
     typed_name = str(body.get("library_name") or "").strip()
@@ -958,23 +940,11 @@ async def api_admin_delete_library(user_id: str, request: Request):
 @limiter.limit("12/minute")
 async def api_admin_retry_fetch(user_id: str, request: Request):
     """Re-run the last fetch for this account's current library."""
-    admin, err = _require_admin(request)
-    if err or not admin:
-        return err or JSONResponse(status_code=401, content={"detail": "Not authenticated"})
-    if csrf_failed(request):
-        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
-    rec, missing = _load_account(user_id)
-    if missing or not rec:
-        return missing or JSONResponse(
-            status_code=404, content={"detail": "Account not found"}
-        )
+    call = await _begin_action(request, user_id, "retry-fetch")
+    if isinstance(call, JSONResponse):
+        return call
+    admin, rec, body = call.admin, call.rec, call.body
     user_id = rec["id"]
-    if rec.get("is_guest"):
-        return JSONResponse(status_code=400, content={"detail": "Guest demos cannot fetch."})
-    body = await _read_json(request)
-    bad = _require_reason(body)
-    if bad:
-        return bad
     jobs = core.snapshot_jobs(user_id)
     last = (jobs.get("fetch") or {}).get("last_fetch") or {}
     if not last.get("query") or not last.get("sources"):
@@ -1017,26 +987,11 @@ async def api_admin_retry_fetch(user_id: str, request: Request):
 @router.post("/api/admin/users/{user_id}/disable")
 @limiter.limit("12/minute")
 async def api_admin_disable(user_id: str, request: Request):
-    admin, err = _require_admin(request)
-    if err or not admin:
-        return err or JSONResponse(status_code=401, content={"detail": "Not authenticated"})
-    if csrf_failed(request):
-        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
-    rec, missing = _load_account(user_id)
-    if missing or not rec:
-        return missing or JSONResponse(
-            status_code=404, content={"detail": "Account not found"}
-        )
+    call = await _begin_action(request, user_id, "disable")
+    if isinstance(call, JSONResponse):
+        return call
+    admin, rec, body = call.admin, call.rec, call.body
     user_id = rec["id"]
-    if rec.get("is_guest"):
-        return JSONResponse(
-            status_code=400,
-            content={"detail": "Guest demos cannot be disabled. They expire on their own."},
-        )
-    body = await _read_json(request)
-    bad = _require_reason(body, confirm=rec["username"])
-    if bad:
-        return bad
     message = helpdesk.sanitize_plain(str(body.get("message") or body.get("reason") or ""), limit=400)
     if len(message) < 3:
         return JSONResponse(
@@ -1070,21 +1025,11 @@ async def api_admin_disable(user_id: str, request: Request):
 @router.post("/api/admin/users/{user_id}/enable")
 @limiter.limit("12/minute")
 async def api_admin_enable(user_id: str, request: Request):
-    admin, err = _require_admin(request)
-    if err or not admin:
-        return err or JSONResponse(status_code=401, content={"detail": "Not authenticated"})
-    if csrf_failed(request):
-        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
-    rec, missing = _load_account(user_id)
-    if missing or not rec:
-        return missing or JSONResponse(
-            status_code=404, content={"detail": "Account not found"}
-        )
+    call = await _begin_action(request, user_id, "enable")
+    if isinstance(call, JSONResponse):
+        return call
+    admin, rec, body = call.admin, call.rec, call.body
     user_id = rec["id"]
-    body = await _read_json(request)
-    bad = _require_reason(body)
-    if bad:
-        return bad
     old = rec.get("disabled_until") or ""
     helpdesk.clear_disabled(core.user_db, user_id)
     core.user_db.add_support_action(
@@ -1103,21 +1048,11 @@ async def api_admin_enable(user_id: str, request: Request):
 @limiter.limit("12/minute")
 async def api_admin_start_view(user_id: str, request: Request):
     """Start a time-boxed read-only student view. Requires recent password."""
-    admin, err = _require_admin(request)
-    if err or not admin:
-        return err or JSONResponse(status_code=401, content={"detail": "Not authenticated"})
-    if csrf_failed(request):
-        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
-    rec, missing = _load_account(user_id)
-    if missing or not rec:
-        return missing or JSONResponse(
-            status_code=404, content={"detail": "Account not found"}
-        )
+    call = await _begin_action(request, user_id, "view")
+    if isinstance(call, JSONResponse):
+        return call
+    admin, rec, body = call.admin, call.rec, call.body
     user_id = rec["id"]
-    body = await _read_json(request)
-    bad = _require_reason(body)
-    if bad:
-        return bad
     password = str(body.get("password") or "")
     admin_row = core.user_db.get_by_id(admin["user_id"])
     if not admin_row or not await verify_password_async(password, admin_row["hashed_password"]):
@@ -1204,18 +1139,13 @@ async def api_admin_ticket_detail(ticket_id: str, request: Request):
 @router.post("/api/admin/tickets/{ticket_id}/status")
 @limiter.limit("30/minute")
 async def api_admin_ticket_status(ticket_id: str, request: Request):
-    admin, err = _require_admin(request)
-    if err or not admin:
-        return err or JSONResponse(status_code=401, content={"detail": "Not authenticated"})
-    if csrf_failed(request):
-        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    post = await _begin_post(request)
+    if isinstance(post, JSONResponse):
+        return post
+    admin, body = post.admin, post.body
     rec = helpdesk.get_ticket(core.user_db, ticket_id)
     if not rec:
         return JSONResponse(status_code=404, content={"detail": "Ticket not found"})
-    body = await _read_json(request)
-    bad = _require_reason(body)
-    if bad:
-        return bad
     status = str(body.get("status") or "").strip()
     try:
         updated = helpdesk.set_ticket_status(core.user_db, ticket_id, status)
@@ -1233,18 +1163,13 @@ async def api_admin_ticket_status(ticket_id: str, request: Request):
 @router.post("/api/admin/tickets/{ticket_id}/reply")
 @limiter.limit("20/minute")
 async def api_admin_ticket_reply(ticket_id: str, request: Request):
-    admin, err = _require_admin(request)
-    if err or not admin:
-        return err or JSONResponse(status_code=401, content={"detail": "Not authenticated"})
-    if csrf_failed(request):
-        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    post = await _begin_post(request)
+    if isinstance(post, JSONResponse):
+        return post
+    admin, body = post.admin, post.body
     rec = helpdesk.get_ticket(core.user_db, ticket_id)
     if not rec:
         return JSONResponse(status_code=404, content={"detail": "Ticket not found"})
-    body = await _read_json(request)
-    bad = _require_reason(body)
-    if bad:
-        return bad
     try:
         reply = helpdesk.add_ticket_reply(
             core.user_db, ticket_id,
@@ -1287,15 +1212,10 @@ async def api_admin_banner_get(request: Request):
 @router.post("/api/admin/banner")
 @limiter.limit("20/minute")
 async def api_admin_banner_save(request: Request):
-    admin, err = _require_admin(request)
-    if err or not admin:
-        return err or JSONResponse(status_code=401, content={"detail": "Not authenticated"})
-    if csrf_failed(request):
-        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
-    body = await _read_json(request)
-    bad = _require_reason(body)
-    if bad:
-        return bad
+    post = await _begin_post(request)
+    if isinstance(post, JSONResponse):
+        return post
+    admin, body = post.admin, post.body
     until = None
     if str(body.get("until") or "").strip():
         until = _parse_quota_until(str(body.get("until")))
@@ -1324,15 +1244,10 @@ async def api_admin_banner_save(request: Request):
 @router.post("/api/admin/banner/{notice_id}/publish")
 @limiter.limit("20/minute")
 async def api_admin_banner_publish(notice_id: str, request: Request):
-    admin, err = _require_admin(request)
-    if err or not admin:
-        return err or JSONResponse(status_code=401, content={"detail": "Not authenticated"})
-    if csrf_failed(request):
-        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
-    body = await _read_json(request)
-    bad = _require_reason(body)
-    if bad:
-        return bad
+    post = await _begin_post(request, confirm=BANNER_CONFIRM)
+    if isinstance(post, JSONResponse):
+        return post
+    admin, body = post.admin, post.body
     rec = helpdesk.publish_banner(core.user_db, notice_id, actor=admin["username"])
     if not rec:
         return JSONResponse(status_code=404, content={"detail": "Banner not found"})
@@ -1348,15 +1263,10 @@ async def api_admin_banner_publish(notice_id: str, request: Request):
 @router.post("/api/admin/banner/{notice_id}/disable")
 @limiter.limit("20/minute")
 async def api_admin_banner_disable(notice_id: str, request: Request):
-    admin, err = _require_admin(request)
-    if err or not admin:
-        return err or JSONResponse(status_code=401, content={"detail": "Not authenticated"})
-    if csrf_failed(request):
-        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
-    body = await _read_json(request)
-    bad = _require_reason(body)
-    if bad:
-        return bad
+    post = await _begin_post(request, confirm=BANNER_CONFIRM)
+    if isinstance(post, JSONResponse):
+        return post
+    admin, body = post.admin, post.body
     rec = helpdesk.disable_banner(core.user_db, notice_id, actor=admin["username"])
     if not rec:
         return JSONResponse(status_code=404, content={"detail": "Banner not found"})
@@ -1372,15 +1282,10 @@ async def api_admin_banner_disable(notice_id: str, request: Request):
 @router.post("/api/admin/banner/{notice_id}/rollback")
 @limiter.limit("20/minute")
 async def api_admin_banner_rollback(notice_id: str, request: Request):
-    admin, err = _require_admin(request)
-    if err or not admin:
-        return err or JSONResponse(status_code=401, content={"detail": "Not authenticated"})
-    if csrf_failed(request):
-        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
-    body = await _read_json(request)
-    bad = _require_reason(body)
-    if bad:
-        return bad
+    post = await _begin_post(request)
+    if isinstance(post, JSONResponse):
+        return post
+    admin, body = post.admin, post.body
     rec = helpdesk.rollback_banner(
         core.user_db, notice_id, str(body.get("revision_id") or ""), actor=admin["username"],
     )
@@ -1410,17 +1315,12 @@ async def api_admin_content_list(request: Request):
 @router.post("/api/admin/content/{key}")
 @limiter.limit("20/minute")
 async def api_admin_content_save(key: str, request: Request):
-    admin, err = _require_admin(request)
-    if err or not admin:
-        return err or JSONResponse(status_code=401, content={"detail": "Not authenticated"})
-    if csrf_failed(request):
-        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    post = await _begin_post(request)
+    if isinstance(post, JSONResponse):
+        return post
+    admin, body = post.admin, post.body
     if key not in helpdesk.CONTENT_KEYS:
         return JSONResponse(status_code=400, content={"detail": "Unknown content key."})
-    body = await _read_json(request)
-    bad = _require_reason(body)
-    if bad:
-        return bad
     raw = body.get("body")
     if not isinstance(raw, str):
         raw = json.dumps(raw)
@@ -1440,15 +1340,10 @@ async def api_admin_content_save(key: str, request: Request):
 @router.post("/api/admin/content/{key}/rollback")
 @limiter.limit("20/minute")
 async def api_admin_content_rollback(key: str, request: Request):
-    admin, err = _require_admin(request)
-    if err or not admin:
-        return err or JSONResponse(status_code=401, content={"detail": "Not authenticated"})
-    if csrf_failed(request):
-        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
-    body = await _read_json(request)
-    bad = _require_reason(body)
-    if bad:
-        return bad
+    post = await _begin_post(request)
+    if isinstance(post, JSONResponse):
+        return post
+    admin, body = post.admin, post.body
     rec = helpdesk.rollback_site_content(
         core.user_db, key, str(body.get("revision_id") or ""), actor=admin["username"],
     )
@@ -1492,7 +1387,6 @@ async def api_admin_packet(user_id: str, request: Request):
         f"last_login={pub['last_login_at'] or '-'} last_seen={pub['last_seen_at'] or '-'}",
         f"password_changed={pub['password_changed_at'] or '-'}",
         f"disk={report.get('used_mb')} MB of {report.get('limit_mb') or 'unlimited'} MB",
-        f"mfa={pub['mfa']}",
         "",
         "== Auth events ==",
     ]

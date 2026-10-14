@@ -793,13 +793,13 @@ class UserDatabase:
             )
             self.conn.commit()
 
-    def list_auth_events(self, user_id: str, *, limit: int = 20) -> List[Dict]:
+    def list_auth_events(self, user_id: str, *, limit: int = 20, offset: int = 0) -> List[Dict]:
         limit = max(1, min(int(limit), 50))
         with self._lock:
             rows = self.conn.execute(
                 "SELECT id, kind, ip, detail, created_at FROM auth_events "
-                "WHERE user_id = ? ORDER BY created_at DESC LIMIT ?",
-                (user_id, limit),
+                "WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                (user_id, limit, max(0, int(offset))),
             ).fetchall()
         return [
             {
@@ -839,14 +839,14 @@ class UserDatabase:
             "created_at": now,
         }
 
-    def list_support_notes(self, student_id: str, *, limit: int = 50) -> List[Dict]:
+    def list_support_notes(self, student_id: str, *, limit: int = 50, offset: int = 0) -> List[Dict]:
         limit = max(1, min(int(limit), 50))
         with self._lock:
             rows = self.conn.execute(
                 "SELECT id, admin_id, admin_username, body, created_at "
                 "FROM support_notes WHERE student_id = ? "
-                "ORDER BY created_at DESC LIMIT ?",
-                (student_id, limit),
+                "ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                (student_id, limit, max(0, int(offset))),
             ).fetchall()
         return [
             {
@@ -897,14 +897,14 @@ class UserDatabase:
             "created_at": now,
         }
 
-    def list_support_actions(self, student_id: str, *, limit: int = 50) -> List[Dict]:
+    def list_support_actions(self, student_id: str, *, limit: int = 50, offset: int = 0) -> List[Dict]:
         limit = max(1, min(int(limit), 50))
         with self._lock:
             rows = self.conn.execute(
                 "SELECT id, admin_username, action, reason, old_value, new_value, ip, created_at "
                 "FROM support_actions WHERE student_id = ? "
-                "ORDER BY created_at DESC LIMIT ?",
-                (student_id, limit),
+                "ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                (student_id, limit, max(0, int(offset))),
             ).fetchall()
         return [
             {

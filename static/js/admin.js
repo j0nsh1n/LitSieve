@@ -1,7 +1,22 @@
-// Operator admin console. common.js provides apiCall / modals.
+// Operator admin console. common.js provides apiCall, escapeHtml, escapeAttr,
+// openSiteForm and showNotification.
+
+const TABS = ['overview', 'accounts', 'site', 'host'];
+const PAGE = 25;
+
+let _selected = null;
+let _queue = null;
+let _pages = { timeline: 0, notes: 0, activity: 0 };
 
 document.addEventListener('DOMContentLoaded', () => {
+ document.querySelectorAll('.tab[data-tab]').forEach((btn) => {
+  btn.addEventListener('click', () => { location.hash = btn.dataset.tab; });
+ });
+ document.getElementById('admin-tabs')?.addEventListener('keydown', onTabKey);
+ window.addEventListener('hashchange', route);
+ route();
  loadOverview();
+
  const form = document.getElementById('helpdesk-search-form');
  if (form) {
   form.addEventListener('submit', (e) => {
@@ -10,21 +25,16 @@ document.addEventListener('DOMContentLoaded', () => {
   });
  }
  document.querySelectorAll('[data-queue]').forEach((btn) => {
-  btn.addEventListener('click', () => runQueue(btn.getAttribute('data-queue')));
+  btn.addEventListener('click', () => { location.hash = 'accounts/' + btn.dataset.queue; });
  });
- bind('hd-unlock', () => act('unlock', false));
- bind('hd-revoke', () => act('revoke-sessions', true));
- bind('hd-set-email', setEmail);
- bind('hd-verify', () => act('resend-verification', false));
- bind('hd-reset', () => act('send-reset', true));
- bind('hd-otl', () => act('send-login-link', true));
- bind('hd-mfa', () => act('reset-mfa', false));
- bind('hd-retry-embed', retryEmbed);
- bind('hd-retry-fetch', retryFetch);
- bind('hd-view', startStudentView);
- bind('hd-disable', disableAccount);
- bind('hd-enable', () => act('enable', false));
- bind('hd-quota-bump', quotaBump);
+ document.querySelectorAll('[data-action]').forEach((btn) => {
+  btn.addEventListener('click', () => runAction(btn.dataset.action, btn.dataset.task || null));
+ });
+ document.querySelectorAll('[data-more]').forEach((btn) => {
+  btn.addEventListener('click', () => loadMore(btn.dataset.more));
+ });
+ bind('hd-note', saveNote);
+ bind('hd-ticket-reply', replyLatestTicket);
  bind('banner-save', () => bannerAct('save'));
  bind('banner-publish', () => bannerAct('publish'));
  bind('banner-disable', () => bannerAct('disable'));
@@ -32,40 +42,78 @@ document.addEventListener('DOMContentLoaded', () => {
  bind('content-save', saveContent);
  const keySel = document.getElementById('content-key');
  if (keySel) keySel.addEventListener('change', loadContentKey);
- bind('hd-delete-library', deleteOneLibrary);
- bind('hd-ticket-reply', replyLatestTicket);
- bind('hd-note', saveNote);
- document.querySelectorAll('[data-job-act]').forEach((btn) => {
-  btn.addEventListener('click', () => jobAct(
-   btn.getAttribute('data-job-act'),
-   btn.getAttribute('data-job-task'),
-  ));
- });
 });
 
-let _selected = null;
+function bind(id, fn) {
+ const el = document.getElementById(id);
+ if (el) el.addEventListener('click', fn);
+}
+
+// --- tabs and the hash ---------------------------------------------------
+
+function route() {
+ const parts = (location.hash || '#overview').slice(1).split('/');
+ const tab = TABS.includes(parts[0]) ? parts[0] : 'overview';
+ showTab(tab);
+ if (tab === 'accounts' && parts[1] === 'u' && parts[2]) {
+  openStudent(parts[2]);
+ } else if (tab === 'accounts' && parts[1]) {
+  runQueue(parts[1]);
+ }
+}
+
+function showTab(name) {
+ TABS.forEach((t) => {
+  const btn = document.getElementById('tab-' + t);
+  const panel = document.getElementById('panel-' + t);
+  if (btn) btn.setAttribute('aria-selected', t === name ? 'true' : 'false');
+  if (panel) panel.hidden = t !== name;
+ });
+}
+
+function onTabKey(ev) {
+ if (ev.key !== 'ArrowRight' && ev.key !== 'ArrowLeft') return;
+ const current = document.activeElement?.dataset?.tab;
+ if (!current) return;
+ const i = TABS.indexOf(current);
+ const next = TABS[(i + (ev.key === 'ArrowRight' ? 1 : TABS.length - 1)) % TABS.length];
+ ev.preventDefault();
+ document.getElementById('tab-' + next)?.focus();
+ location.hash = next;
+}
+
+// --- overview ------------------------------------------------------------
 
 async function loadOverview() {
  const status = document.getElementById('admin-overview-status');
+ const set = (id, v) => {
+  const el = document.getElementById(id);
+  if (el) el.textContent = String(v);
+ };
+ const tile = (key, v) => {
+  const el = document.querySelector(`[data-count="${key}"]`);
+  if (!el) return;
+  el.textContent = String(v);
+  el.classList.toggle('is-zero', !Number(v));
+ };
  try {
   const d = await apiCall('/api/admin/overview');
   const c = d.counts || {};
-  const set = (id, v) => {
-   const el = document.getElementById(id);
-   if (el) el.textContent = String(v);
-  };
   set('ov-accounts', c.accounts ?? '—');
   set('ov-guests', c.guests ?? '—');
-  set('ov-locked', c.locked ?? '—');
-  set('ov-unverified', c.unverified ?? '—');
+  tile('locked', c.locked ?? 0);
+  tile('unverified', c.unverified ?? 0);
+  const jc = d.jobs || {};
+  tile('active', jc.active || 0);
+  tile('stalled', jc.stalled || 0);
+  tile('failed', jc.failed || 0);
   set('ov-smtp', d.smtp ? 'on' : 'off');
   set('ov-ai', d.ai ? 'on' : 'off');
   set('ov-quota', d.quota_mb ? `${d.quota_mb} MB` : 'off');
   set('ov-version', d.version || '—');
   const up = Number(d.uptime_seconds || 0);
   set('ov-uptime', up ? `${Math.floor(up / 3600)}h ${Math.floor((up % 3600) / 60)}m` : 'just started');
-  const jc = d.jobs || {};
-  set('ov-jobs', `a${jc.active || 0} s${jc.stalled || 0} f${jc.failed || 0}`);
+  set('ov-jobs', `${jc.active || 0} active · ${jc.stalled || 0} stalled · ${jc.failed || 0} failed`);
   const health = document.getElementById('admin-source-health');
   if (health) {
    const fails = (d.source_health || []).filter((s) => s.recent_errors).slice(0, 6);
@@ -78,21 +126,26 @@ async function loadOverview() {
     ? 'Guest demo auto-prepares sample papers.'
     : 'Guest auto-prepare is off.';
   }
-  loadBanner();
-  loadContentKey();
  } catch (e) {
   if (status) status.textContent = e.message || 'Could not load host snapshot.';
  }
+ try {
+  const q = await apiCall('/api/admin/queue?filter=tickets');
+  tile('tickets', (q.tickets || []).length);
+ } catch (e) {
+  tile('tickets', '?');
+ }
+ loadBanner();
+ loadContentKey();
 }
 
-function bind(id, fn) {
- const el = document.getElementById(id);
- if (el) el.addEventListener('click', fn);
-}
+// --- accounts: find one ----------------------------------------------------
 
 async function runSearch() {
  const q = (document.getElementById('helpdesk-q')?.value || '').trim();
  const status = document.getElementById('helpdesk-list-status');
+ setQueueChip(null);
+ if (location.hash !== '#accounts') history.replaceState(null, '', '#accounts');
  if (status) status.textContent = 'Searching…';
  try {
   const data = await apiCall('/api/admin/search?q=' + encodeURIComponent(q));
@@ -104,8 +157,16 @@ async function runSearch() {
  }
 }
 
+function setQueueChip(kind) {
+ _queue = kind;
+ document.querySelectorAll('[data-queue]').forEach((btn) => {
+  btn.classList.toggle('is-on', btn.dataset.queue === kind);
+ });
+}
+
 async function runQueue(kind) {
  const status = document.getElementById('helpdesk-list-status');
+ setQueueChip(kind);
  if (status) status.textContent = 'Loading queue…';
  try {
   const data = await apiCall('/api/admin/queue?filter=' + encodeURIComponent(kind));
@@ -154,6 +215,23 @@ function renderResults(users) {
  });
 }
 
+function renderTicketQueue(tickets) {
+ const list = document.getElementById('helpdesk-results');
+ if (!list) return;
+ if (!tickets.length) {
+  list.innerHTML = '<li class="info-text">No tickets in this list.</li>';
+  return;
+ }
+ list.innerHTML = tickets.map((t) => `<li><button type="button" class="btn btn-secondary btn-block admin-user-btn" data-id="${escapeAttr(t.student_id)}">`
+  + `<span class="library-manage-name">${escapeHtml(t.student_username)}</span>`
+  + `<span class="help-text">${escapeHtml([t.status, t.body].filter(Boolean).join(' · '))}</span></button></li>`).join('');
+ list.querySelectorAll('[data-id]').forEach((btn) => {
+  btn.addEventListener('click', () => openStudent(btn.getAttribute('data-id')));
+ });
+}
+
+// --- accounts: one account -------------------------------------------------
+
 async function openStudent(id) {
  const status = document.getElementById('helpdesk-action-status');
  if (status) status.textContent = 'Loading…';
@@ -162,6 +240,11 @@ async function openStudent(id) {
   _selected = d;
   renderDetail(d);
   if (status) status.textContent = '';
+  const wanted = '#accounts/u/' + encodeURIComponent(d.id);
+  if (location.hash !== wanted) history.replaceState(null, '', wanted);
+  document.querySelectorAll('#helpdesk-results [data-id]').forEach((btn) => {
+   btn.classList.toggle('is-active', btn.getAttribute('data-id') === d.id);
+  });
  } catch (e) {
   if (status) status.textContent = e.message || 'Could not load student';
  }
@@ -172,13 +255,21 @@ function renderDetail(d) {
  if (panel) panel.hidden = false;
  const title = document.getElementById('helpdesk-title');
  if (title) title.textContent = d.username;
+ const badges = document.getElementById('helpdesk-badges');
+ if (badges) {
+  const list = [
+   d.disabled ? ['disabled', 'is-err'] : null,
+   d.locked ? ['locked', 'is-err'] : null,
+   d.email_verified ? null : (d.email ? ['email unverified', 'is-warn'] : ['no email', 'is-warn']),
+   d.quota && d.quota.over_limit ? ['over quota', 'is-warn'] : null,
+   d.role && d.role !== 'student' ? [d.role, ''] : null,
+  ].filter(Boolean);
+  badges.innerHTML = list.map(([text, cls]) => `<span class="admin-badge ${cls}">${escapeHtml(text)}</span>`).join('');
+ }
  const ident = document.getElementById('helpdesk-identity');
  if (ident) {
   ident.textContent = [
-   d.display_name,
    d.email || 'no email',
-   d.role,
-   d.class_section ? `class ${d.class_section}` : 'no class/section',
    d.created_at ? `created ${d.created_at}` : '',
    `id ${d.id}`,
   ].filter(Boolean).join(' · ');
@@ -191,20 +282,10 @@ function renderDetail(d) {
   access.innerHTML = pair('Access', state)
    + (d.disabled && d.disabled_message ? pair('Disabled note', d.disabled_message) : '')
    + pair('Email', d.email_verified ? 'verified' : (d.email ? 'unverified' : 'none'))
-   + pair('MFA', d.mfa === 'not_available' ? 'not used' : d.mfa)
    + pair('Password changed', d.password_changed_at || '—')
    + pair('Last login', d.last_login_at || '—')
    + pair('Last seen', d.last_seen_at || '—')
    + pair('Failed sign-ins', d.failed_logins || 0);
- }
- const act = document.getElementById('helpdesk-activity');
- if (act) {
-  const rows = d.activity || [];
-  act.innerHTML = rows.length
-   ? rows.map((e) => `<li><span class="library-manage-name">${escapeHtml(e.kind)}</span>`
-    + `<span class="help-text">${escapeHtml([e.created_at, e.ip, e.detail].filter(Boolean).join(' · '))}</span></li>`)
-    .join('')
-   : '<li class="info-text">No recent auth events.</li>';
  }
  const err = document.getElementById('helpdesk-last-error');
  if (err) err.textContent = d.last_error ? `Last error: ${d.last_error}` : '';
@@ -263,22 +344,6 @@ function renderDetail(d) {
    : '<li class="info-text">No libraries.</li>';
  }
  setJobButtons(d);
- const notes = document.getElementById('helpdesk-notes');
- if (notes) {
-  notes.innerHTML = (d.support_notes || []).length
-   ? d.support_notes.map((n) => `<li><span class="library-manage-name">${escapeHtml(n.admin_username)}</span>`
-    + `<span class="help-text">${escapeHtml(n.created_at)}</span>`
-    + `<p class="info-text">${escapeHtml(n.body)}</p></li>`).join('')
-   : '<li class="info-text">No notes yet.</li>';
- }
- const tl = document.getElementById('helpdesk-timeline');
- if (tl) {
-  tl.innerHTML = (d.timeline || []).length
-   ? d.timeline.map((a) => `<li><span class="library-manage-name">${escapeHtml(a.action)}</span>`
-    + `<span class="help-text">${escapeHtml([a.created_at, a.admin_username, a.reason].filter(Boolean).join(' · '))}</span></li>`)
-    .join('')
-   : '<li class="info-text">No admin actions yet.</li>';
- }
  const pack = document.getElementById('hd-packet');
  if (pack) pack.href = '/api/admin/users/' + encodeURIComponent(d.id) + '/packet';
  const tickets = document.getElementById('helpdesk-tickets');
@@ -288,6 +353,9 @@ function renderDetail(d) {
     + `<span class="help-text">${escapeHtml([t.created_at, t.body].filter(Boolean).join(' · '))}</span></li>`).join('')
    : '<li class="info-text">No tickets.</li>';
  }
+ renderHistory('notes', d.support_notes || [], true);
+ renderHistory('activity', d.activity || [], true);
+ renderHistory('timeline', d.timeline || [], true);
 }
 
 function pair(label, value) {
@@ -296,18 +364,18 @@ function pair(label, value) {
 
 function setJobButtons(d) {
  const jobs = d.jobs || {};
- const setEnabled = (id, on) => {
-  const el = document.getElementById(id);
-  if (el) el.disabled = !on;
+ const can = {
+  'cancel-job:fetch': !!(jobs.fetch || {}).can_cancel,
+  'cancel-job:embed': !!(jobs.embed || {}).can_cancel,
+  'clear-job:fetch': !!(jobs.fetch || {}).can_clear,
+  'clear-job:embed': !!(jobs.embed || {}).can_clear,
+  'retry-embed': !!(jobs.embed || {}).can_retry,
+  'retry-fetch': !!(jobs.fetch || {}).can_retry_fetch,
  };
- const fetchSlot = jobs.fetch || {};
- const embedSlot = jobs.embed || {};
- setEnabled('hd-cancel-fetch', !!fetchSlot.can_cancel);
- setEnabled('hd-cancel-embed', !!embedSlot.can_cancel);
- setEnabled('hd-clear-fetch', !!fetchSlot.can_clear);
- setEnabled('hd-clear-embed', !!embedSlot.can_clear);
- setEnabled('hd-retry-embed', !!embedSlot.can_retry);
- setEnabled('hd-retry-fetch', !!fetchSlot.can_retry_fetch);
+ document.querySelectorAll('[data-action]').forEach((btn) => {
+  const key = btn.dataset.task ? `${btn.dataset.action}:${btn.dataset.task}` : btn.dataset.action;
+  if (key in can) btn.disabled = !can[key];
+ });
 }
 
 function sourceFailBits(j) {
@@ -317,20 +385,60 @@ function sourceFailBits(j) {
  return bits.length ? bits.join(' ') : '';
 }
 
-function renderTicketQueue(tickets) {
- const list = document.getElementById('helpdesk-results');
+// --- history lists: the first page comes with the account, the rest on demand
+
+const HISTORY = {
+ notes: {
+  list: 'helpdesk-notes',
+  empty: 'No notes yet.',
+  row: (n) => `<li><span class="library-manage-name">${escapeHtml(n.admin_username)}</span>`
+   + `<span class="help-text">${escapeHtml(n.created_at)}</span>`
+   + `<p class="info-text">${escapeHtml(n.body)}</p></li>`,
+ },
+ activity: {
+  list: 'helpdesk-activity',
+  empty: 'No recent sign-in events.',
+  row: (e) => `<li><span class="library-manage-name">${escapeHtml(e.kind)}</span>`
+   + `<span class="help-text">${escapeHtml([e.created_at, e.ip, e.detail].filter(Boolean).join(' · '))}</span></li>`,
+ },
+ timeline: {
+  list: 'helpdesk-timeline',
+  empty: 'No admin actions yet.',
+  row: (a) => `<li><span class="library-manage-name">${escapeHtml(a.action)}</span>`
+   + `<span class="help-text">${escapeHtml([a.created_at, a.admin_username, a.reason].filter(Boolean).join(' · '))}</span></li>`,
+ },
+};
+
+function renderHistory(kind, rows, reset) {
+ const spec = HISTORY[kind];
+ const list = document.getElementById(spec.list);
  if (!list) return;
- if (!tickets.length) {
-  list.innerHTML = '<li class="info-text">No tickets in this list.</li>';
-  return;
+ if (reset) {
+  _pages[kind] = 0;
+  list.innerHTML = rows.length ? '' : `<li class="info-text">${escapeHtml(spec.empty)}</li>`;
  }
- list.innerHTML = tickets.map((t) => `<li><button type="button" class="btn btn-secondary btn-block admin-user-btn" data-id="${escapeAttr(t.student_id)}">`
-  + `<span class="library-manage-name">${escapeHtml(t.student_username)}</span>`
-  + `<span class="help-text">${escapeHtml([t.status, t.body].filter(Boolean).join(' · '))}</span></button></li>`).join('');
- list.querySelectorAll('[data-id]').forEach((btn) => {
-  btn.addEventListener('click', () => openStudent(btn.getAttribute('data-id')));
- });
+ list.insertAdjacentHTML('beforeend', rows.map(spec.row).join(''));
+ _pages[kind] += rows.length;
+ const more = document.querySelector(`[data-more="${kind}"]`);
+ if (more) more.hidden = rows.length < PAGE;
 }
+
+async function loadMore(kind) {
+ if (!_selected) return;
+ const more = document.querySelector(`[data-more="${kind}"]`);
+ if (more) more.disabled = true;
+ try {
+  const d = await apiCall(`/api/admin/users/${encodeURIComponent(_selected.id)}/history?kind=${kind}&offset=${_pages[kind]}&limit=${PAGE}`);
+  renderHistory(kind, d.items || [], false);
+  if (more) more.hidden = !d.more;
+ } catch (e) {
+  showNotification(e.message || 'Could not load more', 'error');
+ } finally {
+  if (more) more.disabled = false;
+ }
+}
+
+// --- actions: one dialog, one post, one report -----------------------------
 
 async function promptAction(title, message, { confirmName, extra, fields: moreFields, validate } = {}) {
  const fields = [
@@ -346,17 +454,11 @@ async function promptAction(title, message, { confirmName, extra, fields: moreFi
    placeholder: confirmName,
   });
  }
- if (typeof openSiteForm !== 'function') {
-  const reason = window.prompt(message || title);
-  if (!reason) return null;
-  const body = { reason, ...(extra || {}) };
-  if (confirmName) body.confirm = confirmName;
-  return body;
- }
  const vals = await openSiteForm({
   title,
   message,
   confirmLabel: 'Continue',
+  danger: !!confirmName,
   fields,
   validate: (v) => {
    if (!String(v.reason || '').trim() || String(v.reason).trim().length < 3) {
@@ -373,191 +475,115 @@ async function promptAction(title, message, { confirmName, extra, fields: moreFi
  return { reason: vals.reason, confirm: vals.confirm, ...vals, ...(extra || {}) };
 }
 
-async function act(name, destructive, opts) {
+// What each action asks beyond the reason, and what it sends. Actions missing
+// here ask for the reason (and the username when destructive) and send that.
+const ACTION_FORMS = {
+ 'set-email': {
+  title: 'Set email and send verification',
+  message: 'Replaces the recovery address and emails a verification link. This does not mark the address verified.',
+  fields: (s) => [{ id: 'email', label: 'New email', type: 'email', value: s.email || '', placeholder: 'name@school.edu' }],
+  validate: (v) => (String(v.email || '').includes('@') ? null : 'Enter an email address.'),
+  body: (v) => ({ email: v.email }),
+ },
+ 'quota-bump': {
+  title: 'Temporary quota bump',
+  message: 'Raises the storage cap for this account only, until the expiry. Everyone else keeps the host default.',
+  fields: (s) => [
+   { id: 'limit_mb', label: 'Temporary cap (MB)', type: 'number', value: String((s.quota && (s.quota.default_limit_mb || s.quota.limit_mb)) || 500) },
+   { id: 'until', label: 'Expires (UTC date)', type: 'date', value: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10) },
+  ],
+  validate: (v) => {
+   const n = Number(v.limit_mb);
+   if (!Number.isFinite(n) || n < 1) return 'Enter a cap in megabytes.';
+   if (!String(v.until || '').trim()) return 'Pick an expiry date.';
+   return null;
+  },
+  body: (v) => ({ limit_mb: Number(v.limit_mb), until: v.until }),
+ },
+ 'delete-library': {
+  title: 'Delete one library',
+  before: (s) => (libraries(s).length < 2 ? 'This account has only one library. You cannot wipe the last collection.' : null),
+  message: (s) => `Deletes a single collection. Remaining: ${libraries(s).map((l) => l.name).join(', ')}. Type the library name exactly.`,
+  fields: (s) => [{ id: 'library_name', label: 'Library name to delete', type: 'text', value: '', placeholder: libraries(s).map((l) => l.name).join(', ') }],
+  validate: (v, s) => {
+   const name = String(v.library_name || '').trim();
+   if (!name) return 'Type the library name.';
+   if (!libraries(s).some((l) => l.name === name)) return 'That name does not match a library on this account.';
+   return null;
+  },
+  body: (v, s) => {
+   const match = libraries(s).find((l) => l.name === String(v.library_name || '').trim());
+   return { library_id: match.id, library_name: match.name };
+  },
+ },
+ disable: {
+  title: 'Disable account',
+  message: 'They will not be able to sign in. Type their username. The explanation is shown to them.',
+  fields: () => [
+   { id: 'message', label: 'Student-facing explanation', type: 'text', value: '' },
+   { id: 'until', label: 'Expires (UTC date, optional)', type: 'date', value: '' },
+  ],
+  validate: (v) => (String(v.message || '').trim().length >= 3 ? null : 'Write a short explanation.'),
+  body: (v) => ({ message: v.message, until: v.until }),
+ },
+ view: {
+  title: 'View as student (read-only)',
+  message: 'Re-enter your password. This is a 15-minute read-only view. It does not sign you in as them.',
+  fields: () => [{ id: 'password', label: 'Your admin password', type: 'password', value: '' }],
+  validate: (v) => (String(v.password || '') ? null : 'Password is required.'),
+  body: (v) => ({ password: v.password }),
+  after: (data) => { window.location.href = data.redirect || '/search'; },
+ },
+ 'retry-embed': {
+  title: 'Retry prepare',
+  message: 'Starts prepare (embeddings, missing only) on this student’s current library. It does not load their collection into your session.',
+ },
+ 'retry-fetch': {
+  title: 'Retry fetch',
+  message: 'Re-runs the last fetch on this student’s current library.',
+ },
+};
+
+function libraries(s) {
+ return (s && s.libraries && s.libraries.libraries) || [];
+}
+
+async function runAction(name, task) {
  if (!_selected) return;
- const status = document.getElementById('helpdesk-action-status');
- const extra = Object.assign({}, (opts && opts.extra) || {});
- if ((name === 'cancel-job' || name === 'clear-job') && !extra.task) extra.task = 'fetch';
- const body = await promptAction(
-  name.replace(/-/g, ' '),
-  destructive
-   ? 'This changes the student’s access. Type their username and a reason.'
-   : 'Add a short reason for the timeline.',
-  { confirmName: destructive ? _selected.username : null, extra },
- );
- if (!body) return;
- if (status) status.textContent = 'Working…';
- try {
-  const data = await apiCall(
-   `/api/admin/users/${encodeURIComponent(_selected.id)}/${name}`,
-   { method: 'POST', body },
-  );
-  if (status) {
-   status.textContent = data.emailed_to
-    ? `Emailed ${data.emailed_to}`
-    : (data.detail || data.status || 'Done');
+ const btn = document.querySelector(task
+  ? `[data-action="${name}"][data-task="${task}"]`
+  : `[data-action="${name}"]`);
+ const destructive = !!(btn && btn.dataset.destructive);
+ const form = ACTION_FORMS[name] || {};
+ if (form.before) {
+  const stop = form.before(_selected);
+  if (stop) {
+   showNotification(stop, 'error');
+   return;
   }
-  showNotification(status ? status.textContent : 'Done', 'success');
-  await openStudent(_selected.id);
- } catch (e) {
-  if (status) status.textContent = e.message || 'Failed';
-  showNotification(e.message || 'Failed', 'error');
  }
-}
-
-async function jobAct(name, task) {
- if (!_selected) return;
- await act(name, true, { extra: { task } });
-}
-
-async function retryEmbed() {
- if (!_selected) return;
+ const title = form.title || (btn ? btn.textContent.trim() : name.replace(/-/g, ' '));
+ const message = typeof form.message === 'function' ? form.message(_selected) : (form.message || (destructive
+  ? 'This changes the student’s access. Type their username and a reason.'
+  : 'Add a short reason for the timeline.'));
+ const vals = await promptAction(title, message, {
+  confirmName: destructive ? _selected.username : null,
+  fields: form.fields ? form.fields(_selected) : [],
+  validate: form.validate ? (v) => form.validate(v, _selected) : null,
+ });
+ if (!vals) return;
+ const body = { reason: vals.reason, confirm: vals.confirm, ...(task ? { task } : {}), ...(form.body ? form.body(vals, _selected) : {}) };
  const status = document.getElementById('helpdesk-action-status');
- const body = await promptAction(
-  'Retry prepare',
-  'Starts prepare (embeddings, missing only) on this student’s current library. It does not load their collection into your session.',
-  {},
- );
- if (!body) return;
  if (status) status.textContent = 'Working…';
  try {
-  const data = await apiCall(
-   `/api/admin/users/${encodeURIComponent(_selected.id)}/retry-embed`,
-   { method: 'POST', body },
-  );
-  if (status) status.textContent = data.status || 'Started';
-  showNotification(status ? status.textContent : 'Started', 'success');
-  await openStudent(_selected.id);
- } catch (e) {
-  if (status) status.textContent = e.message || 'Failed';
-  showNotification(e.message || 'Failed', 'error');
- }
-}
-
-async function setEmail() {
- if (!_selected) return;
- if (_selected.is_guest) {
-  showNotification('Guest demos cannot change email. They must register.', 'error');
-  return;
- }
- const status = document.getElementById('helpdesk-action-status');
- const body = await promptAction(
-  'Set email and send verification',
-  'Replaces the recovery address and emails a verification link. This does not mark the address verified.',
-  {
-   confirmName: _selected.username,
-   fields: [
-    { id: 'email', label: 'New email', type: 'email', value: _selected.email || '', placeholder: 'name@school.edu' },
-   ],
-   validate: (v) => (String(v.email || '').includes('@') ? null : 'Enter an email address.'),
-  },
- );
- if (!body) return;
- if (status) status.textContent = 'Working…';
- try {
-  const data = await apiCall(
-   `/api/admin/users/${encodeURIComponent(_selected.id)}/set-email`,
-   { method: 'POST', body: { reason: body.reason, confirm: body.confirm, email: body.email } },
-  );
-  if (status) status.textContent = data.emailed_to ? `Verification sent to ${data.emailed_to}` : (data.status || 'Done');
-  showNotification(status ? status.textContent : 'Done', 'success');
-  await openStudent(_selected.id);
- } catch (e) {
-  if (status) status.textContent = e.message || 'Failed';
-  showNotification(e.message || 'Failed', 'error');
- }
-}
-
-async function quotaBump() {
- if (!_selected) return;
- const status = document.getElementById('helpdesk-action-status');
- const tomorrow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
- const defaultMb = String((_selected.quota && (_selected.quota.default_limit_mb || _selected.quota.limit_mb)) || 500);
- const body = await promptAction(
-  'Temporary quota bump',
-  'Raises the storage cap for this account only, until the expiry. Everyone else keeps the host default.',
-  {
-   confirmName: _selected.username,
-   fields: [
-    { id: 'limit_mb', label: 'Temporary cap (MB)', type: 'number', value: defaultMb },
-    { id: 'until', label: 'Expires (UTC date)', type: 'date', value: tomorrow },
-   ],
-   validate: (v) => {
-    const n = Number(v.limit_mb);
-    if (!Number.isFinite(n) || n < 1) return 'Enter a cap in megabytes.';
-    if (!String(v.until || '').trim()) return 'Pick an expiry date.';
-    return null;
-   },
-  },
- );
- if (!body) return;
- if (status) status.textContent = 'Working…';
- try {
-  const data = await apiCall(
-   `/api/admin/users/${encodeURIComponent(_selected.id)}/quota-bump`,
-   {
-    method: 'POST',
-    body: {
-     reason: body.reason,
-     confirm: body.confirm,
-     limit_mb: Number(body.limit_mb),
-     until: body.until,
-    },
-   },
-  );
-  if (status) status.textContent = data.status || 'Done';
-  showNotification(status ? status.textContent : 'Done', 'success');
-  await openStudent(_selected.id);
- } catch (e) {
-  if (status) status.textContent = e.message || 'Failed';
-  showNotification(e.message || 'Failed', 'error');
- }
-}
-
-async function deleteOneLibrary() {
- if (!_selected) return;
- const libs = (_selected.libraries && _selected.libraries.libraries) || [];
- if (libs.length < 2) {
-  showNotification('This account has only one library. You cannot wipe the last collection.', 'error');
-  return;
- }
- const names = libs.map((lib) => lib.name).join(', ');
- const status = document.getElementById('helpdesk-action-status');
- const body = await promptAction(
-  'Delete one library',
-  `Deletes a single collection. Remaining: ${names}. Type the library name exactly.`,
-  {
-   confirmName: _selected.username,
-   fields: [
-    { id: 'library_name', label: 'Library name to delete', type: 'text', value: '', placeholder: names },
-   ],
-   validate: (v) => {
-    const name = String(v.library_name || '').trim();
-    if (!name) return 'Type the library name.';
-    if (!libs.some((lib) => lib.name === name)) return 'That name does not match a library on this account.';
-    return null;
-   },
-  },
- );
- if (!body) return;
- const match = libs.find((lib) => lib.name === String(body.library_name || '').trim());
- if (!match) return;
- if (status) status.textContent = 'Working…';
- try {
-  const data = await apiCall(
-   `/api/admin/users/${encodeURIComponent(_selected.id)}/delete-library`,
-   {
-    method: 'POST',
-    body: {
-     reason: body.reason,
-     confirm: body.confirm,
-     library_id: match.id,
-     library_name: match.name,
-    },
-   },
-  );
-  if (status) status.textContent = data.status || 'Deleted';
-  showNotification(status ? status.textContent : 'Deleted', 'success');
+  const data = await apiCall(`/api/admin/users/${encodeURIComponent(_selected.id)}/${name}`, { method: 'POST', body });
+  const said = data.emailed_to ? `Emailed ${data.emailed_to}` : (data.detail || (data.status && data.status !== 'ok' ? data.status : 'Done.'));
+  if (status) status.textContent = said;
+  showNotification(said, 'success');
+  if (form.after) {
+   form.after(data);
+   return;
+  }
   await openStudent(_selected.id);
  } catch (e) {
   if (status) status.textContent = e.message || 'Failed';
@@ -577,70 +603,12 @@ async function saveNote() {
   });
   if (field) field.value = '';
   if (status) status.textContent = 'Note saved.';
+  showNotification('Note saved.', 'success');
   await openStudent(_selected.id);
  } catch (e) {
   if (status) status.textContent = e.message || 'Could not save note';
+  showNotification(e.message || 'Could not save note', 'error');
  }
-}
-
-async function retryFetch() {
- if (!_selected) return;
- const body = await promptAction('Retry fetch', 'Re-runs the last fetch on this student’s current library.', {});
- if (!body) return;
- await postSelected('retry-fetch', body);
-}
-
-async function startStudentView() {
- if (!_selected) return;
- const body = await promptAction(
-  'View as student (read-only)',
-  'Re-enter your password. This is a 15-minute read-only view. It does not sign you in as them.',
-  {
-   fields: [
-    { id: 'password', label: 'Your admin password', type: 'password', value: '' },
-   ],
-   validate: (v) => (String(v.password || '') ? null : 'Password is required.'),
-  },
- );
- if (!body) return;
- const status = document.getElementById('helpdesk-action-status');
- try {
-  const data = await apiCall(`/api/admin/users/${encodeURIComponent(_selected.id)}/view`, {
-   method: 'POST',
-   body: {
-    reason: body.reason,
-    password: body.password,
-   },
-  });
-  if (status) status.textContent = 'Opening student view…';
-  window.location.href = data.redirect || '/search';
- } catch (e) {
-  if (status) status.textContent = e.message || 'Could not start view';
-  showNotification(e.message || 'Failed', 'error');
- }
-}
-
-async function disableAccount() {
- if (!_selected) return;
- const body = await promptAction(
-  'Disable account',
-  'They will not be able to sign in. Type their username. The explanation is shown to them.',
-  {
-   confirmName: _selected.username,
-   fields: [
-    { id: 'message', label: 'Student-facing explanation', type: 'text', value: '' },
-    { id: 'until', label: 'Expires (UTC date, optional)', type: 'date', value: '' },
-   ],
-   validate: (v) => (String(v.message || '').trim().length >= 3 ? null : 'Write a short explanation.'),
-  },
- );
- if (!body) return;
- await postSelected('disable', {
-  reason: body.reason,
-  confirm: body.confirm,
-  message: body.message,
-  until: body.until,
- });
 }
 
 async function replyLatestTicket() {
@@ -650,41 +618,28 @@ async function replyLatestTicket() {
   showNotification('No ticket on this account.', 'error');
   return;
  }
- const body = await promptAction(
+ const vals = await promptAction(
   'Reply to ticket',
   'This is emailed if they have a verified address. It also lands on the timeline.',
   { fields: [{ id: 'body', label: 'Reply', type: 'text', value: '' }] },
  );
- if (!body) return;
+ if (!vals) return;
  const status = document.getElementById('helpdesk-action-status');
  try {
   await apiCall(`/api/admin/tickets/${encodeURIComponent(ticket.id)}/reply`, {
    method: 'POST',
-   body: { reason: body.reason, body: body.body },
+   body: { reason: vals.reason, body: vals.body },
   });
   if (status) status.textContent = 'Reply sent.';
+  showNotification('Reply sent.', 'success');
   await openStudent(_selected.id);
  } catch (e) {
   if (status) status.textContent = e.message || 'Reply failed';
+  showNotification(e.message || 'Reply failed', 'error');
  }
 }
 
-async function postSelected(name, body) {
- const status = document.getElementById('helpdesk-action-status');
- if (status) status.textContent = 'Working…';
- try {
-  const data = await apiCall(`/api/admin/users/${encodeURIComponent(_selected.id)}/${name}`, {
-   method: 'POST',
-   body,
-  });
-  if (status) status.textContent = data.status || 'Done';
-  showNotification(status ? status.textContent : 'Done', 'success');
-  await openStudent(_selected.id);
- } catch (e) {
-  if (status) status.textContent = e.message || 'Failed';
-  showNotification(e.message || 'Failed', 'error');
- }
-}
+// --- site: banner and copy -------------------------------------------------
 
 let _bannerId = null;
 let _bannerRev = null;
@@ -707,38 +662,44 @@ async function loadBanner() {
  }
 }
 
+const BANNER_WORDS = {
+ save: ['Save banner draft', 'Saves the text without showing it to anyone.'],
+ publish: ['Publish banner', 'Every student sees this at the top of every page. Type publish to confirm.'],
+ disable: ['Take the banner down', 'Removes it from every page. Type publish to confirm.'],
+ rollback: ['Roll back the banner', 'Restores the previous revision.'],
+};
+
 async function bannerAct(kind) {
  const field = document.getElementById('banner-body');
  const status = document.getElementById('banner-status');
- const body = await promptAction('Banner ' + kind, 'This is site-wide student-facing text. Plain text only.', {});
- if (!body) return;
+ const [title, message] = BANNER_WORDS[kind];
+ const confirmName = (kind === 'publish' || kind === 'disable') ? 'publish' : null;
+ const vals = await promptAction(title, message, { confirmName });
+ if (!vals) return;
+ const body = { reason: vals.reason, confirm: vals.confirm };
  try {
   if (kind === 'save') {
    const d = await apiCall('/api/admin/banner', {
     method: 'POST',
-    body: { reason: body.reason, body: (field && field.value) || '', status: 'draft' },
+    body: { ...body, body: (field && field.value) || '', status: 'draft' },
    });
    _bannerId = d.banner && d.banner.id;
   } else if (!_bannerId) {
    throw new Error('Save a draft first.');
-  } else if (kind === 'publish') {
-   await apiCall(`/api/admin/banner/${encodeURIComponent(_bannerId)}/publish`, {
-    method: 'POST', body: { reason: body.reason },
-   });
-  } else if (kind === 'disable') {
-   await apiCall(`/api/admin/banner/${encodeURIComponent(_bannerId)}/disable`, {
-    method: 'POST', body: { reason: body.reason },
-   });
   } else if (kind === 'rollback') {
    if (!_bannerRev) throw new Error('No revision to roll back to.');
    await apiCall(`/api/admin/banner/${encodeURIComponent(_bannerId)}/rollback`, {
-    method: 'POST', body: { reason: body.reason, revision_id: _bannerRev },
+    method: 'POST', body: { ...body, revision_id: _bannerRev },
    });
+  } else {
+   await apiCall(`/api/admin/banner/${encodeURIComponent(_bannerId)}/${kind}`, { method: 'POST', body });
   }
   if (status) status.textContent = 'Done.';
+  showNotification(`Banner: ${kind === 'disable' ? 'taken down' : kind + 'd'}.`, 'success');
   await loadBanner();
  } catch (e) {
   if (status) status.textContent = e.message || 'Failed';
+  showNotification(e.message || 'Failed', 'error');
  }
 }
 
@@ -760,15 +721,17 @@ async function saveContent() {
  const key = document.getElementById('content-key')?.value;
  const field = document.getElementById('content-body');
  const status = document.getElementById('content-status');
- const body = await promptAction('Save student-facing copy', 'Plain text or JSON only. No HTML.', {});
- if (!body || !key) return;
+ const vals = await promptAction('Save student-facing copy', 'Plain text or JSON only. No HTML.', {});
+ if (!vals || !key) return;
  try {
   await apiCall(`/api/admin/content/${encodeURIComponent(key)}`, {
    method: 'POST',
-   body: { reason: body.reason, body: (field && field.value) || '' },
+   body: { reason: vals.reason, body: (field && field.value) || '' },
   });
   if (status) status.textContent = 'Saved.';
+  showNotification('Copy saved.', 'success');
  } catch (e) {
   if (status) status.textContent = e.message || 'Failed';
+  showNotification(e.message || 'Failed', 'error');
  }
 }
