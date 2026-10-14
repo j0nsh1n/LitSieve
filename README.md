@@ -8,6 +8,13 @@ datasets), background jobs, screening reports, and citation export.
 
 Built with **FastAPI**, sentence-transformers, FAISS, and scikit-learn.
 
+[![LitSieve 6.0: watch the 4-minute tour](docs/media/litsieve-6.0-poster.jpg)](https://github.com/j0nsh1n/LitSieve/releases/download/v6.0.0/litsieve-6.0-1080p.mp4)
+
+**Watch the 6.0 tour** (4:22, captions and music): the seven looks, a real
+search from topic to ranked papers, and how 6.0 is built.
+[1080p MP4](https://github.com/j0nsh1n/LitSieve/releases/download/v6.0.0/litsieve-6.0-1080p.mp4)
+(29 MB) · 4K in the [v6.0.0 release](https://github.com/j0nsh1n/LitSieve/releases/tag/v6.0.0).
+
 > **Starting point only.** This tool searches a set of **publicly accessible**
 > research databases and helps you organise what you fetch. It is **not** a
 > complete library search, not a substitute for your school library or librarian,
