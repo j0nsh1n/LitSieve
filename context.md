@@ -1,20 +1,18 @@
 # context.md — LitSieve
 
 ## Current State
-- App version **6.0.0** (`app/main.py`, `/health`, admin summary and footers),
-  completed locally on `fix/ops-rollback-and-fetch-deadline`; nothing deployed.
+- App version **6.0.0**, released 2026-10-12. GitHub release `v6.0.0` (at
+  `25356cb`) holds the tour video (1080p and 4K); the README opens with its
+  poster. Live at `https://www.litpilot.org` from the production checkout at
+  `0374605` (2026-10-14). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
-- Latest full suite (2026-10-09): **966 passed**, no xfails. All 15 feature
-  parity rows pass. Required ops/fetch suite: **67 passed**.
-- `ruff check app tests` and `ruff check .` pass. `pyright app` has **0 errors,
-  1 optional Anthropic import warning**; CI blocks on errors.
-- The isolated upgraded dependency audit reports no known vulnerabilities;
-  custom ROCm torch/triton packages are un-auditable. Production dependencies
-  are unchanged. There is no dependency lockfile.
+- Latest full suite (2026-10-14): **1021 passed**, no xfails; all 15 parity
+  rows pass. `ruff check .` clean; `pyright app` **0 errors**, 6 optional-import
+  warnings (CI blocks on errors). `pip-audit` (2026-10-14): no known
+  vulnerabilities; ROCm torch/triton are un-auditable. No dependency lockfile.
 - One `/search` workspace replaces the two UI modes. Old `/data-management`,
-  `/statistics`, and `/clusters` URLs return permanent 301 redirects to Search.
-  The mode toggle, preference writes, cookies and CSS gates are removed.
-  A read-only legacy preference check supplies a one-time layout notice.
+  `/statistics`, and `/clusters` URLs 301 to Search; a read-only legacy
+  preference check supplies a one-time layout notice.
 - Empty Search offers topic selection and fetch; source choices and optional
   contact email are in the fetch popup. Fetch and preparation share one wait
   screen, then Narrow it down offers apply/skip before Search.
@@ -26,7 +24,11 @@
   Not relevant/reasons/Undo and one-paper AI study aids remain available.
 - Seven account looks (Workshop, Broadsheet, Lab, Night, Catalog,
   Observatory, Reading room), each a preset students fine-tune; light/dark
-  remains a browser preference. Shared changed assets use `?v=20261012s`.
+  remains a browser preference. Account opens as a dockable panel over any
+  page for signed-in users. Shared assets carry dated `?v=` values.
+- Laya sidecar (`tools/laya_worker.py`, port 7880) is socket-activated and
+  exits after 5 idle minutes; Search wakes it. Its checkpoint is uncalibrated
+  for questions with 11+ options (topic areas has 13).
 - Guest sessions use sample papers, cannot fetch public sources and expire
   after 30 minutes. Search includes all available sources when unset.
 - Ship rollback dispatches detached when supported, carries its actor, and
@@ -37,6 +39,12 @@
 - New support-view/ticket records omit mode; old history remains readable.
 - Known host gaps: live account cap/AI configuration (Phase 4), actual detached
   deployment history completion (Phase 11), and disconnected browser automation.
+  Semantic Scholar runs without an API key, so it sometimes answers 429; the
+  pipeline logs it and continues with the other sources.
+- GitHub code scanning lists 51 open alerts: 50 routes return `str(e)` of a
+  controlled `ValueError` in JSON `detail`, and the login redirect is already
+  sanitised by `_safe_next_url`. A fix is in progress (one helper for route
+  error messages).
 
 ## Repo Landmarks
 | Path | Role |
@@ -105,21 +113,15 @@ Guest User (is_guest) → sample corpus only; purged by age
   the owning user's progress while a referenced job is active.
 
 ## Session Handoff
-- **Date:** 2026-10-12. **Release:** 6.0.0 (finalized), with the seven-looks work:
-  Observatory and Reading room, a results layout for every look, fine-tune
-  settings saved on the account, the Adjust look panel on Search, the pinned
-  Search bar with a page-matched strip and soft blurred edge, the compacted
-  phone search bar, and five fixes (system-dark Night and Observatory, the
-  focus ring, dialog scroll, logout look, and after-search scroll).
-- The appearance registry lives in `app/content/appearance.py` (SETTINGS,
-  the nine-setting allowlist; PRESETS, each look's values). `theme-init.js`
-  mirrors both so pages paint before CSS loads; `tests/test_appearance.py`
-  keeps the copies equal. Only settings that differ from the preset are
-  stored, in `users.appearance`, mirrored to the readable `ui_appearance`
-  cookie and applied pre-paint as `data-*` on `<html>`.
-- The preview server at `/home/jonathans/litsieve-preview-seven-looks`
-  (port 7872) can be deleted.
-- Still open: Phase 14 polish (Broadsheet and Catalog dark palettes, star
-  and note markers on closed rows, the More like this banner, the Save note
-  timing, Narrow it down after Skip), Phase 15 Laya calibration, and the
-  Phase 4 and 11 host checks.
+- **Date:** 2026-10-14. **Branch:** `docs/freeze-6.0`. Final audit before
+  the freeze: tests, lint, types, pip-audit, version copies, release assets,
+  secrets, backups and the watchdog all checked clean. The account panel
+  (PR #85), Laya idle-exit, and the README tour video (PR #86) are merged
+  and live; the brag scratch, `opencode.json` and the merged branches are
+  deleted.
+- Host notes: the LAN's primary DNS server (192.168.12.132) times out, so
+  cloudflared logs a DNS refresh error every 5 minutes but stays connected.
+  `litpilot.org` needs an apex record or redirect rule in Cloudflare.
+- Still open: Phase 14 polish, Phase 15 Laya calibration, the Phase 4 and
+  11 host checks, and the code-scanning alerts above.
+- **Next step:** merge the code-scanning helper PR, then freeze.
