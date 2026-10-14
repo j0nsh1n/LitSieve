@@ -3032,15 +3032,142 @@ dialog.simple-theme-tools::backdrop { background: var(--scrim); }
     color: var(--bg);
     background: var(--text);
 }
-.admin-reset-code {
-    margin-top: var(--space-3);
-    padding: var(--space-3);
-    border: 1px solid var(--rule);
-    background: var(--surface);
-    font-size: var(--fs-sm);
-    overflow-x: auto;
-    user-select: all;
+/* Tab strip shared by pages with several sections (Admin today). */
+.tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+    margin: var(--space-4) 0 var(--space-5);
+    border-bottom: 1px solid var(--rule);
 }
+.tab {
+    appearance: none;
+    background: none;
+    border: 0;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -1px;
+    padding: var(--space-2) var(--space-4);
+    font: inherit;
+    font-size: var(--fs-base);
+    color: var(--text-soft);
+    cursor: pointer;
+}
+.tab:hover { color: var(--text); }
+.tab[aria-selected="true"] {
+    color: var(--text);
+    font-weight: 600;
+    border-bottom-color: var(--accent);
+}
+.tab:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.tab-panel[hidden] { display: none; }
+
+.admin-tiles {
+    list-style: none;
+    margin: 0 0 var(--space-4);
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+    gap: var(--space-3);
+}
+.admin-tiles a {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    color: var(--text);
+    text-decoration: none;
+}
+.admin-tiles a:hover { border-color: var(--text); }
+.admin-tile-count {
+    font-family: var(--font-sans);
+    font-size: var(--fs-xl);
+    font-weight: 700;
+}
+.admin-tile-count.is-zero { color: var(--text-soft); font-weight: 500; }
+
+.admin-split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-4);
+    align-items: start;
+}
+@media (min-width: 960px) {
+    .admin-split { grid-template-columns: minmax(18rem, 2fr) minmax(0, 3fr); }
+    .admin-finder { position: sticky; top: var(--space-4); }
+}
+.admin-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-4);
+    align-items: start;
+}
+@media (min-width: 960px) {
+    .admin-grid { grid-template-columns: 1fr 1fr; }
+}
+.admin-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin: var(--space-3) 0;
+}
+.admin-chip {
+    appearance: none;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-full);
+    background: var(--surface);
+    color: var(--text);
+    padding: var(--space-1) var(--space-3);
+    font: inherit;
+    font-size: var(--fs-sm);
+    cursor: pointer;
+}
+.admin-chip:hover { border-color: var(--text); }
+.admin-chip.is-on {
+    background: var(--text);
+    border-color: var(--text);
+    color: var(--bg);
+}
+.admin-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin: var(--space-2) 0 var(--space-3);
+}
+.admin-subhead {
+    margin: var(--space-5) 0 var(--space-2);
+    font-family: var(--font-sans);
+    font-size: var(--fs-xs);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-soft);
+}
+.admin-detail-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+}
+.admin-badges { display: inline-flex; flex-wrap: wrap; gap: var(--space-2); }
+.admin-badge {
+    display: inline-block;
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--radius-full);
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    font-family: var(--font-sans);
+    font-size: var(--fs-xs);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+.admin-badge.is-err { color: var(--err); border-color: var(--err); }
+.admin-badge.is-warn { color: var(--warn); border-color: var(--warn); }
+.admin-badge.is-ok { color: var(--ok); border-color: var(--ok); }
+.admin-more { margin-top: var(--space-2); }
 .library-manage-badge {
     font-size: var(--fs-xs);
     color: var(--accent, #93b4ff);

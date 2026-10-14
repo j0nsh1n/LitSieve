@@ -13,13 +13,12 @@
 - One `/search` workspace replaces the two UI modes. Old `/data-management`,
   `/statistics`, and `/clusters` URLs 301 to Search; a read-only legacy
   preference check supplies a one-time layout notice.
-- Empty Search offers topic selection and fetch; source choices and optional
-  contact email are in the fetch popup. Fetch and preparation share one wait
-  screen, then Narrow it down offers apply/skip before Search.
-- Search by offers Question, PICO and a paper seed. Sort/source/starred chips
-  preserve the ranking query. More holds reports, duplicates, re-prepare,
-  Start over, Set aside and optional background Group by theme. Save your work
-  offers visible results or whole-library scope exports.
+- Empty Search offers topic selection and fetch (sources and optional contact
+  email in the fetch popup); fetch and preparation share one wait screen, then
+  Narrow it down offers apply/skip. Search by offers Question, PICO and a
+  paper seed; sort/source/starred chips keep the ranking query; More holds
+  reports, duplicates, re-prepare, Start over, Set aside and Group by theme;
+  Save your work exports visible results or the whole library.
 - Result identifiers/study type are inside the abstract. Stars, notes,
   Not relevant/reasons/Undo and one-paper AI study aids remain available.
 - Seven account looks (Workshop, Broadsheet, Lab, Night, Catalog,
@@ -41,10 +40,13 @@
   deployment history completion (Phase 11), and disconnected browser automation.
   Semantic Scholar runs without an API key, so it sometimes answers 429; the
   pipeline logs it and continues with the other sources.
-- GitHub code scanning lists 51 open alerts: 50 routes return `str(e)` of a
-  controlled `ValueError` in JSON `detail`, and the login redirect is already
-  sanitised by `_safe_next_url`. A fix is in progress (one helper for route
-  error messages).
+- Code scanning is clean: route error messages are the app's own sentences
+  (`app/errors.py`, `UserError` and `sentence_for`), shipped 2026-10-14.
+- Admin (`/admin`) is four tabs with the hash as its address (`#accounts/u/<id>`,
+  `#accounts/<queue>`). Account actions come from `ACTIONS` in
+  `app/routes/admin.py`: the template draws the buttons and `_begin_action`
+  applies the reason and confirm rule; `tests/test_admin_actions.py` keeps
+  them equal. Notes, sign-in events and the timeline page 25 at a time.
 
 ## Repo Landmarks
 | Path | Role |
@@ -113,15 +115,16 @@ Guest User (is_guest) → sample corpus only; purged by age
   the owning user's progress while a referenced job is active.
 
 ## Session Handoff
-- **Date:** 2026-10-14. **Branch:** `docs/freeze-6.0`. Final audit before
-  the freeze: tests, lint, types, pip-audit, version copies, release assets,
-  secrets, backups and the watchdog all checked clean. The account panel
-  (PR #85), Laya idle-exit, and the README tour video (PR #86) are merged
-  and live; the brag scratch, `opencode.json` and the merged branches are
-  deleted.
+- **Date:** 2026-10-14. **Branch:** `feat/admin-tabs` (worktree
+  `/home/jonathans/HealthDatabaseAccess-work`). Admin plan slice 1 built:
+  tabs, two-pane Accounts, one action model, paged history, Reset MFA
+  removed, banner publish needs the word `publish`. Driven in Chromium on a
+  throwaway server (port 7899, scratch `users.db` under `/tmp/admin-drive`).
+  Plan: `docs/ADMIN_PANEL_PLAN.md`.
 - Host notes: the LAN's primary DNS server (192.168.12.132) times out, so
-  cloudflared logs a DNS refresh error every 5 minutes but stays connected.
+  cloudflared logs a DNS refresh error every 5 minutes but stays connected;
   `litpilot.org` needs an apex record or redirect rule in Cloudflare.
-- Still open: Phase 14 polish, Phase 15 Laya calibration, the Phase 4 and
-  11 host checks, and the code-scanning alerts above.
-- **Next step:** merge the code-scanning helper PR, then freeze.
+- Still open: admin plan slices 2 to 4 (Tickets tab; Site history, Host
+  route and Ollama buttons; Overview activity feed); roadmap Phases 4, 11,
+  14 and 15.
+- **Next step:** merge the slice 1 PR, deploy, then slice 2.
