@@ -8,6 +8,11 @@ and this project aims to follow Semantic Versioning for app version strings
 
 ## [Unreleased]
 
+### Changed
+- Error messages are the app's own sentences. When an AI request or a Ship
+  action fails, the message no longer carries the provider's or system's raw
+  error text; the server log keeps it.
+
 ## [6.0.0] - 2026-10-12
 
 ### Added

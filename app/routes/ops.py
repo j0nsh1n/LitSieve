@@ -255,7 +255,7 @@ async def api_ops_status(request: Request):
         diff = await run_in_thread(run_action, "diff")
     except Exception as exc:
         logger.exception("ops status")
-        return JSONResponse(status_code=503, content={"detail": str(exc)[:240]})
+        return JSONResponse(status_code=503, content={"detail": "Ship status is unavailable. See the server log."})
     return {
         "live_sha": diff.get("live_sha") or "",
         "staging_sha": diff.get("staging_sha") or "",

@@ -117,3 +117,16 @@ def test_sentence_for_passes_app_sentences_and_hides_the_rest():
     assert sentence_for(ValueError("unable to open database file /srv/users.db")) == FALLBACK
     assert sentence_for(RuntimeError("Library not found."), "Nope.") == "Library not found."
 
+
+
+def test_routes_never_echo_an_exception():
+    """A route's detail comes from app.errors, never from the exception object."""
+    import re
+
+    routes = pathlib.Path(__file__).resolve().parent.parent / "app" / "routes"
+    offenders = []
+    for path in sorted(routes.glob("*.py")):
+        for n, line in enumerate(path.read_text().splitlines(), 1):
+            if re.search(r'"detail":\s*(str|repr)\((e|exc|err|error)\b', line):
+                offenders.append(f"{path.name}:{n}: {line.strip()}")
+    assert offenders == [], "\n".join(offenders)

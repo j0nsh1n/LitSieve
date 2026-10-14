@@ -13,6 +13,7 @@ from app.core import (
     current_user,
     limiter,
 )
+from app.errors import sentence_for
 from app.storage import helpdesk, quota
 from app.storage.libraries import list_libraries
 
@@ -129,7 +130,7 @@ async def api_create_ticket(request: Request):
             context=ctx,
         )
     except ValueError as exc:
-        return JSONResponse(status_code=400, content={"detail": str(exc)})
+        return JSONResponse(status_code=400, content={"detail": sentence_for(exc)})
     core.user_db.add_support_action(
         user["user_id"], user["user_id"], user["username"], "ticket-open",
         reason="student help request",
@@ -188,7 +189,7 @@ async def api_reply_ticket(ticket_id: str, request: Request):
             body=str(body.get("body") or ""),
         )
     except ValueError as exc:
-        return JSONResponse(status_code=400, content={"detail": str(exc)})
+        return JSONResponse(status_code=400, content={"detail": sentence_for(exc)})
     helpdesk.set_ticket_status(core.user_db, ticket_id, "open")
     core.user_db.add_support_action(
         user["user_id"], user["user_id"], user["username"], "ticket-reply",

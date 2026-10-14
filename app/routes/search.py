@@ -14,6 +14,7 @@ from app.core import (
     run_in_thread,
     server_error,
 )
+from app.errors import sentence_for
 from app.schemas import (
     NoteRequest,
     SearchRequest,
@@ -57,7 +58,7 @@ async def api_search(req: SearchRequest, request: Request):
         sort_articles(results, req.sort_by)
         return {"results": results, "total": len(results)}
     except ValueError as e:
-        return JSONResponse(status_code=400, content={"detail": str(e)})
+        return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
     except Exception as e:
         return server_error()
     finally:
@@ -89,7 +90,7 @@ async def api_search_seed(req: SeedSearchRequest, request: Request):
             "total": len(results),
         }
     except ValueError as e:
-        return JSONResponse(status_code=400, content={"detail": str(e)})
+        return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
     except Exception as e:
         return server_error()
     finally:
@@ -123,7 +124,7 @@ async def api_search_starred(req: StarredSearchRequest, request: Request):
             "seed_count": data["seed_count"],
         }
     except ValueError as e:
-        return JSONResponse(status_code=400, content={"detail": str(e)})
+        return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
     except Exception as e:
         return server_error()
     finally:
@@ -142,7 +143,7 @@ async def api_upsert_note(req: NoteRequest, request: Request):
     try:
         p = get_owned_pipeline(uid, req.library_id)
     except ValueError as e:
-        return JSONResponse(status_code=400, content={"detail": str(e)})
+        return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
     try:
         current = p.db.get_note(req.article_id, req.source)
         if quota.would_increase_stored_text(current["note"], req.note):
@@ -151,7 +152,7 @@ async def api_upsert_note(req: NoteRequest, request: Request):
             except quota.QuotaExceeded as e:
                 return JSONResponse(
                     status_code=507,
-                    content={"detail": str(e), "quota": quota.usage_report(uid)},
+                    content={"detail": sentence_for(e), "quota": quota.usage_report(uid)},
                 )
         note = p.db.upsert_note(req.article_id, req.source, note=req.note, starred=req.starred)
         return {"status": "success", "note": note}
@@ -188,7 +189,7 @@ async def api_get_note(
     try:
         p = get_owned_pipeline(uid, library_id)
     except ValueError as e:
-        return JSONResponse(status_code=400, content={"detail": str(e)})
+        return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
     try:
         return p.db.get_note(article_id, source)
     except Exception as e:

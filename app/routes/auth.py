@@ -33,6 +33,7 @@ from app.core import (
     server_error,
     templates,
 )
+from app.errors import sentence_for
 from app.schemas import (
     ChangePasswordRequest,
     DeleteAccountRequest,
@@ -689,7 +690,7 @@ async def api_set_email(req: SetEmailRequest, request: Request):
     try:
         token = core.user_db.start_email_verification(row["username"], email)
     except ValueError as e:
-        return JSONResponse(status_code=400, content={"detail": str(e)})
+        return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
     if not token:
         return JSONResponse(status_code=404, content={"detail": "Account not found"})
 

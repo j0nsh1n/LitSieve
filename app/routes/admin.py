@@ -31,6 +31,7 @@ from app.core import (
     run_in_thread,
     templates,
 )
+from app.errors import sentence_for
 from app.services import mailer
 from app.storage import helpdesk, quota
 from app.storage.libraries import (
@@ -745,7 +746,7 @@ async def api_admin_retry_embed(user_id: str, request: Request):
     except quota.QuotaExceeded as exc:
         return JSONResponse(
             status_code=507,
-            content={"detail": str(exc), "quota": quota.usage_report(user_id)},
+            content={"detail": sentence_for(exc), "quota": quota.usage_report(user_id)},
         )
     from app.routes.corpus import _run_create_embeddings
     from app.storage.libraries import get_active_library_id
@@ -808,7 +809,7 @@ async def api_admin_set_email(user_id: str, request: Request):
     try:
         token = core.user_db.start_email_verification(rec["username"], email)
     except ValueError as exc:
-        return JSONResponse(status_code=400, content={"detail": str(exc)})
+        return JSONResponse(status_code=400, content={"detail": sentence_for(exc)})
     if not token:
         return JSONResponse(status_code=404, content={"detail": "Account not found"})
     try:
@@ -935,7 +936,7 @@ async def api_admin_delete_library(user_id: str, request: Request):
     try:
         result = delete_library(user_id, library_id)
     except ValueError as exc:
-        return JSONResponse(status_code=400, content={"detail": str(exc)})
+        return JSONResponse(status_code=400, content={"detail": sentence_for(exc)})
     used = quota.usage_bytes(user_id)
     core.user_db.set_storage_bytes(user_id, used)
     core.user_db.add_support_action(
@@ -986,7 +987,7 @@ async def api_admin_retry_fetch(user_id: str, request: Request):
     except quota.QuotaExceeded as exc:
         return JSONResponse(
             status_code=507,
-            content={"detail": str(exc), "quota": quota.usage_report(user_id)},
+            content={"detail": sentence_for(exc), "quota": quota.usage_report(user_id)},
         )
     from app.routes.corpus import _run_multi_fetch
     from app.storage.libraries import get_active_library_id
@@ -1219,7 +1220,7 @@ async def api_admin_ticket_status(ticket_id: str, request: Request):
     try:
         updated = helpdesk.set_ticket_status(core.user_db, ticket_id, status)
     except ValueError as exc:
-        return JSONResponse(status_code=400, content={"detail": str(exc)})
+        return JSONResponse(status_code=400, content={"detail": sentence_for(exc)})
     core.user_db.add_support_action(
         rec["student_id"], admin["user_id"], admin["username"], "ticket-status",
         reason=str(body.get("reason") or ""),
@@ -1253,7 +1254,7 @@ async def api_admin_ticket_reply(ticket_id: str, request: Request):
             body=str(body.get("body") or ""),
         )
     except ValueError as exc:
-        return JSONResponse(status_code=400, content={"detail": str(exc)})
+        return JSONResponse(status_code=400, content={"detail": sentence_for(exc)})
     helpdesk.set_ticket_status(core.user_db, ticket_id, "waiting_on_student")
     core.user_db.add_support_action(
         rec["student_id"], admin["user_id"], admin["username"], "ticket-reply",
@@ -1310,7 +1311,7 @@ async def api_admin_banner_save(request: Request):
             status=status if status in helpdesk.BANNER_STATUSES else "draft",
         )
     except ValueError as exc:
-        return JSONResponse(status_code=400, content={"detail": str(exc)})
+        return JSONResponse(status_code=400, content={"detail": sentence_for(exc)})
     core.user_db.add_support_action(
         admin["user_id"], admin["user_id"], admin["username"], "banner-save",
         reason=str(body.get("reason") or ""),
@@ -1426,7 +1427,7 @@ async def api_admin_content_save(key: str, request: Request):
     try:
         rec = helpdesk.set_site_content(core.user_db, key, raw, actor=admin["username"])
     except ValueError as exc:
-        return JSONResponse(status_code=400, content={"detail": str(exc)})
+        return JSONResponse(status_code=400, content={"detail": sentence_for(exc)})
     core.user_db.add_support_action(
         admin["user_id"], admin["user_id"], admin["username"], "content-save",
         reason=str(body.get("reason") or ""),
