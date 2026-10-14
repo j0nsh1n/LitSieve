@@ -80,7 +80,8 @@ def _safe_next_url(raw: Optional[str]) -> str:
         return "/search"
     if "://" in path:
         return "/search"
-    return path
+    # The caller's text is only ever the suffix of a same-origin path.
+    return "/" + path[1:]
 
 
 @router.get("/login")
