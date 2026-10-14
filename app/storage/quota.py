@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+from app.errors import sentence
 from app.storage.libraries import user_dir
 
 logger = logging.getLogger(__name__)
@@ -35,10 +36,10 @@ class QuotaExceeded(RuntimeError):
     def __init__(self, used_bytes: int, limit_bytes: int):
         self.used_bytes = used_bytes
         self.limit_bytes = limit_bytes
-        super().__init__(
+        super().__init__(sentence(
             f"Storage limit reached ({mb(used_bytes)} MB of {mb(limit_bytes)} MB). "
             "Delete a library or screen out papers you do not need, then try again."
-        )
+        ))
 
 
 def mb(num_bytes: int) -> float:

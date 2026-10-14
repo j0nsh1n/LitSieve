@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
+from app.errors import UserError
 from app.storage import dbconn
 from app.storage.database import ArticleDatabase
 from app.storage.libraries import (
@@ -153,7 +154,7 @@ def create_library_with_unique_name(user_id: str, preferred: str) -> Dict:
             if "already exists" not in str(e).lower():
                 raise
             continue
-    raise ValueError("Could not allocate a unique library name.")
+    raise UserError("Could not allocate a unique library name.")
 
 
 def clone_library_data(
@@ -242,28 +243,28 @@ def join_share(
     """
     code = normalize_share_code(code)
     if not code or len(code) < 9:
-        raise ValueError("Enter a valid library code (for example ABCD-EFGH).")
+        raise UserError("Enter a valid library code (for example ABCD-EFGH).")
 
     share = user_db.get_share_by_code(code)
     if not share:
-        raise ValueError("Library code not found.")
+        raise UserError("Library code not found.")
 
     ok, err = is_share_usable(share)
     if not ok:
-        raise ValueError(err)
+        raise UserError(err)
 
     if share["owner_user_id"] == student_user_id:
-        raise ValueError("You cannot use a code for your own library.")
+        raise UserError("You cannot use a code for your own library.")
 
     if user_db.has_redeemed_share(share["id"], student_user_id):
-        raise ValueError(
+        raise UserError(
             "You already joined with this code. Switch to that library from Account."
         )
 
     owner_id = share["owner_user_id"]
     owner_lib = share["owner_library_id"]
     if not library_exists(owner_id, owner_lib):
-        raise ValueError("That library is no longer available.")
+        raise UserError("That library is no longer available.")
 
     owner = user_db.get_by_id(owner_id)
     owner_name = (owner or {}).get("username") or "another account"
@@ -333,11 +334,11 @@ def join_share(
 def preview_share(user_db, student_user_id: str, code: str) -> Dict[str, Any]:
     code = normalize_share_code(code)
     if not code or len(code) < 9:
-        raise ValueError("Enter a valid library code (for example ABCD-EFGH).")
+        raise UserError("Enter a valid library code (for example ABCD-EFGH).")
 
     share = user_db.get_share_by_code(code)
     if not share:
-        raise ValueError("Library code not found.")
+        raise UserError("Library code not found.")
 
     ok, err = is_share_usable(share)
     owner = user_db.get_by_id(share["owner_user_id"])

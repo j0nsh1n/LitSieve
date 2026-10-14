@@ -23,6 +23,8 @@ import uuid
 from pathlib import Path
 from typing import Dict, Optional
 
+from app.errors import UserError
+
 logger = logging.getLogger(__name__)
 
 _lock = threading.Lock()
@@ -45,7 +47,7 @@ def _safe_fs_id(raw: str, *, label: str = "id") -> str:
     """One path segment only — no slashes or '..' — so user_data/<id> stays inside the root."""
     s = str(raw or "").strip()
     if not _SAFE_SEG.fullmatch(s) or s in (".", ".."):
-        raise ValueError(f"Invalid {label}")
+        raise UserError(f"Invalid {label}")
     return s
 
 
@@ -54,7 +56,7 @@ def user_dir(user_id: str) -> Path:
     root = data_root().resolve()
     path = (root / uid).resolve()
     if os.path.commonpath([str(root), str(path)]) != str(root):
-        raise ValueError("Invalid account id")
+        raise UserError("Invalid account id")
     return path
 
 
@@ -78,7 +80,7 @@ def pipeline_cache_key(user_id: str, library_id: str) -> str:
 def _normalize_name(name: str) -> str:
     cleaned = _NAME_CLEAN.sub(" ", (name or "").strip())
     if len(cleaned) < NAME_MIN or len(cleaned) > NAME_MAX:
-        raise ValueError(f"Library name must be {NAME_MIN}–{NAME_MAX} characters.")
+        raise UserError(f"Library name must be {NAME_MIN}–{NAME_MAX} characters.")
     return cleaned
 
 
@@ -203,7 +205,7 @@ def _migrate_legacy_unlocked(user_id: str) -> Dict:
 def ensure_libraries(user_id: str) -> Dict:
     """Return libraries meta, migrating legacy layout if needed."""
     if not user_id:
-        raise ValueError("user_id required")
+        raise UserError("user_id required")
     with _lock:
         meta = _read_meta_unlocked(user_id)
         if meta is None:
@@ -249,7 +251,7 @@ def owned_library_id(user_id: str, library_id: Optional[str] = None) -> str:
     lid = _safe_fs_id(raw, label="library id")
     ids = {str(L.get("id") or "") for L in meta.get("libraries") or []}
     if lid not in ids:
-        raise ValueError("Library not found.")
+        raise UserError("Library not found.")
     return lid
 
 
@@ -258,7 +260,7 @@ def set_active_library(user_id: str, library_id: str) -> Dict:
         meta = _read_meta_unlocked(user_id) or _migrate_legacy_unlocked(user_id)
         ids = {L["id"] for L in meta.get("libraries") or []}
         if library_id not in ids:
-            raise ValueError("Library not found.")
+            raise UserError("Library not found.")
         meta["active_id"] = library_id
         _write_meta_unlocked(user_id, meta)
         library_db_path(user_id, library_id).parent.mkdir(parents=True, exist_ok=True)
@@ -274,11 +276,11 @@ def create_library(user_id: str, name: str) -> Dict:
         meta = _read_meta_unlocked(user_id) or _migrate_legacy_unlocked(user_id)
         libs = list(meta.get("libraries") or [])
         if len(libs) >= MAX_LIBRARIES:
-            raise ValueError(f"At most {MAX_LIBRARIES} libraries per account.")
+            raise UserError(f"At most {MAX_LIBRARIES} libraries per account.")
         # Unique name (case-insensitive)
         lower = name.lower()
         if any((L.get("name") or "").lower() == lower for L in libs):
-            raise ValueError("A library with that name already exists.")
+            raise UserError("A library with that name already exists.")
         lib_id = str(uuid.uuid4())
         (libraries_dir(user_id) / lib_id).mkdir(parents=True, exist_ok=True)
         entry = {"id": lib_id, "name": name, "created_at": _now_iso()}
@@ -301,13 +303,13 @@ def rename_library(user_id: str, library_id: str, name: str) -> Dict:
                 found = L
                 break
         if not found:
-            raise ValueError("Library not found.")
+            raise UserError("Library not found.")
         lower = name.lower()
         if any(
             L.get("id") != library_id and (L.get("name") or "").lower() == lower
             for L in libs
         ):
-            raise ValueError("A library with that name already exists.")
+            raise UserError("A library with that name already exists.")
         found["name"] = name
         meta["libraries"] = libs
         _write_meta_unlocked(user_id, meta)
@@ -319,9 +321,9 @@ def delete_library(user_id: str, library_id: str) -> Dict:
         meta = _read_meta_unlocked(user_id) or _migrate_legacy_unlocked(user_id)
         libs = list(meta.get("libraries") or [])
         if len(libs) <= 1:
-            raise ValueError("You must keep at least one library.")
+            raise UserError("You must keep at least one library.")
         if not any(L.get("id") == library_id for L in libs):
-            raise ValueError("Library not found.")
+            raise UserError("Library not found.")
         # Remove on-disk data first: if this fails the metadata is untouched,
         # the library stays listed, and the delete can be retried. Never
         # report success while private data is still on disk.

@@ -13,6 +13,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
+from app.errors import UserError
+
 SUPPORT_VIEW_MINUTES = 15
 SUPPORT_VIEW_MAX_MINUTES = 30
 TICKET_STATUSES = ("open", "waiting_on_student", "investigating", "resolved")
@@ -372,9 +374,9 @@ def sanitize_ticket_context(raw: Any) -> Dict[str, Any]:
 def create_ticket(db, *, student_id: str, student_username: str, body: str, context: dict) -> Dict:
     text = (body or "").strip()
     if not text:
-        raise ValueError("Write a short message about what is stuck.")
+        raise UserError("Write a short message about what is stuck.")
     if len(text) > _BODY_MAX:
-        raise ValueError("Message is too long.")
+        raise UserError("Message is too long.")
     now = _now()
     ticket_id = str(uuid.uuid4())
     ctx = sanitize_ticket_context(context)
@@ -474,7 +476,7 @@ def list_tickets(db, *, status: str = "", student_id: str = "", limit: int = 25)
 
 def set_ticket_status(db, ticket_id: str, status: str) -> Optional[Dict]:
     if status not in TICKET_STATUSES:
-        raise ValueError("Unknown ticket status.")
+        raise UserError("Unknown ticket status.")
     with db._lock:
         db.conn.execute(
             "UPDATE support_tickets SET status = ?, updated_at = ? WHERE id = ?",
@@ -489,9 +491,9 @@ def add_ticket_reply(
 ) -> Dict:
     text = (body or "").strip()
     if not text:
-        raise ValueError("Reply cannot be empty.")
+        raise UserError("Reply cannot be empty.")
     if len(text) > _BODY_MAX:
-        raise ValueError("Reply is too long.")
+        raise UserError("Reply is too long.")
     now = _now()
     reply_id = str(uuid.uuid4())
     with db._lock:
@@ -542,20 +544,20 @@ def _valid_link(url: str) -> bool:
 
 def validate_content(key: str, body: str) -> str:
     if key not in CONTENT_KEYS:
-        raise ValueError("Unknown content key.")
+        raise UserError("Unknown content key.")
     if key in ("help_text", "known_issues"):
         text = sanitize_plain(body, limit=2000)
         if not text:
-            raise ValueError("Text cannot be empty.")
+            raise UserError("Text cannot be empty.")
         return text
     try:
         data = json.loads(body)
     except (TypeError, ValueError) as exc:
-        raise ValueError("Body must be JSON.") from exc
+        raise UserError("Body must be JSON.") from exc
     if key == "support_links":
         items = data if isinstance(data, list) else data.get("links")
         if not isinstance(items, list):
-            raise ValueError("support_links must be a list of {label, url}.")
+            raise UserError("support_links must be a list of {label, url}.")
         clean = []
         for item in items[:20]:
             if not isinstance(item, dict):
@@ -563,13 +565,13 @@ def validate_content(key: str, body: str) -> str:
             label = sanitize_plain(str(item.get("label") or ""), limit=80)
             url = str(item.get("url") or "").strip()
             if not label or not _valid_link(url):
-                raise ValueError("Each link needs a label and an https or / path.")
+                raise UserError("Each link needs a label and an https or / path.")
             clean.append({"label": label, "url": url})
         return json.dumps(clean)
     # topic_presets
     items = data if isinstance(data, list) else data.get("presets")
     if not isinstance(items, list):
-        raise ValueError("topic_presets must be a list of {id, label}.")
+        raise UserError("topic_presets must be a list of {id, label}.")
     clean = []
     for item in items[:20]:
         if not isinstance(item, dict):
@@ -577,9 +579,9 @@ def validate_content(key: str, body: str) -> str:
         pid = sanitize_plain(str(item.get("id") or ""), limit=40)
         label = sanitize_plain(str(item.get("label") or ""), limit=80)
         if not re.fullmatch(r"[a-z0-9_-]{1,40}", pid or ""):
-            raise ValueError("Preset id must be short letters, numbers, _ or -.")
+            raise UserError("Preset id must be short letters, numbers, _ or -.")
         if not label:
-            raise ValueError("Each preset needs a label.")
+            raise UserError("Each preset needs a label.")
         clean.append({"id": pid, "label": label})
     return json.dumps(clean)
 
@@ -598,9 +600,9 @@ def save_notice_revision(db, notice_id: str, *, action: str, status: str, body: 
 def upsert_banner(db, *, body: str, expires_at: Optional[str], actor: str, status: str = "draft") -> Dict:
     text = sanitize_plain(body, limit=_NOTICE_MAX)
     if not text:
-        raise ValueError("Banner text cannot be empty.")
+        raise UserError("Banner text cannot be empty.")
     if status not in BANNER_STATUSES:
-        raise ValueError("Unknown banner status.")
+        raise UserError("Unknown banner status.")
     now = _now()
     existing = published_banner(db, include_draft=True)
     if existing:

@@ -16,6 +16,8 @@ from fastapi import Request
 from jwt import InvalidTokenError
 from starlette.concurrency import run_in_threadpool
 
+from app.errors import UserError
+
 logger = logging.getLogger(__name__)
 
 
@@ -146,7 +148,7 @@ BCRYPT_MAX_BYTES = 72  # bcrypt limit; routes reject longer passwords
 def hash_password(password: str) -> str:
     raw = password.encode("utf-8")
     if len(raw) > BCRYPT_MAX_BYTES:
-        raise ValueError(f"Password exceeds {BCRYPT_MAX_BYTES} bytes.")
+        raise UserError(f"Password exceeds {BCRYPT_MAX_BYTES} bytes.")
     return bcrypt.hashpw(raw, bcrypt.gensalt(rounds=BCRYPT_ROUNDS)).decode("ascii")
 
 

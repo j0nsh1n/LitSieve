@@ -15,6 +15,7 @@ from typing import Dict, List, Optional, Tuple
 
 from app.content.appearance import kept_across_looks, parse_overrides
 from app.content.looks import DEFAULT_LOOK, normalize_look, parse_look
+from app.errors import UserError
 from app.storage import dbconn
 
 DEFAULT_USERS_DB = "users.db"
@@ -340,7 +341,7 @@ class UserDatabase:
                 # Driver-agnostic: sqlcipher3 has its own IntegrityError, so
                 # naming sqlite3's would stop catching this the moment
                 # DB_ENCRYPTION_KEY is set, turning a taken username into a 500.
-                raise ValueError(f"Username already taken: {username}") from e
+                raise UserError(f"Username already taken: {username}") from e
         return {
             "id": user_id,
             "username": username,
@@ -818,9 +819,9 @@ class UserDatabase:
         now = self._utc_now()
         text = (body or "").strip()
         if not text:
-            raise ValueError("Note cannot be empty.")
+            raise UserError("Note cannot be empty.")
         if len(text) > 2000:
-            raise ValueError("Note is too long (max 2000 characters).")
+            raise UserError("Note is too long (max 2000 characters).")
         with self._lock:
             self.conn.execute(
                 "INSERT INTO support_notes "
@@ -1062,7 +1063,7 @@ class UserDatabase:
                 )
                 self.conn.commit()
             except dbconn.integrity_errors() as e:
-                raise ValueError("Could not create share (code collision). Retry.") from e
+                raise UserError("Could not create share (code collision). Retry.") from e
         return {
             "id": share_id,
             "code": code,
@@ -1143,7 +1144,7 @@ class UserDatabase:
                 (share_id,),
             ).fetchone()
             if not row:
-                raise ValueError("Library code not found.")
+                raise UserError("Library code not found.")
             max_uses, use_count, revoked_at, expires_at = (
                 row[0],
                 int(row[1] or 0),
@@ -1151,7 +1152,7 @@ class UserDatabase:
                 row[3],
             )
             if revoked_at:
-                raise ValueError("This library code has been revoked.")
+                raise UserError("This library code has been revoked.")
             if expires_at:
                 exp = expires_at
                 if exp.endswith("Z"):
@@ -1161,12 +1162,12 @@ class UserDatabase:
                     if exp_dt.tzinfo is None:
                         exp_dt = exp_dt.replace(tzinfo=timezone.utc)
                     if datetime.now(timezone.utc) > exp_dt:
-                        raise ValueError("This library code has expired.")
+                        raise UserError("This library code has expired.")
                 except ValueError as e:
                     if "expired" in str(e).lower():
                         raise
             if max_uses is not None and use_count >= int(max_uses):
-                raise ValueError(
+                raise UserError(
                     "This library code has reached its maximum number of uses."
                 )
             try:
@@ -1180,7 +1181,7 @@ class UserDatabase:
                 # Close the failed write transaction; leaving it open keeps
                 # the database locked until some later commit/rollback.
                 self.conn.rollback()
-                raise ValueError(
+                raise UserError(
                     "You already joined with this code. "
                     "Switch to that library from Account."
                 ) from e
@@ -1306,7 +1307,7 @@ class UserDatabase:
                 (email, uname),
             ).fetchone()
             if taken:
-                raise ValueError("That email is already verified on another account.")
+                raise UserError("That email is already verified on another account.")
             # Storing the pending address unverified: harmless (it grants
             # nothing) and lets the UI show "check your inbox".
             self.conn.execute(
