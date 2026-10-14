@@ -12,6 +12,7 @@ from app.core import (
     limiter,
     server_error,
 )
+from app.errors import sentence_for
 from app.schemas import (
     LibraryCreateRequest,
     LibraryRenameRequest,
@@ -56,7 +57,7 @@ async def api_create_library(req: LibraryCreateRequest, request: Request):
         result = create_library(user["user_id"], req.name)
         return {"status": "success", **result}
     except ValueError as e:
-        return JSONResponse(status_code=400, content={"detail": str(e)})
+        return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
     except Exception as e:
         return server_error()
 
@@ -73,7 +74,7 @@ async def api_switch_library(req: LibrarySwitchRequest, request: Request):
         result = set_active_library(user["user_id"], req.library_id)
         return {"status": "success", **result}
     except ValueError as e:
-        return JSONResponse(status_code=400, content={"detail": str(e)})
+        return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
     except Exception as e:
         return server_error()
 
@@ -90,7 +91,7 @@ async def api_rename_library(library_id: str, req: LibraryRenameRequest, request
         result = rename_library(user["user_id"], library_id, req.name)
         return {"status": "success", **result}
     except ValueError as e:
-        return JSONResponse(status_code=400, content={"detail": str(e)})
+        return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
     except Exception as e:
         return server_error()
 
@@ -130,6 +131,6 @@ async def api_delete_library(library_id: str, request: Request):
         result = delete_library(uid, library_id)
         return {"status": "success", **result}
     except ValueError as e:
-        return JSONResponse(status_code=400, content={"detail": str(e)})
+        return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
     except Exception as e:
         return server_error()

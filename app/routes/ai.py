@@ -17,6 +17,7 @@ from app.core import (
     run_in_thread,
     server_error,
 )
+from app.errors import sentence_for
 from app.schemas import (
     AIArticleRequest,
     AIAskRequest,
@@ -232,9 +233,9 @@ async def api_ai_refine_article(req: AIArticleRequest, request: Request):
         result["label"] = "AI rewrite (from the abstract only — not extractive)"
         return result
     except LLMUnavailable as e:
-        return JSONResponse(status_code=503, content={"detail": _friendly_ai_unavailable(str(e))})
+        return JSONResponse(status_code=503, content={"detail": _friendly_ai_unavailable(sentence_for(e))})
     except LLMError as e:
-        return JSONResponse(status_code=400, content={"detail": str(e)})
+        return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
     except Exception as e:
         return server_error()
     finally:
@@ -258,7 +259,7 @@ async def api_ai_save_key_points(req: AISaveKeyPointsRequest, request: Request):
     try:
         p = get_owned_pipeline(uid, req.library_id)
     except ValueError as e:
-        return JSONResponse(status_code=400, content={"detail": str(e)})
+        return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
     try:
         points = [str(x).strip()[:500] for x in (req.key_points or []) if str(x).strip()]
         points = points[:6]
@@ -272,7 +273,7 @@ async def api_ai_save_key_points(req: AISaveKeyPointsRequest, request: Request):
         except quota.QuotaExceeded as e:
             return JSONResponse(
                 status_code=507,
-                content={"detail": str(e), "quota": quota.usage_report(uid)},
+                content={"detail": sentence_for(e), "quota": quota.usage_report(uid)},
             )
         p.db.insert_key_points(
             {(req.article_id, req.source): points},
@@ -340,9 +341,9 @@ async def api_ai_ask_article(req: AIAskRequest, request: Request):
         result["label"] = "AI answer (title + abstract only)"
         return result
     except LLMUnavailable as e:
-        return JSONResponse(status_code=503, content={"detail": _friendly_ai_unavailable(str(e))})
+        return JSONResponse(status_code=503, content={"detail": _friendly_ai_unavailable(sentence_for(e))})
     except LLMError as e:
-        return JSONResponse(status_code=400, content={"detail": str(e)})
+        return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
     except Exception as e:
         return server_error()
     finally:

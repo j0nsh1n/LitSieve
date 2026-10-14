@@ -13,6 +13,7 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
+from app.errors import UserError
 from app.fetchers.arxiv import ArXivFetcher
 from app.fetchers.biorxiv import BioRxivFetcher, MedRxivFetcher
 from app.fetchers.clinicaltrials import ClinicalTrialsFetcher
@@ -120,7 +121,7 @@ class LiteratureSearchPipeline:
 
         fetcher_cls = FETCHERS.get(source)
         if not fetcher_cls:
-            raise ValueError(f"Unknown source: {source}. Available: {list(FETCHERS.keys())}")
+            raise UserError(f"Unknown source: {source}. Available: {list(FETCHERS.keys())}")
 
         fetcher = fetcher_cls(email=email)
         articles = fetcher.search_and_fetch(query, max_results)
@@ -724,7 +725,7 @@ class LiteratureSearchPipeline:
                 query_embedding = self.embedding_engine.embed_query(query_text)
 
         if query_embedding.shape[-1] != article_embeddings.shape[1]:
-            raise ValueError(
+            raise UserError(
                 "Embedding dimension mismatch between the query and stored "
                 "articles. Use Re-prepare under More on Search."
             )
@@ -774,7 +775,7 @@ class LiteratureSearchPipeline:
         fraction = max(0.05, min(0.50, float(fraction)))
         query_text = (query_text or "").strip()
         if not query_text:
-            raise ValueError("Enter a research question to rank papers against.")
+            raise UserError("Enter a research question to rank papers against.")
 
         article_ids, article_embeddings, articles_all = self._candidate_pool()
         total = len(article_ids)
@@ -796,7 +797,7 @@ class LiteratureSearchPipeline:
             query_embedding = self.embedding_engine.embed_query(query_text)
 
         if query_embedding.shape[-1] != article_embeddings.shape[1]:
-            raise ValueError(
+            raise UserError(
                 "Embedding dimension mismatch between the query and stored "
                 "articles. Use Re-prepare under More on Search."
             )
@@ -850,7 +851,7 @@ class LiteratureSearchPipeline:
         """Rank papers near the centroid of the user's starred embeddings."""
         starred_keys = self.db.get_starred_keys()
         if not starred_keys:
-            raise ValueError("Star some papers first")
+            raise UserError("Star some papers first")
 
         all_ids, all_emb = self.db.get_all_embeddings()
         if len(all_ids) == 0:
@@ -863,7 +864,7 @@ class LiteratureSearchPipeline:
             if i is not None:
                 star_vecs.append(all_emb[i])
         if not star_vecs:
-            raise ValueError(
+            raise UserError(
                 "Starred papers have no embeddings yet. Create embeddings first."
             )
 
@@ -1005,7 +1006,7 @@ class LiteratureSearchPipeline:
         """Find a local seed article (by id/title), then rank similar papers."""
         article = self.db.find_article_by_seed(seed)
         if not article:
-            raise ValueError(
+            raise UserError(
                 "No matching article in your collection. Fetch papers first, "
                 "or try a different id / title fragment."
             )

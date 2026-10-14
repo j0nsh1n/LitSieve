@@ -30,6 +30,7 @@ from app.core import (
     try_begin_user_job,
     update_progress,
 )
+from app.errors import sentence_for
 from app.schemas import (
     ClusterRequest,
     ClusterScreeningRequest,
@@ -195,7 +196,7 @@ async def api_fetch_multi(req: MultiFetchRequest, request: Request):
     try:
         lib_id = owned_library_id(uid, req.library_id)
     except ValueError as e:
-        return JSONResponse(status_code=400, content={"detail": str(e)})
+        return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
     # Replace/clear_first must be allowed while over quota so students can
     # wipe the library and free disk; mid-fetch still stops if they go over again.
     if not req.clear_first:
@@ -204,7 +205,7 @@ async def api_fetch_multi(req: MultiFetchRequest, request: Request):
         except quota.QuotaExceeded as e:
             return JSONResponse(
                 status_code=507,
-                content={"detail": str(e), "quota": quota.usage_report(uid)},
+                content={"detail": sentence_for(e), "quota": quota.usage_report(uid)},
             )
     job_kwargs = dict(
         query=req.query,
@@ -220,7 +221,7 @@ async def api_fetch_multi(req: MultiFetchRequest, request: Request):
                 uid, 'fetch', _run_multi_fetch, library_id=lib_id, **job_kwargs,
             )
         except ValueError as e:
-            return JSONResponse(status_code=400, content={"detail": str(e)})
+            return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
         if not started:
             return JSONResponse(
                 status_code=409,
@@ -318,11 +319,11 @@ async def api_create_embeddings(req: EmbeddingsRequest, request: Request):
     try:
         lib_id = owned_library_id(uid, req.library_id)
     except ValueError as e:
-        return JSONResponse(status_code=400, content={"detail": str(e)})
+        return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
     try:
         quota.check_quota(uid)
     except quota.QuotaExceeded as e:
-        return JSONResponse(status_code=507, content={"detail": str(e), "quota": quota.usage_report(uid)})
+        return JSONResponse(status_code=507, content={"detail": sentence_for(e), "quota": quota.usage_report(uid)})
     job_kwargs = dict(model=req.model, only_missing=req.only_missing, uid=uid)
     if not req.wait:
         try:
@@ -330,7 +331,7 @@ async def api_create_embeddings(req: EmbeddingsRequest, request: Request):
                 uid, 'embed', _run_create_embeddings, library_id=lib_id, **job_kwargs,
             )
         except ValueError as e:
-            return JSONResponse(status_code=400, content={"detail": str(e)})
+            return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
         if not started:
             return JSONResponse(
                 status_code=409,
@@ -375,7 +376,7 @@ async def api_create_clusters(req: ClusterRequest, request: Request):
     try:
         lib_id = owned_library_id(uid, req.library_id)
     except ValueError as e:
-        return JSONResponse(status_code=400, content={"detail": str(e)})
+        return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
     kwargs = dict(uid=uid, n_clusters=req.n_clusters, method=req.method)
     if not req.wait:
         try:
@@ -410,7 +411,7 @@ async def api_get_clusters(request: Request, library_id: Optional[str] = None):
     try:
         p = get_owned_pipeline(uid, library_id)
     except ValueError as e:
-        return JSONResponse(status_code=400, content={"detail": str(e)})
+        return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
     try:
         clusters = p.db.get_all_clusters()
         briefings = await run_in_thread(p.get_cluster_briefings)
@@ -435,7 +436,7 @@ async def api_get_cluster_articles(
     try:
         p = get_owned_pipeline(uid, library_id)
     except ValueError as e:
-        return JSONResponse(status_code=400, content={"detail": str(e)})
+        return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
     try:
         articles = p.db.get_articles_by_cluster(cluster_id)
         label = articles[0].get('cluster_label', f'Cluster {cluster_id}') if articles else f'Cluster {cluster_id}'
@@ -459,7 +460,7 @@ async def api_statistics(request: Request, library_id: Optional[str] = None):
     try:
         p = get_owned_pipeline(uid, library_id)
     except ValueError as e:
-        return JSONResponse(status_code=400, content={"detail": str(e)})
+        return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
     try:
         stats = p.get_statistics()
         # Storage usage is account-wide (all libraries), so the UI can warn
@@ -522,7 +523,7 @@ async def api_screening(req: ScreeningRequest, request: Request):
     try:
         p = get_owned_pipeline(uid, req.library_id)
     except ValueError as e:
-        return JSONResponse(status_code=400, content={"detail": str(e)})
+        return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
     try:
         keys = [(item.article_id, item.source) for item in req.items]
         if req.action == "exclude":
@@ -561,7 +562,7 @@ async def api_screening_excluded(
     try:
         p = get_owned_pipeline(uid, library_id)
     except ValueError as e:
-        return JSONResponse(status_code=400, content={"detail": str(e)})
+        return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
     try:
         code = None if not reason or reason == "all" else normalize_reason(reason, default="low_relevance")
         items = p.db.get_excluded_items(code)
@@ -609,7 +610,7 @@ async def api_screening_quick_preview(req: QuickScreenPreviewRequest, request: R
         )
         return result
     except ValueError as e:
-        return JSONResponse(status_code=400, content={"detail": str(e)})
+        return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
     except Exception as e:
         return server_error()
     finally:
@@ -666,7 +667,7 @@ async def api_load_sample_corpus(req: SampleCorpusRequest, request: Request):
         except quota.QuotaExceeded as e:
             return JSONResponse(
                 status_code=507,
-                content={"detail": str(e), "quota": quota.usage_report(uid)},
+                content={"detail": sentence_for(e), "quota": quota.usage_report(uid)},
             )
     p = get_pipeline(uid)
     try:
@@ -707,7 +708,7 @@ async def api_resolve_duplicates(req: ResolveDuplicatesRequest, request: Request
     try:
         p = get_owned_pipeline(uid, req.library_id)
     except ValueError as e:
-        return JSONResponse(status_code=400, content={"detail": str(e)})
+        return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
     try:
         action = p.preview_duplicate_resolution if req.preview else p.resolve_duplicates
         result = await run_in_thread(action, threshold=req.threshold)
@@ -728,7 +729,7 @@ async def api_coverage(req: CoverageRequest, request: Request):
     try:
         p = get_owned_pipeline(uid, req.library_id)
     except ValueError as e:
-        return JSONResponse(status_code=400, content={"detail": str(e)})
+        return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
     try:
         stats = p.get_statistics()
         sources = stats.get("sources") or {}

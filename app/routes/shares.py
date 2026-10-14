@@ -14,6 +14,7 @@ from app.core import (
     run_in_thread,
     server_error,
 )
+from app.errors import sentence_for
 from app.schemas import (
     ShareCreateRequest,
     ShareJoinRequest,
@@ -81,7 +82,7 @@ async def api_create_share(req: ShareCreateRequest, request: Request):
             },
         }
     except ValueError as e:
-        return JSONResponse(status_code=400, content={"detail": str(e)})
+        return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
     except Exception as e:
         return server_error()
 
@@ -142,7 +143,7 @@ async def api_preview_share(request: Request):
         )
         return preview
     except ValueError as e:
-        return JSONResponse(status_code=400, content={"detail": str(e)})
+        return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
     except Exception as e:
         return server_error()
 
@@ -161,7 +162,7 @@ async def api_join_share(req: ShareJoinRequest, request: Request):
     except quota.QuotaExceeded as e:
         return JSONResponse(
             status_code=507,
-            content={"detail": str(e), "quota": quota.usage_report(uid)},
+            content={"detail": sentence_for(e), "quota": quota.usage_report(uid)},
         )
     try:
         result = await run_in_thread(
@@ -173,6 +174,6 @@ async def api_join_share(req: ShareJoinRequest, request: Request):
         )
         return {"status": "success", **result}
     except ValueError as e:
-        return JSONResponse(status_code=400, content={"detail": str(e)})
+        return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
     except Exception as e:
         return server_error()

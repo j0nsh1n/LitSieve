@@ -58,6 +58,11 @@ def test_login_defaults_to_search_and_preserves_safe_next(tmp_path, monkeypatch)
     assert _safe_next_url("https://example.test") == "/search"
     assert _safe_next_url("//example.test") == "/search"
     assert _safe_next_url("/account") == "/account"
+    assert _safe_next_url("/search?topic=sleep&page=2") == "/search?topic=sleep&page=2"
+    assert _safe_next_url("%2F%2Fexample.test") == "/search"
+    assert _safe_next_url("/\\example.test") == "/search"
+    assert _safe_next_url("/account\r\nSet-Cookie: x") == "/search"
+    assert _safe_next_url("account") == "/search"
 
     login = client.get("/login")
     assert login.status_code == 200

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import shutil
@@ -11,7 +12,10 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from app.errors import UserError
 from app.operator.paths import code_root, live_root
+
+logger = logging.getLogger(__name__)
 
 ACTION_SCRIPTS = {
     "list_files": "tools/operator/list_files.py",
@@ -105,11 +109,11 @@ def decode_action_payload(
 
 def script_path(action: str) -> Path:
     if action not in ACTION_SCRIPTS:
-        raise ValueError("Unknown action.")
+        raise UserError("Unknown action.")
     root = code_root()
     path = (root / ACTION_SCRIPTS[action]).resolve()
     if not str(path).startswith(str(root.resolve())):
-        raise ValueError("Action script is outside the repo.")
+        raise UserError("Action script is outside the repo.")
     if not path.is_file():
         raise FileNotFoundError(str(path))
     return path
@@ -165,7 +169,8 @@ def run_action_detached(
             cmd, capture_output=True, text=True, timeout=30, check=False, shell=False
         )
     except (subprocess.TimeoutExpired, OSError) as exc:
-        return {"ok": False, "detail": f"{action} could not be dispatched: {exc}"}
+        logger.warning("%s could not be dispatched: %s", action, exc)
+        return {"ok": False, "detail": f"{action} could not be dispatched."}
     if proc.returncode != 0:
         return {
             "ok": False,
@@ -201,7 +206,8 @@ def run_action(
     except subprocess.TimeoutExpired:
         return {"ok": False, "detail": f"{action} timed out.", "output": ""}
     except OSError as exc:
-        return {"ok": False, "detail": f"{action} could not start: {exc}", "output": ""}
+        logger.warning("%s could not start: %s", action, exc)
+        return {"ok": False, "detail": f"{action} could not start.", "output": ""}
     stdout = proc.stdout.decode("utf-8", "replace") if isinstance(proc.stdout, bytes) else (proc.stdout or "")
     stderr = proc.stderr.decode("utf-8", "replace") if isinstance(proc.stderr, bytes) else (proc.stderr or "")
     return decode_action_payload(stdout, stderr, proc.returncode, action)

@@ -43,6 +43,8 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from pydantic import BaseModel, Field
 
+from app.errors import UserError, sentence
+
 logger = logging.getLogger(__name__)
 
 # Per-account AI config. Host env is the immutable deploy default.
@@ -65,9 +67,15 @@ _builtin_started_by_app = False
 class LLMUnavailable(RuntimeError):
     """No provider configured, or a required package is missing."""
 
+    def __init__(self, text: str):
+        super().__init__(sentence(text))
+
 
 class LLMError(RuntimeError):
     """Provider call failed or returned unusable output."""
+
+    def __init__(self, text: str):
+        super().__init__(sentence(text))
 
 
 # Every message a route may show verbatim for bad input. Keyed by code so the
@@ -164,7 +172,7 @@ def _settings_cache() -> Dict[str, Dict[str, Any]]:
 def _settings_path(user_id: Optional[str] = None) -> Path:
     uid = _current_ai_user(user_id)
     if not uid:
-        raise ValueError("AI settings need an account")
+        raise UserError("AI settings need an account")
     from app.storage.libraries import user_dir
 
     return user_dir(uid) / "ai_settings.json"
@@ -349,7 +357,7 @@ def save_ai_settings(updates: Dict[str, Any], user_id: Optional[str] = None) -> 
     """Merge updates into this account's ai_settings.json. Does not touch env."""
     uid = _current_ai_user(user_id)
     if not uid:
-        raise ValueError("AI settings need an account")
+        raise UserError("AI settings need an account")
     path = _settings_path(uid)
     path.parent.mkdir(parents=True, exist_ok=True)
     current = load_ai_settings(force=True, user_id=uid)
@@ -771,7 +779,8 @@ def start_ollama() -> Tuple[bool, str]:
                 start_new_session=True,
             )
     except Exception as exc:
-        return False, f"Could not start Ollama: {exc}"
+        logger.warning("Could not start Ollama: %s", exc)
+        return False, "Could not start Ollama."
 
     # Brief wait for the HTTP port.
     for _ in range(20):
@@ -1206,7 +1215,8 @@ def _structured_ollama[T: BaseModel](system: str, prompt: str, schema_model: typ
                 "Ollama is not running or not reachable. "
                 "Start it from Account → AI study aid, or use an API key."
             ) from exc
-        raise LLMError(f"Ollama request failed: {exc}") from exc
+        logger.warning("Ollama request failed: %s", exc)
+        raise LLMError("Ollama request failed.") from exc
     return _parse_schema(content, schema_model, "Ollama")
 
 
@@ -1266,7 +1276,8 @@ def _structured_openai[T: BaseModel](system: str, prompt: str, schema_model: typ
             or ""
         )
     except Exception as exc:
-        raise LLMError(f"OpenAI-compatible request failed: {exc}") from exc
+        logger.warning("OpenAI-compatible request failed: %s", exc)
+        raise LLMError("OpenAI-compatible request failed.") from exc
     return _parse_schema(content, schema_model, "OpenAI-compatible")
 
 
@@ -1291,7 +1302,8 @@ def _structured_anthropic[T: BaseModel](system: str, prompt: str, schema_model: 
             messages=[{"role": "user", "content": user}],
         )
     except Exception as exc:
-        raise LLMError(f"LLM request failed: {exc}") from exc
+        logger.warning("LLM request failed: %s", exc)
+        raise LLMError("LLM request failed.") from exc
 
     parts = []
     for block in message.content or []:
@@ -1307,7 +1319,8 @@ def _parse_schema[T: BaseModel](content: str, schema_model: type[T], label: str)
     try:
         return schema_model.model_validate_json(cleaned)
     except Exception as exc:
-        raise LLMError(f"{label} returned no parseable output: {exc}") from exc
+        logger.warning("%s returned no parseable output: %s", label, exc)
+        raise LLMError(f"{label} returned no parseable output.") from exc
 
 
 def _extract_json_object(text: str) -> str:
