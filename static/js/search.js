@@ -1309,8 +1309,8 @@ function openResultRow(card, scrollIntoView) {
 
 document.addEventListener('keydown', (e) => {
  if (e.key !== 'Escape' || e.defaultPrevented) return;
- if (e.target.closest && e.target.closest('input, textarea, select, .appearance-panel, dialog')) return;
- if (document.querySelector('.appearance-panel:not([hidden])')) return;
+ if (e.target.closest && e.target.closest('input, textarea, select, .settings-panel, dialog')) return;
+ if (document.querySelector('.settings-panel:not([hidden])')) return;
  if (document.body.classList.contains('lra-modal-open') || document.querySelector('dialog[open]')) return;
  const open = document.querySelector('#results-list .result-row.is-open');
  if (!open) return;

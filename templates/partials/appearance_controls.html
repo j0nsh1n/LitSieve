@@ -2,7 +2,7 @@
    presses the painted values from <html data-*> on load. #}
 {% set settings = appearance_settings if appearance_settings is defined and appearance_settings else {} %}
 <div class="appearance-controls" data-appearance-controls>
- {% for key, spec in settings.items() %}
+ {% for key, spec in settings.items() if key != 'panel' %}{# docking lives in the panel's own header #}
  <fieldset class="appearance-setting" data-setting="{{ key }}">
   <legend>{{ spec[0] }}</legend>
   <div class="appearance-options">

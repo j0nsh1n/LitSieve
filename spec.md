@@ -52,6 +52,13 @@ a substitute for school library databases.
   applied pre-paint as `data-look` / `data-*` on `<html>`. Choosing a look
   starts its settings fresh. Offered once after registration. Night and
   Observatory are dark-first; light/dark stays a separate browser preference.
+  The Account page opens as a panel over any app page, from the account link
+  in the nav or from More → Adjust look on Search (at the Look section),
+  docks right (default), left, or bottom (phones always get a bottom sheet),
+  and repaints the page live as looks and settings change inside it. The dock
+  is the `panel` setting, saved to the account and kept when a look is picked
+  or reset; Escape closes it, `/account` still works as a full page, and only
+  `/account?embed=1` may be framed, by the same origin.
 - **Screening / triage** on Search (exclude/restore with reason codes):
   - Near-duplicates with preferred-source resolution and selectable strictness;
     **Quick screen** ranks against the research question and applies only on

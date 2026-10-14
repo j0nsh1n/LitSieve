@@ -13,7 +13,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple
 
-from app.content.appearance import parse_overrides
+from app.content.appearance import kept_across_looks, parse_overrides
 from app.content.looks import DEFAULT_LOOK, normalize_look, parse_look
 from app.storage import dbconn
 
@@ -371,14 +371,19 @@ class UserDatabase:
         if parsed is None:
             return None
         with self._lock:
-            # A look is a preset: choosing one starts its settings fresh.
-            cur = self.conn.execute(
-                "UPDATE users SET look = ?, appearance = '' WHERE id = ?",
-                (parsed, user_id),
+            row = self.conn.execute(
+                "SELECT COALESCE(look, 'workshop'), COALESCE(appearance, '') FROM users WHERE id = ?", (user_id,)
+            ).fetchone()
+            if not row:
+                return None
+            # A look is a preset: choosing one starts its settings fresh, apart
+            # from workspace choices such as where the account panel docks.
+            kept = kept_across_looks(parse_overrides(row[1], parsed))
+            self.conn.execute(
+                "UPDATE users SET look = ?, appearance = ? WHERE id = ?",
+                (parsed, json.dumps(kept, sort_keys=True) if kept else "", user_id),
             )
             self.conn.commit()
-            if cur.rowcount == 0:
-                return None
         return parsed
 
     def set_appearance(

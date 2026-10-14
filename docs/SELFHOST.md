@@ -95,16 +95,22 @@ It runs as its own service from Laya's interpreter, so LitSieve's venv never
 imports torch for it, and a crash cannot take the site down. LitSieve calls it
 with a 1.2 s read timeout and falls back to today's behaviour on any error.
 
+systemd holds port 7880 and starts the worker on the first request. After 5
+minutes without one the worker exits and its memory (about 2 GB) is freed.
+Loading again takes about 8 seconds, so opening the Search page wakes it ahead
+of the first question; a question asked while it is still loading falls back.
+
 ```bash
-cp deploy/litsieve-laya.service ~/.config/systemd/user/
+cp deploy/litsieve-laya.socket deploy/litsieve-laya.service ~/.config/systemd/user/
 systemctl --user daemon-reload
-systemctl --user enable --now litsieve-laya.service
-curl -s http://127.0.0.1:7880/health      # {"ok": true, "loaded": true, "device": "cuda"}
+systemctl --user enable --now litsieve-laya.socket
+curl -s http://127.0.0.1:7880/health      # starts it; {"ok": true, "loaded": true, "device": "cuda"}
 echo 'LITSIEVE_LAYA_URL=http://127.0.0.1:7880' >> .env
 systemctl --user restart litsieve-uvicorn.service
 ```
 
 Turn it off by removing `LITSIEVE_LAYA_URL` from `.env` and restarting the app.
+To keep it loaded instead, drop `--idle-exit 300` from the service's `ExecStart`.
 
 ## Cloudflare Tunnel
 

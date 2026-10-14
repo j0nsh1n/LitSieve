@@ -1193,11 +1193,9 @@ function syncAppearanceControls() {
             btn.setAttribute('aria-pressed', btn.getAttribute('data-value') === current ? 'true' : 'false');
         });
     });
-    const look = root.getAttribute('data-look');
-    document.querySelectorAll('.appearance-panel [data-look-pick]').forEach((card) => {
-        const on = card.getAttribute('data-look-pick') === look;
-        card.classList.toggle('is-selected', on);
-        card.setAttribute('aria-pressed', on ? 'true' : 'false');
+    const dock = root.getAttribute('data-panel') || 'right';
+    document.querySelectorAll('#settings-panel [data-dock]').forEach((btn) => {
+        btn.setAttribute('aria-pressed', btn.getAttribute('data-dock') === dock ? 'true' : 'false');
     });
 }
 
@@ -1275,66 +1273,153 @@ function wireAppearanceControls() {
         if (reset) {
             reset.disabled = readOnly;
             reset.addEventListener('click', () => {
-                window.applyUiAppearance({});
+                // Back to the look's preset; where the panel docks is not part of a look.
+                const painted = window.applyUiAppearance(window.lraKeptAcrossLooks(appearanceOverrides()));
                 syncAppearanceControls();
-                saveAppearance('/api/account/appearance', { appearance: {}, look: document.documentElement.getAttribute('data-look') }).catch(() => {});
+                saveAppearance('/api/account/appearance', { appearance: painted.overrides, look: document.documentElement.getAttribute('data-look') }).catch(() => {});
             });
         }
     });
-    // Look cards inside the Search panel; Account wires its own in account.js.
-    document.querySelectorAll('.appearance-panel [data-look-pick]').forEach((card) => {
-        card.disabled = readOnly;
-        card.addEventListener('click', () => {
-            // The current look again would only wipe the student's settings.
-            if (card.getAttribute('data-look-pick') === document.documentElement.getAttribute('data-look')) return;
-            const look = window.applyUiLook(card.getAttribute('data-look-pick'));
-            syncAppearanceControls();
-            saveAppearance('/api/account/look', { look }).catch(() => {});
-        });
-    });
-    const panel = document.getElementById('appearance-panel');
-    const opener = document.getElementById('simple-adjust-look-btn');
-    if (panel && opener) {
-        const more = opener.closest('details');
-        const close = () => {
-            panel.hidden = true;
-            opener.setAttribute('aria-expanded', 'false');
-            // The opener sits in the More menu, closed by now; its summary takes focus.
-            const back = more ? more.querySelector('summary') : opener;
-            if (back) back.focus({ preventScroll: true });
-        };
-        opener.setAttribute('aria-expanded', 'false');
-        opener.addEventListener('click', () => {
-            if (more) more.open = false;
-            panel.hidden = false;
-            opener.setAttribute('aria-expanded', 'true');
-            syncAppearanceControls();
-            const first = panel.querySelector('button');
-            if (first) first.focus();
-        });
-        panel.querySelector('[data-appearance-close]').addEventListener('click', close);
-        panel.addEventListener('keydown', (e) => {
-            if (e.key !== 'Escape') return;
-            e.stopPropagation();
-            close();
-        });
-        document.addEventListener('keydown', (e) => {
-            if (e.key !== 'Escape' || panel.hidden || e.defaultPrevented) return;
-            if (document.body.classList.contains('lra-modal-open')) return;
-            e.preventDefault();
-            close();
-        });
-        document.addEventListener('pointerdown', (e) => {
-            if (panel.hidden || panel.contains(e.target) || opener.contains(e.target)) return;
-            if (e.target.closest && e.target.closest('.lra-modal-root, #site-modal-root, .more-menu, details[open]')) return;
-            close();
-        });
-    }
     syncAppearanceControls();
 }
 window.syncAppearanceControls = syncAppearanceControls;
 
 document.addEventListener('DOMContentLoaded', wireAppearanceControls);
+
+// === Account settings panel ===
+// The whole Account page, framed (/account?embed=1), docked over the current
+// page: right, left or bottom (the "panel" appearance setting). The frame is
+// a real page with its own scripts; looks picked in it repaint this page
+// through theme-init, and this page keeps the frame's copy in step.
+function wireSettingsPanel() {
+    if (document.body.getAttribute('data-embed') === '1') {
+        // Inside the panel, links to other pages (Log Out, Search, Admin) move
+        // the real page, not the frame; section links stay in the panel.
+        document.addEventListener('click', (e) => {
+            const a = e.target.closest && e.target.closest('a[href]');
+            if (a && !a.getAttribute('href').startsWith('#') && !a.target) a.target = '_top';
+        }, true);
+        // Inside the panel: Escape closes the panel around this page.
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape' || e.defaultPrevented || document.body.classList.contains('lra-modal-open')) return;
+            const outer = window.lraHostPage && window.lraHostPage();
+            if (outer && outer.lraCloseSettingsPanel) outer.lraCloseSettingsPanel();
+        });
+        return;
+    }
+    const panel = document.getElementById('settings-panel');
+    if (!panel) return;
+    const root = document.documentElement;
+    const frame = panel.querySelector('iframe');
+    const readOnly = document.body.getAttribute('data-support-view') === '1';
+    let returnTo = null;
+
+    const inner = () => {
+        try { return frame.contentWindow && frame.contentWindow.lraPaintFromPanel ? frame.contentWindow : null; } catch (_) { return null; }
+    };
+    const mirror = () => {
+        const w = inner();
+        if (!w) return;
+        w.lraPaintFromPanel(root.getAttribute('data-look'), appearanceOverrides());
+        const theme = root.getAttribute('data-theme');
+        const fr = w.document.documentElement;
+        if (theme) fr.setAttribute('data-theme', theme); else fr.removeAttribute('data-theme');
+    };
+    frame.addEventListener('load', mirror);
+    if (typeof MutationObserver === 'function') {
+        new MutationObserver(mirror).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+    }
+
+    // The frame only ever loads this one constant URL. A section to open at
+    // is scrolled to once the page is there, never put into the URL.
+    const ACCOUNT_EMBED = '/account?embed=1';
+    let pendingSection = '';
+    const scrollToSection = (id) => {
+        if (!id) return;
+        try {
+            const el = frame.contentWindow.document.getElementById(id);
+            if (el) el.scrollIntoView({ block: 'start' });
+        } catch (_) { /* not loaded yet */ }
+    };
+    frame.addEventListener('load', () => {
+        scrollToSection(pendingSection);
+        pendingSection = '';
+    });
+    const showSection = (id) => {
+        if (!frame.getAttribute('src')) {
+            pendingSection = id || '';
+            frame.src = ACCOUNT_EMBED;
+            return;
+        }
+        scrollToSection(id);
+    };
+    const open = (id) => {
+        // Visible first: a hidden frame cannot scroll to a section.
+        panel.hidden = false;
+        showSection(id);
+        document.body.classList.add('settings-panel-open');
+        placeReadingPane();
+        syncAppearanceControls();
+        panel.querySelector('[data-settings-close]').focus({ preventScroll: true });
+    };
+    const close = () => {
+        if (panel.hidden) return;
+        panel.hidden = true;
+        document.body.classList.remove('settings-panel-open');
+        // On phones the opener sits in the collapsed nav menu.
+        const back = returnTo && returnTo.offsetParent ? returnTo : document.getElementById('nav-menu-toggle');
+        if (back) back.focus({ preventScroll: true });
+        placeReadingPane();
+    };
+    window.lraCloseSettingsPanel = close;
+
+    // An open paper in the Columns/Index reading pane moves to the side the
+    // settings panel is not on, so neither hides the other or its Close. A
+    // bottom sheet leaves too little height to read in, so the paper goes
+    // back to its card instead.
+    function placeReadingPane() {
+        const pane = document.querySelector('#results-list > .result-row.is-open');
+        if (!pane || panel.hidden || getComputedStyle(pane).position !== 'fixed') return;
+        const dock = root.getAttribute('data-panel') || 'right';
+        if (dock === 'right') pane.classList.add('is-reading-left');
+        if (dock === 'left') pane.classList.remove('is-reading-left');
+        if (dock === 'bottom' && typeof setResultRowOpen === 'function') setResultRowOpen(pane, false);
+    }
+
+    document.querySelectorAll('[data-settings-open]').forEach((btn) => {
+        btn.setAttribute('aria-expanded', 'false');
+        btn.addEventListener('click', (e) => {
+            // A new tab or window still gets the full page.
+            if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
+            e.preventDefault();
+            const more = btn.closest('details');
+            if (more) more.open = false;
+            returnTo = more ? more.querySelector('summary') : btn;
+            const id = btn.getAttribute('data-settings-open');
+            if (!panel.hidden && !id) { close(); return; }
+            open(id);
+        });
+    });
+    panel.querySelector('[data-settings-close]').addEventListener('click', close);
+    panel.querySelectorAll('[data-dock]').forEach((btn) => {
+        btn.disabled = readOnly;
+        btn.addEventListener('click', () => {
+            const painted = window.applyUiAppearance({ ...appearanceOverrides(), panel: btn.getAttribute('data-dock') });
+            syncAppearanceControls();
+            mirror();
+            placeReadingPane();
+            saveAppearance('/api/account/appearance', { appearance: painted.overrides, look: root.getAttribute('data-look') }).catch(() => {});
+        });
+    });
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape' || panel.hidden || e.defaultPrevented) return;
+        if (document.body.classList.contains('lra-modal-open')) return;
+        e.preventDefault();
+        close();
+    });
+}
+
+document.addEventListener('DOMContentLoaded', wireSettingsPanel);
 
 // === Multi-library switcher (nav) ===
 async function initLibrarySwitcher() {

@@ -11,11 +11,19 @@ and this project aims to follow Semantic Versioning for app version strings
 ## [6.0.0] - 2026-10-12
 
 ### Added
+- Account opens as a panel over any page, from the account link in the top
+  bar or from More → Adjust look on Search. Dock it right, left, or bottom;
+  the choice saves to your account and stays when you change looks. Phones
+  get a bottom sheet, and each look or setting you pick repaints the page as
+  you go.
 - Optional Laya switches. With the local Laya sidecar running and
   `LITSIEVE_LAYA_URL` set, study-type tags the wording patterns were unsure of
   are settled by Laya when it is at least 85% sure (the tooltip says so), and
   the collect step picks the areas from the typed topic. Search ranking is
   unchanged. With Laya off, slow or unsure, everything behaves as before.
+  The sidecar gives its memory (about 2 GB) back after 5 idle minutes:
+  systemd starts it again on the next request, and opening Search wakes it
+  ahead of the first question (`deploy/litsieve-laya.socket`).
 - Two more looks join Workshop, Broadsheet, Lab, Night, and Catalog:
   Observatory, deep blue with a green signal and a year, title, and source
   register; and Reading room, quiet blue on white with a book serif and a

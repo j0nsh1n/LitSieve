@@ -1,6 +1,7 @@
 """Appearance settings: each look is a preset, and a student can change any
 setting on top of it. Only the settings that differ from the look's preset
-are stored; choosing a look again clears them.
+are stored; choosing a look again clears them, except the settings in
+KEEP_ACROSS_LOOKS, which are about the workspace rather than the look.
 
 SETTINGS is the single allowlist. theme-init.js mirrors it (and PRESETS) so
 the page paints the right layout before CSS loads; tests keep them equal.
@@ -70,9 +71,18 @@ SETTINGS: Dict[str, tuple] = {
         ("bordered", "Bordered"),
         ("offset", "Offset"),
     )),
+    "panel": ("Settings panel", (
+        ("right", "Right"),
+        ("left", "Left"),
+        ("bottom", "Bottom"),
+    )),
 }
 
-_BASE = {"text": "standard", "measure": "standard", "accent": "look", "density": "standard"}
+# Where the account panel docks is a workspace choice, not part of a look:
+# picking a look or resetting to it leaves these alone.
+KEEP_ACROSS_LOOKS = ("panel",)
+
+_BASE = {"text": "standard", "measure": "standard", "accent": "look", "density": "standard", "panel": "right"}
 
 PRESETS: Dict[str, Dict[str, str]] = {
     "workshop": {**_BASE, "layout": "cards", "titles": "serif", "reading": "sans",
@@ -121,3 +131,7 @@ def effective(look: Optional[str], overrides: Mapping[str, str]) -> Dict[str, st
 def cookie_value(overrides: Mapping[str, str]) -> str:
     """`layout.table~density.compact`: cookie-safe without quoting."""
     return "~".join(f"{k}.{v}" for k, v in overrides.items())
+
+
+def kept_across_looks(overrides: Mapping[str, str]) -> Dict[str, str]:
+    return {k: v for k, v in overrides.items() if k in KEEP_ACROSS_LOOKS}

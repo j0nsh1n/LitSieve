@@ -131,20 +131,25 @@ def test_controls_render_every_option_on_account_and_search():
     env = Environment(loader=FileSystemLoader(str(REPO / "templates")), autoescape=True)
     html = env.get_template("partials/appearance_controls.html").render(appearance_settings=SETTINGS)
     for key in SETTINGS:
+        if key == "panel":
+            assert 'data-setting="panel"' not in html  # docking lives in the panel's header
+            continue
         assert f'data-setting="{key}"' in html
         for value in _allowed(key):
             assert f'data-value="{value}"' in html
     assert "data-appearance-reset" in html
     assert 'include "partials/appearance_controls.html"' in _read("templates", "account.html")
-    search = _read("templates", "search.html")
-    assert 'include "partials/appearance_controls.html"' in search
-    assert 'id="simple-adjust-look-btn"' in _read("templates", "partials", "simple_screening_card.html")
+    panel = _read("templates", "partials", "settings_panel.html")
+    for value in _allowed("panel"):
+        assert f'data-dock="{value}"' in panel
+    # Adjust look on Search opens the account panel at its Look section.
+    assert 'data-settings-open="account-look"' in _read("templates", "partials", "simple_screening_card.html")
 
 
 def test_every_setting_value_has_css():
     for key in SETTINGS:
         for value in _allowed(key):
-            if (key, value) in {("accent", "look"), ("text", "standard"), ("measure", "standard"), ("density", "standard")}:
+            if (key, value) in {("accent", "look"), ("text", "standard"), ("measure", "standard"), ("density", "standard"), ("panel", "right")}:
                 continue  # the html defaults
             assert f'html[data-{key}="{value}"]' in CSS or f'[data-{key}="{value}"]' in CSS, f"{key}={value}"
 
@@ -217,3 +222,38 @@ def test_a_guest_look_lasts_only_as_long_as_the_guest(tmp_path, monkeypatch):
     assert r.status_code == 200, r.text
     cookie = [h for h in r.headers.get_list("set-cookie") if h.startswith("ui_appearance=")][0]
     assert f"Max-Age={core.GUEST_MAX_AGE_MINUTES * 60}" in cookie
+
+
+def test_a_new_look_keeps_where_the_panel_docks(tmp_path, monkeypatch):
+    client, db = _client(tmp_path, monkeypatch)
+    _register(client, "docker")
+    client.post("/api/account/appearance", json={"appearance": {"panel": "left", "text": "large"}}, headers=_csrf(client))
+    r = client.post("/api/account/look", json={"look": "lab"}, headers=_csrf(client))
+    assert r.status_code == 200
+    assert r.json()["appearance"] == {"panel": "left"}
+    assert r.cookies.get("ui_appearance") == "panel.left"
+    assert db.get_by_username("docker")["appearance"] == {"panel": "left"}
+
+
+def test_only_the_embedded_account_page_may_be_framed_by_litsieve(tmp_path, monkeypatch):
+    client, _db = _client(tmp_path, monkeypatch)
+    _register(client, "framer")
+    embedded = client.get("/account?embed=1")
+    assert embedded.status_code == 200
+    assert embedded.headers["X-Frame-Options"] == "SAMEORIGIN"
+    assert "frame-ancestors 'self'" in embedded.headers["Content-Security-Policy"]
+    assert 'class="navbar' not in embedded.text and 'data-embed="1"' in embedded.text
+    for path in ("/account", "/search", "/login"):
+        r = client.get(path)
+        assert r.headers["X-Frame-Options"] == "DENY", path
+        assert "frame-ancestors 'none'" in r.headers["Content-Security-Policy"], path
+
+
+def test_every_app_page_offers_the_account_panel_but_account_itself(tmp_path, monkeypatch):
+    client, _db = _client(tmp_path, monkeypatch)
+    _register(client, "paneluser")
+    search = client.get("/search").text
+    assert 'id="settings-panel"' in search and 'class="settings-panel-frame"' in search
+    assert "const ACCOUNT_EMBED = '/account?embed=1';" in _read("static", "js", "common.js")
+    assert 'data-settings-open=""' in search  # the account link in the nav
+    assert 'id="settings-panel"' not in client.get("/account").text

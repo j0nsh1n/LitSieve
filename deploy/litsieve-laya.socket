@@ -1,0 +1,9 @@
+[Unit]
+Description=Laya sidecar socket: starts Laya on the first request (127.0.0.1:7880)
+Documentation=file://%h/HealthDatabaseAccess/docs/SELFHOST.md
+
+[Socket]
+ListenStream=127.0.0.1:7880
+
+[Install]
+WantedBy=sockets.target

@@ -1,0 +1,22 @@
+{# Account settings in a panel over the current page. The frame loads the real
+   Account page (/account?embed=1, set in common.js) on first open; common.js wires the dock
+   buttons and closing. The dock choice is the appearance setting "panel". #}
+<aside class="settings-panel" id="settings-panel" aria-labelledby="settings-panel-title" hidden>
+ <div class="settings-panel-head">
+  <h2 id="settings-panel-title">Account</h2>
+  <div class="settings-dock" role="group" aria-label="Dock the panel">
+   <button type="button" class="settings-dock-btn" data-dock="left" aria-pressed="false" aria-label="Dock left" data-tip="Dock left">
+    <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="13" rx="2"/><rect x="2.5" y="3.5" width="6" height="13" rx="2" class="settings-dock-fill"/></svg>
+   </button>
+   <button type="button" class="settings-dock-btn" data-dock="bottom" aria-pressed="false" aria-label="Dock bottom" data-tip="Dock bottom">
+    <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="13" rx="2"/><rect x="2.5" y="10.5" width="15" height="6" rx="2" class="settings-dock-fill"/></svg>
+   </button>
+   <button type="button" class="settings-dock-btn" data-dock="right" aria-pressed="false" aria-label="Dock right" data-tip="Dock right">
+    <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="13" rx="2"/><rect x="11.5" y="3.5" width="6" height="13" rx="2" class="settings-dock-fill"/></svg>
+   </button>
+  </div>
+  <a class="settings-panel-full" href="/account">Full page</a>
+  <button type="button" class="btn btn-secondary btn-sm" data-settings-close>Done</button>
+ </div>
+ <iframe class="settings-panel-frame" aria-label="Account settings"></iframe>
+</aside>

@@ -64,10 +64,25 @@ def https_enforced() -> bool:
     return os.getenv("DEBUG", "").strip().lower() not in ("1", "true", "yes")
 
 
+# The account page embedded in the settings panel is framed by LitSieve's own
+# pages, so that one URL may be framed by the same origin. Every other page
+# stays unframeable.
+EMBED_HEADERS = {
+    **BASE_HEADERS,
+    "X-Frame-Options": "SAMEORIGIN",
+    "Content-Security-Policy": CSP_VALUE.replace("frame-ancestors 'none'", "frame-ancestors 'self'"),
+}
+
+
+def embeddable(request) -> bool:
+    return request.url.path == "/account" and request.query_params.get("embed") == "1"
+
+
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         response = await call_next(request)
-        for header, value in BASE_HEADERS.items():
+        headers = EMBED_HEADERS if embeddable(request) else BASE_HEADERS
+        for header, value in headers.items():
             response.headers.setdefault(header, value)
         if https_enforced():
             response.headers.setdefault("Strict-Transport-Security", HSTS_VALUE)

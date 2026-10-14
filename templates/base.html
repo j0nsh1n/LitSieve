@@ -7,12 +7,14 @@
     <link rel="icon" href="/static/favicon.svg?v=20260828a" type="image/svg+xml">
     <link rel="icon" href="/static/favicon.ico?v=20260803a" sizes="32x32">
     <link rel="apple-touch-icon" href="/static/favicon.png?v=20260803a">
-    <link rel="stylesheet" href="/static/css/style.css?v=20261012r">
-    <script src="/static/js/theme-init.js?v=20261012q"></script>
+    <link rel="stylesheet" href="/static/css/style.css?v=20261012w">
+    <script src="/static/js/theme-init.js?v=20261012t"></script>
     <script src="/static/js/tooltips.js?v=20260923a" defer></script>
     {% block head_extra %}{% endblock %}
 </head>
-<body class="{% block body_class %}{% endblock %}"{% if user and user.is_guest %} data-guest="1"{% endif %}{% if support_view %} data-support-view="1"{% endif %}>
+<body class="{% block body_class %}{% endblock %}"{% if user and user.is_guest %} data-guest="1"{% endif %}{% if support_view %} data-support-view="1"{% endif %}{% if embed %} data-embed="1"{% endif %}>
+    {# Inside the account panel the page around it already has all of this. #}
+    {% if not embed %}
     {% include "partials/site_notice.html" %}
     {% if support_view %}
     <div class="support-view-banner" role="alert">
@@ -88,6 +90,7 @@
             {% if user %}
             <a href="/account"
                class="nav-username {% if active_page == 'account' %}active{% endif %}"
+               {% if active_page != 'account' %}data-settings-open="" aria-controls="settings-panel"{% endif %}
                data-tip="Account settings"
                aria-label="Account settings ({{ user.username }})">
                 <span class="nav-username-full">{{ user.username }}</span>
@@ -100,6 +103,7 @@
             </div>
         </div>
     </nav>
+    {% endif %}
 
     <main class="container {% block container_mod %}{% endblock %}" id="page-main">
         <div id="notification-area"></div>
@@ -107,6 +111,7 @@
     </main>
 
     {% from "macros/disclaimers.html" import scope_footer %}
+    {% if not embed %}
     <footer class="footer">
         <p>LitSieve - v6.0.0</p>
         {% if support_links %}
@@ -114,8 +119,10 @@
         {% endif %}
         {{ scope_footer() }}
     </footer>
+    {% if user and active_page != 'account' %}{% include "partials/settings_panel.html" %}{% endif %}
+    {% endif %}
 
-    <script src="/static/js/common.js?v=20261012s"></script>
+    <script src="/static/js/common.js?v=20261012y"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

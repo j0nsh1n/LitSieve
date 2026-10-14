@@ -478,7 +478,7 @@ async function doAccountJoin() {
   const name = (data.library && data.library.name) || 'library';
   setStatus('account-join-status', `Added "${name}". Opening Search…`, 'success');
   showNotification(`Added library: ${name}`, 'success');
-  window.location.href = '/search';
+  window.top.location.href = '/search';
  } catch (e) {
   setStatus('account-join-status', e.message, 'error');
   showNotification(e.message, 'error');
@@ -499,7 +499,7 @@ async function doCreateLibrary() {
  showNotification('Library created.', 'success');
  if (typeof refreshLibrarySwitcher === 'function') await refreshLibrarySwitcher();
  // New library is active and empty; reload so Search reflects it.
- window.location.reload();
+ window.top.location.reload();
  } catch (e) {
  setStatus('library-manage-status', e.message, 'error');
  showNotification(e.message, 'error');
@@ -541,7 +541,7 @@ async function doSwitchLibrary(id) {
  method: 'POST',
  body: { library_id: id },
  });
- window.location.reload();
+ window.top.location.reload();
  } catch (e) {
  showNotification(e.message, 'error');
  }
@@ -567,7 +567,7 @@ async function doDeleteLibrary(lib, count) {
  });
  if (typeof refreshLibrarySwitcher === 'function') await refreshLibrarySwitcher();
  // If we deleted the active library, server switched active; reload.
- window.location.reload();
+ window.top.location.reload();
  } catch (e) {
  showNotification(e.message, 'error');
  }
@@ -629,7 +629,7 @@ async function doDeleteAccount() {
  try {
  await apiCall('/api/delete-account', { method: 'POST', body: { password } });
  // Account gone + cookies cleared server-side; bounce to login.
- window.location.href = '/login';
+ window.top.location.href = '/login';
  } catch (e) {
  setStatus('delete-status', `Error: ${e.message}`, 'error');
  showNotification(`Could not delete account: ${e.message}`, 'error');

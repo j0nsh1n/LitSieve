@@ -489,8 +489,10 @@ async def set_account_look(request: Request, body: SetLookRequest):
     saved = core.user_db.set_look(user["user_id"], parsed)
     if not saved:
         return JSONResponse(status_code=400, content={"detail": "Unknown look"})
-    response = JSONResponse({"look": saved, "appearance": {}})
-    _set_look_cookie(response, saved, max_age=_look_cookie_age(user))
+    record = core.user_db.get_by_id(user["user_id"]) or {}
+    kept = record.get("appearance") or {}
+    response = JSONResponse({"look": saved, "appearance": kept})
+    _set_look_cookie(response, saved, max_age=_look_cookie_age(user), appearance=kept)
     return response
 
 

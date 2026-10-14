@@ -3,6 +3,8 @@ and the topic-area route. No real model runs here; the sidecar's HTTP answers
 are faked at requests.post."""
 from __future__ import annotations
 
+import threading
+
 import pytest
 import requests
 from fastapi.testclient import TestClient
@@ -311,3 +313,68 @@ def test_feedback_without_a_known_suggestion_is_ignored(app_module):  # noqa: F8
     h = _register(c, "fbnone")
     assert c.post("/api/topic-area/feedback", headers=h, json={"suggested": ["nope"], "final": []}).json() == {"ok": False}
     assert c.post("/api/topic-area/feedback", headers=h, json={"suggested": ["a", "b", "c", "d"], "final": []}).status_code == 422
+
+
+# --- waking an idled-out worker ------------------------------------------------
+
+def _record_gets(monkeypatch, fail=False):
+    gets = []
+
+    def fake_get(url, timeout):
+        gets.append(url)
+        if fail:
+            raise requests.ConnectionError()
+        return FakeResp({"ok": True})
+
+    monkeypatch.setattr(laya_client.requests, "get", fake_get)
+    return gets
+
+
+def _join_wake():
+    for t in threading.enumerate():
+        if t.name == "laya-wake":
+            t.join(5)
+
+
+def test_wake_does_nothing_with_laya_off(monkeypatch):
+    gets = _record_gets(monkeypatch)
+    laya_client.wake()
+    _join_wake()
+    assert gets == []
+
+
+def test_wake_pings_health_at_most_once_a_minute(monkeypatch):
+    monkeypatch.setenv("LITSIEVE_LAYA_URL", URL)
+    gets = _record_gets(monkeypatch)
+    clock = [1000.0]
+    monkeypatch.setattr(laya_client.time, "monotonic", lambda: clock[0])
+    for _ in range(3):
+        laya_client.wake()
+    _join_wake()
+    assert gets == [f"{URL}/health"]
+    clock[0] += laya_client.WAKE_EVERY_SECONDS + 1
+    laya_client.wake()
+    _join_wake()
+    assert gets == [f"{URL}/health"] * 2
+
+
+def test_a_failed_wake_never_turns_laya_off(laya_on, monkeypatch):
+    calls, _ = laya_on
+    _record_gets(monkeypatch, fail=True)
+    laya_client.wake()
+    _join_wake()
+    assert laya_client.choice("q?", {"a": "A", "b": "B"}, ["text"]) is not None
+    assert len(calls) == 1
+
+
+def test_opening_search_wakes_laya_but_not_for_visitors(app_module, monkeypatch):  # noqa: F811
+    monkeypatch.setenv("LITSIEVE_LAYA_URL", URL)
+    gets = _record_gets(monkeypatch)
+    c = TestClient(app_module.app)
+    assert c.get("/search", follow_redirects=False).status_code == 302
+    _join_wake()
+    assert gets == []
+    _register(c, "layawake")
+    assert c.get("/search").status_code == 200
+    _join_wake()
+    assert gets == [f"{URL}/health"]

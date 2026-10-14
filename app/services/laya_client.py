@@ -24,9 +24,13 @@ logger = logging.getLogger(__name__)
 TIMEOUT = (0.25, 1.2)
 # After a failure, skip Laya for this long instead of paying the timeout on every search.
 COOLDOWN_SECONDS = 30.0
+# A socket-activated worker takes ~8 s to load after idling out; one wake-up per minute is plenty.
+WAKE_EVERY_SECONDS = 60.0
+WAKE_TIMEOUT = (0.25, 15.0)
 
 _state_lock = threading.Lock()
 _down_until = 0.0
+_woken_at = float("-inf")
 
 
 def base_url() -> str:
@@ -47,6 +51,27 @@ def _mark_down(reason: str) -> None:
 def _cooling_down() -> bool:
     with _state_lock:
         return time.monotonic() < _down_until
+
+
+def wake() -> None:
+    """Start loading an idled-out worker before it is asked anything. Never blocks or fails."""
+    global _woken_at
+    url = base_url()
+    if not url:
+        return
+    with _state_lock:
+        now = time.monotonic()
+        if now - _woken_at < WAKE_EVERY_SECONDS:
+            return
+        _woken_at = now
+    threading.Thread(target=_ping, args=(url,), name="laya-wake", daemon=True).start()
+
+
+def _ping(url: str) -> None:
+    try:
+        requests.get(f"{url}/health", timeout=WAKE_TIMEOUT)
+    except requests.RequestException:
+        pass
 
 
 def choice(instructions: str, options: Dict[str, str], states: List[str]) -> Optional[List[dict]]:
@@ -81,6 +106,7 @@ def choice(instructions: str, options: Dict[str, str], states: List[str]) -> Opt
 
 
 def _reset_for_tests() -> None:
-    global _down_until
+    global _down_until, _woken_at
     with _state_lock:
         _down_until = 0.0
+        _woken_at = float("-inf")
