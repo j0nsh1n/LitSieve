@@ -9,6 +9,18 @@ and this project aims to follow Semantic Versioning for app version strings
 ## [Unreleased]
 
 ### Changed
+- Admin is four tabs: Overview (tiles that open the queue they count),
+  Accounts (search and queues beside the open account), Site (banner and
+  student-facing copy) and Host. The address bar follows the tab, queue and
+  account, so a link lands on the right thing and Back works.
+- Every admin action asks the same way: a reason always, the student's
+  username when it changes access or deletes data, and the word `publish`
+  to publish or take down the banner. Each reports with the same toast and
+  status line. The buttons and their rules come from one list in
+  `app/routes/admin.py`, and a test keeps the page equal to it.
+- Account notes, sign-in events and the timeline show 25 at a time with
+  "Show 25 more" (`GET /api/admin/users/{id}/history`).
+- The dead "Reset MFA" button and its route are gone; this host has no MFA.
 - Error messages are the app's own sentences. When an AI request or a Ship
   action fails, the message no longer carries the provider's or system's raw
   error text; the server log keeps it.
