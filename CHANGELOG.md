@@ -9,6 +9,12 @@ and this project aims to follow Semantic Versioning for app version strings
 ## [Unreleased]
 
 ### Added
+- Admin Overview has a tile for every queue (over quota, sign-in errors and
+  disabled join the six that were there) with real totals rather than the
+  queue page's cap of 25, refreshed every minute while the tab is open, and
+  a "Recent admin activity" card: the newest 50 admin actions across every
+  account, each linking to the student (`GET /api/admin/queue-counts`,
+  `GET /api/admin/activity`).
 - Admin gains a Tickets tab: filter by status (open, waiting on student,
   investigating, resolved, all), read the whole thread, reply, and set the
   status. The tab shows the open count, the Overview tile opens it, and a

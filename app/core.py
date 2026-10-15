@@ -150,6 +150,7 @@ _job_futures: dict = {}
 _job_sync: dict = {}
 JOB_STALE_SECONDS = 300
 JOB_QUEUE_CAP = 25
+JOB_QUEUE_MAX = 10000
 JOB_TASKS = ('fetch', 'embed', 'cluster')
 
 
@@ -475,7 +476,7 @@ def list_job_queue(limit: int = JOB_QUEUE_CAP, *, state: Optional[str] = None) -
 
     Does not walk the accounts table.
     """
-    cap = max(1, min(int(limit or JOB_QUEUE_CAP), JOB_QUEUE_CAP))
+    cap = max(1, min(int(limit or JOB_QUEUE_CAP), JOB_QUEUE_MAX))
     wanted = state if state in ('active', 'stalled', 'failed') else None
     with _progress_lock:
         items = list(_all_progress.items())
