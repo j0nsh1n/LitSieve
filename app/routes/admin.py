@@ -12,9 +12,11 @@ from __future__ import annotations
 import json
 import logging
 import os
+import shutil
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, Request
@@ -358,6 +360,107 @@ async def api_admin_overview(request: Request):
         "auth_events_1h": {str(k): int(v) for k, v in auth_hour},
         "source_health": source_health,
     }
+
+
+def _backup_status() -> Optional[dict]:
+    """The newest backup archive: name, size and age. Never the folder's path."""
+    folder = Path(os.getenv("BACKUP_DIR") or (Path.home() / "litsieve-backups"))
+    try:
+        archives = sorted(folder.glob("litsieve-*.tar.gz"))
+    except OSError:
+        archives = []
+    if not archives:
+        return None
+    newest = archives[-1]
+    try:
+        stat = newest.stat()
+    except OSError:
+        return None
+    modified = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc)
+    return {
+        "name": newest.name,
+        "size_bytes": stat.st_size,
+        "modified_at": modified.strftime("%Y-%m-%d %H:%M:%S"),
+        "age_hours": round((datetime.now(timezone.utc) - modified).total_seconds() / 3600, 1),
+    }
+
+
+def _watchdog_status() -> Optional[dict]:
+    """What tools/watchdog.py last wrote to logs/watchdog_state.json."""
+    path = Path("logs") / "watchdog_state.json"
+    try:
+        raw = json.loads(path.read_text())
+    except (OSError, ValueError):
+        return None
+    if not isinstance(raw, dict):
+        return None
+    return {
+        "healthy": bool(raw.get("healthy")),
+        "since": str(raw.get("since") or ""),
+        "checked_at": str(raw.get("checked_at") or ""),
+        "summary": str(raw.get("summary") or "")[:240],
+    }
+
+
+def _disk_status() -> Optional[dict]:
+    target = Path(os.getenv("USER_DATA_DIR", "user_data"))
+    probe = target if target.exists() else Path.cwd()
+    try:
+        usage = shutil.disk_usage(probe)
+    except OSError:
+        return None
+    return {"free_bytes": usage.free, "total_bytes": usage.total}
+
+
+def _laya_status() -> dict:
+    from app.services import laya_client
+
+    url = laya_client.base_url()
+    if not url:
+        return {"state": "unset"}
+    try:
+        import requests
+
+        resp = requests.get(f"{url}/health", timeout=1.5)
+        if not resp.ok:
+            return {"state": "down"}
+        payload = resp.json()
+    except Exception:
+        return {"state": "down"}
+    loaded = payload.get("loaded") if isinstance(payload, dict) else False
+    return {"state": "up", "loaded": bool(loaded)}
+
+
+def _ai_status() -> dict:
+    from app.services import llm as llm_svc
+
+    status = llm_svc.status()
+    return {
+        "provider": status.get("provider"),
+        "ollama_running": bool(status.get("ollama_running")),
+        "ollama_models": list(status.get("ollama_models") or [])[:6],
+        "control_allowed": bool(status.get("ollama_control_allowed")) and llm_svc.ai_settings_write_allowed(),
+        "detail": str(status.get("detail") or ""),
+    }
+
+
+@router.get("/api/admin/host")
+@limiter.limit("30/minute")
+async def api_admin_host(request: Request):
+    """Read-only host facts for the Host tab: backup, watchdog, disk, Laya, the study aid."""
+    _admin, err = _require_admin(request)
+    if err:
+        return err
+    def probe() -> dict:
+        return {
+            "backup": _backup_status(),
+            "watchdog": _watchdog_status(),
+            "disk": _disk_status(),
+            "laya": _laya_status(),
+            "ai": _ai_status(),
+        }
+
+    return await run_in_thread(probe)
 
 
 @router.get("/api/admin/search")

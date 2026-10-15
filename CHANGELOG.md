@@ -15,6 +15,11 @@ and this project aims to follow Semantic Versioning for app version strings
   student's tickets on the Accounts tab link straight to their thread.
   "Reply to latest ticket" is gone with it. An unknown status filter is now
   a 400 instead of the whole list.
+- The Host tab shows the last backup, the watchdog's verdict, free disk and
+  whether the Laya sidecar answers (`GET /api/admin/host`, read-only), the
+  built-in study aid's state with Start and Stop buttons, and the last Ship
+  deploy. The Site tab lists each copy key's revisions with "Roll back to
+  this".
 
 ### Changed
 - Admin is four tabs: Overview (tiles that open the queue they count),

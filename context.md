@@ -48,7 +48,9 @@
   applies the reason and confirm rule; `tests/test_admin_actions.py` keeps
   them equal. Notes, sign-in events and the timeline page 25 at a time. The
   Tickets tab (`#tickets/<status>`, `#tickets/t/<id>`) lists, reads, replies
-  and sets status over the four `/api/admin/tickets*` routes.
+  and sets status over the four `/api/admin/tickets*` routes. The Host tab
+  reads `GET /api/admin/host` (backup folder, `logs/watchdog_state.json`,
+  disk, Laya `/health`, study-aid state) and `/api/ops/deploy-state`.
 
 ## Repo Landmarks
 | Path | Role |
@@ -117,14 +119,15 @@ Guest User (is_guest) → sample corpus only; purged by age
   the owning user's progress while a referenced job is active.
 
 ## Session Handoff
-- **Date:** 2026-10-15. **Branch:** `feat/admin-tickets` (worktree
-  `/home/jonathans/HealthDatabaseAccess-work`). Admin plan slice 1 is live
-  (PR #89, 2026-10-14); slice 2, the Tickets tab, is built and driven in
-  Chromium on a throwaway server (port 7899, scratch `users.db` under
-  `/tmp/admin-drive`). Plan: `docs/ADMIN_PANEL_PLAN.md`.
+- **Date:** 2026-10-15. **Branch:** `feat/admin-host` (worktree
+  `/home/jonathans/HealthDatabaseAccess-work`). Admin plan slices 1 and 2 are
+  live (PRs #89 and #90); slice 3 (Site history, Host facts, Ollama buttons,
+  Ship summary) is built and driven in Chromium on a throwaway server (port
+  7899, scratch `users.db` under `/tmp/admin-drive`). Plan:
+  `docs/ADMIN_PANEL_PLAN.md`.
 - Host notes: the LAN's primary DNS server (192.168.12.132) times out, so
   cloudflared logs a DNS refresh error every 5 minutes but stays connected;
   `litpilot.org` needs an apex record or redirect rule in Cloudflare.
-- Still open: admin plan slices 3 (Site history, Host route and Ollama
-  buttons) and 4 (Overview activity feed); roadmap Phases 4, 11, 14 and 15.
-- **Next step:** merge the slice 2 PR, deploy, then slice 3.
+- Still open: admin plan slice 4 (Overview activity feed and tile counts);
+  roadmap Phases 4, 11, 14 and 15.
+- **Next step:** merge the slice 3 PR, deploy, then slice 4.
