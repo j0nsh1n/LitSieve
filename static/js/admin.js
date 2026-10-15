@@ -193,14 +193,34 @@ async function refreshOverviewCards() {
 
 const ACTIVITY_WORDS = {
  unlock: 'unlocked',
- 'quota-bump': 'bumped quota for',
+ enable: 're-enabled',
  disable: 'disabled',
+ 'revoke-sessions': 'revoked all sessions for',
+ 'resend-verification': 'resent verification to',
+ 'send-reset': 'emailed a password reset to',
+ 'send-login-link': 'emailed a one-time sign-in to',
+ 'set-email': 'set the email for',
+ 'cancel-job': 'cancelled a job for',
+ 'clear-job': 'cleared a stale job for',
+ 'retry-embed': 'retried prepare for',
+ 'retry-fetch': 'retried fetch for',
+ 'quota-bump': 'bumped quota for',
+ 'delete-library': 'deleted a library for',
+ note: 'left a note on',
+ 'ticket-open': 'opened a ticket',
+ 'ticket-student-reply': 'replied to their own ticket',
  'ticket-reply': 'replied to a ticket for',
+ 'ticket-status': 'changed a ticket status for',
  view: 'viewed as student',
  'support-view-start': 'viewed as student',
+ 'banner-save': 'saved a banner draft',
  'banner-publish': 'published the banner',
- 'content-rollback': 'rolled back copy',
+ 'banner-disable': 'took the banner down',
+ 'banner-rollback': 'rolled back the banner',
+ 'content-save': 'saved student-facing copy',
+ 'content-rollback': 'rolled back student-facing copy',
 };
+const SITE_WIDE = /^(banner|content)-/;
 
 function renderAdminActivity(items, error = '') {
  const list = document.getElementById('admin-activity-list');
@@ -212,10 +232,12 @@ function renderAdminActivity(items, error = '') {
  }
  list.innerHTML = items.map((item) => {
   const action = ACTIVITY_WORDS[item.action] || String(item.action || '').replaceAll('-', ' ');
-  return `<li><span class="help-text">${escapeHtml(item.created_at)}</span>`
-   + `<span class="library-manage-name">${escapeHtml(item.admin_username)}</span>`
-   + `<span>${escapeHtml(action)} </span>`
-   + `<a href="#accounts/u/${escapeAttr(item.student_id)}">${escapeHtml(item.student_username)}</a>`
+  const own = item.admin_username && item.admin_username === item.student_username;
+  const who = SITE_WIDE.test(String(item.action || ''))
+   ? (item.new_value ? ` (${escapeHtml(item.new_value)})` : '')
+   : (own ? '' : ` <a href="#accounts/u/${escapeAttr(item.student_id)}">${escapeHtml(item.student_username || 'an account')}</a>`);
+  return `<li><span class="library-manage-name">${escapeHtml(item.admin_username)} ${escapeHtml(action)}${who}</span>`
+   + `<span class="help-text">${escapeHtml(item.created_at)}</span>`
    + `<p class="info-text">${escapeHtml(item.reason)}</p></li>`;
  }).join('');
 }
