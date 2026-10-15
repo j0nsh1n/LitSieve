@@ -474,6 +474,17 @@ def list_tickets(db, *, status: str = "", student_id: str = "", limit: int = 25)
     return [_ticket_summary(r) for r in rows]
 
 
+def count_tickets(db, *, status: str = "") -> int:
+    """Count matching tickets without the list endpoint's page cap."""
+    sql = "SELECT COUNT(*) FROM support_tickets"
+    args: tuple = ()
+    if status and status in TICKET_STATUSES:
+        sql += " WHERE status = ?"
+        args = (status,)
+    with db._lock:
+        return int(db.conn.execute(sql, args).fetchone()[0])
+
+
 def set_ticket_status(db, ticket_id: str, status: str) -> Optional[Dict]:
     if status not in TICKET_STATUSES:
         raise UserError("Unknown ticket status.")

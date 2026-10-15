@@ -362,6 +362,36 @@ async def api_admin_overview(request: Request):
     }
 
 
+@router.get("/api/admin/queue-counts")
+@limiter.limit("30/minute")
+async def api_admin_queue_counts(request: Request):
+    """Uncapped totals for each queue kind without returning an account roster."""
+    _admin, err = _require_admin(request)
+    if err:
+        return err
+    counts = core.user_db.queue_counts(quota.limit_bytes())
+    jobs = core.list_job_queue(limit=core.JOB_QUEUE_MAX)
+    for kind in ("jobs", "jobs-active", "jobs-stalled", "jobs-failed"):
+        state = kind.removeprefix("jobs-") if kind != "jobs" else None
+        counts[kind] = len({
+            str(job.get("user_id")) for job in jobs
+            if job.get("user_id") and (state is None or job.get("state") == state)
+        })
+    counts["tickets"] = helpdesk.count_tickets(core.user_db, status="open")
+    return {"counts": {kind: int(counts.get(kind, 0)) for kind in _QUEUE_KINDS}}
+
+
+@router.get("/api/admin/activity")
+@limiter.limit("30/minute")
+async def api_admin_activity(request: Request, limit: int = 50):
+    """Newest admin actions across accounts, with no private account fields."""
+    _admin, err = _require_admin(request)
+    if err:
+        return err
+    rows = core.user_db.list_admin_activity(limit=max(1, min(int(limit), 50)))
+    return {"items": rows}
+
+
 def _backup_status() -> Optional[dict]:
     """The newest backup archive: name, size and age. Never the folder's path."""
     folder = Path(os.getenv("BACKUP_DIR") or (Path.home() / "litsieve-backups"))

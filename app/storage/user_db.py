@@ -497,6 +497,55 @@ class UserDatabase:
             "unverified": unverified,
         }
 
+    def queue_counts(self, quota_limit_bytes: int) -> Dict[str, int]:
+        """Uncapped totals for the account queues, using their queue predicates."""
+        now = self._utc_now()
+        hour_ago = (
+            datetime.now(timezone.utc) - timedelta(hours=1)
+        ).strftime("%Y-%m-%d %H:%M:%S")
+        quota_cap = max(0, int(quota_limit_bytes or 0))
+        with self._lock:
+            locked = int(self.conn.execute(
+                "SELECT COUNT(*) FROM users "
+                "WHERE locked_until IS NOT NULL AND locked_until > ?", (now,),
+            ).fetchone()[0])
+            unverified = int(self.conn.execute(
+                "SELECT COUNT(*) FROM users "
+                "WHERE email IS NOT NULL AND TRIM(email) != '' "
+                "AND COALESCE(email_verified, 0) = 0 "
+                "AND COALESCE(is_guest, 0) = 0"
+            ).fetchone()[0])
+            quota = int(self.conn.execute(
+                "SELECT COUNT(*) FROM users "
+                "WHERE COALESCE(storage_bytes, 0) > 0 "
+                "AND CASE WHEN quota_limit_mb IS NOT NULL "
+                "AND quota_limit_mb > 0 AND quota_limit_until > ? "
+                "THEN quota_limit_mb * 1048576 ELSE ? END > 0 "
+                "AND COALESCE(storage_bytes, 0) >= CASE "
+                "WHEN quota_limit_mb IS NOT NULL AND quota_limit_mb > 0 "
+                "AND quota_limit_until > ? THEN quota_limit_mb * 1048576 "
+                "ELSE ? END",
+                (now, quota_cap, now, quota_cap),
+            ).fetchone()[0])
+            errors = int(self.conn.execute(
+                "SELECT COUNT(*) FROM users WHERE id IN ("
+                "SELECT user_id FROM auth_events "
+                "WHERE kind IN ('login_fail', 'lockout') AND created_at >= ? "
+                "AND user_id IS NOT NULL GROUP BY user_id HAVING COUNT(*) >= 3) "
+                "", (hour_ago,),
+            ).fetchone()[0])
+            disabled = int(self.conn.execute(
+                "SELECT COUNT(*) FROM users "
+                "WHERE disabled_until IS NOT NULL AND disabled_until > ?", (now,),
+            ).fetchone()[0])
+        return {
+            "locked": locked,
+            "unverified": unverified,
+            "quota": quota,
+            "errors": errors,
+            "disabled": disabled,
+        }
+
     def search_accounts(self, query: str, *, limit: int = 25) -> List[Dict]:
         """Exact id/username/email first, then prefix, then contains. Capped."""
         q = (query or "").strip()
@@ -916,6 +965,26 @@ class UserDatabase:
                 "new_value": r[5],
                 "ip": r[6],
                 "created_at": r[7],
+            }
+            for r in rows
+        ]
+
+    def list_admin_activity(self, *, limit: int = 50) -> List[Dict]:
+        """Newest support actions across accounts with the student's username."""
+        limit = max(1, min(int(limit), 50))
+        with self._lock:
+            rows = self.conn.execute(
+                "SELECT a.id, a.created_at, a.admin_username, a.action, a.reason, "
+                "a.new_value, a.student_id, u.username "
+                "FROM support_actions AS a LEFT JOIN users AS u ON u.id = a.student_id "
+                "ORDER BY a.created_at DESC, a.id DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+        return [
+            {
+                "id": r[0], "created_at": r[1], "admin_username": r[2],
+                "action": r[3], "reason": r[4], "new_value": r[5],
+                "student_id": r[6], "student_username": r[7] or "",
             }
             for r in rows
         ]

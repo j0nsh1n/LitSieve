@@ -9,6 +9,8 @@ and this project aims to follow Semantic Versioning for app version strings
 ## [Unreleased]
 
 ### Added
+- Admin Overview queue tiles now show uncapped queue totals and refresh with a
+  recent cross-account admin activity feed.
 - Admin gains a Tickets tab: filter by status (open, waiting on student,
   investigating, resolved, all), read the whole thread, reply, and set the
   status. The tab shows the open count, the Overview tile opens it, and a

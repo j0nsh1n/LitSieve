@@ -11,12 +11,16 @@ let _queue = null;
 let _ticket = null;
 let _ticketFilter = null;
 let _pages = { timeline: 0, notes: 0, activity: 0 };
+let _overviewTimer = null;
+let _activeTab = null;
+let _overviewLoaded = false;
 
 document.addEventListener('DOMContentLoaded', () => {
  document.querySelectorAll('.tab[data-tab]').forEach((btn) => {
   btn.addEventListener('click', () => { location.hash = btn.dataset.tab; });
  });
  document.getElementById('admin-tabs')?.addEventListener('keydown', onTabKey);
+ document.addEventListener('visibilitychange', onOverviewVisibilityChange);
  window.addEventListener('hashchange', route);
  route();
  loadOverview();
@@ -83,6 +87,28 @@ function showTab(name) {
   if (btn) btn.setAttribute('aria-selected', t === name ? 'true' : 'false');
   if (panel) panel.hidden = t !== name;
  });
+ if (name === 'overview') {
+  if (_overviewLoaded && _activeTab !== 'overview') refreshOverviewCards();
+  syncOverviewTimer();
+ } else if (_overviewTimer) {
+  clearInterval(_overviewTimer);
+  _overviewTimer = null;
+ }
+ _activeTab = name;
+}
+
+function onOverviewVisibilityChange() {
+ if (document.visibilityState === 'visible' && _activeTab === 'overview') refreshOverviewCards();
+ syncOverviewTimer();
+}
+
+function syncOverviewTimer() {
+ if (_overviewTimer) clearInterval(_overviewTimer);
+ _overviewTimer = null;
+ const panel = document.getElementById('panel-overview');
+ if (panel && !panel.hidden && document.visibilityState === 'visible') {
+  _overviewTimer = setInterval(refreshOverviewCards, 60000);
+ }
 }
 
 function onTabKey(ev) {
@@ -99,28 +125,18 @@ function onTabKey(ev) {
 // --- overview ------------------------------------------------------------
 
 async function loadOverview() {
+ _overviewLoaded = true;
  const status = document.getElementById('admin-overview-status');
  const set = (id, v) => {
   const el = document.getElementById(id);
   if (el) el.textContent = String(v);
- };
- const tile = (key, v) => {
-  const el = document.querySelector(`[data-count="${key}"]`);
-  if (!el) return;
-  el.textContent = String(v);
-  el.classList.toggle('is-zero', !Number(v));
  };
  try {
   const d = await apiCall('/api/admin/overview');
   const c = d.counts || {};
   set('ov-accounts', c.accounts ?? '—');
   set('ov-guests', c.guests ?? '—');
-  tile('locked', c.locked ?? 0);
-  tile('unverified', c.unverified ?? 0);
   const jc = d.jobs || {};
-  tile('active', jc.active || 0);
-  tile('stalled', jc.stalled || 0);
-  tile('failed', jc.failed || 0);
   set('ov-smtp', d.smtp ? 'on' : 'off');
   set('ov-ai', d.ai ? 'on' : 'off');
   set('ov-quota', d.quota_mb ? `${d.quota_mb} MB` : 'off');
@@ -143,16 +159,65 @@ async function loadOverview() {
  } catch (e) {
   if (status) status.textContent = e.message || 'Could not load host snapshot.';
  }
- try {
-  const q = await apiCall('/api/admin/tickets?status=open');
-  tile('tickets', (q.tickets || []).length);
-  setTicketBadge((q.tickets || []).length);
- } catch (e) {
-  tile('tickets', '?');
- }
+ await refreshOverviewCards();
  loadBanner();
  loadContentKey();
  loadHost();
+}
+
+async function refreshOverviewCards() {
+ const tile = (key, v) => {
+  const el = document.querySelector(`[data-count="${key}"]`);
+  if (!el) return;
+  el.textContent = String(v);
+  el.classList.toggle('is-zero', !Number(v));
+ };
+ try {
+  const d = await apiCall('/api/admin/queue-counts');
+  const counts = d.counts || {};
+  document.querySelectorAll('#admin-tiles [data-count]').forEach((el) => {
+   const kind = el.dataset.count;
+   tile(kind, counts[kind] ?? 0);
+  });
+  setTicketBadge(counts.tickets || 0);
+ } catch (e) {
+  document.querySelectorAll('#admin-tiles [data-count]').forEach((el) => { el.textContent = '?'; });
+ }
+ try {
+  const d = await apiCall('/api/admin/activity?limit=50');
+  renderAdminActivity(d.items || []);
+ } catch (e) {
+  renderAdminActivity([], e.message || 'Could not load recent admin activity.');
+ }
+}
+
+const ACTIVITY_WORDS = {
+ unlock: 'unlocked',
+ 'quota-bump': 'bumped quota for',
+ disable: 'disabled',
+ 'ticket-reply': 'replied to a ticket for',
+ view: 'viewed as student',
+ 'support-view-start': 'viewed as student',
+ 'banner-publish': 'published the banner',
+ 'content-rollback': 'rolled back copy',
+};
+
+function renderAdminActivity(items, error = '') {
+ const list = document.getElementById('admin-activity-list');
+ if (!list) return;
+ if (!items.length) {
+  const message = error || 'No admin activity yet.';
+  list.innerHTML = `<li class="info-text">${escapeHtml(message)}</li>`;
+  return;
+ }
+ list.innerHTML = items.map((item) => {
+  const action = ACTIVITY_WORDS[item.action] || String(item.action || '').replaceAll('-', ' ');
+  return `<li><span class="help-text">${escapeHtml(item.created_at)}</span>`
+   + `<span class="library-manage-name">${escapeHtml(item.admin_username)}</span>`
+   + `<span>${escapeHtml(action)} </span>`
+   + `<a href="#accounts/u/${escapeAttr(item.student_id)}">${escapeHtml(item.student_username)}</a>`
+   + `<p class="info-text">${escapeHtml(item.reason)}</p></li>`;
+ }).join('');
 }
 
 // --- host --------------------------------------------------------------------

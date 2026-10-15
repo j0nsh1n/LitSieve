@@ -34,9 +34,13 @@
   <ul class="admin-tiles" id="admin-tiles">
    <li><a href="#accounts/locked" data-queue-link="locked">Locked out <span class="admin-tile-count" data-count="locked">…</span></a></li>
    <li><a href="#accounts/unverified" data-queue-link="unverified">Unverified email <span class="admin-tile-count" data-count="unverified">…</span></a></li>
-   <li><a href="#accounts/jobs-stalled" data-queue-link="jobs-stalled">Stalled jobs <span class="admin-tile-count" data-count="stalled">…</span></a></li>
-   <li><a href="#accounts/jobs-failed" data-queue-link="jobs-failed">Failed jobs <span class="admin-tile-count" data-count="failed">…</span></a></li>
-   <li><a href="#accounts/jobs-active" data-queue-link="jobs-active">Active jobs <span class="admin-tile-count" data-count="active">…</span></a></li>
+   <li><a href="#accounts/quota" data-queue-link="quota">Over quota <span class="admin-tile-count" data-count="quota">…</span></a></li>
+   <li><a href="#accounts/errors" data-queue-link="errors">Sign-in errors (1h) <span class="admin-tile-count" data-count="errors">…</span></a></li>
+   <li><a href="#accounts/jobs" data-queue-link="jobs">Stuck jobs <span class="admin-tile-count" data-count="jobs">…</span></a></li>
+   <li><a href="#accounts/jobs-active" data-queue-link="jobs-active">Active jobs <span class="admin-tile-count" data-count="jobs-active">…</span></a></li>
+   <li><a href="#accounts/jobs-stalled" data-queue-link="jobs-stalled">Stalled jobs <span class="admin-tile-count" data-count="jobs-stalled">…</span></a></li>
+   <li><a href="#accounts/jobs-failed" data-queue-link="jobs-failed">Failed jobs <span class="admin-tile-count" data-count="jobs-failed">…</span></a></li>
+   <li><a href="#accounts/disabled" data-queue-link="disabled">Disabled <span class="admin-tile-count" data-count="disabled">…</span></a></li>
    <li><a href="#tickets/open">Open tickets <span class="admin-tile-count" data-count="tickets">…</span></a></li>
   </ul>
   <dl class="admin-stats">
@@ -44,6 +48,12 @@
    <div><dt>Guests</dt><dd id="ov-guests">…</dd></div>
   </dl>
   <p class="help-text" id="admin-overview-status"></p>
+ </div>
+ <div class="card" id="admin-recent-activity">
+  <h2>Recent admin activity</h2>
+  <ul class="library-manage-list" id="admin-activity-list">
+   <li class="info-text">Loading recent admin activity…</li>
+  </ul>
  </div>
 </section>
 
@@ -279,5 +289,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/admin.js?v=20261015a"></script>
+<script src="/static/js/admin.js?v=20261015b"></script>
 {% endblock %}
