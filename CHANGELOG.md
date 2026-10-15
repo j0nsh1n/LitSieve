@@ -8,6 +8,14 @@ and this project aims to follow Semantic Versioning for app version strings
 
 ## [Unreleased]
 
+### Added
+- Admin gains a Tickets tab: filter by status (open, waiting on student,
+  investigating, resolved, all), read the whole thread, reply, and set the
+  status. The tab shows the open count, the Overview tile opens it, and a
+  student's tickets on the Accounts tab link straight to their thread.
+  "Reply to latest ticket" is gone with it. An unknown status filter is now
+  a 400 instead of the whole list.
+
 ### Changed
 - Admin is four tabs: Overview (tiles that open the queue they count),
   Accounts (search and queues beside the open account), Site (banner and
