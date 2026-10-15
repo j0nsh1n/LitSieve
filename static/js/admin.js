@@ -1,11 +1,15 @@
 // Operator admin console. common.js provides apiCall, escapeHtml, escapeAttr,
 // openSiteForm and showNotification.
 
-const TABS = ['overview', 'accounts', 'site', 'host'];
+const TABS = ['overview', 'accounts', 'tickets', 'site', 'host'];
+const TICKET_STATUSES = ['open', 'waiting_on_student', 'investigating', 'resolved'];
+const TICKET_WORDS = { open: 'open', waiting_on_student: 'waiting on student', investigating: 'investigating', resolved: 'resolved' };
 const PAGE = 25;
 
 let _selected = null;
 let _queue = null;
+let _ticket = null;
+let _ticketFilter = null;
 let _pages = { timeline: 0, notes: 0, activity: 0 };
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -34,7 +38,11 @@ document.addEventListener('DOMContentLoaded', () => {
   btn.addEventListener('click', () => loadMore(btn.dataset.more));
  });
  bind('hd-note', saveNote);
- bind('hd-ticket-reply', replyLatestTicket);
+ document.querySelectorAll('[data-ticket-status]').forEach((btn) => {
+  btn.addEventListener('click', () => { location.hash = 'tickets/' + btn.dataset.ticketStatus; });
+ });
+ bind('ticket-reply-send', sendTicketReply);
+ bind('ticket-status-set', setTicketStatus);
  bind('banner-save', () => bannerAct('save'));
  bind('banner-publish', () => bannerAct('publish'));
  bind('banner-disable', () => bannerAct('disable'));
@@ -59,6 +67,10 @@ function route() {
   openStudent(parts[2]);
  } else if (tab === 'accounts' && parts[1]) {
   runQueue(parts[1]);
+ } else if (tab === 'tickets' && parts[1] === 't' && parts[2]) {
+  openTicket(parts[2]);
+ } else if (tab === 'tickets') {
+  listTickets(parts[1] || 'open');
  }
 }
 
@@ -130,8 +142,9 @@ async function loadOverview() {
   if (status) status.textContent = e.message || 'Could not load host snapshot.';
  }
  try {
-  const q = await apiCall('/api/admin/queue?filter=tickets');
+  const q = await apiCall('/api/admin/tickets?status=open');
   tile('tickets', (q.tickets || []).length);
+  setTicketBadge((q.tickets || []).length);
  } catch (e) {
   tile('tickets', '?');
  }
@@ -349,7 +362,7 @@ function renderDetail(d) {
  const tickets = document.getElementById('helpdesk-tickets');
  if (tickets) {
   tickets.innerHTML = (d.tickets || []).length
-   ? d.tickets.map((t) => `<li><span class="library-manage-name">${escapeHtml(t.status)}</span>`
+   ? d.tickets.map((t) => `<li><a class="library-manage-name" href="#tickets/t/${escapeAttr(t.id)}">${escapeHtml(TICKET_WORDS[t.status] || t.status)}</a>`
     + `<span class="help-text">${escapeHtml([t.created_at, t.body].filter(Boolean).join(' · '))}</span></li>`).join('')
    : '<li class="info-text">No tickets.</li>';
  }
@@ -611,31 +624,153 @@ async function saveNote() {
  }
 }
 
-async function replyLatestTicket() {
- if (!_selected) return;
- const ticket = (_selected.tickets || [])[0];
- if (!ticket) {
-  showNotification('No ticket on this account.', 'error');
+// --- tickets ---------------------------------------------------------------
+
+function setTicketBadge(n) {
+ const el = document.getElementById('tab-tickets-count');
+ if (!el) return;
+ el.textContent = String(n);
+ el.hidden = !n;
+}
+
+async function listTickets(filter) {
+ const status = document.getElementById('ticket-list-status');
+ _ticketFilter = filter;
+ document.querySelectorAll('[data-ticket-status]').forEach((btn) => {
+  btn.classList.toggle('is-on', btn.dataset.ticketStatus === filter);
+ });
+ if (status) status.textContent = 'Loading…';
+ try {
+  const q = filter === 'all' ? '' : '?status=' + encodeURIComponent(filter);
+  const d = await apiCall('/api/admin/tickets' + q);
+  renderTicketList(d.tickets || []);
+  if (filter === 'open') setTicketBadge((d.tickets || []).length);
+  if (status) {
+   status.textContent = (d.tickets || []).length
+    ? `${d.tickets.length} ${filter === 'all' ? 'tickets' : TICKET_WORDS[filter] || filter}`
+    : 'No tickets here.';
+  }
+ } catch (e) {
+  if (status) status.textContent = e.message || 'Could not list tickets';
+ }
+}
+
+function renderTicketList(tickets) {
+ const list = document.getElementById('ticket-list');
+ if (!list) return;
+ if (!tickets.length) {
+  list.innerHTML = '<li class="info-text">No tickets in this list.</li>';
   return;
  }
- const vals = await promptAction(
-  'Reply to ticket',
-  'This is emailed if they have a verified address. It also lands on the timeline.',
-  { fields: [{ id: 'body', label: 'Reply', type: 'text', value: '' }] },
- );
- if (!vals) return;
- const status = document.getElementById('helpdesk-action-status');
+ list.innerHTML = tickets.map((t) => {
+  const active = _ticket && _ticket.id === t.id ? ' is-active' : '';
+  const first = String(t.body || '').split('\n')[0].slice(0, 90);
+  return `<li><button type="button" class="btn btn-secondary btn-block admin-user-btn${active}" data-ticket-id="${escapeAttr(t.id)}">`
+   + `<span class="library-manage-name">${escapeHtml(t.student_username)}<br><span class="help-text">${escapeHtml(first)}</span></span>`
+   + `<span class="help-text">${escapeHtml([TICKET_WORDS[t.status] || t.status, t.updated_at].filter(Boolean).join(' · '))}</span></button></li>`;
+ }).join('');
+ list.querySelectorAll('[data-ticket-id]').forEach((btn) => {
+  btn.addEventListener('click', () => { location.hash = 'tickets/t/' + btn.getAttribute('data-ticket-id'); });
+ });
+}
+
+async function openTicket(id) {
+ const status = document.getElementById('ticket-action-status');
+ if (status) status.textContent = 'Loading…';
+ if (!_ticketFilter) listTickets('open');
  try {
-  await apiCall(`/api/admin/tickets/${encodeURIComponent(ticket.id)}/reply`, {
-   method: 'POST',
-   body: { reason: vals.reason, body: vals.body },
+  const t = await apiCall('/api/admin/tickets/' + encodeURIComponent(id));
+  _ticket = t;
+  renderTicket(t);
+  if (status) status.textContent = '';
+  document.querySelectorAll('#ticket-list [data-ticket-id]').forEach((btn) => {
+   btn.classList.toggle('is-active', btn.getAttribute('data-ticket-id') === t.id);
   });
-  if (status) status.textContent = 'Reply sent.';
-  showNotification('Reply sent.', 'success');
-  await openStudent(_selected.id);
  } catch (e) {
-  if (status) status.textContent = e.message || 'Reply failed';
-  showNotification(e.message || 'Reply failed', 'error');
+  if (status) status.textContent = e.message || 'Could not load ticket';
+ }
+}
+
+function renderTicket(t) {
+ const panel = document.getElementById('ticket-detail');
+ if (panel) panel.hidden = false;
+ const title = document.getElementById('ticket-title');
+ if (title) title.textContent = `${t.student_username}: ${String(t.body || '').split('\n')[0].slice(0, 70)}`;
+ const badges = document.getElementById('ticket-badges');
+ if (badges) {
+  const cls = t.status === 'resolved' ? 'is-ok' : (t.status === 'open' ? 'is-warn' : '');
+  badges.innerHTML = `<span class="admin-badge ${cls}">${escapeHtml(TICKET_WORDS[t.status] || t.status)}</span>`;
+ }
+ const meta = document.getElementById('ticket-meta');
+ if (meta) {
+  const ctx = t.context || {};
+  const bits = [
+   `opened ${t.created_at}`,
+   ctx.route ? `on ${ctx.route}` : '',
+   ctx.article_count != null ? `${ctx.article_count} papers, ${ctx.embedding_count || 0} prepared` : '',
+   ctx.quota_limit_mb ? `${ctx.quota_used_mb || 0} of ${ctx.quota_limit_mb} MB` : '',
+   ctx.job_fetch && ctx.job_fetch !== 'idle' ? `fetch ${ctx.job_fetch}` : '',
+   ctx.job_embed && ctx.job_embed !== 'idle' ? `prepare ${ctx.job_embed}` : '',
+   ctx.last_error ? `last error: ${ctx.last_error}` : '',
+   ctx.app_version ? `v${ctx.app_version}` : '',
+  ].filter(Boolean).join(' · ');
+  meta.innerHTML = `${escapeHtml(bits)} · <a href="#accounts/u/${escapeAttr(t.student_id)}">open account</a>`;
+ }
+ const thread = document.getElementById('ticket-thread');
+ if (thread) {
+  const rows = [{ author_username: t.student_username, author_role: 'student', body: t.body, created_at: t.created_at }]
+   .concat(t.replies || []);
+  thread.innerHTML = rows.map((r) => `<li class="${r.author_role === 'admin' ? 'is-admin' : ''}">`
+   + `<span class="admin-thread-who">${escapeHtml(r.author_username)} · ${escapeHtml(r.created_at)}</span>`
+   + `<p>${escapeHtml(r.body)}</p></li>`).join('');
+ }
+ const sel = document.getElementById('ticket-status-select');
+ if (sel) sel.value = t.status;
+}
+
+async function sendTicketReply() {
+ if (!_ticket) return;
+ const field = document.getElementById('ticket-reply-body');
+ const text = String((field && field.value) || '').trim();
+ if (!text) {
+  showNotification('Write the reply first.', 'error');
+  return;
+ }
+ const vals = await promptAction('Send reply', 'Emailed if the student has a verified address. The ticket moves to waiting on student.', {});
+ if (!vals) return;
+ await ticketPost(`/api/admin/tickets/${encodeURIComponent(_ticket.id)}/reply`, { reason: vals.reason, body: text }, (d) => {
+  if (field) field.value = '';
+  return d.emailed ? 'Reply sent and emailed.' : 'Reply sent.';
+ });
+}
+
+async function setTicketStatus() {
+ if (!_ticket) return;
+ const sel = document.getElementById('ticket-status-select');
+ const next = sel ? sel.value : '';
+ if (!TICKET_STATUSES.includes(next)) return;
+ if (next === _ticket.status) {
+  showNotification(`Already ${TICKET_WORDS[next]}.`, 'info');
+  return;
+ }
+ const vals = await promptAction('Set ticket status', `Marks this ticket ${TICKET_WORDS[next]}.`, {});
+ if (!vals) return;
+ await ticketPost(`/api/admin/tickets/${encodeURIComponent(_ticket.id)}/status`, { reason: vals.reason, status: next }, () => `Marked ${TICKET_WORDS[next]}.`);
+}
+
+async function ticketPost(url, body, said) {
+ const status = document.getElementById('ticket-action-status');
+ if (status) status.textContent = 'Working…';
+ try {
+  const d = await apiCall(url, { method: 'POST', body });
+  const text = said(d);
+  if (status) status.textContent = text;
+  showNotification(text, 'success');
+  await openTicket(_ticket.id);
+  if (_ticketFilter) listTickets(_ticketFilter);
+ } catch (e) {
+  if (status) status.textContent = e.message || 'Failed';
+  showNotification(e.message || 'Failed', 'error');
  }
 }
 

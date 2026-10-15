@@ -3168,6 +3168,49 @@ dialog.simple-theme-tools::backdrop { background: var(--scrim); }
 .admin-badge.is-warn { color: var(--warn); border-color: var(--warn); }
 .admin-badge.is-ok { color: var(--ok); border-color: var(--ok); }
 .admin-more { margin-top: var(--space-2); }
+.tab-count {
+    display: inline-block;
+    min-width: 1.4em;
+    margin-left: var(--space-2);
+    padding: 0 var(--space-2);
+    border-radius: var(--radius-full);
+    background: var(--accent);
+    color: var(--on-accent);
+    font-family: var(--font-sans);
+    font-size: var(--fs-xs);
+    line-height: 1.5;
+    text-align: center;
+}
+.admin-thread {
+    list-style: none;
+    margin: var(--space-3) 0 0;
+    padding: 0;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+}
+.admin-thread li {
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--rule);
+}
+.admin-thread li:last-child { border-bottom: 0; }
+.admin-thread li.is-admin { background: var(--bg); }
+.admin-thread .admin-thread-who {
+    display: block;
+    margin-bottom: var(--space-1);
+    font-family: var(--font-sans);
+    font-size: var(--fs-xs);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-soft);
+}
+.admin-thread p { margin: 0; white-space: pre-wrap; }
+.admin-actions select { width: auto; }
+.admin-inline-label {
+    margin-left: var(--space-3);
+    font-size: var(--fs-sm);
+    color: var(--text-soft);
+}
 .library-manage-badge {
     font-size: var(--fs-xs);
     color: var(--accent, #93b4ff);

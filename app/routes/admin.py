@@ -1120,7 +1120,9 @@ async def api_admin_tickets(request: Request, status: str = ""):
     _admin, err = _require_admin(request)
     if err:
         return err
-    rows = helpdesk.list_tickets(core.user_db, status=status, limit=25)
+    if status not in ("", "all", *helpdesk.TICKET_STATUSES):
+        return JSONResponse(status_code=400, content={"detail": "Unknown ticket status filter."})
+    rows = helpdesk.list_tickets(core.user_db, status="" if status == "all" else status, limit=25)
     return {"tickets": rows, "total": len(rows)}
 
 

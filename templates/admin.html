@@ -23,6 +23,7 @@
 <div class="tabs" role="tablist" aria-label="Admin sections" id="admin-tabs">
  <button type="button" class="tab" role="tab" id="tab-overview" data-tab="overview" aria-controls="panel-overview" aria-selected="true">Overview</button>
  <button type="button" class="tab" role="tab" id="tab-accounts" data-tab="accounts" aria-controls="panel-accounts" aria-selected="false">Accounts</button>
+ <button type="button" class="tab" role="tab" id="tab-tickets" data-tab="tickets" aria-controls="panel-tickets" aria-selected="false">Tickets <span class="tab-count" id="tab-tickets-count" hidden></span></button>
  <button type="button" class="tab" role="tab" id="tab-site" data-tab="site" aria-controls="panel-site" aria-selected="false">Site</button>
  <button type="button" class="tab" role="tab" id="tab-host" data-tab="host" aria-controls="panel-host" aria-selected="false">Host</button>
 </div>
@@ -36,7 +37,7 @@
    <li><a href="#accounts/jobs-stalled" data-queue-link="jobs-stalled">Stalled jobs <span class="admin-tile-count" data-count="stalled">…</span></a></li>
    <li><a href="#accounts/jobs-failed" data-queue-link="jobs-failed">Failed jobs <span class="admin-tile-count" data-count="failed">…</span></a></li>
    <li><a href="#accounts/jobs-active" data-queue-link="jobs-active">Active jobs <span class="admin-tile-count" data-count="active">…</span></a></li>
-   <li><a href="#accounts/tickets" data-queue-link="tickets">Open tickets <span class="admin-tile-count" data-count="tickets">…</span></a></li>
+   <li><a href="#tickets/open">Open tickets <span class="admin-tile-count" data-count="tickets">…</span></a></li>
   </ul>
   <dl class="admin-stats">
    <div><dt>Accounts</dt><dd id="ov-accounts">…</dd></div>
@@ -136,7 +137,6 @@
 
    <h3 class="admin-subhead">Tickets</h3>
    <ul class="library-manage-list" id="helpdesk-tickets"></ul>
-   <button type="button" class="btn btn-secondary btn-sm" id="hd-ticket-reply">Reply to latest ticket</button>
 
    <h3 class="admin-subhead">Sign-in events</h3>
    <ul class="library-manage-list" id="helpdesk-activity"></ul>
@@ -145,6 +145,51 @@
    <h3 class="admin-subhead">Timeline</h3>
    <ul class="library-manage-list" id="helpdesk-timeline"></ul>
    <button type="button" class="btn btn-secondary btn-sm admin-more" data-more="timeline" hidden>Show 25 more</button>
+  </div>
+ </div>
+</section>
+
+<section class="tab-panel" role="tabpanel" id="panel-tickets" aria-labelledby="tab-tickets" hidden>
+ <div class="admin-split">
+  <div class="card admin-finder">
+   <h2>Tickets</h2>
+   <div class="admin-chips" role="group" aria-label="Ticket status">
+    <button type="button" class="admin-chip" data-ticket-status="open">Open</button>
+    <button type="button" class="admin-chip" data-ticket-status="waiting_on_student">Waiting on student</button>
+    <button type="button" class="admin-chip" data-ticket-status="investigating">Investigating</button>
+    <button type="button" class="admin-chip" data-ticket-status="resolved">Resolved</button>
+    <button type="button" class="admin-chip" data-ticket-status="all">All</button>
+   </div>
+   <ul class="library-manage-list" id="ticket-list">
+    <li class="info-text">Pick a status to list tickets.</li>
+   </ul>
+   <div id="ticket-list-status" class="status-indicator"></div>
+  </div>
+
+  <div class="card admin-detail" id="ticket-detail" hidden>
+   <div class="admin-detail-head">
+    <h2 id="ticket-title">Ticket</h2>
+    <span class="admin-badges" id="ticket-badges"></span>
+   </div>
+   <p class="info-text" id="ticket-meta"></p>
+   <div id="ticket-action-status" class="status-indicator"></div>
+   <ol class="admin-thread" id="ticket-thread"></ol>
+   <h3 class="admin-subhead">Reply</h3>
+   <div class="form-group">
+    <label for="ticket-reply-body">Your reply (emailed when the student has a verified address)</label>
+    <textarea id="ticket-reply-body" rows="3" maxlength="4000"></textarea>
+   </div>
+   <div class="admin-actions">
+    <button type="button" class="btn btn-primary btn-sm" id="ticket-reply-send">Send reply</button>
+    <label class="admin-inline-label" for="ticket-status-select">Status</label>
+    <select id="ticket-status-select">
+     <option value="open">Open</option>
+     <option value="waiting_on_student">Waiting on student</option>
+     <option value="investigating">Investigating</option>
+     <option value="resolved">Resolved</option>
+    </select>
+    <button type="button" class="btn btn-secondary btn-sm" id="ticket-status-set">Set status</button>
+   </div>
   </div>
  </div>
 </section>
@@ -207,5 +252,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/admin.js?v=20261014a"></script>
+<script src="/static/js/admin.js?v=20261014b"></script>
 {% endblock %}
