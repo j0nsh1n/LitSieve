@@ -48,6 +48,8 @@ document.addEventListener('DOMContentLoaded', () => {
  bind('banner-disable', () => bannerAct('disable'));
  bind('banner-rollback', () => bannerAct('rollback'));
  bind('content-save', saveContent);
+ bind('ollama-start', () => ollamaAct('start'));
+ bind('ollama-stop', () => ollamaAct('stop'));
  const keySel = document.getElementById('content-key');
  if (keySel) keySel.addEventListener('change', loadContentKey);
 });
@@ -150,6 +152,90 @@ async function loadOverview() {
  }
  loadBanner();
  loadContentKey();
+ loadHost();
+}
+
+// --- host --------------------------------------------------------------------
+
+function mb(bytes) {
+ const n = Number(bytes || 0);
+ return n < 1024 * 1024 ? `${Math.round(n / 1024)} KB` : `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function gb(bytes) {
+ return `${(Number(bytes || 0) / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
+
+async function loadHost() {
+ const set = (id, v) => {
+  const el = document.getElementById(id);
+  if (el) el.textContent = String(v);
+ };
+ try {
+  const h = await apiCall('/api/admin/host');
+  const b = h.backup;
+  set('host-backup', b ? `${b.age_hours < 48 ? `${Math.round(b.age_hours)} h ago` : `${Math.round(b.age_hours / 24)} days ago`} · ${mb(b.size_bytes)}` : 'none found');
+  const w = h.watchdog;
+  set('host-watchdog', w ? (w.healthy ? `OK · ${w.checked_at}` : `UNHEALTHY · ${w.checked_at}`) : 'no state file');
+  set('host-watchdog-summary', w && w.summary ? w.summary : '');
+  const d = h.disk;
+  set('host-disk', d ? `${gb(d.free_bytes)} of ${gb(d.total_bytes)}` : '—');
+  const l = h.laya || {};
+  set('host-laya', l.state === 'up' ? (l.loaded ? 'up, model loaded' : 'up, idle') : (l.state === 'down' ? 'not answering' : 'not configured'));
+  renderAi(h.ai || {});
+ } catch (e) {
+  set('host-status', e.message || 'Could not read host facts.');
+ }
+ try {
+  const s = await apiCall('/api/ops/deploy-state');
+  const r = s.record;
+  set('host-ship', r
+   ? `Last deploy ${String(r.sha || '').slice(0, 8)}${r.actor_username ? ` by ${r.actor_username}` : ''} at ${r.started_at || '?'} · ${s.in_flight ? `in flight (${s.phase})` : (r.result || s.phase || 'done')}${r.detail ? ` · ${r.detail}` : ''}`
+   : 'No deploys recorded on this host.');
+ } catch (e) {
+  set('host-ship', e.message || 'Could not read the deploy state.');
+ }
+}
+
+function renderAi(ai) {
+ const line = document.getElementById('host-ai');
+ if (line) {
+  const models = (ai.ollama_models || []).join(', ');
+  const running = `Ollama ${ai.ollama_running ? 'running' : 'stopped'}${models ? ` (${models})` : ''}`;
+  line.textContent = ai.provider
+   ? `${ai.provider === 'ollama' ? 'Built-in study aid' : `Cloud provider ${ai.provider}`} · ${running}${ai.detail ? ` · ${ai.detail}` : ''}`
+   : `${ai.detail || 'No study aid configured.'} ${running}.`;
+ }
+ const start = document.getElementById('ollama-start');
+ const stop = document.getElementById('ollama-stop');
+ if (start) start.disabled = !ai.control_allowed || !!ai.ollama_running;
+ if (stop) stop.disabled = !ai.control_allowed || !ai.ollama_running;
+ const status = document.getElementById('host-ai-status');
+ if (status && !ai.control_allowed) status.textContent = 'Process control is off on this host (AI_ALLOW_SETTINGS_WRITE / AI_ALLOW_OLLAMA_CONTROL).';
+}
+
+async function ollamaAct(kind) {
+ const ok = await openSiteModal({
+  mode: 'confirm',
+  title: kind === 'start' ? 'Start the built-in study aid?' : 'Stop the built-in study aid?',
+  message: kind === 'start'
+   ? 'Starts Ollama on this host. Students can use Refine and Ask once it is up.'
+   : 'Stops Ollama and frees its memory. A student\u2019s next Refine or Ask starts it again.',
+  confirmLabel: kind === 'start' ? 'Start' : 'Stop',
+ });
+ if (!ok) return;
+ const status = document.getElementById('host-ai-status');
+ if (status) status.textContent = 'Working…';
+ try {
+  const d = await apiCall(`/api/ai/ollama/${kind}`, { method: 'POST', body: {} });
+  const said = d.message || (d.ok ? 'Done.' : 'Failed.');
+  if (status) status.textContent = said;
+  showNotification(said, d.ok ? 'success' : 'error');
+  await loadHost();
+ } catch (e) {
+  if (status) status.textContent = e.message || 'Failed';
+  showNotification(e.message || 'Failed', 'error');
+ }
 }
 
 // --- accounts: find one ----------------------------------------------------
@@ -846,9 +932,54 @@ async function loadContentKey() {
   const d = await apiCall('/api/admin/content');
   const item = (d.items || {})[key] || {};
   field.value = item.body || '';
+  renderRevisions(key, item);
  } catch (e) {
   const status = document.getElementById('content-status');
   if (status) status.textContent = e.message || 'Could not load copy.';
+ }
+}
+
+function renderRevisions(key, item) {
+ const current = document.getElementById('content-current');
+ if (current) {
+  current.textContent = item.revision
+   ? `Revision ${item.revision} · ${item.updated_by || '?'} · ${item.updated_at || ''}`
+   : 'Never set; students see the built-in default.';
+ }
+ const list = document.getElementById('content-revisions');
+ if (!list) return;
+ const revs = item.revisions || [];
+ if (!revs.length) {
+  list.innerHTML = '<li class="info-text">No revisions yet.</li>';
+  return;
+ }
+ list.innerHTML = revs.map((r, i) => {
+  const first = String(r.body || '').split('\n')[0].slice(0, 80);
+  const tag = i === 0
+   ? '<span class="admin-badge is-ok">current</span>'
+   : `<button type="button" class="btn btn-secondary btn-sm" data-revision="${escapeAttr(r.id)}">Roll back to this</button>`;
+  return `<li><span class="library-manage-name">${escapeHtml(r.created_at)} · ${escapeHtml(r.actor || '?')}<br><span class="help-text">${escapeHtml(first)}</span></span>${tag}</li>`;
+ }).join('');
+ list.querySelectorAll('[data-revision]').forEach((btn) => {
+  btn.addEventListener('click', () => rollbackContent(key, btn.getAttribute('data-revision')));
+ });
+}
+
+async function rollbackContent(key, revisionId) {
+ const status = document.getElementById('content-status');
+ const vals = await promptAction('Roll back student-facing copy', `Restores an earlier revision of ${key} as a new revision. Students see it at once.`, {});
+ if (!vals) return;
+ try {
+  await apiCall(`/api/admin/content/${encodeURIComponent(key)}/rollback`, {
+   method: 'POST',
+   body: { reason: vals.reason, revision_id: revisionId },
+  });
+  if (status) status.textContent = 'Rolled back.';
+  showNotification('Copy rolled back.', 'success');
+  await loadContentKey();
+ } catch (e) {
+  if (status) status.textContent = e.message || 'Failed';
+  showNotification(e.message || 'Failed', 'error');
  }
 }
 
@@ -865,6 +996,7 @@ async function saveContent() {
   });
   if (status) status.textContent = 'Saved.';
   showNotification('Copy saved.', 'success');
+  await loadContentKey();
  } catch (e) {
   if (status) status.textContent = e.message || 'Failed';
   showNotification(e.message || 'Failed', 'error');

@@ -230,6 +230,9 @@
    </div>
    <button type="button" class="btn btn-primary btn-sm" id="content-save">Save copy</button>
    <p class="help-text" id="content-status"></p>
+   <h3 class="admin-subhead">History</h3>
+   <p class="help-text" id="content-current"></p>
+   <ul class="library-manage-list" id="content-revisions"><li class="info-text">No revisions yet.</li></ul>
   </div>
  </div>
 </section>
@@ -246,11 +249,35 @@
    <div><dt>Jobs</dt><dd id="ov-jobs">…</dd></div>
   </dl>
   <p class="help-text" id="admin-source-health"></p>
-  <p class="help-text"><a href="/ops">Open Ship</a> to edit, check and deploy the staging checkout.</p>
+  <h3 class="admin-subhead">Backup, watchdog, disk, Laya</h3>
+  <dl class="admin-stats">
+   <div><dt>Last backup</dt><dd id="host-backup">…</dd></div>
+   <div><dt>Watchdog</dt><dd id="host-watchdog">…</dd></div>
+   <div><dt>Disk free</dt><dd id="host-disk">…</dd></div>
+   <div><dt>Laya</dt><dd id="host-laya">…</dd></div>
+  </dl>
+  <p class="help-text" id="host-watchdog-summary"></p>
+  <p class="help-text" id="host-status"></p>
+ </div>
+ <div class="admin-grid">
+  <div class="card" id="admin-ai">
+   <h2>Study aid (Ollama)</h2>
+   <p class="info-text" id="host-ai"></p>
+   <div class="admin-actions">
+    <button type="button" class="btn btn-secondary btn-sm" id="ollama-start" disabled>Start</button>
+    <button type="button" class="btn btn-secondary btn-sm" id="ollama-stop" disabled>Stop and free memory</button>
+   </div>
+   <p class="help-text" id="host-ai-status"></p>
+  </div>
+  <div class="card" id="admin-ship">
+   <h2>Ship</h2>
+   <p class="info-text" id="host-ship">…</p>
+   <p class="help-text"><a href="/ops">Open Ship</a> to edit, check and deploy the staging checkout.</p>
+  </div>
  </div>
 </section>
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/admin.js?v=20261014b"></script>
+<script src="/static/js/admin.js?v=20261015a"></script>
 {% endblock %}
