@@ -494,7 +494,9 @@ function renderDetail(d) {
   jobList.innerHTML = ['fetch', 'embed', 'cluster'].map((k) => {
    const j = jobs[k] || {};
    const state = j.state || (j.active ? 'active' : (j.error ? 'failed' : 'idle'));
+   const lib = j.library_id ? libs.find((L) => L.id === j.library_id) : null;
    const bits = [
+    lib ? `library ${lib.name || lib.id}` : '',
     j.started_at ? `started ${j.started_at}` : '',
     j.updated_at ? `updated ${j.updated_at}` : '',
     j.worker_alive ? 'worker live' : (j.active ? 'no worker' : ''),
@@ -771,7 +773,8 @@ async function runAction(name, task) {
   validate: form.validate ? (v) => form.validate(v, _selected) : null,
  });
  if (!vals) return;
- const body = { reason: vals.reason, confirm: vals.confirm, ...(task ? { task } : {}), ...(form.body ? form.body(vals, _selected) : {}) };
+ const jobLib = task ? ((_selected.jobs || {})[task] || {}).library_id : null;
+ const body = { reason: vals.reason, confirm: vals.confirm, ...(task ? { task } : {}), ...(jobLib ? { library_id: jobLib } : {}), ...(form.body ? form.body(vals, _selected) : {}) };
  const status = document.getElementById('helpdesk-action-status');
  if (status) status.textContent = 'Working…';
  try {

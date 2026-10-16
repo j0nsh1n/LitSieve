@@ -923,7 +923,7 @@ async function cancelFetch() {
  ].filter(Boolean);
  btns.forEach((btn) => { btn.disabled = true; });
  try {
- await apiCall('/api/jobs/fetch/cancel', { method: 'POST', body: {} });
+ await apiCall('/api/jobs/fetch/cancel', { method: 'POST', body: withPageLibrary({}) });
  showNotification('Cancel requested — finishing the current source…', 'info');
  } catch (e) {
  showNotification(`Could not cancel: ${e.message}`, 'error');
@@ -1168,7 +1168,7 @@ function waitForJob(task, fillId, labelId, wrapId, formatLabel, timeoutMs, opts)
     finish(new Error('Timed out waiting for the job to finish'));
     return;
    }
-   const data = await apiCall('/api/progress');
+   const data = await apiCall(progressUrl());
    pollFailures = 0;
    const p = data[task];
    if (!p) return;

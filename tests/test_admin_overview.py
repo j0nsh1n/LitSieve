@@ -135,7 +135,7 @@ def test_overview_template_has_every_queue_and_activity_card(tmp_path, monkeypat
     assert 'id="admin-recent-activity"' in html
     assert 'id="admin-activity-list"' in html
     assert 'href="#tickets/open"' in html
-    assert 'admin.js?v=20261016a' in html
+    assert 'admin.js?v=20261016j' in html
 
 
 def test_activity_leaves_out_what_students_did_themselves(tmp_path, monkeypatch):

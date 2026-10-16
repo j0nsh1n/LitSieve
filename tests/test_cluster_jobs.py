@@ -55,10 +55,11 @@ def _paper():
             "abstract": "Complete original abstract", "year": "2024", "authors": [], "journal": "Fixture"}
 
 
-def _until_done(client):
+def _until_done(client, library_id=None):
     deadline = time.monotonic() + 3
+    params = {"library_id": library_id} if library_id else None
     while time.monotonic() < deadline:
-        slot = client.get("/api/progress").json()["cluster"]
+        slot = client.get("/api/progress", params=params).json()["cluster"]
         if not slot["active"]:
             return slot
         time.sleep(0.01)
@@ -100,7 +101,8 @@ def test_receipt_progress_conflict_and_completion_use_original_library(cluster_c
         assert other.status_code == 200
     finally:
         finish.set()
-    completed = _until_done(client)
+    assert client.get("/api/progress").json()["cluster"]["active"] is False
+    completed = _until_done(client, library_id)
     assert completed["error"] is None
     assert completed["result"]["status"] == "success"
     assert completed["result"]["resolved_n_clusters"] == 1
@@ -125,12 +127,12 @@ def test_failure_closes_slot_and_sync_default_still_works(cluster_client, monkey
     assert response.status_code == 202
     failed = _until_done(client)
     assert failed["error"] == "Grouping failed" and failed["result"] is None
-    assert not core.job_worker_alive(uid, "cluster")
+    assert not core.job_worker_alive(uid, library_id, "cluster")
     monkeypatch.setattr(LiteratureSearchPipeline, "cluster_articles", lambda self, **kwargs: None)
     sync = client.post("/api/create-clusters", json={}, headers=_headers(client))
     assert sync.status_code == 200 and sync.json()["clusters"] == []
     assert sync.json()["auto"] is True
-    assert not core.job_worker_alive(uid, "cluster")
+    assert not core.job_worker_alive(uid, library_id, "cluster")
     assert core._pipeline_refcounts.get(core.pipeline_cache_key(uid, library_id), 0) == 0
 
 
@@ -155,7 +157,7 @@ def test_executor_submission_failure_releases_job_and_library(cluster_client, mo
     assert response.status_code == 500
     slot = client.get("/api/progress").json()["cluster"]
     assert not slot["active"] and slot["error"] == "Executor unavailable"
-    assert not core.job_worker_alive(uid, "cluster")
+    assert not core.job_worker_alive(uid, library_id, "cluster")
     assert core._pipeline_refcounts.get(core.pipeline_cache_key(uid, library_id), 0) == 0
 
 
@@ -164,15 +166,15 @@ def test_cluster_progress_is_not_evicted_or_cancellable(monkeypatch):
     monkeypatch.setattr(core, "_job_sync", {})
     monkeypatch.setattr(core, "_job_futures", {})
     monkeypatch.setattr(core, "MAX_CACHED_USERS", 1)
-    assert core.try_begin_user_job("running", "cluster", library_id="library")
+    assert core.try_begin_user_job("running", "library", "cluster")
     with core._progress_lock:
-        core._ensure_progress("other")
+        core._ensure_progress("other", "library")
     assert "running" in core._all_progress
     assert core.list_job_queue()[0]["task"] == "cluster"
-    assert not core.clear_stale_job("running", "cluster")[0]
+    assert not core.clear_stale_job("running", "library", "cluster")[0]
     core._job_sync.clear()
-    assert core.clear_stale_job("running", "cluster")[0]
-    assert not core._all_progress["running"]["cluster"]["active"]
+    assert core.clear_stale_job("running", "library", "cluster")[0]
+    assert not core._all_progress["running"]["library"]["cluster"]["active"]
 
 
 def test_real_grouping_reports_stages_without_excluding_papers(tmp_path):

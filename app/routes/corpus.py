@@ -16,12 +16,13 @@ from app.content.screening_reasons import (
 )
 from app.content.source_catalog import drop_retired_sources
 from app.core import (
-    _ensure_progress,
+    account_jobs_full,
     csrf_failed,
     current_user,
     get_owned_pipeline,
     get_pipeline,
     is_job_cancelled,
+    library_progress,
     limiter,
     release_pipeline,
     request_job_cancel,
@@ -44,6 +45,7 @@ from app.schemas import (
     SampleCorpusRequest,
     ScreeningRequest,
 )
+from app.services import sample_embeddings
 from app.services.enrich import attach_key_points
 from app.services.pipeline import FETCHERS
 from app.storage import quota
@@ -57,41 +59,53 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-# Job slots are per account, not per library (audit 21.8): say so.
-ONE_FETCH = (
-    "A fetch is already running. One fetch runs at a time per account, "
-    "in any of your libraries; wait for it to finish."
-)
+# Each library has its own job slots; an account runs at most two at once (21.8).
+ONE_FETCH = "A fetch is already running in this library. Wait for it to finish."
 ONE_PREPARE = (
-    "Papers are already being prepared. One prepare runs at a time per "
-    "account, in any of your libraries; wait for it to finish."
+    "Papers are already being prepared in this library. Wait for it to finish."
+)
+ONE_CLUSTER = "Theme grouping is already running in this library."
+ACCOUNT_FULL = (
+    f"Your account is already running {core.MAX_JOBS_PER_ACCOUNT} jobs in "
+    "other libraries. Wait for one to finish."
 )
 
+
+def _busy(uid: str, lib_id: str, task: str, detail: str) -> JSONResponse:
+    """409 that names why the slot could not be claimed: this library, or the account."""
+    own = core.job_worker_alive(uid, lib_id, task) or library_progress(uid, lib_id)[task].get("active")
+    full = not own and account_jobs_full(uid)
+    return JSONResponse(status_code=409, content={"detail": ACCOUNT_FULL if full else detail})
+
+
 @router.get("/api/progress")
-async def api_progress(request: Request):
+async def api_progress(request: Request, library_id: Optional[str] = None):
+    """Job slots of one library: the page's, else the active one."""
     user = current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
-    with core._progress_lock:
-        p = _ensure_progress(user["user_id"])
-        snapshot = {k: dict(v) for k, v in p.items()}
-        sources = {}
-        for src, row in p['fetch'].get('source_progress', {}).items():
-            item = dict(row)
-            if item['state'] == 'running' and item.get('started_at') is not None:
-                item['elapsed_seconds'] = max(0, time.time() - item['started_at'])
-            sources[src] = item
-        snapshot['fetch']['source_progress'] = sources
-        return snapshot
+    try:
+        lib_id = owned_library_id(user["user_id"], library_id)
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
+    snapshot = library_progress(user["user_id"], lib_id)
+    sources = {}
+    for src, row in (snapshot['fetch'].get('source_progress') or {}).items():
+        item = dict(row)
+        if item['state'] == 'running' and item.get('started_at') is not None:
+            item['elapsed_seconds'] = max(0, time.time() - item['started_at'])
+        sources[src] = item
+    snapshot['fetch']['source_progress'] = sources
+    return snapshot
 
 
-def _run_multi_fetch(p, *, query, sources, max_results, email, clear_first, uid):
+def _run_multi_fetch(p, *, query, sources, max_results, email, clear_first, uid, lib_id):
     """Blocking multi-source fetch for sync wait= or background jobs."""
     # Live per-source narrative for the UI: only counts the API has produced.
     live_by_source: dict = {}
     live_status: dict = {}
     update_progress(
-        uid, 'fetch', done=0, total=len(sources),
+        uid, lib_id, 'fetch', done=0, total=len(sources),
         articles_so_far=0, message='Starting fetch…', cancel=False,
         sources=list(sources), by_source={}, source_status={},
         source_progress={
@@ -122,7 +136,7 @@ def _run_multi_fetch(p, *, query, sources, max_results, email, clear_first, uid)
         else:
             msg = f"{done}/{total} sources · {arts} papers · searching {src}"
         update_progress(
-            uid, 'fetch', done=done, total=total,
+            uid, lib_id, 'fetch', done=done, total=total,
             articles_so_far=arts, message=msg,
             sources=list(sources),
             by_source=dict(live_by_source),
@@ -139,13 +153,13 @@ def _run_multi_fetch(p, *, query, sources, max_results, email, clear_first, uid)
             email=email or "",
             progress_callback=on_source_done,
             cancel_check=lambda: (
-                is_job_cancelled(uid, 'fetch')
+                is_job_cancelled(uid, lib_id, 'fetch')
                 or quota.is_over_quota(uid, reclaimable=reclaimable)
             ),
             into_staging=bool(clear_first),
         )
         total = sum(v['count'] for v in results.values())
-        user_cancel = is_job_cancelled(uid, 'fetch')
+        user_cancel = is_job_cancelled(uid, lib_id, 'fetch')
         # Quota stop is not a user cancel. Do not swap a partial staging set
         # over the live library — keep what the student already has.
         hit_quota = quota.is_over_quota(uid, reclaimable=reclaimable)
@@ -177,7 +191,7 @@ def _run_multi_fetch(p, *, query, sources, max_results, email, clear_first, uid)
     ok = {src: v['count'] for src, v in results.items() if not v['error']}
     hit_quota = quota.is_over_quota(uid, reclaimable=reclaimable if not actually_cleared else 0)
     status, cancelled_flag = quota.fetch_finish_status(
-        cancelled=is_job_cancelled(uid, 'fetch'),
+        cancelled=is_job_cancelled(uid, lib_id, 'fetch'),
         hit_quota=hit_quota,
     )
     return {
@@ -239,27 +253,16 @@ async def api_fetch_multi(req: MultiFetchRequest, request: Request):
         max_results=req.max_results,
         email=req.email,
         clear_first=req.clear_first,
-        uid=uid,
     )
     if not req.wait:
-        try:
-            started = start_user_job(
-                uid, 'fetch', _run_multi_fetch, library_id=lib_id, **job_kwargs,
-            )
-        except ValueError as e:
-            return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
-        if not started:
-            return JSONResponse(
-                status_code=409,
-                content={"detail": ONE_FETCH},
-            )
+        if not start_user_job(uid, lib_id, 'fetch', _run_multi_fetch, **job_kwargs):
+            return _busy(uid, lib_id, 'fetch', ONE_FETCH)
         return JSONResponse(status_code=202, content={"status": "started"})
 
     # Same per-user fetch slot as wait=False. Staging is library-wide; two
     # overlapping fetches (sync or background) would reset or mix staged rows.
     if not try_begin_user_job(
-        uid, 'fetch',
-        library_id=lib_id,
+        uid, lib_id, 'fetch',
         total=len(req.sources),
         sources=list(req.sources),
         by_source={},
@@ -272,20 +275,17 @@ async def api_fetch_multi(req: MultiFetchRequest, request: Request):
             "email": req.email or "",
         },
     ):
-        return JSONResponse(
-            status_code=409,
-            content={"detail": ONE_FETCH},
-        )
+        return _busy(uid, lib_id, 'fetch', ONE_FETCH)
     try:
         p = get_pipeline(uid, lib_id)
-        result = await run_in_thread(_run_multi_fetch, p, **job_kwargs)
-        update_progress(uid, 'fetch', active=False, result=result, error=None)
+        result = await run_in_thread(_run_multi_fetch, p, uid=uid, lib_id=lib_id, **job_kwargs)
+        update_progress(uid, lib_id, 'fetch', active=False, result=result, error=None)
         return result
     except Exception as e:
-        update_progress(uid, 'fetch', active=False, result=None, error=str(e))
+        update_progress(uid, lib_id, 'fetch', active=False, result=None, error=str(e))
         return server_error()
     finally:
-        update_progress(uid, 'fetch', active=False)
+        update_progress(uid, lib_id, 'fetch', active=False)
         release_pipeline(uid, lib_id)
 
 
@@ -300,7 +300,16 @@ async def api_cancel_job(task: str, request: Request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
     if task not in ("fetch", "embed"):
         return JSONResponse(status_code=400, content={"detail": "Unknown task"})
-    ok = request_job_cancel(user["user_id"], task)
+    try:
+        body = await request.json()
+    except ValueError:
+        body = {}
+    raw_lib = body.get("library_id") if isinstance(body, dict) else None
+    try:
+        lib_id = owned_library_id(user["user_id"], raw_lib)
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
+    ok = request_job_cancel(user["user_id"], lib_id, task)
     if not ok:
         return JSONResponse(
             status_code=409,
@@ -313,15 +322,15 @@ class _EmbedCancelled(Exception):
     """Raised between batches when the student (or an admin) cancels a prepare."""
 
 
-def _run_create_embeddings(p, *, model, only_missing, uid):
+def _run_create_embeddings(p, *, model, only_missing, uid, lib_id):
     """Blocking embedding pass for sync wait= or background jobs."""
-    update_progress(uid, 'embed', done=0, total=0, cancel=False)
+    update_progress(uid, lib_id, 'embed', done=0, total=0, cancel=False)
 
     def on_batch_done(done, total):
-        update_progress(uid, 'embed', done=done, total=total)
+        update_progress(uid, lib_id, 'embed', done=done, total=total)
         # Read the cancel flag between batches: before, only fetch read it,
         # so cancelling a prepare did nothing (audit 21.1).
-        if is_job_cancelled(uid, 'embed'):
+        if is_job_cancelled(uid, lib_id, 'embed'):
             raise _EmbedCancelled()
 
     # Engine swap happens inside create_embeddings under the pipeline lock.
@@ -368,48 +377,47 @@ async def api_create_embeddings(req: EmbeddingsRequest, request: Request):
         quota.check_quota(uid)
     except quota.QuotaExceeded as e:
         return JSONResponse(status_code=507, content={"detail": sentence_for(e), "quota": quota.usage_report(uid)})
-    job_kwargs = dict(model=req.model, only_missing=req.only_missing, uid=uid)
+    job_kwargs = dict(model=req.model, only_missing=req.only_missing)
     if not req.wait:
-        try:
-            started = start_user_job(
-                uid, 'embed', _run_create_embeddings, library_id=lib_id, **job_kwargs,
-            )
-        except ValueError as e:
-            return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
-        if not started:
-            return JSONResponse(
-                status_code=409,
-                content={"detail": ONE_PREPARE},
-            )
+        if not start_user_job(uid, lib_id, 'embed', _run_create_embeddings, **job_kwargs):
+            return _busy(uid, lib_id, 'embed', ONE_PREPARE)
         return JSONResponse(status_code=202, content={"status": "started"})
 
     # Claim the slot like the background path: a sync embed used to mark the
     # slot active over a running job and then clear it in finally (21.3).
-    if not try_begin_user_job(uid, 'embed', library_id=lib_id, done=0, total=0):
-        return JSONResponse(
-            status_code=409,
-            content={"detail": ONE_PREPARE},
-        )
+    if not try_begin_user_job(uid, lib_id, 'embed', done=0, total=0):
+        return _busy(uid, lib_id, 'embed', ONE_PREPARE)
     try:
         p = get_pipeline(uid, lib_id)
     except Exception:
-        update_progress(uid, 'embed', active=False)
+        update_progress(uid, lib_id, 'embed', active=False)
         return server_error()
     try:
-        result = await run_in_thread(_run_create_embeddings, p, **job_kwargs)
-        update_progress(uid, 'embed', active=False, result=result, error=None)
+        result = await run_in_thread(_run_create_embeddings, p, uid=uid, lib_id=lib_id, **job_kwargs)
+        update_progress(uid, lib_id, 'embed', active=False, result=result, error=None)
         return result
     except Exception as e:
-        update_progress(uid, 'embed', active=False, result=None, error=str(e))
+        update_progress(uid, lib_id, 'embed', active=False, result=None, error=str(e))
         return server_error()
     finally:
-        update_progress(uid, 'embed', active=False)
+        update_progress(uid, lib_id, 'embed', active=False)
         release_pipeline(uid, lib_id)
 
 
-def _run_create_clusters(p, *, uid, n_clusters, method):
+def _run_sample_prepare(p, *, model, only_missing, uid, lib_id):
+    """Prepare the sample papers, then save their vectors for the next guest (21.9)."""
+    result = _run_create_embeddings(p, model=model, only_missing=only_missing, uid=uid, lib_id=lib_id)
+    if result.get("status") == "success" and result.get("embeddings_created"):
+        try:
+            sample_embeddings.save(p, model)
+        except Exception:
+            logger.warning("Could not save sample-paper vectors", exc_info=True)
+    return result
+
+
+def _run_create_clusters(p, *, uid, lib_id, n_clusters, method):
     def on_progress(done, total, message):
-        update_progress(uid, 'cluster', done=done, total=total, message=message)
+        update_progress(uid, lib_id, 'cluster', done=done, total=total, message=message)
 
     result = p.cluster_articles(n_clusters=n_clusters, method=method, progress_callback=on_progress)
     return {
@@ -431,25 +439,25 @@ async def api_create_clusters(req: ClusterRequest, request: Request):
         lib_id = owned_library_id(uid, req.library_id)
     except ValueError as e:
         return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
-    kwargs = dict(uid=uid, n_clusters=req.n_clusters, method=req.method)
+    kwargs = dict(n_clusters=req.n_clusters, method=req.method)
     if not req.wait:
         try:
-            started = start_user_job(uid, 'cluster', _run_create_clusters, library_id=lib_id, **kwargs)
+            started = start_user_job(uid, lib_id, 'cluster', _run_create_clusters, **kwargs)
         except Exception:
             return server_error()
         if not started:
-            return JSONResponse(status_code=409, content={"detail": "Theme grouping is already running"})
+            return _busy(uid, lib_id, 'cluster', ONE_CLUSTER)
         return JSONResponse(status_code=202, content={"status": "started"})
-    if not try_begin_user_job(uid, 'cluster', library_id=lib_id):
-        return JSONResponse(status_code=409, content={"detail": "Theme grouping is already running"})
+    if not try_begin_user_job(uid, lib_id, 'cluster'):
+        return _busy(uid, lib_id, 'cluster', ONE_CLUSTER)
     p = None
     try:
         p = get_pipeline(uid, lib_id)
-        result = await run_in_thread(_run_create_clusters, p, **kwargs)
-        update_progress(uid, 'cluster', active=False, result=result, error=None)
+        result = await run_in_thread(_run_create_clusters, p, uid=uid, lib_id=lib_id, **kwargs)
+        update_progress(uid, lib_id, 'cluster', active=False, result=result, error=None)
         return result
     except Exception as e:
-        update_progress(uid, 'cluster', active=False, result=None, error=core.safe_error_text(e))
+        update_progress(uid, lib_id, 'cluster', active=False, result=None, error=core.safe_error_text(e))
         return server_error()
     finally:
         if p is not None:
@@ -748,6 +756,7 @@ async def api_load_sample_corpus(req: SampleCorpusRequest, request: Request):
             p.db.clear_all()
         stats = p.db.insert_articles(articles, dedupe=True)
         p.invalidate_corpus_cache()
+        sample_embeddings.restore(p)
         inserted = stats.get("inserted", 0) if isinstance(stats, dict) else 0
         return {
             "status": "success",

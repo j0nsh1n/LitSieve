@@ -28,6 +28,15 @@ and this project aims to follow Semantic Versioning for app version strings
   this".
 
 ### Changed
+- Each library runs its own jobs: a fetch or prepare in one library no
+  longer blocks another, and an account runs at most two jobs at once. The
+  409 says which limit was hit. Search, the wait screen and Cancel act on
+  the page's library (`GET /api/progress?library_id=`), and Admin's job
+  card names the library and sends it with Cancel and Clear stale.
+- A guest start no longer embeds the sample papers each time: the first
+  prepare saves their vectors under `USER_DATA_DIR/.cache/`, and later
+  guests and "Load sample papers" copy them in (about 10 s down to under
+  half a second on the host).
 - Admin is four tabs: Overview (tiles that open the queue they count),
   Accounts (search and queues beside the open account), Site (banner and
   student-facing copy) and Host. The address bar follows the tab, queue and

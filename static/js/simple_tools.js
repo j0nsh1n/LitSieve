@@ -2268,7 +2268,7 @@ function _waitForEmbedJob(timeoutMs) {
      reject(new Error('Timed out waiting for prepare'));
      return;
     }
-    const data = await apiCall('/api/progress');
+    const data = await apiCall(progressUrl());
     const p = data && data.embed;
     if (p && p.active) {
      setTimeout(tick, 400);
