@@ -234,6 +234,36 @@ and this project aims to follow Semantic Versioning for app version strings
     the job and source-error counts say they cover the time since the last
     restart.
 
+- AI study aids (audit 22.1 to 22.6):
+  - Account shows the student's own AI mode and status: the status was
+    computed as the host's, and saving from that state replaced the
+    student's provider.
+  - Choosing an installed local model no longer writes `OLLAMA_MODEL` into
+    the server's environment, which made one account's model everyone's.
+  - A student's own API base URL must be https and a public address; a
+    loopback, private or link-local server is refused on save and again
+    before each request (`AI_ALLOW_PRIVATE_BASE_URL=true` allows a LAN
+    model server). The timeout is held between 5 and 300 seconds.
+  - The settings payload no longer carries the server's file path.
+  - The Anthropic provider is offered only when its package is installed
+    (a saved key showed the buttons and every click returned 503);
+    `anthropic` and `httpx` are now in `requirements.txt`.
+  - `HIDE_AI_BUTTONS` also turns Refine, Ask and Explain off (403), so a
+    host key is never spent while the buttons are hidden.
+- Exports (audit 22.7 to 22.10): CSV cells that start with `=`, `+`, `-`,
+  `@`, a tab or a carriage return are prefixed with `'`, so a hostile title
+  opens inert in a spreadsheet. The "these results" CSV fills Similarity
+  with the score shown on each card and Cluster from the library's themes
+  (both were blank). RIS and BibTeX write the DOI for every DOI-shaped id
+  (PLOS, OpenAIRE, bioRxiv, medRxiv, not only CrossRef), leave out a
+  placeholder journal such as "Unknown journal", strip HTML from the RIS
+  abstract, and keep BibTeX URLs unescaped. The whole-library export is
+  rate limited (10 a minute) and built off the request thread.
+- Host (audit 23.4, 23.5): the version string lives only in
+  `app/version.py`; FastAPI, `/health`, the admin summary, support packets
+  and the footers read it. `.env.example` lists every setting the code
+  reads, and a test keeps it that way.
+
 ### Removed
 - DBLP is no longer offered as a source: it answers every request from the
   host with a bot check, and its records have no abstracts. Papers already

@@ -3,7 +3,8 @@
 import csv
 import io
 import logging
-from typing import List
+import math
+from typing import List, Optional
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -31,6 +32,23 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+_FORMULA_LEADERS = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _csv_text(value) -> str:
+    """Text cell for a spreadsheet: a leading = + - @ tab or CR gets a ' prefix (OWASP)."""
+    if value is None:
+        return ""
+    text = str(value)
+    if text.startswith(_FORMULA_LEADERS):
+        return "'" + text
+    return text
+
+
+def _csv_row(cells) -> list:
+    """Neutralise every text cell; ints and floats we generated pass through."""
+    return [c if isinstance(c, (int, float)) and not isinstance(c, bool) else _csv_text(c) for c in cells]
+
 
 def _format_ranked_export(results: List[dict], fmt: str):
     """Build download body for an ordered result list (search hits or selection)."""
@@ -47,13 +65,18 @@ def _format_ranked_export(results: List[dict], fmt: str):
             "Source", "ID", "Cluster ID", "Cluster Label",
         ])
         for i, a in enumerate(results, 1):
-            writer.writerow([
-                i, f"{a.get('similarity_score', 0):.3f}" if a.get("similarity_score") is not None else "",
+            sim = a.get("similarity_score")
+            cells = _csv_row([
+                i, "",
                 a.get("title", ""), a.get("year", ""),
                 a.get("journal", ""), "; ".join(a.get("authors") or []),
                 a.get("source", ""), a.get("article_id", ""),
                 a.get("cluster_id", ""), a.get("cluster_label", ""),
             ])
+            # Our own number, not source text: written as is, even when negative.
+            if isinstance(sim, (int, float)) and not isinstance(sim, bool):
+                cells[1] = f"{sim:.3f}"
+            writer.writerow(cells)
         return output.getvalue(), "text/csv", "search_results.csv"
     # txt
     lines = []
@@ -68,6 +91,24 @@ def _format_ranked_export(results: List[dict], fmt: str):
             lines.append(f"   Cluster: {a.get('cluster_label')}")
         lines.append("")
     return "\n".join(lines), "text/plain", "search_results.txt"
+
+
+def _clean_score(value) -> Optional[float]:
+    """A search score sent by the page: a finite float in [-1, 2], else ignored."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    score = float(value)
+    if not math.isfinite(score) or score < -1.0 or score > 2.0:
+        return None
+    return score
+
+
+def _clean_label(value) -> str:
+    """A cluster label sent by the page: a short single-line string, else empty."""
+    if not isinstance(value, str):
+        return ""
+    label = " ".join(value.split())
+    return label if 0 < len(label) <= 200 else ""
 
 
 @router.post("/api/export/selection")
@@ -97,11 +138,20 @@ async def api_export_selection(req: ExportSelectionRequest, request: Request, li
         return JSONResponse(status_code=400, content={"detail": "Invalid library"})
     try:
         def _load():
+            known = p.db.get_all_articles_with_clusters()
             rows = []
             for key in items:
-                art = p.db.get_article_by_id(key.article_id, key.source)
-                if art:
-                    rows.append(art)
+                art = known.get((key.article_id, key.source))
+                if not art:
+                    continue
+                art = dict(art)
+                score = _clean_score(key.similarity_score)
+                if score is not None:
+                    art["similarity_score"] = score
+                label = _clean_label(key.cluster_label)
+                if label and not art.get("cluster_label"):
+                    art["cluster_label"] = label
+                rows.append(art)
             return rows
 
         results = await run_in_thread(_load)
@@ -132,7 +182,7 @@ def _library_rows_to_csv(rows: List[dict]) -> str:
         "Starred", "Note",
     ])
     for a in rows:
-        writer.writerow([
+        writer.writerow(_csv_row([
             a.get("title", ""),
             a.get("year", ""),
             a.get("journal", ""),
@@ -145,11 +195,51 @@ def _library_rows_to_csv(rows: List[dict]) -> str:
             a.get("exclusion_reason", ""),
             "yes" if a.get("starred") else "no",
             a.get("note", ""),
-        ])
+        ]))
     return output.getvalue()
 
 
+def _build_library_export(db, scope: str, fmt: str):
+    """Build (content, media_type, filename) for the library export; runs off the event loop."""
+    rows = db.get_library_export_rows(scope=scope)
+    if fmt == "ris":
+        content = collection_to_ris(rows)
+        media_type = "application/x-research-info-systems"
+        filename = "library.ris"
+    elif fmt == "bibtex":
+        content = collection_to_bibtex(rows)
+        media_type = "application/x-bibtex"
+        filename = "library.bib"
+    elif fmt == "apa":
+        content = collection_to_apa(rows)
+        media_type = "text/plain"
+        filename = "library_apa.txt"
+    elif fmt == "txt":
+        lines = []
+        for a in rows:
+            flag = "EXCLUDED" if a.get("excluded") else ("STARRED" if a.get("starred") else "INCLUDED")
+            lines.append(f"[{flag}] {a.get('title', '')}")
+            lines.append(
+                f"  Year: {a.get('year', '')} | Source: {a.get('source', '')} | "
+                f"ID: {a.get('article_id', '')}"
+            )
+            if a.get("cluster_label"):
+                lines.append(f"  Cluster: {a.get('cluster_label')}")
+            if a.get("exclusion_reason"):
+                lines.append(f"  Exclusion reason: {a.get('exclusion_reason')}")
+            if a.get("note"):
+                lines.append(f"  Note: {a.get('note')}")
+            lines.append("")
+        content = "\n".join(lines)
+        media_type, filename = "text/plain", f"library_{scope}.txt"
+    else:
+        content = _library_rows_to_csv(rows)
+        media_type, filename = "text/csv", f"library_{scope}.csv"
+    return content, media_type, filename
+
+
 @router.get("/api/export/library")
+@limiter.limit("10/minute")
 async def api_export_library(
     request: Request,
     scope: str = "all",
@@ -175,40 +265,7 @@ async def api_export_library(
     except ValueError:
         return JSONResponse(status_code=400, content={"detail": "Invalid library"})
     try:
-        rows = p.db.get_library_export_rows(scope=scope)
-        if fmt == "ris":
-            content = collection_to_ris(rows)
-            media_type = "application/x-research-info-systems"
-            filename = "library.ris"
-        elif fmt == "bibtex":
-            content = collection_to_bibtex(rows)
-            media_type = "application/x-bibtex"
-            filename = "library.bib"
-        elif fmt == "apa":
-            content = collection_to_apa(rows)
-            media_type = "text/plain"
-            filename = "library_apa.txt"
-        elif fmt == "txt":
-            lines = []
-            for a in rows:
-                flag = "EXCLUDED" if a.get("excluded") else ("STARRED" if a.get("starred") else "INCLUDED")
-                lines.append(f"[{flag}] {a.get('title', '')}")
-                lines.append(
-                    f"  Year: {a.get('year', '')} | Source: {a.get('source', '')} | "
-                    f"ID: {a.get('article_id', '')}"
-                )
-                if a.get("cluster_label"):
-                    lines.append(f"  Cluster: {a.get('cluster_label')}")
-                if a.get("exclusion_reason"):
-                    lines.append(f"  Exclusion reason: {a.get('exclusion_reason')}")
-                if a.get("note"):
-                    lines.append(f"  Note: {a.get('note')}")
-                lines.append("")
-            content = "\n".join(lines)
-            media_type, filename = "text/plain", f"library_{scope}.txt"
-        else:
-            content = _library_rows_to_csv(rows)
-            media_type, filename = "text/csv", f"library_{scope}.csv"
+        content, media_type, filename = await run_in_thread(_build_library_export, p.db, scope, fmt)
         return StreamingResponse(
             io.BytesIO(content.encode()),
             media_type=media_type,

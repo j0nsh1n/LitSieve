@@ -44,6 +44,12 @@ slowapi>=0.1.9
 
 # Utilities
 python-dotenv>=1.0.1
+# HTTP client for the Ollama and OpenAI-compatible study-aid calls (was only
+# present as a transitive dependency).
+httpx>=0.27
+# Anthropic study-aid provider. Optional at runtime: without it the provider
+# is not offered (app/services/llm.py anthropic_installed).
+anthropic>=0.40
 
 # Testing
 pytest>=8.0.0

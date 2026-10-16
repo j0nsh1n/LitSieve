@@ -15,6 +15,21 @@ def _env_truthy(name: str, default: str = "false") -> bool:
     return os.getenv(name, default).strip().lower() in ("1", "true", "yes", "on")
 
 
+def ai_buttons_hidden() -> bool:
+    """HIDE_AI_BUTTONS also switches the AI routes off (decided 2026-10-16)."""
+    return _env_truthy("HIDE_AI_BUTTONS", "false")
+
+
+def ai_off_response():
+    """403 for an AI study-aid request while HIDE_AI_BUTTONS is on (audit 22.6)."""
+    from fastapi.responses import JSONResponse
+
+    return JSONResponse(
+        status_code=403,
+        content={"detail": "AI study aids are turned off on this server."},
+    )
+
+
 def get_ui_flags() -> Dict[str, bool]:
     """Public flags consumed by templates/JS and search enrichment.
 

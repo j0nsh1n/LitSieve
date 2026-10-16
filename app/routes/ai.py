@@ -5,6 +5,7 @@ import logging
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
+from app.content.ui_flags import ai_buttons_hidden, ai_off_response
 from app.core import (
     admin_forbidden_response,
     csrf_failed,
@@ -41,12 +42,15 @@ async def api_ai_settings_get(request: Request):
     from app.services.llm import status as ai_status
     with ai_for_user(user["user_id"]):
         settings = public_ai_settings()
+        # Inside the account's context: outside it the status was the host's,
+        # and saving from that state replaced the student's provider (22.1).
+        status_detail = ai_status()
     # Ollama start/stop drives the host process — admins only, regardless of
     # the per-account settings a student may edit.
     settings["ollama_control_allowed"] = bool(
         is_admin_user(user) and settings.get("ollama_control_allowed")
     )
-    return {"settings": settings, "status": ai_status()}
+    return {"settings": settings, "status": status_detail}
 
 
 @router.post("/api/ai/settings")
@@ -88,6 +92,21 @@ async def api_ai_settings_save(req: AISettingsUpdate, request: Request):
                 content={"detail": "llm_provider must be auto, ollama, openai, or anthropic"},
             )
         payload["llm_provider"] = prov
+    if payload.get("openai_base_url"):
+        from app.services.llm import base_url_problem
+        problem = await run_in_thread(base_url_problem, str(payload["openai_base_url"]))
+        if problem:
+            return JSONResponse(status_code=400, content={"detail": problem})
+    if payload.get("llm_timeout_seconds") not in (None, ""):
+        try:
+            seconds = float(payload["llm_timeout_seconds"])
+        except (TypeError, ValueError):
+            seconds = -1.0
+        if not 5 <= seconds <= 300:
+            return JSONResponse(
+                status_code=400,
+                content={"detail": "The AI timeout must be between 5 and 300 seconds."},
+            )
     uid = user["user_id"]
     with ai_for_user(uid):
         save_ai_settings(payload, user_id=uid)
@@ -187,6 +206,8 @@ async def api_ai_refine_article(req: AIArticleRequest, request: Request):
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
     if csrf_failed(request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    if ai_buttons_hidden():
+        return ai_off_response()
     uid = user["user_id"]
     p = get_pipeline(uid)
     try:
@@ -304,6 +325,8 @@ async def api_ai_ask_article(req: AIAskRequest, request: Request):
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
     if csrf_failed(request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    if ai_buttons_hidden():
+        return ai_off_response()
     uid = user["user_id"]
     p = get_pipeline(uid)
     try:

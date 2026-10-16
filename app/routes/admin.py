@@ -47,6 +47,7 @@ from app.storage.libraries import (
     owned_library_id,
     pipeline_cache_key,
 )
+from app.version import APP_VERSION
 
 logger = logging.getLogger(__name__)
 
@@ -388,7 +389,7 @@ async def api_admin_overview(request: Request):
         "ai": llm_svc.is_configured(),
         "quota_mb": round(cap / (1024 * 1024)) if cap else 0,
         "guest_auto_prepare": guest_prep not in ("0", "false", "no", "off"),
-        "version": "6.0.0",
+        "version": APP_VERSION,
         "uptime_seconds": int(max(0, __import__("time").time() - core.PROCESS_STARTED)),
         "jobs": job_counts,
         "auth_events_1h": {str(k): int(v) for k, v in auth_hour},

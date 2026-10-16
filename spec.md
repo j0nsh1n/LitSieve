@@ -83,8 +83,9 @@ a substitute for school library databases.
   never silent bulk rewrite. Explain this study is a structured plain-language
   reading (audiences `high_school` | `general_reader`) of an abstract already
   in the student's library. Automatic checks are **warnings only** (never
-  "verified"). Hidden with `HIDE_AI_BUTTONS`. No `/api/reader/explain-library`
-  or bulk-explain route.
+  "verified"). `HIDE_AI_BUTTONS` hides them and turns their routes off
+  (refine, ask, explain answer 403), so hidden means off (decided
+  2026-10-16). No `/api/reader/explain-library` or bulk-explain route.
 - Optional library **clone codes** (copy, not live share)
 - Optional recovery email (SMTP-gated; verified before trusted) on current product
   path when SMTP is configured

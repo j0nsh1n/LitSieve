@@ -119,6 +119,9 @@ def test_settings_post_ok_when_write_enabled(app_module, monkeypatch, tmp_path):
 
 def test_settings_post_stays_on_the_callers_account(app_module, monkeypatch, tmp_path):
     monkeypatch.setenv("AI_ALLOW_SETTINGS_WRITE", "true")
+    # This test is about which account is written, not URL checks (no DNS here).
+    from app.services import llm
+    monkeypatch.setattr(llm, "base_url_problem", lambda url: None)
     a = TestClient(app_module.app)
     _register(a, username="student_a")
     r = a.post(

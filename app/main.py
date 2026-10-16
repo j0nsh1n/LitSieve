@@ -1,5 +1,5 @@
 """
-FastAPI Application — LitSieve v6.0.0
+FastAPI Application — LitSieve (version: app/version.py)
 Multi-user web interface for literature search and analysis.
 
 This module only wires the app together: configuration, static files, the
@@ -43,6 +43,7 @@ from app.routes import (  # noqa: E402
 )
 from app.security import SecurityHeadersMiddleware  # noqa: E402
 from app.support_gate import SupportViewMiddleware  # noqa: E402
+from app.version import APP_VERSION  # noqa: E402
 
 configure_logging()
 logger = logging.getLogger(__name__)
@@ -115,7 +116,7 @@ def _handle_rate_limit(request: Request, exc: Exception) -> Response:
 
 app = FastAPI(
     title="LitSieve",
-    version="6.0.0",
+    version=APP_VERSION,
     lifespan=lifespan,
 )
 app.state.limiter = core.limiter

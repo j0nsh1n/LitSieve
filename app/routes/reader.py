@@ -5,6 +5,7 @@ import logging
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
 
+from app.content.ui_flags import ai_buttons_hidden, ai_off_response
 from app.core import (
     csrf_failed,
     current_user,
@@ -51,6 +52,8 @@ async def api_reader_explain(req: ReaderExplainRequest, request: Request):
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
     if csrf_failed(request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    if ai_buttons_hidden():
+        return ai_off_response()
     uid = user["user_id"]
     p = get_pipeline(uid)
     try:
