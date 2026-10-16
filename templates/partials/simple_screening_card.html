@@ -70,6 +70,11 @@
     </label>
    </fieldset>
    <p class="info-text simple-screen-total" id="simple-screen-total" hidden></p>
+   {# Duplicates are set aside on their own after prepare; this says so and can bring them back. #}
+   <p class="info-text simple-screen-dups" id="simple-screen-dups" hidden>
+    <span id="simple-screen-dups-msg"></span>
+    <button type="button" class="btn btn-secondary btn-sm" id="simple-screen-dups-undo">Undo</button>
+   </p>
    <div class="form-row simple-screen-actions" id="simple-screen-actions">
     <button type="button" class="btn btn-secondary" id="simple-screen-preview-btn">Show me what would go</button>
     <button type="button" class="btn btn-primary" id="simple-screen-apply-btn">Set them aside</button>

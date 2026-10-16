@@ -494,6 +494,20 @@ function fillSimpleRailStats(stats, report) {
  host.hidden = total <= 0;
 }
 
+/** Re-read the counts behind the Kept / Removed / Screened out rail (audit 19.2). */
+async function refreshRailStats() {
+ if (!document.getElementById('simple-rail-stats')) return;
+ try {
+  const [stats, report] = await Promise.all([
+   apiCall('/api/statistics'),
+   apiCall('/api/screening-report?format=json'),
+  ]);
+  fillSimpleRailStats(stats, report);
+ } catch (e) {
+  // The rail keeps its last numbers; the next change or reload corrects them.
+ }
+}
+
 async function loadSearchEmptyState() {
  try {
  const stats = await apiCall('/api/statistics');
@@ -1153,6 +1167,7 @@ function setSearchRequestPending(pending) {
 
 function clientSort(results, sortBy) {
  const arr = results.slice();
+ // Similarity keeps the server's order, which is the order of the shown score.
  if (sortBy === 'year') {
  arr.sort((a, b) => (parseYear(b.year) - parseYear(a.year)));
  } else if (sortBy === 'journal') {
@@ -1160,7 +1175,9 @@ function clientSort(results, sortBy) {
  } else if (sortBy === 'title') {
  arr.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
  }
- return arr;
+ // Under a year range, papers with no usable year stay in their own group
+ // after the dated ones, whatever the sort (audit 19.16).
+ return arr.filter((a) => !a.no_year).concat(arr.filter((a) => a.no_year));
 }
 
 function parseYear(y) {
@@ -1355,8 +1372,9 @@ function buildResultCard(article, idx) {
  const simLabel = sim.toFixed(3);
  // Hover definition: 0–1 rank of meaning match vs the query (not a quality grade).
  const scoreHelp =
-  'Similarity score (0–1): how closely this paper matches your query by meaning. '
-  + 'Higher is a stronger match. Not a quality or evidence grade.';
+  'Similarity score (0–1): mostly how closely this paper matches your query by meaning, '
+  + 'plus a smaller share for the exact words it shares with it. The list is sorted '
+  + 'by this number. Not a quality or evidence grade.';
 
  const url = getArticleUrl(article.article_id, article.source);
  const idText = escapeHtml(article.article_id || '');
@@ -1666,6 +1684,7 @@ function syncResultCountAfterScreen() {
   exportSec.style.display = hasHits ? 'block' : 'none';
  }
  if (typeof updateSimpleSearchPanel === 'function') updateSimpleSearchPanel(hasHits);
+ refreshRailStats();
 }
 
 /** Swap a result card for a short-lived undo strip after Not relevant. Returns the strip. */
@@ -1997,10 +2016,11 @@ function renderResults(results) {
  return;
  }
 
+ const renderItem = (article, idx) => buildResultListItem(results, article, idx);
  if (typeof renderPaginatedList === 'function') {
- renderPaginatedList(container, results, buildResultCard, { noun: 'results' });
+ renderPaginatedList(container, results, renderItem, { noun: 'results' });
  } else {
- results.forEach((article, idx) => container.appendChild(buildResultCard(article, idx)));
+ results.forEach((article, idx) => container.appendChild(renderItem(article, idx)));
  }
  // The grid layouts start closed: an open paper there is a side panel.
  if (!resultsUseReaderPanel()) {
@@ -2010,6 +2030,21 @@ function renderResults(results) {
  if (typeof enhanceAbstracts === 'function') {
  enhanceAbstracts(container);
  }
+}
+
+/** A result card; the first undated paper under a year range starts the "No year listed" group. */
+function buildResultListItem(results, article, idx) {
+ const card = buildResultCard(article, idx);
+ if (!article.no_year || (idx > 0 && results[idx - 1].no_year)) return card;
+ const group = document.createDocumentFragment();
+ const heading = document.createElement('h3');
+ heading.className = 'results-group-heading';
+ heading.textContent = 'No year listed';
+ const note = document.createElement('p');
+ note.className = 'results-group-note';
+ note.textContent = 'These papers give no publication year, so the year range cannot place them.';
+ group.append(heading, note, card);
+ return group;
 }
 
 /**

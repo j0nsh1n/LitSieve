@@ -47,7 +47,8 @@ def apply_pico_boost(results: List[dict], query_text: str) -> None:
         boost = min(0.08, 0.015 * hits)
         a["similarity_score"] = round(base + boost, 4)
         a["pico_boost"] = round(boost, 4)
-    results.sort(key=lambda x: x.get("similarity_score") or 0, reverse=True)
+    # Papers in the "No year listed" group stay after the dated ones.
+    results.sort(key=lambda x: (not x.get("no_year"), x.get("similarity_score") or 0), reverse=True)
 
 
 def attach_notes(results: List[dict], p) -> None:

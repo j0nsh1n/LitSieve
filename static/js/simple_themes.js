@@ -82,6 +82,7 @@ function _themeRenderBrowser(clusters, libraryId) {
    _simpleThemeUndoState = {libraryId: '', items: []};
    undoButton.hidden = true;
    _themeSetStatus('Those papers are back in Search.');
+   if (typeof refreshRailStats === 'function') refreshRailStats();
   } catch (error) {
    _themeSetStatus('Could not undo. Try again.', true);
   } finally {
@@ -217,6 +218,7 @@ function _themeRenderBrowser(clusters, libraryId) {
      if (undoButton) undoButton.hidden = false;
      preview.hidden = true;
      _themeSetStatus(`${items.length} paper(s) set aside. You can undo this change.`);
+     if (typeof refreshRailStats === 'function') refreshRailStats();
     } catch (error) {
      apply.disabled = false;
      _themeSetStatus('Could not set those papers aside. Try again.', true);

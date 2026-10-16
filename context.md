@@ -6,7 +6,7 @@
   poster. Live at `https://www.litpilot.org` from the production checkout at
   `0374605` (2026-10-14). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
-- Latest full suite (2026-10-16): **1123 passed**, no xfails; all 15 parity
+- Latest full suite (2026-10-16): **1135 passed**, no xfails; all 15 parity
   rows pass. `ruff check .` clean; `pyright app` **0 errors**, 6 optional-import
   warnings (CI blocks on errors). `pip-audit` (2026-10-14): no known
   vulnerabilities; ROCm torch/triton are un-auditable. No dependency lockfile.
@@ -54,8 +54,8 @@
   Phases 16 to 23; findings have ids (`16.1`, ...) that tasks and PRs cite;
   mark a finding `Fixed in #NN` when its PR merges. Sections 16 and 17 are
   fixed (#93, #94; 16.9's Overview counts moved to Phase 21); section 18 is
-  fixed in #95 (open). Open headline items: quota never freed by deleting
-  papers; hybrid rank min-max normalisation; several Search-page element
+  fixed in #95. Open headline items: quota never freed by deleting
+  papers; several Search-page element
   ids that no template renders; Laya topic areas keep a stale pick when the
   answer is unsure, the topic is short, or any area was clicked by hand.
 - Admin (`/admin`) is four tabs with the hash as its address (`#accounts/u/<id>`,
@@ -144,9 +144,10 @@ Guest User (is_guest) → sample corpus only; purged by age
   the owning user's progress while a referenced job is active.
 
 ## Session Handoff
-- **Date:** 2026-10-16. **Branch:** `fix/sources` (Phase 18, audit 18.1 to
-  18.17), worktree `~/.t3/worktrees/HealthDatabaseAccess/fix-sources`.
-  Phases 16 and 17 merged as #93 and #94; their branches and worktrees are
+- **Date:** 2026-10-16. **Branch:** `fix/search-ranking` (Phase 19a, audit
+  19.1-19.3 and 19.16), worktree
+  `~/.t3/worktrees/HealthDatabaseAccess/fix-search-ranking`. Phases 16, 17
+  and 18 merged as #93, #94 and #95; their branches and worktrees are
   deleted. Production still serves `0374605` (audit 23.1): main has moved
   on but the live checkout was not pulled or restarted.
 - Live response samples for every source (2026-10-15) are trimmed into
@@ -155,6 +156,6 @@ Guest User (is_guest) → sample corpus only; purged by age
 - Host notes: the LAN's primary DNS server (192.168.12.132) times out, so
   cloudflared logs a DNS refresh error every 5 minutes but stays connected;
   `litpilot.org` needs an apex record or redirect rule in Cloudflare.
-- **Next step:** merge #95, then Phase 19 from `main`. 19.3 approved
-  2026-10-16: duplicates stay auto-removed after prepare, shown inside
-  Narrow it down as their own line with Undo.
+- **Next step:** PR for 19a, then 19b (page flow and wait screens,
+  19.4-19.14) from `main`, then 19c (19.15 and Looks polish; dark palettes
+  get contrast fixes only).
