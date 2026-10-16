@@ -8691,6 +8691,8 @@ input:autofill:focus-visible {
 .collect-areas-help { margin: 0 0 var(--space-3); }
 .collect-areas-summary { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: 0; }
 .collect-areas-summary[hidden], #collect-areas-picker[hidden] { display: none; }
+.collect-areas-offer { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: 0 0 var(--space-3); }
+.collect-areas-offer[hidden] { display: none; }
 .collect-areas-note { color: var(--text-soft); }
 .collect-areas-change { padding: var(--space-1) var(--space-3); font-size: var(--fs-sm); }
 

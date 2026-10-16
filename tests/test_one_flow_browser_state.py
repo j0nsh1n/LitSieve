@@ -19,10 +19,12 @@ def test_layout_notice_is_once_and_never_writes_a_mode():
     )
     assert result.returncode == 0, result.stderr
     cases = json.loads(result.stdout)
-    for previous in ("advanced", "unset"):
-        assert cases[previous]["shown"] == 1
-        assert cases[previous]["afterDismiss"] == 0
-        assert cases[previous]["writes"] == [["litsieve_one_flow_notice_v1", "1"]]
+    assert cases["advanced"]["shown"] == 1
+    assert cases["advanced"]["afterDismiss"] == 0
+    assert cases["advanced"]["writes"] == [["litsieve_one_flow_notice_v1", "1"]]
+    # A new browser stored no mode, so it has no old layout to relearn (19.4).
+    assert cases["unset"]["shown"] == 0
+    assert cases["unset"]["writes"] == [["litsieve_one_flow_notice_v1", "1"]]
     assert cases["simple"]["shown"] == 0
     assert cases["simple"]["writes"] == [["litsieve_one_flow_notice_v1", "1"]]
     assert cases["otherPage"]["writes"] == []

@@ -146,14 +146,23 @@ function showSimpleBuffering(phase) {
  const cancel = document.getElementById('search-buffering-cancel');
  if (title) title.textContent = 'Sieving your papers';
  if (lead) lead.textContent = 'Stay on this page';
- if (cancel) cancel.hidden = (phase === 'prepare') || !!window._simpleWaitHolding;
+ if (cancel) {
+  cancel.hidden = (phase === 'prepare') || !!window._simpleWaitHolding;
+  // A cancel disables it; every new wait starts with it usable (19.9).
+  cancel.disabled = false;
+ }
  _startWaitMessages();
  const collect = document.getElementById('search-collect');
  if (collect) collect.hidden = true;
  const card = document.getElementById('simple-screening-card');
  if (card) {
   const modal = document.getElementById('simple-screen-modal');
-  if (!modal || modal.hidden) card.hidden = true;
+  if ((!modal || modal.hidden) && !card.hidden) {
+   card.hidden = true;
+   // Remember that the wait screen hid the More dock, so closing it brings
+   // the dock back (Group by theme never refreshed it; audit 19.8).
+   card.dataset.waitHid = '1';
+  }
  }
 }
 
@@ -172,6 +181,11 @@ function hideSimpleBuffering() {
  if (document.body) document.body.classList.remove('simple-buffering');
  const cancel = document.getElementById('search-buffering-cancel');
  if (cancel) cancel.hidden = true;
+ const card = document.getElementById('simple-screening-card');
+ if (card && card.dataset.waitHid === '1') {
+  delete card.dataset.waitHid;
+  card.hidden = false;
+ }
  _setWaitPct(0);
 }
 
@@ -259,6 +273,8 @@ const SIMPLE_SCREEN_LEVELS = {
 };
 /** @type {Record<string, {proposed_count:number, total_ranked:number, candidates:array}|null>} */
 var _simpleScreenCounts = { low: null, medium: null, high: null };
+// The open modal and the card refresh both ask for counts; share one request.
+let _simpleScreenCountsLoading = null;
 let _simpleScreenCandidates = [];
 let _simpleTriageUsed = false;
 let _simpleTriageLevel = '';
@@ -843,11 +859,11 @@ function simpleScreenFraction(level) {
  return SIMPLE_SCREEN_LEVELS[level] != null ? SIMPLE_SCREEN_LEVELS[level] : 0.25;
 }
 
+/** The typed research question only. The fetch topic is a subject, not a
+ * question, so it never stands in for one (audit 19.11). */
 function simpleScreenQuery() {
  const el = document.getElementById('simple-screen-query');
- if (el && el.value.trim()) return el.value.trim();
- const fetchQ = document.getElementById('fetch-query');
- return (fetchQ && fetchQ.value.trim()) || '';
+ return (el && el.value.trim()) || '';
 }
 
 function prefillSimpleScreenQuery() {
@@ -1014,6 +1030,26 @@ function openSimpleScreenModal() {
  *  - complete: low_relevance > 0 (applied at least once)
  */
 async function refreshSimpleScreeningCard() {
+ try {
+  await _refreshSimpleScreeningCardNow();
+ } finally {
+  await settleSimpleWaitHold();
+ }
+}
+
+/** The 90% hold waits only for Narrow it down's Apply or Skip. When the card
+ * ends anywhere else (already screened, skipped, nothing ready, an error),
+ * finish the wait instead of parking on "Almost got it" (audit 19.10). */
+async function settleSimpleWaitHold() {
+ if (!window._simpleWaitHolding) return;
+ // Mid fetch + prepare the card stays hidden on purpose; the refresh that
+ // runs once the job ends decides.
+ if (_isPipelineBusy()) return;
+ if (isSimpleScreenGatePending()) return;
+ await finishSimpleWaitThenSearch();
+}
+
+async function _refreshSimpleScreeningCardNow() {
  const card = document.getElementById('simple-screening-card');
  if (!card) return;
  if (_isPipelineBusy()) {
@@ -1139,6 +1175,21 @@ async function refreshSimpleScreeningCard() {
 
 async function loadSimpleScreenCounts() {
  const query = simpleScreenQuery();
+ if (_simpleScreenCountsLoading && _simpleScreenCountsLoading.query === query) {
+  return _simpleScreenCountsLoading.promise;
+ }
+ const promise = _loadSimpleScreenCounts(query);
+ _simpleScreenCountsLoading = { query, promise };
+ try {
+  return await promise;
+ } finally {
+  if (_simpleScreenCountsLoading && _simpleScreenCountsLoading.promise === promise) {
+   _simpleScreenCountsLoading = null;
+  }
+ }
+}
+
+async function _loadSimpleScreenCounts(query) {
  const status = document.getElementById('simple-screen-status');
  if (!query) {
   ['low', 'medium', 'high'].forEach((level) => {
@@ -1314,6 +1365,8 @@ function closeSimpleScreenTriage() {
  el.hidden = true;
  el.classList.add('u-hidden');
  document.body.classList.remove('simple-screen-triage-open');
+ // "Showing N paper(s) that would be set aside" described the closed list (19.5).
+ setStatus('simple-screen-status', '', 'info');
  const detail = document.getElementById('screen-triage-detail');
  if (detail) detail.classList.remove('is-open');
  if (_simpleTriageKeyHandler) {
@@ -1803,33 +1856,21 @@ async function doSimpleScreenDuplicatesUndo() {
  }
 }
 
+/** Re-prepare's pre-fill: the question already typed, never the fetch topic
+ * (the saved fetch preferences hold the topic too). */
 function getResearchQuestionCandidate() {
  const screen = document.getElementById('simple-screen-query');
- if (screen && screen.value.trim()) return screen.value.trim();
- const fetchQ = document.getElementById('fetch-query');
- if (fetchQ && fetchQ.value.trim()) return fetchQ.value.trim();
- try {
-  const prefs = JSON.parse(localStorage.getItem(FETCH_PREFS_KEY) || 'null');
-  if (prefs && prefs.query && String(prefs.query).trim()) {
-   return String(prefs.query).trim();
-  }
- } catch (e) { /* ignore */ }
- return '';
+ return (screen && screen.value.trim()) || '';
 }
 
-/** Write a verified question into fetch + screening fields and persist prefs. */
+/** Write a verified question into the screening field; the topic stays. */
 function applyVerifiedResearchQuestion(query) {
  const q = String(query || '').trim();
  if (!q) return;
- const fetchQ = document.getElementById('fetch-query');
- if (fetchQ) fetchQ.value = q;
  const screen = document.getElementById('simple-screen-query');
  if (screen) screen.value = q;
  // Counts were for the old question — force a re-rank after re-prepare.
  _simpleScreenCounts = { low: null, medium: null, high: null };
- try {
-  saveFetchPrefs();
- } catch (e) { /* ignore */ }
 }
 
 /**

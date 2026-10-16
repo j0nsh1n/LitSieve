@@ -136,7 +136,11 @@
             if (ev) ev.preventDefault();
             const root = wrap.closest('.result-card, .cluster-article, .article-card') || wrap.parentElement;
             const abs = root && root.querySelector('.article-abstract');
-            if (abs && typeof abs.scrollIntoView === 'function') {
+            if (!abs) return;
+            // The abstract sits in a closed <details> on result rows (19.14).
+            const details = abs.closest('details');
+            if (details && !details.open) details.open = true;
+            if (typeof abs.scrollIntoView === 'function') {
                 abs.scrollIntoView({ block: 'nearest' });
             }
         };

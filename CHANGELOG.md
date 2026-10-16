@@ -143,6 +143,33 @@ and this project aims to follow Semantic Versioning for app version strings
 - A year range no longer hides papers with no usable year: they appear
   after the results under "No year listed" (19.16).
 
+- Search page flow (audit 19.4 to 19.14):
+  - The "All your tools now live on Search" notice shows only in a browser
+    that stored the old Advanced layout, not in every new browser.
+  - Narrow it down asks for its three level counts once per question
+    (six requests before), and Back clears "Showing N paper(s) that would
+    be set aside".
+  - Laya's topic areas follow the topic: an unsure answer clears its
+    earlier pick instead of keeping it as "picked from your topic"; short
+    topics such as "Lasers" are asked about; after a hand-picked area a new
+    topic offers Laya's areas ("Use these") and drops Laya's own earlier
+    ones; Find asks again when Laya's pick was for an earlier topic.
+  - A library with papers shows the "already has N papers" banner and the
+    "Start fresh deletes N papers" warning again.
+  - Closing a wait screen brings the More dock back (Group by theme hid it
+    until a reload), and the wait screen's Cancel works after a cancel.
+  - The 90% "Almost got it" hold ends on its own whenever Narrow it down is
+    not waiting for Apply or Skip (already screened, skipped, nothing
+    ready, a failed request) instead of parking the page.
+  - Narrow it down and Re-prepare use only the research question typed for
+    them; the fetch topic no longer stands in for it, and Re-prepare no
+    longer overwrites the fetch topic.
+  - One failed progress poll no longer ends the wait while the job runs.
+  - Errors read as sentences ("That note is too long. Keep it to 8000
+    characters or fewer.", "Too many requests in a short time…") instead
+    of "[object Object]" or "Request failed".
+  - "Show original abstract" opens the abstract before scrolling to it.
+
 ### Removed
 - DBLP is no longer offered as a source: it answers every request from the
   host with a bot check, and its records have no abstracts. Papers already

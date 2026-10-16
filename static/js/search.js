@@ -2132,8 +2132,9 @@ async function doExportLibrary(scope, format, libraryId) {
    credentials: 'same-origin',
   });
   if (!response.ok) {
-   const err = await response.json().catch(() => ({ detail: response.statusText }));
-   throw new Error(err.detail || 'Export failed');
+   const err = await response.json().catch(() => ({}));
+   throw new Error(typeof apiErrorSentence === 'function'
+    ? apiErrorSentence(response.status, err) : (err.detail || 'Export failed'));
   }
   const blob = await response.blob();
   const cd = response.headers.get('Content-Disposition') || '';
@@ -2316,8 +2317,9 @@ async function doExportResults(format, libraryId = '') {
    body: JSON.stringify({ format: format || 'ris', items }),
   });
   if (!response.ok) {
-   const err = await response.json().catch(() => ({ detail: response.statusText }));
-   throw new Error(err.detail || 'Export failed');
+   const err = await response.json().catch(() => ({}));
+   throw new Error(typeof apiErrorSentence === 'function'
+    ? apiErrorSentence(response.status, err) : (err.detail || 'Export failed'));
   }
   const blob = await response.blob();
   const cd = response.headers.get('Content-Disposition') || '';

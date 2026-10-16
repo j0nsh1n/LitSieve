@@ -13,34 +13,12 @@ audit when its PR merges.
 
 ## Phase 19 — Search page and ranking
 Audit section 19. Three PRs (decided 2026-10-16): (a) ranking, rail,
-duplicates and undated papers (19.1-19.3, 19.16; on `fix/search-ranking`);
-(b) the page flow and wait screens (19.4-19.14); (c) 19.15 and the Looks
-polish. Dark palettes: fix contrast only (every pair to 4.5:1), keep the
+duplicates and undated papers (19.1-19.3, 19.16; `fix/search-ranking`);
+(b) the page flow and wait screens (19.4-19.14; first commits of
+`fix/audit-rest`); (c) 19.15 and the Looks polish. Dark palettes: fix contrast only (every pair to 4.5:1), keep the
 colours otherwise.
 - Tasks:
-  - (19.4) Show the layout notice only when `uiMode` was stored, and update
-    the test that pins the opposite
-  - (19.5) Narrow it down: load the level counts once per question; clear
-    the status line after Back
-  - (19.6) Laya topic areas: clear or relabel the selection when the answer
-    is unsure or unavailable; ask for topics under 8 characters; after a
-    hand click, offer the new pick on a changed topic instead of ignoring
-    it, and drop Laya's own earlier pick from the set; re-ask at Find
-    when the selection came from Laya for a different topic
-  - (19.7) Render the elements `collect.js` writes to (`#prepare-section`
-    and the rest) or delete the code that targets them; the fetch-lock
-    banner and "Start fresh deletes N papers" must show
-  - (19.8) Group by theme: restore the More dock when its wait screen
-    closes
-  - (19.9, 19.10) Re-enable the wait-screen Cancel after a cancel; give the
-    90% hold an exit (reload mid-prepare, statistics failure, zero
-    embeddings)
-  - (19.11) Never use the fetch topic as the Narrow it down question;
-    require a typed question in every apply path and in Re-prepare's
-    pre-fill
-  - (19.12, 19.13) `apiCall`: render 422 and 429 bodies as sentences;
-    retry one failed progress poll before giving up
-  - (19.14, 19.15) "Show original abstract" opens the details; source
+  - (19.15) Source
     chips and Save your work refresh after the first fetch; look cards
     revert on a failed save; clear "Preparing papers…" after Re-prepare;
     keyboard access on topic cards; `escapeAttr` in attribute contexts;
@@ -53,8 +31,7 @@ colours otherwise.
     after Skip
 - Complete when: the audit's browser walk
   (guest, register, fetch, prepare, Narrow it down, star, note, Not
-  relevant, export) passes with no stuck screen; the Laya reproduction in
-  19.6 follows every topic change; the Looks items are checked in the
+  relevant, export) passes with no stuck screen; the Looks items are checked in the
   browser in the looks they touch, light and dark, with ink contrast at or
   above 4.5:1 where colour changes
 - Status: [ ] open
