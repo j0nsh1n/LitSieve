@@ -148,8 +148,8 @@ async function loadOverview() {
   if (health) {
    const fails = (d.source_health || []).filter((s) => s.recent_errors).slice(0, 6);
    health.textContent = fails.length
-    ? ('Recent source errors: ' + fails.map((s) => `${s.name} ${s.recent_errors}`).join(', '))
-    : 'No recent source errors in the job map.';
+    ? ('Source errors in jobs since the last restart: ' + fails.map((s) => `${s.name} ${s.recent_errors}`).join(', '))
+    : 'No source errors in jobs since the last restart.';
   }
   if (status) {
    status.textContent = d.guest_auto_prepare
@@ -830,7 +830,7 @@ async function listTickets(filter) {
   const q = filter === 'all' ? '' : '?status=' + encodeURIComponent(filter);
   const d = await apiCall('/api/admin/tickets' + q);
   renderTicketList(d.tickets || []);
-  if (filter === 'open') setTicketBadge((d.tickets || []).length);
+  if (typeof d.open_total === 'number') setTicketBadge(d.open_total);
   if (status) {
    status.textContent = (d.tickets || []).length
     ? `${d.tickets.length} ${filter === 'all' ? 'tickets' : TICKET_WORDS[filter] || filter}`

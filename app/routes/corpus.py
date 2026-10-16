@@ -45,6 +45,7 @@ from app.schemas import (
     ScreeningRequest,
 )
 from app.services.enrich import attach_key_points
+from app.services.pipeline import FETCHERS
 from app.storage import quota
 from app.storage.libraries import owned_library_id
 from app.utils import (
@@ -55,6 +56,16 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+
+# Job slots are per account, not per library (audit 21.8): say so.
+ONE_FETCH = (
+    "A fetch is already running. One fetch runs at a time per account, "
+    "in any of your libraries; wait for it to finish."
+)
+ONE_PREPARE = (
+    "Papers are already being prepared. One prepare runs at a time per "
+    "account, in any of your libraries; wait for it to finish."
+)
 
 @router.get("/api/progress")
 async def api_progress(request: Request):
@@ -199,7 +210,14 @@ async def api_fetch_multi(req: MultiFetchRequest, request: Request):
     except ValueError as e:
         return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
     # Saved preferences from before a source was retired may still list it.
-    req.sources = drop_retired_sources(req.sources)
+    # Then: once each, in order, and only databases this server knows (21.5).
+    req.sources = list(dict.fromkeys(drop_retired_sources(req.sources)))
+    unknown = [src for src in req.sources if src not in FETCHERS]
+    if unknown:
+        return JSONResponse(
+            status_code=400,
+            content={"detail": f"Unknown database: {unknown[0]}. Pick from the list on Search."},
+        )
     if not req.sources:
         return JSONResponse(
             status_code=400,
@@ -233,7 +251,7 @@ async def api_fetch_multi(req: MultiFetchRequest, request: Request):
         if not started:
             return JSONResponse(
                 status_code=409,
-                content={"detail": "A fetch is already running"},
+                content={"detail": ONE_FETCH},
             )
         return JSONResponse(status_code=202, content={"status": "started"})
 
@@ -256,7 +274,7 @@ async def api_fetch_multi(req: MultiFetchRequest, request: Request):
     ):
         return JSONResponse(
             status_code=409,
-            content={"detail": "A fetch is already running"},
+            content={"detail": ONE_FETCH},
         )
     try:
         p = get_pipeline(uid, lib_id)
@@ -268,7 +286,7 @@ async def api_fetch_multi(req: MultiFetchRequest, request: Request):
         return server_error()
     finally:
         update_progress(uid, 'fetch', active=False)
-        release_pipeline(uid)
+        release_pipeline(uid, lib_id)
 
 
 @router.post("/api/jobs/{task}/cancel")
@@ -291,19 +309,36 @@ async def api_cancel_job(task: str, request: Request):
     return {"status": "cancelling", "task": task}
 
 
+class _EmbedCancelled(Exception):
+    """Raised between batches when the student (or an admin) cancels a prepare."""
+
+
 def _run_create_embeddings(p, *, model, only_missing, uid):
     """Blocking embedding pass for sync wait= or background jobs."""
-    update_progress(uid, 'embed', done=0, total=0)
+    update_progress(uid, 'embed', done=0, total=0, cancel=False)
 
     def on_batch_done(done, total):
         update_progress(uid, 'embed', done=done, total=total)
+        # Read the cancel flag between batches: before, only fetch read it,
+        # so cancelling a prepare did nothing (audit 21.1).
+        if is_job_cancelled(uid, 'embed'):
+            raise _EmbedCancelled()
 
     # Engine swap happens inside create_embeddings under the pipeline lock.
-    result = p.create_embeddings(
-        model=model,
-        progress_callback=on_batch_done,
-        only_missing=only_missing,
-    ) or {}
+    try:
+        result = p.create_embeddings(
+            model=model,
+            progress_callback=on_batch_done,
+            only_missing=only_missing,
+        ) or {}
+    except _EmbedCancelled:
+        stats = p.get_statistics()
+        return {
+            "status": "cancelled",
+            "articles_processed": stats["articles_with_embeddings"],
+            "embeddings_created": 0,
+            "message": "Preparing was cancelled. Nothing from this run was saved.",
+        }
     stats = p.get_statistics()
     return {
         "status": "success",
@@ -344,12 +379,22 @@ async def api_create_embeddings(req: EmbeddingsRequest, request: Request):
         if not started:
             return JSONResponse(
                 status_code=409,
-                content={"detail": "A embed is already running"},
+                content={"detail": ONE_PREPARE},
             )
         return JSONResponse(status_code=202, content={"status": "started"})
 
-    p = get_pipeline(uid, lib_id)
-    update_progress(uid, 'embed', active=True, done=0, total=0, result=None, error=None)
+    # Claim the slot like the background path: a sync embed used to mark the
+    # slot active over a running job and then clear it in finally (21.3).
+    if not try_begin_user_job(uid, 'embed', library_id=lib_id, done=0, total=0):
+        return JSONResponse(
+            status_code=409,
+            content={"detail": ONE_PREPARE},
+        )
+    try:
+        p = get_pipeline(uid, lib_id)
+    except Exception:
+        update_progress(uid, 'embed', active=False)
+        return server_error()
     try:
         result = await run_in_thread(_run_create_embeddings, p, **job_kwargs)
         update_progress(uid, 'embed', active=False, result=result, error=None)
@@ -359,7 +404,7 @@ async def api_create_embeddings(req: EmbeddingsRequest, request: Request):
         return server_error()
     finally:
         update_progress(uid, 'embed', active=False)
-        release_pipeline(uid)
+        release_pipeline(uid, lib_id)
 
 
 def _run_create_clusters(p, *, uid, n_clusters, method):
@@ -490,9 +535,13 @@ async def api_detect_duplicates(req: DuplicateRequest, request: Request):
     if csrf_failed(request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
     uid = user["user_id"]
-    p = get_pipeline(uid)
     try:
-        duplicates = p.detect_duplicates(threshold=req.threshold)
+        p = get_owned_pipeline(uid, req.library_id)
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
+    try:
+        # Pairwise similarity over the library: off the event loop (21.4).
+        duplicates = await run_in_thread(p.detect_duplicates, threshold=req.threshold)
         result = []
         for id1, id2, sim in duplicates[:50]:
             a1 = p.db.get_article_by_id(*id1)
@@ -517,7 +566,7 @@ async def api_detect_duplicates(req: DuplicateRequest, request: Request):
     except Exception as e:
         return server_error()
     finally:
-        release_pipeline(uid)
+        release_pipeline(uid, req.library_id)
 
 
 @router.post("/api/screening")
@@ -611,7 +660,10 @@ async def api_screening_quick_preview(req: QuickScreenPreviewRequest, request: R
     if csrf_failed(request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
     uid = user["user_id"]
-    p = get_pipeline(uid)
+    try:
+        p = get_owned_pipeline(uid, req.library_id)
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
     try:
         # Embedding a query can be heavy — keep it off the event loop.
         result = await run_in_thread(
@@ -623,7 +675,7 @@ async def api_screening_quick_preview(req: QuickScreenPreviewRequest, request: R
     except Exception as e:
         return server_error()
     finally:
-        release_pipeline(uid)
+        release_pipeline(uid, req.library_id)
 
 
 @router.post("/api/clusters/{cluster_id}/screening")
@@ -635,7 +687,10 @@ async def api_cluster_screening(cluster_id: int, req: ClusterScreeningRequest, r
     if csrf_failed(request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
     uid = user["user_id"]
-    p = get_pipeline(uid)
+    try:
+        p = get_owned_pipeline(uid, req.library_id)
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
     try:
         keys = p.db.get_cluster_article_keys(cluster_id)
         if not keys:
@@ -657,7 +712,7 @@ async def api_cluster_screening(cluster_id: int, req: ClusterScreeningRequest, r
     except Exception as e:
         return server_error()
     finally:
-        release_pipeline(uid)
+        release_pipeline(uid, req.library_id)
 
 
 @router.post("/api/load-sample-corpus")
@@ -678,7 +733,10 @@ async def api_load_sample_corpus(req: SampleCorpusRequest, request: Request):
                 status_code=507,
                 content={"detail": sentence_for(e), "quota": quota.usage_report(uid)},
             )
-    p = get_pipeline(uid)
+    try:
+        p = get_owned_pipeline(uid, req.library_id)
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
     try:
         articles = get_sample_articles()
         if not articles:
@@ -702,7 +760,7 @@ async def api_load_sample_corpus(req: SampleCorpusRequest, request: Request):
     except Exception as e:
         return server_error()
     finally:
-        release_pipeline(uid)
+        release_pipeline(uid, req.library_id)
 
 
 @router.post("/api/resolve-duplicates")

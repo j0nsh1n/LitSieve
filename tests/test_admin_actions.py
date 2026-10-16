@@ -290,3 +290,84 @@ def test_retry_fetch_keeps_the_students_contact_email(tmp_path, monkeypatch):
     )
     assert r.status_code == 200, r.text
     assert started["email"] == "kid@school.org"
+
+
+def _capture_start(monkeypatch):
+    started = {}
+
+    def fake_start(user_id, task, fn, **kwargs):
+        started.update(kwargs, task=task)
+        return True
+
+    monkeypatch.setattr(core, "start_user_job", fake_start)
+    return started
+
+
+def test_retry_embed_uses_the_models_the_library_was_built_with(tmp_path, monkeypatch):
+    import numpy as np
+
+    client, db = _admin_client(tmp_path, monkeypatch)
+    _register("stu")
+    uid = db.get_by_username("stu")["id"]
+    pipe = core.get_pipeline(uid)
+    try:
+        pipe.db.insert_articles([{
+            "article_id": "a1", "source": "pubmed", "title": "T", "abstract": "A",
+        }])
+        pipe.db.insert_embeddings({("a1", "pubmed"): np.ones(4, dtype=np.float32)}, model_name="clinical")
+    finally:
+        core.release_pipeline(uid)
+    started = _capture_start(monkeypatch)
+    r = client.post(f"/api/admin/users/{uid}/retry-embed",
+                    json={"reason": "never finished"}, headers=_csrf(client))
+    assert r.status_code == 200, r.text
+    assert started["model"] == "clinical"
+    assert started["only_missing"] is True
+    assert started["library_id"] == r.json()["library_id"]
+
+
+def test_retry_embed_falls_back_to_general_when_nothing_is_stored(tmp_path, monkeypatch):
+    client, db = _admin_client(tmp_path, monkeypatch)
+    _register("stu")
+    uid = db.get_by_username("stu")["id"]
+    started = _capture_start(monkeypatch)
+    r = client.post(f"/api/admin/users/{uid}/retry-embed",
+                    json={"reason": "never finished"}, headers=_csrf(client))
+    assert r.status_code == 200, r.text
+    assert started["model"] == "general"
+
+
+def test_retry_fetch_runs_on_the_library_the_fetch_used(tmp_path, monkeypatch):
+    from app.storage.libraries import create_library, get_active_library_id, set_active_library
+
+    client, db = _admin_client(tmp_path, monkeypatch)
+    _register("stu")
+    uid = db.get_by_username("stu")["id"]
+    first_id = get_active_library_id(uid)
+    other_id = create_library(uid, "Second")["library"]["id"]
+    set_active_library(uid, first_id)
+    assert other_id != get_active_library_id(uid), "the student is on a different library now"
+    last = {"query": "sleep", "sources": ["pubmed"], "max_results": 10,
+            "clear_first": False, "email": ""}
+    monkeypatch.setattr(core, "snapshot_jobs",
+                        lambda _uid: {"fetch": {"last_fetch": last, "library_id": other_id}})
+    started = _capture_start(monkeypatch)
+    r = client.post(f"/api/admin/users/{uid}/retry-fetch",
+                    json={"reason": "source was down"}, headers=_csrf(client))
+    assert r.status_code == 200, r.text
+    assert started["library_id"] == other_id
+    assert r.json()["library_id"] == other_id
+
+
+def test_retry_fetch_refuses_when_that_library_is_gone(tmp_path, monkeypatch):
+    client, db = _admin_client(tmp_path, monkeypatch)
+    _register("stu")
+    uid = db.get_by_username("stu")["id"]
+    last = {"query": "sleep", "sources": ["pubmed"], "max_results": 10, "clear_first": False, "email": ""}
+    monkeypatch.setattr(core, "snapshot_jobs",
+                        lambda _uid: {"fetch": {"last_fetch": last, "library_id": "deleted-lib"}})
+    started = _capture_start(monkeypatch)
+    r = client.post(f"/api/admin/users/{uid}/retry-fetch",
+                    json={"reason": "source was down"}, headers=_csrf(client))
+    assert r.status_code == 400, r.text
+    assert not started

@@ -135,7 +135,7 @@ def test_overview_template_has_every_queue_and_activity_card(tmp_path, monkeypat
     assert 'id="admin-recent-activity"' in html
     assert 'id="admin-activity-list"' in html
     assert 'href="#tickets/open"' in html
-    assert 'admin.js?v=20261015c' in html
+    assert 'admin.js?v=20261016a' in html
 
 
 def test_activity_leaves_out_what_students_did_themselves(tmp_path, monkeypatch):
@@ -164,3 +164,28 @@ def test_activity_leaves_out_what_students_did_themselves(tmp_path, monkeypatch)
     timeline = [a["action"] for a in db.list_support_actions(stu["id"])]
     assert "ticket-open" in timeline
     assert "ticket-student-reply" in timeline
+
+
+def test_overview_job_counts_are_not_cut_to_a_page(tmp_path, monkeypatch):
+    client, _ = _admin_client(tmp_path, monkeypatch)
+    fake = [{"user_id": f"u{i}", "state": "failed", "error_kinds": {"pubmed": "timeout"}} for i in range(40)]
+    monkeypatch.setattr(core, "list_job_queue", lambda limit=25, **_k: fake[:limit])
+    d = client.get("/api/admin/overview").json()
+    assert d["jobs"]["failed"] == 40
+    pubmed = next(s for s in d["source_health"] if s["id"] == "pubmed")
+    assert pubmed["recent_errors"] == 40
+
+
+def test_job_counts_say_they_cover_the_time_since_restart(tmp_path, monkeypatch):
+    client, _ = _admin_client(tmp_path, monkeypatch)
+    html = client.get("/admin").text
+    for kind in ("jobs", "jobs-active", "jobs-stalled", "jobs-failed"):
+        m = re.search(rf'data-queue-link="{kind}"([^>]*)>', html)
+        assert m and "since the server last restarted" in m.group(1), kind
+    assert "Jobs (since restart)" in html
+    import pathlib
+
+    root = pathlib.Path(__file__).resolve().parent.parent
+    js = (root / "static" / "js" / "admin.js").read_text()
+    assert "since the last restart" in js and "in the job map" not in js
+

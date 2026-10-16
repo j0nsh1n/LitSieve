@@ -44,12 +44,25 @@ from app.storage.libraries import (
     delete_library,
     library_db_path,
     list_libraries,
+    owned_library_id,
     pipeline_cache_key,
 )
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+DEFAULT_EMBEDDING_MODEL = "general"
+
+
+def _stored_embedding_model(user_id: str, library_id: str) -> Optional[str]:
+    """The model this library's embeddings were built with, or None if it has none."""
+    pipe = core.get_pipeline(user_id, library_id)
+    try:
+        return pipe.db.get_embedding_model()
+    finally:
+        core.release_pipeline(user_id, library_id)
+
 
 @dataclass(frozen=True)
 class AdminAction:
@@ -349,7 +362,7 @@ async def api_admin_overview(request: Request):
     guest_prep = (os.getenv("GUEST_AUTO_PREPARE") or "1").strip().lower()
     from app.content.source_catalog import SOURCE_CATALOG
     from app.services import llm as llm_svc
-    jobs = core.list_job_queue(limit=25)
+    jobs = core.list_job_queue(limit=core.JOB_QUEUE_MAX)
     job_counts = {"active": 0, "stalled": 0, "failed": 0}
     source_fails: dict = {}
     for job in jobs:
@@ -938,10 +951,12 @@ async def api_admin_retry_embed(user_id: str, request: Request):
     from app.routes.corpus import _run_create_embeddings
     from app.storage.libraries import get_active_library_id
     lib_id = get_active_library_id(user_id)
+    # Same model the library's vectors were built with; "general" only when it has none yet.
+    model = await core.run_in_thread(_stored_embedding_model, user_id, lib_id) or DEFAULT_EMBEDDING_MODEL
     # Bind the job to the student uid/library — never the admin session.
     if not core.start_user_job(
         user_id, "embed", _run_create_embeddings,
-        model="general", only_missing=True, uid=user_id,
+        model=model, only_missing=True, uid=user_id, library_id=lib_id,
     ):
         return JSONResponse(
             status_code=409,
@@ -1131,7 +1146,15 @@ async def api_admin_retry_fetch(user_id: str, request: Request):
         )
     from app.routes.corpus import _run_multi_fetch
     from app.storage.libraries import get_active_library_id
-    lib_id = get_active_library_id(user_id)
+    # The library the last fetch ran on (kept on the slot); the active one only for an old slot without it.
+    lib_id = (jobs.get("fetch") or {}).get("library_id") or get_active_library_id(user_id)
+    try:
+        lib_id = owned_library_id(user_id, lib_id)
+    except ValueError:
+        return JSONResponse(
+            status_code=400,
+            content={"detail": "The library that fetch ran on no longer exists."},
+        )
     if not core.start_user_job(
         user_id, "fetch", _run_multi_fetch,
         query=last["query"],
@@ -1140,6 +1163,7 @@ async def api_admin_retry_fetch(user_id: str, request: Request):
         email=last.get("email") or "",
         clear_first=bool(last.get("clear_first")),
         uid=user_id,
+        library_id=lib_id,
     ):
         return JSONResponse(
             status_code=409,
@@ -1292,7 +1316,12 @@ async def api_admin_tickets(request: Request, status: str = ""):
     if status not in ("", "all", *helpdesk.TICKET_STATUSES):
         return JSONResponse(status_code=400, content={"detail": "Unknown ticket status filter."})
     rows = helpdesk.list_tickets(core.user_db, status="" if status == "all" else status, limit=25)
-    return {"tickets": rows, "total": len(rows)}
+    # `total` is this page (capped at 25); `open_total` is every open ticket, for the tab badge.
+    return {
+        "tickets": rows,
+        "total": len(rows),
+        "open_total": helpdesk.count_tickets(core.user_db, status="open"),
+    }
 
 
 @router.get("/api/admin/tickets/{ticket_id}")

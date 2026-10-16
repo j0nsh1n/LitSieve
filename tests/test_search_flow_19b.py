@@ -39,7 +39,7 @@ let calls = 0;
 const sandbox = {
   SIMPLE_SCREEN_LEVELS: {low: 0.1, medium: 0.25, high: 0.5},
   document: {getElementById: (id) => (id === 'simple-screen-query' ? {value: 'Does sleep help?'} : null)},
-  setStatus() {}, applySimpleScreenCountLabels() {}, console,
+  setStatus() {}, applySimpleScreenCountLabels() {}, console, withPageLibrary: (body) => body,
   apiCall: async () => { calls += 1; await new Promise((r) => setTimeout(r, 10)); return {proposed_count: 1, total_ranked: 9}; },
   setTimeout,
 };

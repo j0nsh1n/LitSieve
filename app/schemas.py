@@ -171,7 +171,9 @@ class ClusterRequest(BaseModel):
 
 
 class DuplicateRequest(BaseModel):
-    threshold: float = 0.98
+    # Strict 0.99, Normal 0.98, Loose 0.95; below 0.8 nearly every pair "matches".
+    threshold: float = Field(default=0.98, ge=0.8, le=1.0)
+    library_id: Optional[str] = Field(default=None, max_length=128)
 
 
 class ScreeningItem(BaseModel):
@@ -192,15 +194,22 @@ class QuickScreenPreviewRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=2000)
     # Fraction of the prepared, non-excluded library to propose (bottom of rank).
     fraction: float = Field(default=0.25, ge=0.05, le=0.50)
+    library_id: Optional[str] = Field(default=None, max_length=128)
 
 
 class ClusterScreeningRequest(BaseModel):
     action: str = Field(default="exclude", pattern="^(exclude|include)$")
     reason: Optional[str] = "cluster"
+    library_id: Optional[str] = Field(default=None, max_length=128)
 
 class SampleCorpusRequest(BaseModel):
     # True = wipe collection first (demo reset). False = append samples.
     clear_first: bool = True
+    library_id: Optional[str] = Field(default=None, max_length=128)
+
+
+class StartOverRequest(BaseModel):
+    library_id: Optional[str] = Field(default=None, max_length=128)
 
 
 class LibraryCreateRequest(BaseModel):
