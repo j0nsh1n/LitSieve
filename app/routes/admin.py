@@ -53,7 +53,11 @@ router = APIRouter()
 
 @dataclass(frozen=True)
 class AdminAction:
-    """One account action: its route suffix, button, and confirm rule."""
+    """One account action: its route suffix, button, and confirm rule.
+
+    The messages are the accounts it refuses: guests, the acting admin's own
+    account, or any admin. The page shows them before a dialog opens.
+    """
 
     name: str
     label: str
@@ -61,18 +65,22 @@ class AdminAction:
     destructive: bool = False
     per_task: bool = False
     guest_message: Optional[str] = None
+    self_message: Optional[str] = None
+    admin_message: Optional[str] = None
 
 
 ACTIONS: tuple[AdminAction, ...] = (
     AdminAction("unlock", "Unlock account", "access"),
     AdminAction("resend-verification", "Resend verification", "access"),
     AdminAction("set-email", "Set email + send verification", "access", destructive=True,
-                guest_message="Guest demos cannot change email. They must register."),
+                guest_message="Guest demos cannot change email. They must register.",
+                admin_message="An admin's email is changed from their own Account page."),
     AdminAction("send-reset", "Email password reset", "access", destructive=True,
                 guest_message="Guest demos have no password."),
     AdminAction("send-login-link", "Email one-time sign-in", "access", destructive=True,
                 guest_message="Guest demos cannot use a login link."),
-    AdminAction("revoke-sessions", "Revoke all sessions", "access", destructive=True),
+    AdminAction("revoke-sessions", "Revoke all sessions", "access", destructive=True,
+                self_message="This would sign you out of the console. Use Log out instead."),
     AdminAction("cancel-job", "Cancel", "jobs", destructive=True, per_task=True),
     AdminAction("clear-job", "Clear stale", "jobs", destructive=True, per_task=True),
     AdminAction("retry-embed", "Retry prepare", "jobs"),
@@ -82,7 +90,9 @@ ACTIONS: tuple[AdminAction, ...] = (
     AdminAction("delete-library", "Delete one library", "storage", destructive=True),
     AdminAction("view", "View as student", "account"),
     AdminAction("disable", "Disable account", "account", destructive=True,
-                guest_message="Guest demos cannot be disabled. They expire on their own."),
+                guest_message="Guest demos cannot be disabled. They expire on their own.",
+                admin_message="Admins cannot be disabled here. Take the name out of "
+                              "ADMIN_USERNAMES first."),
     AdminAction("enable", "Re-enable account", "account"),
 )
 ACTION_BY_NAME = {a.name: a for a in ACTIONS}
@@ -153,6 +163,16 @@ async def _begin_post(request: Request, *, confirm: Optional[str] = None):
     return AdminPost(admin=admin, body=body)
 
 
+def _refusal(action: AdminAction, rec: dict, admin: dict) -> Optional[str]:
+    if rec.get("is_guest"):
+        return action.guest_message
+    if action.self_message and rec["id"] == admin["user_id"]:
+        return action.self_message
+    if action.admin_message and core.is_admin_username(rec["username"]):
+        return action.admin_message
+    return None
+
+
 async def _begin_action(request: Request, user_id: str, name: str):
     """The same checks for an account action, with the confirm rule from ACTIONS."""
     action = ACTION_BY_NAME[name]
@@ -164,8 +184,9 @@ async def _begin_action(request: Request, user_id: str, name: str):
     rec, missing = _load_account(user_id)
     if missing or not rec:
         return missing or JSONResponse(status_code=404, content={"detail": "Account not found"})
-    if action.guest_message and rec.get("is_guest"):
-        return JSONResponse(status_code=400, content={"detail": action.guest_message})
+    refused = _refusal(action, rec, admin)
+    if refused:
+        return JSONResponse(status_code=400, content={"detail": refused})
     body = await _read_json(request)
     bad = _require_reason(body, confirm=rec["username"] if action.destructive else None)
     if bad:
@@ -426,10 +447,20 @@ def _watchdog_status() -> Optional[dict]:
         return None
     return {
         "healthy": bool(raw.get("healthy")),
-        "since": str(raw.get("since") or ""),
-        "checked_at": str(raw.get("checked_at") or ""),
+        "since": _utc_text(raw.get("since")),
+        "checked_at": _utc_text(raw.get("checked_at")),
         "summary": str(raw.get("summary") or "")[:240],
     }
+
+
+def _utc_text(value) -> str:
+    """The watchdog writes epoch seconds; show them like every other admin time."""
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        try:
+            return datetime.fromtimestamp(value, timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        except (OverflowError, OSError, ValueError):
+            return ""
+    return str(value or "")
 
 
 def _disk_status() -> Optional[dict]:
@@ -455,6 +486,9 @@ def _laya_status() -> dict:
         if not resp.ok:
             return {"state": "down"}
         payload = resp.json()
+    except requests.exceptions.ReadTimeout:
+        # The socket accepted, so systemd is starting a worker that idled out.
+        return {"state": "waking"}
     except Exception:
         return {"state": "down"}
     loaded = payload.get("loaded") if isinstance(payload, dict) else False
@@ -559,8 +593,8 @@ async def api_admin_queue(request: Request, filter: str = "locked"):
 @router.get("/api/admin/users/{user_id}")
 @limiter.limit("30/minute")
 async def api_admin_user_detail(user_id: str, request: Request):
-    _admin, err = _require_admin(request)
-    if err:
+    admin, err = _require_admin(request)
+    if err or not admin:
         return err
     rec, missing = _load_account(user_id)
     if missing or not rec:
@@ -609,6 +643,9 @@ async def api_admin_user_detail(user_id: str, request: Request):
             "notes": stats.get("notes", 0),
         },
         "jobs": jobs,
+        "refusals": {
+            a.name: msg for a in ACTIONS if (msg := _refusal(a, rec, admin))
+        },
         "quota_stopped": any(slot.get("quota_stopped") for slot in jobs.values()),
         "last_error": last_job_error or (
             next((e["detail"] for e in auth_ev if e["kind"] in ("login_fail", "lockout")), None)
@@ -1100,7 +1137,7 @@ async def api_admin_retry_fetch(user_id: str, request: Request):
         query=last["query"],
         sources=list(last["sources"]),
         max_results=int(last.get("max_results") or 20),
-        email="user@example.com",
+        email=last.get("email") or "",
         clear_first=bool(last.get("clear_first")),
         uid=user_id,
     ):
@@ -1340,8 +1377,10 @@ async def api_admin_banner_get(request: Request):
     _admin, err = _require_admin(request)
     if err:
         return err
-    rec = helpdesk.latest_banner(core.user_db)
-    return {"banner": rec, "published": helpdesk.published_banner(core.user_db)}
+    return {
+        "draft": helpdesk.draft_banner(core.user_db),
+        "published": helpdesk.published_banner(core.user_db),
+    }
 
 
 @router.post("/api/admin/banner")
@@ -1356,21 +1395,19 @@ async def api_admin_banner_save(request: Request):
         until = _parse_quota_until(str(body.get("until")))
         if not until:
             return JSONResponse(status_code=400, content={"detail": "until must be a future UTC date."})
-    status = str(body.get("status") or "draft").strip()
     try:
-        rec = helpdesk.upsert_banner(
+        rec = helpdesk.save_banner_draft(
             core.user_db,
             body=str(body.get("body") or ""),
             expires_at=until,
             actor=admin["username"],
-            status=status if status in helpdesk.BANNER_STATUSES else "draft",
         )
     except ValueError as exc:
         return JSONResponse(status_code=400, content={"detail": sentence_for(exc)})
     core.user_db.add_support_action(
         admin["user_id"], admin["user_id"], admin["username"], "banner-save",
         reason=str(body.get("reason") or ""),
-        new_value=status,
+        new_value=rec["id"],
         ip=client_bucket(request),
     )
     return {"status": "ok", "banner": rec}

@@ -148,3 +148,29 @@ def test_laya_health_that_is_not_an_object_counts_as_up_but_not_loaded(monkeypat
     monkeypatch.setenv("LITSIEVE_LAYA_URL", "http://127.0.0.1:7880")
     monkeypatch.setattr(requests, "get", lambda *a, **k: _Resp())
     assert admin._laya_status() == {"state": "up", "loaded": False}
+
+
+def test_watchdog_times_are_shown_as_utc_times(tmp_path, monkeypatch):
+    client, _ = _admin_client(tmp_path, monkeypatch)
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "logs").mkdir()
+    (tmp_path / "logs" / "watchdog_state.json").write_text(json.dumps({
+        "healthy": True, "since": 1787123751.458334, "last_alert": None,
+        "checked_at": 1792109262.0758734, "summary": "all checks passed",
+    }))
+    body = client.get("/api/admin/host").json()
+    assert body["watchdog"]["checked_at"] == "2026-10-16 00:07:42"
+    assert body["watchdog"]["since"] == "2026-08-19 07:15:51"
+
+
+def test_a_sleeping_laya_worker_reads_as_waking_not_down(monkeypatch):
+    import requests
+
+    from app.routes import admin
+
+    def slow(*_a, **_k):
+        raise requests.exceptions.ReadTimeout("socket accepted, worker loading")
+
+    monkeypatch.setenv("LITSIEVE_LAYA_URL", "http://127.0.0.1:7880")
+    monkeypatch.setattr(requests, "get", slow)
+    assert admin._laya_status() == {"state": "waking"}

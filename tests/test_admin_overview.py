@@ -135,4 +135,32 @@ def test_overview_template_has_every_queue_and_activity_card(tmp_path, monkeypat
     assert 'id="admin-recent-activity"' in html
     assert 'id="admin-activity-list"' in html
     assert 'href="#tickets/open"' in html
-    assert 'admin.js?v=20261015b' in html
+    assert 'admin.js?v=20261015c' in html
+
+
+def test_activity_leaves_out_what_students_did_themselves(tmp_path, monkeypatch):
+    client, db = _admin_client(tmp_path, monkeypatch)
+    student = _register("needhelp")
+    r = student.post(
+        "/api/tickets",
+        json={"body": "Prepare never finishes."},
+        headers={"X-CSRF-Token": student.cookies.get("csrf_token") or ""},
+    )
+    assert r.status_code == 200, r.text
+    ticket_id = r.json()["ticket"]["id"]
+    r = student.post(
+        f"/api/tickets/{ticket_id}/reply",
+        json={"body": "Still stuck."},
+        headers={"X-CSRF-Token": student.cookies.get("csrf_token") or ""},
+    )
+    assert r.status_code == 200, r.text
+    stu = db.get_by_username("needhelp")
+    legacy = db.add_support_action(stu["id"], stu["id"], "needhelp", "ticket-reply", "student reply")
+    assert legacy
+    admin_id = db.get_by_username("opadmin")["id"]
+    db.add_support_action(stu["id"], admin_id, "opadmin", "ticket-reply", "answered")
+    items = client.get("/api/admin/activity").json()["items"]
+    assert [(i["admin_username"], i["action"]) for i in items] == [("opadmin", "ticket-reply")]
+    timeline = [a["action"] for a in db.list_support_actions(stu["id"])]
+    assert "ticket-open" in timeline
+    assert "ticket-student-reply" in timeline

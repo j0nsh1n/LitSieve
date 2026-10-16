@@ -22,10 +22,10 @@ Audit section 16.
   - (16.3) Refuse disable, revoke-sessions and set-email on the acting
     admin's own account, and refuse disable on any other admin; say so in
     the dialog before it opens
-  - (16.4, 16.5) Clear the `support_view` cookie on `/logout`, and make a
-    support view re-check that its admin still exists, is enabled and is
-    still an admin, and that the student is not disabled or locked and has
-    not had their sessions revoked (`token_version`)
+  - (16.4, 16.5) Clear the `support_view` cookie on `/logout`, and end a
+    support view when the admin session that started it is gone (logged
+    out, revoked, disabled, or no longer an admin); student-side state does
+    not end a view (see audit 16.5)
   - (16.6, 16.7) Host tab: give the Laya probe long enough for a
     socket-activated worker to load, or show "asleep" when the socket
     accepts but the read times out; format the watchdog `checked_at` and

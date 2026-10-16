@@ -42,6 +42,7 @@ from app.schemas import (
     SetLookRequest,
 )
 from app.services import mailer
+from app.storage import helpdesk
 from app.storage.user_db import AccountCapExceeded, LookChanged
 
 logger = logging.getLogger(__name__)
@@ -536,10 +537,16 @@ def _look_cookie_age(user: dict) -> Optional[int]:
 
 
 @router.get("/logout")
-async def logout():
+async def logout(request: Request):
+    view = helpdesk.get_support_view_by_token(
+        core.user_db, request.cookies.get(core.SUPPORT_VIEW_COOKIE) or "",
+    )
+    if view:
+        helpdesk.end_support_view(core.user_db, view["id"], reason="logout")
     response = RedirectResponse(url="/login", status_code=302)
     response.delete_cookie("access_token")
     response.delete_cookie("csrf_token")
+    response.delete_cookie(core.SUPPORT_VIEW_COOKIE)
     # The next person at this computer starts from the default look, not the
     # last student's (a cookie, so it also overrides the stored copy).
     _set_look_cookie(response, DEFAULT_LOOK)

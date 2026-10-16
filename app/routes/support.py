@@ -69,7 +69,7 @@ async def api_support_view_exit(request: Request):
     if view and user:
         helpdesk.end_support_view(core.user_db, view["id"], reason="exit")
         core.user_db.add_support_action(
-            user["user_id"], view.get("admin_username") or "", view.get("admin_username") or "",
+            user["user_id"], view.get("admin_id") or "", view.get("admin_username") or "",
             "support-view-end", reason=view.get("reason") or "exit",
             new_value="exit",
         )
@@ -85,7 +85,7 @@ async def support_view_exit_page(request: Request):
     if view and user:
         helpdesk.end_support_view(core.user_db, view["id"], reason="exit")
         core.user_db.add_support_action(
-            user["user_id"], view.get("admin_username") or "", view.get("admin_username") or "",
+            user["user_id"], view.get("admin_id") or "", view.get("admin_username") or "",
             "support-view-end", reason=view.get("reason") or "exit",
             new_value="exit",
         )
@@ -192,7 +192,7 @@ async def api_reply_ticket(ticket_id: str, request: Request):
         return JSONResponse(status_code=400, content={"detail": sentence_for(exc)})
     helpdesk.set_ticket_status(core.user_db, ticket_id, "open")
     core.user_db.add_support_action(
-        user["user_id"], user["user_id"], user["username"], "ticket-reply",
+        user["user_id"], user["user_id"], user["username"], "ticket-student-reply",
         reason="student reply", new_value=ticket_id,
     )
     return {"status": "ok", "reply": reply}

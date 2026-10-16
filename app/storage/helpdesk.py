@@ -19,7 +19,6 @@ SUPPORT_VIEW_MINUTES = 15
 SUPPORT_VIEW_MAX_MINUTES = 30
 TICKET_STATUSES = ("open", "waiting_on_student", "investigating", "resolved")
 CONTENT_KEYS = ("support_links", "help_text", "topic_presets", "known_issues")
-BANNER_STATUSES = ("draft", "published", "disabled")
 _VISIT_PATH_MAX = 200
 _BODY_MAX = 4000
 _NOTICE_MAX = 800
@@ -608,21 +607,24 @@ def save_notice_revision(db, notice_id: str, *, action: str, status: str, body: 
         db.conn.commit()
 
 
-def upsert_banner(db, *, body: str, expires_at: Optional[str], actor: str, status: str = "draft") -> Dict:
+def save_banner_draft(db, *, body: str, expires_at: Optional[str], actor: str) -> Dict:
+    """Write the draft row; the published banner is never edited here.
+
+    Only publish and disable change what students see, and both ask for the
+    publish word. A save edits the newest draft, or starts one.
+    """
     text = sanitize_plain(body, limit=_NOTICE_MAX)
     if not text:
         raise UserError("Banner text cannot be empty.")
-    if status not in BANNER_STATUSES:
-        raise UserError("Unknown banner status.")
     now = _now()
-    existing = published_banner(db, include_draft=True)
+    existing = draft_banner(db)
     if existing:
         notice_id = existing["id"]
         with db._lock:
             db.conn.execute(
-                "UPDATE site_notices SET status = ?, body = ?, expires_at = ?, "
+                "UPDATE site_notices SET body = ?, expires_at = ?, "
                 "updated_by = ?, updated_at = ? WHERE id = ?",
-                (status, text, expires_at, actor, now, notice_id),
+                (text, expires_at, actor, now, notice_id),
             )
             db.conn.commit()
     else:
@@ -632,15 +634,12 @@ def upsert_banner(db, *, body: str, expires_at: Optional[str], actor: str, statu
                 "INSERT INTO site_notices "
                 "(id, status, body, expires_at, created_by, updated_by, "
                 "created_at, updated_at, published_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (
-                    notice_id, status, text, expires_at, actor, actor, now, now,
-                    now if status == "published" else None,
-                ),
+                "VALUES (?, 'draft', ?, ?, ?, ?, ?, ?, NULL)",
+                (notice_id, text, expires_at, actor, actor, now, now),
             )
             db.conn.commit()
     save_notice_revision(
-        db, notice_id, action="save", status=status, body=text,
+        db, notice_id, action="save", status="draft", body=text,
         expires_at=expires_at, actor=actor,
     )
     return get_banner(db, notice_id) or {}
@@ -690,30 +689,16 @@ def disable_banner(db, notice_id: str, *, actor: str) -> Optional[Dict]:
 
 
 def rollback_banner(db, notice_id: str, revision_id: str, *, actor: str) -> Optional[Dict]:
+    """Bring back an earlier wording as the draft; publishing it is a separate step."""
     with db._lock:
         row = db.conn.execute(
-            "SELECT body, status, expires_at FROM site_notice_revisions "
+            "SELECT body, expires_at FROM site_notice_revisions "
             "WHERE id = ? AND notice_id = ?",
             (revision_id, notice_id),
         ).fetchone()
     if not row:
         return None
-    body, status, expires_at = row[0], row[1], row[2] or None
-    if status not in BANNER_STATUSES:
-        status = "draft"
-    now = _now()
-    with db._lock:
-        db.conn.execute(
-            "UPDATE site_notices SET body = ?, status = ?, expires_at = ?, "
-            "updated_at = ?, updated_by = ? WHERE id = ?",
-            (body, status, expires_at, now, actor, notice_id),
-        )
-        db.conn.commit()
-    save_notice_revision(
-        db, notice_id, action="rollback", status=status, body=body,
-        expires_at=expires_at, actor=actor,
-    )
-    return get_banner(db, notice_id)
+    return save_banner_draft(db, body=row[0], expires_at=row[1] or None, actor=actor)
 
 
 def get_banner(db, notice_id: str) -> Optional[Dict]:
@@ -756,28 +741,23 @@ def get_banner(db, notice_id: str) -> Optional[Dict]:
     }
 
 
-def latest_banner(db) -> Optional[Dict]:
+def draft_banner(db) -> Optional[Dict]:
     with db._lock:
         row = db.conn.execute(
-            "SELECT id FROM site_notices ORDER BY updated_at DESC LIMIT 1"
+            "SELECT id FROM site_notices WHERE status = 'draft' "
+            "ORDER BY updated_at DESC LIMIT 1"
         ).fetchone()
     return get_banner(db, row[0]) if row else None
 
 
-def published_banner(db, *, include_draft: bool = False) -> Optional[Dict]:
-    now = _now()
+def published_banner(db) -> Optional[Dict]:
     with db._lock:
-        if include_draft:
-            row = db.conn.execute(
-                "SELECT id FROM site_notices ORDER BY updated_at DESC LIMIT 1"
-            ).fetchone()
-        else:
-            row = db.conn.execute(
-                "SELECT id FROM site_notices WHERE status = 'published' "
-                "AND (expires_at IS NULL OR expires_at = '' OR expires_at > ?) "
-                "ORDER BY published_at DESC LIMIT 1",
-                (now,),
-            ).fetchone()
+        row = db.conn.execute(
+            "SELECT id FROM site_notices WHERE status = 'published' "
+            "AND (expires_at IS NULL OR expires_at = '' OR expires_at > ?) "
+            "ORDER BY published_at DESC LIMIT 1",
+            (_now(),),
+        ).fetchone()
     return get_banner(db, row[0]) if row else None
 
 
