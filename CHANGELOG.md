@@ -89,6 +89,48 @@ and this project aims to follow Semantic Versioning for app version strings
   change, including an Ask Grok edit, needs a new Validate before commit
   or deploy.
 
+- Sources (audit 18.1 to 18.17). bioRxiv and medRxiv search Europe PMC's
+  preprint index for that server, so a plain topic finds matching
+  preprints; before, they scanned 30 posts from the oldest end of a 60-day
+  window and almost always reported no results. Their papers link through
+  doi.org.
+- Europe PMC stores each paper's journal (it read a field core results do
+  not have, so every paper said "Unknown journal"), strips HTML from
+  abstracts, and links preprints and PMC records to the right page.
+  DOAJ, Zenodo, OpenAIRE and PLOS abstracts and titles are plain text too.
+- arXiv and PLOS match every word of a topic instead of any one of them
+  ("heart disease" found Alzheimer's papers), and arXiv keeps the
+  three-second spacing its API asks for, with one request per page.
+- A source that answers with a web page instead of data (DBLP's bot check)
+  reports a sentence instead of "Expecting value". PubMed, Semantic Scholar,
+  DOAJ, Zenodo, Europe PMC and NASA ADS report failures as failures rather
+  than "no results", and NASA ADS says when the server has no token.
+- PubMed goes through the shared HTTP client, so its requests time out,
+  retry, honour the fetch budget and cancel; older records dated only by a
+  range ("1990 Dec 3-17") get their year. The process-wide 30-second socket
+  timeout it set at import is gone.
+- A source that finishes just after the fetch budget keeps its papers, any
+  error keeps the pages already fetched, and a `Retry-After` longer than
+  the time left fails at once instead of waiting out the budget.
+- DOAJ, Zenodo and OpenAIRE page without re-fetching earlier records.
+  OpenAIRE links a PMID to PubMed and its own ids to OpenAIRE Explore
+  instead of a broken doi.org link.
+- ClinicalTrials.gov no longer stores the sponsor as the journal. OpenAlex
+  shows the journal instead of a repository name such as "PubMed". PubMed,
+  Europe PMC, OpenAlex and ClinicalTrials.gov keep every author, not the
+  first five. A paper with no year is stored with an empty year rather
+  than "Unknown".
+- Optional host keys `S2_API_KEY`, `OPENALEX_API_KEY` and `NCBI_API_KEY`
+  give Semantic Scholar, OpenAlex and PubMed their own limits
+  (`docs/SELFHOST.md`). A blank contact email sends no address at all
+  instead of a shared placeholder.
+
+### Removed
+- DBLP is no longer offered as a source: it answers every request from the
+  host with a bot check, and its records have no abstracts. Papers already
+  stored from DBLP keep their link and name, and a saved fetch that lists
+  DBLP simply skips it.
+
 ## [6.0.0] - 2026-10-12
 
 ### Added

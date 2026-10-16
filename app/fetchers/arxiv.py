@@ -8,7 +8,8 @@ import logging
 import xml.etree.ElementTree as ET
 from typing import Dict, List, Optional
 
-from app.fetchers.base import BaseFetcher, HttpClient, reraise_fetch_error
+from app.fetchers.base import BaseFetcher, FetchError, HttpClient, reraise_fetch_error, user_agent
+from app.fetchers.terms import boolean_terms
 
 logger = logging.getLogger(__name__)
 
@@ -20,67 +21,66 @@ ARXIV_NS = 'http://arxiv.org/schemas/atom'
 class ArXivFetcher(BaseFetcher):
     SOURCE_NAME = 'arxiv'
     BASE_URL = 'https://export.arxiv.org/api/query'
+    # arXiv asks for no more than one request every three seconds.
+    DELAY = 3.0
 
     def __init__(self, email: Optional[str] = None):
         self.email = email
+        self.http = HttpClient(delay=self.DELAY, user_agent=user_agent(email))
 
-        self.http = HttpClient(delay=0.3)
-
+    @staticmethod
+    def search_query(query: str) -> str:
+        """arXiv ORs bare words, so join them with AND (NOT becomes ANDNOT)."""
+        parts: List[str] = []
+        for term in boolean_terms(query):
+            if term == 'NOT':
+                if parts and parts[-1] == 'AND':
+                    parts.pop()
+                parts.append('ANDNOT')
+            elif term in ('AND', 'OR'):
+                parts.append(term)
+            else:
+                parts.append(f'all:{term}')
+        return ' '.join(parts) or 'all:*'
 
     def search(self, query: str, max_results: int = 500) -> List[str]:
-        ids = []
+        return [a['article_id'] for a in self.search_and_fetch(query, max_results)]
+
+    def search_and_fetch(self, query: str, max_results: int = 500) -> List[Dict]:
+        """The search response already holds each entry in full; parse it directly."""
+        articles: List[Dict] = []
+        ns = {'a': ATOM_NS, 'ax': ARXIV_NS}
         batch = min(200, max_results)
         start = 0
-        ns = {'a': ATOM_NS}
+        search_query = self.search_query(query)
 
-        while len(ids) < max_results:
-            n = min(batch, max_results - len(ids))
+        while len(articles) < max_results:
             try:
                 r = self.http.get(
                     self.BASE_URL,
-                    params={'search_query': f'all:{query}', 'start': start, 'max_results': n},
-                    timeout=30
+                    params={'search_query': search_query, 'start': start, 'max_results': batch},
+                    timeout=30,
                 )
                 root = ET.fromstring(r.text)
-                entries = root.findall('a:entry', ns)
-                if not entries:
-                    break
-                for entry in entries:
-                    id_el = entry.find('a:id', ns)
-                    if id_el is not None and id_el.text:
-                        ids.append(id_el.text.split('/abs/')[-1].strip())
-                if len(entries) < n:
-                    break
-                start += len(entries)
-            except Exception as e:
-                reraise_fetch_error(e)
-                logger.exception("arXiv search error: %s", e)
-                break
-
-        return ids[:max_results]
-
-    def fetch_details(self, ids: List[str], batch_size: int = 100) -> List[Dict]:
-        articles = []
-        ns = {'a': ATOM_NS, 'ax': ARXIV_NS}
-
-        for i in range(0, len(ids), batch_size):
-            batch = ids[i:i + batch_size]
-            try:
-                r = self.http.get(
-                    self.BASE_URL,
-                    params={'id_list': ','.join(batch), 'max_results': len(batch)},
-                    timeout=30
-                )
-                root = ET.fromstring(r.text)
-                for entry in root.findall('a:entry', ns):
-                    article = self._parse_entry(entry, ns)
-                    if article:
-                        articles.append(article)
-            except Exception as e:
+            except FetchError as e:
                 reraise_fetch_error(e, articles)
-                logger.exception("arXiv fetch_details error: %s", e)
+                raise
+            except ET.ParseError as e:
+                raise FetchError(
+                    f"arXiv sent a reply that could not be read: {e}", kind="network", articles=articles
+                ) from e
+            entries = root.findall('a:entry', ns)
+            if not entries:
+                break
+            for entry in entries:
+                article = self._parse_entry(entry, ns)
+                if article:
+                    articles.append(article)
+            if len(entries) < batch:
+                break
+            start += len(entries)
 
-        return articles
+        return articles[:max_results]
 
     def _parse_entry(self, entry, ns) -> Optional[Dict]:
         try:

@@ -8,11 +8,40 @@ from __future__ import annotations
 
 import re
 from typing import Any, Callable, Dict, List, Optional
+from urllib.parse import quote
+
+
+def _openaire_url(aid: Any) -> str:
+    """OpenAIRE ids are a DOI, a bare PMID, or an OpenAIRE object id.
+
+    Keep in sync with the 'openaire' case of getArticleUrl() in static/js/common.js.
+    """
+    text = str(aid)
+    if text.startswith("10."):
+        return f"https://doi.org/{text}"
+    if text.startswith("http"):
+        return text
+    if text.isascii() and text.isdigit():
+        return f"https://pubmed.ncbi.nlm.nih.gov/{text}/"
+    return f"https://explore.openaire.eu/search/result?id={quote(text, safe='')}"
+
+
+def _europepmc_url(aid: Any) -> str:
+    """Europe PMC ids carry their collection: PPR preprints, PMC full texts, bare MED ids.
+
+    Keep in sync with the 'europepmc' case of getArticleUrl() in static/js/common.js.
+    """
+    text = str(aid)
+    for prefix in ("PPR", "PMC"):
+        if text.startswith(prefix):
+            return f"https://europepmc.org/article/{prefix}/{text}"
+    return f"https://europepmc.org/article/MED/{text}"
+
 
 # Keep in sync with getArticleUrl() in static/js/common.js
 SOURCE_URL: Dict[str, Callable[[str], str]] = {
     "pubmed": lambda aid: f"https://pubmed.ncbi.nlm.nih.gov/{aid}/",
-    "europepmc": lambda aid: f"https://europepmc.org/article/MED/{aid}",
+    "europepmc": _europepmc_url,
     "clinicaltrials": lambda aid: f"https://clinicaltrials.gov/study/{aid}",
     "openalex": lambda aid: f"https://openalex.org/{aid}",
     "arxiv": lambda aid: f"https://arxiv.org/abs/{aid}",
@@ -23,12 +52,10 @@ SOURCE_URL: Dict[str, Callable[[str], str]] = {
     "doaj": lambda aid: f"https://doaj.org/article/{aid}",
     "nasa_ads": lambda aid: f"https://ui.adsabs.harvard.edu/abs/{aid}",
     "core": lambda aid: f"https://core.ac.uk/works/{aid}",
-    "biorxiv": lambda aid: f"https://www.biorxiv.org/content/{aid}",
-    "medrxiv": lambda aid: f"https://www.medrxiv.org/content/{aid}",
+    "biorxiv": lambda aid: f"https://doi.org/{aid}",
+    "medrxiv": lambda aid: f"https://doi.org/{aid}",
     "dblp": lambda aid: f"https://dblp.org/rec/{aid}",
-    "openaire": lambda aid: (
-        f"https://doi.org/{aid}" if not str(aid).startswith("http") else str(aid)
-    ),
+    "openaire": _openaire_url,
     "plos": lambda aid: f"https://doi.org/{aid}",
     "hal": lambda aid: (
         f"https://doi.org/{aid}"

@@ -166,8 +166,12 @@ function getArticleUrl(articleId, source) {
     switch (source) {
         case 'pubmed':
             return `https://pubmed.ncbi.nlm.nih.gov/${articleId}/`;
-        case 'europepmc':
-            return `https://europepmc.org/article/MED/${articleId}`;
+        case 'europepmc': {
+            // PPR preprints and PMC full texts keep their prefix (keep in sync with citations.py).
+            const id = String(articleId);
+            const collection = id.startsWith('PPR') ? 'PPR' : id.startsWith('PMC') ? 'PMC' : 'MED';
+            return `https://europepmc.org/article/${collection}/${id}`;
+        }
         case 'clinicaltrials':
             return `https://clinicaltrials.gov/study/${articleId}`;
         case 'openalex':
@@ -189,15 +193,18 @@ function getArticleUrl(articleId, source) {
         case 'core':
             return `https://core.ac.uk/works/${articleId}`;
         case 'biorxiv':
-            return `https://www.biorxiv.org/content/${articleId}`;
         case 'medrxiv':
-            return `https://www.medrxiv.org/content/${articleId}`;
+            return `https://doi.org/${articleId}`;
         case 'dblp':
             return `https://dblp.org/rec/${articleId}`;
         case 'openaire':
-            return String(articleId).startsWith('http')
-                ? String(articleId)
-                : `https://doi.org/${articleId}`;
+            // DOI, URL, bare PMID, or an OpenAIRE object id (keep in sync with citations.py).
+            if (String(articleId).startsWith('10.')) return `https://doi.org/${articleId}`;
+            if (String(articleId).startsWith('http')) return String(articleId);
+            if (/^[0-9]+$/.test(String(articleId))) {
+                return `https://pubmed.ncbi.nlm.nih.gov/${articleId}/`;
+            }
+            return `https://explore.openaire.eu/search/result?id=${encodeURIComponent(articleId)}`;
         case 'plos':
             return `https://doi.org/${articleId}`;
         case 'hal':

@@ -1,0 +1,172 @@
+{
+ "version": "6.9",
+ "hitCount": 747110,
+ "nextCursorMark": "AoIIP+Invig1NjUyOTc3Mw==",
+ "nextPageUrl": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=%22heart+disease%22+AND+SRC%3AMED&cursorMark=AoIIP%2BInvig1NjUyOTc3Mw%3D%3D&resultType=core&format=json",
+ "request": {
+  "queryString": "\"heart disease\" AND SRC:MED",
+  "resultType": "core",
+  "cursorMark": "*",
+  "pageSize": 25,
+  "sort": "",
+  "synonym": false
+ },
+ "resultList": {
+  "result": [
+   {
+    "id": "42813549",
+    "source": "MED",
+    "pmid": "42813549",
+    "doi": "10.1017/s1047951126124226",
+    "title": "From detection to retention: redefining success in screening for rheumatic heart disease in Sub-Saharan Africa.",
+    "authorString": "Antunes Vicente MB, Fernandes E, Ramos D, Gonçalves L.",
+    "authorList": {
+     "author": [
+      {
+       "fullName": "Antunes Vicente MB",
+       "lastName": "Antunes Vicente",
+       "firstName": "Miguel Bernardino",
+       "initials": "MB",
+       "authorId": {
+        "type": "ORCID",
+        "value": "0000-0002-1329-5229"
+       },
+       "authorAffiliationDetailsList": {
+        "authorAffiliation": [
+         {
+          "affiliation": "Department of Cardiology, Coimbra Hospital and University Center, Coimbra, Portugal."
+         },
+         {
+          "affiliation": "Cardiovascular and Thoracic Center - Clínica Girassol, Luanda, Angola."
+         }
+        ]
+       }
+      },
+      {
+       "fullName": "Fernandes E",
+       "lastName": "Fernandes",
+       "firstName": "Elsa",
+       "initials": "E",
+       "authorAffiliationDetailsList": {
+        "authorAffiliation": [
+         {
+          "affiliation": "Cardiovascular and Thoracic Center - Clínica Girassol, Luanda, Angola."
+         }
+        ]
+       }
+      },
+      {
+       "fullName": "Ramos D",
+       "lastName": "Ramos",
+       "firstName": "Domingos",
+       "initials": "D",
+       "authorAffiliationDetailsList": {
+        "authorAffiliation": [
+         {
+          "affiliation": "Department of Cardiology, Coimbra Hospital and University Center, Coimbra, Portugal."
+         }
+        ]
+       }
+      },
+      {
+       "fullName": "Gonçalves L",
+       "lastName": "Gonçalves",
+       "firstName": "Lino",
+       "initials": "L",
+       "authorAffiliationDetailsList": {
+        "authorAffiliation": [
+         {
+          "affiliation": "Department of Cardiology, Coimbra Hospital and University Center, Coimbra, Portugal."
+         }
+        ]
+       }
+      }
+     ]
+    },
+    "authorIdList": {
+     "authorId": [
+      {
+       "type": "ORCID",
+       "value": "0000-0002-1329-5229"
+      }
+     ]
+    },
+    "journalInfo": {
+     "journalIssueId": 4257792,
+     "dateOfPublication": "2026 Sep",
+     "monthOfPublication": 9,
+     "yearOfPublication": 2026,
+     "journal": {
+      "medlineAbbreviation": "Cardiol Young",
+      "title": "Cardiology in the young",
+      "essn": "1467-1107",
+      "issn": "1047-9511",
+      "nlmid": "9200019",
+      "isoabbreviation": "Cardiol Young"
+     },
+     "printPublicationDate": "2026-09-01"
+    },
+    "pubYear": "2026",
+    "pageInfo": "1-3",
+    "abstractText": "Rheumatic heart disease remains a leading cause of preventable cardiovascular morbidity and premature mortality among children and young adults in Sub-Saharan Africa. Advances in portable echocardiography, standardised World Heart Federation diagnostic criteria, and task-sharing strategies have substantially expanded the detection of latent rheumatic heart disease. However, increased diagnostic capacity has not consistently translated into improved long-term clinical outcomes. This viewpoint argues that the principal challenge in rheumatic heart disease control has shifted from underdiagnosis to the inability of health systems to provide sustained longitudinal care after screening. Although the GOAL Trial demonstrated that secondary prophylaxis with benzathine penicillin reduces echocardiographic progression of latent disease, robust evidence that screening alone decreases heart failure, stroke, need for valve surgery, or mortality remains limited. Furthermore, recurrent shortages of benzathine penicillin, fragmented follow-up, weak referral pathways, and socioeconomic barriers continue to undermine the effectiveness of screening programmes across Sub-Saharan Africa. We propose a paradigm shift in the evaluation of rheumatic heart disease screening initiatives: programme success should no longer be measured primarily by the number of cases detected but by the proportion of patients retained in continuous care and protected from major cardiovascular outcomes. Future rheumatic heart disease programmes should integrate early diagnosis with reliable access to secondary prophylaxis, structured follow-up, timely referral for specialist and surgical care, and outcome-based evaluation. Redefining screening success around care retention rather than diagnostic yield may substantially improve the long-term impact of rheumatic heart disease control strategies in resource-limited settings.",
+    "affiliation": "Department of Cardiology, Coimbra Hospital and University Center, Coimbra, Portugal.",
+    "publicationStatus": "aheadofprint",
+    "language": "eng",
+    "pubModel": "Print-Electronic",
+    "pubTypeList": {
+     "pubType": [
+      "Journal Article"
+     ]
+    },
+    "keywordList": {
+     "keyword": [
+      "Echocardiography",
+      "Sub-Saharan Africa",
+      "Rheumatic heart disease"
+     ]
+    },
+    "subsetList": {
+     "subset": [
+      {
+       "code": "IM",
+       "name": "Index Medicus"
+      }
+     ]
+    },
+    "fullTextUrlList": {
+     "fullTextUrl": [
+      {
+       "availability": "Subscription required",
+       "availabilityCode": "S",
+       "documentStyle": "doi",
+       "site": "DOI",
+       "url": "https://doi.org/10.1017/S1047951126124226"
+      }
+     ]
+    },
+    "isOpenAccess": "N",
+    "inEPMC": "N",
+    "inPMC": "N",
+    "citedByCount": 0,
+    "hasReferences": "N",
+    "hasTextMinedTerms": "N",
+    "hasDbCrossReferences": "N",
+    "hasPDF": "N",
+    "hasBook": "N",
+    "hasSuppl": "N",
+    "hasLabsLinks": "N",
+    "hasData": "N",
+    "authMan": "N",
+    "epmcAuthMan": "N",
+    "nihAuthMan": "N",
+    "hasTMAccessionNumbers": "N",
+    "dateOfCreation": "2026-09-30",
+    "dateOfRevision": "2026-09-30",
+    "electronicPublicationDate": "2026-09-30",
+    "firstPublicationDate": "2026-09-30",
+    "firstIndexDate": "2026-10-01",
+    "hasEvaluations": "N"
+   }
+  ]
+ }
+}

@@ -1,0 +1,202 @@
+{
+ "version": "6.9",
+ "hitCount": 3115,
+ "nextCursorMark": "AoJgKDU2Mzk2OTU5",
+ "nextPageUrl": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=%22heart+disease%22+AND+SRC%3APPR+AND+PUBLISHER%3A%22medRxiv%22&cursorMark=AoJgKDU2Mzk2OTU5&resultType=core&pageSize=10&sort=P_PDATE_D+desc&format=json",
+ "request": {
+  "queryString": "\"heart disease\" AND SRC:PPR AND PUBLISHER:\"medRxiv\"",
+  "resultType": "core",
+  "cursorMark": "*",
+  "pageSize": 10,
+  "sort": "P_PDATE_D desc",
+  "synonym": false
+ },
+ "resultList": {
+  "result": [
+   {
+    "id": "PPR1338052",
+    "source": "PPR",
+    "doi": "10.64898/2026.10.07.26364995",
+    "title": "Factors Associated with Predischarge Morbidity and Mortality in Small for Gestational Age Infants: A Single-Center Retrospective Cohort Study",
+    "authorString": "Cinkus-Rios C, Pickell S, Thompson C, Bomback M, Lyford A, Hays T.",
+    "authorList": {
+     "author": [
+      {
+       "fullName": "Cinkus-Rios C",
+       "lastName": "Cinkus-Rios",
+       "firstName": "Christopher",
+       "initials": "C"
+      },
+      {
+       "fullName": "Pickell S",
+       "lastName": "Pickell",
+       "firstName": "Samantha",
+       "initials": "S"
+      },
+      {
+       "fullName": "Thompson C",
+       "lastName": "Thompson",
+       "firstName": "Charlotte",
+       "initials": "C"
+      },
+      {
+       "fullName": "Bomback M",
+       "lastName": "Bomback",
+       "firstName": "Miles",
+       "initials": "M"
+      },
+      {
+       "fullName": "Lyford A",
+       "lastName": "Lyford",
+       "firstName": "Alex",
+       "initials": "A"
+      },
+      {
+       "fullName": "Hays T",
+       "lastName": "Hays",
+       "firstName": "Thomas",
+       "initials": "T"
+      }
+     ]
+    },
+    "pubYear": "2026",
+    "abstractText": "<h4>Objective: </h4> To identify factors associated with predischarge morbidity and mortality among small for gestational age infants. Study Design: We conducted a retrospective single-center cohort study of small for gestational age infants admitted to a level IV neonatal intensive care unit. We determined the association of clinical characteristics, congenital anomalies, and genetic disorders with the primary outcome of predischarge morbidity or mortality and characterized morbidity and mortality across congenital anomaly subgroups. <h4>Results:</h4> Among 293 small for gestational age infants, 18 (6.1%) had a genetic disorder and 103 (35.2%) had a major congenital anomaly, with congenital heart disease (CHD) representing the largest subgroup. The primary outcome of morbidity or mortality occurred in 93 infants (31.7%); 74 infants (25.3%) experienced morbidity and 19 (6.5%) died. CHD (adjusted odds ratio [aOR]: 16.5, 95% CI 6.44-45.7) and multiple congenital anomalies (aOR: 17.8, 95% CI 4.64-71.1) were found to be strongly associated with morbidity or mortality, after accounting for sex, maternal race, and intubation > 7 days. Statistically significant associations were also found with the presence of musculoskeletal anomalies as well as genetic disorders in infants without congenital anomalies, though in limited sample sizes. CHD was the largest contributor to morbidity, whereas multiple congenital anomalies accounted for the greatest proportion of mortality. Infants with abdominal wall defects and central nervous system anomalies experienced no morbidity or mortality. <h4>Conclusion:</h4> Congenital heart disease and multiple congenital anomalies were strongly associated with morbidity and mortality among SGA infants, whereas the degree of SGA alone was not. These findings suggest that risk is not explained by the degree of SGA alone and may be more strongly associated with congenital disease and other underlying factors.",
+    "pubTypeList": {
+     "pubType": [
+      "Preprint"
+     ]
+    },
+    "bookOrReportDetails": {
+     "publisher": "medRxiv",
+     "yearOfPublication": 2026
+    },
+    "fullTextUrlList": {
+     "fullTextUrl": [
+      {
+       "availability": "Free",
+       "availabilityCode": "F",
+       "documentStyle": "doi",
+       "site": "DOI",
+       "url": "https://doi.org/10.64898/2026.10.07.26364995"
+      }
+     ]
+    },
+    "isOpenAccess": "N",
+    "inEPMC": "N",
+    "inPMC": "N",
+    "citedByCount": 0,
+    "hasReferences": "N",
+    "hasTextMinedTerms": "N",
+    "hasDbCrossReferences": "N",
+    "hasPDF": "N",
+    "hasBook": "N",
+    "hasSuppl": "N",
+    "hasLabsLinks": "N",
+    "hasData": "N",
+    "authMan": "N",
+    "epmcAuthMan": "N",
+    "nihAuthMan": "N",
+    "hasTMAccessionNumbers": "N",
+    "dateOfCreation": "2026-10-10",
+    "firstPublicationDate": "2026-10-09",
+    "firstIndexDate": "2026-10-10",
+    "hasEvaluations": "N"
+   },
+   {
+    "id": "PPR1332540",
+    "source": "PPR",
+    "doi": "10.64898/2026.09.29.26362732",
+    "title": "Economic cost of paediatric heart disease in the United Kingdom: A national tertiary healthcare and societal cost-of-illness analysis using real-world data",
+    "authorString": "Naylor R, Buylova A, Shetty S, Witter T, Grant S, Byrne N, Pushparajah K.",
+    "authorList": {
+     "author": [
+      {
+       "fullName": "Naylor R",
+       "lastName": "Naylor",
+       "firstName": "Rebecca",
+       "initials": "R"
+      },
+      {
+       "fullName": "Buylova A",
+       "lastName": "Buylova",
+       "firstName": "Anna",
+       "initials": "A"
+      },
+      {
+       "fullName": "Shetty S",
+       "lastName": "Shetty",
+       "firstName": "Siddesh",
+       "initials": "S"
+      },
+      {
+       "fullName": "Witter T",
+       "lastName": "Witter",
+       "firstName": "Thomas",
+       "initials": "T"
+      },
+      {
+       "fullName": "Grant S",
+       "lastName": "Grant",
+       "firstName": "Samara",
+       "initials": "S"
+      },
+      {
+       "fullName": "Byrne N",
+       "lastName": "Byrne",
+       "firstName": "Nick",
+       "initials": "N"
+      },
+      {
+       "fullName": "Pushparajah K",
+       "lastName": "Pushparajah",
+       "firstName": "Kuberan",
+       "initials": "K"
+      }
+     ]
+    },
+    "pubYear": "2026",
+    "abstractText": "<h4>Background/Aims</h4>  This work aimed to estimate the annual tertiary healthcare and societal costs associated with paediatric congenital heart disease (CHD) in the United Kingdom using real-world data from a Level 1 cardiac surgical centre in the National Health Service (NHS). <h4>Methods</h4>  A prevalence-based cost-of-illness analysis was conducted using patient-level inpatient and outpatient activity data from Evelina London Children’s Hospital between 1 June 2023 and 31 May 2024. Costs were estimated from NHS and societal perspectives and extrapolated to national level using National Congenital Heart Disease Audit (NCHDA) procedural activity data. Healthcare costs included tertiary centre care costs. Societal costs included parental productivity losses and impacts on lifetime earnings for children. Deterministic sensitivity analysis explored parameter uncertainty. <h4>Results</h4>  Approximately 9.6% of UK paediatric CHD procedures were undertaken at Evelina London Children’s Hospital at a cost of £15.0 million per annum, corresponding to a national estimate of £156.4 million. Single-ventricle procedures accounted for 4.8% of inpatient activity but 19.4% of inpatient costs. Sensitivity analysis produced national healthcare cost estimates ranging from £125.1 million to £187.7 million. National productivity losses associated with parental absence from work were estimated at £82.4 million annually. Individuals with CHD were estimated to experience a mean reduction in lifetime earnings of £81,509. <h4>Conclusion</h4>  Paediatric CHD imposes a substantial economic cost on the UK healthcare system and wider society. This study provides the first real-world national estimate of the economic impact of paediatric CHD in the UK and may inform future service planning, research investment, and innovation adoption strategies. <h4>Key Learning points</h4>  1. What is already known • Congenital heart disease (CHD) is the most common congenital abnormality worldwide and requires substantial healthcare utilisation throughout childhood, including outpatient monitoring, hospital admissions, surgical and catheter interventions. • Existing evidence suggests that CHD is associated with high healthcare costs and wider societal impacts; however, available economic burden studies have been conducted in the United States and are not generalisable to the UK healthcare system. • The broader economic consequences of paediatric CHD, including parental productivity losses and impacts on future employment and earnings, remain poorly quantified in the UK. 2. What this study adds • This study provides, to our knowledge, the first UK-wide estimate of the economic burden of paediatric CHD using real-world patient-level activity and cost data from a large volume tertiary centre. • Annual direct NHS costs associated with paediatric CHD care at tertiary settings were estimated at £156.4 million nationally, with an additional £82.4 million in parental productivity losses, demonstrating a substantial societal burden beyond healthcare expenditure alone. • Infants and patients with severe CHD requiring single-ventricle procedures accounted for a disproportionately large share of costs, highlighting important targets for future service improvement, research investment, and innovation.",
+    "pubTypeList": {
+     "pubType": [
+      "Preprint"
+     ]
+    },
+    "bookOrReportDetails": {
+     "publisher": "medRxiv",
+     "yearOfPublication": 2026
+    },
+    "fullTextUrlList": {
+     "fullTextUrl": [
+      {
+       "availability": "Free",
+       "availabilityCode": "F",
+       "documentStyle": "doi",
+       "site": "DOI",
+       "url": "https://doi.org/10.64898/2026.09.29.26362732"
+      }
+     ]
+    },
+    "isOpenAccess": "N",
+    "inEPMC": "N",
+    "inPMC": "N",
+    "citedByCount": 0,
+    "hasReferences": "N",
+    "hasTextMinedTerms": "Y",
+    "hasDbCrossReferences": "N",
+    "hasPDF": "N",
+    "hasBook": "N",
+    "hasSuppl": "N",
+    "hasLabsLinks": "N",
+    "hasData": "N",
+    "authMan": "N",
+    "epmcAuthMan": "N",
+    "nihAuthMan": "N",
+    "hasTMAccessionNumbers": "N",
+    "dateOfCreation": "2026-10-02",
+    "firstPublicationDate": "2026-10-01",
+    "firstIndexDate": "2026-10-02",
+    "hasEvaluations": "N"
+   }
+  ]
+ }
+}

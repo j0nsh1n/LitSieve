@@ -1,0 +1,74 @@
+{
+ "studies": [
+  {
+   "protocolSection": {
+    "identificationModule": {
+     "nctId": "NCT02791113",
+     "briefTitle": "Analysis of Coronary CT Angiography to Identify Patients With Significant Coronary Artery Stenosis",
+     "officialTitle": "Automatic Analysis of Coronary CT Angiography to Identify Patients With Significant Coronary Artery Stenosis for Clinical Decision-making."
+    },
+    "statusModule": {
+     "startDateStruct": {
+      "date": "2014-03"
+     }
+    },
+    "sponsorCollaboratorsModule": {
+     "leadSponsor": {
+      "name": "National Heart Centre Singapore",
+      "class": "OTHER"
+     }
+    },
+    "descriptionModule": {
+     "briefSummary": "The investigators propose to develop a computational framework involving a novel automatic image segmentation algorithm based on CTA images, an artery model reconstruction algorithm for stenosis detection, and quantification of severity of stenosis in terms of area stenosis.",
+     "detailedDescription": "Coronary heart disease (CHD) is a common \\[affecting about 6% in the general adult population\\] cardiac disorder where a portion of the coronary artery is blocked. Among populations aged more than 65 years, the prevalence increases to 19.8%. The incidence of CHD in Singapore and other major countries is comparable. The prognosis of CHD is poor. CHD causes 1.2 million heart attacks and nearly 19% of deaths in US.\\[2\\] In Singapore, cardiovascular disease (CVD) accounted for 30.4% of all deaths in 2011, among these, 19% are due to CHD. In future, CVD deaths will increase up to 24.2 million globally in 2030. Among these, CHD deaths will change from 13.1% in 2010 to 14.9% in 2030 of all males; and from 13.6% to 13.1% of all females. The direct costs of CHD are estimated at over $87 billion and indirect cost at $70 billion in US. Unless current trends are halted or reversed, over a million people will die from CHD in US annually. Globally, the majority of CHD deaths will be in developing countries and many of the lives will be lost in middle age.\n\nInvasive coronary angiography (ICA), is the gold standard method to delineate anatomical coronary stenosis. Fractional flow reserve (FFR) measurement with pressure wire is the gold standard for assessment of the physiological importance of an anatomical stenosis. Non-invasive computed tomography angiography (CTA), is a diagnostic alternative to invasive coronary angiography from single and multi-centre trials.\n\nCTA enables visualization of coronary vessels in two-dimensional (2D) or three-dimensional (3D) formats. Current available imaging techniques on CTA are limited in their abilities in assessing physiological stenosis. First, the commonly used percent diameter stenosis to describe the extent of coronary artery stenosis is only a modest descriptor of coronary stenosis because it does not incorporate other lesion characteristics (e.g. length, shape and eccentricity) or the effect of stenosis in series that may greatly affect the blood flow. From our preliminary study, we found that diameter stenosis weakly correlated with golden standard FFR from invasive catheterization (r = 0.30). Second, percent diameter stenosis assessment is usually given per specific coronary artery lesion, the lesions being manually identified by the expert reader. There is no method to comprehensively assess the entire coronary tree in an automated fashion without the need for manual input. We propose the development of an Automatic CTA analyzer to identify significant coronary stenosis in coronary arteries that will provide rapid triage for patients suspected of CHD. This analyzer can also facilitate disease surveillance and monitoring of therapeutic efficacy.\n\nThe proposed integrated solution is expected to achieve earlier and higher accuracy in detecting severity of coronary stenosis. From 2004 to 2007 alone, the number of annual CTA procedures in the US is around 4.7 million. In National Heart Centre Singapore, we performed more than 1000 CTA per year.\n\nDiameter stenosis from CTA cannot determine the hemodynamic significance of the coronary artery disease. For example, even if significant stenosis (\\>50%) is identified at CTA, fewer than 50% of the lesions actually cause ischemia. Furthermore, as many as 20% of patients with severe stenoses (i.e., \\>70%) on CTA turn out not to have ischemia confirmed by ICA and FFR. As a result, these patients risk of being referred for ICA when they do not need it."
+    },
+    "contactsLocationsModule": {
+     "overallOfficials": [
+      {
+       "name": "Ru San Tan, MBBS",
+       "affiliation": "National Heart Centre Singapore",
+       "role": "PRINCIPAL_INVESTIGATOR"
+      }
+     ]
+    }
+   },
+   "hasResults": false
+  },
+  {
+   "protocolSection": {
+    "identificationModule": {
+     "nctId": "NCT05933824",
+     "briefTitle": "Study to Evaluate the Safety, Tolerability, Pharmacokinetics and Immunogenicity of LP-98 Injection in Healthy Subjects",
+     "officialTitle": "A Randomized, Placebo-controlled, Single-administration, Dose-escalation Study to Evaluate the Safety, Tolerability, Pharmacokinetics and Immunogenicity of LP-98 Injection in Healthy Subjects in a First-in-human Clinical Study"
+    },
+    "statusModule": {
+     "startDateStruct": {
+      "date": "2023-07-13",
+      "type": "ACTUAL"
+     }
+    },
+    "sponsorCollaboratorsModule": {
+     "leadSponsor": {
+      "name": "Shanxi Kangbao Biological Product Co., Ltd.",
+      "class": "INDUSTRY"
+     }
+    },
+    "descriptionModule": {
+     "briefSummary": "A randomized, placebo-controlled, single-administration, dose-escalation study to evaluate the safety, tolerability, pharmacokinetics and immunogenicity of LP-98 injection in healthy subjects in a first-in-human clinical study",
+     "detailedDescription": "The study was divided into two parts, Part A and Part B. The Part A and Part B studies were carried out separately according to the protocol flow, with the Part A study carried out first.\n\n1. Part A is set up with 5 cohorts(5mg, 10mg, 20mg, 40mg, 80mg), administration is by subcutaneous, each subject entered only one cohort to receive the drug. 4 subjects were included in cohort 1, and 8 subjects were planned to be included in each cohort 2 to 5, to observe the safety, tolerability, PK and ADA of LP-98 injection by subcutaneous.\n2. Part B is set up with 6 cohorts (5mg,10mg,20mg,40mg,80mg, 160mg), administration is by intravenous drip, each subject entered only one cohort to receive the drug. 4 subjects were included in cohort 1, and 8 subjects were planned to be included in each cohort 2 to 6, to observe the safety, tolerability, PK and ADA of LP-98 injection by intravenous drip."
+    },
+    "contactsLocationsModule": {
+     "overallOfficials": [
+      {
+       "name": "Shuang Li, Master",
+       "affiliation": "Henan Provincial Hospital for Infectious Diseases (Zhengzhou Sixth People's Hospital)",
+       "role": "PRINCIPAL_INVESTIGATOR"
+      }
+     ]
+    }
+   },
+   "hasResults": false
+  }
+ ],
+ "nextPageToken": "ZVNj7o2Elu8o3lpzBdv-p-numpOQJJxuZPmp"
+}

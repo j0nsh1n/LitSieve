@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from fastapi.testclient import TestClient
+from test_integration_accounts import _register, app_module  # noqa: F401
 
 from app.content.source_catalog import (
     SOURCE_CATALOG,
@@ -101,7 +102,6 @@ def test_eligible_for_coverage_excludes_preprints_and_unkeyed():
     assert eligible_for_coverage_suggestion("arxiv") is False
     assert eligible_for_coverage_suggestion("clinicaltrials") is False
     assert eligible_for_coverage_suggestion("zenodo") is False
-    assert eligible_for_coverage_suggestion("dblp") is False
 
 
 def test_every_topic_has_a_line_icon():
@@ -115,3 +115,47 @@ def test_every_topic_has_a_line_icon():
     assert set(api) == set(TOPIC_META)
     for tid, meta in TOPIC_META.items():
         assert api[tid]["icon_svg"] == meta["icon_svg"]
+
+
+def test_dblp_is_retired_but_still_named():
+    from app.content import source_catalog as sc
+
+    assert "dblp" in sc.RETIRED_SOURCES
+    assert "dblp" not in sc.SOURCE_CATALOG
+    assert "dblp" not in sc.TOPIC_SOURCE_HINTS.get("cs", [])
+    assert all("dblp" not in pack["sources"] for pack in sc.TOPIC_PACKS)
+    assert all(s["id"] != "dblp" for s in sc.list_sources_for_api())
+    assert sc.eligible_for_coverage_suggestion("dblp") is False
+    assert sc.drop_retired_sources(["dblp", "pubmed"]) == ["pubmed"]
+    # Papers already stored under the old source still show a readable name.
+    assert sc.source_display_name("dblp") == "DBLP"
+
+
+def _post_fetch(client, sources):
+    return client.post(
+        "/api/fetch-articles-multi",
+        json={"sources": sources, "query": "diabetes", "max_results": 5, "wait": True},
+        headers={"X-CSRF-Token": client.cookies.get("csrf_token")},
+    )
+
+
+def test_fetch_request_listing_dblp_runs_the_other_sources(app_module):
+    main = app_module
+    client = TestClient(main.app)
+    _register(client, "oldprefs")
+
+    r = _post_fetch(client, ["dblp", "pubmed"])
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["by_source"] == {"pubmed": 1}
+    assert body["errors"] == {}
+
+
+def test_fetch_request_with_only_dblp_is_a_plain_400(app_module):
+    main = app_module
+    client = TestClient(main.app)
+    _register(client, "onlydblp")
+
+    r = _post_fetch(client, ["dblp"])
+    assert r.status_code == 400, r.text
+    assert "at least one" in r.json()["detail"]

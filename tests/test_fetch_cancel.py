@@ -151,8 +151,13 @@ def test_http_retry_and_backoff_share_a_wall_clock_budget(failure):
         client.get("https://example.test/dead")
     elapsed = time.monotonic() - started
 
-    assert error.value.kind == "timeout"
-    assert 0.05 <= elapsed < 0.5
+    if failure == "timeout":
+        assert error.value.kind == "timeout"
+        assert 0.05 <= elapsed < 0.5
+    else:
+        # Retry-After 60 cannot fit in the budget, so it fails at once (audit 18.8).
+        assert error.value.kind == ("rate_limited" if failure == 429 else "network")
+        assert elapsed < 0.05
     assert client.session.request.call_count == 1
     assert 0 < client.session.request.call_args.kwargs["timeout"] <= 0.06
 

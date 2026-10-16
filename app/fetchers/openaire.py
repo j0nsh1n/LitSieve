@@ -7,10 +7,17 @@ No key for basic classroom use. Aggregates European open-access deposits.
 
 from __future__ import annotations
 
-import re
 from typing import Any, Dict, List, Optional
 
-from app.fetchers.base import BaseFetcher, FetchError, HttpClient, reraise_fetch_error
+from app.fetchers.base import (
+    BaseFetcher,
+    FetchError,
+    HttpClient,
+    clean_text,
+    json_of,
+    reraise_fetch_error,
+    user_agent,
+)
 
 
 def _node_text(node: Any) -> str:
@@ -55,17 +62,18 @@ class OpenAIREFetcher(BaseFetcher):
         self.http = HttpClient(
             delay=0.45,
             timeout=45,
-            user_agent=f"LiteratureResearchAide/4.0 ({email or 'research@example.com'})",
+            user_agent=user_agent(email),
         )
 
     def search_and_fetch(self, query: str, max_results: int = 500) -> List[Dict]:
         articles: List[Dict] = []
         page = 1
         # OpenAIRE pages can be heavy; keep page size modest.
-        page_size = min(25, max_results)
+        # The size stays constant: pages are numbered, so a smaller later page
+        # would start inside records the earlier pages already returned.
+        size = 25
 
         while len(articles) < max_results:
-            size = min(page_size, max_results - len(articles))
             try:
                 r = self.http.get(
                     self.BASE_URL,
@@ -76,11 +84,13 @@ class OpenAIREFetcher(BaseFetcher):
                         "format": "json",
                     },
                 )
-                data = r.json()
+                data = json_of(r)
             except FetchError as e:
                 reraise_fetch_error(e, articles)
             except Exception as e:
-                raise FetchError(f"OpenAIRE request failed: {e}", kind="network") from e
+                raise FetchError(
+                    f"OpenAIRE request failed: {e}", kind="network", articles=articles
+                ) from e
 
             results = (
                 ((data.get("response") or {}).get("results") or {}).get("result")
@@ -112,9 +122,8 @@ class OpenAIREFetcher(BaseFetcher):
             )
             if not meta:
                 return None
-            title = _node_text(meta.get("title"))
-            abstract = _node_text(meta.get("description"))
-            abstract = re.sub(r"<[^>]+>", "", abstract).strip()
+            title = clean_text(_node_text(meta.get("title")))
+            abstract = clean_text(_node_text(meta.get("description")))
             if not title or not abstract:
                 return None
 
@@ -138,18 +147,21 @@ class OpenAIREFetcher(BaseFetcher):
             year = date[:4] if date else ""
             journal = _node_text(meta.get("journal")) or "OpenAIRE"
 
-            # Prefer DOI as id
+            # Prefer a DOI, else the first pid (a PMID is a JSON number, so it is
+            # stringified), else the OpenAIRE object id.
             pid = meta.get("pid")
+            pids = pid if isinstance(pid, list) else [pid]
             aid = ""
-            if isinstance(pid, list):
-                for p in pid:
-                    if isinstance(p, dict) and str(p.get("@classid", "")).lower() == "doi":
-                        aid = _node_text(p)
+            for p in pids:
+                if isinstance(p, dict) and str(p.get("@classid", "")).lower() == "doi":
+                    aid = _node_text(p)
+                    if aid:
                         break
-                if not aid and pid:
-                    aid = _node_text(pid[0])
-            else:
-                aid = _node_text(pid)
+            if not aid:
+                for p in pids:
+                    aid = _node_text(p)
+                    if aid:
+                        break
             if not aid:
                 aid = _node_text(
                     ((res.get("header") or {}).get("dri:objIdentifier"))

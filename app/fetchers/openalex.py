@@ -4,9 +4,10 @@ Fetches scholarly works from OpenAlex API
 """
 
 import logging
+import os
 from typing import Dict, List, Optional
 
-from app.fetchers.base import BaseFetcher, HttpClient, reraise_fetch_error
+from app.fetchers.base import BaseFetcher, HttpClient, json_of, reraise_fetch_error
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,14 @@ class OpenAlexFetcher(BaseFetcher):
         self.http = HttpClient(delay=0.2)
 
 
+    def _add_identity(self, params: Dict) -> None:
+        """Send the API key (when the host has one) and the student's email (when given)."""
+        api_key = os.getenv("OPENALEX_API_KEY", "").strip()
+        if api_key:
+            params["api_key"] = api_key
+        if self.email:
+            params["mailto"] = self.email
+
     def search(self, query: str, max_results: int = 1000) -> List[str]:
         """Search OpenAlex, return work IDs"""
         logger.info("Searching OpenAlex for: '%s'", query)
@@ -38,12 +47,11 @@ class OpenAlexFetcher(BaseFetcher):
                 "per_page": per_page,
                 "page": page,
             }
-            if self.email:
-                params["mailto"] = self.email
+            self._add_identity(params)
 
             try:
                 resp = self.http.get(f"{self.BASE_URL}/works", params=params, timeout=30)
-                data = resp.json()
+                data = json_of(resp)
 
                 results = data.get("results", [])
                 if not results:
@@ -54,6 +62,8 @@ class OpenAlexFetcher(BaseFetcher):
                     if openalex_id:
                         ids.append(openalex_id)
 
+                if len(results) < per_page:
+                    break
                 page += 1
 
             except Exception as e:
@@ -78,12 +88,11 @@ class OpenAlexFetcher(BaseFetcher):
                 "per_page": per_page,
                 "page": page,
             }
-            if self.email:
-                params["mailto"] = self.email
+            self._add_identity(params)
 
             try:
                 resp = self.http.get(f"{self.BASE_URL}/works", params=params, timeout=30)
-                results = resp.json().get("results", [])
+                results = json_of(resp).get("results", [])
 
                 if not results:
                     break
@@ -93,6 +102,8 @@ class OpenAlexFetcher(BaseFetcher):
                     if parsed:
                         articles.append(parsed)
 
+                if len(results) < per_page:
+                    break
                 page += 1
 
             except Exception as e:
@@ -115,12 +126,11 @@ class OpenAlexFetcher(BaseFetcher):
                 "filter": f"openalex_id:{id_filter}",
                 "per_page": batch_size,
             }
-            if self.email:
-                params["mailto"] = self.email
+            self._add_identity(params)
 
             try:
                 resp = self.http.get(f"{self.BASE_URL}/works", params=params, timeout=30)
-                for work in resp.json().get("results", []):
+                for work in json_of(resp).get("results", []):
                     parsed = self._parse_work(work)
                     if parsed:
                         articles.append(parsed)
@@ -147,16 +157,14 @@ class OpenAlexFetcher(BaseFetcher):
         if not abstract:
             return None
 
-        year = str(work.get("publication_year", "Unknown"))
+        year = str(work.get("publication_year") or "")
 
         # Journal
-        primary_location = work.get("primary_location", {}) or {}
-        source_info = primary_location.get("source", {}) or {}
-        journal = source_info.get("display_name", "Unknown journal")
+        journal = self._venue(work)
 
         # Authors
         authors = []
-        for authorship in work.get("authorships", [])[:5]:
+        for authorship in work.get("authorships") or []:
             name = authorship.get("author", {}).get("display_name", "")
             if name:
                 authors.append(name)
@@ -170,6 +178,27 @@ class OpenAlexFetcher(BaseFetcher):
             "authors": authors,
             "journal": journal,
         }
+
+    @staticmethod
+    def _venue(work: Dict) -> str:
+        """Prefer a journal or conference location over a repository copy.
+
+        The primary location is often a repository such as PubMed while the
+        journal sits further down `locations`. When every location is a
+        repository, the name the record was deposited under is usually the
+        journal (live W2340941041: "PubMed" vs "Heart disease and stroke ...").
+        """
+        locations = [work.get("primary_location") or {}, *(work.get("locations") or [])]
+        for location in locations:
+            source = (location or {}).get("source") or {}
+            name = (source.get("display_name") or "").strip()
+            if name and source.get("type") != "repository":
+                return name
+        for location in locations:
+            raw = ((location or {}).get("raw_source_name") or "").strip()
+            if raw:
+                return raw
+        return ((locations[0].get("source") or {}).get("display_name") or "").strip()
 
     @staticmethod
     def _reconstruct_abstract(inverted_index: Dict) -> str:
