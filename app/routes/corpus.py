@@ -243,6 +243,7 @@ async def api_fetch_multi(req: MultiFetchRequest, request: Request):
             "sources": list(req.sources),
             "max_results": req.max_results,
             "clear_first": bool(req.clear_first),
+            "email": req.email or "",
         },
     ):
         return JSONResponse(

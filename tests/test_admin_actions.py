@@ -159,3 +159,134 @@ def test_banner_publish_and_take_down_need_the_word(tmp_path, monkeypatch):
     )
     assert r.status_code == 200, r.text
     assert helpdesk.published_banner(db) is None
+
+
+def _save_banner(client, text, **extra):
+    r = client.post(
+        "/api/admin/banner",
+        json={"reason": "drafting", "body": text, **extra},
+        headers=_csrf(client),
+    )
+    assert r.status_code == 200, r.text
+    return r.json()["banner"]
+
+
+def _publish(client, nid):
+    r = client.post(
+        f"/api/admin/banner/{nid}/publish",
+        json={"reason": "go live", "confirm": BANNER_CONFIRM},
+        headers=_csrf(client),
+    )
+    assert r.status_code == 200, r.text
+
+
+def test_saving_a_draft_leaves_the_live_banner_up(tmp_path, monkeypatch):
+    client, db = _admin_client(tmp_path, monkeypatch)
+    live = _save_banner(client, "PubMed is slow this afternoon.")
+    _publish(client, live["id"])
+    draft = _save_banner(client, "PubMed is back.")
+    assert draft["id"] != live["id"]
+    assert draft["status"] == "draft"
+    published = helpdesk.published_banner(db)
+    assert published["id"] == live["id"]
+    assert published["body"] == "PubMed is slow this afternoon."
+    state = client.get("/api/admin/banner").json()
+    assert state["published"]["body"] == "PubMed is slow this afternoon."
+    assert state["draft"]["body"] == "PubMed is back."
+    again = _save_banner(client, "PubMed is back to normal.")
+    assert again["id"] == draft["id"]
+    _publish(client, again["id"])
+    assert helpdesk.published_banner(db)["body"] == "PubMed is back to normal."
+    assert client.get("/api/admin/banner").json()["draft"] is None
+
+
+def test_banner_status_changes_only_through_the_word(tmp_path, monkeypatch):
+    client, db = _admin_client(tmp_path, monkeypatch)
+    saved = _save_banner(client, "Maintenance tonight.", status="published")
+    assert saved["status"] == "draft"
+    assert helpdesk.published_banner(db) is None
+    _publish(client, saved["id"])
+    rev = saved["revisions"][0]["id"]
+    r = client.post(
+        f"/api/admin/banner/{saved['id']}/rollback",
+        json={"reason": "undo", "revision_id": rev},
+        headers=_csrf(client),
+    )
+    assert r.status_code == 200, r.text
+    assert helpdesk.published_banner(db)["id"] == saved["id"]
+    r = client.post(
+        f"/api/admin/banner/{saved['id']}/disable",
+        json={"reason": "over", "confirm": BANNER_CONFIRM},
+        headers=_csrf(client),
+    )
+    assert r.status_code == 200, r.text
+    r = client.post(
+        f"/api/admin/banner/{saved['id']}/rollback",
+        json={"reason": "bring it back", "revision_id": rev},
+        headers=_csrf(client),
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["banner"]["status"] == "draft"
+    assert helpdesk.published_banner(db) is None
+
+
+def test_admins_cannot_lock_admins_out(tmp_path, monkeypatch):
+    client, db = _admin_client(tmp_path, monkeypatch)
+    monkeypatch.setenv("ADMIN_USERNAMES", "opadmin,second")
+    second = _register("second")
+    me = db.get_by_username("opadmin")
+    other = db.get_by_username("second")
+    by_name = {a.name: a for a in ACTIONS}
+    refused = (
+        (me, "disable", by_name["disable"].admin_message, {"message": "paused"}),
+        (me, "revoke-sessions", by_name["revoke-sessions"].self_message, {}),
+        (me, "set-email", by_name["set-email"].admin_message, {"email": "me@example.org"}),
+        (other, "disable", by_name["disable"].admin_message, {"message": "paused"}),
+        (other, "set-email", by_name["set-email"].admin_message, {"email": "x@example.org"}),
+    )
+    for rec, name, message, extra in refused:
+        assert message
+        r = client.post(
+            f"/api/admin/users/{rec['id']}/{name}",
+            json={"reason": "testing", "confirm": rec["username"], **extra},
+            headers=_csrf(client),
+        )
+        assert r.status_code == 400, (name, r.text)
+        assert r.json()["detail"] == message
+        detail = client.get(f"/api/admin/users/{rec['id']}").json()
+        assert detail["refusals"][name] == message
+    assert client.get("/api/admin/queue-counts").status_code == 200
+    assert second.get("/api/libraries").status_code == 200
+    r = client.post(
+        f"/api/admin/users/{other['id']}/revoke-sessions",
+        json={"reason": "stolen laptop", "confirm": "second"},
+        headers=_csrf(client),
+    )
+    assert r.status_code == 200, r.text
+    student = _register("stu")
+    assert student
+    stu = db.get_by_username("stu")
+    assert client.get(f"/api/admin/users/{stu['id']}").json()["refusals"] == {}
+
+
+def test_retry_fetch_keeps_the_students_contact_email(tmp_path, monkeypatch):
+    client, db = _admin_client(tmp_path, monkeypatch)
+    _register("stu")
+    uid = db.get_by_username("stu")["id"]
+    last = {"query": "sleep", "sources": ["pubmed"], "max_results": 10,
+            "clear_first": False, "email": "kid@school.org"}
+    monkeypatch.setattr(core, "snapshot_jobs", lambda _uid: {"fetch": {"last_fetch": last}})
+    started = {}
+
+    def fake_start(user_id, task, fn, **kwargs):
+        started.update(kwargs)
+        return True
+
+    monkeypatch.setattr(core, "start_user_job", fake_start)
+    r = client.post(
+        f"/api/admin/users/{uid}/retry-fetch",
+        json={"reason": "source was down"},
+        headers=_csrf(client),
+    )
+    assert r.status_code == 200, r.text
+    assert started["email"] == "kid@school.org"

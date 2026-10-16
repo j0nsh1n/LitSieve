@@ -509,7 +509,13 @@ def test_support_view_read_only_and_expiry(tmp_path, monkeypatch):
     db.conn.commit()
     legacy = helpdesk.get_support_view_by_token(db, token)
     assert legacy and legacy["ui_mode"] == "advanced"
-    synthesized = core._support_view_user(SimpleNamespace(cookies={"support_view": token}))
+    alone = core._support_view_user(SimpleNamespace(cookies={"support_view": token}))
+    assert alone is None
+    db.conn.execute("UPDATE support_views SET ended_at = NULL, end_reason = NULL")
+    db.conn.commit()
+    synthesized = core._support_view_user(SimpleNamespace(cookies={
+        "support_view": token, "access_token": client.cookies.get("access_token"),
+    }))
     assert synthesized and "ui_mode" not in synthesized["support_view"]
     actions = [a["action"] for a in db.list_support_actions(uid)]
     assert "support-view-start" in actions
@@ -697,3 +703,53 @@ def test_ticket_privacy_and_banner_rollback(tmp_path, monkeypatch):
     )
     assert bad_html.status_code == 200
     assert "<script>" not in bad_html.json()["banner"]["body"]
+
+
+def _start_view(client, uid):
+    r = client.post(
+        f"/api/admin/users/{uid}/view",
+        json={"reason": "reproduce search bug", "password": TEST_PASSWORD},
+        headers={"X-CSRF-Token": client.cookies.get("csrf_token") or ""},
+    )
+    assert r.status_code == 200, r.text
+    assert client.get("/api/libraries").status_code == 200
+
+
+def _end_reason(db):
+    return db.conn.execute(
+        "SELECT end_reason FROM support_views ORDER BY started_at DESC, rowid DESC LIMIT 1"
+    ).fetchone()[0]
+
+
+def test_support_view_ends_with_the_admin_session(tmp_path, monkeypatch):
+    client, db = _admin_client(tmp_path, monkeypatch, username="opadmin")
+    _register("needhelp")
+    uid = db.get_by_username("needhelp")["id"]
+
+    _start_view(client, uid)
+    out = client.get("/logout", follow_redirects=False)
+    assert out.status_code == 302
+    assert client.cookies.get("support_view") is None
+    assert client.get("/api/libraries").status_code == 401
+    assert _end_reason(db) == "logout"
+
+    client.post(
+        "/login",
+        data={"username": "opadmin", "password": TEST_PASSWORD},
+        follow_redirects=False,
+    )
+    _start_view(client, uid)
+    monkeypatch.setenv("ADMIN_USERNAMES", "")
+    page = client.get("/search", follow_redirects=False)
+    assert b"Read-only student view" not in page.content
+    assert _end_reason(db) == "admin-session-ended"
+    monkeypatch.setenv("ADMIN_USERNAMES", "opadmin")
+
+    client.cookies.delete("support_view")
+    _start_view(client, uid)
+    db.conn.execute(
+        "UPDATE users SET token_version = token_version + 1 WHERE username = 'opadmin'"
+    )
+    db.conn.commit()
+    assert client.get("/api/libraries").status_code == 401
+    assert _end_reason(db) == "admin-session-ended"

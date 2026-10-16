@@ -6,7 +6,7 @@
   poster. Live at `https://www.litpilot.org` from the production checkout at
   `0374605` (2026-10-14). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
-- Latest full suite (2026-10-14): **1021 passed**, no xfails; all 15 parity
+- Latest full suite (2026-10-15): **1048 passed**, no xfails; all 15 parity
   rows pass. `ruff check .` clean; `pyright app` **0 errors**, 6 optional-import
   warnings (CI blocks on errors). `pip-audit` (2026-10-14): no known
   vulnerabilities; ROCm torch/triton are un-auditable. No dependency lockfile.
@@ -36,12 +36,26 @@
   pagination, requests and retry waits. Completed pages survive timeout;
   progress reports queued/running/done states and elapsed time per source.
 - New support-view/ticket records omit mode; old history remains readable.
-- Known host gaps: live account cap/AI configuration (Phase 4), actual detached
-  deployment history completion (Phase 11), and disconnected browser automation.
+- Known host gaps: live account cap/AI configuration and confirming detached
+  deployment history on the host (roadmap Phase 23), and disconnected browser
+  automation.
   Semantic Scholar runs without an API key, so it sometimes answers 429; the
   pipeline logs it and continues with the other sources.
 - Code scanning is clean: route error messages are the app's own sentences
   (`app/errors.py`, `UserError` and `sentence_for`), shipped 2026-10-14.
+- Full audit 2026-10-15: `docs/AUDIT_2026-10-15.md`, two independent passes
+  (lead and a blind Grok pass) merged. Sections 16 to 23 match roadmap
+  Phases 16 to 23; findings have ids (`16.1`, ...) that tasks and PRs cite;
+  mark a finding `Fixed in #NN` when its PR merges. Nothing fixed yet.
+  Headline items: bioRxiv/medRxiv, DBLP
+  and Semantic Scholar effectively never return papers on the host; Europe
+  PMC stores every journal as "Unknown journal"; login
+  lockout never resets; rate limiter keyed on unverified JWTs; quota never
+  freed by deleting papers; hybrid rank min-max normalisation; several
+  Search-page element ids that no template renders; Laya topic areas keep
+  a stale pick when the answer is unsure, the topic is short, or any area
+  was clicked by hand; admin: saving a banner draft unpublishes the live
+  one, self-disable locks the only admin out, logout keeps a support view.
 - Admin (`/admin`) is four tabs with the hash as its address (`#accounts/u/<id>`,
   `#accounts/<queue>`). Account actions come from `ACTIONS` in
   `app/routes/admin.py`: the template draws the buttons and `_begin_action`
@@ -121,14 +135,17 @@ Guest User (is_guest) → sample corpus only; purged by age
   the owning user's progress while a referenced job is active.
 
 ## Session Handoff
-- **Date:** 2026-10-15. **Branch:** `feat/admin-overview` (Codex's worktree
-  under `~/.t3/worktrees/HealthDatabaseAccess/`). Admin plan slices 1 to 3
-  are live (PRs #89, #90, #91); slice 4 (Overview tiles for every queue with
-  real totals, the cross-account activity card) was built by Codex
-  (gpt-6-luna) from a sealed brief, reviewed and driven in Chromium here.
-  Plan: `docs/ADMIN_PANEL_PLAN.md`; with slice 4 merged the plan is done.
+- **Date:** 2026-10-15. **Branch:** `docs/audit-2026-10-15`. Admin plan
+  slices 1 to 4 are merged (PRs #89 to #92); `docs/ADMIN_PANEL_PLAN.md` is
+  done. Production still serves `0374605` (audit 23.1).
+- The 2026-10-15 audit is merged into one file, `docs/AUDIT_2026-10-15.md`;
+  `roadmap.md` Phases 16 to 23 are the fixes in order, each task tagged with
+  its finding ids. The old Phases 4, 11, 14 and 15 are gone; their open
+  tasks moved into Phases 19 and 23 and the backlog.
+- Dev leftovers in `dev_users.db` only: admins `audit1015` and `grokaudit`,
+  guest `guest_17006d07`, test tickets, a 63-paper library, a disabled
+  banner.
 - Host notes: the LAN's primary DNS server (192.168.12.132) times out, so
   cloudflared logs a DNS refresh error every 5 minutes but stays connected;
   `litpilot.org` needs an apex record or redirect rule in Cloudflare.
-- Still open: roadmap Phases 4, 11, 14 and 15.
-- **Next step:** merge the slice 4 PR, deploy, delete the plan's worktrees.
+- **Next step:** branch `fix/admin-console` from `main` and start Phase 16.

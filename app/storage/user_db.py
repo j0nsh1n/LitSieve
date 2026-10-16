@@ -970,13 +970,20 @@ class UserDatabase:
         ]
 
     def list_admin_activity(self, *, limit: int = 50) -> List[Dict]:
-        """Newest support actions across accounts with the student's username."""
+        """Newest admin actions across accounts with the student's username.
+
+        Students' own ticket actions share the table but are not admin
+        activity. Older student replies were written as ``ticket-reply`` with
+        the student as the actor.
+        """
         limit = max(1, min(int(limit), 50))
         with self._lock:
             rows = self.conn.execute(
                 "SELECT a.id, a.created_at, a.admin_username, a.action, a.reason, "
                 "a.new_value, a.student_id, u.username "
                 "FROM support_actions AS a LEFT JOIN users AS u ON u.id = a.student_id "
+                "WHERE a.action NOT IN ('ticket-open', 'ticket-student-reply') "
+                "AND NOT (a.action = 'ticket-reply' AND a.admin_id = a.student_id) "
                 "ORDER BY a.created_at DESC, a.id DESC LIMIT ?",
                 (limit,),
             ).fetchall()

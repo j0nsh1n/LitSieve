@@ -452,6 +452,7 @@ def job_view(user_id: str, task: str, slot: dict) -> dict:
             'sources': list(last_fetch.get('sources') or [])[:20],
             'max_results': last_fetch.get('max_results'),
             'clear_first': bool(last_fetch.get('clear_first')),
+            'email': last_fetch.get('email') or '',
         } if last_fetch else None,
         'can_cancel': task != 'cluster' and active and alive,
         'can_clear': active and not alive,
@@ -562,6 +563,7 @@ def start_user_job(uid: str, task: str, fn, /, **kwargs) -> bool:
             "sources": list(kwargs.get("sources") or []),
             "max_results": kwargs.get("max_results"),
             "clear_first": bool(kwargs.get("clear_first")),
+            "email": kwargs.get("email") or "",
         }
     if not try_begin_user_job(uid, task, **extra):
         return False
@@ -614,24 +616,22 @@ def current_user(request: Request) -> Optional[dict]:
     if cached is not _MISSING:
         return cast(Optional[dict], cached)
 
-    view_user = _support_view_user(request)
-    if view_user is not None:
-        request.state._current_user = view_user
-        return view_user
+    user = _support_view_user(request) or _session_user(request)
+    request.state._current_user = user
+    return user
 
+
+def _session_user(request: Request) -> Optional[dict]:
+    """The account behind the access_token JWT, if that session is still live."""
     payload = get_current_user(request)
     if not payload or not payload.get("user_id"):
-        request.state._current_user = None
         return None
     record = user_db.get_by_id(payload["user_id"])
     if not record:
-        request.state._current_user = None
         return None
     if int(payload.get("tv", 0) or 0) != int(record.get("token_version") or 0):
-        request.state._current_user = None
         return None
     if user_db.is_locked(record) or user_db.is_disabled(record):
-        request.state._current_user = None
         return None
     try:
         user_db.touch_last_seen(record["id"])
@@ -645,11 +645,10 @@ def current_user(request: Request) -> Optional[dict]:
             destroy_guest_account(record["id"])
         except Exception:
             logger.exception("Failed to expire guest %s", record["id"])
-        request.state._current_user = None
         return None
     username = record["username"]
     guest = bool(record.get("is_guest"))
-    result = {
+    return {
         "user_id": record["id"],
         "username": username,
         "token_version": int(record.get("token_version") or 0),
@@ -659,17 +658,24 @@ def current_user(request: Request) -> Optional[dict]:
         "look": normalize_look(record.get("look")),
         "appearance": record.get("appearance") or {},
     }
-    request.state._current_user = result
-    return result
 
 
 def _support_view_user(request: Request) -> Optional[dict]:
+    """The student a live support view shows, while its admin's own session lasts.
+
+    Logging out, losing admin rights, or a revoked or disabled admin session
+    ends the view, so the student identity never outlives the admin's.
+    """
     token = request.cookies.get(SUPPORT_VIEW_COOKIE)
     if not token:
         return None
     from app.storage import helpdesk
     view = helpdesk.get_support_view_by_token(user_db, token)
     if not view:
+        return None
+    admin = _session_user(request)
+    if not admin or admin["user_id"] != view["admin_id"] or not admin["is_admin"]:
+        helpdesk.end_support_view(user_db, view["id"], reason="admin-session-ended")
         return None
     record = user_db.get_by_id(view["student_id"])
     if not record:
@@ -686,6 +692,7 @@ def _support_view_user(request: Request) -> Optional[dict]:
         "appearance": record.get("appearance") or {},
         "support_view": {
             "id": view["id"],
+            "admin_id": view["admin_id"],
             "admin_username": view["admin_username"],
             "student_username": view["student_username"],
             "reason": view["reason"],

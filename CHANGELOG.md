@@ -44,6 +44,29 @@ and this project aims to follow Semantic Versioning for app version strings
   action fails, the message no longer carries the provider's or system's raw
   error text; the server log keeps it.
 
+### Fixed
+- Admin console (audit 16.1 to 16.9). Saving a banner draft no longer takes
+  the live banner down: the draft is its own row, the Site tab shows what is
+  on the site and the draft separately, and only Publish and Take down
+  (both behind the word `publish`) change what students see. A `status`
+  field in the save body is ignored, and Roll back brings the earlier
+  wording back as the draft.
+- An admin can no longer disable, or set the email of, any admin account
+  (their own included), or revoke their own sessions; the page says why
+  before a dialog opens (`refusals` in `GET /api/admin/users/{id}`).
+- A support view now lasts only as long as the admin session that started
+  it: logging out, a revoked or disabled admin session, or losing admin
+  rights ends it, so the student's identity never outlives the admin's.
+- Host tab: a socket-activated Laya worker that idled out reads "asleep,
+  starting now" instead of "not answering"; watchdog times show as UTC
+  times rather than epoch seconds.
+- Recent admin activity leaves out students' own ticket actions, says
+  "their own account" instead of ending on a preposition, words student
+  view ends and support packet exports, and no longer prints banner row ids.
+- Unlock, Re-enable and Retry prepare are enabled only when the account's
+  state allows them; Retry fetch reuses the student's own contact email
+  instead of a placeholder.
+
 ## [6.0.0] - 2026-10-12
 
 ### Added

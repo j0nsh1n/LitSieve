@@ -207,12 +207,11 @@ const ACTIVITY_WORDS = {
  'quota-bump': 'bumped quota for',
  'delete-library': 'deleted a library for',
  note: 'left a note on',
- 'ticket-open': 'opened a ticket',
- 'ticket-student-reply': 'replied to their own ticket',
  'ticket-reply': 'replied to a ticket for',
  'ticket-status': 'changed a ticket status for',
- view: 'viewed as student',
- 'support-view-start': 'viewed as student',
+ 'support-view-start': 'opened a student view of',
+ 'support-view-end': 'ended a student view of',
+ 'export-packet': 'exported the support packet for',
  'banner-save': 'saved a banner draft',
  'banner-publish': 'published the banner',
  'banner-disable': 'took the banner down',
@@ -234,8 +233,8 @@ function renderAdminActivity(items, error = '') {
   const action = ACTIVITY_WORDS[item.action] || String(item.action || '').replaceAll('-', ' ');
   const own = item.admin_username && item.admin_username === item.student_username;
   const who = SITE_WIDE.test(String(item.action || ''))
-   ? (item.new_value ? ` (${escapeHtml(item.new_value)})` : '')
-   : (own ? '' : ` <a href="#accounts/u/${escapeAttr(item.student_id)}">${escapeHtml(item.student_username || 'an account')}</a>`);
+   ? (String(item.action).startsWith('content-') && item.new_value ? ` (${escapeHtml(item.new_value)})` : '')
+   : (own ? ' their own account' : ` <a href="#accounts/u/${escapeAttr(item.student_id)}">${escapeHtml(item.student_username || 'an account')}</a>`);
   return `<li><span class="library-manage-name">${escapeHtml(item.admin_username)} ${escapeHtml(action)}${who}</span>`
    + `<span class="help-text">${escapeHtml(item.created_at)}</span>`
    + `<p class="info-text">${escapeHtml(item.reason)}</p></li>`;
@@ -268,7 +267,12 @@ async function loadHost() {
   const d = h.disk;
   set('host-disk', d ? `${gb(d.free_bytes)} of ${gb(d.total_bytes)}` : '—');
   const l = h.laya || {};
-  set('host-laya', l.state === 'up' ? (l.loaded ? 'up, model loaded' : 'up, idle') : (l.state === 'down' ? 'not answering' : 'not configured'));
+  const LAYA_WORDS = {
+   down: 'not answering',
+   waking: 'asleep, starting now (about 8 s)',
+   unset: 'not configured',
+  };
+  set('host-laya', l.state === 'up' ? (l.loaded ? 'up, model loaded' : 'up, idle') : (LAYA_WORDS[l.state] || 'not configured'));
   renderAi(h.ai || {});
  } catch (e) {
   set('host-status', e.message || 'Could not read host facts.');
@@ -529,7 +533,7 @@ function renderDetail(d) {
    }).join('')
    : '<li class="info-text">No libraries.</li>';
  }
- setJobButtons(d);
+ setActionButtons(d);
  const pack = document.getElementById('hd-packet');
  if (pack) pack.href = '/api/admin/users/' + encodeURIComponent(d.id) + '/packet';
  const tickets = document.getElementById('helpdesk-tickets');
@@ -548,14 +552,18 @@ function pair(label, value) {
  return `<div><dt>${escapeHtml(String(label))}</dt><dd>${escapeHtml(String(value == null ? '—' : value))}</dd></div>`;
 }
 
-function setJobButtons(d) {
+function setActionButtons(d) {
  const jobs = d.jobs || {};
+ const stats = d.statistics || {};
  const can = {
+  'unlock': !!(d.locked || d.failed_logins),
+  'enable': !!d.disabled,
   'cancel-job:fetch': !!(jobs.fetch || {}).can_cancel,
   'cancel-job:embed': !!(jobs.embed || {}).can_cancel,
   'clear-job:fetch': !!(jobs.fetch || {}).can_clear,
   'clear-job:embed': !!(jobs.embed || {}).can_clear,
-  'retry-embed': !!(jobs.embed || {}).can_retry,
+  'retry-embed': !!(jobs.embed || {}).can_retry
+   && (stats.total_articles || 0) > (stats.articles_with_embeddings || 0),
   'retry-fetch': !!(jobs.fetch || {}).can_retry_fetch,
  };
  document.querySelectorAll('[data-action]').forEach((btn) => {
@@ -740,6 +748,11 @@ async function runAction(name, task) {
   ? `[data-action="${name}"][data-task="${task}"]`
   : `[data-action="${name}"]`);
  const destructive = !!(btn && btn.dataset.destructive);
+ const refused = (_selected.refusals || {})[name];
+ if (refused) {
+  showNotification(refused, 'error');
+  return;
+ }
  const form = ACTION_FORMS[name] || {};
  if (form.before) {
   const stop = form.before(_selected);
@@ -949,24 +962,26 @@ async function ticketPost(url, body, said) {
 
 // --- site: banner and copy -------------------------------------------------
 
-let _bannerId = null;
-let _bannerRev = null;
+let _banner = { draft: null, published: null };
+
+function bannerLine(label, b) {
+ if (!b) return `${label}: none.`;
+ return `${label}: ${b.body}${b.expires_at ? ` (until ${b.expires_at})` : ''}`;
+}
 
 async function loadBanner() {
+ const live = document.getElementById('banner-current');
+ const draft = document.getElementById('banner-draft');
  try {
   const d = await apiCall('/api/admin/banner');
-  const b = d.banner || d.published;
-  const el = document.getElementById('banner-current');
+  _banner = { draft: d.draft || null, published: d.published || null };
+  if (live) live.textContent = bannerLine('On the site', _banner.published);
+  if (draft) draft.textContent = bannerLine('Draft', _banner.draft);
   const field = document.getElementById('banner-body');
-  if (b) {
-   _bannerId = b.id;
-   _bannerRev = (b.revisions && b.revisions[1] && b.revisions[1].id) || (b.revisions && b.revisions[0] && b.revisions[0].id) || null;
-   if (el) el.textContent = `${b.status}: ${b.body}${b.expires_at ? ` (until ${b.expires_at})` : ''}`;
-   if (field && !field.value) field.value = b.body || '';
-  } else if (el) el.textContent = 'No published banner.';
+  const shown = _banner.draft || _banner.published;
+  if (field && !field.value && shown) field.value = shown.body || '';
  } catch (e) {
-  const el = document.getElementById('banner-current');
-  if (el) el.textContent = e.message || 'Could not load banner.';
+  if (live) live.textContent = e.message || 'Could not load banner.';
  }
 }
 
@@ -974,12 +989,28 @@ const BANNER_WORDS = {
  save: ['Save banner draft', 'Saves the text without showing it to anyone.'],
  publish: ['Publish banner', 'Every student sees this at the top of every page. Type publish to confirm.'],
  disable: ['Take the banner down', 'Removes it from every page. Type publish to confirm.'],
- rollback: ['Roll back the banner', 'Restores the previous revision.'],
+ rollback: ['Bring back the earlier wording', 'Puts the previous wording back in the draft. Publish it to show it.'],
 };
 
 async function bannerAct(kind) {
  const field = document.getElementById('banner-body');
  const status = document.getElementById('banner-status');
+ const target = kind === 'disable' ? _banner.published
+  : kind === 'publish' ? _banner.draft
+  : (_banner.draft || _banner.published);
+ if (kind !== 'save' && !target) {
+  const why = kind === 'disable' ? 'No banner is on the site.' : 'Save a draft first.';
+  if (status) status.textContent = why;
+  showNotification(why, 'error');
+  return;
+ }
+ const previous = kind === 'rollback'
+  ? (target.revisions || []).find((r) => r.body !== target.body)
+  : null;
+ if (kind === 'rollback' && !previous) {
+  if (status) status.textContent = 'No earlier wording to bring back.';
+  return;
+ }
  const [title, message] = BANNER_WORDS[kind];
  const confirmName = (kind === 'publish' || kind === 'disable') ? 'publish' : null;
  const vals = await promptAction(title, message, { confirmName });
@@ -987,20 +1018,17 @@ async function bannerAct(kind) {
  const body = { reason: vals.reason, confirm: vals.confirm };
  try {
   if (kind === 'save') {
-   const d = await apiCall('/api/admin/banner', {
+   await apiCall('/api/admin/banner', {
     method: 'POST',
-    body: { ...body, body: (field && field.value) || '', status: 'draft' },
+    body: { ...body, body: (field && field.value) || '' },
    });
-   _bannerId = d.banner && d.banner.id;
-  } else if (!_bannerId) {
-   throw new Error('Save a draft first.');
   } else if (kind === 'rollback') {
-   if (!_bannerRev) throw new Error('No revision to roll back to.');
-   await apiCall(`/api/admin/banner/${encodeURIComponent(_bannerId)}/rollback`, {
-    method: 'POST', body: { ...body, revision_id: _bannerRev },
+   const d = await apiCall(`/api/admin/banner/${encodeURIComponent(target.id)}/rollback`, {
+    method: 'POST', body: { ...body, revision_id: previous.id },
    });
+   if (field && d.banner) field.value = d.banner.body || '';
   } else {
-   await apiCall(`/api/admin/banner/${encodeURIComponent(_bannerId)}/${kind}`, { method: 'POST', body });
+   await apiCall(`/api/admin/banner/${encodeURIComponent(target.id)}/${kind}`, { method: 'POST', body });
   }
   if (status) status.textContent = 'Done.';
   showNotification(`Banner: ${kind === 'disable' ? 'taken down' : kind + 'd'}.`, 'success');
