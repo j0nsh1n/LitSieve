@@ -17,7 +17,6 @@ def _admin_client(tmp_path, monkeypatch, username="opadmin"):
     db = UserDatabase(str(tmp_path / "users.db"))
     monkeypatch.setattr(core, "user_db", db)
     monkeypatch.setenv("USER_DATA_DIR", str(tmp_path / "user_data"))
-    monkeypatch.setenv("ADMIN_USERNAMES", username)
     monkeypatch.setattr(mailer, "is_configured", lambda: False)
     client = TestClient(app)
     r = client.post(
@@ -26,6 +25,7 @@ def _admin_client(tmp_path, monkeypatch, username="opadmin"):
         follow_redirects=False,
     )
     assert r.status_code in (302, 303), r.text
+    monkeypatch.setenv("ADMIN_USERNAMES", username)
     return client, db
 
 

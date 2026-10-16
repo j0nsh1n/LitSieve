@@ -4,6 +4,7 @@ import logging
 import os
 import secrets
 import shutil
+from datetime import timedelta
 from typing import Optional
 from urllib.parse import unquote
 
@@ -96,6 +97,18 @@ async def login_page(request: Request):
     )
 
 
+_CROSS_SITE = "Sign in and register from this site's own pages."
+_DECOY_HASH: Optional[str] = None
+
+
+async def _decoy_hash() -> str:
+    """A real bcrypt hash, so an unknown username costs as long as a wrong password."""
+    global _DECOY_HASH
+    if _DECOY_HASH is None:
+        _DECOY_HASH = await hash_password_async(secrets.token_urlsafe(16))
+    return _DECOY_HASH
+
+
 @router.post("/login")
 @limiter.limit("10/minute")
 async def login_submit(
@@ -105,6 +118,12 @@ async def login_submit(
     next: str = Form(""),
 ):
     next_url = _safe_next_url(next or request.query_params.get("next"))
+    if core.cross_site_form(request):
+        return templates.TemplateResponse(
+            request, "login.html",
+            context={"error": _CROSS_SITE, "info": "", "next": ""},
+            status_code=403,
+        )
     username = username.strip().lower()
     user = core.user_db.get_by_username(username)
     ip = core.client_bucket(request)
@@ -134,7 +153,8 @@ async def login_submit(
             },
             status_code=400,
         )
-    if not user or not await verify_password_async(password, user["hashed_password"]):
+    hashed = user["hashed_password"] if user else await _decoy_hash()
+    if not await verify_password_async(password, hashed) or not user:
         core.user_db.record_login_failure(username, ip)
         return templates.TemplateResponse(
             request, "login.html",
@@ -206,7 +226,8 @@ async def login_once(request: Request, token: str = ""):
 
 @router.get("/register")
 async def register_page(request: Request):
-    if current_user(request):
+    user = current_user(request)
+    if user and not user.get("is_guest"):
         return RedirectResponse(url="/search", status_code=302)
     return templates.TemplateResponse(
         request, "register.html",
@@ -222,10 +243,12 @@ def _register_ctx(*, error: str = "", username: str = "") -> dict:
 
 
 def _reset_codes_in_response() -> bool:
-    """Classroom/self-host: show the reset code when DEBUG or explicit flag is set."""
-    if os.getenv("RESET_CODES_IN_RESPONSE", "").strip().lower() in ("1", "true", "yes"):
-        return True
-    return os.getenv("DEBUG", "").strip().lower() in ("1", "true", "yes")
+    """Classroom/self-host without mail: show the reset code only when asked to.
+
+    DEBUG alone does not turn this on, so debugging a server never puts reset
+    codes on a page anyone can open.
+    """
+    return os.getenv("RESET_CODES_IN_RESPONSE", "").strip().lower() in ("1", "true", "yes")
 
 
 @router.get("/reset-password")
@@ -340,11 +363,21 @@ async def register_submit(
     password: str = Form(...),
     password_confirm: str = Form(...),
 ):
+    if core.cross_site_form(request):
+        return templates.TemplateResponse(
+            request, "register.html",
+            context=_register_ctx(error=_CROSS_SITE),
+            status_code=403,
+        )
     username = username.strip().lower()
     # New accounts get a plain handle; an optional recovery email is added
     # later from Account and must be verified. Older email-shaped logins are
     # grandfathered by validate_login_name at sign-in.
     error = validate_new_username(username)
+    if error is None and core.is_admin_username(username):
+        # Admin rights follow the name, so a listed name nobody has
+        # registered yet must not be claimable. Register first, then list it.
+        error = "That login is reserved. Choose a different username."
 
     if error is None and len(password) < 8:
         error = "Password must be at least 8 characters."
@@ -380,6 +413,12 @@ async def register_submit(
             ),
             status_code=400,
         )
+    demo = current_user(request)
+    if demo and demo.get("is_guest"):
+        try:
+            core.destroy_guest_account(demo["user_id"])
+        except Exception:
+            logger.exception("Could not drop guest %s after registering", demo["user_id"])
     token = create_token(
         user["id"], user["username"], user.get("token_version", 0),
     )
@@ -447,6 +486,7 @@ async def _start_guest_session(request: Request) -> RedirectResponse:
 
     token = create_token(
         user["id"], user["username"], user.get("token_version", 0),
+        lifetime=timedelta(minutes=core.GUEST_MAX_AGE_MINUTES),
     )
     response = RedirectResponse(url="/search", status_code=302)
     # Cookies expire with the demo window so browsers drop the session too.
@@ -554,6 +594,7 @@ async def logout(request: Request):
 
 
 @router.post("/api/change-password")
+@limiter.limit("10/minute")
 async def api_change_password(req: ChangePasswordRequest, request: Request):
     user = current_user(request)
     if not user:
@@ -561,8 +602,9 @@ async def api_change_password(req: ChangePasswordRequest, request: Request):
     if csrf_failed(request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
 
-    record = core.user_db.get_by_id(user["user_id"])
-    if not record or not await verify_password_async(req.current_password, record["hashed_password"]):
+    if not await core.password_confirms(
+        request, user["user_id"], req.current_password, "change-password",
+    ):
         return JSONResponse(status_code=400, content={"detail": "Incorrect password"})
 
     new_pw = req.new_password or ""
@@ -599,6 +641,7 @@ async def api_change_password(req: ChangePasswordRequest, request: Request):
 
 
 @router.post("/api/delete-account")
+@limiter.limit("10/minute")
 async def api_delete_account(req: DeleteAccountRequest, request: Request):
     user = current_user(request)
     if not user:
@@ -608,8 +651,7 @@ async def api_delete_account(req: DeleteAccountRequest, request: Request):
 
     uid = user["user_id"]
     # Re-verify the password before destroying anything.
-    record = core.user_db.get_by_username(user["username"])
-    if not record or not await verify_password_async(req.password, record["hashed_password"]):
+    if not await core.password_confirms(request, uid, req.password, "delete-account"):
         return JSONResponse(status_code=400, content={"detail": "Incorrect password"})
 
     try:
@@ -686,8 +728,9 @@ async def api_set_email(req: SetEmailRequest, request: Request):
                                "configure SMTP."},
         )
 
-    row = core.user_db.get_by_username(user["username"])
-    if not row or not await verify_password_async(req.current_password, row["hashed_password"]):
+    if not await core.password_confirms(
+        request, user["user_id"], req.current_password, "set-email",
+    ):
         return JSONResponse(status_code=400, content={"detail": "Incorrect password"})
 
     error = validate_email(req.email)
@@ -696,16 +739,16 @@ async def api_set_email(req: SetEmailRequest, request: Request):
 
     email = core.user_db.normalize_email(req.email)
     try:
-        token = core.user_db.start_email_verification(row["username"], email)
+        token = core.user_db.start_email_verification(user["username"], email)
     except ValueError as e:
         return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
     if not token:
         return JSONResponse(status_code=404, content={"detail": "Account not found"})
 
     try:
-        await run_in_thread(mailer.send_verification, email, row["username"], token)
+        await run_in_thread(mailer.send_verification, email, user["username"], token)
     except Exception:
-        logger.exception("Verification email failed for %s", row["username"])
+        logger.exception("Verification email failed for %s", user["username"])
         return JSONResponse(
             status_code=502,
             content={"detail": "Saved, but the verification email could not be sent. "

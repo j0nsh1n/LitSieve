@@ -12,7 +12,7 @@
     <script src="/static/js/tooltips.js?v=20260923a" defer></script>
     {% block head_extra %}{% endblock %}
 </head>
-<body class="{% block body_class %}{% endblock %}"{% if user and user.is_guest %} data-guest="1"{% endif %}{% if support_view %} data-support-view="1"{% endif %}{% if embed %} data-embed="1"{% endif %}>
+<body class="{% block body_class %}{% endblock %}"{% if user %} data-account="{{ user.user_id }}"{% endif %}{% if user and user.is_guest %} data-guest="1"{% endif %}{% if support_view %} data-support-view="1"{% endif %}{% if embed %} data-embed="1"{% endif %}>
     {# Inside the account panel the page around it already has all of this. #}
     {% if not embed %}
     {% include "partials/site_notice.html" %}
@@ -122,7 +122,7 @@
     {% if user and active_page != 'account' %}{% include "partials/settings_panel.html" %}{% endif %}
     {% endif %}
 
-    <script src="/static/js/common.js?v=20261012y"></script>
+    <script src="/static/js/common.js?v=20261016a"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

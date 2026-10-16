@@ -95,8 +95,10 @@ app = FastAPI(
 )
 app.state.limiter = core.limiter
 app.add_exception_handler(RateLimitExceeded, _handle_rate_limit)
-app.add_middleware(SecurityHeadersMiddleware)
+# The last one added runs outermost, so the security headers also reach the
+# 403s and redirects SupportViewMiddleware answers on its own.
 app.add_middleware(SupportViewMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 

@@ -14,7 +14,6 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from app import core
-from app.auth import verify_password_async
 from app.core import (
     COOKIE_SECURE,
     admin_forbidden_response,
@@ -57,8 +56,10 @@ def _require_operator(request: Request):
 
 
 def _reauth_secret() -> bytes:
-    key = (os.getenv("SECRET_KEY") or "ops-dev-only").encode("utf-8")
-    return key
+    key = os.getenv("SECRET_KEY") or ""
+    if not key:
+        raise RuntimeError("SECRET_KEY is not configured; Ship cannot unlock.")
+    return key.encode("utf-8")
 
 
 def _parse_ttl_seconds(body: dict) -> Optional[int]:
@@ -212,8 +213,7 @@ async def api_ops_reauth(request: Request):
                 "choices_minutes": list(REAUTH_TTL_CHOICES),
             },
         )
-    row = core.user_db.get_by_id(user["user_id"])
-    if not row or not await verify_password_async(password, row["hashed_password"]):
+    if not await core.password_confirms(request, user["user_id"], password, "ops-unlock"):
         return JSONResponse(status_code=403, content={"detail": "Password did not match."})
     until = int(time.time()) + ttl
     response = JSONResponse({"status": "ok", "ttl": ttl, "until": until})
@@ -267,7 +267,7 @@ async def api_ops_status(request: Request):
         "reauth_choices_minutes": list(REAUTH_TTL_CHOICES),
         "reauth_default_minutes": REAUTH_TTL_DEFAULT // 60,
         "history": ops_audit.list_deploys(core.user_db, limit=15),
-        "last_validate": ops_audit.get_state(core.user_db, "last_validate_ok") == "1",
+        "last_validate": bool(ops_audit.get_state(core.user_db, "last_validate_tree")),
         "grok": await run_in_thread(run_action, 
             "grok_status",
             extra_env={"LITSIEVE_GROK_SESSION": ops_audit.get_state(core.user_db, "grok_session")},
@@ -328,7 +328,7 @@ async def api_ops_save(request: Request):
         ip=client_bucket(request),
     )
     if result.get("ok"):
-        ops_audit.set_state(core.user_db, "last_validate_ok", "0")
+        ops_audit.set_state(core.user_db, "last_validate_tree", "")
     if not result.get("ok"):
         return JSONResponse(status_code=400, content={"detail": result.get("detail") or "save failed"})
     return result
@@ -352,8 +352,8 @@ async def api_ops_validate(request: Request):
     if csrf_failed(request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
     result = await run_in_thread(run_action, "validate")
-    ok = bool(result.get("ok"))
-    ops_audit.set_state(core.user_db, "last_validate_ok", "1" if ok else "0")
+    ok = bool(result.get("ok")) and bool(result.get("tree"))
+    ops_audit.set_state(core.user_db, "last_validate_tree", result["tree"] if ok else "")
     ops_audit.set_state(core.user_db, "last_validate_sha", result.get("sha") or "")
     ops_audit.add(
         core.user_db, actor_id=user["user_id"], actor_username=user["username"],
@@ -367,11 +367,23 @@ async def api_ops_validate(request: Request):
     return result
 
 
-def _validate_blocks() -> Optional[JSONResponse]:
-    if ops_audit.get_state(core.user_db, "last_validate_ok") != "1":
+async def _validate_blocks() -> Optional[JSONResponse]:
+    """Commit and deploy need a passing Validate of exactly the files staged now.
+
+    Any change after it (a save, an Ask Grok edit, a hand edit on the host)
+    gives the staging tree a new id, so the old Validate no longer counts.
+    """
+    validated = ops_audit.get_state(core.user_db, "last_validate_tree")
+    if not validated:
         return JSONResponse(
             status_code=400,
             content={"detail": "Validate must pass before commit or deploy."},
+        )
+    now = (await run_in_thread(run_action, "diff")).get("staging_tree") or ""
+    if now != validated:
+        return JSONResponse(
+            status_code=400,
+            content={"detail": "Files changed since the last Validate. Run Validate again."},
         )
     return None
 
@@ -386,7 +398,7 @@ async def api_ops_commit(request: Request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
     if not _reauth_ok(request, user["user_id"]):
         return _need_reauth()
-    blocked = _validate_blocks()
+    blocked = await _validate_blocks()
     if blocked:
         return blocked
     body = await _read_json(request)
@@ -418,7 +430,7 @@ async def api_ops_deploy(request: Request):
         return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
     if not _reauth_ok(request, user["user_id"]):
         return _need_reauth()
-    blocked = _validate_blocks()
+    blocked = await _validate_blocks()
     if blocked:
         return blocked
     body = await _read_json(request)

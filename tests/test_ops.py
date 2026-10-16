@@ -64,7 +64,6 @@ def _ops_client(tmp_path, monkeypatch, username="opadmin"):
     _ops_env(tmp_path, monkeypatch)
     db = UserDatabase(str(tmp_path / "users.db"))
     monkeypatch.setattr(core, "user_db", db)
-    monkeypatch.setenv("ADMIN_USERNAMES", username)
     client = TestClient(app)
     r = client.post(
         "/register",
@@ -76,6 +75,7 @@ def _ops_client(tmp_path, monkeypatch, username="opadmin"):
         follow_redirects=False,
     )
     assert r.status_code in (302, 303), r.text
+    monkeypatch.setenv("ADMIN_USERNAMES", username)
     return client, db
 
 
@@ -1027,3 +1027,23 @@ def test_ops_routes_never_call_run_action_inline():
         f"{len(bare)} call(s) to run_action() outside run_in_thread in ops.py; "
         "wrap them or the single worker stalls for the action's duration"
     )
+
+
+def test_validate_covers_only_the_files_it_checked(tmp_path, monkeypatch):
+    client, _db = _ops_client(tmp_path, monkeypatch)
+    _reauth(client)
+    save = client.post(
+        "/api/ops/file",
+        json={"path": "app/ok.py", "content": "VALUE = 2\n"},
+        headers=_csrf(client),
+    )
+    assert save.status_code == 200, save.text
+    assert client.post("/api/ops/validate", json={}, headers=_csrf(client)).status_code == 200
+    (tmp_path / "staging" / "app" / "ok.py").write_text("def (\n", encoding="utf-8")
+    commit = client.post("/api/ops/commit", json={"message": "after an edit"}, headers=_csrf(client))
+    assert commit.status_code == 400
+    assert "changed since" in commit.json()["detail"]
+    (tmp_path / "staging" / "app" / "ok.py").write_text("VALUE = 3\n", encoding="utf-8")
+    assert client.post("/api/ops/validate", json={}, headers=_csrf(client)).status_code == 200
+    commit = client.post("/api/ops/commit", json={"message": "validated edit"}, headers=_csrf(client))
+    assert commit.status_code == 200, commit.text

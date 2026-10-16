@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import os
 import subprocess
+import tempfile
 from pathlib import Path
-from typing import List, Sequence
+from typing import List, Optional, Sequence
 
 from app.operator.paths import repo_root, staging_root
 
@@ -14,7 +15,10 @@ class GitError(RuntimeError):
     pass
 
 
-def git(cwd: Path, args: Sequence[str], *, timeout: int = 60, check: bool = True) -> subprocess.CompletedProcess:
+def git(
+    cwd: Path, args: Sequence[str], *, timeout: int = 60, check: bool = True,
+    env: Optional[dict] = None,
+) -> subprocess.CompletedProcess:
     cmd = ["git", "-C", str(cwd), *list(args)]
     try:
         proc = subprocess.run(
@@ -24,6 +28,7 @@ def git(cwd: Path, args: Sequence[str], *, timeout: int = 60, check: bool = True
             timeout=timeout,
             check=False,
             shell=False,
+            env={**os.environ, **env} if env else None,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise GitError(f"git failed: {exc}") from exc
@@ -36,6 +41,19 @@ def git(cwd: Path, args: Sequence[str], *, timeout: int = 60, check: bool = True
 def rev_parse(cwd: Path, rev: str = "HEAD") -> str:
     proc = git(cwd, ["rev-parse", rev])
     return (proc.stdout or "").strip()
+
+
+def worktree_tree(cwd: Path) -> str:
+    """The git tree id of the working tree as it is on disk, untracked files included.
+
+    Built in a throwaway index, so the real index is untouched. Two calls agree
+    exactly when no file changed, which is what ties a Validate to its files.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        env = {"GIT_INDEX_FILE": str(Path(tmp) / "index")}
+        git(cwd, ["read-tree", "HEAD"], env=env)
+        git(cwd, ["add", "-A"], env=env, timeout=120)
+        return (git(cwd, ["write-tree"], env=env).stdout or "").strip()
 
 
 def is_git_repo(cwd: Path) -> bool:

@@ -708,29 +708,48 @@ class UserDatabase:
         from app.storage.helpdesk import is_disabled
         return is_disabled(user, now=self._utc_now())
 
-    def record_login_failure(self, username: str, ip: str = "") -> Dict:
-        """Increment fail count; lock after LOCKOUT_AFTER. Returns {locked, user_id}."""
+    def record_login_failure(self, username: str, ip: str = "", purpose: str = "") -> Dict:
+        """Count a failed sign-in; lock after LOCKOUT_AFTER inside the window.
+
+        The count starts again once a lock has expired or the last failure is
+        older than LOCKOUT_MINUTES, so old mistakes never relock an account.
+        Returns {locked, user_id}.
+        """
         user = self.get_by_username(username)
         uid = user["id"] if user else None
         uname = (user["username"] if user else username) or username
         locked = False
         if user:
-            now = self._utc_now()
-            fails = int(user.get("failed_logins") or 0) + 1
+            now = datetime.now(timezone.utc)
+            stamp = now.strftime("%Y-%m-%d %H:%M:%S")
+            window_start = (now - timedelta(minutes=self.LOCKOUT_MINUTES)).strftime(
+                "%Y-%m-%d %H:%M:%S"
+            )
             until = None
-            if fails >= self.LOCKOUT_AFTER:
-                until = (
-                    datetime.now(timezone.utc)
-                    + timedelta(minutes=self.LOCKOUT_MINUTES)
-                ).strftime("%Y-%m-%d %H:%M:%S")
-                locked = True
             with self._lock:
+                row = self.conn.execute(
+                    "SELECT failed_logins, locked_until, "
+                    "(SELECT MAX(created_at) FROM auth_events "
+                    " WHERE user_id = users.id AND kind = 'login_fail') "
+                    "FROM users WHERE id = ?",
+                    (uid,),
+                ).fetchone()
+                fails, lock_end, last_fail = (row or (0, None, None))
+                expired = bool(lock_end) and str(lock_end) <= stamp
+                stale = not last_fail or str(last_fail) < window_start
+                fails = 1 if (expired or stale) else int(fails or 0) + 1
+                if fails >= self.LOCKOUT_AFTER:
+                    until = (now + timedelta(minutes=self.LOCKOUT_MINUTES)).strftime(
+                        "%Y-%m-%d %H:%M:%S"
+                    )
+                    locked = True
                 self.conn.execute(
                     "UPDATE users SET failed_logins = ?, locked_until = ? WHERE id = ?",
                     (fails, until, uid),
                 )
                 self.conn.commit()
-            self.record_auth_event(uid, uname, "login_fail", ip, f"fails={fails}")
+            detail = f"{purpose} fails={fails}" if purpose else f"fails={fails}"
+            self.record_auth_event(uid, uname, "login_fail", ip, detail)
             if locked:
                 self.record_auth_event(uid, uname, "lockout", ip, f"until={until}")
         else:

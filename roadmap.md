@@ -57,11 +57,12 @@ Audit section 17.
   - (17.3) Count failed password re-auths (admin view, ops re-auth, change
     password, delete account) toward the lockout and write auth events;
     rate-limit change-password and delete-account like login
-  - (17.4) Check the CSRF double-submit token on the `/login` and
-    `/register` POSTs
+  - (17.4) Refuse `/login` and `/register` POSTs the browser marks as
+    cross-site (`Sec-Fetch-Site`, else `Origin`; decided 2026-10-16)
   - (17.5) Let a guest open `/register` (the guest banner links there) and
     replace the guest session with the new account on success
-  - (17.6) Reserve `ADMIN_USERNAMES` at registration
+  - (17.6) Reserve `ADMIN_USERNAMES` at registration (register first,
+    then list the name)
   - (17.7) Run a dummy password hash for an unknown username so login
     timing does not reveal which handles exist
   - (17.8, 17.9) Show reset codes on screen only with
@@ -136,9 +137,11 @@ Audit section 19.
     score
   - (19.2) Refresh the Kept / Removed / Screened out rail after Not
     relevant, Undo, Set aside and duplicate actions
-  - (19.3) Duplicate resolution after prepare: either preview and undo as
-    `spec.md` says, or change the spec (the human decides); make the
-    Narrow it down counts and "papers ready" agree
+  - (19.3) Duplicates belong to the triage: keep the automatic removal
+    after prepare, but show it inside Narrow it down as its own line ("12
+    duplicate copies already set aside") with Undo, make the Narrow it down
+    counts and "papers ready" agree, and update `spec.md` to say so
+    (decided 2026-10-16)
   - (19.4) Show the layout notice only when `uiMode` was stored, and update
     the test that pins the opposite
   - (19.5) Narrow it down: load the level counts once per question; clear
@@ -167,8 +170,9 @@ Audit section 19.
     keyboard access on topic cards; `escapeAttr` in attribute contexts;
     one Reader Escape listener; public copy says Narrow it down, not
     "Quick screen"
-  - (19.16) Year bounds: decide whether undated records stay visible when
-    a year range is set, and say so in the filter
+  - (19.16) Year bounds: papers with no usable year stay visible when a
+    year range is set, in their own "No year listed" group after the
+    results instead of mixed into them (decided 2026-10-16)
   - Looks polish (not from the audit): tune the dark palettes of
     Broadsheet and Catalog; closed result rows show no star or note marker;
     More like this shows no visible banner after re-ranking; Save note says
@@ -241,8 +245,9 @@ Audit section 22.
   - (22.4, 22.5) Validate `openai_base_url` (https, no loopback or private
     ranges unless the host allows it) and bound `llm_timeout_seconds`;
     drop `settings_path` from the settings payload students receive
-  - (22.6) Decide whether `HIDE_AI_BUTTONS` also refuses the three AI
-    routes, and write the answer into `spec.md`
+  - (22.6) `HIDE_AI_BUTTONS` also refuses the three AI routes, so hidden
+    means off and the host key is not spent; write that into `spec.md`
+    (decided 2026-10-16)
   - (22.7, 22.8, 22.9) CSV: escape leading `=`, `+`, `-`, `@`; fill
     Similarity and Cluster columns in the selection export or drop them;
     RIS and BibTeX: write `DO` for every DOI-shaped id; RIS: omit `JO` when

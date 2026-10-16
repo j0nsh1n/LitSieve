@@ -23,7 +23,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse
 
 from app import core
-from app.auth import validate_email, verify_password_async
+from app.auth import validate_email
 from app.core import (
     admin_forbidden_response,
     client_bucket,
@@ -1224,8 +1224,7 @@ async def api_admin_start_view(user_id: str, request: Request):
     admin, rec, body = call.admin, call.rec, call.body
     user_id = rec["id"]
     password = str(body.get("password") or "")
-    admin_row = core.user_db.get_by_id(admin["user_id"])
-    if not admin_row or not await verify_password_async(password, admin_row["hashed_password"]):
+    if not await core.password_confirms(request, admin["user_id"], password, "support-view"):
         return JSONResponse(
             status_code=403,
             content={"detail": "Re-enter your admin password to start student view."},

@@ -123,7 +123,7 @@ def test_authenticated_users_still_get_their_own_bucket(monkeypatch):
     """Signed-in users must not share a bucket with everyone behind the NAT."""
     from app import core
     monkeypatch.setattr(core, "get_remote_address", lambda request: "2001:db8::1")
-    monkeypatch.setattr(core, "get_current_user", lambda request: {"user_id": "u-123"})
+    monkeypatch.setattr(core, "current_user", lambda request: {"user_id": "u-123"})
     assert core.rate_limit_key(object()) == "user:u-123"
 
 
