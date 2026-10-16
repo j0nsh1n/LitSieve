@@ -117,13 +117,15 @@ def cmd_diff(_argv: List[str]) -> int:
     status = gitutil.status_porcelain(staging)
     try:
         staging_sha = gitutil.rev_parse(staging)
+        staging_tree = gitutil.worktree_tree(staging)
     except gitutil.GitError:
-        staging_sha = ""
+        staging_sha = staging_tree = ""
     diff_text = (vs_live.stdout or "") + (unstaged.stdout or "") + (cached.stdout or "")
     return _json_out({
         "ok": True,
         "live_sha": live_sha,
         "staging_sha": staging_sha,
+        "staging_tree": staging_tree,
         "dirty": bool(status.strip()),
         "empty": not bool(diff_text.strip() or status.strip()),
         "diff": diff_text[-20000:],
@@ -188,12 +190,13 @@ def cmd_validate(_argv: List[str]) -> int:
             test_ok = False
             steps.append({"name": "pytest", "ok": False, "output": str(exc)})
     ok = compile_proc.returncode == 0 and ruff_ok and test_ok
-    sha = ""
+    sha = tree = ""
     try:
         sha = gitutil.rev_parse(staging)
+        tree = gitutil.worktree_tree(staging)
     except gitutil.GitError:
-        pass
-    return _json_out({"ok": ok, "steps": steps, "sha": sha}, 0 if ok else 1)
+        ok = False
+    return _json_out({"ok": ok, "steps": steps, "sha": sha, "tree": tree}, 0 if ok else 1)
 
 
 def cmd_commit(argv: List[str]) -> int:

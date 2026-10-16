@@ -138,9 +138,9 @@ def test_registration_and_guest_do_not_seed_mode_cookie(tmp_path, monkeypatch):
 def test_search_nav_keeps_workspace_controls_admin_links_and_model_catalog(
     tmp_path, monkeypatch
 ):
-    monkeypatch.setenv("ADMIN_USERNAMES", "catalogadmin")
     client, _ = _client(tmp_path, monkeypatch)
     _register(client, "catalogadmin")
+    monkeypatch.setenv("ADMIN_USERNAMES", "catalogadmin")
     response = client.get("/search")
     assert response.status_code == 200
     html = response.text

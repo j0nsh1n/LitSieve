@@ -167,23 +167,23 @@ def test_ollama_stop_forbidden_for_non_admin(app_module, monkeypatch):
 
 def test_ollama_start_forbidden_when_write_disabled(app_module, monkeypatch):
     """Admin gate passed; the host-wide write flag still binds admins too."""
-    monkeypatch.setenv("ADMIN_USERNAMES", "gate_admin")
     monkeypatch.setenv("AI_ALLOW_SETTINGS_WRITE", "false")
     c = TestClient(app_module.app)
     _register(c, username="gate_admin")
+    monkeypatch.setenv("ADMIN_USERNAMES", "gate_admin")
     r = c.post("/api/ai/ollama/start", headers=_csrf(c))
     assert r.status_code == 403
     assert "disabled" in r.json().get("detail", "").lower()
 
 
 def test_ollama_start_allowed_for_admin_when_flags_allow(app_module, monkeypatch):
-    monkeypatch.setenv("ADMIN_USERNAMES", "gate_admin")
     monkeypatch.setenv("AI_ALLOW_SETTINGS_WRITE", "true")
     monkeypatch.setattr(
         "app.services.llm.start_ollama", lambda: (True, "started")
     )
     c = TestClient(app_module.app)
     _register(c, username="gate_admin")
+    monkeypatch.setenv("ADMIN_USERNAMES", "gate_admin")
     r = c.post("/api/ai/ollama/start", headers=_csrf(c))
     assert r.status_code == 200, r.text
     body = r.json()
@@ -192,7 +192,6 @@ def test_ollama_start_allowed_for_admin_when_flags_allow(app_module, monkeypatch
 
 
 def test_ollama_control_flag_requires_admin(app_module, monkeypatch):
-    monkeypatch.setenv("ADMIN_USERNAMES", "gate_admin")
     monkeypatch.setenv("AI_ALLOW_OLLAMA_CONTROL", "true")
     c = TestClient(app_module.app)
     _register(c, username="student_plain")
@@ -201,5 +200,6 @@ def test_ollama_control_flag_requires_admin(app_module, monkeypatch):
 
     admin = TestClient(app_module.app)
     _register(admin, username="gate_admin")
+    monkeypatch.setenv("ADMIN_USERNAMES", "gate_admin")
     got = admin.get("/api/ai/settings").json()["settings"]
     assert got["ollama_control_allowed"] is True

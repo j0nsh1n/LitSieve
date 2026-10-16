@@ -30,7 +30,7 @@ from fastapi.templating import Jinja2Templates
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-from app.auth import get_current_user
+from app.auth import get_current_user, verify_password_async
 from app.content.appearance import PRESETS, SETTINGS, cookie_value, parse_overrides
 from app.content.looks import DEFAULT_LOOK, LOOK_CARDS, normalize_look
 from app.services.pipeline import LiteratureSearchPipeline
@@ -105,13 +105,14 @@ def client_bucket(request: Request) -> str:
 
 
 def rate_limit_key(request: Request) -> str:
-    """Authenticated users get their own bucket; anonymous falls back to network.
+    """Live sessions get their own bucket; anything else falls back to network.
 
-    Login/register stay network-keyed (no cookie yet), which is what we want for
-    brute-force protection. Classroom NATs no longer share one budget once
-    users are signed in.
+    The session is checked against the database (account exists, token
+    version matches), so a signed token for a purged guest or a revoked
+    session cannot mint fresh buckets. Classroom NATs no longer share one
+    budget once students are signed in.
     """
-    user = get_current_user(request)
+    user = current_user(request)
     if user and user.get("user_id"):
         return f"user:{user['user_id']}"
     return client_bucket(request)
@@ -631,7 +632,7 @@ def _session_user(request: Request) -> Optional[dict]:
         return None
     if int(payload.get("tv", 0) or 0) != int(record.get("token_version") or 0):
         return None
-    if user_db.is_locked(record) or user_db.is_disabled(record):
+    if user_db.is_disabled(record):
         return None
     try:
         user_db.touch_last_seen(record["id"])
@@ -658,6 +659,21 @@ def _session_user(request: Request) -> Optional[dict]:
         "look": normalize_look(record.get("look")),
         "appearance": record.get("appearance") or {},
     }
+
+
+async def password_confirms(request: Request, user_id: str, password: str, purpose: str) -> bool:
+    """Re-check a signed-in user's password before a sensitive step.
+
+    A wrong password counts toward the same lockout as sign-in, and a locked
+    account cannot re-check at all, so a stolen session cannot guess here.
+    """
+    record = user_db.get_by_id(user_id)
+    if not record or user_db.is_locked(record):
+        return False
+    if await verify_password_async(password or "", record["hashed_password"]):
+        return True
+    user_db.record_login_failure(record["username"], client_bucket(request), purpose=purpose)
+    return False
 
 
 def _support_view_user(request: Request) -> Optional[dict]:
@@ -817,6 +833,24 @@ def _set_look_cookie(
             max_age=age,
             path="/",
         )
+
+
+def cross_site_form(request: Request) -> bool:
+    """True when the browser says this form post came from another site.
+
+    Sign-in and registration have no session to pair a CSRF token with, so
+    they rely on the headers every current browser sends: Sec-Fetch-Site,
+    else Origin compared with this host. A request with neither (a script,
+    an old browser) passes, as it did before.
+    """
+    site = (request.headers.get("sec-fetch-site") or "").strip().lower()
+    if site:
+        return site == "cross-site"
+    origin = (request.headers.get("origin") or "").strip()
+    if not origin or origin == "null":
+        return False
+    from urllib.parse import urlsplit
+    return urlsplit(origin).netloc.lower() != (request.headers.get("host") or "").lower()
 
 
 def csrf_failed(request: Request) -> bool:

@@ -195,8 +195,8 @@ Effects of `DEBUG=true`:
 
 1. App may start without `SECRET_KEY` (tokens still need a key to log in).
 2. Auth cookies are **not** `Secure` (browsers store them on http).
-3. Password-reset codes may be shown on screen when SMTP is off
-   (`RESET_CODES_IN_RESPONSE` can force that on a non-DEBUG host).
+3. Password-reset codes are shown on screen only with
+   `RESET_CODES_IN_RESPONSE=1`; `DEBUG` alone does not show them.
 
 With `DEBUG=false` over plain http, login appears to succeed then bounce back
 to login — browsers drop `Secure` cookies. That is expected; use HTTPS or
@@ -284,7 +284,7 @@ search, clustering, and dedup all compare vectors directly.
 ### Optional outbound email (SMTP)
 
 Leave `SMTP_HOST` empty → recovery-email UI stays off; password reset keeps the
-on-screen code path when DEBUG / `RESET_CODES_IN_RESPONSE` allows it.
+on-screen code path only when `RESET_CODES_IN_RESPONSE=1`.
 
 | Variable | Notes |
 |----------|--------|
@@ -394,10 +394,12 @@ stick (Secure cookies). Use HTTPS (tunnel or reverse proxy) for real logins.
   not in DEBUG (`app/security.py`).
 - Sessions: HttpOnly + Secure (when not DEBUG) + SameSite=Lax JWT cookie;
   password change bumps `token_version` and signs out other sessions.
-- CSRF double-submit on mutating routes.
+- CSRF double-submit on mutating routes; `/login` and `/register` refuse a
+  post the browser marks as cross-site (`Sec-Fetch-Site`, else `Origin`).
 - Do not commit `.env`, `user_data/`, `*.db`, or SMTP password files.
-- Admin console: set `ADMIN_USERNAMES=yourhandle` (comma-separated) and
-  restart, then open `/admin`. Guests cannot be admins.
+- Admin console: register the account, then set
+  `ADMIN_USERNAMES=yourhandle` (comma-separated) and restart, then open
+  `/admin`. A listed name cannot be registered, and guests cannot be admins.
 
 ---
 

@@ -32,8 +32,8 @@ def test_rate_limit_key_anonymous_uses_ip():
     assert rate_limit_key(req) == "198.51.100.7"
 
 
-def test_rate_limit_key_authenticated_uses_user_id():
+def test_rate_limit_key_ignores_a_signed_token_for_no_account():
     uid = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
     token = auth.create_token(uid, "alice")
     req = _make_request(cookies={"access_token": token}, client_host="198.51.100.7")
-    assert rate_limit_key(req) == f"user:{uid}"
+    assert rate_limit_key(req) == "198.51.100.7"

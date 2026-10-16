@@ -67,6 +67,28 @@ and this project aims to follow Semantic Versioning for app version strings
   state allows them; Retry fetch reuses the student's own contact email
   instead of a placeholder.
 
+- Account safety (audit 17.1 to 17.12). Wrong passwords only lock an
+  account when eight land within 15 minutes, an expired lock starts the
+  count again, and a lock no longer signs out sessions that are already in.
+  Wrong passwords on Account, Ship unlock and student view count toward the
+  same lock, and change-password and delete-account are rate limited.
+- Rate limits key on a live session (the account exists and the token
+  version matches), not on any signed token; guest tokens last as long as
+  the 30-minute demo.
+- `/login` and `/register` refuse posts the browser marks as cross-site. A
+  guest's "Create a free account" opens the form, and registering replaces
+  the demo. A name listed in `ADMIN_USERNAMES` cannot be registered:
+  register first, then list it.
+- An unknown username costs a full password check, reset codes appear on
+  screen only with `RESET_CODES_IN_RESPONSE`, and Ship unlock has no
+  fallback secret.
+- The last fetch's topic, sources and contact email are stored per account
+  in the browser and cleared on Logout.
+- Support-view refusals and redirects carry the security headers.
+- Ship: a Validate counts only for the exact files it checked; any later
+  change, including an Ask Grok edit, needs a new Validate before commit
+  or deploy.
+
 ## [6.0.0] - 2026-10-12
 
 ### Added

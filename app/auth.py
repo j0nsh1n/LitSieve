@@ -198,10 +198,13 @@ async def verify_password_async(plain: str, hashed: str) -> bool:
     return await run_in_threadpool(verify_password, plain, hashed)
 
 
-def create_token(user_id: str, username: str, token_version: int = 0) -> str:
+def create_token(
+    user_id: str, username: str, token_version: int = 0,
+    lifetime: Optional[timedelta] = None,
+) -> str:
     if not _SECRET_KEY:
         raise RuntimeError("SECRET_KEY is not configured. Cannot create JWT tokens.")
-    expire = datetime.now(timezone.utc) + timedelta(days=TOKEN_EXPIRE_DAYS)
+    expire = datetime.now(timezone.utc) + (lifetime or timedelta(days=TOKEN_EXPIRE_DAYS))
     payload = {
         "user_id": user_id,
         "username": username,

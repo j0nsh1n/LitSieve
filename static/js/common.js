@@ -21,8 +21,21 @@ function safeDomId(raw) {
     return s || 'field';
 }
 
-/** Shared localStorage key for last fetch query / replace-vs-append. */
-var FETCH_PREFS_KEY = 'lra_fetch_prefs_v1';
+/**
+ * The last fetch's topic, sources and contact email belong to one account,
+ * so a shared classroom browser never hands them to the next student.
+ * Logging out clears them; the old shared key is dropped on sight.
+ */
+var FETCH_PREFS_KEY = 'lra_fetch_prefs_v2:' + ((document.body && document.body.dataset.account) || 'anon');
+try { localStorage.removeItem('lra_fetch_prefs_v1'); } catch (e) { /* storage blocked */ }
+document.addEventListener('click', (e) => {
+    if (!e.target.closest || !e.target.closest('a[href="/logout"]')) return;
+    try {
+        Object.keys(localStorage)
+            .filter((k) => k.startsWith('lra_fetch_prefs_'))
+            .forEach((k) => localStorage.removeItem(k));
+    } catch (err) { /* storage blocked */ }
+});
 
 // === Classroom UI flags (env: HIDE_STUDY_TYPE_TAGS, HIDE_AI_BUTTONS) ===
 // Defaults keep features on until /api/ui-flags loads.

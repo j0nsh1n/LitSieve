@@ -22,7 +22,6 @@ def _admin_client(tmp_path, monkeypatch, username="opadmin"):
     db = UserDatabase(str(tmp_path / "users.db"))
     monkeypatch.setattr(core, "user_db", db)
     monkeypatch.setenv("USER_DATA_DIR", str(tmp_path / "user_data"))
-    monkeypatch.setenv("ADMIN_USERNAMES", username)
     client = TestClient(app)
     r = client.post(
         "/register",
@@ -30,6 +29,7 @@ def _admin_client(tmp_path, monkeypatch, username="opadmin"):
         follow_redirects=False,
     )
     assert r.status_code in (302, 303), r.text
+    monkeypatch.setenv("ADMIN_USERNAMES", username)
     return client, db
 
 
@@ -232,8 +232,8 @@ def test_banner_status_changes_only_through_the_word(tmp_path, monkeypatch):
 
 def test_admins_cannot_lock_admins_out(tmp_path, monkeypatch):
     client, db = _admin_client(tmp_path, monkeypatch)
-    monkeypatch.setenv("ADMIN_USERNAMES", "opadmin,second")
     second = _register("second")
+    monkeypatch.setenv("ADMIN_USERNAMES", "opadmin,second")
     me = db.get_by_username("opadmin")
     other = db.get_by_username("second")
     by_name = {a.name: a for a in ACTIONS}
