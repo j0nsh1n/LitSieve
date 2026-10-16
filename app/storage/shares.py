@@ -41,6 +41,11 @@ MAX_EXPIRES_DAYS = 365
 MAX_MAX_USES = 10_000
 
 
+
+# Tables a share clone keeps. notes and clusters stay as empty tables; every
+# other table is dropped and the app recreates its empty schema on open.
+CLONE_TABLES = frozenset({"articles", "embeddings", "screening", "key_points", "notes", "clusters"})
+
 def generate_share_code() -> str:
     """Return an unguessable XXXX-YYYY classroom code."""
     raw = "".join(secrets.choice(_CODE_ALPHABET) for _ in range(8))
@@ -196,6 +201,17 @@ def clone_library_data(
             tmp_conn = dbconn.connect(str(tmp))
             try:
                 src_conn.backup(tmp_conn)
+                # Copy by allow-list: anything else in the owner's file (AI
+                # explanations, a half-finished fetch's staging, a crashed
+                # swap's _swap_keep_* tables) is not the student's (20.3).
+                tables = [
+                    row[0] for row in tmp_conn.execute(
+                        "SELECT name FROM sqlite_master WHERE type = 'table'"
+                    )
+                ]
+                for table in tables:
+                    if table not in CLONE_TABLES and not table.startswith("sqlite_"):
+                        tmp_conn.execute(f'DROP TABLE IF EXISTS "{table}"')
                 tmp_conn.execute("DELETE FROM notes")
                 tmp_conn.execute("DELETE FROM clusters")
                 if not include_embeddings:

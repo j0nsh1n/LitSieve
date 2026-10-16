@@ -69,6 +69,26 @@ def _warn_legacy_ai_settings() -> None:
     )
 
 
+def _storage_sweep(stop: threading.Event) -> None:
+    """Refresh every account's stored usage now and then (audit 20.2).
+
+    Job ends refresh their own account; this catches deletes, library
+    removals and anything changed outside a job.
+    """
+    try:
+        interval = float(os.getenv("LITSIEVE_STORAGE_SWEEP_SECONDS", "900"))
+    except ValueError:
+        interval = 900.0
+    if interval <= 0:
+        return
+    while not stop.wait(interval):
+        try:
+            from app import core
+            core.refresh_all_storage_bytes()
+        except Exception:
+            logging.getLogger(__name__).warning("Storage sweep failed", exc_info=True)
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     """Startup/shutdown hook (replaces the deprecated on_event decorator)."""
@@ -77,7 +97,12 @@ async def lifespan(_app: FastAPI):
     # thread so the first Generate Clusters click stays ~1s (bench_scale.py).
     from app.services.clustering import warm_density_reducer
     threading.Thread(target=warm_density_reducer, daemon=True, name="umap-warmup").start()
+    stop_sweep = threading.Event()
+    threading.Thread(
+        target=_storage_sweep, args=(stop_sweep,), daemon=True, name="storage-sweep",
+    ).start()
     yield
+    stop_sweep.set()
     # Nothing to tear down: SQLite handles close via the pipeline cache and the
     # warm-up thread is a daemon.
 

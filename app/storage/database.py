@@ -8,6 +8,7 @@ import logging
 import pickle
 import re
 import threading
+from contextlib import contextmanager
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
@@ -36,6 +37,37 @@ class ArticleDatabase:
         self.migrate_schema()
         # Crash / restart leftover: jobs are in-memory, so never auto-swap.
         self.drop_staging_articles()
+
+    @contextmanager
+    def _writing(self):
+        """Hold the lock for a write; roll back on any error.
+
+        A failure mid-batch (a foreign-key error, say) used to leave the
+        transaction open on the shared connection, so the next caller's
+        commit wrote half a batch (audit 20.5).
+        """
+        with self._lock:
+            try:
+                yield
+            except BaseException:
+                self.conn.rollback()
+                raise
+
+    def compact(self) -> None:
+        """Give the space of deleted rows back to the disk (audit 20.1).
+
+        Quota counts bytes on disk, and SQLite keeps freed pages inside the
+        file, so start over, a replace fetch or a clear freed nothing.
+        """
+        with self._lock:
+            self.conn.commit()
+            try:
+                self.conn.execute("VACUUM")
+                self.conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            except Exception as e:
+                # Another connection's open read can block it; the space comes
+                # back at the next compact.
+                logger.warning("Could not compact %s: %s", self.db_path, e)
 
     def create_tables(self):
         """Create database tables if they don't exist"""
@@ -483,8 +515,19 @@ class ArticleDatabase:
                 self.conn.commit()
             except Exception:
                 self.conn.rollback()
+                # CREATE TABLE ... AS runs outside the transaction, so a failed
+                # swap left its _swap_keep_* tables behind (audit 20.3).
+                for tmp in (
+                    "_swap_keep_notes",
+                    "_swap_keep_ai_kp",
+                    "_swap_keep_screening",
+                    "_swap_keep_emb",
+                ):
+                    cursor.execute(f"DROP TABLE IF EXISTS {tmp}")
+                self.conn.commit()
                 raise
-            return n
+        self.compact()
+        return n
 
     def clear_all(self):
         """Wipe the library (sample reset / explicit empty).
@@ -493,7 +536,7 @@ class ArticleDatabase:
         fetch cannot leave an empty library. Append fetch and re-prepare leave
         origin=ai rows intact.
         """
-        with self._lock:
+        with self._writing():
             cursor = self.conn.cursor()
             cursor.execute("DELETE FROM key_points")
             cursor.execute("DELETE FROM notes")
@@ -502,15 +545,23 @@ class ArticleDatabase:
             cursor.execute("DELETE FROM embeddings")
             cursor.execute("DELETE FROM articles")
             self.conn.commit()
+        self.compact()
 
     def keep_starred_and_noted(self) -> Dict:
+        """Start over, then give the freed pages back to the disk (audit 20.1)."""
+        result = self._keep_starred_and_noted()
+        if result.get("deleted"):
+            self.compact()
+        return result
+
+    def _keep_starred_and_noted(self) -> Dict:
         """Start over (option B): drop unmarked papers; keep starred/noted.
 
         Keeps any article that is starred or has a non-empty (trimmed) note.
         Child rows cascade. Leftover staging is dropped. Idempotent when only
         annotated papers remain.
         """
-        with self._lock:
+        with self._writing():
             cursor = self.conn.cursor()
             cursor.execute("SELECT COUNT(*) FROM articles")
             before = int(cursor.fetchone()[0] or 0)
@@ -613,7 +664,7 @@ class ArticleDatabase:
         stale_derived = 0
         table = self.STAGING_TABLE if staging else "articles"
 
-        with self._lock:
+        with self._writing():
             cursor = self.conn.cursor()
             existing_titles: set = set()
             existing_dois: set = set()
@@ -770,7 +821,7 @@ class ArticleDatabase:
             embeddings: Dictionary mapping (article_id, source) tuples to embedding vectors
             model_name: Name of the embedding model used
         """
-        with self._lock:
+        with self._writing():
             cursor = self.conn.cursor()
             for key, embedding in embeddings.items():
                 article_id, source = key
@@ -976,7 +1027,7 @@ class ArticleDatabase:
         new_star = current["starred"] if starred is None else bool(starred)
         # Drop empty unstarred rows to keep the table small.
         if not new_note and not new_star:
-            with self._lock:
+            with self._writing():
                 cursor = self.conn.cursor()
                 cursor.execute(
                     "DELETE FROM notes WHERE article_id = ? AND source = ?",
@@ -984,7 +1035,7 @@ class ArticleDatabase:
                 )
                 self.conn.commit()
             return {"article_id": article_id, "source": source, "note": "", "starred": False}
-        with self._lock:
+        with self._writing():
             cursor = self.conn.cursor()
             cursor.execute("""
                 INSERT INTO notes (article_id, source, note, starred, updated_at)
@@ -1032,7 +1083,7 @@ class ArticleDatabase:
         if not points:
             return 0
         origin = "ai" if origin == "ai" else "extractive"
-        with self._lock:
+        with self._writing():
             cursor = self.conn.cursor()
             for (article_id, source), bullets in points.items():
                 cursor.execute(
@@ -1166,7 +1217,7 @@ class ArticleDatabase:
         ON CONFLICT DO UPDATE (not INSERT OR REPLACE) keeps the FK alive.
         content/verification are stored as JSON text; the abstract is not.
         """
-        with self._lock:
+        with self._writing():
             cursor = self.conn.cursor()
             cursor.execute(
                 """
@@ -1216,7 +1267,7 @@ class ArticleDatabase:
             return 0
         from app.content.screening_reasons import normalize_reason
         reason = normalize_reason(reason, default="manual")
-        with self._lock:
+        with self._writing():
             cursor = self.conn.cursor()
             cursor.executemany(
                 "INSERT OR REPLACE INTO screening (article_id, source, reason) VALUES (?, ?, ?)",
@@ -1230,7 +1281,7 @@ class ArticleDatabase:
         """Undo exclusion for the given (article_id, source) keys."""
         if not keys:
             return 0
-        with self._lock:
+        with self._writing():
             cursor = self.conn.cursor()
             cursor.executemany(
                 "DELETE FROM screening WHERE article_id = ? AND source = ?",
@@ -1302,7 +1353,7 @@ class ArticleDatabase:
         clusters (e.g. from a larger previous k) don't linger.
         """
         cluster_titles = cluster_titles or {}
-        with self._lock:
+        with self._writing():
             cursor = self.conn.cursor()
             cursor.execute("DELETE FROM clusters")
             for key, (cluster_id, label) in cluster_assignments.items():

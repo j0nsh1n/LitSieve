@@ -363,6 +363,11 @@ systemctl --user start litsieve-uvicorn.service
 ```
 
 `--restore` honours `USERS_DB` and `USER_DATA_DIR` the same way the app does.
+It integrity-checks every database in the archive before touching a live file,
+replaces each database atomically (temp file, fsync, rename) after deleting the
+old `-wal`, `-shm` and `-journal` sidecars so a stale WAL cannot replay onto the
+restored file, then re-runs `PRAGMA integrity_check` on everything it restored
+and exits non-zero if any fails. Stop the server first.
 `--no-env` skips copying `.env`. Manual extract still works for the default
 layout (`users.db` and `user_data/` at the checkout root).
 

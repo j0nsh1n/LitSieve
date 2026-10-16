@@ -4,36 +4,12 @@ Note: "Complete when" conditions are verified locally (tests pass, feature
 works) and via PR review. One phase may span several small PRs.
 
 The open phases are the fix work from `docs/AUDIT_2026-10-15.md`, in the
-order to take them: storage and quota, jobs, AI and exports, then the
-host. Phase 19 (Search page) is done on `fix/search-ranking` and the first
-commits of `fix/audit-rest`.
+order to take them: jobs, AI and exports, then the host. Phases 19 and
+20 are done on `fix/search-ranking` and `fix/audit-rest` (not yet pushed).
 Phase N matches audit section N, and each task names the finding ids
 (`16.1`, `18.4`, ...) that hold the evidence and file locations. Cite
 those ids in branches and PRs, and mark a finding `Fixed in #NN` in the
 audit when its PR merges.
-
-## Phase 20 — Storage and quota
-Audit section 20.
-- Tasks:
-  - (20.1) Free space after deletes: `PRAGMA auto_vacuum=INCREMENTAL` on
-    new library databases plus `incremental_vacuum` (or a `VACUUM`) after
-    start over, replace-fetch swap and library clear; reword the 507
-    message to say what frees space
-  - (20.2) Refresh `storage_bytes` when a job finishes and in a periodic
-    sweep, so the over-quota queue and tile are current
-  - (20.3) Clone by an allow-list of tables; drop `_swap_*` tables on
-    rollback
-  - (20.4) `backup.py --restore`: remove `-wal` and `-shm`, write to a temp
-    file and rename; `encrypt_databases.py`: honour `USERS_DB`, strip the
-    key, verify after conversion
-  - (20.5) Rollback around every batch writer in `database.py`; delete the
-    guest row only after its directory is gone; parse
-    `MAX_USER_STORAGE_MB` as a number of megabytes without truncating to
-    zero
-- Complete when: a user at the cap who starts over can fetch again; the
-  quota tile matches `usage_bytes` within a minute of a job ending; a
-  restore over a live WAL passes `integrity_check`; tests cover each
-- Status: [ ] open
 
 ## Phase 21 — Jobs
 Audit section 21.
@@ -115,6 +91,7 @@ Audit section 23, and what was still open from running the live instance.
 - Status: [ ] open
 
 ## Backlog (unscheduled)
+- Prune `auth_events` and expired token rows (audit 20.5; they only grow)
 - Control edges: input and button borders (`--rule`, `--edge`) are 1.2 to
   2.1:1 against their background in every look, under the 3:1 WCAG asks
   for UI components; a `--control-edge` token across all seven looks

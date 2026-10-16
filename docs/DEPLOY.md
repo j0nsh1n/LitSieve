@@ -317,6 +317,12 @@ python tools/encrypt_databases.py --apply  # convert
 # decrypt: python tools/encrypt_databases.py --decrypt --apply
 ```
 
+The tool converts the accounts DB at `USERS_DB` (default `users.db`) and every
+library DB, strips whitespace from the key the same way the app does, and only
+replaces a database after the converted copy opens with the key, passes
+`PRAGMA integrity_check` and has the same tables and row counts. The original is
+kept as `*.plaintext.bak`. Stop the server first.
+
 Losing the key loses the data. Keep it in the host secret store.
 
 ### AI study aid (optional)

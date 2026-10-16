@@ -185,6 +185,31 @@ and this project aims to follow Semantic Versioning for app version strings
   danger buttons in every dark look use dark text on the light red (2.35
   to 7.5:1).
 
+- Storage and quota (audit 20.1 to 20.5):
+  - Start over, a replace fetch and clearing a library now compact the
+    library file, so the freed space counts against the quota again; a
+    student at the cap who starts over can fetch again. The storage-limit
+    message says what frees space (delete a library or Start over) instead
+    of "screen out papers", which frees nothing. Start over runs off the
+    request thread.
+  - Each account's stored usage, behind the admin over-quota queue and
+    tile, refreshes when a job ends, after Start over, and in a sweep every
+    15 minutes (`LITSIEVE_STORAGE_SWEEP_SECONDS`), not only when an admin
+    opens the account.
+  - A share clone copies an allow-list of tables, so the owner's Reader
+    explanations, a half-finished fetch's staging and a crashed swap's
+    tables no longer reach the student; a failed replace swap drops its
+    temporary tables.
+  - `tools/backup.py --restore` writes each file to a temp copy, removes
+    stale `-wal`/`-shm`/`-journal` sidecars, swaps it in and checks
+    integrity before and after; a corrupt archive changes nothing.
+    `tools/encrypt_databases.py` follows `USERS_DB`, strips the key like
+    the app, and verifies the converted copy before replacing anything.
+  - Every batch writer in the library database rolls back on error instead
+    of leaving half a batch open on the shared connection; a guest whose
+    files cannot be removed keeps its row so the next purge retries;
+    `MAX_USER_STORAGE_MB=0.5` means half a megabyte, not unlimited.
+
 ### Removed
 - DBLP is no longer offered as a source: it answers every request from the
   host with a bot check, and its records have no abstracts. Papers already

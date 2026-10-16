@@ -525,6 +525,27 @@ def clear_stale_job(user_id: str, task: str) -> tuple:
     return True, "cleared"
 
 
+def refresh_storage_bytes(uid: str) -> None:
+    """Store the account's bytes on disk for the admin over-quota queue (20.2).
+
+    The queue and its tile read ``storage_bytes``, which used to change only
+    when an admin opened the account.
+    """
+    try:
+        from app.storage import quota
+        user_db.set_storage_bytes(uid, quota.usage_bytes(uid))
+    except Exception:
+        logger.warning("Could not refresh stored usage for %s", uid, exc_info=True)
+
+
+def refresh_all_storage_bytes() -> int:
+    """Sweep every account's stored usage; returns how many were refreshed."""
+    ids = user_db.all_user_ids()
+    for uid in ids:
+        refresh_storage_bytes(uid)
+    return len(ids)
+
+
 def try_begin_user_job(uid: str, task: str, **extra) -> bool:
     """Claim the per-user job slot. Returns False if that task is already active.
 
@@ -598,6 +619,7 @@ def start_user_job(uid: str, task: str, fn, /, **kwargs) -> bool:
             with _progress_lock:
                 _release_job_markers(uid, task)
             release_pipeline(uid, lib_id)
+            refresh_storage_bytes(uid)
 
     future.add_done_callback(_on_done)
     return True
@@ -777,6 +799,10 @@ def destroy_guest_account(user_id: str) -> None:
     udir = lib_user_dir(user_id)
     if udir.is_dir():
         shutil.rmtree(udir, ignore_errors=True)
+    # Keep the row until the files are gone, so the next purge retries them
+    # instead of leaving an orphaned directory (audit 20.5).
+    if udir.exists():
+        raise OSError(f"Could not remove {udir}")
     user_db.delete_user(user_id)
 
 
