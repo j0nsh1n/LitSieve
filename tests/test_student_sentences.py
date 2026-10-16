@@ -100,7 +100,8 @@ def test_storage_limit_sentence_carries_the_numbers(app_module, monkeypatch):
     assert r.status_code == 507, r.text
     assert r.json()["detail"] == (
         "Storage limit reached (3.0 MB of 2.0 MB). "
-        "Delete a library or screen out papers you do not need, then try again."
+        "Delete a library you no longer need, or use Start over to remove papers "
+        "that are not starred or noted, then try again."
     )
 
 

@@ -38,8 +38,10 @@ async def api_start_over(request: Request):
     uid = user["user_id"]
     p = get_pipeline(uid)
     try:
-        result = p.db.keep_starred_and_noted()
+        # Off the event loop: it now also compacts the file (audit 20.1).
+        result = await core.run_in_thread(p.db.keep_starred_and_noted)
         p.invalidate_corpus_cache()
+        core.refresh_storage_bytes(uid)
         stats = p.get_statistics()
         return {
             "status": "success",

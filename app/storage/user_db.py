@@ -812,6 +812,11 @@ class UserDatabase:
             self.conn.commit()
             return cur.rowcount > 0
 
+    def all_user_ids(self) -> List[str]:
+        """Every account id (guests included), for maintenance sweeps."""
+        with self._lock:
+            return [row[0] for row in self.conn.execute("SELECT id FROM users")]
+
     def set_storage_bytes(self, user_id: str, used: int) -> None:
         with self._lock:
             self.conn.execute(

@@ -39,11 +39,11 @@ from __future__ import annotations
 import argparse
 import os
 import shutil
-import sqlite3
 import sys
 import tarfile
 import tempfile
 import time
+import zlib
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
@@ -147,7 +147,9 @@ def _integrity_ok(path: Path) -> bool:
             return bool(row) and str(row[0]).lower() == "ok"
         finally:
             conn.close()
-    except sqlite3.DatabaseError:
+    except Exception:  # noqa: BLE001
+        # sqlite3, sqlcipher3 (own hierarchy) and dbconn.DatabaseKeyError all
+        # mean the same thing here: this file is not a usable database.
         return False
 
 
@@ -213,8 +215,14 @@ def verify(archive: Path) -> bool:
 
 
 def _extract_root(archive: Path, dest: Path) -> Path:
-    with tarfile.open(archive, "r:gz") as tar:
-        tar.extractall(dest, filter="data")
+    try:
+        with tarfile.open(archive, "r:gz") as tar:
+            tar.extractall(dest, filter="data")
+    except (tarfile.TarError, EOFError, zlib.error, OSError) as exc:
+        raise SystemExit(
+            f"restore: cannot read {archive} ({exc}) — the archive is corrupt or "
+            "truncated; nothing was restored"
+        ) from exc
     root = dest / "litsieve"
     if root.is_dir():
         return root
@@ -224,35 +232,88 @@ def _extract_root(archive: Path, dest: Path) -> Path:
     raise SystemExit("restore: archive is missing the litsieve/ prefix")
 
 
+def _install_file(src: Path, dest: Path) -> None:
+    """Replace ``dest`` with the bytes of ``src`` atomically.
+
+    The bytes go to a temp file in ``dest``'s directory, are fsynced, and only
+    then renamed over ``dest``. For a database, any ``-wal`` / ``-shm`` /
+    ``-journal`` sidecar of the old file is deleted first: left in place, SQLite
+    would replay the old file's WAL onto the restored one and silently
+    corrupt or rewind it.
+    """
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(prefix=f".{dest.name}.restoring-", dir=dest.parent)
+    tmp = Path(tmp_name)
+    try:
+        with os.fdopen(fd, "wb") as out, open(src, "rb") as inp:
+            shutil.copyfileobj(inp, out)
+            out.flush()
+            os.fsync(out.fileno())
+        shutil.copymode(src, tmp)
+        if dest.suffix == ".db":
+            for suffix in ("-wal", "-shm", "-journal"):
+                Path(str(dest) + suffix).unlink(missing_ok=True)
+        os.replace(tmp, dest)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
+    dir_fd = os.open(dest.parent, os.O_RDONLY)
+    try:
+        os.fsync(dir_fd)
+    finally:
+        os.close(dir_fd)
+
+
 def restore(archive: Path, *, include_env: bool = True) -> None:
-    """Copy archive contents onto the live USERS_DB / USER_DATA_DIR layout."""
+    """Copy archive contents onto the live USERS_DB / USER_DATA_DIR layout.
+
+    Stop the server first. Every database in the archive is integrity-checked
+    before any live file is touched, and every restored database is checked
+    again afterwards; either failure exits non-zero.
+    """
     if not archive.exists():
         raise SystemExit(f"restore: no such archive {archive}")
     with tempfile.TemporaryDirectory(prefix="litsieve-restore-") as tmp:
         root = _extract_root(archive, Path(tmp))
+
+        for db in sorted(root.rglob("*.db")):
+            if not _integrity_ok(db):
+                raise SystemExit(
+                    f"restore: {db.relative_to(root)} in {archive.name} failed its "
+                    "integrity check — nothing was restored"
+                )
+
+        restored_dbs: list[Path] = []
         src_users = root / ARCHIVE_USERS
         if src_users.is_file():
             dest = _accounts_db()
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(src_users, dest)
+            _install_file(src_users, dest)
+            restored_dbs.append(dest)
             _log(f"  restored {ARCHIVE_USERS} -> {dest}")
         src_data = root / ARCHIVE_DATA
         if src_data.is_dir():
             dest_data = _data_root()
             dest_data.mkdir(parents=True, exist_ok=True)
-            for src in src_data.rglob("*"):
+            for src in sorted(src_data.rglob("*")):
                 if not src.is_file():
                     continue
                 out = dest_data / src.relative_to(src_data)
-                out.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(src, out)
+                _install_file(src, out)
+                if out.suffix == ".db":
+                    restored_dbs.append(out)
             _log(f"  restored {ARCHIVE_DATA}/ -> {dest_data}")
         if include_env:
             src_env = root / ARCHIVE_ENV
             if src_env.is_file():
                 dest_env = REPO / ".env"
-                shutil.copy2(src_env, dest_env)
+                _install_file(src_env, dest_env)
                 _log(f"  restored {ARCHIVE_ENV} -> {dest_env}")
+
+    bad = [db for db in restored_dbs if not _integrity_ok(db)]
+    if bad:
+        names = ", ".join(str(db) for db in bad)
+        raise SystemExit(f"restore: integrity check FAILED after restore for: {names}")
+    _log(f"restore: {len(restored_dbs)} database(s) pass integrity_check")
 
 
 def main() -> int:

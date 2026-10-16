@@ -38,7 +38,8 @@ class QuotaExceeded(RuntimeError):
         self.limit_bytes = limit_bytes
         super().__init__(sentence(
             f"Storage limit reached ({mb(used_bytes)} MB of {mb(limit_bytes)} MB). "
-            "Delete a library or screen out papers you do not need, then try again."
+            "Delete a library you no longer need, or use Start over to remove papers "
+            "that are not starred or noted, then try again."
         ))
 
 
@@ -65,7 +66,8 @@ def limit_bytes() -> int:
     if not math.isfinite(value) or value < 0:
         logger.warning("%s=%r is invalid; using default %d MB", ENV_KEY, raw, DEFAULT_MAX_MB)
         return DEFAULT_MAX_MB * 1024 * 1024
-    return int(value) * 1024 * 1024
+    # Multiply first: int(0.5) is 0, which means unlimited (audit 20.5).
+    return int(value * 1024 * 1024)
 
 
 def _utc_now_sql() -> str:

@@ -32,9 +32,23 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.storage.dbconn import is_encrypted  # noqa: E402
+from app.storage.dbconn import _quote, is_encrypted  # noqa: E402
+from app.storage.user_db import users_db_path  # noqa: E402
 
 BACKUP_SUFFIX = ".plaintext.bak"
+
+
+class ConversionError(RuntimeError):
+    """A converted copy did not verify; the original was left in place."""
+
+
+def clean_key(raw: str | None) -> str:
+    """Strip the key exactly as ``dbconn.encryption_key()`` does.
+
+    The app strips whitespace from ``DB_ENCRYPTION_KEY`` before keying, so a
+    trailing newline in the secret store must not change what this tool uses.
+    """
+    return (raw or "").strip()
 
 
 def data_root() -> Path:
@@ -44,7 +58,7 @@ def data_root() -> Path:
 def find_databases() -> list[Path]:
     """users.db plus every per-library articles.db."""
     found = []
-    users = Path("users.db")
+    users = Path(users_db_path())  # USERS_DB, else users.db — same as the app
     if users.is_file():
         found.append(users)
     root = data_root()
@@ -55,34 +69,80 @@ def find_databases() -> list[Path]:
     return found
 
 
-def _quote(key: str) -> str:
-    return "'" + key.replace("'", "''") + "'"
+def _open(path: Path, key: str | None):
+    """sqlcipher3 connection; ``key=None`` opens without a key (plaintext)."""
+    import sqlcipher3
+
+    conn = sqlcipher3.dbapi2.connect(str(path))
+    if key is not None:
+        conn.execute(f"PRAGMA key = {_quote(key)}")
+    return conn
+
+
+def _tables(conn) -> dict[str, int]:
+    names = [
+        r[0]
+        for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+        ).fetchall()
+    ]
+    return {n: conn.execute(f'SELECT count(*) FROM "{n}"').fetchone()[0] for n in names}
+
+
+def _snapshot(path: Path, key: str | None) -> dict[str, int]:
+    """Open ``path`` with ``key``, require integrity_check == ok, return table row counts."""
+    try:
+        conn = _open(path, key)
+        try:
+            row = conn.execute("PRAGMA integrity_check").fetchone()
+            if not row or str(row[0]).lower() != "ok":
+                raise ConversionError(f"integrity_check failed for {path}: {row}")
+            return _tables(conn)
+        finally:
+            conn.close()
+    except ConversionError:
+        raise
+    except Exception as exc:
+        raise ConversionError(f"could not open {path}: {exc}") from exc
 
 
 def convert(path: Path, key: str, *, decrypt: bool) -> None:
-    """Rewrite ``path`` via sqlcipher_export(), keeping a backup."""
-    import sqlcipher3
+    """Rewrite ``path`` via sqlcipher_export(), keeping a backup.
 
+    The converted copy must open with the right key (or none, when decrypting),
+    pass ``PRAGMA integrity_check`` and hold the same tables and row counts as
+    the source before it replaces the original.
+    """
+    key = clean_key(key)
     tmp = path.with_name(path.name + ".converting")
     backup = path.with_name(path.name + BACKUP_SUFFIX)
-    for stale in (tmp,):
-        stale.unlink(missing_ok=True)
+    tmp.unlink(missing_ok=True)
 
-    conn = sqlcipher3.dbapi2.connect(str(path))
+    conn = _open(path, key if decrypt else None)
     try:
-        if decrypt:
-            # Source is encrypted; destination gets an empty key.
-            conn.execute(f"PRAGMA key = {_quote(key)}")
-            conn.execute(f"ATTACH DATABASE '{tmp}' AS target KEY ''")
-        else:
-            # Source is plaintext (no key); destination gets the key.
-            conn.execute(f"ATTACH DATABASE '{tmp}' AS target KEY {_quote(key)}")
         # Flush any WAL content into the file we are about to copy from.
         conn.execute("PRAGMA journal_mode=DELETE")
+        # Destination gets the key when encrypting, an empty key when decrypting.
+        target_key = "''" if decrypt else _quote(key)
+        conn.execute(f"ATTACH DATABASE {_quote(str(tmp))} AS target KEY {target_key}")
         conn.execute("SELECT sqlcipher_export('target')")
         conn.execute("DETACH DATABASE target")
+        expected = _tables(conn)
     finally:
         conn.close()
+
+    try:
+        actual = _snapshot(tmp, None if decrypt else key)
+        if actual != expected:
+            raise ConversionError(
+                f"converted copy of {path} differs from the source "
+                f"(source {expected}, copy {actual})"
+            )
+        if is_encrypted(str(tmp)) == decrypt:
+            raise ConversionError(f"converted copy of {path} is not {'plaintext' if decrypt else 'encrypted'}")
+    except ConversionError:
+        tmp.unlink(missing_ok=True)
+        raise
 
     shutil.copy2(path, backup)
     os.replace(tmp, path)
@@ -105,6 +165,7 @@ def main() -> int:
                     help="actually write changes (default is a dry run)")
     args = ap.parse_args()
 
+    args.key = clean_key(args.key)
     if not args.key:
         print(
             "No key given. Set DB_ENCRYPTION_KEY in the environment "
@@ -139,7 +200,11 @@ def main() -> int:
 
     print()
     for path in todo:
-        convert(path, args.key, decrypt=args.decrypt)
+        try:
+            convert(path, args.key, decrypt=args.decrypt)
+        except ConversionError as exc:
+            print(f"  FAILED   {path}: {exc}\n  original left untouched; stopping.", file=sys.stderr)
+            return 1
         print(f"  done     {path}  (backup: {path.name}{BACKUP_SUFFIX})")
 
     print(
