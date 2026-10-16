@@ -54,7 +54,7 @@
   Phases 16 to 23; findings have ids (`16.1`, ...) that tasks and PRs cite;
   mark a finding `Fixed in #NN` when its PR merges. Sections 16 and 17 are
   fixed (#93, #94; 16.9's Overview counts moved to Phase 21); section 18 is
-  on `fix/sources`. Open headline items: quota never freed by deleting
+  fixed in #95 (open). Open headline items: quota never freed by deleting
   papers; hybrid rank min-max normalisation; several Search-page element
   ids that no template renders; Laya topic areas keep a stale pick when the
   answer is unsure, the topic is short, or any area was clicked by hand.
@@ -155,6 +155,6 @@ Guest User (is_guest) → sample corpus only; purged by age
 - Host notes: the LAN's primary DNS server (192.168.12.132) times out, so
   cloudflared logs a DNS refresh error every 5 minutes but stays connected;
   `litpilot.org` needs an apex record or redirect rule in Cloudflare.
-- **Next step:** once Phase 18 merges, mark 18.x `Fixed in #NN` in the
-  audit, then branch from `main` for Phase 19 (19.3 duplicates inside
-  Narrow it down still needs the owner's yes on the approach).
+- **Next step:** merge #95, then Phase 19 from `main`. 19.3 approved
+  2026-10-16: duplicates stay auto-removed after prepare, shown inside
+  Narrow it down as their own line with Undo.
