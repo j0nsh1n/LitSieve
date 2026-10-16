@@ -590,7 +590,8 @@ async function waitIfPreparing(stats) {
   } catch (e) { /* continue */ }
  }
 
- const embedNow = (progress && progress.embed) || embed;
+ // Filtered like fetchJob: another library's prepare is not ours to wait on.
+ const embedNow = ours(progress && progress.embed) ? progress.embed : embed;
  if (!embedNow.active) {
   hide();
   return stats;

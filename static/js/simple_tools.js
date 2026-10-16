@@ -1845,7 +1845,9 @@ async function doSimpleScreenDuplicatesUndo() {
  const btn = document.getElementById('simple-screen-dups-undo');
  setLoading(btn, true);
  try {
-  const data = await apiCall('/api/screening/excluded?reason=duplicate');
+  const lib = typeof pageLibraryId === 'function' ? pageLibraryId() : '';
+  const data = await apiCall('/api/screening/excluded?reason=duplicate'
+   + (lib ? '&library_id=' + encodeURIComponent(lib) : ''));
   const items = ((data && data.items) || []).map((it) => ({
    article_id: it.article_id, source: it.source,
   }));
@@ -1855,7 +1857,7 @@ async function doSimpleScreenDuplicatesUndo() {
   }
   await apiCall('/api/screening', {
    method: 'POST',
-   body: { items, action: 'include' },
+   body: withPageLibrary({ items, action: 'include' }),
   });
   _simpleScreenCounts = { low: null, medium: null, high: null };
   await refreshSimpleScreeningCard();

@@ -403,6 +403,10 @@ function applyTopicPack(packId) {
  const pack = TOPIC_PACKS.find(p => p.id === packId);
  if (!pack) return;
  selectedTopics = new Set(pack.topics || []);
+ // A pack is the student's choice: none of its areas are Laya's any more.
+ layaAreas = new Set();
+ layaTopic = '';
+ hideAreaOffer();
  syncAreaCards();
  // Pre-check pack sources (replace current checkboxes for a clean unit start).
  Object.keys(ALL_SOURCES).forEach(sourceId => {
@@ -1723,6 +1727,14 @@ async function doCreateEmbeddings(opts) {
  if (data && data.status === 'started' && !data.articles_processed) {
   throw new Error('Prepare job did not return a result. Try Re-prepare Papers.');
  }
+ if (data && data.status === 'cancelled') {
+  // Cancel now stops a prepare (audit 21.1); do not report it as done.
+  setStatus('embeddings-status', data.message || 'Preparing was cancelled.', 'warning');
+  showNotification('Preparing was cancelled. Nothing from that run was saved.', 'warning');
+  if (useBuffer && typeof hideSimpleBuffering === 'function') hideSimpleBuffering();
+  await loadPageData();
+  return data;
+ }
  const created = data.embeddings_created ?? data.articles_processed;
  const skipped = data.skipped_existing || 0;
  const preparedCount = data.articles_processed != null ? data.articles_processed : created;
@@ -1817,7 +1829,8 @@ async function doCreateEmbeddings(opts) {
  if (msg.toLowerCase().includes('storage limit')) {
   setStatus('embeddings-status', msg, 'warning');
   showNotification(msg, 'warning');
- } else if (msg.toLowerCase().includes('already running')) {
+ } else if (msg.toLowerCase().includes('already running')
+  || msg.toLowerCase().includes('already being prepared')) {
  setStatus('embeddings-status', 'Preparing is already running.', 'warning');
  showNotification('A prepare job is already running.', 'warning');
  } else {

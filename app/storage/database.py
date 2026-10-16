@@ -60,8 +60,8 @@ class ArticleDatabase:
         file, so start over, a replace fetch or a clear freed nothing.
         """
         with self._lock:
-            self.conn.commit()
             try:
+                self.conn.commit()
                 self.conn.execute("VACUUM")
                 self.conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
             except Exception as e:
