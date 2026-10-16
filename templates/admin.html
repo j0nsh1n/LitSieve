@@ -36,10 +36,10 @@
    <li><a href="#accounts/unverified" data-queue-link="unverified">Unverified email <span class="admin-tile-count" data-count="unverified">…</span></a></li>
    <li><a href="#accounts/quota" data-queue-link="quota">Over quota <span class="admin-tile-count" data-count="quota">…</span></a></li>
    <li><a href="#accounts/errors" data-queue-link="errors">Sign-in errors (1h) <span class="admin-tile-count" data-count="errors">…</span></a></li>
-   <li><a href="#accounts/jobs" data-queue-link="jobs">Stuck jobs <span class="admin-tile-count" data-count="jobs">…</span></a></li>
-   <li><a href="#accounts/jobs-active" data-queue-link="jobs-active">Active jobs <span class="admin-tile-count" data-count="jobs-active">…</span></a></li>
-   <li><a href="#accounts/jobs-stalled" data-queue-link="jobs-stalled">Stalled jobs <span class="admin-tile-count" data-count="jobs-stalled">…</span></a></li>
-   <li><a href="#accounts/jobs-failed" data-queue-link="jobs-failed">Failed jobs <span class="admin-tile-count" data-count="jobs-failed">…</span></a></li>
+   <li><a href="#accounts/jobs" data-queue-link="jobs" data-tip="Counts jobs held in memory since the server last restarted, for the 50 most recent accounts. Not a lifetime total.">Stuck jobs <span class="admin-tile-count" data-count="jobs">…</span></a></li>
+   <li><a href="#accounts/jobs-active" data-queue-link="jobs-active" data-tip="Counts jobs held in memory since the server last restarted, for the 50 most recent accounts. Not a lifetime total.">Active jobs <span class="admin-tile-count" data-count="jobs-active">…</span></a></li>
+   <li><a href="#accounts/jobs-stalled" data-queue-link="jobs-stalled" data-tip="Counts jobs held in memory since the server last restarted, for the 50 most recent accounts. Not a lifetime total.">Stalled jobs <span class="admin-tile-count" data-count="jobs-stalled">…</span></a></li>
+   <li><a href="#accounts/jobs-failed" data-queue-link="jobs-failed" data-tip="Counts jobs held in memory since the server last restarted, for the 50 most recent accounts. Not a lifetime total.">Failed jobs <span class="admin-tile-count" data-count="jobs-failed">…</span></a></li>
    <li><a href="#accounts/disabled" data-queue-link="disabled">Disabled <span class="admin-tile-count" data-count="disabled">…</span></a></li>
    <li><a href="#tickets/open">Open tickets <span class="admin-tile-count" data-count="tickets">…</span></a></li>
   </ul>
@@ -257,7 +257,7 @@
    <div><dt>Email</dt><dd id="ov-smtp">…</dd></div>
    <div><dt>Refine AI</dt><dd id="ov-ai">…</dd></div>
    <div><dt>Quota</dt><dd id="ov-quota">…</dd></div>
-   <div><dt>Jobs</dt><dd id="ov-jobs">…</dd></div>
+   <div><dt data-tip="Counts jobs held in memory since the server last restarted, for the 50 most recent accounts. Not a lifetime total.">Jobs (since restart)</dt><dd id="ov-jobs">…</dd></div>
   </dl>
   <p class="help-text" id="admin-source-health"></p>
   <h3 class="admin-subhead">Backup, watchdog, disk, Laya</h3>
@@ -290,5 +290,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/admin.js?v=20261015c"></script>
+<script src="/static/js/admin.js?v=20261016a"></script>
 {% endblock %}

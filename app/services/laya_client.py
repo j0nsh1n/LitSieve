@@ -86,6 +86,9 @@ def choice(instructions: str, options: Dict[str, str], states: List[str]) -> Opt
         data = resp.json()
     except (requests.RequestException, ValueError) as exc:
         _mark_down(type(exc).__name__)
+        if isinstance(exc, requests.RequestException):
+            # A sleeping socket-activated worker: start it now so the next call after the cooldown finds it awake.
+            wake()
         return None
     results = data.get("results") if isinstance(data, dict) else None
     if not isinstance(results, list) or len(results) != len(states):

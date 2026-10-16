@@ -4,40 +4,12 @@ Note: "Complete when" conditions are verified locally (tests pass, feature
 works) and via PR review. One phase may span several small PRs.
 
 The open phases are the fix work from `docs/AUDIT_2026-10-15.md`, in the
-order to take them: jobs, AI and exports, then the host. Phases 19 and
-20 are done on `fix/search-ranking` and `fix/audit-rest` (not yet pushed).
+order to take them: AI and exports, then the host. Phases 19 to 21 are
+done on `fix/search-ranking` and `fix/audit-rest` (not yet pushed).
 Phase N matches audit section N, and each task names the finding ids
 (`16.1`, `18.4`, ...) that hold the evidence and file locations. Cite
 those ids in branches and PRs, and mark a finding `Fixed in #NN` in the
 audit when its PR merges.
-
-## Phase 21 — Jobs
-Audit section 21.
-- Tasks:
-  - (21.1) Embed cancel that the worker reads between batches;
-    `can_cancel` only where cancel works
-  - (21.2) `library_id` on start-over, load-sample, detect-duplicates and
-    cluster-screening, bound like fetch and embed
-  - (21.3) `wait=true` embed goes through `try_begin_user_job`
-  - (21.4, 21.5) Bounds on `DuplicateRequest.threshold`, validation of
-    `MultiFetchRequest.sources` (non-empty, known, unique); detect
-    duplicates in a thread
-  - (21.6) Laya calls off the event loop (`run_in_thread` around
-    enrichment) and `wake()` on the first failed call, not only on page
-    load
-  - (21.7) Admin retry-embed uses the library's stored model; retry-fetch
-    uses the library on the job slot
-  - (21.8) Job slots are per account, not per library: either key them by
-    library or say on the page that one job runs per account; the wait
-    screen ignores a progress payload for another library
-  - (16.9, left from #93) Admin Overview: count stuck jobs and source
-    errors from stored job records rather than the capped in-memory job
-    map, and take the Tickets badge from the real open count, not the 25
-    listed rows
-- Complete when: cancelling a prepare stops it within one batch; two tabs
-  on different libraries cannot wipe the wrong one; a sleeping sidecar
-  does not delay other users' requests; tests cover each
-- Status: [ ] open
 
 ## Phase 22 — AI study aids and exports
 Audit section 22.
@@ -91,6 +63,13 @@ Audit section 23, and what was still open from running the live instance.
 - Status: [ ] open
 
 ## Backlog (unscheduled)
+- Job slots per library instead of per account (audit 21.8); for now the
+  409 says one job runs per account and a page ignores another library's
+  job
+- Precomputed sample embeddings so `/guest` does not run an embed job each
+  time (audit 21.9)
+- Persistent job records, so Admin Overview's job and source-error counts
+  survive a restart (they say "since the last restart")
 - Prune `auth_events` and expired token rows (audit 20.5; they only grow)
 - Control edges: input and button borders (`--rule`, `--edge`) are 1.2 to
   2.1:1 against their background in every look, under the 3:1 WCAG asks

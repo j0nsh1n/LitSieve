@@ -887,7 +887,8 @@ async function loadSampleCorpus(clearFirst) {
  try {
  const data = await apiCall('/api/load-sample-corpus', {
  method: 'POST',
- body: { clear_first: !!clearFirst },
+ // The library this page shows, not whichever is active in another tab (21.2).
+ body: withPageLibrary({ clear_first: !!clearFirst }),
  });
  showNotification(
  `Loaded ${data.inserted || data.loaded || 0} sample papers. Use Re-prepare Papers when you are ready.`,
@@ -1643,7 +1644,7 @@ async function silentResolveDuplicatesAfterPrepare() {
  try {
   const data = await apiCall('/api/resolve-duplicates', {
    method: 'POST',
-   body: { threshold: 0.98 },
+   body: withPageLibrary({ threshold: 0.98 }),
   });
   const n = Number(data && data.excluded) || 0;
   if (n <= 0) return null;

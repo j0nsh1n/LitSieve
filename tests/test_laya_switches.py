@@ -88,6 +88,7 @@ def test_network_errors_return_none_and_cool_down(monkeypatch, exc):
         raise exc
 
     monkeypatch.setattr(laya_client.requests, "post", boom)
+    monkeypatch.setattr(laya_client.requests, "get", lambda *a, **k: None)  # the wake ping
     assert laya_client.choice("q", {"a": "A", "b": "B"}, ["t"]) is None
     assert laya_client.choice("q", {"a": "A", "b": "B"}, ["t"]) is None
     assert calls == [1], "second call should be skipped during the cooldown"
@@ -378,3 +379,86 @@ def test_opening_search_wakes_laya_but_not_for_visitors(app_module, monkeypatch)
     assert c.get("/search").status_code == 200
     _join_wake()
     assert gets == [f"{URL}/health"]
+
+
+# --- a slow or sleeping sidecar must not stall the server ---------------------
+
+@pytest.mark.parametrize("exc", [requests.ConnectionError("down"), requests.ReadTimeout("slow")])
+def test_first_failed_call_wakes_the_worker_once(monkeypatch, exc):
+    monkeypatch.setenv("LITSIEVE_LAYA_URL", URL)
+    gets = _record_gets(monkeypatch)
+
+    def boom(*a, **k):
+        raise exc
+
+    monkeypatch.setattr(laya_client.requests, "post", boom)
+    for _ in range(3):  # the 2nd and 3rd are skipped by the cooldown and ping nothing
+        assert laya_client.choice("q", {"a": "A", "b": "B"}, ["t"]) is None
+    _join_wake()
+    assert gets == [f"{URL}/health"]
+
+
+def test_malformed_answer_does_not_wake(monkeypatch):
+    monkeypatch.setenv("LITSIEVE_LAYA_URL", URL)
+    gets = _record_gets(monkeypatch)
+    monkeypatch.setattr(laya_client.requests, "post", lambda *a, **k: FakeResp({"nope": 1}))
+    assert laya_client.choice("q", {"a": "A", "b": "B"}, ["t"]) is None
+    _join_wake()
+    assert gets == []
+
+
+def test_search_enrichment_runs_off_the_event_loop(app_module, monkeypatch):  # noqa: F811
+    """Enrichment reaches Laya over blocking HTTP, so every search route must hand
+    it to a worker thread. A function run on the loop thread sees a running loop."""
+    import asyncio
+    import time
+
+    from test_search_http import _seed
+
+    from app.routes import search as search_routes
+
+    seen = []
+
+    def slow_enrich(results, p, **kw):
+        seen.append(asyncio._get_running_loop() is None)  # True only off the loop
+        time.sleep(0.5)  # a Laya call waiting on its read timeout
+
+    monkeypatch.setattr(search_routes, "enrich_search_results", slow_enrich)
+    c = TestClient(app_module.app)
+    h = _register(c, "layaloop")
+    arts = _seed(app_module, c, h, "layaloop")
+    assert c.post("/api/search", headers=h, json={"query_text": "health", "top_k": 3}).status_code == 200
+    assert c.post("/api/search/seed", headers=h, json={"seed": arts[0]["article_id"], "top_k": 3}).status_code == 200
+    assert c.post("/api/search/starred", headers=h, json={"top_k": 3}).status_code in (200, 400)
+    assert seen[:2] == [True, True]
+    assert all(seen), "enrichment ran on the event loop thread"
+
+
+def test_concurrent_searches_overlap_a_slow_laya(app_module, monkeypatch):  # noqa: F811
+    """Two searches whose enrichment sleeps 0.5 s finish in about 0.5 s, not 1.0 s."""
+    import asyncio
+    import time
+
+    import httpx
+    from test_search_http import _seed
+
+    from app.routes import search as search_routes
+
+    monkeypatch.setattr(search_routes, "enrich_search_results", lambda *a, **k: time.sleep(0.5))
+    c = TestClient(app_module.app)
+    h = _register(c, "layaconc")
+    _seed(app_module, c, h, "layaconc")
+    cookies = dict(c.cookies)
+
+    async def go():
+        transport = httpx.ASGITransport(app=app_module.app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver",
+                                     cookies=cookies, headers=h) as ac:
+            t0 = time.monotonic()
+            rs = await asyncio.gather(*[ac.post("/api/search", json={"query_text": "health", "top_k": 3})
+                                        for _ in range(2)])
+            return time.monotonic() - t0, [r.status_code for r in rs]
+
+    elapsed, codes = asyncio.run(go())
+    assert codes == [200, 200]
+    assert elapsed < 0.9, f"enrichment serialised on the event loop ({elapsed:.2f}s)"

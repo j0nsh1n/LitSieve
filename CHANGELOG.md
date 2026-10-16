@@ -210,6 +210,30 @@ and this project aims to follow Semantic Versioning for app version strings
     files cannot be removed keeps its row so the next purge retries;
     `MAX_USER_STORAGE_MB=0.5` means half a megabyte, not unlimited.
 
+- Jobs (audit 21.1 to 21.8, and 16.9's counts):
+  - Cancelling a prepare stops it at the next batch (only fetch read the
+    cancel flag before); nothing from the cancelled run is saved.
+  - Start over, Load sample, Detect duplicates, Narrow it down's counts and
+    cluster screening act on the library the page shows, not whichever
+    library another tab made active; a library the account does not own is
+    a 400.
+  - A synchronous prepare claims the job slot like a background one
+    instead of overriding a running prepare and then clearing it.
+  - Detect duplicates takes a threshold from 0.8 to 1.0 and runs off the
+    request thread; a fetch request's databases are deduplicated and an
+    unknown one is a 400 with a sentence.
+  - Search enrichment (study types via Laya) runs off the request thread,
+    so a sleeping sidecar no longer stalls everyone's requests, and a failed
+    Laya call wakes it.
+  - Admin Retry prepare uses the library's stored model; Retry fetch runs
+    on the library the failed fetch used.
+  - A second job in another library gets "One fetch runs at a time per
+    account, in any of your libraries", and a page ignores another
+    library's running job instead of showing its wait screen.
+  - Admin: the Tickets badge counts every open ticket, not the 25 listed;
+    the job and source-error counts say they cover the time since the last
+    restart.
+
 ### Removed
 - DBLP is no longer offered as a source: it answers every request from the
   host with a bot check, and its records have no abstracts. Papers already

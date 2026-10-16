@@ -1234,7 +1234,7 @@ async function _loadSimpleScreenCounts(query) {
     const fraction = SIMPLE_SCREEN_LEVELS[level];
     const data = await apiCall('/api/screening/quick-preview', {
      method: 'POST',
-     body: { query, fraction },
+     body: withPageLibrary({ query, fraction }),
     });
     return [level, data];
    })
@@ -1649,7 +1649,7 @@ async function doSimpleScreenPreview() {
   if (!data) {
    data = await apiCall('/api/screening/quick-preview', {
     method: 'POST',
-    body: { query, fraction },
+    body: withPageLibrary({ query, fraction }),
    });
    _simpleScreenCounts[level] = data;
    applySimpleScreenCountLabels();
@@ -1699,7 +1699,7 @@ async function doSimpleScreenApply() {
   if (!data) {
    data = await apiCall('/api/screening/quick-preview', {
     method: 'POST',
-    body: { query, fraction },
+    body: withPageLibrary({ query, fraction }),
    });
    _simpleScreenCounts[level] = data;
   }
@@ -2323,7 +2323,7 @@ async function simpleToolsStartOver() {
  if (status) status.textContent = 'Keeping starred and noted papers…';
  if (btn) btn.disabled = true;
  try {
-  const result = await apiCall('/api/start-over', { method: 'POST', body: {} });
+  const result = await apiCall('/api/start-over', { method: 'POST', body: withPageLibrary({}) });
   const kept = Number(result && result.remaining) || 0;
   const deleted = Number(result && result.deleted) || 0;
   _lastTotalArticles = kept;

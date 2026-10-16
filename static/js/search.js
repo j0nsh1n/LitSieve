@@ -554,8 +554,12 @@ async function waitIfPreparing(stats) {
   hide();
   return stats;
  }
- const fetchJob = (progress && progress.fetch) || {};
- const embed = (progress && progress.embed) || {};
+ // Jobs run one per account. A job for another library (a second tab) is not
+ // this page's to wait on (audit 21.8).
+ const pageLib = typeof pageLibraryId === 'function' ? pageLibraryId() : '';
+ const ours = (job) => !!job && (!job.library_id || !pageLib || job.library_id === pageLib);
+ const fetchJob = ours(progress && progress.fetch) ? progress.fetch : {};
+ const embed = ours(progress && progress.embed) ? progress.embed : {};
 
  if (fetchJob.active && typeof showSimpleBuffering === 'function') {
   showSimpleBuffering('fetch');

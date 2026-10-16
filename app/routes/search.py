@@ -52,7 +52,8 @@ async def api_search(req: SearchRequest, request: Request):
             year_min=req.year_min, year_max=req.year_max,
             lexical_boost=req.lexical_boost,
         )
-        enrich_search_results(
+        await run_in_thread(
+            enrich_search_results,
             results, p, query_text=req.query_text, pico_boost=req.pico_boost,
         )
         sort_articles(results, req.sort_by)
@@ -83,7 +84,7 @@ async def api_search_seed(req: SeedSearchRequest, request: Request):
             req.include_seed,
         )
         results = data["results"]
-        enrich_search_results(results, p)
+        await run_in_thread(enrich_search_results, results, p)
         return {
             "seed": data["seed"],
             "results": results,
@@ -117,7 +118,7 @@ async def api_search_starred(req: StarredSearchRequest, request: Request):
             year_max=req.year_max,
         )
         results = data["results"]
-        enrich_search_results(results, p)
+        await run_in_thread(enrich_search_results, results, p)
         return {
             "results": results,
             "total": len(results),

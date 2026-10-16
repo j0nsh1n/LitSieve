@@ -150,3 +150,24 @@ def test_plain_user_is_refused_and_reason_is_required(tmp_path, monkeypatch):
         assert "reason" in r.json()["detail"]
     assert helpdesk.get_ticket(db, tid)["status"] == "open"
     assert helpdesk.get_ticket(db, tid)["replies"] == []
+
+
+def test_list_reports_every_open_ticket_not_just_the_page(tmp_path, monkeypatch):
+    client, db = _admin_client(tmp_path, monkeypatch)
+    _register("stu")
+    for i in range(27):
+        _ticket(db, "stu", f"open {i}")
+    _ticket(db, "stu", "done", "resolved")
+    for query in ("?status=open", "?status=resolved", "?status=all", ""):
+        d = client.get(f"/api/admin/tickets{query}").json()
+        assert d["open_total"] == 27, query
+    d = client.get("/api/admin/tickets?status=open").json()
+    assert d["total"] == 25, "the listed page stays capped"
+
+
+def test_tab_badge_uses_the_real_open_count():
+    import pathlib
+
+    js = (pathlib.Path(__file__).resolve().parent.parent / "static" / "js" / "admin.js").read_text()
+    assert "setTicketBadge(d.open_total)" in js
+    assert "setTicketBadge((d.tickets" not in js
