@@ -102,12 +102,38 @@ async function apiCall(url, options = {}) {
             }
             throw new Error('Not authenticated');
         }
-        const error = await response.json().catch(() => ({ detail: response.statusText }));
-        const failure = new Error(error.detail || 'Request failed');
+        const error = await response.json().catch(() => ({}));
+        const failure = new Error(apiErrorSentence(response.status, error));
         failure.status = response.status;
         throw failure;
     }
     return response.json();
+}
+
+/** One readable sentence for a failed request (audit 19.13). FastAPI's 422
+ *  `detail` is a list of field errors, and the rate limiter's 429 has none. */
+function apiErrorSentence(status, body) {
+    const detail = body && body.detail;
+    if (typeof detail === 'string' && detail.trim()) return detail;
+    if (Array.isArray(detail) && detail.length) {
+        const first = detail[0] || {};
+        const loc = Array.isArray(first.loc) ? first.loc : [];
+        const field = String(loc[loc.length - 1] || 'value').replace(/_/g, ' ');
+        const max = first.ctx && (first.ctx.max_length ?? first.ctx.le);
+        if (/too_long/.test(first.type || '') && max != null) {
+            return `That ${field} is too long. Keep it to ${max} characters or fewer.`;
+        }
+        if (/too_short|missing/.test(first.type || '')) {
+            return `Fill in the ${field} and try again.`;
+        }
+        const msg = String(first.msg || '').replace(/^Value error, /, '');
+        return msg ? `Check the ${field}: ${msg}.` : `Check the ${field} and try again.`;
+    }
+    if (status === 429) {
+        return 'Too many requests in a short time. Wait a minute and try again.';
+    }
+    if (status >= 500) return 'The server could not finish that. Try again in a moment.';
+    return 'That request could not be completed. Try again.';
 }
 
 // === Notification system ===
@@ -1665,8 +1691,13 @@ function showOneFlowNotice() {
         if (localStorage.getItem(marker)) return;
         const previous = localStorage.getItem('uiMode');
         localStorage.setItem(marker, '1');
-        if (previous === 'simple') return;
-    } catch (e) { /* Browser storage can be unavailable. */ }
+        // Only a browser that stored the old Advanced layout has anything to
+        // relearn; a new browser or a Simple one never saw two modes (19.4).
+        if (!previous || previous === 'simple') return;
+    } catch (e) {
+        // Without storage there is no old preference to read.
+        return;
+    }
     const main = document.querySelector('main');
     if (!main) return;
     const notice = document.createElement('section');

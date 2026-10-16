@@ -156,6 +156,10 @@ Guest User (is_guest) → sample corpus only; purged by age
 - Host notes: the LAN's primary DNS server (192.168.12.132) times out, so
   cloudflared logs a DNS refresh error every 5 minutes but stays connected;
   `litpilot.org` needs an apex record or redirect rule in Cloudflare.
-- **Next step:** PR for 19a, then 19b (page flow and wait screens,
-  19.4-19.14) from `main`, then 19c (19.15 and Looks polish; dark palettes
-  get contrast fixes only).
+- `fix/audit-rest` (worktree `~/.t3/worktrees/HealthDatabaseAccess/
+  fix-audit-rest`) is stacked on `fix/search-ranking` and holds the
+  remaining phases as separate commits (19b, 19c, 20, 21, 22, 23 code), to
+  be split into PRs once 19a merges. Nothing on either branch is pushed;
+  the owner asked to keep implementing (2026-10-16 night).
+- **Next step:** finish the roadmap on `fix/audit-rest`, then push and open
+  PRs in order when the owner says so.

@@ -116,7 +116,7 @@ function makeRun(cancel, scope='only_missing'){
  const run=makeRun(false);const result=await run.ctx.doCreateEmbeddings({fromSimpleReprepare:true});assert.ok(result);
  const request=run.requests.find(r=>r.path==='/api/create-embeddings');assert.ok(request);
  assert.deepEqual(JSON.parse(JSON.stringify(request.options.body)),{model:'specter',only_missing:true,library_id:'lib-1'});
- assert.equal(run.controls['simple-screen-query'].value,'new research question');assert.equal(run.controls['fetch-query'].value,'new research question');
+ assert.equal(run.controls['simple-screen-query'].value,'new research question');assert.equal(run.controls['fetch-query'].value,'old question');
  assert.deepEqual(run.prefChanges,[{model:'specter',onlyMissing:true}]);
  assert.equal(run.ctx.showCount,1);assert.equal(run.ctx.hideCount,1);
  assert.equal(run.waitCalls[0][0],'embed');assert.equal(run.waitCalls[0][1],'search-buffering-fill');assert.equal(run.waitCalls[0][5].mapMin,0);

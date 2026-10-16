@@ -165,6 +165,7 @@ async function run(cancel) {
   withPageLibrary: (body) => body,
   // Area picker (Laya switch): topics are already selected here, so these stay idle.
   pickAreasFromTopic: async () => false, openAreaPicker() {}, sendAreaFeedback() {},
+  layaAreas: new Set(), layaTopic: '',
  };
  vm.runInNewContext(
   extractFn(simple, 'resolveSimpleFetchModeBeforeRequest') + '\n' +

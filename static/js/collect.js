@@ -278,6 +278,47 @@ let areasSource = 'none';
 let areasExpanded = true;
 let lastLayaPick = [];
 let areasPickerOpened = false;
+// Which selected areas Laya chose, and for which topic. A hand click takes an
+// area out of this set; a new topic replaces it (audit 19.6).
+let layaAreas = new Set();
+let layaTopic = '';
+let _areaOffer = [];
+
+function syncAreaCards() {
+ document.querySelectorAll('#topic-grid .topic-card').forEach(card => {
+  card.classList.toggle('selected', selectedTopics.has(card.dataset.topicId));
+ });
+}
+
+function areaNames(ids) {
+ return ids.map(id => (TOPICS.find(t => t.id === id) || {}).name || id);
+}
+
+/** Offer Laya's areas for a new topic beside the student's own choice. */
+function showAreaOffer(ids) {
+ const line = document.getElementById('collect-areas-offer');
+ const text = document.getElementById('collect-areas-offer-text');
+ _areaOffer = ids.slice();
+ if (!line || !text) return;
+ const fresh = ids.filter(id => !selectedTopics.has(id));
+ line.hidden = !fresh.length;
+ if (!fresh.length) return;
+ text.textContent = '';
+ text.append('For this topic Laya would search ');
+ areaNames(ids).forEach((n, i) => {
+  if (i) text.append(i === ids.length - 1 ? ' and ' : ', ');
+  const b = document.createElement('strong');
+  b.textContent = n;
+  text.append(b);
+ });
+ text.append('.');
+}
+
+function hideAreaOffer() {
+ _areaOffer = [];
+ const line = document.getElementById('collect-areas-offer');
+ if (line) line.hidden = true;
+}
 
 function renderAreaState() {
  const summary = document.getElementById('collect-areas-summary');
@@ -307,10 +348,12 @@ function renderAreaState() {
 /** Replace the selected areas (Laya or saved prefs), keeping the grid in sync. */
 function setAreas(ids, source) {
  selectedTopics = new Set(ids);
- document.querySelectorAll('#topic-grid .topic-card').forEach(card => {
-  card.classList.toggle('selected', selectedTopics.has(card.dataset.topicId));
- });
+ syncAreaCards();
  areasSource = source;
+ if (source !== 'laya') {
+  layaAreas = new Set();
+  layaTopic = '';
+ }
  updateRecommendedSources();
  applyModelRecommendation();
  saveFetchPrefs();
@@ -387,6 +430,8 @@ function toggleTopic(topicId, card) {
  selectedTopics.add(topicId);
  card.classList.add('selected');
  }
+ // Either way the area is now the student's choice, not Laya's.
+ layaAreas.delete(topicId);
  updateRecommendedSources();
  applyModelRecommendation();
  saveFetchPrefs();
@@ -736,29 +781,20 @@ function updateReplaceConsequence() {
 }
 
 function updatePrepareSectionVisibility(totalArticles, opts) {
- const sec = document.getElementById('prepare-section');
- if (!sec) return;
  if (typeof totalArticles === 'number' && !Number.isNaN(totalArticles)) {
   _lastTotalArticles = totalArticles;
  }
  if (opts && typeof opts.readyArticles === 'number' && !Number.isNaN(opts.readyArticles)) {
   _lastReadyArticles = opts.readyArticles;
  }
- const forceShow = !!(opts && opts.forceShow);
- if (_pipelineBusy) {
-  sec.hidden = true;
-  updateSimpleFetchLock();
-  updateReplaceConsequence();
-  return;
+ // The one-page Search has no #prepare-section; the fetch lock and the
+ // "Start fresh deletes N papers" warning must update without it (19.7).
+ const sec = document.getElementById('prepare-section');
+ if (sec) {
+  const forceShow = !!(opts && opts.forceShow);
+  // Optional re-prepare only once something is actually ready for search.
+  sec.hidden = _pipelineBusy ? true : (forceShow ? false : !(_lastReadyArticles > 0));
  }
- if (forceShow) {
-  sec.hidden = false;
-  updateSimpleFetchLock();
-  updateReplaceConsequence();
-  return;
- }
- // Optional re-prepare only once something is actually ready for search.
- sec.hidden = !(_lastReadyArticles > 0);
  updateSimpleFetchLock();
  updateReplaceConsequence();
 }
@@ -1058,6 +1094,9 @@ function waitForJob(task, fillId, labelId, wrapId, formatLabel, timeoutMs, opts)
  let lastChangeAt = Date.now();
  let stallHintShown = false;
  let gotProgress = false;
+ // One dropped poll (a blip on the network or a slow server) must not end the
+ // wait while the job keeps running on the server (audit 19.12).
+ let pollFailures = 0;
 
  const writePct = (pct) => {
   const clamped = Math.max(0, Math.min(100, pct));
@@ -1115,6 +1154,7 @@ function waitForJob(task, fillId, labelId, wrapId, formatLabel, timeoutMs, opts)
     return;
    }
    const data = await apiCall('/api/progress');
+   pollFailures = 0;
    const p = data[task];
    if (!p) return;
    if (p.active) {
@@ -1172,6 +1212,8 @@ function waitForJob(task, fillId, labelId, wrapId, formatLabel, timeoutMs, opts)
     finish(null, p.result);
    }
   } catch (e) {
+   pollFailures += 1;
+   if (pollFailures < 2 && e.status !== 401) return;
    finish(e);
   }
  };
@@ -1408,8 +1450,9 @@ async function doFetch() {
   showNotification('Please enter a topic.', 'error');
   return;
  }
- if (selectedTopics.size === 0) {
-  // A fast typist can press Find before the debounced Laya pick lands.
+ if (selectedTopics.size === 0 || (layaAreas.size && layaTopic !== query)) {
+  // A fast typist can press Find before the debounced Laya pick lands, and
+  // Laya's pick may belong to the topic as it was a moment ago.
   await pickAreasFromTopic(query);
  }
  if (selectedTopics.size === 0) {
@@ -1790,33 +1833,79 @@ function initAreaPicker() {
  const input = document.getElementById('fetch-query');
  const change = document.getElementById('collect-areas-change');
  if (change) change.addEventListener('click', openAreaPicker);
+ const use = document.getElementById('collect-areas-offer-use');
+ if (use) {
+  use.addEventListener('click', () => {
+   if (!_areaOffer.length) return;
+   const topic = ((input || {}).value || '').trim();
+   setAreas(_areaOffer, 'laya');
+   layaAreas = new Set(_areaOffer);
+   layaTopic = topic;
+   hideAreaOffer();
+   areasExpanded = false;
+   renderAreaState();
+  });
+ }
  if (!input) return;
  input.addEventListener('input', () => {
   clearTimeout(_areaPickTimer);
   const topic = input.value.trim();
-  if (topic.length < 8 || areasSource === 'manual') return;
+  // Short topics count too: the server answers "Lasers" with Physics at 0.98.
+  if (topic.length < 3) return;
   _areaPickTimer = setTimeout(() => pickAreasFromTopic(topic), 700);
  });
 }
 
 async function pickAreasFromTopic(topic) {
- if (!topic || topic.length < 3 || areasSource === 'manual') return false;
+ if (!topic || topic.length < 3) return false;
  const seq = ++_areaPickSeq;
  let data;
  try {
   data = await apiCall('/api/topic-area', { method: 'POST', body: { topic } });
  } catch (e) {
-  return false;
+  data = null;
  }
  const current = ((document.getElementById('fetch-query') || {}).value || '').trim();
- if (seq !== _areaPickSeq || current !== topic || areasSource === 'manual') return false;
+ if (seq !== _areaPickSeq || current !== topic) return false;
  const ids = ((data && data.topics) || []).map(t => t.id).filter(id => TOPICS.some(t => t.id === id));
+ // Areas the student chose by hand stay whatever Laya says.
+ const hand = [...selectedTopics].filter(id => !layaAreas.has(id));
  if (!data || !data.available || !ids.length) {
-  if (!selectedTopics.size) { areasExpanded = true; renderAreaState(); }
+  // Unsure or off: Laya's pick for an earlier topic must not stay labelled
+  // "picked from your topic", and Find must not search it.
+  if (layaAreas.size) {
+   selectedTopics = new Set(hand);
+   syncAreaCards();
+   updateRecommendedSources();
+   saveFetchPrefs();
+   areasSource = hand.length ? 'manual' : 'none';
+  }
+  layaAreas = new Set();
+  layaTopic = topic;
+  hideAreaOffer();
+  if (!selectedTopics.size) areasExpanded = true;
+  renderAreaState();
   return false;
  }
  lastLayaPick = ids;
+ if (areasSource === 'manual' && hand.length) {
+  // A hand choice wins: drop Laya's own earlier areas and offer the new ones.
+  if (layaAreas.size) {
+   selectedTopics = new Set(hand);
+   syncAreaCards();
+   updateRecommendedSources();
+   saveFetchPrefs();
+  }
+  layaAreas = new Set();
+  layaTopic = topic;
+  showAreaOffer(ids);
+  renderAreaState();
+  return false;
+ }
  setAreas(ids, 'laya');
+ layaAreas = new Set(ids);
+ layaTopic = topic;
+ hideAreaOffer();
  areasExpanded = false;
  renderAreaState();
  return true;
