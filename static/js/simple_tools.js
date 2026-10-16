@@ -1114,12 +1114,19 @@ async function refreshSimpleScreeningCard() {
   if (openBtn) openBtn.hidden = false;
   if (dockHint) dockHint.hidden = false;
   setSimpleScreenGotoVisible(false);
+  // Set-aside papers (duplicates included) are not ranked, so leave them out
+  // here too; the level counts below are "about X of" this number.
+  const excludedTotal = Number(report && report.excluded && report.excluded.total) || 0;
+  const rankable = Math.max(0, ready - excludedTotal);
   const totalEl = document.getElementById('simple-screen-total');
   if (totalEl) {
    totalEl.hidden = false;
-   totalEl.textContent = `${ready} paper${ready === 1 ? '' : 's'} ready to rank`
-    + (total > ready ? ` (${total} in collection).` : '.');
+   totalEl.textContent = `${rankable} paper${rankable === 1 ? '' : 's'} ready to rank`
+    + (total > rankable ? ` (${total} in collection).` : '.');
   }
+  renderSimpleScreenDuplicates(
+   Number(report && report.excluded && report.excluded.duplicate) || 0
+  );
   setSimpleScreenGatePending(true);
   if (_onSearchPage()) openSimpleScreenModal();
   await loadSimpleScreenCounts();
@@ -1206,6 +1213,8 @@ function wireSimpleScreeningCard() {
  if (applyBtn) applyBtn.addEventListener('click', doSimpleScreenApply);
  if (skipBtn) skipBtn.addEventListener('click', doSimpleScreenSkip);
  if (undoBtn) undoBtn.addEventListener('click', doSimpleScreenUndo);
+ const dupsUndoBtn = document.getElementById('simple-screen-dups-undo');
+ if (dupsUndoBtn) dupsUndoBtn.addEventListener('click', doSimpleScreenDuplicatesUndo);
  const openBtn = document.getElementById('simple-screen-open-btn');
  if (openBtn) openBtn.addEventListener('click', openSimpleScreenModal);
  document.querySelectorAll('[data-simple-screen-close]').forEach((el) => {
@@ -1748,6 +1757,52 @@ async function doSimpleScreenUndo() {
  }
 }
 
+/** "N duplicate copies already set aside" inside Narrow it down (audit 19.3). */
+function renderSimpleScreenDuplicates(count) {
+ const line = document.getElementById('simple-screen-dups');
+ const msg = document.getElementById('simple-screen-dups-msg');
+ if (!line || !msg) return;
+ line.hidden = count <= 0;
+ if (count > 0) {
+  msg.textContent = count === 1
+   ? '1 duplicate copy already set aside (the best copy stays).'
+   : `${count} duplicate copies already set aside (the best copy of each stays).`;
+ }
+}
+
+async function doSimpleScreenDuplicatesUndo() {
+ const btn = document.getElementById('simple-screen-dups-undo');
+ setLoading(btn, true);
+ try {
+  const data = await apiCall('/api/screening/excluded?reason=duplicate');
+  const items = ((data && data.items) || []).map((it) => ({
+   article_id: it.article_id, source: it.source,
+  }));
+  if (!items.length) {
+   renderSimpleScreenDuplicates(0);
+   return;
+  }
+  await apiCall('/api/screening', {
+   method: 'POST',
+   body: { items, action: 'include' },
+  });
+  _simpleScreenCounts = { low: null, medium: null, high: null };
+  await refreshSimpleScreeningCard();
+  updateNavStats();
+  // After the refresh, which redraws the counts and clears the status line.
+  const n = items.length;
+  setStatus(
+   'simple-screen-status',
+   `Brought back ${n} duplicate cop${n === 1 ? 'y' : 'ies'}.`,
+   'success'
+  );
+ } catch (e) {
+  setStatus('simple-screen-status', `Undo failed: ${e.message}`, 'error');
+ } finally {
+  setLoading(btn, false);
+ }
+}
+
 function getResearchQuestionCandidate() {
  const screen = document.getElementById('simple-screen-query');
  if (screen && screen.value.trim()) return screen.value.trim();
@@ -2213,6 +2268,7 @@ async function simpleToolsStartOver() {
   const deleted = Number(result && result.deleted) || 0;
   _lastTotalArticles = kept;
   if (typeof updateNavStats === 'function') updateNavStats();
+  if (typeof refreshRailStats === 'function') refreshRailStats();
   if (status) {
    status.textContent = deleted
     ? `Kept ${kept} annotated paper${kept === 1 ? '' : 's'}; removed ${deleted}.`

@@ -8910,8 +8910,18 @@ html[data-accent="maroon"][data-tone="dark"] { --accent: #d6877f; --accent-hover
 .result-teaser { display: none; }
 .results-columns { display: none; }
 #results-list > .result-row.is-open,
-#results-list > :is(.show-more-btn, .info-text) {
+#results-list > :is(.show-more-btn, .info-text, .results-group-heading, .results-group-note) {
     grid-column: 1 / -1;
+}
+/* "No year listed": papers a year range cannot place, after the results. */
+.results-group-heading {
+    margin: var(--space-6) 0 0;
+    font-size: var(--fs-base);
+}
+.results-group-note {
+    margin: 0 0 var(--space-3);
+    color: var(--text-soft);
+    font-size: var(--fs-sm);
 }
 .result-ghost { display: none; }
 .result-row .article-abstract {

@@ -12,19 +12,12 @@ those ids in branches and PRs, and mark a finding `Fixed in #NN` in the
 audit when its PR merges.
 
 ## Phase 19 — Search page and ranking
-Audit section 19.
+Audit section 19. Three PRs (decided 2026-10-16): (a) ranking, rail,
+duplicates and undated papers (19.1-19.3, 19.16; on `fix/search-ranking`);
+(b) the page flow and wait screens (19.4-19.14); (c) 19.15 and the Looks
+polish. Dark palettes: fix contrast only (every pair to 4.5:1), keep the
+colours otherwise.
 - Tasks:
-  - (19.1) Hybrid rank: normalise lexical scores against an absolute scale
-    (or cap the lexical term when the TF-IDF cosine is small) and show the
-    score the list is sorted by; make `pico_boost` re-sort the blended
-    score
-  - (19.2) Refresh the Kept / Removed / Screened out rail after Not
-    relevant, Undo, Set aside and duplicate actions
-  - (19.3) Duplicates belong to the triage: keep the automatic removal
-    after prepare, but show it inside Narrow it down as its own line ("12
-    duplicate copies already set aside") with Undo, make the Narrow it down
-    counts and "papers ready" agree, and update `spec.md` to say so
-    (decided 2026-10-16)
   - (19.4) Show the layout notice only when `uiMode` was stored, and update
     the test that pins the opposite
   - (19.5) Narrow it down: load the level counts once per question; clear
@@ -53,16 +46,12 @@ Audit section 19.
     keyboard access on topic cards; `escapeAttr` in attribute contexts;
     one Reader Escape listener; public copy says Narrow it down, not
     "Quick screen"
-  - (19.16) Year bounds: papers with no usable year stay visible when a
-    year range is set, in their own "No year listed" group after the
-    results instead of mixed into them (decided 2026-10-16)
   - Looks polish (not from the audit): tune the dark palettes of
     Broadsheet and Catalog; closed result rows show no star or note marker;
     More like this shows no visible banner after re-ranking; Save note says
     Saved only after the request returns; the Narrow it down step returns
     after Skip
-- Complete when: a search's displayed scores are monotonic under
-  Similarity; the rail updates without a reload; the audit's browser walk
+- Complete when: the audit's browser walk
   (guest, register, fetch, prepare, Narrow it down, star, note, Not
   relevant, export) passes with no stuck screen; the Laya reproduction in
   19.6 follows every topic change; the Looks items are checked in the

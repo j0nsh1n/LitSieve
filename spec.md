@@ -37,8 +37,13 @@ a substitute for school library databases.
     use chips; whole-library export is in Save your work; source choices and
     optional contact email sit inside the fetch popup's Databases disclosure.
   - Set aside lists every exclusion reason and supports reason selection,
-    restoring one paper, a group, or all. Duplicate and theme exclusions
-    preview before apply and offer undo. Clustering runs as a background job.
+    restoring one paper, a group, or all. Duplicate checking from More and
+    theme exclusions preview before apply and offer undo. After prepare,
+    near-duplicate copies (Normal, 0.98) are set aside automatically, keeping
+    the preferred copy; **Narrow it down** shows that as its own line ("N
+    duplicate copies already set aside") with Undo, and its "papers ready"
+    count leaves out set-aside papers so it matches the level counts
+    (decided 2026-10-16). Clustering runs as a background job.
   - `/data-management`, `/statistics`, and `/clusters` permanently redirect
     to `/search`. Old mode preferences receive a one-time layout notice.
 - **Look** (per-account preference): one of seven looks, Workshop (default),
@@ -67,7 +72,11 @@ a substitute for school library databases.
     exclude/restore; grouping is optional and never auto-runs after fetch.
   - Per-result **Not relevant** (`off_topic`), optional reasons, and Undo.
 - Search: per-result **Not relevant** (`off_topic`); export / report panel
-- Search: hybrid rank (semantic + optional lexical), year/source filters, seed
+- Search: hybrid rank (0.7 × semantic cosine + 0.3 × TF-IDF cosine, both on
+  their own 0-1 scale; the card shows that blended score and the list is
+  sorted by it), year/source filters (a year range lists papers with no
+  usable year after the results, under "No year listed"; decided
+  2026-10-16), seed
   paper, **more like starred** (starred papers **remain** in the result list),
   notes/stars, export on-screen results as RIS
 - Optional AI Refine / Ask / **Explain this study**: one abstract at a time;

@@ -1595,8 +1595,8 @@ async function silentResolveDuplicatesAfterPrepare() {
   const n = Number(data && data.excluded) || 0;
   if (n <= 0) return null;
   return n === 1
-   ? 'Removed 1 duplicate copy.'
-   : `Removed ${n} duplicate copies.`;
+   ? 'Set aside 1 duplicate copy (Narrow it down can bring it back).'
+   : `Set aside ${n} duplicate copies (Narrow it down can bring them back).`;
  } catch (err) {
   console.warn('Silent duplicate resolve failed (continuing):', err);
   return null;

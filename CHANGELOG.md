@@ -125,6 +125,24 @@ and this project aims to follow Semantic Versioning for app version strings
   (`docs/SELFHOST.md`). A blank contact email sends no address at all
   instead of a shared placeholder.
 
+- Search ranking (audit 19.1). The number on each result is now the score
+  the list is sorted by: 0.7 × meaning plus 0.3 × exact-word overlap, both
+  on their own fixed 0-1 scale. Before, word overlap was stretched across
+  the shortlist, so the paper with the most overlap got the full word
+  weight however small it was ("Public comment periods and environmental
+  justice" ranked 4th for an exercise and depression question), and the
+  cards could read 0.321, 0.354, 0.167 down the list. The PICO boost adds
+  to that same score.
+- The Kept / Removed / Screened out rail updates after Not relevant and its
+  Undo, Group by theme's Set aside and Undo, and Start over, without a
+  reload (19.2).
+- Duplicate copies removed after prepare now show inside Narrow it down as
+  their own line ("16 duplicate copies already set aside") with Undo, and
+  "papers ready to rank" leaves set-aside papers out, so it matches the
+  "about 21 of 85" counts (19.3).
+- A year range no longer hides papers with no usable year: they appear
+  after the results under "No year listed" (19.16).
+
 ### Removed
 - DBLP is no longer offered as a source: it answers every request from the
   host with a bot check, and its records have no abstracts. Papers already

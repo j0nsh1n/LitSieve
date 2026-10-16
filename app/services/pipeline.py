@@ -37,6 +37,23 @@ from app.services.clustering import (
 )
 from app.services.embeddings import EmbeddingEngine
 from app.storage.database import ArticleDatabase
+from app.utils import parse_year
+
+
+def group_undated_last(results: List[Dict]) -> None:
+    """Under a year bound, mark papers with no usable year and list them last.
+
+    They stay visible in their own "No year listed" group (decided
+    2026-10-16) instead of being dropped or mixed in with the dated ones.
+    """
+    for article in results:
+        article['no_year'] = parse_year(article.get('year')) == 0
+    results.sort(key=lambda a: a['no_year'])
+
+
+# Hybrid rank: meaning first, exact words second (both cosine, 0-1).
+SEMANTIC_WEIGHT = 0.7
+LEXICAL_WEIGHT = 0.3
 
 FETCHERS = {
     'pubmed': PubMedFetcher,
@@ -560,7 +577,6 @@ class LiteratureSearchPipeline:
         extra_exclude: Optional[set] = None,
     ) -> Tuple[List[Tuple[str, str]], np.ndarray, Dict]:
         """Embeddings + metadata after screening / source / cluster / year filters."""
-        from app.utils import parse_year
 
         article_ids, article_embeddings = self._load_embeddings_cached()
         empty_meta: Dict = {}
@@ -598,12 +614,14 @@ class LiteratureSearchPipeline:
             article_ids = [article_ids[i] for i in keep]
             article_embeddings = article_embeddings[keep]
 
-        # When either year bound is set, unknown/unparseable years are excluded.
+        # A year bound drops papers outside it. Papers with no usable year stay
+        # in the pool; search_similar lists them after the dated results.
         if year_min is not None or year_max is not None:
             keep = []
             for i, key in enumerate(article_ids):
                 y = parse_year((articles_all.get(key) or {}).get('year'))
                 if y == 0:
+                    keep.append(i)
                     continue
                 if year_min is not None and y < year_min:
                     continue
@@ -617,15 +635,6 @@ class LiteratureSearchPipeline:
 
         return article_ids, article_embeddings, articles_all
 
-    @staticmethod
-    def _minmax(values: List[float]) -> List[float]:
-        if not values:
-            return []
-        lo, hi = min(values), max(values)
-        if hi - lo < 1e-12:
-            return [0.5] * len(values)
-        return [(v - lo) / (hi - lo) for v in values]
-
     def _hybrid_rerank(
         self,
         query_text: str,
@@ -634,6 +643,12 @@ class LiteratureSearchPipeline:
         top_k: int,
     ) -> List[Dict]:
         """Blend semantic cosine with TF-IDF lexical scores; cut to top_k.
+
+        Both scores stay on their own fixed 0-1 cosine scale. Stretching them
+        against the shortlist (min-max) gave the paper with the most word
+        overlap the full lexical weight however small that overlap was (audit
+        19.1). `similarity_score` is the blend, so the number on each card is
+        the one the list is sorted by; `semantic_score` keeps the meaning part.
 
         TF-IDF is fit only on the semantic shortlist (typically <= ~250 docs),
         not the full corpus, so rebuilding per query is intentional and cheap.
@@ -654,20 +669,18 @@ class LiteratureSearchPipeline:
             vec = TfidfVectorizer(stop_words='english', ngram_range=(1, 2))
             mat = vec.fit_transform(docs)
             q = vec.transform([query_text or ''])
-            lex = sk_cosine(q, mat).ravel().tolist()
+            lex: Optional[List[float]] = sk_cosine(q, mat).ravel().tolist()
         except Exception as e:
             logger.warning("Lexical boost failed (%s); pure semantic ranking.", e)
             lex = None
 
         if lex is None:
-            # Keep semantic order; expose neutral lexical scores.
-            lex_norm = [0.5] * len(sem_scores)
-            order = list(range(len(keys)))
+            scores = list(sem_scores)
         else:
-            sem_norm = self._minmax(sem_scores)
-            lex_norm = self._minmax(lex)
-            blended = [0.7 * s + 0.3 * L for s, L in zip(sem_norm, lex_norm)]
-            order = sorted(range(len(keys)), key=lambda i: blended[i], reverse=True)
+            scores = [
+                SEMANTIC_WEIGHT * s + LEXICAL_WEIGHT * L for s, L in zip(sem_scores, lex)
+            ]
+        order = sorted(range(len(keys)), key=lambda i: scores[i], reverse=True)
 
         out: List[Dict] = []
         for i in order[:top_k]:
@@ -675,8 +688,10 @@ class LiteratureSearchPipeline:
             if key not in articles_all:
                 continue
             article = dict(articles_all[key])
-            article['similarity_score'] = float(sem_scores[i])
-            article['lexical_score'] = round(float(lex_norm[i]), 4)
+            article['similarity_score'] = round(float(scores[i]), 4)
+            article['semantic_score'] = round(float(sem_scores[i]), 4)
+            if lex is not None:
+                article['lexical_score'] = round(float(lex[i]), 4)
             out.append(article)
         return out
 
@@ -751,6 +766,9 @@ class LiteratureSearchPipeline:
                     article = dict(articles_all[key])
                     article['similarity_score'] = float(similarity)
                     similar_articles.append(article)
+
+        if year_min is not None or year_max is not None:
+            group_undated_last(similar_articles)
 
         logger.info(f"Top {len(similar_articles)} most similar articles:\n")
         for i, article in enumerate(similar_articles, 1):
