@@ -4,37 +4,13 @@ Note: "Complete when" conditions are verified locally (tests pass, feature
 works) and via PR review. One phase may span several small PRs.
 
 The open phases are the fix work from `docs/AUDIT_2026-10-15.md`, in the
-order to take them: the Search page, storage and quota, jobs, AI and
-exports, then the host.
+order to take them: storage and quota, jobs, AI and exports, then the
+host. Phase 19 (Search page) is done on `fix/search-ranking` and the first
+commits of `fix/audit-rest`.
 Phase N matches audit section N, and each task names the finding ids
 (`16.1`, `18.4`, ...) that hold the evidence and file locations. Cite
 those ids in branches and PRs, and mark a finding `Fixed in #NN` in the
 audit when its PR merges.
-
-## Phase 19 — Search page and ranking
-Audit section 19. Three PRs (decided 2026-10-16): (a) ranking, rail,
-duplicates and undated papers (19.1-19.3, 19.16; `fix/search-ranking`);
-(b) the page flow and wait screens (19.4-19.14; first commits of
-`fix/audit-rest`); (c) 19.15 and the Looks polish. Dark palettes: fix contrast only (every pair to 4.5:1), keep the
-colours otherwise.
-- Tasks:
-  - (19.15) Source
-    chips and Save your work refresh after the first fetch; look cards
-    revert on a failed save; clear "Preparing papers…" after Re-prepare;
-    keyboard access on topic cards; `escapeAttr` in attribute contexts;
-    one Reader Escape listener; public copy says Narrow it down, not
-    "Quick screen"
-  - Looks polish (not from the audit): tune the dark palettes of
-    Broadsheet and Catalog; closed result rows show no star or note marker;
-    More like this shows no visible banner after re-ranking; Save note says
-    Saved only after the request returns; the Narrow it down step returns
-    after Skip
-- Complete when: the audit's browser walk
-  (guest, register, fetch, prepare, Narrow it down, star, note, Not
-  relevant, export) passes with no stuck screen; the Looks items are checked in the
-  browser in the looks they touch, light and dark, with ink contrast at or
-  above 4.5:1 where colour changes
-- Status: [ ] open
 
 ## Phase 20 — Storage and quota
 Audit section 20.
@@ -139,6 +115,11 @@ Audit section 23, and what was still open from running the live instance.
 - Status: [ ] open
 
 ## Backlog (unscheduled)
+- Control edges: input and button borders (`--rule`, `--edge`) are 1.2 to
+  2.1:1 against their background in every look, under the 3:1 WCAG asks
+  for UI components; a `--control-edge` token across all seven looks
+  (found 2026-10-16 while fixing the Broadsheet and Catalog dark palettes)
+- Night light: accent text on the accent-soft chip is 4.47:1
 - Laya cut-offs from real use: after Phase 19 has been live a few weeks,
   read `laya topic-area feedback` log lines and set `MIN_BEST` /
   `SECOND_RATIO` (`app/routes/laya.py`); spot-check Laya-tagged study

@@ -132,7 +132,8 @@ function wireLookPicker() {
  cards.forEach((card) => {
   card.addEventListener('click', async () => {
    // The current look again would only wipe the student's settings.
-   if (card.getAttribute('data-look-pick') === document.documentElement.getAttribute('data-look')) return;
+   const previous = document.documentElement.getAttribute('data-look');
+   if (card.getAttribute('data-look-pick') === previous) return;
    const look = paintLook(card.getAttribute('data-look-pick'));
    try {
     // Same queue as the fine-tune controls, so a setting picked right after
@@ -140,7 +141,9 @@ function wireLookPicker() {
     await window.saveAppearance('/api/account/look', { look });
     setStatus('look-status', 'Saved.', 'success');
    } catch (e) {
-    setStatus('look-status', e.message, 'error');
+    // The account still has the old look; show it again (audit 19.15).
+    if (previous) paintLook(previous);
+    setStatus('look-status', `${e.message} Your look was not changed.`, 'error');
    }
   });
  });

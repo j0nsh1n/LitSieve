@@ -47,7 +47,7 @@ search from topic to ranked papers, and how 6.0 is built.
   PICO / **seed paper** / **more like my starred**, highlights & private notes;
   paginated result lists; export and screening-report popups
 - 🧹 Duplicate preview with Strict / Normal / Loose matching, preferred-source
-  resolution, Quick screen, and screening report on Search
+  resolution, Narrow it down, and screening report on Search
 - 🧩 Background Group by theme: Density (HDBSCAN), K-Means, Hierarchical;
   preview and optional group exclusions with Undo; not auto-run after fetch
 - 📋 **Screening report** (collected / excluded by reason / included / by year)
@@ -124,7 +124,7 @@ Register/login for a private workspace, then:
    model picks them from the topic; Change opens the full list), review
    database choices, and fetch. One wait screen covers fetch and prepare. Apply or skip **Narrow
    it down**, then rank by Question, PICO, or a paper already in your library.
-2. **More** opens collection report, duplicates, Quick screen, re-prepare,
+2. **More** opens collection report, duplicates, Narrow it down, re-prepare,
    Start over, and background grouping. **Search options** adjusts ranking.
 3. **Save your work** exports visible results or a whole-library scope.
 4. **Account** manages your look, password, and account. Former Data Management,

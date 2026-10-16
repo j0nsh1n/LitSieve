@@ -58,6 +58,9 @@
     --ok: #3f6f3a;
     --warn: #8a5a12;
     --err: #a33b35;
+    /* Text on an --err fill: white on the dark red, dark ink on the light red
+       of the dark palettes (white there was 2.35:1). */
+    --on-err: #fff;
     --on-accent: #fff;
     /* Body-level explanatory text (card leads, subtitles): between primary
        ink and fine print, so it reads instead of blending. Derived from the
@@ -145,6 +148,7 @@
         --ok: #8fd39a;
         --warn: #e0b56a;
         --err: #ef8f86;
+        --on-err: #241512;
         --on-accent: #1b1712;
         --edge: #14100c;
         --sheen: inset 0 1px 0 rgba(255, 240, 220, 0.06);
@@ -176,6 +180,7 @@
     --ok: #8fd39a;
     --warn: #e0b56a;
     --err: #ef8f86;
+    --on-err: #241512;
     --on-accent: #1b1712;
     --edge: #14100c;
     --sheen: inset 0 1px 0 rgba(255, 240, 220, 0.06);
@@ -396,7 +401,7 @@ html[data-look="catalog"][data-theme="dark"] {
     --text-soft: #a99f89;
     --rule: #473f2d;
     --hover: rgba(208, 128, 120, 0.08);
-    --accent: #d08078;
+    --accent: #d38981;
     --accent-hover: #e09a93;
     --ok: #8fbf9b;
     --warn: #e0b56a;
@@ -452,7 +457,7 @@ html[data-look="catalog"][data-theme="dark"] {
         --text-soft: #a99f89;
         --rule: #473f2d;
         --hover: rgba(208, 128, 120, 0.08);
-        --accent: #d08078;
+        --accent: #d38981;
         --accent-hover: #e09a93;
         --ok: #8fbf9b;
         --warn: #e0b56a;
@@ -1697,7 +1702,7 @@ input[type="range"]::-moz-range-thumb:hover {
 .btn-danger {
     background: var(--err);
     border-color: transparent;
-    color: #fff;
+    color: var(--on-err);
 }
 
 .btn-danger:hover:not(:disabled) {
@@ -9745,4 +9750,22 @@ body[data-embed="1"] .account-content > .card {
 /* Docked at the bottom, the page can still scroll its last rows into view. */
 @media (min-width: 641px) {
     html[data-panel="bottom"] body.settings-panel-open { padding-bottom: var(--settings-sheet-h); }
+}
+
+/* Star and note marks beside a closed result's title (Looks polish). */
+.result-marks {
+    display: inline-flex;
+    gap: var(--space-1);
+    margin-left: var(--space-2);
+    vertical-align: middle;
+    color: var(--accent);
+}
+.result-mark[hidden],
+.result-row.is-open .result-marks { display: none; }
+.result-mark .ico { width: 0.85em; height: 0.85em; }
+
+/* Topic area cards are toggle buttons; show where the keyboard is. */
+.topic-card:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
 }

@@ -131,7 +131,7 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "least-related papers with undo. Group by theme uses embeddings to "
             "organize papers; review a group before excluding it. Search ranks the "
             "papers you keep. Cluster labels are best when they read like real "
-            "topics; if they look weak, prefer Quick screen."
+            "topics; if they look weak, prefer Narrow it down."
         ),
         "how_it_works": [
             "After prepare, Narrow it down can help focus the collection. Enter your "
@@ -158,7 +158,7 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "what was excluded and why.",
             "Re-clustering refreshes groups but keeps your exclusion list.",
         ],
-        "where_in_app": "Search → Narrow it down, Quick screen, Group by theme, and Not relevant.",
+        "where_in_app": "Search → Narrow it down, Group by theme, and Not relevant.",
         "app_path": "/search",
         "app_label": "Open Search",
     },
@@ -166,10 +166,10 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
         "slug": "duplicate-resolution",
         "title": "Duplicate checks & report",
         "icon": "🔄",
-        "tagline": "Duplicates, Quick screen, and the hand-in report.",
+        "tagline": "Duplicates, Narrow it down, and the hand-in report.",
         "summary": (
             "Search includes tools to finish a collection: remove near-duplicate "
-            "copies across databases, optionally Quick-screen least-related papers, "
+            "copies across databases, optionally use Narrow it down on least-related papers, "
             "and download a screening report (collected / excluded / included "
             "counts) for hand-ins."
         ),
@@ -180,7 +180,7 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "Auto-Resolve keeps the most complete abstract; if lengths are similar "
             "it prefers trusted sources (PubMed first, then Europe PMC, and so on).",
             "Losers are screened out (hidden from Search), not deleted.",
-            "Quick screen: rank against your research question and screen out the "
+            "Narrow it down: rank against your research question and screen out the "
             "least related set (primary button), or Preview first; Undo once.",
             "Screening report shows collected, duplicates removed, exclusions by "
             "reason (including low relevance and cluster triage), and included set "
@@ -193,7 +193,7 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "Teachers: ask students to attach the screening report text with a "
             "short reflection on what they excluded.",
         ],
-        "where_in_app": "Search → duplicate checks, Quick screen, and screening report.",
+        "where_in_app": "Search → duplicate checks, Narrow it down, and screening report.",
         "app_path": "/search",
         "app_label": "Open Search",
     },
@@ -239,7 +239,7 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "Each result may show a study Type tag (plain-language guess from title "
             "and abstract - often wrong when confidence is low). It is not an evidence "
             "grade.",
-            "Narrow it down or run Quick screen before ranking if you want a smaller set.",
+            "Narrow it down before ranking if you want a smaller set.",
             "Seed mode is useful when a teacher gives you a starter paper.",
             "Star a handful of must-read papers, then use More like my starred to "
             "expand the set without rewriting the query.",
@@ -326,7 +326,7 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
         ),
         "how_it_works": [
             "Use this app to collect candidates (fetch + auto-prepare), screen in "
-            "Search (duplicates and/or Quick screen), and export "
+            "Search (duplicates and/or Narrow it down), and export "
             "RIS plus a screening report.",
             "Write down what you still need (for example: a peer-reviewed review, "
             "a local newspaper archive, or a book chapter your teacher assigned).",

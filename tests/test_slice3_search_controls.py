@@ -74,7 +74,7 @@ const sandbox = {
  window: {}, Event: class {constructor(type) {this.type = type;}},
  sessionStorage: {getItem: (k) => stored.get(k), setItem: (k,v) => stored.set(k,v), removeItem: (k) => stored.delete(k)},
  setLoading() {}, updateRangeFill() {}, showNotification: (...args) => notices.push(args),
- escapeHtml: (s) => String(s), getSourceName: (s) => s,
+ escapeHtml: (s) => String(s), escapeAttr: (s) => String(s), getSourceName: (s) => s,
  getArticleUrl: () => 'https://example.test/paper', withPageLibrary: (body) => body,
  apiCall: async (path, options) => {
   if (path === '/api/statistics') return stats;
