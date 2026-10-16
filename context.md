@@ -4,7 +4,7 @@
 - App version **6.0.0**, released 2026-10-12. GitHub release `v6.0.0` (at
   `25356cb`) holds the tour video (1080p and 4K); the README opens with its
   poster. Live at `https://www.litpilot.org` from the production checkout at
-  `0374605` (2026-10-14). The bare `litpilot.org` has no DNS record.
+  `f9485cf` (2026-10-16). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
 - Latest full suite (2026-10-16): **1229 passed**, no xfails; all 15 parity
   rows pass. `ruff check .` clean; `pyright app` **0 errors**, 6 optional-import
@@ -40,24 +40,26 @@
   source, PubMed included, goes through `HttpClient`; a 2xx body that is not
   JSON (a bot wall) is a typed `network` error with a sentence.
 - New support-view/ticket records omit mode; old history remains readable.
-- Known host gaps: live account cap/AI configuration and confirming detached
-  deployment history on the host (roadmap Phase 23), and disconnected browser
-  automation.
-  Semantic Scholar, OpenAlex and PubMed take optional host keys
-  (`S2_API_KEY`, `OPENALEX_API_KEY`, `NCBI_API_KEY`); production sets none,
-  so Semantic Scholar mostly answers 429 and OpenAlex shares one free daily
-  budget per IP.
+- Host (2026-10-16): `MAX_TOTAL_ACCOUNTS=100` (27 real accounts then); the
+  study aid is `LLM_PROVIDER=ollama`, `OLLAMA_MODEL=qwen2.5:14b` on the
+  system Ollama service (port 11434, runs as user `ollama` with its own
+  store; the model was imported from `/var/mnt/games/LLM_Models`, which
+  `OLLAMA_MODELS` names for an app-started Ollama). `HF_HUB_OFFLINE=1` is a
+  drop-in, `~/.config/systemd/user/litsieve-uvicorn.service.d/hf-offline.conf`.
+  A detached rollback and deploy each wrote their own `operator_deploys`
+  row (actor `phase23-check`). Still open: Cloudflare challenges non-browser
+  clients on `/health` (roadmap Phase 23). Semantic Scholar, OpenAlex and
+  PubMed take optional host keys (`S2_API_KEY`, `OPENALEX_API_KEY`,
+  `NCBI_API_KEY`); production sets none, so Semantic Scholar mostly answers
+  429 and OpenAlex shares one free daily budget per IP.
 - Code scanning is clean: route error messages are the app's own sentences
   (`app/errors.py`, `UserError` and `sentence_for`), shipped 2026-10-14.
 - Full audit 2026-10-15: `docs/AUDIT_2026-10-15.md`, two independent passes
   (lead and a blind Grok pass) merged. Sections 16 to 23 match roadmap
   Phases 16 to 23; findings have ids (`16.1`, ...) that tasks and PRs cite;
-  mark a finding `Fixed in #NN` when its PR merges. Sections 16 and 17 are
-  fixed (#93, #94; 16.9's Overview counts moved to Phase 21); section 18 is
-  fixed in #95. Open headline items: quota never freed by deleting
-  papers; several Search-page element
-  ids that no template renders; Laya topic areas keep a stale pick when the
-  answer is unsure, the topic is short, or any area was clicked by hand.
+  mark a finding `Fixed in #NN` when its PR merges. Every code finding in
+  sections 16 to 23 is fixed (#93 to #102); 21.9 moved to the backlog and
+  23.2 is a Cloudflare setting (roadmap Phase 23).
 - Admin (`/admin`) is four tabs with the hash as its address (`#accounts/u/<id>`,
   `#accounts/<queue>`). Account actions come from `ACTIONS` in
   `app/routes/admin.py`: the template draws the buttons and `_begin_action`
@@ -144,22 +146,18 @@ Guest User (is_guest) → sample corpus only; purged by age
   the owning user's progress while a referenced job is active.
 
 ## Session Handoff
-- **Date:** 2026-10-16. Every code task in the 2026-10-15 audit roadmap is
-  merged or in its last PR: #96 (19a), #97 (19b), #98 (19c), #99 (20),
-  #100 (21), #101 (22 and 23's code), #102 (review follow-ups, audit
-  marks). Phases 16 to 18 merged as #93 to #95. Remaining: roadmap Phase
-  23's host tasks.
-- Production still serves `0374605`; the live checkout was never pulled or
-  restarted. Deploy steps (roadmap Phase 23): pull, `pip install -r
-  requirements.txt` (adds `anthropic`, `httpx`), restart, then the `.env`
-  decisions (`MAX_TOTAL_ACCOUNTS`, Ollama settings, optional source keys).
-- `spec.md` still says "Quick screen" on two lines (69, 188); flagged, not
-  edited.
-- Dev leftovers: `dev_users.db`/`dev_data` in the `fix-audit-rest` worktree (test accounts
-  only). Scratch: `~/HealthDatabaseAccess-scratch/` (fixtures captures,
-  contrast script).
+- **Date:** 2026-10-16. Every code finding in the 2026-10-15 audit is merged
+  (#93 to #102) and deployed: production serves `f9485cf`, with `anthropic`
+  and `httpx` installed. Roadmap Phase 23's host settings are done and
+  checked live: account cap, a guest Ask answered by `qwen2.5:14b` in about
+  6 s, a guest embed with no Hub request, and a detached rollback to
+  `7917139` and deploy back to `f9485cf`, each writing its own row.
+- The Ship staging worktree (`~/.local/share/litsieve/staging`, branch
+  `operator-staging`) now sits at `f9485cf`.
+- Open: the Cloudflare rule for `/health` (dashboard only; no API token on
+  the host) and the optional source keys. `spec.md` still says "Quick
+  screen" on two lines (69, 188); flagged, not edited.
 - Host notes: the LAN's primary DNS server (192.168.12.132) times out, so
   cloudflared logs a DNS refresh error every 5 minutes but stays connected;
   `litpilot.org` needs an apex record or redirect rule in Cloudflare.
-- **Next step:** Phase 23 host work once the owner says so: deploy (pull,
-  `pip install -r requirements.txt`, restart), then the `.env` decisions.
+- **Next step:** none scheduled; the backlog in `roadmap.md` is unscheduled.
