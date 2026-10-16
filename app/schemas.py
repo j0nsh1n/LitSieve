@@ -246,6 +246,9 @@ class ShareCreateRequest(BaseModel):
 class ExportArticleKey(BaseModel):
     article_id: str
     source: str
+    # What the page showed for this paper; the server re-checks both before use.
+    similarity_score: Optional[float] = None
+    cluster_label: Optional[str] = None
 
 
 class ExportSelectionRequest(BaseModel):

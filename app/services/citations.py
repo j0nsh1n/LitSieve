@@ -10,6 +10,8 @@ import re
 from typing import Any, Callable, Dict, List, Optional
 from urllib.parse import quote
 
+from app.fetchers.base import clean_text
+
 
 def _openaire_url(aid: Any) -> str:
     """OpenAIRE ids are a DOI, a bare PMID, or an OpenAIRE object id.
@@ -112,6 +114,26 @@ def _four_digit_year(year: Any) -> Optional[str]:
     return m.group(1) if m else None
 
 
+_DOI_SHAPE = re.compile(r"^10\.\d{4,9}/\S+$")
+_PLACEHOLDER_JOURNALS = {
+    "unknown journal", "unknown", "n/a", "na", "none", "null", "-", "--", "?",
+}
+
+
+def article_doi(article: dict) -> Optional[str]:
+    """The DOI for an article whose id is DOI-shaped (10.<digits>/...), whatever the source."""
+    aid = str(article.get("article_id") or "").strip()
+    if aid.lower().startswith("https://doi.org/"):
+        aid = aid[len("https://doi.org/"):]
+    return aid if _DOI_SHAPE.match(aid) else None
+
+
+def _real_journal(article: dict) -> str:
+    """Journal name, or "" when it is empty or a placeholder such as "Unknown journal"."""
+    journal = _collapse_ws(article.get("journal") or "")
+    return "" if journal.lower().rstrip(".") in _PLACEHOLDER_JOURNALS else journal
+
+
 def _ris_line(tag: str, value: str) -> str:
     return f"{tag}  - {value}"
 
@@ -127,16 +149,17 @@ def article_to_ris(article: dict) -> str:
     year = _four_digit_year(article.get("year"))
     if year:
         lines.append(_ris_line("PY", year))
-    journal = _collapse_ws(article.get("journal") or "")
+    journal = _real_journal(article)
     if journal:
         lines.append(_ris_line("JO", journal))
-    abstract = _collapse_ws(article.get("abstract") or "")
+    abstract = clean_text(article.get("abstract"))
     if abstract:
         lines.append(_ris_line("AB", abstract))
     source = (article.get("source") or "").strip()
     aid = str(article.get("article_id") or "")
-    if source == "crossref" and aid:
-        lines.append(_ris_line("DO", aid))
+    doi = article_doi(article)
+    if doi:
+        lines.append(_ris_line("DO", doi))
     url = article_url(article)
     if url:
         lines.append(_ris_line("UR", url))
@@ -176,16 +199,19 @@ def article_to_bibtex(article: dict) -> str:
     if year:
         fields.append(f"  year = {{{year}}}")
 
-    journal = _collapse_ws(article.get("journal") or "")
+    journal = _real_journal(article)
     if journal:
         fields.append(f"  journal = {{{_bibtex_escape(journal)}}}")
 
-    if source == "crossref" and aid:
-        fields.append(f"  doi = {{{_bibtex_escape(aid)}}}")
+    doi = article_doi(article)
+    if doi:
+        fields.append(f"  doi = {{{_bibtex_escape(doi)}}}")
 
+    # A URL is written raw: escaping _ % # ~ would break the link. A brace or a
+    # line break would break the entry, so such a URL is left out.
     url = article_url(article)
-    if url:
-        fields.append(f"  url = {{{_bibtex_escape(url)}}}")
+    if url and not re.search(r"[{}\r\n]", url):
+        fields.append(f"  url = {{{url}}}")
 
     if source:
         fields.append(f"  note = {{{_bibtex_escape(f'Source: {source}')}}}")

@@ -2329,10 +2329,13 @@ async function doExportResults(format, libraryId = '') {
   status.className = 'status-indicator loading';
  }
  if (simpleStatus) simpleStatus.textContent = 'Preparing download…';
- const items = exportRows.map((a) => ({
-  article_id: a.article_id,
-  source: a.source,
- }));
+ const items = exportRows.map((a) => {
+  const item = { article_id: a.article_id, source: a.source };
+  const score = Number(a.similarity_score);
+  if (a.similarity_score != null && Number.isFinite(score)) item.similarity_score = score;
+  if (a.cluster_label) item.cluster_label = String(a.cluster_label);
+  return item;
+ });
  try {
   const headers = {
    Accept: '*/*',

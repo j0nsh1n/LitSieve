@@ -16,6 +16,7 @@ from app.core import (
 from app.errors import sentence_for
 from app.storage import helpdesk, quota
 from app.storage.libraries import list_libraries
+from app.version import APP_VERSION
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +47,7 @@ def _ticket_context(request: Request, body: dict, user: dict) -> dict:
             break
     return {
         "route": raw.get("route") or request.headers.get("referer") or "",
-        "app_version": "6.0.0",
+        "app_version": APP_VERSION,
         "user_agent": (raw.get("user_agent") or request.headers.get("user-agent") or "")[:160],
         "library_count": len((libs or {}).get("libraries") or []),
         "article_count": int(stats.get("total_articles") or 0),

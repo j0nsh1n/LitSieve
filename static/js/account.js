@@ -705,6 +705,10 @@ function fillAiSettingsForm(settings, status) {
   ah.textContent = settings.anthropic_api_key_set
    ? `Saved key: ${settings.anthropic_api_key_masked || '••••'}`
    : 'No Anthropic key saved yet.';
+  // A key cannot work until the host installs the package (audit 22.2).
+  if (settings.anthropic_available === false) {
+   ah.textContent += ' This server cannot use Anthropic keys yet; use an OpenAI-compatible key.';
+  }
  }
  syncAiModePanels();
  applyAiWriteGate(settings);

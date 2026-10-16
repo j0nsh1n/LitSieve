@@ -12,6 +12,7 @@ from app.core import (
     templates,
 )
 from app.services import laya_client
+from app.version import APP_VERSION
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +28,7 @@ async def health():
         _core.purge_expired_guests()
     except Exception:
         logger.exception("purge_expired_guests from /health failed")
-    return {"status": "healthy", "version": "6.0.0"}
+    return {"status": "healthy", "version": APP_VERSION}
 
 
 # Browsers and crawlers request these at the site root, where the /static mount

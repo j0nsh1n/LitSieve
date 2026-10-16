@@ -45,10 +45,21 @@ def test_provider_openai_before_anthropic_in_auto(monkeypatch):
 
 def test_provider_force_anthropic(monkeypatch):
     _clear_providers(monkeypatch)
+    monkeypatch.setattr(llm_service, "anthropic_installed", lambda: True)
     monkeypatch.setenv("OLLAMA_MODEL", "llama3.1")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
     monkeypatch.setenv("LLM_PROVIDER", "anthropic")
     assert llm_service.provider() == "anthropic"
+
+
+def test_anthropic_without_its_package_is_not_offered(monkeypatch):
+    """A saved key with no package showed the buttons and 503ed (audit 22.2)."""
+    _clear_providers(monkeypatch)
+    monkeypatch.setattr(llm_service, "anthropic_installed", lambda: False)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+    monkeypatch.setenv("LLM_PROVIDER", "anthropic")
+    assert llm_service.provider() is None
+    assert llm_service.student_can_get_ai() is False
 
 
 def test_save_and_load_ai_settings(tmp_path, monkeypatch):

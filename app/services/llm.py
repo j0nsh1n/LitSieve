@@ -431,7 +431,7 @@ def runtime_ai(user_id: Optional[str] = None) -> Dict[str, str]:
         "anthropic_api_key": anthropic_key,
         "llm_model": llm_model,
         "llm_timeout_seconds": user_timeout or host_timeout,
-        "ollama_model": host_ollama_model or user_ollama_model,
+        "ollama_model": host_ollama_model or user_ollama_model or (_INSTALLED_OLLAMA_DEFAULT or ""),
         "ollama_host": host_ollama_host.rstrip("/"),
         "ollama_models_dir": _env("OLLAMA_MODELS"),
     }
@@ -460,7 +460,7 @@ def student_can_get_ai(user_id: Optional[str] = None) -> bool:
     Ollama or any network.
     """
     rt = runtime_ai(user_id=user_id)
-    if rt["openai_api_key"] or rt["anthropic_api_key"]:
+    if rt["openai_api_key"] or (rt["anthropic_api_key"] and anthropic_installed()):
         return True
     return bool(rt["ollama_model"])
 
@@ -478,14 +478,6 @@ def public_ai_settings(user_id: Optional[str] = None) -> Dict[str, Any]:
             return "••••••••"
         return raw[:4] + "…" + raw[-4:]
 
-    path = ""
-    uid = _current_ai_user(user_id)
-    if uid:
-        try:
-            path = str(_settings_path(uid))
-        except ValueError:
-            path = ""
-
     return {
         "llm_provider": str(data.get("llm_provider") or rt["llm_provider"] or "auto"),
         "ollama_host": rt["ollama_host"],
@@ -502,7 +494,8 @@ def public_ai_settings(user_id: Optional[str] = None) -> Dict[str, Any]:
         "ollama_control_allowed": ollama_control_allowed(),
         "settings_write_allowed": ai_settings_write_allowed(),
         "study_aid_mode": study_aid_mode(user_id=user_id),
-        "settings_path": path,
+        # No server file path: students have no use for it (audit 22.5).
+        "anthropic_available": anthropic_installed(),
     }
 
 
@@ -521,13 +514,24 @@ def ai_settings_write_allowed() -> bool:
     return flag not in ("0", "false", "no", "off")
 
 
+def anthropic_installed() -> bool:
+    """Whether the optional ``anthropic`` package is importable on this host.
+
+    Without it a saved Anthropic key showed the buttons and every click
+    returned 503 (audit 22.2).
+    """
+    import importlib.util
+
+    return importlib.util.find_spec("anthropic") is not None
+
+
 def provider() -> Optional[str]:
     """Pick active provider: auto prefers Ollama, then OpenAI-compatible, then Anthropic."""
     rt = runtime_ai()
     pref = (rt["llm_provider"] or "auto").lower()
     has_ollama = bool(rt["ollama_model"])
     has_openai = bool(rt["openai_api_key"])
-    has_anthropic = bool(rt["anthropic_api_key"])
+    has_anthropic = bool(rt["anthropic_api_key"]) and anthropic_installed()
     if pref in ("ollama", "openai", "anthropic"):
         if pref == "ollama":
             return "ollama" if (has_ollama or ollama_control_allowed()) else None
@@ -549,15 +553,21 @@ def is_configured() -> bool:
     return provider() is not None
 
 
+# With no model name configured, the first model the local service reports.
+# Kept here, never in os.environ: writing OLLAMA_MODEL made one account's
+# choice every account's (audit 22.3).
+_INSTALLED_OLLAMA_DEFAULT: Optional[str] = None
+
+
 def _ensure_ollama_model_env() -> Optional[str]:
     """Return a usable model tag, preferring host env, else this account, else first installed."""
+    global _INSTALLED_OLLAMA_DEFAULT
     model = runtime_ai()["ollama_model"]
     if model:
-        os.environ["OLLAMA_MODEL"] = model
         return model
     models = list_ollama_models()
     if models:
-        os.environ["OLLAMA_MODEL"] = models[0]
+        _INSTALLED_OLLAMA_DEFAULT = models[0]
         return models[0]
     return None
 
@@ -645,11 +655,55 @@ def run_with_ephemeral_builtin(fn: Callable[[], Any]) -> Any:
         release_builtin_service()
 
 
+TIMEOUT_MIN_SECONDS = 5.0
+TIMEOUT_MAX_SECONDS = 300.0
+
+
 def _timeout() -> float:
+    """Request timeout, held between 5 s and 5 min whatever was saved (22.4)."""
     try:
-        return float(runtime_ai().get("llm_timeout_seconds") or "120")
+        value = float(runtime_ai().get("llm_timeout_seconds") or "120")
     except ValueError:
         return 120.0
+    if value != value:  # NaN
+        return 120.0
+    return max(TIMEOUT_MIN_SECONDS, min(TIMEOUT_MAX_SECONDS, value))
+
+
+def private_base_urls_allowed() -> bool:
+    """AI_ALLOW_PRIVATE_BASE_URL=true lets a student point at a LAN model server."""
+    return _env("AI_ALLOW_PRIVATE_BASE_URL", "false").lower() in ("1", "true", "yes", "on")
+
+
+def base_url_problem(url: str) -> Optional[str]:
+    """Why a student's OpenAI-compatible base URL may not be used, or None.
+
+    The server sends the student's key to ``{base}/chat/completions``, so a
+    loopback or private address would let an account probe this host and its
+    network (audit 22.4). Every address the name resolves to is checked.
+    """
+    import ipaddress
+    import socket
+    from urllib.parse import urlparse
+
+    text = (url or "").strip()
+    if not text:
+        return None
+    parsed = urlparse(text)
+    if parsed.scheme != "https" or not parsed.hostname:
+        return "The API base URL must start with https:// and name a server."
+    if private_base_urls_allowed():
+        return None
+    try:
+        infos = socket.getaddrinfo(parsed.hostname, parsed.port or 443, proto=socket.IPPROTO_TCP)
+    except OSError:
+        return "The API base URL's server name could not be found."
+    for info in infos:
+        addr = ipaddress.ip_address(info[4][0])
+        if (addr.is_private or addr.is_loopback or addr.is_link_local
+                or addr.is_reserved or addr.is_multicast or addr.is_unspecified):
+            return "The API base URL must be a public server, not a local or private address."
+    return None
 
 
 # One /api/tags request answers both "running?" and "which models?". Cached
@@ -1229,6 +1283,11 @@ def _structured_openai[T: BaseModel](system: str, prompt: str, schema_model: typ
     if not api_key:
         raise LLMUnavailable("OPENAI_API_KEY is not set.")
     base = (rt["openai_base_url"] or _DEFAULT_OPENAI_BASE).rstrip("/")
+    # Checked again here, not only on save: a name can change what it points at.
+    if base != _DEFAULT_OPENAI_BASE.rstrip("/") and base != (_env("OPENAI_BASE_URL") or "").rstrip("/"):
+        problem = base_url_problem(base)
+        if problem:
+            raise LLMUnavailable(problem)
     model = rt["openai_model"] or "gpt-4o-mini"
     schema = json.dumps(schema_model.model_json_schema())
     user = (

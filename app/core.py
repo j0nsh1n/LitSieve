@@ -63,7 +63,10 @@ def _template_context(request: Request) -> dict:
         site = helpdesk.public_site_content(user_db)
     except Exception:
         logger.exception("Could not load site notice/content")
+    from app.version import APP_VERSION
+
     return {
+        "app_version": APP_VERSION,
         "support_view": (user or {}).get("support_view"),
         "site_notice": notice,
         "site_content": site,

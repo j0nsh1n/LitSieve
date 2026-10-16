@@ -113,7 +113,7 @@
     {% from "macros/disclaimers.html" import scope_footer %}
     {% if not embed %}
     <footer class="footer">
-        <p>LitSieve - v6.0.0</p>
+        <p>LitSieve - v{{ app_version }}</p>
         {% if support_links %}
         <p class="help-text">{% for link in support_links %}<a href="{{ link.url }}">{{ link.label }}</a>{% if not loop.last %} · {% endif %}{% endfor %}</p>
         {% endif %}
