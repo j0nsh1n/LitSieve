@@ -164,3 +164,11 @@ def test_show_original_abstract_opens_the_details():
     reader = _read("static", "js", "reader.js")
     scroll = _slice(reader, "const scrollToAbstract = (ev) => {", "const paint = (data) => {")
     assert "details.open = true" in scroll
+
+
+def test_the_wait_finish_does_not_depend_on_animation_frames():
+    """A background tab pauses requestAnimationFrame; a timer finishes anyway."""
+    tools = _read("static", "js", "simple_tools.js")
+    fin = _slice(tools, "function finishSimpleWaitThenSearch()", "function setNextStepVisible(")
+    assert "setTimeout(finish, dur + 500);" in fin
+    assert "if (finished) return;" in fin
