@@ -28,6 +28,7 @@ os.environ["DEBUG"] = "true"
 import pytest
 
 from app import core
+from app.storage.libraries import get_active_library_id
 
 # Skip the whole module cleanly if the app's runtime deps aren't installed.
 for _dep in (
@@ -314,7 +315,7 @@ def test_fetch_async_job_and_conflict(app_module):
 
     # Force an in-flight job so the next start is rejected (deterministic under TestClient).
     with core._progress_lock:
-        core._ensure_progress(uid)["fetch"].update(
+        core._ensure_progress(uid, get_active_library_id(uid))["fetch"].update(
             {"active": True, "done": 0, "total": 1, "result": None, "error": None}
         )
 
@@ -333,7 +334,7 @@ def test_fetch_async_job_and_conflict(app_module):
     assert "already running" in r_conflict.json()["detail"].lower()
 
     with core._progress_lock:
-        core._ensure_progress(uid)["fetch"]["active"] = False
+        core._ensure_progress(uid, get_active_library_id(uid))["fetch"]["active"] = False
 
     r = c.post(
         "/api/fetch-articles-multi",

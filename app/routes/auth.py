@@ -60,10 +60,11 @@ def _start_guest_prepare(uid: str) -> None:
     if not uid or not _guest_auto_prepare_enabled():
         return
     try:
-        from app.routes.corpus import _run_create_embeddings
+        from app.routes.corpus import _run_sample_prepare
+        from app.storage.libraries import owned_library_id
         core.start_user_job(
-            uid, "embed", _run_create_embeddings,
-            model="general", only_missing=True, uid=uid,
+            uid, owned_library_id(uid), "embed", _run_sample_prepare,
+            model="general", only_missing=True,
         )
     except Exception:
         logger.exception("Guest auto-prepare failed to start for %s", uid)
@@ -476,6 +477,8 @@ async def _start_guest_session(request: Request) -> RedirectResponse:
         p.db.clear_all()
         p.db.insert_articles(articles, dedupe=False)
         p.invalidate_corpus_cache()
+        from app.services import sample_embeddings
+        sample_embeddings.restore(p, "general")
     except Exception:
         logger.exception("Guest sample load failed for %s", uid)
         # Still let them in; they can use "Load sample papers" on DM.

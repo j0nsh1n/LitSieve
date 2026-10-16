@@ -27,11 +27,6 @@ Cloudflare dashboard or new keys.
 - Status: [ ] open
 
 ## Backlog (unscheduled)
-- Job slots per library instead of per account (audit 21.8); for now the
-  409 says one job runs per account and a page ignores another library's
-  job
-- Precomputed sample embeddings so `/guest` does not run an embed job each
-  time (audit 21.9)
 - Persistent job records, so Admin Overview's job and source-error counts
   survive a restart (they say "since the last restart")
 - Prune `auth_events` and expired token rows (audit 20.5; they only grow)
@@ -49,8 +44,6 @@ Cloudflare dashboard or new keys.
 - Dependency lockfile (pip-tools / uv) if reproducibility becomes a priority
 - Optional later ruff ratchet: E501 / UP / E402
 - Scale opts (FAISS defaults, TF-IDF corpus cache) only with new ≥10× evidence
-- Precomputed sample-corpus embeddings so a guest start does not run an
-  embed job (audit 21.9)
 - Prune `auth_events` and expired token tables; decide what account delete
   removes from the support tables (audit 20.5)
 - Not building: clinical evidence grades, paywalled DBs, live teacher shares / LMS

@@ -414,8 +414,8 @@ def test_admin_job_clear_and_retry_logged(tmp_path, monkeypatch):
 
     started = []
 
-    def fake_start(uid, task, fn, /, **kwargs):
-        started.append({"uid": uid, "task": task, "fn": getattr(fn, "__name__", ""), "kwargs": kwargs})
+    def fake_start(uid, lib_id, task, fn, /, **kwargs):
+        started.append({"uid": uid, "lib_id": lib_id, "task": task, "fn": getattr(fn, "__name__", ""), "kwargs": kwargs})
         return True
 
     monkeypatch.setattr(core, "start_user_job", fake_start)
@@ -426,11 +426,13 @@ def test_admin_job_clear_and_retry_logged(tmp_path, monkeypatch):
     rec = db.get_by_username("needhelp")
     uid = rec["id"]
 
+    from app.storage.libraries import get_active_library_id
+    lib = get_active_library_id(uid)
     with core._progress_lock:
-        core._ensure_progress(uid)["fetch"].update(
+        core._ensure_progress(uid, lib)["fetch"].update(
             {"active": True, "error": "worker gone", "message": "stuck"}
         )
-        core._ensure_progress(uid)["embed"].update(
+        core._ensure_progress(uid, lib)["embed"].update(
             {"active": False, "error": "boom", "result": {"status": "error"}}
         )
 

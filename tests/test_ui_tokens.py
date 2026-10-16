@@ -373,45 +373,10 @@ def test_fresh_progress_slot_declares_fetch_narrative_fields():
         core._all_progress.pop(uid, None)
     try:
         with core._progress_lock:
-            fetch = core._ensure_progress(uid)["fetch"]
+            fetch = core._ensure_progress(uid, "L1")["fetch"]
             assert "sources" in fetch
             assert "by_source" in fetch
             assert "source_status" in fetch
-            assert fetch["sources"] == []
-            assert fetch["by_source"] == {}
-            assert fetch["source_status"] == {}
-    finally:
-        with core._progress_lock:
-            core._all_progress.pop(uid, None)
-
-
-def test_progress_backfills_narrative_fields_without_clobbering():
-    """Pre-Phase-7 in-flight slots get empty narrative keys; done/total stay put."""
-    from app import core
-
-    uid = "test-progress-backfill-uid"
-    with core._progress_lock:
-        core._all_progress.pop(uid, None)
-        # Shape that existed before the live narrative fields were added.
-        core._all_progress[uid] = {
-            "fetch": {"active": True, "done": 1, "total": 3},
-            "embed": {
-                "active": False,
-                "done": 0,
-                "total": 0,
-                "result": None,
-                "error": None,
-                "cancel": False,
-                "articles_so_far": 0,
-                "message": "",
-            },
-        }
-    try:
-        with core._progress_lock:
-            fetch = core._ensure_progress(uid)["fetch"]
-            assert fetch["active"] is True
-            assert fetch["done"] == 1
-            assert fetch["total"] == 3
             assert fetch["sources"] == []
             assert fetch["by_source"] == {}
             assert fetch["source_status"] == {}
@@ -497,9 +462,10 @@ def test_run_multi_fetch_publishes_per_source_counts_including_failures(monkeypa
             email=None,
             clear_first=False,
             uid=uid,
+            lib_id="L1",
         )
         with core._progress_lock:
-            fetch = core._all_progress[uid]["fetch"]
+            fetch = core._all_progress[uid]["L1"]["fetch"]
             assert fetch["by_source"] == {
                 "pubmed": 142,
                 "europepmc": 89,

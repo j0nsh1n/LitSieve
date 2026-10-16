@@ -885,6 +885,15 @@ async def api_admin_send_login_link(user_id: str, request: Request):
     return {"status": "sent", "emailed_to": verified}
 
 
+def _job_library(user_id: str, task: str, body: dict) -> Optional[str]:
+    """The library a job action targets: the one the panel showed, else the shown slot's."""
+    raw = str(body.get("library_id") or "") or str(core.snapshot_jobs(user_id)[task].get("library_id") or "")
+    try:
+        return owned_library_id(user_id, raw or None)
+    except ValueError:
+        return None
+
+
 @router.post("/api/admin/users/{user_id}/cancel-job")
 @limiter.limit("30/minute")
 async def api_admin_cancel_job(user_id: str, request: Request):
@@ -896,7 +905,10 @@ async def api_admin_cancel_job(user_id: str, request: Request):
     task = str(body.get("task") or "").strip()
     if task not in ("fetch", "embed"):
         return JSONResponse(status_code=400, content={"detail": "task must be fetch or embed"})
-    ok = request_job_cancel(user_id, task)
+    lib_id = _job_library(user_id, task, body)
+    if lib_id is None:
+        return JSONResponse(status_code=400, content={"detail": "That library no longer exists."})
+    ok = request_job_cancel(user_id, lib_id, task)
     if not ok:
         return JSONResponse(
             status_code=409,
@@ -922,7 +934,10 @@ async def api_admin_clear_job(user_id: str, request: Request):
     task = str(body.get("task") or "").strip()
     if task not in core.JOB_TASKS:
         return JSONResponse(status_code=400, content={"detail": "task must be fetch, embed or cluster"})
-    ok, detail = core.clear_stale_job(user_id, task)
+    lib_id = _job_library(user_id, task, body)
+    if lib_id is None:
+        return JSONResponse(status_code=400, content={"detail": "That library no longer exists."})
+    ok, detail = core.clear_stale_job(user_id, lib_id, task)
     if not ok:
         return JSONResponse(status_code=409, content={"detail": detail})
     core.user_db.add_support_action(
@@ -956,12 +971,12 @@ async def api_admin_retry_embed(user_id: str, request: Request):
     model = await core.run_in_thread(_stored_embedding_model, user_id, lib_id) or DEFAULT_EMBEDDING_MODEL
     # Bind the job to the student uid/library — never the admin session.
     if not core.start_user_job(
-        user_id, "embed", _run_create_embeddings,
-        model=model, only_missing=True, uid=user_id, library_id=lib_id,
+        user_id, lib_id, "embed", _run_create_embeddings,
+        model=model, only_missing=True,
     ):
         return JSONResponse(
             status_code=409,
-            content={"detail": "An embed is already running for this account."},
+            content={"detail": "A prepare is already running in that library, or the account is at its job limit."},
         )
     core.user_db.add_support_action(
         user_id, admin["user_id"], admin["username"], "retry-embed",
@@ -1157,18 +1172,16 @@ async def api_admin_retry_fetch(user_id: str, request: Request):
             content={"detail": "The library that fetch ran on no longer exists."},
         )
     if not core.start_user_job(
-        user_id, "fetch", _run_multi_fetch,
+        user_id, lib_id, "fetch", _run_multi_fetch,
         query=last["query"],
         sources=list(last["sources"]),
         max_results=int(last.get("max_results") or 20),
         email=last.get("email") or "",
         clear_first=bool(last.get("clear_first")),
-        uid=user_id,
-        library_id=lib_id,
     ):
         return JSONResponse(
             status_code=409,
-            content={"detail": "A fetch is already running for this account."},
+            content={"detail": "A fetch is already running in that library, or the account is at its job limit."},
         )
     core.user_db.add_support_action(
         user_id, admin["user_id"], admin["username"], "retry-fetch",

@@ -101,8 +101,9 @@ def test_guest_start_kicks_off_prepare_when_enabled(tmp_path, monkeypatch):
     monkeypatch.setenv("GUEST_AUTO_PREPARE", "1")
     called = {}
 
-    def fake_start(uid, task, fn, /, **kwargs):
+    def fake_start(uid, lib_id, task, fn, /, **kwargs):
         called["uid"] = uid
+        called["lib_id"] = lib_id
         called["task"] = task
         called["fn"] = getattr(fn, "__name__", str(fn))
         return True
@@ -113,7 +114,8 @@ def test_guest_start_kicks_off_prepare_when_enabled(tmp_path, monkeypatch):
     assert r.status_code in (302, 303), r.text
     assert called.get("task") == "embed"
     assert called.get("uid")
-    assert called.get("fn") == "_run_create_embeddings"
+    assert called.get("lib_id")
+    assert called.get("fn") == "_run_sample_prepare"
 
 
 def test_guest_end_demo_is_guarded_and_tappable():

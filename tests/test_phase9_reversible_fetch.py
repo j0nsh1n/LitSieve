@@ -163,6 +163,7 @@ def test_failed_replace_fetch_leaves_collection_intact(tmp_path, monkeypatch):
             email=None,
             clear_first=True,
             uid="phase9-user",
+            lib_id="L1",
         )
         assert result["total_fetched"] == 0
         assert result["errors"]
@@ -205,6 +206,7 @@ def test_successful_replace_keeps_work_on_papers_that_return(tmp_path, monkeypat
             email=None,
             clear_first=True,
             uid="phase9-swap",
+            lib_id="L1",
         )
         assert result["total_fetched"] == 1
         assert result["cleared_first"] is True
@@ -259,6 +261,7 @@ def test_successful_replace_keeps_embedding_when_text_unchanged(tmp_path, monkey
             email=None,
             clear_first=True,
             uid="phase9-same-text",
+            lib_id="L1",
         )
         assert result["cleared_first"] is True
         assert ("a1", "pubmed") in p.db.get_embedding_keys()
@@ -282,6 +285,7 @@ def test_append_fetch_does_not_use_staging(tmp_path, monkeypatch):
             email=None,
             clear_first=False,
             uid="phase9-append",
+            lib_id="L1",
         )
         assert result["cleared_first"] is False
         assert result["total_fetched"] >= 1
@@ -324,6 +328,7 @@ def test_quota_stop_after_staged_source_keeps_live_library(tmp_path, monkeypatch
             email=None,
             clear_first=True,
             uid="phase9-quota",
+            lib_id="L1",
         )
         assert result["quota_stopped"] is True
         assert result["cleared_first"] is False

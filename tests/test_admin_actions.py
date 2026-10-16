@@ -278,7 +278,7 @@ def test_retry_fetch_keeps_the_students_contact_email(tmp_path, monkeypatch):
     monkeypatch.setattr(core, "snapshot_jobs", lambda _uid: {"fetch": {"last_fetch": last}})
     started = {}
 
-    def fake_start(user_id, task, fn, **kwargs):
+    def fake_start(user_id, lib_id, task, fn, **kwargs):
         started.update(kwargs)
         return True
 
@@ -295,8 +295,8 @@ def test_retry_fetch_keeps_the_students_contact_email(tmp_path, monkeypatch):
 def _capture_start(monkeypatch):
     started = {}
 
-    def fake_start(user_id, task, fn, **kwargs):
-        started.update(kwargs, task=task)
+    def fake_start(user_id, lib_id, task, fn, **kwargs):
+        started.update(kwargs, task=task, library_id=lib_id)
         return True
 
     monkeypatch.setattr(core, "start_user_job", fake_start)

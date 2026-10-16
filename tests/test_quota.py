@@ -19,6 +19,7 @@ import pytest
 
 from app import core
 from app.storage import quota
+from app.storage.libraries import get_active_library_id
 
 for _dep in ("fastapi", "httpx", "sklearn", "jwt", "bcrypt", "multipart", "dotenv"):
     pytest.importorskip(_dep)
@@ -150,7 +151,7 @@ def test_wait_true_fetch_conflicts_with_active_job(app_module):
     headers = _register(c, "fetchlock")
     uid = core.user_db.get_by_username("fetchlock")["id"]
     with core._progress_lock:
-        core._ensure_progress(uid)["fetch"].update(
+        core._ensure_progress(uid, get_active_library_id(uid))["fetch"].update(
             {"active": True, "done": 0, "total": 1, "result": None, "error": None}
         )
     r = c.post(

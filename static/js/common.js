@@ -1532,6 +1532,12 @@ function withPageLibrary(body) {
     return body;
 }
 
+/** Job progress for this page's library; each library runs its own jobs. */
+function progressUrl() {
+    const id = pageLibraryId();
+    return '/api/progress' + (id ? '?library_id=' + encodeURIComponent(id) : '');
+}
+
 /** Refresh library dropdown after create/rename/delete on Account page. */
 async function refreshLibrarySwitcher() {
     const sel = document.getElementById('nav-library-select');

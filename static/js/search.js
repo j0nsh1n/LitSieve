@@ -549,17 +549,13 @@ async function waitIfPreparing(stats) {
  };
  let progress = {};
  try {
-  progress = await apiCall('/api/progress');
+  progress = await apiCall(progressUrl());
  } catch (e) {
   hide();
   return stats;
  }
- // Jobs run one per account. A job for another library (a second tab) is not
- // this page's to wait on (audit 21.8).
- const pageLib = typeof pageLibraryId === 'function' ? pageLibraryId() : '';
- const ours = (job) => !!job && (!job.library_id || !pageLib || job.library_id === pageLib);
- const fetchJob = ours(progress && progress.fetch) ? progress.fetch : {};
- const embed = ours(progress && progress.embed) ? progress.embed : {};
+ const fetchJob = (progress && progress.fetch) || {};
+ const embed = (progress && progress.embed) || {};
 
  if (fetchJob.active && typeof showSimpleBuffering === 'function') {
   showSimpleBuffering('fetch');
@@ -586,12 +582,11 @@ async function waitIfPreparing(stats) {
   // Client auto-chain may still be running on the original tab; this tab
   // only waits if prepare has already started.
   try {
-   progress = await apiCall('/api/progress');
+   progress = await apiCall(progressUrl());
   } catch (e) { /* continue */ }
  }
 
- // Filtered like fetchJob: another library's prepare is not ours to wait on.
- const embedNow = ours(progress && progress.embed) ? progress.embed : embed;
+ const embedNow = (progress && progress.embed) || embed;
  if (!embedNow.active) {
   hide();
   return stats;

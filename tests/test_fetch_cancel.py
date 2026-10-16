@@ -258,9 +258,11 @@ def test_progress_reports_source_states_and_increasing_running_time(monkeypatch)
     from app.routes import corpus
 
     monkeypatch.setattr(corpus, "current_user", lambda _request: {"user_id": "deadline-fixture"})
+
+    monkeypatch.setattr(corpus, "owned_library_id", lambda _uid, lib=None: lib or "L1")
     monkeypatch.setattr(core, "_all_progress", core.OrderedDict())
     core.update_progress(
-        "deadline-fixture", "fetch", active=True,
+        "deadline-fixture", "L1", "fetch", active=True,
         source_progress={
             "openaire": {"state": "running", "started_at": 100, "finished_at": None,
                          "elapsed_seconds": 0, "error_kind": None},
@@ -281,7 +283,7 @@ def test_progress_reports_source_states_and_increasing_running_time(monkeypatch)
     assert rows["queued"]["started_at"] is None
     monkeypatch.setattr(corpus.time, "time", lambda: 163)
     assert client.get("/api/progress").json()["fetch"]["source_progress"]["openaire"]["elapsed_seconds"] == 63
-    assert core._all_progress["deadline-fixture"]["fetch"]["source_progress"]["openaire"]["elapsed_seconds"] == 0
+    assert core._all_progress["deadline-fixture"]["L1"]["fetch"]["source_progress"]["openaire"]["elapsed_seconds"] == 0
 
 
 def test_fetch_job_reports_running_source_then_keeps_fast_results_on_http_timeout(tmp_path, monkeypatch):
@@ -294,6 +296,7 @@ def test_fetch_job_reports_running_source_then_keeps_fast_results_on_http_timeou
     uid = "budget-job-fixture"
     monkeypatch.setenv("LITSIEVE_FETCH_SOURCE_TIMEOUT", "0.3")
     monkeypatch.setattr(corpus, "current_user", lambda _request: {"user_id": uid})
+    monkeypatch.setattr(corpus, "owned_library_id", lambda _uid, lib=None: lib or "L1")
     monkeypatch.setattr(core, "_all_progress", core.OrderedDict())
     monkeypatch.setattr(corpus.quota, "is_over_quota", lambda *_args, **_kw: False)
     monkeypatch.setattr(corpus.quota, "usage_report", lambda *_args: {})
@@ -326,12 +329,12 @@ def test_fetch_job_reports_running_source_then_keeps_fast_results_on_http_timeou
     monkeypatch.setitem(pipeline_mod.FETCHERS, "fast", Fast)
     monkeypatch.setitem(pipeline_mod.FETCHERS, "openaire", DeadHost)
     p = LiteratureSearchPipeline(db_path=str(tmp_path / "http-budget.db"))
-    core.update_progress(uid, "fetch", active=True)
+    core.update_progress(uid, "L1", "fetch", active=True)
     try:
         with ThreadPoolExecutor(max_workers=1) as pool:
             future = pool.submit(
                 corpus._run_multi_fetch, p, query="q", sources=["fast", "openaire"],
-                max_results=10, email="test@example.test", clear_first=False, uid=uid,
+                max_results=10, email="test@example.test", clear_first=False, uid=uid, lib_id="L1",
             )
             client = TestClient(app)
             deadline = time.monotonic() + 1
@@ -400,11 +403,11 @@ def test_new_fetch_slot_does_not_reuse_previous_source_progress(monkeypatch):
     monkeypatch.setattr(core, "_job_futures", {})
     uid = "new-fetch-fixture"
     core.update_progress(
-        uid, "fetch", sources=["old"], by_source={"old": 1}, source_status={"old": "ok"},
+        uid, "L1", "fetch", sources=["old"], by_source={"old": 1}, source_status={"old": "ok"},
         source_progress={"old": {"state": "done"}},
     )
-    assert core.try_begin_user_job(uid, "fetch") is True
-    slot = core._all_progress[uid]["fetch"]
+    assert core.try_begin_user_job(uid, "L1", "fetch") is True
+    slot = core._all_progress[uid]["L1"]["fetch"]
     assert slot["sources"] == []
     assert slot["source_status"] == {}
     assert slot["by_source"] == {}
