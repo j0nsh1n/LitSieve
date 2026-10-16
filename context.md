@@ -6,7 +6,7 @@
   poster. Live at `https://www.litpilot.org` from the production checkout at
   `0374605` (2026-10-14). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
-- Latest full suite (2026-10-16): **1135 passed**, no xfails; all 15 parity
+- Latest full suite (2026-10-16): **1229 passed**, no xfails; all 15 parity
   rows pass. `ruff check .` clean; `pyright app` **0 errors**, 6 optional-import
   warnings (CI blocks on errors). `pip-audit` (2026-10-14): no known
   vulnerabilities; ROCm torch/triton are un-auditable. No dependency lockfile.
@@ -144,22 +144,22 @@ Guest User (is_guest) → sample corpus only; purged by age
   the owning user's progress while a referenced job is active.
 
 ## Session Handoff
-- **Date:** 2026-10-16. **Branch:** `fix/search-ranking` (Phase 19a, audit
-  19.1-19.3 and 19.16), worktree
-  `~/.t3/worktrees/HealthDatabaseAccess/fix-search-ranking`. Phases 16, 17
-  and 18 merged as #93, #94 and #95; their branches and worktrees are
-  deleted. Production still serves `0374605` (audit 23.1): main has moved
-  on but the live checkout was not pulled or restarted.
-- Live response samples for every source (2026-10-15) are trimmed into
-  `tests/fixtures/sources/`; the untrimmed captures are outside the repo in
-  `~/HealthDatabaseAccess-scratch/phase18-raw/`.
+- **Date:** 2026-10-16. Every code task in the 2026-10-15 audit roadmap is
+  merged or in its last PR: #96 (19a), #97 (19b), #98 (19c), #99 (20),
+  #100 (21), #101 (22 and 23's code), #102 (review follow-ups, audit
+  marks). Phases 16 to 18 merged as #93 to #95. Remaining: roadmap Phase
+  23's host tasks.
+- Production still serves `0374605`; the live checkout was never pulled or
+  restarted. Deploy steps (roadmap Phase 23): pull, `pip install -r
+  requirements.txt` (adds `anthropic`, `httpx`), restart, then the `.env`
+  decisions (`MAX_TOTAL_ACCOUNTS`, Ollama settings, optional source keys).
+- `spec.md` still says "Quick screen" on two lines (69, 188); flagged, not
+  edited.
+- Dev leftovers: `dev_users.db`/`dev_data` in the `fix-audit-rest` worktree (test accounts
+  only). Scratch: `~/HealthDatabaseAccess-scratch/` (fixtures captures,
+  contrast script).
 - Host notes: the LAN's primary DNS server (192.168.12.132) times out, so
   cloudflared logs a DNS refresh error every 5 minutes but stays connected;
   `litpilot.org` needs an apex record or redirect rule in Cloudflare.
-- `fix/audit-rest` (worktree `~/.t3/worktrees/HealthDatabaseAccess/
-  fix-audit-rest`) is stacked on `fix/search-ranking` and holds the
-  remaining phases as separate commits (19b, 19c, 20, 21, 22, 23 code), to
-  be split into PRs once 19a merges. Nothing on either branch is pushed;
-  the owner asked to keep implementing (2026-10-16 night).
-- **Next step:** finish the roadmap on `fix/audit-rest`, then push and open
-  PRs in order when the owner says so.
+- **Next step:** Phase 23 host work once the owner says so: deploy (pull,
+  `pip install -r requirements.txt`, restart), then the `.env` decisions.

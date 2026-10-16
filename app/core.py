@@ -622,7 +622,9 @@ def start_user_job(uid: str, task: str, fn, /, **kwargs) -> bool:
             with _progress_lock:
                 _release_job_markers(uid, task)
             release_pipeline(uid, lib_id)
-            refresh_storage_bytes(uid)
+            # A done callback runs on the event loop; the directory walk and
+            # the users.db write go to a worker thread.
+            loop.run_in_executor(None, refresh_storage_bytes, uid)
 
     future.add_done_callback(_on_done)
     return True

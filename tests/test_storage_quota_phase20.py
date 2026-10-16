@@ -163,7 +163,7 @@ def test_stored_usage_follows_the_disk(tmp_path, monkeypatch):
 def test_job_ends_refresh_the_stored_usage():
     core = (ROOT / "app" / "core.py").read_text()
     done = core[core.index("    def _on_done(fut):"):core.index("future.add_done_callback(_on_done)")]
-    assert "refresh_storage_bytes(uid)" in done
+    assert "loop.run_in_executor(None, refresh_storage_bytes, uid)" in done
     main = (ROOT / "app" / "main.py").read_text()
     assert "LITSIEVE_STORAGE_SWEEP_SECONDS" in main
     start_over = (ROOT / "app" / "routes" / "start_over.py").read_text()

@@ -107,3 +107,19 @@ def test_the_wait_screen_ignores_another_librarys_job():
     search = (ROOT / "static" / "js" / "search.js").read_text()
     wait = search[search.index("async function waitIfPreparing("):search.index("showSimpleBuffering('fetch');")]
     assert "job.library_id === pageLib" in wait
+
+
+def test_review_follow_ups_hold():
+    """Checks for the four defects a review of Phases 19-21 found."""
+    search = (ROOT / "static" / "js" / "search.js").read_text()
+    assert "const embedNow = ours(progress && progress.embed) ? progress.embed : embed;" in search
+    tools = (ROOT / "static" / "js" / "simple_tools.js").read_text()
+    undo = tools[tools.index("async function doSimpleScreenDuplicatesUndo("):tools.index("function getResearchQuestionCandidate(")]
+    assert "library_id=" in undo and "withPageLibrary({ items, action: 'include' })" in undo
+    collect = (ROOT / "static" / "js" / "collect.js").read_text()
+    embed = collect[collect.index("async function doCreateEmbeddings("):]
+    assert embed.index("data.status === 'cancelled'") < embed.index("const created = data.embeddings_created")
+    assert "already being prepared" in collect
+    assert "Papers are already being prepared" in (ROOT / "app" / "routes" / "corpus.py").read_text()
+    pack = collect[collect.index("function applyTopicPack("):collect.index("function toggleTopic(")]
+    assert "layaAreas = new Set();" in pack
