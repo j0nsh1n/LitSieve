@@ -45,12 +45,28 @@ HTTPS URL users type in the browser.
 `LITSIEVE_FETCH_SOURCE_TIMEOUT` sets the fetch budget for each source in seconds
 (default `90`). It starts when the source worker begins, excluding queue time,
 and covers pagination and retry waits. Invalid or non-positive values use `90`.
-Completed pages remain in the library when a later request times out. HTTP
+Completed pages remain in the library when a later request fails or times out,
+and a source that finishes just after the budget keeps its papers. HTTP
 requests use the remaining budget as their timeout; the retry loop stops when
-the budget expires. A blocking call outside `HttpClient`, such as PubMed's
-Entrez request, is checked when it returns or reaches a polite delay. Requests
-read timeouts measure socket inactivity, so a response that keeps sending bytes
-can also outlast the budget until control returns to the deadline check.
+the budget expires, and a `Retry-After` longer than the time left fails at once.
+Every source, PubMed included, goes through `HttpClient`. Requests read
+timeouts measure socket inactivity, so a response that keeps sending bytes can
+outlast the budget until control returns to the deadline check.
+
+### Source API keys
+
+All optional. Without them the sources still work, sharing the free public
+limits with everyone else on the same address.
+
+| Variable | Source | What it buys |
+|----------|--------|--------------|
+| `S2_API_KEY` | Semantic Scholar | A private rate limit. Without one, most requests from a shared host get HTTP 429. Free at semanticscholar.org/product/api. |
+| `OPENALEX_API_KEY` | OpenAlex | Its own daily budget. Without one, the whole host shares one free budget per IP (about 100 list requests a day); `mailto` does not raise it. |
+| `NCBI_API_KEY` | PubMed | 10 requests a second instead of 3. Free from an NCBI account. |
+| `NASA_ADS_TOKEN` | NASA ADS | Required. Without it, NASA ADS reports that the server has no token. |
+
+When a student leaves the contact email empty, no address is sent to the
+sources; there is no shared placeholder.
 
 ## Confirming a detached deploy on the host
 

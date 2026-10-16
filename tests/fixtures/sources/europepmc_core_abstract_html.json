@@ -1,0 +1,467 @@
+{
+ "version": "6.9",
+ "hitCount": 747110,
+ "nextCursorMark": "AoIIP+Invig1NjUyOTc3Mw==",
+ "nextPageUrl": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=%22heart+disease%22+AND+SRC%3AMED&cursorMark=AoIIP%2BInvig1NjUyOTc3Mw%3D%3D&resultType=core&format=json",
+ "request": {
+  "queryString": "\"heart disease\" AND SRC:MED",
+  "resultType": "core",
+  "cursorMark": "*",
+  "pageSize": 25,
+  "sort": "",
+  "synonym": false
+ },
+ "resultList": {
+  "result": [
+   {
+    "id": "42808454",
+    "source": "MED",
+    "pmid": "42808454",
+    "doi": "10.1161/jaha.126.048813",
+    "title": "Changing Comorbidity Clusters in Patients With Congenital Heart Disease Across the Lifespan.",
+    "authorString": "Li C, Moroz H, Bendayan S, D'Angelo M, Liu A, Guo L, Therrien J, Yang AY, Tamblyn R, Brophy J, Li Y, Marelli A.",
+    "authorList": {
+     "author": [
+      {
+       "fullName": "Li C",
+       "lastName": "Li",
+       "firstName": "Chao",
+       "initials": "C",
+       "authorAffiliationDetailsList": {
+        "authorAffiliation": [
+         {
+          "affiliation": "McGill Adult Unit for Congenital Heart Disease Excellence Montreal Québec Canada."
+         }
+        ]
+       }
+      },
+      {
+       "fullName": "Moroz H",
+       "lastName": "Moroz",
+       "firstName": "Harry",
+       "initials": "H",
+       "authorId": {
+        "type": "ORCID",
+        "value": "0009-0009-8178-5615"
+       },
+       "authorAffiliationDetailsList": {
+        "authorAffiliation": [
+         {
+          "affiliation": "McGill Adult Unit for Congenital Heart Disease Excellence Montreal Québec Canada."
+         }
+        ]
+       }
+      },
+      {
+       "fullName": "Bendayan S",
+       "lastName": "Bendayan",
+       "firstName": "Solomon",
+       "initials": "S",
+       "authorAffiliationDetailsList": {
+        "authorAffiliation": [
+         {
+          "affiliation": "McGill Adult Unit for Congenital Heart Disease Excellence Montreal Québec Canada."
+         }
+        ]
+       }
+      },
+      {
+       "fullName": "D'Angelo M",
+       "lastName": "D'Angelo",
+       "firstName": "Maya",
+       "initials": "M",
+       "authorId": {
+        "type": "ORCID",
+        "value": "0009-0000-1195-0018"
+       },
+       "authorAffiliationDetailsList": {
+        "authorAffiliation": [
+         {
+          "affiliation": "McGill Adult Unit for Congenital Heart Disease Excellence Montreal Québec Canada."
+         }
+        ]
+       }
+      },
+      {
+       "fullName": "Liu A",
+       "lastName": "Liu",
+       "firstName": "Aihua",
+       "initials": "A",
+       "authorId": {
+        "type": "ORCID",
+        "value": "0000-0003-0309-114X"
+       },
+       "authorAffiliationDetailsList": {
+        "authorAffiliation": [
+         {
+          "affiliation": "McGill Adult Unit for Congenital Heart Disease Excellence Montreal Québec Canada."
+         }
+        ]
+       }
+      },
+      {
+       "fullName": "Guo L",
+       "lastName": "Guo",
+       "firstName": "Liming",
+       "initials": "L",
+       "authorId": {
+        "type": "ORCID",
+        "value": "0000-0002-6400-3775"
+       },
+       "authorAffiliationDetailsList": {
+        "authorAffiliation": [
+         {
+          "affiliation": "McGill Adult Unit for Congenital Heart Disease Excellence Montreal Québec Canada."
+         }
+        ]
+       }
+      },
+      {
+       "fullName": "Therrien J",
+       "lastName": "Therrien",
+       "firstName": "Judith",
+       "initials": "J",
+       "authorId": {
+        "type": "ORCID",
+        "value": "0000-0001-7627-4663"
+       },
+       "authorAffiliationDetailsList": {
+        "authorAffiliation": [
+         {
+          "affiliation": "McGill Adult Unit for Congenital Heart Disease Excellence Montreal Québec Canada."
+         }
+        ]
+       }
+      },
+      {
+       "fullName": "Yang AY",
+       "lastName": "Yang",
+       "firstName": "Archer Yi",
+       "initials": "AY",
+       "authorAffiliationDetailsList": {
+        "authorAffiliation": [
+         {
+          "affiliation": "Department of Mathematics and Statistics McGill University Montreal Québec Canada."
+         }
+        ]
+       }
+      },
+      {
+       "fullName": "Tamblyn R",
+       "lastName": "Tamblyn",
+       "firstName": "Robyn",
+       "initials": "R",
+       "authorId": {
+        "type": "ORCID",
+        "value": "0000-0003-0134-6954"
+       },
+       "authorAffiliationDetailsList": {
+        "authorAffiliation": [
+         {
+          "affiliation": "Department of Epidemiology, Biostatistics, and Occupational Health McGill University Montreal Québec Canada."
+         }
+        ]
+       }
+      },
+      {
+       "fullName": "Brophy J",
+       "lastName": "Brophy",
+       "firstName": "James",
+       "initials": "J",
+       "authorId": {
+        "type": "ORCID",
+        "value": "0000-0001-8049-6875"
+       },
+       "authorAffiliationDetailsList": {
+        "authorAffiliation": [
+         {
+          "affiliation": "Department of Epidemiology, Biostatistics, and Occupational Health McGill University Montreal Québec Canada."
+         }
+        ]
+       }
+      },
+      {
+       "fullName": "Li Y",
+       "lastName": "Li",
+       "firstName": "Yue",
+       "initials": "Y",
+       "authorId": {
+        "type": "ORCID",
+        "value": "0000-0003-3844-4865"
+       },
+       "authorAffiliationDetailsList": {
+        "authorAffiliation": [
+         {
+          "affiliation": "School of Computer Science McGill University Montreal Québec Canada."
+         }
+        ]
+       }
+      },
+      {
+       "fullName": "Marelli A",
+       "lastName": "Marelli",
+       "firstName": "Ariane",
+       "initials": "A",
+       "authorId": {
+        "type": "ORCID",
+        "value": "0000-0002-1784-8206"
+       },
+       "authorAffiliationDetailsList": {
+        "authorAffiliation": [
+         {
+          "affiliation": "McGill Adult Unit for Congenital Heart Disease Excellence Montreal Québec Canada."
+         }
+        ]
+       }
+      }
+     ]
+    },
+    "authorIdList": {
+     "authorId": [
+      {
+       "type": "ORCID",
+       "value": "0000-0001-7627-4663"
+      },
+      {
+       "type": "ORCID",
+       "value": "0000-0001-8049-6875"
+      },
+      {
+       "type": "ORCID",
+       "value": "0000-0002-1784-8206"
+      },
+      {
+       "type": "ORCID",
+       "value": "0000-0002-6400-3775"
+      },
+      {
+       "type": "ORCID",
+       "value": "0000-0003-0134-6954"
+      },
+      {
+       "type": "ORCID",
+       "value": "0000-0003-0309-114X"
+      },
+      {
+       "type": "ORCID",
+       "value": "0000-0003-3844-4865"
+      },
+      {
+       "type": "ORCID",
+       "value": "0009-0000-1195-0018"
+      },
+      {
+       "type": "ORCID",
+       "value": "0009-0009-8178-5615"
+      }
+     ]
+    },
+    "journalInfo": {
+     "journalIssueId": 4253308,
+     "dateOfPublication": "2026 Sep",
+     "monthOfPublication": 9,
+     "yearOfPublication": 2026,
+     "journal": {
+      "medlineAbbreviation": "J Am Heart Assoc",
+      "title": "Journal of the American Heart Association",
+      "essn": "2047-9980",
+      "issn": "2047-9980",
+      "nlmid": "101580524",
+      "isoabbreviation": "J Am Heart Assoc"
+     },
+     "printPublicationDate": "2026-09-01"
+    },
+    "pubYear": "2026",
+    "pageInfo": "e048813",
+    "abstractText": "<h4>Background</h4>Benefiting from advances in medical care, patients with congenital heart disease (CHD) now survive to adulthood but face elevated risks of cardiac and noncardiac complications. Understanding how comorbidity evolves across the lifespan is the cornerstone to improving long-term outcomes. We hypothesized that comorbidity occurs in clusters that change over time in patients with CHD.<h4>Methods</h4>Using the Quebec CHD database with 35 years of follow-up (1983-2017), we designed a longitudinal cohort study evaluating 38 <i>International Classification of Diseases, Ninth Revision/Tenth Revision</i> (<i>ICD-9/10</i>) coded comorbidities. Observed sequences of comorbidities were mapped using median ages of onset. Associations between disease pairs were quantified using hazard ratios from Cox proportional hazard models adjusting for age, sex, genetic syndrome, competing risks of death, and time-varying predictor diseases.<h4>Results</h4>The cohort comprised 9764 individuals with severe CHD and 127 728 with nonsevere CHD. Patients with severe CHD demonstrated higher cumulative probabilities of developing comorbidities than those with nonsevere CHD from birth to older adulthood. By age 40 years, cumulative probabilities for developing cardiac, vascular, endocrine/metabolic, digestive, infectious, renal, and neurological disease were ≥2-fold higher in severe versus nonsevere CHD. Median ages of onset for most comorbidities occurred below age 40 in severe CHD, 2 to 3 decades earlier than patients with nonsevere CHD where peak comorbidity onsets occurred between their 60s and 80s. Disease progression in severe CHD began with childhood cardiovascular diseases, progressing to early-adulthood metabolic, hepatic, renal diseases, and later heart failure and dementia.<h4>Conclusions</h4>Distinct multimorbidity clusters were observed by CHD severity, with earlier clustering in severe CHD, highlighting the need for early risk characterization and preventive strategies.",
+    "affiliation": "McGill Adult Unit for Congenital Heart Disease Excellence Montreal Québec Canada.",
+    "publicationStatus": "aheadofprint",
+    "language": "eng",
+    "pubModel": "Print-Electronic",
+    "pubTypeList": {
+     "pubType": [
+      "Journal Article"
+     ]
+    },
+    "keywordList": {
+     "keyword": [
+      "Congenital heart disease",
+      "risk factors",
+      "Multimorbidity",
+      "Disease Trajectory",
+      "Lifespan Analysis"
+     ]
+    },
+    "subsetList": {
+     "subset": [
+      {
+       "code": "IM",
+       "name": "Index Medicus"
+      }
+     ]
+    },
+    "fullTextUrlList": {
+     "fullTextUrl": [
+      {
+       "availability": "Subscription required",
+       "availabilityCode": "S",
+       "documentStyle": "doi",
+       "site": "DOI",
+       "url": "https://doi.org/10.1161/JAHA.126.048813"
+      }
+     ]
+    },
+    "isOpenAccess": "N",
+    "inEPMC": "N",
+    "inPMC": "N",
+    "citedByCount": 0,
+    "hasReferences": "N",
+    "hasTextMinedTerms": "N",
+    "hasDbCrossReferences": "N",
+    "hasPDF": "N",
+    "hasBook": "N",
+    "hasSuppl": "N",
+    "hasLabsLinks": "N",
+    "hasData": "N",
+    "authMan": "N",
+    "epmcAuthMan": "N",
+    "nihAuthMan": "N",
+    "hasTMAccessionNumbers": "N",
+    "dateOfCreation": "2026-09-29",
+    "dateOfRevision": "2026-09-29",
+    "electronicPublicationDate": "2026-09-29",
+    "firstPublicationDate": "2026-09-29",
+    "firstIndexDate": "2026-09-30",
+    "hasEvaluations": "N"
+   },
+   {
+    "id": "42680123",
+    "source": "MED",
+    "pmid": "42680123",
+    "doi": "10.1016/j.amepre.2026.108545",
+    "title": "Parental son preference in childhood and sex differences in the risk of cardiovascular disease in middle-aged and older adults.",
+    "authorString": "Lyu J, Xiao M, He B.",
+    "authorList": {
+     "author": [
+      {
+       "fullName": "Lyu J",
+       "lastName": "Lyu",
+       "firstName": "Jingfei",
+       "initials": "J",
+       "authorAffiliationDetailsList": {
+        "authorAffiliation": [
+         {
+          "affiliation": "School of Public Health, Fudan University, Shanghai, China; National Health Commission Key Laboratory of Health Technology Assessment, Fudan University, Shanghai, China."
+         }
+        ]
+       }
+      },
+      {
+       "fullName": "Xiao M",
+       "lastName": "Xiao",
+       "firstName": "Meng",
+       "initials": "M",
+       "authorAffiliationDetailsList": {
+        "authorAffiliation": [
+         {
+          "affiliation": "The Third Affiliated Hospital of Southern Medical University, Guangzhou, China."
+         }
+        ]
+       }
+      },
+      {
+       "fullName": "He B",
+       "lastName": "He",
+       "firstName": "Biaochuan",
+       "initials": "B",
+       "authorAffiliationDetailsList": {
+        "authorAffiliation": [
+         {
+          "affiliation": "Guangdong Provincial People's Hospital, Southern Medical University, Guangzhou, China; Guangdong Provincial Key Laboratory of South China Structural Heart Disease, Guangdong Provincial People's Hospital, Guangzhou, China. Electronic address: hebiaochuan@aliyun.com."
+         }
+        ]
+       }
+      }
+     ]
+    },
+    "journalInfo": {
+     "journalIssueId": 4252460,
+     "dateOfPublication": "2028 Aug",
+     "monthOfPublication": 8,
+     "yearOfPublication": 2028,
+     "journal": {
+      "medlineAbbreviation": "Am J Prev Med",
+      "title": "American journal of preventive medicine",
+      "essn": "1873-2607",
+      "issn": "0749-3797",
+      "nlmid": "8704773",
+      "isoabbreviation": "Am J Prev Med"
+     },
+     "printPublicationDate": "2028-08-01"
+    },
+    "pubYear": "2028",
+    "pageInfo": "108545",
+    "abstractText": "<h4>Introduction</h4>Sex differences in cardiovascular disease (CVD) risk are examined through biological and clinical factors, with less attention to early-life social exposures. This study examined associations of childhood parental son preference with CVD risk, sex differences, and mediation by modifiable risk factors.<h4>Methods</h4>This cohort analysis included China Health and Retirement Longitudinal Study participants aged ≥45 years without baseline CVD. Parental son preference was assessed retrospectively in 2014; incident CVD was self-reported physician-diagnosed heart disease or stroke through 2020. Sampling-weighted, community-clustered Cox models estimated adjusted hazard ratios (aHRs) and 95% CIs. Sex was prespecified as an effect modifier; mediation by 13 risk factors used inverse-odds-ratio weighting. Data were collected from 2011 to 2020 and analyzed from 2025 to 2026.<h4>Results</h4>Among 8,079 participants (mean age, 57.5 years; 4,216 women [52.2%]), 1,820 (22.5%) reported parental son preference. Son preference was associated with higher CVD risk overall (aHR 1.23 [95% CI 1.04, 1.46]) and among women (aHR 1.25 [95% CI 1.03, 1.53]); among men, the estimate was 1.16 (95% CI 0.87, 1.56), with limited heterogeneity by sex (ratio of aHRs 1.06 [95% CI 0.72, 1.58]). Among women, risk was concentrated in the highest paternal (aHR 1.47 [95% CI 1.14, 1.90]) and maternal (aHR 1.50 [95% CI 1.12, 1.99]) preference categories. Modifiable risk factors mediated 5.8% (95% CI 1.9%, 9.7%) of the association among women, mainly through socioeconomic and psychosocial factors. CVD risk was highest with both son preference and high risk-factor burden overall (aHR 1.97 [95% CI 1.43, 2.73]) and among women (aHR 2.23 [95% CI 1.61, 3.10]).<h4>Conclusions</h4>Parental son preference was associated with higher incident CVD risk, with the largest estimates in the highest paternal or maternal categories among women. Modifiable risk factors explained a modest proportion, supporting life-course cardiovascular prevention that considers sex-differentiated childhood environments alongside risk-factor modification.",
+    "affiliation": "School of Public Health, Fudan University, Shanghai, China; National Health Commission Key Laboratory of Health Technology Assessment, Fudan University, Shanghai, China.",
+    "publicationStatus": "aheadofprint",
+    "language": "eng",
+    "pubModel": "Print-Electronic",
+    "pubTypeList": {
+     "pubType": [
+      "Journal Article"
+     ]
+    },
+    "keywordList": {
+     "keyword": [
+      "Cardiovascular disease",
+      "Sex differences",
+      "Mediation",
+      "Son Preference",
+      "Modifiable Risk Factors"
+     ]
+    },
+    "subsetList": {
+     "subset": [
+      {
+       "code": "IM",
+       "name": "Index Medicus"
+      }
+     ]
+    },
+    "fullTextUrlList": {
+     "fullTextUrl": [
+      {
+       "availability": "Subscription required",
+       "availabilityCode": "S",
+       "documentStyle": "doi",
+       "site": "DOI",
+       "url": "https://doi.org/10.1016/j.amepre.2026.108545"
+      }
+     ]
+    },
+    "isOpenAccess": "N",
+    "inEPMC": "N",
+    "inPMC": "N",
+    "citedByCount": 0,
+    "hasReferences": "N",
+    "hasTextMinedTerms": "Y",
+    "hasDbCrossReferences": "N",
+    "hasPDF": "N",
+    "hasBook": "N",
+    "hasSuppl": "N",
+    "hasLabsLinks": "N",
+    "hasData": "N",
+    "authMan": "N",
+    "epmcAuthMan": "N",
+    "nihAuthMan": "N",
+    "hasTMAccessionNumbers": "N",
+    "dateOfCreation": "2026-09-01",
+    "dateOfRevision": "2026-09-01",
+    "electronicPublicationDate": "2028-08-14",
+    "firstPublicationDate": "2028-08-14",
+    "firstIndexDate": "2026-09-02",
+    "hasEvaluations": "N"
+   }
+  ]
+ }
+}

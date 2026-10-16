@@ -1,0 +1,280 @@
+{
+ "version": "6.9",
+ "hitCount": 821,
+ "nextCursorMark": "AoJgKDU2MTYzMTg2",
+ "nextPageUrl": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=%22heart+disease%22+AND+SRC%3APPR+AND+PUBLISHER%3A%22bioRxiv%22&cursorMark=AoJgKDU2MTYzMTg2&resultType=core&pageSize=10&sort=P_PDATE_D+desc&format=json",
+ "request": {
+  "queryString": "\"heart disease\" AND SRC:PPR AND PUBLISHER:\"bioRxiv\"",
+  "resultType": "core",
+  "cursorMark": "*",
+  "pageSize": 10,
+  "sort": "P_PDATE_D desc",
+  "synonym": false
+ },
+ "resultList": {
+  "result": [
+   {
+    "id": "PPR1338733",
+    "source": "PPR",
+    "doi": "10.64898/2026.10.06.757136",
+    "title": "Autonomic neurons are intrinsically hyperexcitable in a Friedreich ataxia iPSC model",
+    "authorString": "(Max) SL, Lees J, Zhang H, Li L, Dottori M, Pebay A, Corben L, Delatycki M, Wilcox S, Pullin J, Choi J, McCarthy D, Napierala J, Napierala M.",
+    "authorList": {
+     "author": [
+      {
+       "fullName": "(Max) SL",
+       "lastName": "(Max)",
+       "firstName": "Shiang",
+       "initials": "SL"
+      },
+      {
+       "fullName": "Lees J",
+       "lastName": "Lees",
+       "firstName": "Jarmon",
+       "initials": "J"
+      },
+      {
+       "fullName": "Zhang H",
+       "lastName": "Zhang",
+       "firstName": "Haoxiang",
+       "initials": "H"
+      },
+      {
+       "fullName": "Li L",
+       "lastName": "Li",
+       "firstName": "Li",
+       "initials": "L"
+      },
+      {
+       "fullName": "Dottori M",
+       "lastName": "Dottori",
+       "firstName": "Mirella",
+       "initials": "M"
+      },
+      {
+       "fullName": "Pebay A",
+       "lastName": "Pebay",
+       "firstName": "Alice",
+       "initials": "A"
+      },
+      {
+       "fullName": "Corben L",
+       "lastName": "Corben",
+       "firstName": "Louise",
+       "initials": "L"
+      },
+      {
+       "fullName": "Delatycki M",
+       "lastName": "Delatycki",
+       "firstName": "Martin",
+       "initials": "M"
+      },
+      {
+       "fullName": "Wilcox S",
+       "lastName": "Wilcox",
+       "firstName": "Stephen",
+       "initials": "S"
+      },
+      {
+       "fullName": "Pullin J",
+       "lastName": "Pullin",
+       "firstName": "Jeffrey",
+       "initials": "J"
+      },
+      {
+       "fullName": "Choi J",
+       "lastName": "Choi",
+       "firstName": "Jarny",
+       "initials": "J"
+      },
+      {
+       "fullName": "McCarthy D",
+       "lastName": "McCarthy",
+       "firstName": "Davis",
+       "initials": "D"
+      },
+      {
+       "fullName": "Napierala J",
+       "lastName": "Napierala",
+       "firstName": "Jill",
+       "initials": "J"
+      },
+      {
+       "fullName": "Napierala M",
+       "lastName": "Napierala",
+       "firstName": "Marek",
+       "initials": "M"
+      }
+     ]
+    },
+    "pubYear": "2026",
+    "abstractText": "Friedreich ataxia (FRDA) is an inherited multisystem disorder caused by a GAA repeat expansion in the FXN gene and consequent frataxin deficiency, causing progressive neurodegeneration and heart disease. Clinical studies have documented autonomic dysfunction in FRDA, including elevated resting heart rate, raised plasma catecholamines and a high burden of urinary, bowel and sexual symptoms. Consistent with this, autopsy studies show degeneration of the cardiac conduction system and its associated ganglia in FRDA. Whether these features are intrinsic to FRDA autonomic neurons has been untestable without a human cellular model. Here, a human model of FRDA autonomic neurons was established by differentiating induced pluripotent stem cells (iPSCs) from individuals with FRDA and from their CRISPR/Cas9-corrected isogenic controls. FRDA autonomic neurons expressed canonical autonomic lineage markers and retained reduced FXN mRNA and frataxin protein levels. Electrophysiological analysis revealed pronounced hyperexcitability, with an approximately five-fold increase in spike number, shortened interspike intervals, and longer bursts. FRDA autonomic neurons also exhibited increased cell death, elevated mitochondrial reactive oxygen species, and a shift from networked to tubular mitochondrial morphology. Bulk RNA sequencing of all three isogenic pairs revealed loss of extracellular matrix programs and activation of stress response pathways. The top differentially expressed gene was MEG3, a maternally imprinted long noncoding RNA, which was consistently upregulated across all three isogenic pairs. MEG3 sits within the imprinted 14q32 DLK1-DIO3 locus, whose maternally expressed noncoding transcripts were co-ordinately de-repressed in FRDA autonomic neurons. Competitive gene-set testing of 43 imprinted genes across 20 domains showed this to be specific to 14q32: no other imprinted domain was co-ordinately altered. Together, these findings establish hyperexcitability of autonomic neurons as a cell autonomous consequence of frataxin deficiency, accompanied by mitochondrial dysfunction. This provides a cellular basis for the increased sympathetic tone observed in clinical studies.",
+    "pubTypeList": {
+     "pubType": [
+      "Preprint"
+     ]
+    },
+    "bookOrReportDetails": {
+     "publisher": "bioRxiv",
+     "yearOfPublication": 2026
+    },
+    "fullTextUrlList": {
+     "fullTextUrl": [
+      {
+       "availability": "Free",
+       "availabilityCode": "F",
+       "documentStyle": "doi",
+       "site": "DOI",
+       "url": "https://doi.org/10.64898/2026.10.06.757136"
+      }
+     ]
+    },
+    "isOpenAccess": "N",
+    "inEPMC": "N",
+    "inPMC": "N",
+    "citedByCount": 0,
+    "hasReferences": "N",
+    "hasTextMinedTerms": "N",
+    "hasDbCrossReferences": "N",
+    "hasPDF": "N",
+    "hasBook": "N",
+    "hasSuppl": "N",
+    "hasLabsLinks": "N",
+    "hasData": "N",
+    "authMan": "N",
+    "epmcAuthMan": "N",
+    "nihAuthMan": "N",
+    "hasTMAccessionNumbers": "N",
+    "dateOfCreation": "2026-10-12",
+    "firstPublicationDate": "2026-10-11",
+    "firstIndexDate": "2026-10-12",
+    "hasEvaluations": "N"
+   },
+   {
+    "id": "PPR1336059",
+    "source": "PPR",
+    "doi": "10.64898/2026.10.06.757199",
+    "title": "Phosphoproteomics profiling of the monocytes uncovers the mechanosensory pathways regulating monocytes responses to pathologic level of shear stress",
+    "authorString": "Lai AL, Chheang C, Fang H, Danish H, Mirzaalikhan Y, Dayawansa N, Watson A, Noonan J, Ang C, Greening D, Peter K, Baratchi S.",
+    "authorList": {
+     "author": [
+      {
+       "fullName": "Lai AL",
+       "lastName": "Lai",
+       "firstName": "Austin Lai",
+       "initials": "AL"
+      },
+      {
+       "fullName": "Chheang C",
+       "lastName": "Chheang",
+       "firstName": "Chanly",
+       "initials": "C"
+      },
+      {
+       "fullName": "Fang H",
+       "lastName": "Fang",
+       "firstName": "Haoyun",
+       "initials": "H"
+      },
+      {
+       "fullName": "Danish H",
+       "lastName": "Danish",
+       "firstName": "Habiba",
+       "initials": "H"
+      },
+      {
+       "fullName": "Mirzaalikhan Y",
+       "lastName": "Mirzaalikhan",
+       "firstName": "Yasmin",
+       "initials": "Y"
+      },
+      {
+       "fullName": "Dayawansa N",
+       "lastName": "Dayawansa",
+       "firstName": "Nalin",
+       "initials": "N"
+      },
+      {
+       "fullName": "Watson A",
+       "lastName": "Watson",
+       "firstName": "Anna",
+       "initials": "A"
+      },
+      {
+       "fullName": "Noonan J",
+       "lastName": "Noonan",
+       "firstName": "Jonathan",
+       "initials": "J"
+      },
+      {
+       "fullName": "Ang C",
+       "lastName": "Ang",
+       "firstName": "Ching-Seng",
+       "initials": "C"
+      },
+      {
+       "fullName": "Greening D",
+       "lastName": "Greening",
+       "firstName": "David",
+       "initials": "D"
+      },
+      {
+       "fullName": "Peter K",
+       "lastName": "Peter",
+       "firstName": "Karlheinz",
+       "initials": "K"
+      },
+      {
+       "fullName": "Baratchi S",
+       "lastName": "Baratchi",
+       "firstName": "Sara",
+       "initials": "S"
+      }
+     ]
+    },
+    "pubYear": "2026",
+    "abstractText": "<h4>Background: </h4> Calcific aortic valve disease (CAVD) is the most common valvular heart disease in older adults and currently has no approved pharmacological therapy to prevent or slow disease progression. Aortic valve replacement, either surgically or by transcatheter aortic valve implantation (TAVI), therefore remains the only effective treatment for severe CAVD. Monocytes play an important role in driving inflammation and disease progression in CAVD. As the disease progresses and the aortic valve becomes increasingly stenotic, circulating monocytes passing through the narrowed valve are repeatedly exposed to pathological haemodynamic forces, including markedly elevated shear stress, before their recruitment into the valve tissue. However, how exposure to these mechanical forces reprograms circulating monocytes influences their subsequent responses within the valve remain poorly understood. <h4>Methods and Results:</h4> In this study, we used an engineered model of aortic valve stenosis combined with phosphoproteomic profiling to investigate how prolonged exposure to pathological shear stress reprograms circulating monocytes and influences their subsequent phenotype and function following recruitment into the valve matrix. We further used TAVI as a unique clinical model to determine whether restoration of physiological haemodynamics in patients with severe aortic stenosis reverses the shear-induced monocyte phenotype observed in our experimental model. We found that prolonged exposure of monocytes to pathological shear stress induced extensive remodelling of the proteomic and phosphoproteomic landscape, with enrichment of pathways associated with cellular metabolism, cytoskeletal organisation, and inflammatory signalling. Kinase activity analysis further identified increased protein kinase C (PKC) activity accompanied by suppression of AKT signalling. Consistent with these molecular changes, pathological shear stress increased actin polymerisation, mitochondrial membrane potential, intracellular calcium signalling, and PKC activity. Using a bioengineered extracellular matrix model that recapitulates the glycosaminoglycan-rich microenvironment of the stenotic aortic valve we found that prior exposure to pathological shear stress altered monocyte-to-macrophage differentiation, reducing oxidised LDL uptake and foam-cell formation while promoting co-expression of CD80 and CD163, indicative of a mixed macrophage phenotype. Finally, using a myeloid-specific Piezo1 knockout mouse model, we identified Piezo1 as a key mechanosensor linking pathological shear stress to PKC activation, mitochondrial responses, and persistent changes in monocyte phenotype following migration into the extracellular matrix. <h4>Conclusions:</h4> These findings establish a mechanistic link between abnormal valve haemodynamics, metabolic and inflammatory reprogramming of circulating monocytes, extracellular matrix remodelling, and immune dysregulation during CAVD progression, highlighting monocyte mechanotransduction and downstream PKC/Piezo1 signalling as potential therapeutic targets.",
+    "pubTypeList": {
+     "pubType": [
+      "Preprint"
+     ]
+    },
+    "bookOrReportDetails": {
+     "publisher": "bioRxiv",
+     "yearOfPublication": 2026
+    },
+    "fullTextUrlList": {
+     "fullTextUrl": [
+      {
+       "availability": "Free",
+       "availabilityCode": "F",
+       "documentStyle": "doi",
+       "site": "DOI",
+       "url": "https://doi.org/10.64898/2026.10.06.757199"
+      }
+     ]
+    },
+    "isOpenAccess": "N",
+    "inEPMC": "N",
+    "inPMC": "N",
+    "citedByCount": 0,
+    "hasReferences": "N",
+    "hasTextMinedTerms": "N",
+    "hasDbCrossReferences": "N",
+    "hasPDF": "N",
+    "hasBook": "N",
+    "hasSuppl": "N",
+    "hasLabsLinks": "N",
+    "hasData": "N",
+    "authMan": "N",
+    "epmcAuthMan": "N",
+    "nihAuthMan": "N",
+    "hasTMAccessionNumbers": "N",
+    "dateOfCreation": "2026-10-08",
+    "firstPublicationDate": "2026-10-07",
+    "firstIndexDate": "2026-10-08",
+    "hasEvaluations": "N"
+   }
+  ]
+ }
+}

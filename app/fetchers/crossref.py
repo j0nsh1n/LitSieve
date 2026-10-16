@@ -8,7 +8,7 @@ import logging
 import re
 from typing import Dict, List, Optional
 
-from app.fetchers.base import BaseFetcher, HttpClient, reraise_fetch_error
+from app.fetchers.base import BaseFetcher, HttpClient, json_of, reraise_fetch_error, user_agent
 
 logger = logging.getLogger(__name__)
 
@@ -22,12 +22,8 @@ class CrossRefFetcher(BaseFetcher):
 
     def __init__(self, email: Optional[str] = None):
         self.email = email
-        # Polite Pool UA improves rate limits when mailto is present.
-        ua = (
-            f'LiteratureResearchAide/3.7 (mailto:{email})'
-            if email else 'LiteratureResearchAide/3.7'
-        )
-        self.http = HttpClient(delay=0.5, user_agent=ua)
+        # The polite pool is chosen by the `mailto` query parameter below.
+        self.http = HttpClient(delay=0.5, user_agent=user_agent(email))
 
 
     def search_and_fetch(self, query: str, max_results: int = 500) -> List[Dict]:
@@ -49,7 +45,7 @@ class CrossRefFetcher(BaseFetcher):
 
             try:
                 r = self.http.get(self.BASE_URL, params=params, timeout=30)
-                items = r.json().get('message', {}).get('items', [])
+                items = json_of(r).get('message', {}).get('items', [])
                 if not items:
                     break
                 for item in items:

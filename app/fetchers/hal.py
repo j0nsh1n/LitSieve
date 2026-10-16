@@ -10,7 +10,14 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List, Optional
 
-from app.fetchers.base import BaseFetcher, FetchError, HttpClient, reraise_fetch_error
+from app.fetchers.base import (
+    BaseFetcher,
+    FetchError,
+    HttpClient,
+    json_of,
+    reraise_fetch_error,
+    user_agent,
+)
 
 
 class HALFetcher(BaseFetcher):
@@ -20,7 +27,7 @@ class HALFetcher(BaseFetcher):
     def __init__(self, email: Optional[str] = None):
         self.http = HttpClient(
             delay=0.35,
-            user_agent=f"LiteratureResearchAide/4.0 ({email or 'research@example.com'})",
+            user_agent=user_agent(email),
         )
 
     def search_and_fetch(self, query: str, max_results: int = 500) -> List[Dict]:
@@ -45,7 +52,7 @@ class HALFetcher(BaseFetcher):
                         ),
                     },
                 )
-                docs = (r.json().get("response") or {}).get("docs") or []
+                docs = (json_of(r).get("response") or {}).get("docs") or []
             except FetchError as e:
                 reraise_fetch_error(e, articles)
             except Exception as e:

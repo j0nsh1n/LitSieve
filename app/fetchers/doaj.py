@@ -8,7 +8,15 @@ import logging
 from typing import Dict, List, Optional
 from urllib.parse import quote
 
-from app.fetchers.base import BaseFetcher, FetchError, HttpClient, reraise_fetch_error
+from app.fetchers.base import (
+    BaseFetcher,
+    FetchError,
+    HttpClient,
+    clean_text,
+    json_of,
+    reraise_fetch_error,
+    user_agent,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -16,26 +24,28 @@ logger = logging.getLogger(__name__)
 class DOAJFetcher(BaseFetcher):
     SOURCE_NAME = 'doaj'
     BASE_URL = 'https://doaj.org/api/v3/search/articles'
+    PAGE_SIZE = 100
 
     def __init__(self, email: Optional[str] = None):
         self.http = HttpClient(
             delay=0.3,
-            user_agent=f'LiteratureResearchAide/3.7 ({email or "research@example.com"})',
+            user_agent=user_agent(email),
         )
 
     def search_and_fetch(self, query: str, max_results: int = 500) -> List[Dict]:
         articles = []
         page = 1
-        page_size = min(100, max_results)
+        # Constant page size: DOAJ pages by number, so a smaller later page
+        # would start inside records the earlier pages already returned.
+        page_size = self.PAGE_SIZE
 
         while len(articles) < max_results:
-            n = min(page_size, max_results - len(articles))
             try:
                 r = self.http.get(
                     f'{self.BASE_URL}/{quote(query)}',
-                    params={'page': page, 'pageSize': n},
+                    params={'page': page, 'pageSize': page_size},
                 )
-                data = r.json()
+                data = json_of(r)
                 results = data.get('results', [])
                 if not results:
                     break
@@ -43,7 +53,7 @@ class DOAJFetcher(BaseFetcher):
                     article = self._parse_result(result)
                     if article:
                         articles.append(article)
-                if len(results) < n:
+                if len(results) < page_size:
                     break
                 page += 1
             except FetchError as e:
@@ -51,15 +61,17 @@ class DOAJFetcher(BaseFetcher):
                 reraise_fetch_error(e, articles)
             except Exception as e:
                 logger.exception("DOAJ fetch error: %s", e)
-                break
+                raise FetchError(
+                    f"DOAJ request failed: {e}", kind="network", articles=articles[:max_results]
+                ) from e
 
         return articles[:max_results]
 
     def _parse_result(self, result: Dict) -> Optional[Dict]:
         try:
             bib = result.get('bibjson', {})
-            title = (bib.get('title') or '').strip()
-            abstract = (bib.get('abstract') or '').strip()
+            title = clean_text(bib.get('title'))
+            abstract = clean_text(bib.get('abstract'))
             if not title or not abstract:
                 return None
 

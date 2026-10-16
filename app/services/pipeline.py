@@ -18,7 +18,6 @@ from app.fetchers.arxiv import ArXivFetcher
 from app.fetchers.biorxiv import BioRxivFetcher, MedRxivFetcher
 from app.fetchers.clinicaltrials import ClinicalTrialsFetcher
 from app.fetchers.crossref import CrossRefFetcher
-from app.fetchers.dblp import DBLPFetcher
 from app.fetchers.doaj import DOAJFetcher
 from app.fetchers.eric import ERICFetcher
 from app.fetchers.europepmc import EuropePMCFetcher
@@ -53,7 +52,6 @@ FETCHERS = {
     'nasa_ads': NASAADSFetcher,
     'biorxiv': BioRxivFetcher,
     'medrxiv': MedRxivFetcher,
-    'dblp': DBLPFetcher,
     'openaire': OpenAIREFetcher,
     'plos': PLOSFetcher,
     'hal': HALFetcher,
@@ -105,7 +103,7 @@ class LiteratureSearchPipeline:
         self,
         query: str,
         max_results: int = 1000,
-        email: str = "your.email@example.com",
+        email: str = "",
         source: str = "pubmed"
     ):
         """
@@ -142,7 +140,7 @@ class LiteratureSearchPipeline:
         query: str,
         sources: List[str],
         max_results: int = 100,
-        email: str = "your.email@example.com",
+        email: str = "",
         progress_callback=None,
         cancel_check=None,
         into_staging: bool = False,
@@ -211,9 +209,11 @@ class LiteratureSearchPipeline:
             set_fetch_deadline(time.monotonic() + budget)
             try:
                 fetcher = fetcher_cls(email=email)
+                # A fetch that returns just after the budget keeps its papers;
+                # an empty one that ran over reports the timeout.
                 articles = fetcher.search_and_fetch(query, max_results) or []
-                check_fetch_deadline()
                 if not articles:
+                    check_fetch_deadline()
                     return (source, [], None, "no_results")
                 return (source, articles, None, None)
             except FetchError as e:

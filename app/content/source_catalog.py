@@ -112,16 +112,6 @@ SOURCE_CATALOG: Dict[str, Dict[str, Any]] = {
         "priority": 60,
         "needs_key": False,
     },
-    "dblp": {
-        "name": "DBLP",
-        "desc": "Computer science papers & conferences",
-        "good_for": "CS titles, authors, venues (conferences and journals).",
-        "misses": "Many hits have no real abstract — those are skipped, so counts look low.",
-        "tip": "CS bibliography (title/venue). Many records lack abstracts and are skipped.",
-        "badges": ["title-only"],
-        "priority": 58,
-        "needs_key": False,
-    },
     "eric": {
         "name": "ERIC",
         "desc": "Education, psychology, social sciences",
@@ -176,9 +166,9 @@ SOURCE_CATALOG: Dict[str, Dict[str, Any]] = {
     "biorxiv": {
         "name": "bioRxiv",
         "desc": "Biology preprints",
-        "good_for": "Very recent biology preprints.",
-        "misses": "Not peer-reviewed; only a recent rolling date window is searched.",
-        "tip": "Biology preprints — not peer-reviewed; recent posts only.",
+        "good_for": "Recent biology preprints, searched through Europe PMC.",
+        "misses": "Not peer-reviewed; a preprint may change or never be published.",
+        "tip": "Biology preprints — not peer-reviewed.",
         "badges": ["preprint", "not-peer-reviewed"],
         "priority": 35,
         "needs_key": False,
@@ -186,9 +176,9 @@ SOURCE_CATALOG: Dict[str, Dict[str, Any]] = {
     "medrxiv": {
         "name": "medRxiv",
         "desc": "Health preprints",
-        "good_for": "Very recent clinical/health preprints.",
-        "misses": "Not peer-reviewed; recent window only; not medical advice.",
-        "tip": "Health preprints — not peer-reviewed; recent posts only. Not advice.",
+        "good_for": "Recent clinical and health preprints, searched through Europe PMC.",
+        "misses": "Not peer-reviewed; not medical advice.",
+        "tip": "Health preprints — not peer-reviewed. Not advice.",
         "badges": ["preprint", "not-peer-reviewed"],
         "priority": 34,
         "needs_key": False,
@@ -219,7 +209,7 @@ TOPIC_SOURCE_HINTS: Dict[str, List[str]] = {
         "openaire",
     ],
     "cs": [
-        "dblp", "arxiv", "openalex", "semanticscholar", "crossref",
+        "arxiv", "openalex", "semanticscholar", "crossref",
         "zenodo", "doaj", "openaire",
     ],
     "earth": [
@@ -363,10 +353,10 @@ TOPIC_PACKS: List[Dict[str, Any]] = [
         "id": "pack_cs_intro",
         "name": "CS intro",
         "icon": "💻",
-        "blurb": "CS bibliography + arXiv (many DBLP hits lack abstracts)",
+        "blurb": "arXiv preprints + broad scholarly indexes for computer science",
         "topics": ["cs"],
         "sources": [
-            "dblp", "arxiv", "openalex", "semanticscholar",
+            "arxiv", "openalex", "semanticscholar",
             "crossref", "doaj",
         ],
         "query_hint": "introductory computer science education",
@@ -379,10 +369,23 @@ SOURCE_PRIORITY: Dict[str, int] = {
 }
 
 
+# Sources taken off the list. They can no longer be fetched, but papers already
+# stored under them stay readable, and old saved requests may still name them.
+RETIRED_SOURCES = frozenset({"dblp"})
+_RETIRED_NAMES = {"dblp": "DBLP"}
+
+
+def drop_retired_sources(sources: List[str]) -> List[str]:
+    """Remove retired source ids (order and other ids unchanged)."""
+    return [s for s in sources if s not in RETIRED_SOURCES]
+
+
 def source_display_name(source_id: str) -> str:
     meta = SOURCE_CATALOG.get(source_id or "")
     if meta:
         return str(meta.get("name") or source_id)
+    if source_id in _RETIRED_NAMES:
+        return _RETIRED_NAMES[source_id]
     if source_id == "sample":
         return "Sample demo"
     return source_id or ""

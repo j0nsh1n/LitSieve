@@ -1,0 +1,59 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom" xmlns="http://www.w3.org/2005/Atom">
+  <id>https://arxiv.org/api/HAlrn0ZIlW4I3Og9y4OqxKs0+aE</id>
+  <title>arXiv Query: search_query=all:diabetes AND all:insulin&amp;id_list=&amp;start=0&amp;max_results=2</title>
+  <updated>2026-10-16T05:45:27Z</updated>
+  <link href="https://arxiv.org/api/query?search_query=all:diabetes+AND+all:insulin&amp;start=0&amp;max_results=2&amp;id_list=" type="application/atom+xml"/>
+  <opensearch:itemsPerPage>2</opensearch:itemsPerPage>
+  <opensearch:totalResults>212</opensearch:totalResults>
+  <opensearch:startIndex>0</opensearch:startIndex>
+  <entry>
+    <id>http://arxiv.org/abs/2411.12812v1</id>
+    <title>DIETS: Diabetic Insulin Management System in Everyday Life</title>
+    <updated>2024-11-19T19:04:42Z</updated>
+    <link href="https://arxiv.org/abs/2411.12812v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2411.12812v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>People with diabetes need insulin delivery to effectively manage their blood glucose levels, especially after meals, because their bodies either do not produce enough insulin or cannot fully utilize it. Accurate insulin delivery starts with estimating the nutrients in meals and is followed by developing a detailed, personalized insulin injection strategy. These tasks are particularly challenging in daily life, especially without professional guidance. Existing solutions usually assume the prior knowledge of nutrients in meals and primarily rely on feedback from professional clinicians or simulators to develop Reinforcement Learning-based models for insulin management, leading to extensive consumption of medical resources and difficulties in adapting the models to new patients due to individual differences. In this paper, we propose DIETS, a novel diabetic insulin management framework built on the transformer architecture, to help people with diabetes effectively manage insulin delivery in everyday life. Specifically, DIETS tailors a Large Language Model (LLM) to estimate the nutrients in meals and employs a titration model to generate recommended insulin injection strategies, which are further validated by a glucose prediction model to prevent potential risks of hyperglycemia or hypoglycemia. DIETS has been extensively evaluated on three public datasets, and the results show it achieves superior performance in providing effective insulin delivery recommendation to control blood glucose levels.</summary>
+    <category term="eess.SY" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2024-11-19T19:04:42Z</published>
+    <arxiv:primary_category term="eess.SY"/>
+    <author>
+      <name>Hanyu Zeng</name>
+    </author>
+    <author>
+      <name>Hui Ji</name>
+    </author>
+    <author>
+      <name>Pengfei Zhou</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2502.03269v1</id>
+    <title>Modeling and Optimization of Insulin Injection for Type-1 Diabetes Mellitus Management</title>
+    <updated>2025-02-05T15:24:46Z</updated>
+    <link href="https://arxiv.org/abs/2502.03269v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2502.03269v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Diabetes mellitus is a global health crisis characterized by poor blood sugar regulation, impacting millions of people worldwide and leading to severe complications and mortality. Although Type 1 Diabetes Mellitus (T1DM) has a lower number of cases compared to other forms of diabetes, it is often diagnosed at a young age and requires lifelong exogenous insulin administration. In this paper, we focus on understanding the interaction of insulin and glucose molecules within the subcutaneous layer, which is crucial for blood sugar control in T1DM patients. Specifically, we propose a comprehensive model to characterize the insulin-glucose system within the subcutaneous layer, incorporating a multicellular molecular communication system. We then divide the T1DM system into insulin and glucose subsystems and derive the end-to-end expression for insulin-glucose interaction in the subcutaneous layer. We further validate the insulin-glucose interaction analysis with an agent-based simulator. As effectively managing postprandial glucose levels is crucial for individuals with T1DM to safeguard their overall health and avert short-term and long-term complications, we also derive the optimal insulin administration time based on the derived glucose response via the Lagrange multiplier and gradient descent ascent method. This allows us to explore the impact of different types of insulin and dietary management on blood sugar levels. Simulation results confirm the correctness of our proposed model and the effectiveness of our optimized effective time window for injecting insulin in individuals with T1DM.</summary>
+    <category term="q-bio.OT" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2025-02-05T15:24:46Z</published>
+    <arxiv:comment>15 pages, 10 figures</arxiv:comment>
+    <arxiv:primary_category term="q-bio.OT"/>
+    <author>
+      <name>Rinrada Jadsadaphongphaibool</name>
+    </author>
+    <author>
+      <name>Dadi Bi</name>
+    </author>
+    <author>
+      <name>Christian D. Lorenz</name>
+    </author>
+    <author>
+      <name>Yansha Deng</name>
+    </author>
+    <author>
+      <name>Robert Schober</name>
+    </author>
+    <arxiv:doi>10.1109/TMBMC.2025.3559470</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.1109/TMBMC.2025.3559470" title="doi"/>
+  </entry>
+</feed>

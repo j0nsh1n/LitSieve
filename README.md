@@ -26,9 +26,9 @@ search from topic to ranked papers, and how 6.0 is built.
 
 ## Features
 
-- 🔍 Fetch from **17 sources** in parallel (PubMed, Europe PMC, ClinicalTrials.gov,
+- 🔍 Fetch from **16 sources** in parallel (PubMed, Europe PMC, ClinicalTrials.gov,
   OpenAlex, arXiv, Semantic Scholar, ERIC, Zenodo, CrossRef, DOAJ, NASA ADS,
-  bioRxiv, medRxiv, DBLP, OpenAIRE, PLOS, HAL)
+  bioRxiv, medRxiv, OpenAIRE, PLOS, HAL)
   — replace or append; **background jobs** with progress, cancel, retries, and
   per-source error classes; **auto prepare-for-search** after a successful fetch
 - 🧭 **One Search workspace**: fetch by topic, review database choices, wait for

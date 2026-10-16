@@ -6,7 +6,7 @@ let TOPICS = [
  { id: 'chemistry', name: 'Chemistry', icon: '⚗️', sources: ['openalex', 'arxiv', 'semanticscholar', 'crossref', 'zenodo', 'doaj', 'openaire'] },
  { id: 'physics', name: 'Physics', icon: '⚛️', sources: ['arxiv', 'openalex', 'semanticscholar', 'crossref', 'zenodo', 'nasa_ads', 'openaire'] },
  { id: 'math', name: 'Mathematics', icon: '📐', sources: ['arxiv', 'openalex', 'semanticscholar', 'crossref', 'zenodo', 'openaire'] },
- { id: 'cs', name: 'Computer Science', icon: '💻', sources: ['dblp', 'arxiv', 'openalex', 'semanticscholar', 'crossref', 'zenodo', 'doaj', 'openaire'] },
+ { id: 'cs', name: 'Computer Science', icon: '💻', sources: ['arxiv', 'openalex', 'semanticscholar', 'crossref', 'zenodo', 'doaj', 'openaire'] },
  { id: 'earth', name: 'Earth & Environment', icon: '🌍', sources: ['openalex', 'semanticscholar', 'zenodo', 'crossref', 'doaj', 'nasa_ads', 'openaire', 'hal'] },
  { id: 'history', name: 'History', icon: '📜', sources: ['openalex', 'semanticscholar', 'eric', 'crossref', 'doaj', 'hal', 'openaire'] },
  { id: 'economics', name: 'Economics', icon: '📊', sources: ['arxiv', 'openalex', 'semanticscholar', 'eric', 'crossref', 'doaj', 'openaire'] },
@@ -48,9 +48,9 @@ let TOPIC_PACKS = [
  id: 'pack_cs_intro',
  name: 'CS intro',
  icon: '💻',
- blurb: 'CS bibliography + arXiv (many DBLP hits lack abstracts)',
+ blurb: 'arXiv preprints + broad scholarly indexes for computer science',
  topics: ['cs'],
- sources: ['dblp', 'arxiv', 'openalex', 'semanticscholar', 'crossref', 'doaj'],
+ sources: ['arxiv', 'openalex', 'semanticscholar', 'crossref', 'doaj'],
  queryHint: 'introductory computer science education',
  },
 ];
@@ -68,9 +68,8 @@ let ALL_SOURCES = {
  crossref: { name: 'CrossRef', desc: 'Broad academic metadata registry', tip: 'Huge DOI registry; skips no-abstract items.' },
  doaj: { name: 'DOAJ', desc: 'Peer-reviewed open access journals', tip: 'Peer-reviewed open access journals.' },
  nasa_ads: { name: 'NASA ADS', desc: 'Astronomy, astrophysics & geosciences', tip: 'Space & geoscience (token required).', needs_key: true },
- biorxiv: { name: 'bioRxiv', desc: 'Biology preprints', tip: 'Not peer-reviewed; recent window only.', badges: ['preprint', 'not-peer-reviewed'] },
- medrxiv: { name: 'medRxiv', desc: 'Health preprints', tip: 'Not peer-reviewed; recent window only.', badges: ['preprint', 'not-peer-reviewed'] },
- dblp: { name: 'DBLP', desc: 'Computer science papers & conferences', tip: 'Title/venue often; many abstracts skipped.', badges: ['title-only'] },
+ biorxiv: { name: 'bioRxiv', desc: 'Biology preprints', tip: 'Not peer-reviewed.', badges: ['preprint', 'not-peer-reviewed'] },
+ medrxiv: { name: 'medRxiv', desc: 'Health preprints', tip: 'Not peer-reviewed.', badges: ['preprint', 'not-peer-reviewed'] },
  openaire: { name: 'OpenAIRE', desc: 'European open research aggregator', tip: 'European open research graph.' },
  plos: { name: 'PLOS', desc: 'Fully open-access science journals', tip: 'Open-access science journals.' },
  hal: { name: 'HAL', desc: 'French national open archive (multi-discipline)', tip: 'French open archive; language mix varies.' },
@@ -601,10 +600,15 @@ function restoreFetchPrefs() {
  if (prefs.topics.length) { areasSource = 'saved'; areasExpanded = false; }
  renderAreaState();
  }
- if (Array.isArray(prefs.sources) && prefs.sources.length) {
+ // Only ids that still have a checkbox count; retired sources saved by an
+ // older version (e.g. dblp) are dropped quietly.
+ const savedSources = Array.isArray(prefs.sources)
+ ? prefs.sources.filter(id => document.getElementById(`source-${id}`))
+ : [];
+ if (savedSources.length) {
  Object.keys(ALL_SOURCES).forEach(id => {
  const cb = document.getElementById(`source-${id}`);
- if (cb) cb.checked = prefs.sources.includes(id);
+ if (cb) cb.checked = savedSources.includes(id);
  });
  }
  updateModelHint();
@@ -1243,16 +1247,11 @@ function buildFetchSourceReportModel(data, sources) {
  timeouts.sort((a, b) => a.name.localeCompare(b.name));
  muted.sort((a, b) => a.name.localeCompare(b.name));
 
- // Classroom notes for tricky sources (preprints / DBLP abstracts).
+ // Classroom notes for tricky sources (preprints).
  const tipLines = [];
  if (used.has('biorxiv') || used.has('medrxiv')) {
   tipLines.push(
-   'Note: bioRxiv / medRxiv are preprints — not peer-reviewed, and only recent posts in a rolling date window.'
-  );
- }
- if (used.has('dblp')) {
-  tipLines.push(
-   'Note: DBLP often has title and venue only; papers without a real abstract are skipped, so counts can look low.'
+   'Note: bioRxiv / medRxiv are preprints — not peer-reviewed yet.'
   );
  }
  if (used.has('arxiv') && (counts.arxiv || 0) > 0) {

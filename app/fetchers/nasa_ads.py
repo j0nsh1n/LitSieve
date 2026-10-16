@@ -8,7 +8,7 @@ import logging
 import os
 from typing import Dict, List, Optional
 
-from app.fetchers.base import BaseFetcher, HttpClient, reraise_fetch_error
+from app.fetchers.base import BaseFetcher, FetchError, HttpClient, json_of, reraise_fetch_error
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +28,10 @@ class NASAADSFetcher(BaseFetcher):
 
     def search_and_fetch(self, query: str, max_results: int = 500) -> List[Dict]:
         if not self.token:
-            logger.warning("NASA ADS: NASA_ADS_TOKEN env var not set; skipping source")
-            return []
+            raise FetchError(
+                "NASA ADS needs an API token, and this server has not set one.",
+                kind="unavailable",
+            )
         articles = []
         start = 0
         rows = min(200, max_results)
@@ -48,7 +50,7 @@ class NASAADSFetcher(BaseFetcher):
                     },
                     timeout=30
                 )
-                data = r.json()
+                data = json_of(r)
                 docs = data.get('response', {}).get('docs', [])
                 if not docs:
                     break
@@ -61,8 +63,9 @@ class NASAADSFetcher(BaseFetcher):
                 start += len(docs)
             except Exception as e:
                 reraise_fetch_error(e, articles)
-                logger.exception("NASA ADS fetch error: %s", e)
-                break
+                raise FetchError(
+                    f"NASA ADS request failed: {e}", kind="network", articles=articles
+                ) from e
 
         return articles[:max_results]
 

@@ -7,10 +7,18 @@ API key optional for higher rate limits (not required for classroom use).
 
 from __future__ import annotations
 
-import re
 from typing import Dict, List, Optional
 
-from app.fetchers.base import BaseFetcher, FetchError, HttpClient, reraise_fetch_error
+from app.fetchers.base import (
+    BaseFetcher,
+    FetchError,
+    HttpClient,
+    clean_text,
+    json_of,
+    reraise_fetch_error,
+    user_agent,
+)
+from app.fetchers.terms import boolean_terms
 
 
 class PLOSFetcher(BaseFetcher):
@@ -20,16 +28,20 @@ class PLOSFetcher(BaseFetcher):
     def __init__(self, email: Optional[str] = None):
         self.http = HttpClient(
             delay=0.35,
-            user_agent=f"LiteratureResearchAide/4.0 ({email or 'research@example.com'})",
+            user_agent=user_agent(email),
         )
+
+    @staticmethod
+    def solr_query(query: str) -> str:
+        """Every word in the title or the abstract; bare `title:a b` scoped only `a`."""
+        terms = " ".join(boolean_terms(query))
+        return f"title:({terms}) OR abstract:({terms})" if terms else "*:*"
 
     def search_and_fetch(self, query: str, max_results: int = 500) -> List[Dict]:
         articles: List[Dict] = []
         start = 0
         page_size = min(100, max_results)
-        q = (query or "").strip() or "*:*"
-        # Prefer title/abstract hits for classroom relevance.
-        solr_q = f"title:{q} OR abstract:{q}" if q != "*:*" else q
+        solr_q = self.solr_query(query)
 
         while len(articles) < max_results:
             rows = min(page_size, max_results - len(articles))
@@ -44,11 +56,11 @@ class PLOSFetcher(BaseFetcher):
                         "wt": "json",
                     },
                 )
-                docs = (r.json().get("response") or {}).get("docs") or []
+                docs = (json_of(r).get("response") or {}).get("docs") or []
             except FetchError as e:
                 reraise_fetch_error(e, articles)
             except Exception as e:
-                raise FetchError(f"PLOS request failed: {e}", kind="network") from e
+                raise FetchError(f"PLOS request failed: {e}", kind="network", articles=articles) from e
 
             if not docs:
                 break
@@ -69,11 +81,11 @@ class PLOSFetcher(BaseFetcher):
             title = doc.get("title")
             if isinstance(title, list):
                 title = title[0] if title else ""
-            title = (title or "").strip()
+            title = clean_text(title)
             abstract = doc.get("abstract")
             if isinstance(abstract, list):
                 abstract = " ".join(str(a) for a in abstract if a)
-            abstract = re.sub(r"<[^>]+>", "", (abstract or "")).strip()
+            abstract = clean_text(abstract)
             if not title or not abstract:
                 return None
             authors = doc.get("author") or []

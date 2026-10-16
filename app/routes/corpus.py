@@ -14,6 +14,7 @@ from app.content.screening_reasons import (
     normalize_reason,
     set_aside_group_label,
 )
+from app.content.source_catalog import drop_retired_sources
 from app.core import (
     _ensure_progress,
     csrf_failed,
@@ -124,7 +125,7 @@ def _run_multi_fetch(p, *, query, sources, max_results, email, clear_first, uid)
             query=query,
             sources=sources,
             max_results=max_results,
-            email=email or "user@example.com",
+            email=email or "",
             progress_callback=on_source_done,
             cancel_check=lambda: (
                 is_job_cancelled(uid, 'fetch')
@@ -197,6 +198,13 @@ async def api_fetch_multi(req: MultiFetchRequest, request: Request):
         lib_id = owned_library_id(uid, req.library_id)
     except ValueError as e:
         return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
+    # Saved preferences from before a source was retired may still list it.
+    req.sources = drop_retired_sources(req.sources)
+    if not req.sources:
+        return JSONResponse(
+            status_code=400,
+            content={"detail": "Pick at least one database to search."},
+        )
     # Replace/clear_first must be allowed while over quota so students can
     # wipe the library and free disk; mid-fetch still stops if they go over again.
     if not req.clear_first:

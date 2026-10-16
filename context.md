@@ -6,7 +6,7 @@
   poster. Live at `https://www.litpilot.org` from the production checkout at
   `0374605` (2026-10-14). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
-- Latest full suite (2026-10-15): **1048 passed**, no xfails; all 15 parity
+- Latest full suite (2026-10-16): **1123 passed**, no xfails; all 15 parity
   rows pass. `ruff check .` clean; `pyright app` **0 errors**, 6 optional-import
   warnings (CI blocks on errors). `pip-audit` (2026-10-14): no known
   vulnerabilities; ROCm torch/triton are un-auditable. No dependency lockfile.
@@ -33,29 +33,31 @@
 - Ship rollback dispatches detached when supported, carries its actor, and
   polls completion. Deploy history persistence has database-reopen tests.
 - Fetch sources share a configurable 90-second whole-source budget across
-  pagination, requests and retry waits. Completed pages survive timeout;
-  progress reports queued/running/done states and elapsed time per source.
+  pagination, requests and retry waits. Pages already fetched survive any
+  later error, a source that returns just after the budget keeps its papers,
+  and a `Retry-After` longer than the time left fails at once. Progress
+  reports queued/running/done states and elapsed time per source. Every
+  source, PubMed included, goes through `HttpClient`; a 2xx body that is not
+  JSON (a bot wall) is a typed `network` error with a sentence.
 - New support-view/ticket records omit mode; old history remains readable.
 - Known host gaps: live account cap/AI configuration and confirming detached
   deployment history on the host (roadmap Phase 23), and disconnected browser
   automation.
-  Semantic Scholar runs without an API key, so it sometimes answers 429; the
-  pipeline logs it and continues with the other sources.
+  Semantic Scholar, OpenAlex and PubMed take optional host keys
+  (`S2_API_KEY`, `OPENALEX_API_KEY`, `NCBI_API_KEY`); production sets none,
+  so Semantic Scholar mostly answers 429 and OpenAlex shares one free daily
+  budget per IP.
 - Code scanning is clean: route error messages are the app's own sentences
   (`app/errors.py`, `UserError` and `sentence_for`), shipped 2026-10-14.
 - Full audit 2026-10-15: `docs/AUDIT_2026-10-15.md`, two independent passes
   (lead and a blind Grok pass) merged. Sections 16 to 23 match roadmap
   Phases 16 to 23; findings have ids (`16.1`, ...) that tasks and PRs cite;
-  mark a finding `Fixed in #NN` when its PR merges. Nothing fixed yet.
-  Headline items: bioRxiv/medRxiv, DBLP
-  and Semantic Scholar effectively never return papers on the host; Europe
-  PMC stores every journal as "Unknown journal"; login
-  lockout never resets; rate limiter keyed on unverified JWTs; quota never
-  freed by deleting papers; hybrid rank min-max normalisation; several
-  Search-page element ids that no template renders; Laya topic areas keep
-  a stale pick when the answer is unsure, the topic is short, or any area
-  was clicked by hand; admin: saving a banner draft unpublishes the live
-  one, self-disable locks the only admin out, logout keeps a support view.
+  mark a finding `Fixed in #NN` when its PR merges. Sections 16 and 17 are
+  fixed (#93, #94; 16.9's Overview counts moved to Phase 21); section 18 is
+  on `fix/sources`. Open headline items: quota never freed by deleting
+  papers; hybrid rank min-max normalisation; several Search-page element
+  ids that no template renders; Laya topic areas keep a stale pick when the
+  answer is unsure, the topic is short, or any area was clicked by hand.
 - Admin (`/admin`) is four tabs with the hash as its address (`#accounts/u/<id>`,
   `#accounts/<queue>`). Account actions come from `ACTIONS` in
   `app/routes/admin.py`: the template draws the buttons and `_begin_action`
@@ -77,7 +79,7 @@
 | `app/operator/` | named Ship actions (staging worktree, no shell interpolation) |
 | `app/services/` | pipeline, embeddings, clustering, summarize, llm, reader_mode / facts / verify, citations, mailer |
 | `app/storage/` | database, libraries, shares, user_db, quota, dbconn, helpdesk, ops_audit |
-| `app/fetchers/` | 17 public sources + `base.py` |
+| `app/fetchers/` | 16 public sources + `base.py` (HTTP, `json_of`, `clean_text`) + `terms.py` |
 | `app/content/` | source_catalog, feature_guides, sample_corpus, ui_flags, looks |
 | `templates/` + `partials/` | Jinja shell + Search/guest partials |
 | `static/` | vanilla JS/CSS (no npm); cache-bust `?v=` |
@@ -117,7 +119,14 @@ Guest User (is_guest) → sample corpus only; purged by age
 ```
 
 ## Non-Obvious Decisions
-- Student starting-point product: 17 free sources; CORE was removed for rate limits.
+- Student starting-point product: 16 free sources; CORE was removed for rate
+  limits and DBLP (2026-10-16) for its bot wall and missing abstracts. Old
+  `dblp` papers still link and show their name; a saved request naming a
+  retired source drops it (`RETIRED_SOURCES`).
+- bioRxiv and medRxiv search Europe PMC's preprint index
+  (`SRC:PPR AND PUBLISHER:"bioRxiv"`): their own API has no search and lists
+  30 posts a request. Papers stay keyed by DOI and link through doi.org.
+- A blank contact email sends no address to the sources (no placeholder).
 - Multi-library is the multi-collection story; share codes clone rather than live-share.
 - AI is optional; extractive key points remain the default; study aids read one abstract.
 - Grouping is optional, runs in the background, and does not itself exclude papers.
@@ -135,17 +144,17 @@ Guest User (is_guest) → sample corpus only; purged by age
   the owning user's progress while a referenced job is active.
 
 ## Session Handoff
-- **Date:** 2026-10-15. **Branch:** `docs/audit-2026-10-15`. Admin plan
-  slices 1 to 4 are merged (PRs #89 to #92); `docs/ADMIN_PANEL_PLAN.md` is
-  done. Production still serves `0374605` (audit 23.1).
-- The 2026-10-15 audit is merged into one file, `docs/AUDIT_2026-10-15.md`;
-  `roadmap.md` Phases 16 to 23 are the fixes in order, each task tagged with
-  its finding ids. The old Phases 4, 11, 14 and 15 are gone; their open
-  tasks moved into Phases 19 and 23 and the backlog.
-- Dev leftovers in `dev_users.db` only: admins `audit1015` and `grokaudit`,
-  guest `guest_17006d07`, test tickets, a 63-paper library, a disabled
-  banner.
+- **Date:** 2026-10-16. **Branch:** `fix/sources` (Phase 18, audit 18.1 to
+  18.17), worktree `~/.t3/worktrees/HealthDatabaseAccess/fix-sources`.
+  Phases 16 and 17 merged as #93 and #94; their branches and worktrees are
+  deleted. Production still serves `0374605` (audit 23.1): main has moved
+  on but the live checkout was not pulled or restarted.
+- Live response samples for every source (2026-10-15) are trimmed into
+  `tests/fixtures/sources/`; the untrimmed captures are outside the repo in
+  `~/HealthDatabaseAccess-scratch/phase18-raw/`.
 - Host notes: the LAN's primary DNS server (192.168.12.132) times out, so
   cloudflared logs a DNS refresh error every 5 minutes but stays connected;
   `litpilot.org` needs an apex record or redirect rule in Cloudflare.
-- **Next step:** branch `fix/admin-console` from `main` and start Phase 16.
+- **Next step:** once Phase 18 merges, mark 18.x `Fixed in #NN` in the
+  audit, then branch from `main` for Phase 19 (19.3 duplicates inside
+  Narrow it down still needs the owner's yes on the approach).

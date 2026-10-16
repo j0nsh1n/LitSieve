@@ -1,0 +1,274 @@
+{
+ "response": {
+  "header": {
+   "query": {
+    "$": "(oaftype exact result) and (resulttypeid exact publication) and ( heart and disease)"
+   },
+   "locale": {
+    "$": "en_US"
+   },
+   "size": {
+    "$": 5
+   },
+   "page": {
+    "$": 1
+   },
+   "total": {
+    "$": 648698
+   },
+   "fields": null
+  },
+  "results": {
+   "result": [
+    {
+     "header": {
+      "dri:objIdentifier": {
+       "$": "pmid________::5768f99cd4375a4a0901bdb6b8daeec7"
+      }
+     },
+     "metadata": {
+      "oaf:entity": {
+       "oaf:result": {
+        "pid": [
+         {
+          "@classid": "pmid",
+          "@classname": "PubMed ID",
+          "@schemeid": "dnet:pid_types",
+          "@schemename": "dnet:pid_types",
+          "@inferred": false,
+          "@provenanceaction": "sysimport:actionset",
+          "@trust": "0.9",
+          "$": 40123605
+         },
+         {
+          "@classid": "pmc",
+          "@classname": "PubMed Central ID",
+          "@schemeid": "dnet:pid_types",
+          "@schemename": "dnet:pid_types",
+          "@inferred": false,
+          "@provenanceaction": "sysimport:actionset",
+          "@trust": "0.9",
+          "$": "PMC11923789"
+         }
+        ],
+        "title": {
+         "@classid": "main title",
+         "@classname": "main title",
+         "@schemeid": "dnet:dataCite_title",
+         "@schemename": "dnet:dataCite_title",
+         "@inferred": false,
+         "@provenanceaction": "sysimport:actionset",
+         "@trust": "0.9",
+         "$": "Traditional Chinese Medicine for the Treatment of Geriatric Heart Disease: A Review."
+        },
+        "description": {
+         "$": "Geriatric heart disease is a common disease in modern society. Due to the characteristics of advanced age and multiple underlying diseases, elderly patients with heart disease have a variety of types and treatment methods compared to other diseases. We searched the databases of CNKI, PubMed, and Web of Science to search for the causes and treatment methods of traditional Chinese and Western medicine for heart diseases using the terms \"geriatric heart disease\", \"treatment\", \"ischemic heart disease\", \"pulmonary heart disease\", \"hypertensive heart disease\", \"rheumatic heart disease\", \"thyroid heart disease\", \"coronary heart disease\", \"arrhythmia\", and \"heart conduction block\". The search also included the terms \"reasonable emotional therapy\", \"Baduanjin\", \"TaiChi\", \"Wuqinxi\", \"Qigong\", \"acupuncture and moxibustion\", \"moxibustion\", \"guasha\" and so on, auxiliary Chinese medicine therapies for geriatric heart disease. The results showed that traditional Chinese medicine (TCM) has a relatively comprehensive treatment plan for different types of geriatric heart disease. Generally, TCM combined with Western medicine or surgery can effectively improve heart function and treat the disease. Chinese exercise and TCM therapy also play an indispensable role in the auxiliary treatment of geriatric heart disease, effectively improving the living conditions of the elderly."
+        },
+        "creator": {
+         "@rank": "1",
+         "@name": "Jianyun",
+         "@surname": "Bi",
+         "$": "Jianyun, Bi"
+        },
+        "journal": {
+         "@issn": "1011-6842",
+         "@iss": "2",
+         "@vol": "41",
+         "$": "Acta Cardiologica Sinica"
+        }
+       }
+      }
+     }
+    },
+    {
+     "header": {
+      "dri:objIdentifier": {
+       "$": "pmid________::636ce55c499054c512e873256993118a"
+      }
+     },
+     "metadata": {
+      "oaf:entity": {
+       "oaf:result": {
+        "pid": {
+         "@classid": "pmid",
+         "@classname": "PubMed ID",
+         "@schemeid": "dnet:pid_types",
+         "@schemename": "dnet:pid_types",
+         "@inferred": false,
+         "@provenanceaction": "sysimport:actionset",
+         "@trust": "0.9",
+         "$": 3837525
+        },
+        "title": {
+         "@classid": "main title",
+         "@classname": "main title",
+         "@schemeid": "dnet:dataCite_title",
+         "@schemename": "dnet:dataCite_title",
+         "@inferred": false,
+         "@provenanceaction": "sysimport:actionset",
+         "@trust": "0.9",
+         "$": "Progression of coronary and valvular heart disease in patients on dialysis."
+        },
+        "description": {
+         "$": "Coronary heart disease and end-stage renal disease: Coronary heart disease is frequent in patients with end-stage renal disease. Without invasive procedures coronary heart disease is often not diagnosed in patients with end-stage renal disease. We have no evidence for accelerated progression of coronary heart disease under conditions of dialysis. Valvular heart disease and end-stage renal disease: Valvular heart disease shows an increasing frequency depending on the period of dialysis. Valvular heart disease is often unnoticed and constantly underestimated without invasive investigation. Valvular heart disease often indicates a bad prognosis in our patients with end-stage renal disease."
+        },
+        "creator": [
+         {
+          "@rank": "1",
+          "@name": "L",
+          "@surname": "Castro",
+          "$": "L, Castro"
+         },
+         {
+          "@rank": "2",
+          "@name": "B",
+          "@surname": "Höfling",
+          "$": "B, Höfling"
+         },
+         {
+          "@rank": "3",
+          "@name": "R",
+          "@surname": "Hässler",
+          "$": "R, Hässler"
+         },
+         {
+          "@rank": "4",
+          "@name": "G",
+          "@surname": "Hillebrand",
+          "$": "G, Hillebrand"
+         },
+         {
+          "@rank": "5",
+          "@name": "W",
+          "@surname": "Land",
+          "$": "W, Land"
+         },
+         {
+          "@rank": "6",
+          "@name": "E",
+          "@surname": "Kreuzer",
+          "$": "E, Kreuzer"
+         },
+         {
+          "@rank": "7",
+          "@name": "B",
+          "@surname": "Kemkes",
+          "$": "B, Kemkes"
+         },
+         {
+          "@rank": "8",
+          "@name": "H J",
+          "@surname": "Gurland",
+          "$": "H J, Gurland"
+         },
+         {
+          "@rank": "9",
+          "@name": "E",
+          "@surname": "Erdmann",
+          "$": "E, Erdmann"
+         }
+        ],
+        "dateofacceptance": {
+         "$": "1986-09-16"
+        },
+        "journal": {
+         "@issn": "0066-0078",
+         "@vol": "31",
+         "$": "Transactions - American Society for Artificial Internal Organs"
+        }
+       }
+      }
+     }
+    },
+    {
+     "header": {
+      "dri:objIdentifier": {
+       "$": "doi_dedup___::3030475abca1125e2adb8efb262c9b32"
+      }
+     },
+     "metadata": {
+      "oaf:entity": {
+       "oaf:result": {
+        "pid": {
+         "@classid": "doi",
+         "@classname": "Digital Object Identifier",
+         "@schemeid": "dnet:pid_types",
+         "@schemename": "dnet:pid_types",
+         "$": "10.1093/innovait/inm006"
+        },
+        "title": [
+         {
+          "@classid": "main title",
+          "@classname": "main title",
+          "@schemeid": "dnet:dataCite_title",
+          "@schemename": "dnet:dataCite_title",
+          "$": "Congenital Heart Disease"
+         },
+         {
+          "@classid": "main title",
+          "@classname": "main title",
+          "@schemeid": "dnet:dataCite_title",
+          "@schemename": "dnet:dataCite_title",
+          "$": "congenital heart disease"
+         }
+        ],
+        "description": {
+         "$": "<jats:p>Congenital heart disease simply means heart disease present at birth. It comprises genetic heart disease and structural anormalities of the heart. This article aims to describe the presentation of congenital heart disease, and outline common structural and genetic heart problems.</jats:p>"
+        },
+        "creator": [
+         {
+          "@rank": "1",
+          "@name": "Francoise",
+          "@surname": "van Dorp",
+          "$": "Francoise van Dorp"
+         },
+         {
+          "@rank": "2",
+          "@name": "Chantal",
+          "@surname": "Simon",
+          "$": "Chantal Simon"
+         }
+        ],
+        "dateofacceptance": {
+         "$": "2008-01-01"
+        },
+        "journal": {
+         "@issn": "1755-7380",
+         "@eissn": "1755-7399",
+         "@ep": "40",
+         "@sp": "34",
+         "@vol": "1",
+         "$": "InnovAiT: Education and inspiration for general practice"
+        },
+        "relevantdate": [
+         {
+          "@classid": "created",
+          "@classname": "created",
+          "@schemeid": "dnet:dataCite_date",
+          "@schemename": "dnet:dataCite_date",
+          "$": "2008-03-12"
+         },
+         {
+          "@classid": "published-online",
+          "@classname": "published-online",
+          "@schemeid": "dnet:dataCite_date",
+          "@schemename": "dnet:dataCite_date",
+          "$": "2008-01-01"
+         },
+         {
+          "@classid": "published-print",
+          "@classname": "published-print",
+          "@schemeid": "dnet:dataCite_date",
+          "@schemename": "dnet:dataCite_date",
+          "$": "2008-01-01"
+         }
+        ]
+       }
+      }
+     }
+    }
+   ]
+  },
+  "browseResults": null
+ }
+}

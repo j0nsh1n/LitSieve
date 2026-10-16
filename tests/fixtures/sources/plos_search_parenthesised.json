@@ -1,0 +1,45 @@
+{
+ "response": {
+  "numFound": 4556,
+  "start": 0,
+  "docs": [
+   {
+    "id": "10.1371/journal.pone.0066861",
+    "journal": "PLoS ONE",
+    "publication_date": "2013-06-24T00:00:00Z",
+    "author": [
+     "Alexander Lukasz",
+     "Gernot Beutel",
+     "Philipp Kümpers",
+     "Agnieszka Denecke",
+     "Mechthild Westhoff-Bleck",
+     "Bernhard Schieffer",
+     "Johann Bauersachs",
+     "Jan T Kielstein",
+     "Oktay Tutarel"
+    ],
+    "abstract": [
+     "Background: Chronic heart failure is an important cause for morbidity and mortality in adults with congenital heart disease (ACHD). While NT-proBNP is an established biomarker for heart failure of non-congenital origin, its application in ACHD has limitations. The angiogenic factors Angiopoietin-1 and -2 (Ang-1, Ang-2), vascular endothelial growth factor (VEGF), and soluble receptor tyrosine kinase of the Tie family (sTie2) correlate with disease severity in heart failure of non-congenital origin. Their role in ACHD has not been studied. Methods: In 91 patients Ang-2 and NT-proBNP were measured and related to New York Heart Association class, systemic ventricular function and parameters of cardiopulmonary exercise testing. Ang-1, VEGF, and sTie2 were also measured. Results: Ang-2 correlates with NYHA class and ventricular dysfunction comparable to NT-proBNP. Further, Ang-2 showed a good correlation with parameters of cardiopulmonary exercise testing. Both, Ang-2 and NT-proBNP identified patients with severely limited cardiopulmonary exercise capacity. Additionally, Ang-2 is elevated in patients with a single ventricle physiology in contrast to NT-proBNP. VEGF, Ang-1, and sTie2 were not correlated with any clinical parameter. Conclusion: The performance of Ang-2 as a biomarker for heart failure in ACHD is comparable to NT-proBNP. Its significant elevation in patients with single ventricle physiology indicates potential in this patient group and warrants further studies. "
+    ],
+    "title": "Angiopoietin-2 in Adults with Congenital Heart Disease and Heart Failure"
+   },
+   {
+    "id": "10.1371/journal.pone.0321209",
+    "journal": "PLOS One",
+    "publication_date": "2025-05-23T00:00:00Z",
+    "author": [
+     "Yu Fang",
+     "Dongbo Liu",
+     "Zijian Guo",
+     "Hongxia Leng",
+     "Xing Liu",
+     "Xiaochen Wu"
+    ],
+    "abstract": [
+     "\nConventional heart sound classification methods often rely on single-channel, one-dimensional feature extraction, which inadequately captures pathological relationships across different auscultation zones, thereby limiting the accuracy of heart disease detection. To address this issue, a novel classification framework based on multi-channel heart sound coupling feature extraction is proposed to enhance heart disease identification. This approach begins with denoising preprocessing applied to four-channel heart sound signals and a single-channel electrocardiogram. These five-channel signals are systematically paired to extract five types of coupling features, resulting in 130 distinct features per multi-channel sample. The ReliefF algorithm is then used to evaluate feature importance, retaining the top 20% of features to construct a coupling feature set. A convolutional neural network is employed to classify normal and abnormal heart sounds. When applied to clinical congenital heart disease datasets, the proposed method achieved a classification accuracy of 95.6%, while on the PhysioNet heart sound challenge dataset, it reached an accuracy of 98.3%. Experimental results demonstrate that compared to single-channel, one-dimensional features, multi-channel coupling features more effectively capture pathological characteristics in heart sound signals, significantly improving the accuracy of heart disease classification and addressing challenges in the refined categorization of cardiac conditions.\n"
+    ],
+    "title": "Advanced heart disease classification based on multi-channel heart sound coupling features"
+   }
+  ]
+ }
+}

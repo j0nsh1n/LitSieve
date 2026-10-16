@@ -8,7 +8,7 @@ Free API, no authentication required
 import logging
 from typing import Dict, List, Optional
 
-from app.fetchers.base import BaseFetcher, FetchError, HttpClient, reraise_fetch_error
+from app.fetchers.base import BaseFetcher, FetchError, HttpClient, json_of, reraise_fetch_error
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ class ERICFetcher(BaseFetcher):
                         'start': start,
                     },
                 )
-                docs = r.json().get('response', {}).get('docs', [])
+                docs = json_of(r).get('response', {}).get('docs', [])
                 if not docs:
                     break
                 for doc in docs:

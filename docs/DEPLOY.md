@@ -338,6 +338,7 @@ Losing the key loses the data. Keep it in the host secret store.
 | Variable | Role |
 |----------|------|
 | `NASA_ADS_TOKEN` | Enables NASA ADS fetcher |
+| `S2_API_KEY` / `OPENALEX_API_KEY` / `NCBI_API_KEY` | Optional source keys; see `docs/SELFHOST.md` |
 | `EMBEDDING_DEVICE` | `cpu` / `cuda` / `mps` (default: auto) |
 | `USER_DATA_DIR` | Override data root (default `user_data/`) |
 | `HIDE_STUDY_TYPE_TAGS` / `HIDE_AI_BUTTONS` | Classroom UI toggles |

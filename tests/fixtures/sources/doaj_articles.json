@@ -1,0 +1,191 @@
+{
+ "total": 92156,
+ "page": 1,
+ "pageSize": 25,
+ "timestamp": "2026-10-16T05:44:37.681198Z",
+ "query": "heart disease",
+ "results": [
+  {
+   "last_updated": "2025-08-20T03:47:49Z",
+   "bibjson": {
+    "title": "Growth Failure in Children with Congenital Heart Disease",
+    "abstract": "<b>Background/Objectives</b>: Growth failure is a common complication in children with congenital heart disease (CHD), yet its underlying mechanisms and consequences remain incompletely understood. This review aims to provide a comprehensive overview of growth failure in children with CHD and outline a framework of factors contributing to this condition. <b>Methods:</b> To lay the foundation for this narrative review, several databases were searched using broad search terms related to CHD and growth failure. <b>Results</b>: Growth failure is most pronounced during the first year of life, but often improves after achieving hemodynamic stability through surgical or medical interventions. However, children with complex conditions, such as single-ventricle physiology or multiple heart defects, may experience persistent growth impairment due to chronic disease effects. Specific features of CHD—cyanosis, pulmonary hypertension, and low cardiac output—can further hinder growth by disrupting endocrine function and impairing musculoskeletal development. Long-term use of medications and exposure to repeated diagnostic procedures also contribute to growth failure. Beyond physical effects, growth failure profoundly influences neurodevelopment, psychosocial well-being, and survival outcomes. Based on our review, we have developed a knowledge map to better understand the complexities of growth failure in children with CHD. <b>Conclusions</b>: A thorough understanding of the multifaceted contributors to growth failure in CHD is essential for identifying high-risk children and devising strategies to support optimal growth. Integrating this knowledge into clinical practice can improve long-term outcomes for children with CHD.",
+    "year": "2025",
+    "author": [
+     {
+      "name": "Jihye Lee"
+     },
+     {
+      "name": "Teresa Marshall"
+     },
+     {
+      "name": "Harleah Buck"
+     },
+     {
+      "name": "Mulder Pamela"
+     },
+     {
+      "name": "Sandra Daack-Hirsch"
+     }
+    ],
+    "journal": {
+     "title": "Children"
+    },
+    "identifier": [
+     {
+      "id": "10.3390/children12050616",
+      "type": "doi"
+     },
+     {
+      "id": "2227-9067",
+      "type": "eissn"
+     }
+    ]
+   },
+   "id": "00042bd8cfa54c51814410ad098ad25e",
+   "created_date": "2025-05-27T13:02:57Z"
+  },
+  {
+   "last_updated": "2026-07-07T12:03:50Z",
+   "bibjson": {
+    "title": "Influence of SGLT2i on Renal Progression in CKD Patients: A Multicenter Real-World Study in China",
+    "abstract": "\n          <p>Introduction: Although large randomized control trials have established the renal benefits of sodium-glucose cotransporter-2 inhibitors (SGLT2is) in chronic kidney disease (CKD), real-world evidence in Chinese CKD populations remains scarce. Here we report a multicenter real-world retrospective cohort study of SGLT2i use in hospitalized CKD patients in China. Methods: We enrolled 155,053 adults with CKD from the China Renal Data System (CRDS) databases (January 2002–January 2023). We included patients treated with SGLT2i for at least 3 months. SGLT2i users and nonusers were matched (1:2) using propensity score matching (PSM). The main outcomes included renal, safety, and clinical outcomes. Renal outcomes included the first occurrence of CKD progression, end-stage kidney disease (ESKD), or composite outcomes. Multivariable Cox regression models and cumulative incidence were estimated post-PSM. Results: Overall, the core analysis included 1,477 SGLT2i users and 2,674 nonusers. The progression of CKD (HR 0.81, 95% confidence interval [CI] 0.69–0.95, p < 0.01), incidence of ESKD (HR 0.26, 95% CI 0.18–0.37, p < 0.001), and composite renal outcome (HR 0.68, 95% CI 0.59–0.77, p < 0.001) were significantly lower in the SGLT2i group compared to the non-SGLT2i group. Additionally, the SGLT2i group experienced lower rates of heart failure, stroke, transient ischemic attack, and severe hypoglycemia but a higher risk of acute pancreatitis compared to the non-SGLT2i group. Additionally, eGFR remains better preserved over 3 years in CKD patients treated with SGLT2i. Conclusion: These findings suggest that SGLT2i offers substantial renal and cardiovascular benefits for Chinese CKD patients. </p>",
+    "year": "2026",
+    "author": [
+     {
+      "name": "Wen-Cong  Guo"
+     },
+     {
+      "name": "Li-Cong  Su"
+     },
+     {
+      "name": "Bin Wang"
+     },
+     {
+      "name": "Zuo-Lin Li"
+     },
+     {
+      "name": "Min Wu"
+     },
+     {
+      "name": "Yi Wen"
+     },
+     {
+      "name": "Meng-Chun  Gong"
+     },
+     {
+      "name": "Fan-Fan Hou"
+     },
+     {
+      "name": "Bi-Cheng Liu"
+     }
+    ],
+    "journal": {
+     "title": "Kidney Diseases"
+    },
+    "identifier": [
+     {
+      "id": "2296-9357",
+      "type": "eissn"
+     },
+     {
+      "id": "10.1159/000550222",
+      "type": "doi"
+     }
+    ]
+   },
+   "id": "0004843731644a88b39fc474723ca895",
+   "created_date": "2026-07-07T12:03:50Z"
+  },
+  {
+   "last_updated": "2025-10-13T05:26:33Z",
+   "bibjson": {
+    "title": "Impact of in-hospital oral beta-blockers initiation on long-term outcomes in ST-elevation myocardial infarction patients with cardiogenic shock",
+    "abstract": "BackgroundEarly revascularization enables ST-elevation myocardial infarction (STEMI) patients with cardiogenic shock (CS) to initiate oral beta-blockers once hemodynamic stability is achieved, but the impact of such initiation on prognosis remains unknown. We aimed to describe the clinical use of oral beta-blockers and assess its impact on long-term outcomes in STEMI patients with CS in a real-world setting.Materials and methodsThe China Acute Myocardial Infarction registry (CAMI) is a prospective observational study that enrolls patients with acute myocardial infarction from three-level hospitals across 31 administrative regions in mainland China. Among 19,112 STEMI patients in the CAMI registry, a total of 744 STEMI patients who presented with CS at admission were analyzed. Multivariate regression models were used to evaluate the impact of in-hospital oral beta-blockers on 2-year outcomes. Inverse probability treatment weighting (IPTW) score was further used to address biases between the groups with and without oral beta-blockers. The primary endpoint was all-cause death.Results42.7% (n = 318) of the patients initiated in-hospital oral beta-blockers; these patients were in better states and more likely to receive primary percutaneous coronary intervention and secondary prevention at discharge. The crude 2-year all-cause mortality was 41.7%, with a lower rate in patients who received oral beta-blockers (24.2% vs. 54.8%, P &lt; 0.001). However, after multivariate adjustment, patients who received oral beta-blockers showed a non-significant increase in 2-year mortality compared with non-users (HR = 1.29, 95% CI: 0.95–1.75, P = 0.099), and this increase became statistically significant in the subgroup of county-level hospitals (HR = 1.79, 95% CI: 1.03–3.09, P = 0.038, P-interaction = 0.010). Furthermore, after balancing the baseline covariates using IPTW and further adjusting for discharge medications, initiation of oral beta-blockers during hospitalization increased the risk of 2-year all-cause mortality (HR = 1.59, 95% CI: 1.18–2.13, P = 0.002).ConclusionNo benefit of in-hospital oral beta-blockers initiation on long-term all-cause mortality was found in Chinese STEMI patients with CS, and a trend toward increased mortality existed, especially in small-scale hospitals with insufficient experience in CS treatment.",
+    "year": "2025",
+    "author": [
+     {
+      "name": "Xiaojin Gao"
+     },
+     {
+      "name": "Mengyuan Liu"
+     },
+     {
+      "name": "Jing Xu"
+     },
+     {
+      "name": "Ling Li"
+     },
+     {
+      "name": "Min Chen"
+     },
+     {
+      "name": "Xinyue Lang"
+     },
+     {
+      "name": "Shaobin Jia"
+     },
+     {
+      "name": "Bin Ning"
+     },
+     {
+      "name": "Haiyan Xu"
+     },
+     {
+      "name": "Lei Song"
+     },
+     {
+      "name": "Yuan Wu"
+     },
+     {
+      "name": "Jun Zhang"
+     },
+     {
+      "name": "Fenghuan Hu"
+     },
+     {
+      "name": "Shubin Qiao"
+     },
+     {
+      "name": "Yongjian Wu"
+     },
+     {
+      "name": "Yanyan Zhao"
+     },
+     {
+      "name": "Yang Wang"
+     },
+     {
+      "name": "Wei Li"
+     },
+     {
+      "name": "Chen Jin"
+     },
+     {
+      "name": "Jingang Yang"
+     },
+     {
+      "name": "Yuejin Yang"
+     }
+    ],
+    "journal": {
+     "title": "Frontiers in Medicine"
+    },
+    "identifier": [
+     {
+      "id": "2296-858X",
+      "type": "eissn"
+     },
+     {
+      "id": "10.3389/fmed.2025.1666977",
+      "type": "doi"
+     }
+    ]
+   },
+   "id": "000df8edcbf642e3b0322b4cc12e5f3a",
+   "created_date": "2025-10-13T05:26:33Z"
+  }
+ ],
+ "next": "https://doaj.org/api/v4/search/articles/heart%20disease?page=2&pageSize=25",
+ "last": "https://doaj.org/api/v4/search/articles/heart%20disease?page=3687&pageSize=25"
+}

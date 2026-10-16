@@ -129,9 +129,11 @@ a substitute for school library databases.
   - `templates/` (+ `partials/`) + `static/` — UI (repo root; no frontend build)
   - `tests/` — pytest suite; `tests/README.md` policy
   - `tools/` — backup, watchdog, bench_scale, encrypt_databases
-- External APIs: 17 free academic sources (PubMed, Europe PMC, OpenAlex, arXiv,
+- External APIs: 16 free academic sources (PubMed, Europe PMC, OpenAlex, arXiv,
   Semantic Scholar, ERIC, CrossRef, DOAJ, ClinicalTrials.gov, NASA ADS with
-  token, bioRxiv, medRxiv, DBLP, OpenAIRE, PLOS, HAL, Zenodo). Optional:
+  token, bioRxiv and medRxiv searched through Europe PMC's preprint index,
+  OpenAIRE, PLOS, HAL, Zenodo). DBLP was removed 2026-10-16: it blocks
+  automated requests and its records lack abstracts. Optional:
   Ollama (local), OpenAI-compatible / Anthropic keys, SMTP for email.
 
 ## Security & Privacy

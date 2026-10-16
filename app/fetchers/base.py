@@ -5,14 +5,16 @@ Abstract base class plus shared HTTP client with retries and polite delay.
 
 from __future__ import annotations
 
+import html
 import logging
 import math
 import os
 import random
+import re
 import threading
 import time
 from abc import ABC, abstractmethod
-from typing import Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 import requests
 
@@ -71,7 +73,7 @@ class FetchError(Exception):
 
     def __init__(self, message: str, kind: str = "error", articles: Optional[List[Dict]] = None):
         super().__init__(message)
-        self.kind = kind  # rate_limited | network | http | no_results | error | cancelled | timeout
+        self.kind = kind  # rate_limited | network | http | no_results | error | cancelled | timeout | unavailable
         self.articles = articles or []
 
 
@@ -83,11 +85,49 @@ class FetchCancelled(FetchError):
 
 
 def reraise_fetch_error(exc: BaseException, articles: Optional[List[Dict]] = None) -> None:
-    """Let typed HTTP failures reach the coordinator instead of looking empty."""
+    """Let typed HTTP failures reach the coordinator with the pages already fetched."""
     if isinstance(exc, FetchError):
-        if exc.kind == "timeout" and articles:
+        if articles and not exc.articles:
             exc.articles = articles
         raise exc
+
+
+def json_of(resp) -> Any:
+    """Parse a response body, or raise a typed error for a page that is not data.
+
+    Bot walls answer 2xx with HTML (DBLP sent 202 "Making sure you're not a
+    bot!"), which would otherwise surface as "Expecting value".
+    """
+    try:
+        return resp.json()
+    except ValueError as e:
+        raise FetchError(
+            "The source sent a web page instead of search results. "
+            "It may be refusing automated requests right now; try again later.",
+            kind="network",
+        ) from e
+
+
+# Tag-shaped only: "p < 0.01 and q > 2" in an abstract is text, not markup.
+_TAG = re.compile(r"</?[A-Za-z][A-Za-z0-9:-]*(?:\s[^<>]*)?/?>")
+_SPACE = re.compile(r"\s+")
+
+
+def clean_text(text: Any) -> str:
+    """Plain text from an API string: tags dropped, entities decoded, spaces collapsed."""
+    if not text:
+        return ""
+    plain = str(text)
+    # Some APIs escape twice (DOAJ sends "&amp;lt;"), and Europe PMC escapes its tags.
+    for _ in range(2):
+        plain = html.unescape(plain)
+    return _SPACE.sub(" ", _TAG.sub(" ", plain)).strip()
+
+
+def user_agent(email: Optional[str] = None) -> str:
+    """Identify LitSieve to APIs; add the student's contact only when they gave one."""
+    email = (email or "").strip()
+    return f"LitSieve (educational; {email})" if email else "LitSieve (educational)"
 
 
 def classify_error(exc: BaseException) -> str:
@@ -124,7 +164,7 @@ class HttpClient:
         timeout: float = DEFAULT_TIMEOUT,
         delay: float = DEFAULT_DELAY,
         max_retries: int = MAX_RETRIES,
-        user_agent: str = "LiteratureResearchAide/3.7 (educational; polite bot)",
+        user_agent: str = "LitSieve (educational)",
         headers: Optional[Dict[str, str]] = None,
         budget_seconds: Optional[float] = None,
     ):
@@ -214,7 +254,9 @@ class HttpClient:
                 if attempt >= self.max_retries:
                     raise last_exc
                 retry_after = resp.headers.get("Retry-After")
-                self._backoff_sleep(attempt, retry_after=retry_after, deadline=deadline)
+                self._backoff_sleep(
+                    attempt, retry_after=retry_after, deadline=deadline, kind=last_exc.kind
+                )
                 continue
 
             if resp.status_code >= 400:
@@ -236,15 +278,26 @@ class HttpClient:
         return self.request("POST", url, **kwargs)
 
     @staticmethod
-    def _backoff_sleep(attempt: int, retry_after: Optional[str], deadline: Optional[float] = None) -> None:
+    def _backoff_sleep(
+        attempt: int,
+        retry_after: Optional[str],
+        deadline: Optional[float] = None,
+        kind: str = "rate_limited",
+    ) -> None:
         if retry_after:
             try:
                 seconds = float(retry_after)
-                if seconds >= 0:
-                    HttpClient._sleep_interruptible(min(seconds, 60.0), deadline=deadline)
-                    return
             except (TypeError, ValueError):
-                pass
+                seconds = -1.0
+            if seconds >= 0:
+                wait = min(seconds, 60.0)
+                if wait > check_fetch_deadline(deadline):
+                    raise FetchError(
+                        f"The source asked us to wait {int(seconds)} seconds, longer than the time left.",
+                        kind=kind,
+                    )
+                HttpClient._sleep_interruptible(wait, deadline=deadline)
+                return
         # Exponential backoff with jitter: ~0.5, 1, 2, 4 …
         base = min(30.0, 0.5 * (2 ** attempt))
         HttpClient._sleep_interruptible(base + random.uniform(0, 0.25), deadline=deadline)

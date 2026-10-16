@@ -6,7 +6,7 @@ Fetches clinical trial records from the ClinicalTrials.gov v2 API
 import logging
 from typing import Dict, List, Optional
 
-from app.fetchers.base import BaseFetcher, HttpClient, reraise_fetch_error
+from app.fetchers.base import BaseFetcher, HttpClient, json_of, reraise_fetch_error
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ class ClinicalTrialsFetcher(BaseFetcher):
 
             try:
                 resp = self.http.get(f"{self.BASE_URL}/studies", params=params, timeout=30)
-                data = resp.json()
+                data = json_of(resp)
 
                 studies = data.get("studies", [])
                 if not studies:
@@ -82,7 +82,7 @@ class ClinicalTrialsFetcher(BaseFetcher):
 
             try:
                 resp = self.http.get(f"{self.BASE_URL}/studies", params=params, timeout=30)
-                data = resp.json()
+                data = json_of(resp)
 
                 studies = data.get("studies", [])
                 if not studies:
@@ -116,7 +116,7 @@ class ClinicalTrialsFetcher(BaseFetcher):
                     params={"format": "json"},
                     timeout=30
                 )
-                parsed = self._parse_study(resp.json())
+                parsed = self._parse_study(json_of(resp))
                 if parsed:
                     articles.append(parsed)
             except Exception as e:
@@ -144,19 +144,15 @@ class ClinicalTrialsFetcher(BaseFetcher):
             # Year from start date
             status = proto.get("statusModule", {})
             start_date = status.get("startDateStruct", {}).get("date", "")
-            year = start_date[:4] if start_date and len(start_date) >= 4 else "Unknown"
+            year = start_date[:4] if start_date and len(start_date) >= 4 else ""
 
             # Investigators as authors
             contacts = proto.get("contactsLocationsModule", {})
             authors = []
-            for person in contacts.get("overallOfficials", [])[:5]:
+            for person in contacts.get("overallOfficials", []):
                 name = person.get("name", "")
                 if name:
                     authors.append(name)
-
-            # Lead sponsor as journal equivalent
-            sponsor = proto.get("sponsorCollaboratorsModule", {})
-            lead = sponsor.get("leadSponsor", {}).get("name", "ClinicalTrials.gov")
 
             return {
                 "article_id": nct_id,
@@ -165,7 +161,7 @@ class ClinicalTrialsFetcher(BaseFetcher):
                 "abstract": abstract,
                 "year": str(year),
                 "authors": authors,
-                "journal": lead,
+                "journal": "ClinicalTrials.gov",
             }
 
         except Exception as e:

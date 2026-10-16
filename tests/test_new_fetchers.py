@@ -1,84 +1,82 @@
 """Offline unit tests for new public source fetchers (HTTP mocked)."""
 
+import json
+from pathlib import Path
 
+import pytest
 
 from app.fetchers.base import FetchError
-from app.fetchers.biorxiv import BioRxivFetcher, MedRxivFetcher, _matches
-from app.fetchers.dblp import DBLPFetcher
+from app.fetchers.biorxiv import BioRxivFetcher, MedRxivFetcher
 from app.fetchers.hal import HALFetcher
 from app.fetchers.openaire import OpenAIREFetcher, _node_text
 from app.fetchers.plos import PLOSFetcher
 from app.services.pipeline import FETCHERS
 
+FIXTURES = Path(__file__).parent / "fixtures" / "sources"
+
 
 def test_all_new_sources_registered():
-    for src in ("biorxiv", "medrxiv", "dblp", "openaire", "plos", "hal"):
+    for src in ("biorxiv", "medrxiv", "openaire", "plos", "hal"):
         assert src in FETCHERS
 
 
-def test_biorxiv_token_match():
-    assert _matches("stem cell", "Stem cell niches", "biology of stem cells")
-    assert not _matches("stem cell zebra", "Stem cell niches", "biology of cells")
+def _fixture(name):
+    return json.loads((FIXTURES / name).read_text())
 
 
-def test_biorxiv_parse_and_filter(monkeypatch):
+class _JsonResp:
+    def __init__(self, payload):
+        self._payload = payload
+
+    def json(self):
+        return self._payload
+
+
+def test_biorxiv_searches_europepmc_for_that_servers_preprints(monkeypatch):
     f = BioRxivFetcher()
-    sample = {
-        "title": "CRISPR editing in mice",
-        "abstract": "We used CRISPR to edit genes in laboratory mice models.",
-        "authors": "Doe, J.; Roe, A.",
-        "doi": "10.1101/2024.01.01.123456",
-        "date": "2024-06-01",
-    }
+    calls = []
 
-    class FakeResp:
-        def json(self):
-            return {
-                "messages": [{"status": "ok", "count": 1, "total": "1"}],
-                "collection": [sample],
-            }
+    def get(url, params=None, **kwargs):
+        calls.append(params)
+        return _JsonResp(_fixture("europepmc_ppr_biorxiv.json"))
 
-    monkeypatch.setattr(f.http, "get", lambda *a, **k: FakeResp())
-    arts = f.search_and_fetch("CRISPR mice", max_results=10)
-    assert len(arts) == 1
-    assert arts[0]["source"] == "biorxiv"
-    assert arts[0]["article_id"].startswith("10.1101/")
+    monkeypatch.setattr(f.http, "get", get)
+    arts = f.search_and_fetch("heart disease", max_results=2)
+    assert calls[0]["query"] == '(heart disease) AND SRC:PPR AND PUBLISHER:"bioRxiv"'
+    assert [a["article_id"] for a in arts] == [
+        "10.64898/2026.10.06.757136",
+        "10.64898/2026.10.06.757199",
+    ]
+    assert {a["source"] for a in arts} == {"biorxiv"}
+    assert {a["journal"] for a in arts} == {"bioRxiv preprint"}
+    assert all(a["abstract"] and "<" not in a["abstract"] for a in arts)
+    assert len(arts[0]["authors"]) == 14
 
 
-def test_medrxiv_source_name():
-    assert MedRxivFetcher.SOURCE_NAME == "medrxiv"
-    assert MedRxivFetcher.SERVER == "medrxiv"
+def test_medrxiv_is_scoped_to_medrxiv(monkeypatch):
+    f = MedRxivFetcher()
+    calls = []
+
+    def get(url, params=None, **kwargs):
+        calls.append(params)
+        return _JsonResp(_fixture("europepmc_ppr_medrxiv.json"))
+
+    monkeypatch.setattr(f.http, "get", get)
+    arts = f.search_and_fetch("heart disease", max_results=2)
+    assert calls[0]["query"].endswith('PUBLISHER:"medRxiv"')
+    assert {a["source"] for a in arts} == {"medrxiv"}
+    assert {a["journal"] for a in arts} == {"medRxiv preprint"}
 
 
-def test_dblp_parse_without_abstract(monkeypatch):
-    f = DBLPFetcher()
-    payload = {
-        "result": {
-            "hits": {
-                "hit": [{
-                    "@id": "1",
-                    "info": {
-                        "key": "conf/test/Doe24",
-                        "title": "Learning in Games.",
-                        "year": "2024",
-                        "venue": "ICML",
-                        "authors": {"author": {"text": "Jane Doe"}},
-                    },
-                }],
-            }
-        }
-    }
-
-    class FakeResp:
-        def json(self):
-            return payload
-
-    monkeypatch.setattr(f.http, "get", lambda *a, **k: FakeResp())
-    arts = f.search_and_fetch("learning", max_results=5)
-    assert len(arts) == 1
-    assert arts[0]["source"] == "dblp"
-    assert "No abstract" in arts[0]["abstract"]
-    assert arts[0]["authors"] == ["Jane Doe"]
+def test_rxiv_skips_a_preprint_without_a_doi_and_reports_no_results(monkeypatch):
+    f = BioRxivFetcher()
+    payload = _fixture("europepmc_ppr_biorxiv.json")
+    for record in payload["resultList"]["result"]:
+        record.pop("doi", None)
+    monkeypatch.setattr(f.http, "get", lambda *a, **k: _JsonResp(payload))
+    with pytest.raises(FetchError) as exc:
+        f.search_and_fetch("heart disease", max_results=2)
+    assert exc.value.kind == "no_results"
 
 
 def test_plos_parse(monkeypatch):
