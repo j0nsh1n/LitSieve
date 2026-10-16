@@ -41,6 +41,10 @@ Environment=PYTHONUNBUFFERED=1
 # systemd user PATH is only /usr/local/bin:/usr/bin. Refine auto-starts
 # ollama from ~/.local/bin (official installer). Keep that on PATH.
 Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin
+# Once every catalog embedding model has loaded once (so the Hugging Face
+# cache is complete), stop model loads from contacting the Hub (audit 23.3).
+# Turn it off again before adding an EXTRA_EMBEDDING_MODELS entry.
+#Environment=HF_HUB_OFFLINE=1
 SyslogIdentifier=litsieve
 
 # Light hardening

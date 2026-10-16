@@ -12,29 +12,18 @@ those ids in branches and PRs, and mark a finding `Fixed in #NN` in the
 audit when its PR merges.
 
 ## Phase 23 — Host
-Audit section 23, and what was still open from running the live instance.
+Audit section 23. The deploy, account cap, study aid, offline model loads and
+the deploy record are done on the host (2026-10-16); what is left needs the
+Cloudflare dashboard or new keys.
 - Tasks:
-  - (23.1) Deploy `main` (the admin slices and the fixes above) to the
-    production checkout and restart
-  - (23.4) Set `MAX_TOTAL_ACCOUNTS` in `.env` and restart; unset means no
-    cap and registration is open
-  - (23.4) Set `LLM_PROVIDER`, `OLLAMA_MODEL`, `OLLAMA_HOST` and
-    `OLLAMA_MODELS` in `.env` and restart, so the built-in study aid is on
-    for students again; decide on `NASA_ADS_TOKEN`, `AI_ALLOW_SETTINGS_WRITE`
-    and the optional source keys (`S2_API_KEY`, `OPENALEX_API_KEY`,
-    `NCBI_API_KEY`); `.env.example` now lists every setting the code reads
-  - Run `pip install -r requirements.txt` in the production venv before the
-    restart: `anthropic` and `httpx` are now declared (22.2)
-  - (23.3) Set `HF_HUB_OFFLINE=1` on the app unit once the model cache is
-    complete, so no model load contacts the Hub
-  - (23.2) Let an external uptime check reach `/health` (a Cloudflare skip
-    rule for that path, or check through the tunnel)
-  - Confirm on the host that a detached deploy writes its
-    `operator_deploys` row to the live `users.db` and that a console
-    rollback closes its own record
-- Complete when: the host serves the fixed build, an account cap is
-  enforced, students have a working study aid, the log shows no Hub
-  requests on model load, and the deploy record has been seen on the host
+  - (23.2) Let an external uptime check reach `/health`: find what
+    challenges it (Cloudflare Security → Events, path `/health`) and add a
+    skip rule for that path. Bot Fight Mode on the free plan cannot be
+    skipped by a rule, only turned off
+  - (23.4) Optional source keys when wanted: `S2_API_KEY`,
+    `OPENALEX_API_KEY`, `NCBI_API_KEY`, and `NASA_ADS_TOKEN` (NASA ADS
+    reports unavailable without it)
+- Complete when: an external check reads `/health` as healthy
 - Status: [ ] open
 
 ## Backlog (unscheduled)
