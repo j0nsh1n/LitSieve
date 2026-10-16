@@ -170,6 +170,21 @@ and this project aims to follow Semantic Versioning for app version strings
     of "[object Object]" or "Request failed".
   - "Show original abstract" opens the abstract before scrolling to it.
 
+- Smaller Search fixes (audit 19.15): the source chips and Save your work
+  load again after the first fetch, so the Sources dialog is no longer
+  empty; a look that fails to save shows the old look again; Re-prepare's
+  status no longer stays on "Preparing papers…"; topic area cards work
+  from the keyboard (Enter or Space, with a focus outline); values inside
+  HTML attributes are escaped with `escapeAttr`; one Reader panel's Escape
+  listener at a time; public copy says Narrow it down, not "Quick screen".
+- Looks: closed results show a star and a note mark beside the title; Save
+  note says "Saving…" and then "Saved" only once the note is stored; More
+  like this scrolls its "Starting from this paper" banner into view; a
+  Skip made before the library list loads is kept after a reload; Catalog
+  dark's accent rises from 4.21 to 4.57:1 on its tinted chips and hover;
+  danger buttons in every dark look use dark text on the light red (2.35
+  to 7.5:1).
+
 ### Removed
 - DBLP is no longer offered as a source: it answers every request from the
   host with a bot check, and its records have no abstracts. Papers already

@@ -98,6 +98,10 @@
             + `</form>`;
     }
 
+    // One Escape listener for the whole page: opening a second panel retires
+    // the first panel's (audit 19.15).
+    let clearActiveEscape = null;
+
     function bindReaderModeActions(opts) {
         const wrap = opts && opts.wrap;
         const panel = opts && opts.panel;
@@ -118,10 +122,13 @@
                 document.removeEventListener('keydown', escapeHandler);
                 escapeHandler = null;
             }
+            if (clearActiveEscape === clearEscape) clearActiveEscape = null;
         };
 
         const armEscape = () => {
+            if (clearActiveEscape) clearActiveEscape();
             clearEscape();
+            clearActiveEscape = clearEscape;
             escapeHandler = (ev) => {
                 if (ev.key !== 'Escape') return;
                 ev.preventDefault();

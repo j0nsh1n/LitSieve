@@ -1150,6 +1150,13 @@ async function doMoreLikeThisPaper(article, opts) {
  lastSuccessfulSession = session;
  lastResults = results;
  showSearchResults(results);
+ // The button sits on a result far down the list; bring the "Starting from
+ // this paper" banner and the re-ranked list into view (Looks polish).
+ if (!fromRestore && banner && typeof banner.scrollIntoView === 'function') {
+  const reduce = typeof matchMedia === 'function'
+   && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  banner.scrollIntoView({ block: 'start', behavior: reduce ? 'auto' : 'smooth' });
+ }
  await saveSearchSession('seed');
  } catch (e) {
  if (!fromRestore) showNotification(`Search failed: ${e.message}`, 'error');
@@ -1236,13 +1243,28 @@ function renderStudyTypeBadge(article) {
  ? `<span class="study-type-meaning">${escapeHtml(meaning)}</span>`
  : '';
  return `<span class="study-type-wrap">`
- + `<span class="study-type-badge band-${escapeHtml(band)}" data-tip="${escapeHtml(title)}">`
+ + `<span class="study-type-badge band-${escapeAttr(band)}" data-tip="${escapeAttr(title)}">`
  + `${escapeHtml(label)}${warnMark}</span>`
  + meaningLine
  + `</span>`;
 }
 
 /** Star control label: inline SVG (never an emoji glyph) + text. */
+/** Star and note marks a closed row shows beside its title (Looks polish). */
+function resultMarksHtml(starred, hasNote) {
+ return '<span class="result-marks">'
+  + `<span class="result-mark result-mark-star"${starred ? '' : ' hidden'}>`
+  + '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">'
+  + '<path d="M12 2l3 6.5 7 .9-5 4.9 1.2 7L12 18l-6.2 3.3L7 14.3 2 9.4l7-.9z"/></svg>'
+  + '<span class="u-visually-hidden">Starred</span></span>'
+  + `<span class="result-mark result-mark-note"${hasNote ? '' : ' hidden'}>`
+  + '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"'
+  + ' stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'
+  + '<path d="M4 20h4L19 9l-4-4L4 16v4z"/></svg>'
+  + '<span class="u-visually-hidden">Has a note</span></span>'
+  + '</span>';
+}
+
 function starLabelHtml(on) {
  const fill = on ? 'currentColor' : 'none';
  return '<svg class="ico star-ico" viewBox="0 0 24 24" aria-hidden="true" fill="' + fill + '"'
@@ -1379,10 +1401,10 @@ function buildResultCard(article, idx) {
  const url = getArticleUrl(article.article_id, article.source);
  const idText = escapeHtml(article.article_id || '');
  const idLink = url
- ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" class="article-link">${idText}</a>`
+ ? `<a href="${escapeAttr(url)}" target="_blank" rel="noopener" class="article-link">${idText}</a>`
  : idText;
  const openLink = url
- ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" class="result-open-link"
+ ? `<a href="${escapeAttr(url)}" target="_blank" rel="noopener" class="result-open-link"
   data-tip="Open this paper at its source (new tab)">View paper \u2197</a>`
  : '';
 
@@ -1424,7 +1446,7 @@ function buildResultCard(article, idx) {
 
  const headHtml = `
  <div class="result-row-head result-row-meta">
- <div class="score-meter" role="img" aria-label="Similarity ${simLabel} of 1. Higher is a closer match to your query." data-tip="${escapeHtml(scoreHelp)}">
+ <div class="score-meter" role="img" aria-label="Similarity ${simLabel} of 1. Higher is a closer match to your query." data-tip="${escapeAttr(scoreHelp)}">
   <span class="score-meter-value">${escapeHtml(simLabel)}</span>
   <span class="score-meter-track"><span class="score-meter-fill"></span></span>
  </div>
@@ -1434,7 +1456,7 @@ function buildResultCard(article, idx) {
   <span class="tag">${escapeHtml(getSourceName(article.source))}</span>
  </span>
  </div>
- <h3 class="article-title result-row-title">${escapeHtml(article.title || '')}</h3>
+ <h3 class="article-title result-row-title">${escapeHtml(article.title || '')}${resultMarksHtml(starred, !!String(noteVal).trim())}</h3>
  <div class="byline result-byline">${byline}</div>
  ${teaser ? `<p class="result-teaser">${escapeHtml(teaser)}</p>` : ''}`;
 
@@ -1537,6 +1559,8 @@ function buildResultCard(article, idx) {
  }),
  });
  patchLastResult(article, { starred: next });
+ const starMark = card.querySelector('.result-mark-star');
+ if (starMark) starMark.hidden = !next;
  bumpStarredCount(next ? 1 : -1);
  if (displayFilterState.starred) showSearchResults();
  } catch (err) {
@@ -1554,7 +1578,8 @@ function buildResultCard(article, idx) {
  e.preventDefault();
  const prev = saveBtn.textContent;
  saveBtn.disabled = true;
- saveBtn.textContent = 'Saved';
+ // "Saved" only once the server has it (Looks polish).
+ saveBtn.textContent = 'Saving…';
  try {
  await apiCall('/api/notes', {
  method: 'POST',
@@ -1565,6 +1590,9 @@ function buildResultCard(article, idx) {
  }),
  });
  patchLastResult(article, { note: noteField.value });
+ saveBtn.textContent = 'Saved';
+ const noteMark = card.querySelector('.result-mark-note');
+ if (noteMark) noteMark.hidden = !noteField.value.trim();
  showNotification('Note saved.', 'success');
  if (displayFilterState.noted) showSearchResults();
  } catch (err) {

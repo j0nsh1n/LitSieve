@@ -263,7 +263,16 @@ function renderTopicGrid() {
   ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${topic.icon_svg}</svg>`
   : topic.icon;
  card.innerHTML = `<span class="topic-icon">${iconHtml}</span><span class="topic-name">${topic.name}</span>`;
+ // A toggle button for keyboards and screen readers too (audit 19.15).
+ card.setAttribute('role', 'button');
+ card.tabIndex = 0;
+ card.setAttribute('aria-pressed', 'false');
  card.addEventListener('click', () => toggleTopic(topic.id, card));
+ card.addEventListener('keydown', (ev) => {
+  if (ev.key !== 'Enter' && ev.key !== ' ') return;
+  ev.preventDefault();
+  toggleTopic(topic.id, card);
+ });
  grid.appendChild(card);
  });
  renderAreaState();
@@ -286,7 +295,9 @@ let _areaOffer = [];
 
 function syncAreaCards() {
  document.querySelectorAll('#topic-grid .topic-card').forEach(card => {
-  card.classList.toggle('selected', selectedTopics.has(card.dataset.topicId));
+  const on = selectedTopics.has(card.dataset.topicId);
+  card.classList.toggle('selected', on);
+  card.setAttribute('aria-pressed', on ? 'true' : 'false');
  });
 }
 
@@ -392,9 +403,7 @@ function applyTopicPack(packId) {
  const pack = TOPIC_PACKS.find(p => p.id === packId);
  if (!pack) return;
  selectedTopics = new Set(pack.topics || []);
- document.querySelectorAll('#topic-grid .topic-card').forEach(card => {
- card.classList.toggle('selected', selectedTopics.has(card.dataset.topicId));
- });
+ syncAreaCards();
  // Pre-check pack sources (replace current checkboxes for a clean unit start).
  Object.keys(ALL_SOURCES).forEach(sourceId => {
  const checkbox = document.getElementById(`source-${sourceId}`);
@@ -430,6 +439,7 @@ function toggleTopic(topicId, card) {
  selectedTopics.add(topicId);
  card.classList.add('selected');
  }
+ if (card.setAttribute) card.setAttribute('aria-pressed', selectedTopics.has(topicId) ? 'true' : 'false');
  // Either way the area is now the student's choice, not Laya's.
  layaAreas.delete(topicId);
  updateRecommendedSources();

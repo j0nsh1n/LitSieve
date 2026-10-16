@@ -19,7 +19,7 @@ EXCLUSION_REASONS: Dict[str, str] = {
     "language": "Language",
     "insufficient_info": "Insufficient abstract / info",
     "other": "Other",
-    # System-suggested (Quick screen): least similar to the research question.
+    # System-suggested (Narrow it down): least similar to the research question.
     "low_relevance": "Low relevance (suggested)",
 }
 

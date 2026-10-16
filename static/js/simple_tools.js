@@ -39,6 +39,7 @@ function setCollectQueryOnUrl() {
  }
 }
 
+var _sourcesLoadedForReady = null;
 function syncSimpleOnePageState(stats) {
  const collect = document.getElementById('search-collect');
  if (!collect) return;
@@ -72,6 +73,14 @@ function syncSimpleOnePageState(stats) {
  }
  if (typeof updateSimpleToolsStrip === 'function') {
   updateSimpleToolsStrip(stats);
+ }
+ // The source chips and Save your work read the library's sources, loaded
+ // once at page load; a first fetch on this page must load them again or
+ // the Sources dialog is empty and blocks the search (audit 19.15).
+ if (typeof _sourcesLoadedForReady !== 'undefined' && typeof applyAvailableSources === 'function'
+  && ready > 0 && !showCollect && _sourcesLoadedForReady !== ready) {
+  _sourcesLoadedForReady = ready;
+  applyAvailableSources();
  }
 }
 
@@ -417,7 +426,16 @@ function isSimpleScreenSkipped() {
 function setSimpleScreenSkipped(skipped) {
  _simpleScreenSkippedSession = skipped;
  const lib = _activeLibraryId();
- if (!lib) return;
+ if (!lib) {
+  // The nav select may not have loaded yet; without the library id a Skip
+  // lived only until the next reload and Narrow it down came back.
+  if (typeof ensureActiveLibraryId === 'function') {
+   ensureActiveLibraryId().then((id) => {
+    if (id) setSimpleScreenSkipped(skipped);
+   }).catch(() => {});
+  }
+  return;
+ }
  try {
   const store = _skipStore();
   if (skipped) {
@@ -2216,7 +2234,8 @@ async function simpleToolsReprepare() {
  try {
   if (typeof doCreateEmbeddings !== 'function') throw new Error('Prepare action is unavailable. Reload Search and try again.');
   const result = await doCreateEmbeddings({ fromSimpleReprepare: true });
-  if (!result && status) status.textContent = '';
+  // Success or cancel, "Preparing papers…" is over either way (audit 19.15).
+  if (status) status.textContent = result ? 'Papers are ready for search.' : '';
  } catch (e) {
   if (status) status.textContent = '';
   // doCreateEmbeddings already reports its own errors.

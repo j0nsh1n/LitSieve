@@ -188,7 +188,7 @@ class ScreeningRequest(BaseModel):
 
 
 class QuickScreenPreviewRequest(BaseModel):
-    """Preview least-relevant papers for Quick screen (does not exclude)."""
+    """Preview least-relevant papers for Narrow it down (does not exclude)."""
     query: str = Field(..., min_length=1, max_length=2000)
     # Fraction of the prepared, non-excluded library to propose (bottom of rank).
     fraction: float = Field(default=0.25, ge=0.05, le=0.50)

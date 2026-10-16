@@ -65,7 +65,7 @@ def test_guides_describe_the_single_search_workflow():
     triage_body = (
         triage["summary"] + " ".join(triage["how_it_works"]) + triage["where_in_app"]
     ).lower()
-    assert "quick screen" in triage_body
+    assert "narrow it down" in triage_body
     assert "group by theme" in triage_body
     assert "search" in triage_body
 
