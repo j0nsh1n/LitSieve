@@ -145,29 +145,21 @@ Guest User (is_guest) → sample corpus only; purged by age
 
 ## Session Handoff
 - **Date:** 2026-10-16. Every code task in the 2026-10-15 audit roadmap is
-  done and committed locally, nothing pushed:
-  - `fix/search-ranking` (worktree `~/.t3/worktrees/HealthDatabaseAccess/
-    fix-search-ranking`): Phase 19a (`a949904`).
-  - `fix/audit-rest` (worktree `.../fix-audit-rest`), stacked on it, one
-    commit per phase: 19b `bad0a01`, 19c `b7a5cb8`, 20 `04b4b48`, 21
-    `10f52a9`, 22 + 23 code `51cceb0`, review follow-ups `836ac11`, wait
-    fallback (last commit).
-  - Phases 16 to 18 merged as #93, #94, #95.
-- PR plan when the owner says go: push `fix/search-ranking` and open its PR
-  against `main`; after it merges, open PRs for the `fix/audit-rest`
-  commits (split by phase, branches cut at each commit) against `main`.
-  Mark audit findings `Fixed in #NN` as each merges.
+  merged or in its last PR: #96 (19a), #97 (19b), #98 (19c), #99 (20),
+  #100 (21), #101 (22 and 23's code), #102 (review follow-ups, audit
+  marks). Phases 16 to 18 merged as #93 to #95. Remaining: roadmap Phase
+  23's host tasks.
 - Production still serves `0374605`; the live checkout was never pulled or
   restarted. Deploy steps (roadmap Phase 23): pull, `pip install -r
   requirements.txt` (adds `anthropic`, `httpx`), restart, then the `.env`
   decisions (`MAX_TOTAL_ACCOUNTS`, Ollama settings, optional source keys).
 - `spec.md` still says "Quick screen" on two lines (69, 188); flagged, not
   edited.
-- Dev leftovers: `dev_users.db`/`dev_data` in both worktrees (test accounts
+- Dev leftovers: `dev_users.db`/`dev_data` in the `fix-audit-rest` worktree (test accounts
   only). Scratch: `~/HealthDatabaseAccess-scratch/` (fixtures captures,
   contrast script).
 - Host notes: the LAN's primary DNS server (192.168.12.132) times out, so
   cloudflared logs a DNS refresh error every 5 minutes but stays connected;
   `litpilot.org` needs an apex record or redirect rule in Cloudflare.
-- **Next step:** the owner reviews; then push and PR in order, then the
-  Phase 23 host work.
+- **Next step:** Phase 23 host work once the owner says so: deploy (pull,
+  `pip install -r requirements.txt`, restart), then the `.env` decisions.
