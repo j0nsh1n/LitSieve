@@ -359,6 +359,8 @@ html[data-look="night"][data-theme="light"] {
     --hover: rgba(168, 114, 31, 0.08);
     --accent: #8a5f1d;
     --accent-hover: #704c16;
+    /* 14% left accent text on the chip at 4.47:1; 12% clears 4.5:1. */
+    --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
     --ok: #137537;
     --warn: #8a5a12;
     --err: #a33b35;
@@ -1414,6 +1416,17 @@ html[data-tone="light"] .theme-toggle .icon-moon { display: none; }
     color: var(--text-soft);
 }
 
+/* Control edges: --rule is a hairline for dividers, too faint to mark a
+   field or button (1.2 to 2.3:1). Text mixed 58% into the surface clears
+   the 3:1 WCAG 1.4.11 asks for in every look; declared on the control so it
+   follows any local --text and --surface. */
+.btn,
+input,
+textarea,
+select {
+    --control-edge: color-mix(in srgb, var(--text) 58%, var(--surface));
+}
+
 input[type="text"],
 input[type="email"],
 input[type="number"],
@@ -1422,7 +1435,7 @@ textarea,
 select {
     width: 100%;
     padding: var(--space-2) var(--space-3);
-    border: 1px solid var(--rule);
+    border: 1px solid var(--control-edge);
     border-radius: var(--radius-full);
     font-size: var(--fs-sm);
     font-family: var(--font-sans);
@@ -1435,7 +1448,7 @@ select {
 }
 
 input:hover, textarea:hover, select:hover {
-    border-color: color-mix(in srgb, var(--text) 35%, var(--rule));
+    border-color: color-mix(in srgb, var(--text) 80%, var(--surface));
 }
 
 input:focus, textarea:focus, select:focus {
@@ -1624,7 +1637,7 @@ input[type="range"]::-moz-range-thumb:hover {
     justify-content: center;
     gap: var(--space-2);
     padding: var(--space-2) var(--space-4);
-    border: 1px solid var(--rule);
+    border: 1px solid var(--control-edge);
     border-bottom: 3px solid var(--edge);
     border-radius: var(--radius-full);
     font-size: var(--fs-sm);
@@ -1685,12 +1698,12 @@ input[type="range"]::-moz-range-thumb:hover {
 .btn-secondary {
     background: var(--surface);
     color: var(--text);
-    border-color: var(--rule);
+    border-color: var(--control-edge);
 }
 
 .btn-secondary:hover:not(:disabled) {
     background: color-mix(in srgb, var(--accent) 12%, var(--surface));
-    border-color: color-mix(in srgb, var(--accent) 28%, var(--rule));
+    border-color: color-mix(in srgb, var(--accent) 60%, var(--control-edge));
     color: var(--text);
     box-shadow: var(--sheen);
 }
@@ -2486,7 +2499,7 @@ dialog.simple-theme-tools::backdrop { background: var(--scrim); }
     font-size: var(--fs-base);
     line-height: 1.4;
     padding: var(--space-3) var(--space-3);
-    border: 1px solid var(--rule);
+    border: 1px solid var(--control-edge);
     border-radius: var(--radius-md);
     background: var(--bg);
     color: var(--text);
@@ -2600,7 +2613,7 @@ dialog.simple-theme-tools::backdrop { background: var(--scrim); }
     font-size: var(--fs-base);
     line-height: 1.4;
     padding: var(--space-3) var(--space-3);
-    border: 1px solid var(--rule);
+    border: 1px solid var(--control-edge);
     border-radius: var(--radius-md);
     background: var(--bg);
     color: var(--text);

@@ -28,6 +28,13 @@ and this project aims to follow Semantic Versioning for app version strings
   this".
 
 ### Changed
+- Text fields, selects and buttons have a visible edge in every look: a
+  `--control-edge` token (text mixed 58% into the surface) measures 3.3:1
+  or more against the surface and page, where the old `--rule` hairline
+  was 1.2 to 2.3:1 (WCAG 1.4.11). Dividers keep `--rule`.
+- Night light's accent chip is a shade lighter (12%), so its accent text
+  reads at 4.6:1 instead of 4.47:1.
+- `spec.md` calls the relevance step "Narrow it down", as the app does.
 - Admin Overview's failed-job count and source errors cover the last 24
   hours from saved job records (`job_records` in `users.db`), so a restart
   no longer resets them; active and stalled stay live. The line reads
