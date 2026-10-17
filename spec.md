@@ -66,7 +66,7 @@ a substitute for school library databases.
   `/account?embed=1` may be framed, by the same origin.
 - **Screening / triage** on Search (exclude/restore with reason codes):
   - Near-duplicates with preferred-source resolution and selectable strictness;
-    **Quick screen** ranks against the research question and applies only on
+    **Narrow it down** ranks against the research question and applies only on
     confirm (`low_relevance` is a system reason); screening report export.
   - Group by theme offers density, k-means, and hierarchical grouping, with
     exclude/restore; grouping is optional and never auto-runs after fetch.
@@ -186,8 +186,8 @@ a substitute for school library databases.
 ## Acceptance Criteria
 - [ ] Student can complete a literature pass on public sources only:
       topic → areas → fetch → auto-prepare wait → required Narrow it down → search
-      → export RIS; optional duplicate checking, Quick screen, and theme grouping
-      remain reachable on Search
+      → export RIS; optional duplicate checking, re-running Narrow it down, and
+      theme grouping remain reachable on Search
 - [ ] Guest demo loads sample papers without multi-source fetch and does not
       hijack an existing signed-in session
 - [ ] Libraries isolate data; clone codes do not grant live write access

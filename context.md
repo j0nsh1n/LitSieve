@@ -3,10 +3,10 @@
 ## Current State
 - App version **6.0.0**, released 2026-10-12. GitHub release `v6.0.0` (at
   `25356cb`) holds the tour video (1080p and 4K); the README opens with its
-  poster. Live at `https://www.litpilot.org` from the production checkout at
-  `f9485cf` (2026-10-16). The bare `litpilot.org` has no DNS record.
+  poster. Live at `https://www.litpilot.org` from the production checkout,
+  `main` through #106 (2026-10-16). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
-- Latest full suite (2026-10-16): **1229 passed**, no xfails; all 15 parity
+- Latest full suite (2026-10-16): **1246 passed**, no xfails; all 15 parity
   rows pass. `ruff check .` clean; `pyright app` **0 errors**, 6 optional-import
   warnings (CI blocks on errors). `pip-audit` (2026-10-14): no known
   vulnerabilities; ROCm torch/triton are un-auditable. No dependency lockfile.
@@ -47,8 +47,10 @@
   `OLLAMA_MODELS` names for an app-started Ollama). `HF_HUB_OFFLINE=1` is a
   drop-in, `~/.config/systemd/user/litsieve-uvicorn.service.d/hf-offline.conf`.
   A detached rollback and deploy each wrote their own `operator_deploys`
-  row (actor `phase23-check`). Still open: Cloudflare challenges non-browser
-  clients on `/health` (roadmap Phase 23). Semantic Scholar, OpenAlex and
+  row (actor `phase23-check`). Cloudflare runs I'm Under Attack mode for
+  the site; a rule sets Security Level to Essentially Off for `/health`
+  only, so external checks get 200 while other paths still challenge
+  non-browser clients. Semantic Scholar, OpenAlex and
   PubMed take optional host keys (`S2_API_KEY`, `OPENALEX_API_KEY`,
   `NCBI_API_KEY`); production sets none, so Semantic Scholar mostly answers
   429 and OpenAlex shares one free daily budget per IP.
@@ -57,9 +59,9 @@
 - Full audit 2026-10-15: `docs/AUDIT_2026-10-15.md`, two independent passes
   (lead and a blind Grok pass) merged. Sections 16 to 23 match roadmap
   Phases 16 to 23; findings have ids (`16.1`, ...) that tasks and PRs cite;
-  mark a finding `Fixed in #NN` when its PR merges. Every code finding in
-  sections 16 to 23 is fixed (#93 to #102); 21.9 moved to the backlog and
-  23.2 is a Cloudflare setting (roadmap Phase 23).
+  mark a finding `Fixed in #NN` when its PR merges. Every finding in
+  sections 16 to 23 is fixed (#93 to #106, 23.2 on Cloudflare) except
+  the optional source keys (23.4) and the bare `litpilot.org` record.
 - Admin (`/admin`) is four tabs with the hash as its address (`#accounts/u/<id>`,
   `#accounts/<queue>`). Account actions come from `ACTIONS` in
   `app/routes/admin.py`: the template draws the buttons and `_begin_action`
@@ -144,20 +146,29 @@ Guest User (is_guest) → sample corpus only; purged by age
   operator escape hatch. CSP blocks inline style attributes.
 - Pipeline references stay held during background jobs; LRU eviction retains
   the owning user's progress while a referenced job is active.
+- Job slots are per (account, library, task), at most two running per
+  account (`MAX_JOBS_PER_ACCOUNT`); pages poll `/api/progress?library_id=`.
+  Finished jobs go to `job_records` in `users.db` (Admin Overview's 24-hour
+  failures); the storage sweep prunes them, sign-in events (90 days) and
+  tokens a week past expiry.
+- Sample-paper vectors and key points are saved under
+  `USER_DATA_DIR/.cache/sample-embeddings/` by the first guest prepare; the
+  file name hashes the model and the embedded text, so edits make a new file.
+- Field and button borders use `--control-edge` (text 58% into surface),
+  declared on the controls so it follows local colors; `--rule` stays the
+  divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-16. Every code finding in the 2026-10-15 audit is merged
-  (#93 to #102) and deployed: production serves `f9485cf`, with `anthropic`
-  and `httpx` installed. Roadmap Phase 23's host settings are done and
-  checked live: account cap, a guest Ask answered by `qwen2.5:14b` in about
-  6 s, a guest embed with no Hub request, and a detached rollback to
-  `7917139` and deploy back to `f9485cf`, each writing its own row.
+- **Date:** 2026-10-16. The 2026-10-15 audit is closed: #93 to #106 merged
+  and deployed, and Cloudflare lets `/health` through. The last three PRs
+  were backlog work: per-library job slots and saved sample vectors (#104),
+  job records and pruning (#105), control-edge contrast, the Night light
+  chip, `spec.md`'s "Narrow it down" wording and these docs (#106).
 - The Ship staging worktree (`~/.local/share/litsieve/staging`, branch
-  `operator-staging`) now sits at `f9485cf`.
-- Open: the Cloudflare rule for `/health` (dashboard only; no API token on
-  the host) and the optional source keys. `spec.md` still says "Quick
-  screen" on two lines (69, 188); flagged, not edited.
-- Host notes: the LAN's primary DNS server (192.168.12.132) times out, so
-  cloudflared logs a DNS refresh error every 5 minutes but stays connected;
-  `litpilot.org` needs an apex record or redirect rule in Cloudflare.
+  `operator-staging`) sits at `f9485cf`; move it to `main` before a Ship
+  deploy.
+- Open: the optional source keys and the bare `litpilot.org` record (both
+  need the owner). The first guest prepare on the host builds the sample
+  vector file (about 10 s); it persists across deploys, and later guests
+  prepare in under a second.
 - **Next step:** none scheduled; the backlog in `roadmap.md` is unscheduled.

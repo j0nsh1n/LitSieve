@@ -378,3 +378,72 @@ def test_look_inks_meet_wcag_aa_on_page_grounds():
                         f"{label} {ink_name}={tokens[ink_name]} on {ground_name}={ground}: {ratio:.3f}"
                     )
     assert not failures, "contrast below 4.5:1: " + "; ".join(failures)
+
+
+def _hex_rgb(value: str) -> tuple[int, int, int]:
+    return int(value[1:3], 16), int(value[3:5], 16), int(value[5:7], 16)
+
+
+def _mix_hex(a: str, b: str, share_of_a: float) -> str:
+    ra, rb = _hex_rgb(a), _hex_rgb(b)
+    return "#" + "".join(
+        f"{round(x * share_of_a + y * (1 - share_of_a)):02x}" for x, y in zip(ra, rb)
+    )
+
+
+def _soft_pct(tokens: dict, inherited: float) -> float:
+    m = re.search(r"var\(--accent\)\s+(\d+)%", tokens.get("--accent-soft", ""))
+    return float(m.group(1)) / 100 if m else inherited
+
+
+def _look_token_blocks():
+    """(label, tokens, accent-soft share) for every look and mode, Workshop included."""
+    root = _css_block_tokens(_rule_body(CSS, ":root {"))
+    workshop_dark = {**root, **_css_block_tokens(_rule_body(CSS, '[data-theme="dark"] {'))}
+    out = [
+        ("workshop light", root, _soft_pct(root, 0.12)),
+        ("workshop dark", workshop_dark, _soft_pct(workshop_dark, 0.12)),
+    ]
+    for look_id in LIGHT_FIRST_LOOKS:
+        base = _css_block_tokens(_rule_body(CSS, f'html[data-look="{look_id}"] {{'))
+        dark = {**base, **_css_block_tokens(
+            _rule_body(CSS, f'html[data-look="{look_id}"][data-theme="dark"] {{'))}
+        out.append((f"{look_id} light", base, _soft_pct(base, 0.12)))
+        out.append((f"{look_id} dark", dark, _soft_pct(dark, _soft_pct(base, 0.12))))
+    for look_id in DARK_FIRST_LOOKS:
+        base = _css_block_tokens(_rule_body(CSS, f'html[data-look="{look_id}"] {{'))
+        light = {**base, **_css_block_tokens(
+            _rule_body(CSS, f'html[data-look="{look_id}"][data-theme="light"] {{'))}
+        out.append((f"{look_id} dark", base, _soft_pct(base, 0.12)))
+        out.append((f"{look_id} light", light, _soft_pct(light, _soft_pct(base, 0.12))))
+    return out
+
+
+def test_control_edges_meet_three_to_one_in_every_look():
+    """Field and button borders must read as a boundary (WCAG 1.4.11)."""
+    decl = re.search(
+        r"--control-edge:\s*color-mix\(in srgb, var\(--text\) (\d+)%, var\(--surface\)\)", CSS
+    )
+    assert decl, "--control-edge must mix --text into --surface"
+    share = int(decl.group(1)) / 100
+    failures = []
+    for label, tokens, _soft in _look_token_blocks():
+        edge = _mix_hex(tokens["--text"], tokens["--surface"], share)
+        for ground in ("--surface", "--bg"):
+            ratio = _wcag_contrast(edge, tokens[ground])
+            if ratio < 3:
+                failures.append(f"{label} edge {edge} on {ground}: {ratio:.2f}")
+    assert not failures, "control edge below 3:1: " + "; ".join(failures)
+    body = _rule_body(CSS, 'input[type="text"],\ninput[type="email"]')
+    assert "border: 1px solid var(--control-edge)" in body
+    assert "border: 1px solid var(--control-edge)" in _rule_body(CSS, ".btn {")
+
+
+def test_accent_text_on_the_accent_chip_meets_aa_in_every_look():
+    failures = []
+    for label, tokens, soft in _look_token_blocks():
+        chip = _mix_hex(tokens["--accent"], tokens["--surface"], soft)
+        ratio = _wcag_contrast(tokens["--accent"], chip)
+        if ratio < 4.5:
+            failures.append(f"{label} accent on chip {chip}: {ratio:.2f}")
+    assert not failures, "accent chip below 4.5:1: " + "; ".join(failures)
