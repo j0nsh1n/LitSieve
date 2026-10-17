@@ -27,9 +27,6 @@ Cloudflare dashboard or new keys.
 - Status: [ ] open
 
 ## Backlog (unscheduled)
-- Persistent job records, so Admin Overview's job and source-error counts
-  survive a restart (they say "since the last restart")
-- Prune `auth_events` and expired token rows (audit 20.5; they only grow)
 - Control edges: input and button borders (`--rule`, `--edge`) are 1.2 to
   2.1:1 against their background in every look, under the 3:1 WCAG asks
   for UI components; a `--control-edge` token across all seven looks
@@ -44,6 +41,7 @@ Cloudflare dashboard or new keys.
 - Dependency lockfile (pip-tools / uv) if reproducibility becomes a priority
 - Optional later ruff ratchet: E501 / UP / E402
 - Scale opts (FAISS defaults, TF-IDF corpus cache) only with new ≥10× evidence
-- Prune `auth_events` and expired token tables; decide what account delete
-  removes from the support tables (audit 20.5)
+- Decide what account delete removes from the support tables (tickets,
+  notes, admin actions, sign-in events); today they keep the deleted
+  account's id, and only sign-in events age out (90 days) (audit 20.5)
 - Not building: clinical evidence grades, paywalled DBs, live teacher shares / LMS

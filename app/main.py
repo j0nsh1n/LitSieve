@@ -71,7 +71,8 @@ def _warn_legacy_ai_settings() -> None:
 
 
 def _storage_sweep(stop: threading.Event) -> None:
-    """Refresh every account's stored usage now and then (audit 20.2).
+    """Refresh every account's stored usage now and then (audit 20.2), and
+    prune old sign-in events, job records and expired tokens (20.5).
 
     Job ends refresh their own account; this catches deletes, library
     removals and anything changed outside a job.
@@ -86,6 +87,7 @@ def _storage_sweep(stop: threading.Event) -> None:
         try:
             from app import core
             core.refresh_all_storage_bytes()
+            core.user_db.prune()
         except Exception:
             logging.getLogger(__name__).warning("Storage sweep failed", exc_info=True)
 

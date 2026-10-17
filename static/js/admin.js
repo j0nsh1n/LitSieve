@@ -143,13 +143,14 @@ async function loadOverview() {
   set('ov-version', d.version || '—');
   const up = Number(d.uptime_seconds || 0);
   set('ov-uptime', up ? `${Math.floor(up / 3600)}h ${Math.floor((up % 3600) / 60)}m` : 'just started');
-  set('ov-jobs', `${jc.active || 0} active · ${jc.stalled || 0} stalled · ${jc.failed || 0} failed`);
+  const win = Number(d.jobs_window_hours || 24);
+  set('ov-jobs', `${jc.active || 0} active · ${jc.stalled || 0} stalled · ${jc.failed || 0} failed of ${jc.finished || 0} in the last ${win} h`);
   const health = document.getElementById('admin-source-health');
   if (health) {
    const fails = (d.source_health || []).filter((s) => s.recent_errors).slice(0, 6);
    health.textContent = fails.length
-    ? ('Source errors in jobs since the last restart: ' + fails.map((s) => `${s.name} ${s.recent_errors}`).join(', '))
-    : 'No source errors in jobs since the last restart.';
+    ? (`Source errors in jobs over the last ${win} hours: ` + fails.map((s) => `${s.name} ${s.recent_errors}`).join(', '))
+    : `No source errors in jobs over the last ${win} hours.`;
   }
   if (status) {
    status.textContent = d.guest_auto_prepare

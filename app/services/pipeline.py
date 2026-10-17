@@ -385,7 +385,9 @@ class LiteratureSearchPipeline:
                 "key_points_created": kp,
                 "seconds": round(time.perf_counter() - t0, 2),
                 "model": stored_model or target_model,
-                "device": select_device(),
+                # Nothing was embedded: do not import torch just to name a
+                # device (about 10 s on a fresh process, audit 21.9).
+                "device": self.embedding_engine.device,
             }
 
         logger.info(

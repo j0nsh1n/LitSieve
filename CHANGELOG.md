@@ -28,6 +28,15 @@ and this project aims to follow Semantic Versioning for app version strings
   this".
 
 ### Changed
+- Admin Overview's failed-job count and source errors cover the last 24
+  hours from saved job records (`job_records` in `users.db`), so a restart
+  no longer resets them; active and stalled stay live. The line reads
+  "N failed of M in the last 24 h".
+- The storage sweep also deletes sign-in events and job records older than
+  90 days and one-time tokens a week past expiry (audit 20.5).
+- With the sample papers' vectors and key points saved, a guest's prepare
+  loads no model at all, even in a fresh server process (0 s instead of
+  about 10 s); the saved file now holds key points too.
 - Each library runs its own jobs: a fetch or prepare in one library no
   longer blocks another, and an account runs at most two jobs at once. The
   409 says which limit was hit. Search, the wait screen and Cancel act on

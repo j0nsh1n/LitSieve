@@ -337,15 +337,47 @@ def _release_job_markers(user_id: str, library_id: str, task: str) -> None:
     _job_sync.pop((user_id, library_id, task), None)
 
 
+def _job_outcome(slot: dict) -> str:
+    """success | cancelled | quota_stopped | failed, for a slot that just stopped."""
+    _res = slot.get('result')
+    result = _res if isinstance(_res, dict) else {}
+    status = result.get('status')
+    if slot.get('error'):
+        return 'failed'
+    if result.get('quota_stopped') or status == 'quota_stopped':
+        return 'quota_stopped'
+    if status in (None, 'success', 'cancelled'):
+        return status or 'success'
+    return 'failed'
+
+
+def _record_finished_job(user_id: str, library_id: str, task: str, slot: dict) -> None:
+    _res = slot.get('result')
+    kinds = (_res or {}).get('error_kinds') if isinstance(_res, dict) else None
+    try:
+        user_db.add_job_record(
+            user_id, library_id, task, _job_outcome(slot),
+            kinds if isinstance(kinds, dict) else {},
+        )
+    except Exception:
+        logger.warning("Could not record the finished %s job", task, exc_info=True)
+
+
 def update_progress(user_id: str, library_id: str, task: str, **kwargs):
+    finished = None
     with _progress_lock:
         slot = _ensure_progress(user_id, library_id)[task]
+        was_active = bool(slot.get('active'))
         slot.update(kwargs)
         slot['updated_at'] = _utc_stamp()
         if kwargs.get('active') is False:
             fut = _job_futures.get((user_id, library_id, task))
             if fut is None or fut.done():
                 _release_job_markers(user_id, library_id, task)
+            if was_active:
+                finished = dict(slot)
+    if finished is not None:
+        _record_finished_job(user_id, library_id, task, finished)
 
 
 def is_job_cancelled(user_id: str, library_id: str, task: str) -> bool:
