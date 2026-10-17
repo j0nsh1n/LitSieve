@@ -17,6 +17,7 @@ def _embed_all(p, model="general"):
     keys = [(a["article_id"], a["source"]) for a in p.db.get_all_articles()]
     vectors = {k: np.full(4, i + 1, dtype=np.float32) for i, k in enumerate(keys)}
     p.db.insert_embeddings(vectors, model)
+    p.db.insert_key_points({k: [f"point {i}"] for i, k in enumerate(keys)})
     return vectors
 
 
@@ -35,7 +36,35 @@ def test_saved_vectors_fill_a_new_sample_library(tmp_path, monkeypatch):
     got = {tuple(k): matrix[i] for i, k in enumerate(keys)}
     for key, vec in vectors.items():
         assert np.array_equal(got[key], vec)
+    points = second.db.get_key_points_map()
+    assert points == first.db.get_key_points_map()
     assert sample_embeddings.restore(second, "general") == 0
+
+
+def test_a_restored_library_prepares_without_loading_a_model(tmp_path, monkeypatch):
+    monkeypatch.setenv("USER_DATA_DIR", str(tmp_path / "data"))
+    first = _library(tmp_path, "warm")
+    _embed_all(first)
+    sample_embeddings.save(first, "general")
+    second = _library(tmp_path, "cold")
+    sample_embeddings.restore(second, "general")
+
+    def no_model(*_a, **_k):
+        raise AssertionError("prepare loaded the embedding model")
+
+    monkeypatch.setattr(second, "_encode_texts", no_model)
+    monkeypatch.setattr("app.services.embeddings.select_device", no_model)
+    result = second.create_embeddings(model="general", only_missing=True)
+    assert result["embeddings_created"] == 0 and result["key_points_created"] == 0
+
+
+def test_ai_key_points_are_not_saved_as_sample_points(tmp_path, monkeypatch):
+    monkeypatch.setenv("USER_DATA_DIR", str(tmp_path / "data"))
+    p = _library(tmp_path, "refined")
+    _embed_all(p)
+    art = p.db.get_all_articles()[0]
+    p.db.insert_key_points({(art["article_id"], art["source"]): ["student rewrite"]}, origin="ai")
+    assert sample_embeddings.save(p, "general") is False
 
 
 def test_no_file_until_every_sample_paper_has_a_vector(tmp_path, monkeypatch):

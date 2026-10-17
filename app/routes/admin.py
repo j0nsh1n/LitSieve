@@ -351,6 +351,9 @@ async def admin_page(request: Request):
     )
 
 
+JOB_WINDOW_HOURS = 24
+
+
 @router.get("/api/admin/overview")
 @limiter.limit("30/minute")
 async def api_admin_overview(request: Request):
@@ -363,14 +366,17 @@ async def api_admin_overview(request: Request):
     guest_prep = (os.getenv("GUEST_AUTO_PREPARE") or "1").strip().lower()
     from app.content.source_catalog import SOURCE_CATALOG
     from app.services import llm as llm_svc
-    jobs = core.list_job_queue(limit=core.JOB_QUEUE_MAX)
-    job_counts = {"active": 0, "stalled": 0, "failed": 0}
-    source_fails: dict = {}
-    for job in jobs:
-        job_counts[job.get("state", "")] = job_counts.get(job.get("state", ""), 0) + 1
-        for src, kind in (job.get("error_kinds") or {}).items():
-            if kind and kind not in ("ok", "no_results"):
-                source_fails[src] = source_fails.get(src, 0) + 1
+    # Running and stalled jobs are live state; failures and source errors come
+    # from job_records, so they survive a restart.
+    job_counts = {"active": 0, "stalled": 0}
+    for job in core.list_job_queue(limit=core.JOB_QUEUE_MAX):
+        if job.get("state") in job_counts:
+            job_counts[job["state"]] += 1
+    day_ago = (datetime.now(timezone.utc) - timedelta(hours=JOB_WINDOW_HOURS)).strftime("%Y-%m-%d %H:%M:%S")
+    summary = await core.run_in_thread(core.user_db.job_record_summary, day_ago)
+    job_counts["failed"] = summary["failed"]
+    job_counts["finished"] = summary["finished"]
+    source_fails = summary["source_errors"]
     hour_ago = (datetime.now(timezone.utc) - timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
     with core.user_db._lock:
         auth_hour = core.user_db.conn.execute(
@@ -392,6 +398,7 @@ async def api_admin_overview(request: Request):
         "version": APP_VERSION,
         "uptime_seconds": int(max(0, __import__("time").time() - core.PROCESS_STARTED)),
         "jobs": job_counts,
+        "jobs_window_hours": JOB_WINDOW_HOURS,
         "auth_events_1h": {str(k): int(v) for k, v in auth_hour},
         "source_health": source_health,
     }

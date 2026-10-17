@@ -296,6 +296,25 @@ class UserDatabase:
                 created_at  TEXT NOT NULL
             )
         """)
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_auth_events_time ON auth_events(created_at)"
+        )
+        # One row per finished job, so Admin Overview's failure and source-error
+        # counts survive a restart; the live slots stay in memory (app.core).
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS job_records (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id      TEXT NOT NULL,
+                library_id   TEXT,
+                task         TEXT NOT NULL,
+                outcome      TEXT NOT NULL,
+                error_kinds  TEXT NOT NULL DEFAULT '{}',
+                finished_at  TEXT NOT NULL
+            )
+        """)
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_job_records_time ON job_records(finished_at)"
+        )
         from app.storage.helpdesk import ensure_tables
         from app.storage.ops_audit import ensure_tables as ensure_ops_tables
         ensure_tables(self)
@@ -865,6 +884,68 @@ class UserDatabase:
                 (str(uuid.uuid4()), user_id, username or "", kind, ip or "", detail or "", now),
             )
             self.conn.commit()
+
+    def add_job_record(
+        self, user_id: str, library_id: str, task: str, outcome: str, error_kinds: Dict,
+    ) -> None:
+        with self._lock:
+            self.conn.execute(
+                "INSERT INTO job_records "
+                "(user_id, library_id, task, outcome, error_kinds, finished_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (user_id, library_id or "", task, outcome,
+                 json.dumps(error_kinds or {}), self._utc_now()),
+            )
+            self.conn.commit()
+
+    def job_record_summary(self, since: str) -> Dict:
+        """Failed jobs and per-source failures among jobs finished since ``since``."""
+        with self._lock:
+            rows = self.conn.execute(
+                "SELECT outcome, error_kinds FROM job_records WHERE finished_at >= ?",
+                (since,),
+            ).fetchall()
+        failed = 0
+        sources: Dict[str, int] = {}
+        for outcome, kinds_json in rows:
+            if outcome in ("failed", "quota_stopped"):
+                failed += 1
+            try:
+                kinds = json.loads(kinds_json or "{}")
+            except ValueError:
+                kinds = {}
+            for src, kind in (kinds if isinstance(kinds, dict) else {}).items():
+                if kind and kind not in ("ok", "no_results"):
+                    sources[str(src)] = sources.get(str(src), 0) + 1
+        return {"finished": len(rows), "failed": failed, "source_errors": sources}
+
+    # Sign-in history and job records are kept this long; expired one-time
+    # tokens a week past expiry, so a late click still reads "expired" (20.5).
+    AUTH_EVENT_DAYS = 90
+    JOB_RECORD_DAYS = 90
+    EXPIRED_TOKEN_GRACE_DAYS = 7
+
+    def prune(self, now: Optional[datetime] = None) -> Dict[str, int]:
+        """Delete old sign-in events, job records and long-expired tokens."""
+        now = now or datetime.now(timezone.utc)
+
+        def stamp(days: int) -> str:
+            return (now - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
+
+        plan = (
+            ("auth_events", "created_at", stamp(self.AUTH_EVENT_DAYS)),
+            ("job_records", "finished_at", stamp(self.JOB_RECORD_DAYS)),
+            ("email_verification_tokens", "expires_at", stamp(self.EXPIRED_TOKEN_GRACE_DAYS)),
+            ("password_reset_tokens", "expires_at", stamp(self.EXPIRED_TOKEN_GRACE_DAYS)),
+            ("one_time_logins", "expires_at", stamp(self.EXPIRED_TOKEN_GRACE_DAYS)),
+        )
+        removed: Dict[str, int] = {}
+        with self._lock:
+            for table, column, cutoff in plan:
+                cur = self.conn.execute(f"DELETE FROM {table} WHERE {column} < ?", (cutoff,))
+                removed[table] = cur.rowcount
+            self.conn.commit()
+        return removed
 
     def list_auth_events(self, user_id: str, *, limit: int = 20, offset: int = 0) -> List[Dict]:
         limit = max(1, min(int(limit), 50))
