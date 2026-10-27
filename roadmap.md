@@ -8,6 +8,12 @@ sections 16 to 23) is fixed and deployed (#93 to #106); its findings keep
 their ids (`16.1`, `18.4`, ...) for anyone tracing a change back.
 
 ## Backlog (unscheduled)
+- Field test 2026-10-27 (`docs/FIELD_TEST_2026-10-27.md`): export every
+  record's real type (RIS `BOOK`/`CHAP`, BibTeX `@book`) instead of always
+  `JOUR`; stop using a source's name ("OpenAIRE", "HAL", "PLOS") as the
+  journal; rank by the relationship the question asks about, not only its
+  topic (build an evaluation set from that run first); decide on a
+  primary-source collection
 - Optional source keys on the host when wanted (audit 23.4): `S2_API_KEY`,
   `OPENALEX_API_KEY`, `NCBI_API_KEY`, and `NASA_ADS_TOKEN` (NASA ADS
   reports unavailable without it)
