@@ -181,7 +181,7 @@ class OpenAlexFetcher(BaseFetcher):
 
     @staticmethod
     def _venue(work: Dict) -> str:
-        """Prefer a journal or conference location over a repository copy.
+        """Prefer a journal or conference over repositories and e-book platforms.
 
         The primary location is often a repository such as PubMed while the
         journal sits further down `locations`. When every location is a
@@ -192,13 +192,16 @@ class OpenAlexFetcher(BaseFetcher):
         for location in locations:
             source = (location or {}).get("source") or {}
             name = (source.get("display_name") or "").strip()
-            if name and source.get("type") != "repository":
+            if name and source.get("type") not in ("repository", "ebook-platform"):
                 return name
         for location in locations:
+            source = (location or {}).get("source") or {}
+            if source.get("type") == "ebook-platform":
+                continue
             raw = ((location or {}).get("raw_source_name") or "").strip()
             if raw:
                 return raw
-        return ((locations[0].get("source") or {}).get("display_name") or "").strip()
+        return ""
 
     @staticmethod
     def _reconstruct_abstract(inverted_index: Dict) -> str:

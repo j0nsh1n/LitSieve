@@ -8,14 +8,20 @@ import json
 import re
 import shutil
 import subprocess
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from urllib.parse import quote, unquote, urlsplit
 
 import pytest
 
+from app.fetchers.arxiv import ARXIV_NS, ATOM_NS, ArXivFetcher
 from app.fetchers.base import FetchError
+from app.fetchers.biorxiv import BioRxivFetcher, MedRxivFetcher
 from app.fetchers.clinicaltrials import ClinicalTrialsFetcher
+from app.fetchers.crossref import CrossRefFetcher
 from app.fetchers.doaj import DOAJFetcher
+from app.fetchers.eric import ERICFetcher
+from app.fetchers.europepmc import EuropePMCFetcher
 from app.fetchers.hal import HALFetcher
 from app.fetchers.openaire import OpenAIREFetcher
 from app.fetchers.openalex import OpenAlexFetcher
@@ -493,3 +499,108 @@ def test_openalex_non_json_body_is_a_typed_network_error(monkeypatch):
     with pytest.raises(FetchError) as caught:
         f.search_and_fetch("heart", max_results=5)
     assert caught.value.kind == "network"
+
+
+def test_openaire_without_a_journal_leaves_it_empty():
+    record = copy.deepcopy(_openaire_records()[0])
+    record["metadata"]["oaf:entity"]["oaf:result"].pop("journal", None)
+    assert OpenAIREFetcher()._parse(record)["journal"] == ""
+
+
+def test_hal_without_a_journal_leaves_it_empty():
+    record = {"halId_s": "hal-123", "title_s": ["Title"], "abstract_s": ["Abstract"]}
+    assert HALFetcher()._parse(record)["journal"] == ""
+
+
+@pytest.mark.parametrize("journal", [None, "", []])
+def test_plos_without_a_journal_leaves_it_empty(journal):
+    from app.fetchers.plos import PLOSFetcher
+
+    record = {"id": "10.1371/example", "title": "Title", "abstract": "Abstract", "journal": journal}
+    assert PLOSFetcher()._parse(record)["journal"] == ""
+
+
+def test_zenodo_does_not_use_the_publisher_as_a_journal():
+    record = {
+        "id": 123,
+        "metadata": {
+            "title": "Title", "description": "Abstract",
+            "imprint": {"publisher": "University Press"},
+        },
+    }
+    assert ZenodoFetcher()._parse_record(record)["journal"] == ""
+
+
+def test_arxiv_does_not_use_the_category_as_a_journal():
+    entry = ET.fromstring(f"""
+        <entry xmlns="{ATOM_NS}" xmlns:arxiv="{ARXIV_NS}">
+          <id>https://arxiv.org/abs/2610.12345</id>
+          <title>Title</title><summary>Abstract</summary>
+          <arxiv:primary_category term="cs.AI" />
+        </entry>
+    """)
+    article = ArXivFetcher()._parse_entry(entry, {"a": ATOM_NS, "ax": ARXIV_NS})
+    assert article["journal"] == ""
+
+
+@pytest.mark.parametrize("fetcher", [BioRxivFetcher, MedRxivFetcher])
+def test_rxiv_does_not_use_the_preprint_server_as_a_journal(fetcher):
+    record = {
+        "id": "PPR123", "doi": "10.1101/example", "source": "PPR",
+        "title": "Title", "abstractText": "Abstract",
+        "bookOrReportDetails": {"publisher": fetcher.PUBLISHER},
+    }
+    article = fetcher()._parse_article(record)
+    assert article["article_id"] == record["doi"]
+    assert article["journal"] == ""
+
+
+def test_europepmc_does_not_use_the_preprint_publisher_as_a_journal():
+    record = {
+        "id": "PPR123", "source": "PPR", "title": "Title", "abstractText": "Abstract",
+        "bookOrReportDetails": {"publisher": "bioRxiv"},
+    }
+    assert EuropePMCFetcher()._parse_article(record)["journal"] == ""
+
+
+@pytest.mark.parametrize("source,journal", [("Online Submission", ""), ("Education Review", "Education Review")])
+def test_eric_distinguishes_online_submissions_from_journals(source, journal):
+    record = {"id": "ED123", "title": "Title", "description": "Abstract", "source": source}
+    assert ERICFetcher()._parse_doc(record)["journal"] == journal
+
+
+@pytest.mark.parametrize("source_type,name,raw_name", [
+    ("ebook-platform", "Princeton University Press eBooks", None),
+    ("ebook-platform", "Princeton University Press eBooks", "Princeton University Press eBooks"),
+    ("repository", "PubMed", None),
+])
+def test_openalex_excludes_platform_and_repository_names(source_type, name, raw_name):
+    work = copy.deepcopy(_works()[1])
+    location = {"source": {"display_name": name, "type": source_type}}
+    if raw_name:
+        location["raw_source_name"] = raw_name
+    work["primary_location"] = location
+    work["locations"] = [location]
+    assert OpenAlexFetcher()._parse_work(work)["journal"] == ""
+
+
+def test_openalex_looks_past_an_ebook_platform_for_a_journal():
+    work = copy.deepcopy(_works()[1])
+    journal_location = work["primary_location"]
+    work["primary_location"] = {
+        "source": {"display_name": "Princeton University Press eBooks", "type": "ebook-platform"},
+    }
+    work["locations"] = [work["primary_location"], journal_location]
+    assert OpenAlexFetcher()._parse_work(work)["journal"] == "Circulation"
+
+
+def test_crossref_decodes_title_and_container_entities_and_keeps_abstract_handling():
+    record = {
+        "DOI": "10.1234/example", "title": ["City &amp; Society"],
+        "container-title": ["City &amp; Community"],
+        "abstract": "<jats:p>Abstract &amp; details.</jats:p>",
+    }
+    article = CrossRefFetcher()._parse_item(record)
+    assert article["title"] == "City & Society"
+    assert article["journal"] == "City & Community"
+    assert article["abstract"] == "Abstract &amp; details."

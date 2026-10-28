@@ -94,8 +94,6 @@ class ZenodoFetcher(BaseFetcher):
             journal_info = meta.get('journal', {})
             if journal_info:
                 journal = journal_info.get('title', '') or ''
-            if not journal:
-                journal = meta.get('imprint', {}).get('publisher', '') or ''
 
             return {
                 'article_id': str(record.get('id', '')),

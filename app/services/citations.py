@@ -117,6 +117,8 @@ def _four_digit_year(year: Any) -> Optional[str]:
 _DOI_SHAPE = re.compile(r"^10\.\d{4,9}/\S+$")
 _PLACEHOLDER_JOURNALS = {
     "unknown journal", "unknown", "n/a", "na", "none", "null", "-", "--", "?",
+    "openaire", "hal", "plos", "zenodo", "doaj", "eric", "semantic scholar",
+    "openalex", "crossref", "clinicaltrials.gov", "online submission",
 }
 
 
@@ -131,7 +133,14 @@ def article_doi(article: dict) -> Optional[str]:
 def _real_journal(article: dict) -> str:
     """Journal name, or "" when it is empty or a placeholder such as "Unknown journal"."""
     journal = _collapse_ws(article.get("journal") or "")
-    return "" if journal.lower().rstrip(".") in _PLACEHOLDER_JOURNALS else journal
+    name = journal.lower()
+    if (
+        name.rstrip(".") in _PLACEHOLDER_JOURNALS
+        or name.startswith("arxiv:")
+        or name.endswith((" preprint", " ebooks"))
+    ):
+        return ""
+    return journal
 
 
 def _ris_line(tag: str, value: str) -> str:
@@ -277,7 +286,7 @@ def article_to_apa(article: dict) -> str:
     year = _four_digit_year(article.get("year")) or "n.d."
     title = _collapse_ws(article.get("title") or "Untitled")
     # Sentence case is ideal; we keep the stored title as-is.
-    journal = _collapse_ws(article.get("journal") or "")
+    journal = _real_journal(article)
     source = (article.get("source") or "").strip()
     aid = str(article.get("article_id") or "")
 

@@ -39,7 +39,7 @@ class _RxivFetcher(EuropePMCFetcher):
             return None
         # Keyed by DOI, as papers stored before the Europe PMC route were.
         article["article_id"] = doi
-        article["journal"] = f"{self.PUBLISHER} preprint"
+        article["journal"] = ""
         return article
 
 

@@ -99,9 +99,6 @@ class EuropePMCFetcher(BaseFetcher):
         journal = journal or record.get("journalTitle")
         if journal:
             return clean_text(journal)
-        publisher = (record.get("bookOrReportDetails") or {}).get("publisher")
-        if publisher and record.get("source") == "PPR":
-            return f"{clean_text(publisher)} preprint"
         return ""
 
     @staticmethod

@@ -16,7 +16,12 @@ for _dep in (
 from fastapi.testclient import TestClient
 
 from app import core
-from app.services.citations import article_to_bibtex, article_to_ris, collection_to_ris
+from app.services.citations import (
+    article_to_apa,
+    article_to_bibtex,
+    article_to_ris,
+    collection_to_ris,
+)
 
 
 def _sample_crossref():
@@ -89,6 +94,31 @@ def test_collection_to_ris_joins():
     out = collection_to_ris([_sample_crossref(), _sample_pubmed_no_year()])
     assert out.count("TY  - JOUR") == 2
     assert out.count("ER  - ") == 2
+
+
+@pytest.mark.parametrize("export", [article_to_ris, article_to_bibtex, article_to_apa])
+@pytest.mark.parametrize("journal", [
+    "OpenAIRE", "HAL", "PLOS", "Zenodo", "DOAJ", "ERIC", "Semantic Scholar",
+    "OpenAlex", "Crossref", "ClinicalTrials.gov", "Online Submission",
+    "arXiv:cs.AI", "bioRxiv preprint", "medRxiv preprint", "Other Publisher preprint",
+    "Princeton University Press eBooks", "Unknown journal", "N/A", "",
+])
+@pytest.mark.parametrize("case", ["original", "mixed"])
+def test_exports_omit_placeholder_journals(export, journal, case):
+    article = _sample_crossref()
+    if case == "mixed":
+        journal = f"  {journal.swapcase()}  "
+    article["journal"] = journal
+    expected = export({**article, "journal": ""})
+    assert export(article) == expected
+
+
+@pytest.mark.parametrize("journal", ["PLOS ONE", "PLOS Biology", "OpenAlex Studies"])
+def test_exports_keep_real_journals(journal):
+    article = {**_sample_crossref(), "journal": journal}
+    assert f"JO  - {journal}\n" in article_to_ris(article)
+    assert f"journal = {{{journal}}}" in article_to_bibtex(article)
+    assert f"*{journal}*." in article_to_apa(article)
 
 
 @pytest.fixture
