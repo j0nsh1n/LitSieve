@@ -28,6 +28,15 @@ and this project aims to follow Semantic Versioning for app version strings
   this".
 
 ### Changed
+- RIS, BibTeX, APA, CSV and TXT exports follow each record's type (journal
+  article, book, chapter, report, thesis, preprint, and the rest). Older
+  papers with no stored type still export as a journal article when they
+  have a real journal, and as a generic record otherwise. Zotero imports
+  RIS `GEN` as a journal article, so students who need a generic type
+  should prefer BibTeX `@misc`.
+- CSV (search results and library) adds Type, DOI, Container, Publisher
+  and Open copy URL at the end of the existing columns. TXT lists Type
+  and DOI when those fields are present.
 - ERIC, PubMed, Europe PMC, bioRxiv, medRxiv, Semantic Scholar, HAL,
   OpenAIRE, Zenodo, arXiv, PLOS, ClinicalTrials.gov and NASA ADS fill type,
   DOI, container, host, OA and biblio on new fetches, matching OpenAlex,
@@ -87,6 +96,13 @@ and this project aims to follow Semantic Versioning for app version strings
   error text; the server log keeps it.
 
 ### Fixed
+- APA prints `https://doi.org/<doi>` for every paper with a DOI, not only
+  Crossref. RIS `UR` prefers that DOI link; `L2` is only a listed open
+  copy, never a Crossref `via=crossref` link; the discovery page goes in
+  `N1` when it differs from `UR`.
+- ERIC reports, books and other non-journal types store the issuing
+  organization as the publisher instead of a container title, so exports
+  no longer treat that name as a journal.
 - Fetchers leave missing journals empty instead of using OpenAIRE, HAL,
   PLOS, Zenodo publishers, arXiv categories, preprint server names, or
   ERIC's "Online Submission". OpenAlex skips e-book platforms and repository

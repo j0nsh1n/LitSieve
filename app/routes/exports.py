@@ -22,7 +22,13 @@ from app.core import (
 from app.schemas import (
     ExportSelectionRequest,
 )
-from app.services.citations import collection_to_apa, collection_to_bibtex, collection_to_ris
+from app.services.citations import (
+    article_doi,
+    citation_model,
+    collection_to_apa,
+    collection_to_bibtex,
+    collection_to_ris,
+)
 from app.utils import (
     build_screening_report,
     format_screening_report_txt,
@@ -50,6 +56,35 @@ def _csv_row(cells) -> list:
     return [c if isinstance(c, (int, float)) and not isinstance(c, bool) else _csv_text(c) for c in cells]
 
 
+_CSV_EXTRA_HEADERS = ("Type", "DOI", "Container", "Publisher", "Open copy URL")
+
+
+def _csv_extra(article: dict) -> list:
+    """Type, DOI, container, publisher and open-copy URL, after the original columns."""
+    model = citation_model(article)
+    stored = article.get("work_type")
+    container = article.get("container_title") or model.container
+    return [
+        stored if stored is not None else "",
+        model.doi or "",
+        container or "",
+        model.publisher,
+        model.open_copy_url or "",
+    ]
+
+
+def _txt_type_doi_lines(article: dict, indent: str) -> list:
+    """Optional Type and DOI lines for TXT exports that already list fields."""
+    lines = []
+    stored = article.get("work_type")
+    if stored:
+        lines.append(f"{indent}Type: {stored}")
+    doi = article_doi(article)
+    if doi:
+        lines.append(f"{indent}DOI: {doi}")
+    return lines
+
+
 def _format_ranked_export(results: List[dict], fmt: str):
     """Build download body for an ordered result list (search hits or selection)."""
     fmt = (fmt or "csv").lower().strip()
@@ -63,6 +98,7 @@ def _format_ranked_export(results: List[dict], fmt: str):
         writer.writerow([
             "Rank", "Similarity", "Title", "Year", "Journal", "Authors",
             "Source", "ID", "Cluster ID", "Cluster Label",
+            *_CSV_EXTRA_HEADERS,
         ])
         for i, a in enumerate(results, 1):
             sim = a.get("similarity_score")
@@ -72,6 +108,7 @@ def _format_ranked_export(results: List[dict], fmt: str):
                 a.get("journal", ""), "; ".join(a.get("authors") or []),
                 a.get("source", ""), a.get("article_id", ""),
                 a.get("cluster_id", ""), a.get("cluster_label", ""),
+                *_csv_extra(a),
             ])
             # Our own number, not source text: written as is, even when negative.
             if isinstance(sim, (int, float)) and not isinstance(sim, bool):
@@ -87,6 +124,7 @@ def _format_ranked_export(results: List[dict], fmt: str):
         lines.append(f"   Year: {a.get('year', '')} | Journal: {a.get('journal', '')}")
         lines.append(f"   Authors: {'; '.join(a.get('authors') or [])}")
         lines.append(f"   Source: {a.get('source', '')} | ID: {a.get('article_id', '')}")
+        lines.extend(_txt_type_doi_lines(a, "   "))
         if a.get("cluster_label"):
             lines.append(f"   Cluster: {a.get('cluster_label')}")
         lines.append("")
@@ -180,6 +218,7 @@ def _library_rows_to_csv(rows: List[dict]) -> str:
         "Title", "Year", "Journal", "Authors", "Source", "ID",
         "Cluster ID", "Cluster Label", "Excluded", "Exclusion Reason",
         "Starred", "Note",
+        *_CSV_EXTRA_HEADERS,
     ])
     for a in rows:
         writer.writerow(_csv_row([
@@ -195,6 +234,7 @@ def _library_rows_to_csv(rows: List[dict]) -> str:
             a.get("exclusion_reason", ""),
             "yes" if a.get("starred") else "no",
             a.get("note", ""),
+            *_csv_extra(a),
         ]))
     return output.getvalue()
 
@@ -223,6 +263,7 @@ def _build_library_export(db, scope: str, fmt: str):
                 f"  Year: {a.get('year', '')} | Source: {a.get('source', '')} | "
                 f"ID: {a.get('article_id', '')}"
             )
+            lines.extend(_txt_type_doi_lines(a, "  "))
             if a.get("cluster_label"):
                 lines.append(f"  Cluster: {a.get('cluster_label')}")
             if a.get("exclusion_reason"):

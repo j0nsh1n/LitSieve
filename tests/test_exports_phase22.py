@@ -72,7 +72,7 @@ def test_library_csv_neutralises_formulas(app_module):
     assert row[0] == "'=HYPERLINK(\"x\")"
     assert row[3] == "'+1"
     assert row[2] == "'@SUM(A1)"
-    assert row[-1] == "'@SUM(A1)"
+    assert row[11] == "'@SUM(A1)"
 
 
 def test_library_csv_note_is_neutralised():
@@ -82,7 +82,7 @@ def test_library_csv_note_is_neutralised():
     ])
     row = _csv_rows(out)[1]
     assert row[3] == "'-2+3"
-    assert row[-1] == "'@SUM(A1)"
+    assert row[11] == "'@SUM(A1)"
     assert row[6] == "-1"  # an int we generated is not touched
 
 
@@ -103,9 +103,9 @@ def test_selection_csv_carries_page_scores_and_clusters(app_module):
     rows = _csv_rows(r.text)[1:]
     assert len(rows) == 10
     assert [row[1] for row in rows] == [f"{0.9 - i * 0.05:.3f}" for i in range(10)]
-    assert rows[0][8:] == ["2", "Alpha group"]
-    assert rows[1][8:] == ["3", "Beta group"]
-    assert rows[2][8:] == ["", ""]  # unclustered only
+    assert rows[0][8:10] == ["2", "Alpha group"]
+    assert rows[1][8:10] == ["3", "Beta group"]
+    assert rows[2][8:10] == ["", ""]  # unclustered only
 
 
 def test_selection_csv_ignores_bad_scores_and_labels(app_module):

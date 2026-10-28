@@ -19,6 +19,21 @@ from app.services.work_types import (
 
 logger = logging.getLogger(__name__)
 
+# Issuing organizations on reports, books and similar are publishers, not journals.
+_ERIC_NON_JOURNAL_TYPES = frozenset({
+    "book",
+    "edited-book",
+    "book-chapter",
+    "reference-entry",
+    "conference-paper",
+    "dissertation",
+    "report",
+    "preprint",
+    "dataset",
+    "registry-record",
+    "other",
+})
+
 
 class ERICFetcher(BaseFetcher):
     SOURCE_NAME = 'eric'
@@ -82,10 +97,13 @@ class ERICFetcher(BaseFetcher):
                 authors = [a.strip() for a in raw_authors.split(';') if a.strip()]
 
             year = doc.get('publicationdateyear')
-            journal = doc.get('source', '') or ''
-            if journal == 'Online Submission':
-                journal = ''
+            source_name = doc.get('source', '') or ''
+            if source_name == 'Online Submission':
+                source_name = ''
             raw_types = doc.get('publicationtype') or []
+            work_type = pick_canonical_work_type('eric', raw_types)
+            journal_like = work_type not in _ERIC_NON_JOURNAL_TYPES
+            journal = source_name if journal_like else ''
             article = {
                 'article_id': doc.get('id', ''),
                 'source': 'eric',
@@ -99,11 +117,14 @@ class ERICFetcher(BaseFetcher):
                 article,
                 'eric',
                 doc,
-                work_type=pick_canonical_work_type('eric', raw_types),
+                work_type=work_type,
                 provider_type=join_provider_types('eric', raw_types),
                 doi=normalize_doi(doc.get('url')),
                 container_title=journal or None,
-                biblio=build_biblio(isbn=doc.get('isbn')),
+                biblio=build_biblio(
+                    isbn=doc.get('isbn'),
+                    publisher=None if journal_like else source_name or None,
+                ),
             )
         except Exception as e:
             logger.exception("ERIC parse error: %s", e)

@@ -245,7 +245,8 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "expand the set without rewriting the query.",
             "Need a real bibliography? Export RIS of the search results from Search, then "
             "Zotero → File → Import… (not drag-and-drop) → Create Bibliography. "
-            "Need process counts? Search → Screening report (.txt).",
+            "Zotero imports RIS GEN as a journal article, so for a generic type use "
+            "BibTeX @misc. Need process counts? Search → Screening report (.txt).",
         ],
         "where_in_app": "Search page.",
         "app_path": "/search",
@@ -392,7 +393,9 @@ FEATURE_GUIDES: Dict[str, FeatureGuide] = {
             "Match the assignment: some units want peer-reviewed only; others allow "
             "preprints with clear labeling. Your teacher’s rubric wins.",
             "Export RIS into Zotero (or similar) and fix author/title details before "
-            "the final bibliography. APA text generators outside this app are drafts.",
+            "the final bibliography. Zotero imports RIS GEN as a journal article; "
+            "use BibTeX @misc when you need a generic type. APA text from this app "
+            "is a classroom draft.",
         ],
         "tips": [
             "Study-type tags in Search are rough guesses from title+abstract — never "
