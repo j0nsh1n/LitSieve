@@ -15,6 +15,12 @@ from typing import Dict, List, Optional
 
 from app.fetchers.base import FetchError
 from app.fetchers.europepmc import EuropePMCFetcher
+from app.services.work_types import (
+    attach_work_fields,
+    build_location,
+    join_provider_types,
+    normalize_doi,
+)
 
 
 class _RxivFetcher(EuropePMCFetcher):
@@ -40,7 +46,22 @@ class _RxivFetcher(EuropePMCFetcher):
         # Keyed by DOI, as papers stored before the Europe PMC route were.
         article["article_id"] = doi
         article["journal"] = ""
-        return article
+        normalized = normalize_doi(doi)
+        pdf = f"https://www.{self.SOURCE_NAME}.org/content/{normalized or doi}.full.pdf"
+        loc = build_location(url=pdf, kind="pdf", host=self.PUBLISHER, via=self.SOURCE_NAME)
+        return attach_work_fields(
+            article,
+            self.SOURCE_NAME,
+            record,
+            work_type="preprint",
+            provider_type=join_provider_types(self.SOURCE_NAME, ["preprint"]),
+            doi=normalized,
+            container_title=None,
+            host_name=self.PUBLISHER,
+            oa_status="green",
+            best_oa_url=pdf,
+            locations=[loc] if loc else None,
+        )
 
 
 class BioRxivFetcher(_RxivFetcher):

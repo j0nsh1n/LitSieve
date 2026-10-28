@@ -10,6 +10,12 @@ from typing import Dict, List, Optional
 
 from app.fetchers.base import BaseFetcher, FetchError, HttpClient, reraise_fetch_error, user_agent
 from app.fetchers.terms import boolean_terms
+from app.services.work_types import (
+    attach_work_fields,
+    build_location,
+    join_provider_types,
+    normalize_doi,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +115,20 @@ class ArXivFetcher(BaseFetcher):
             if pub_el is not None and pub_el.text:
                 year = pub_el.text[:4]
 
-            return {
+            doi_el = entry.find('ax:doi', ns)
+            doi = normalize_doi(doi_el.text if doi_el is not None else None)
+            pdf = None
+            for link in entry.findall('a:link', ns):
+                if (link.get('title') or '').lower() == 'pdf' or link.get('type') == 'application/pdf':
+                    pdf = (link.get('href') or '').strip() or None
+                    if pdf:
+                        break
+            if not pdf:
+                pdf = f'https://arxiv.org/pdf/{arxiv_id}'
+            cat_el = entry.find('ax:primary_category', ns)
+            category = cat_el.get('term') if cat_el is not None else None
+            loc = build_location(url=pdf, kind='pdf', host='arXiv', via='arxiv')
+            article = {
                 'article_id': arxiv_id,
                 'source': 'arxiv',
                 'title': title,
@@ -118,6 +137,24 @@ class ArXivFetcher(BaseFetcher):
                 'authors': authors,
                 'journal': '',
             }
+            return attach_work_fields(
+                article,
+                'arxiv',
+                {
+                    'id': arxiv_id,
+                    'doi': doi,
+                    'pdf': pdf,
+                    'published': pub_el.text if pub_el is not None else None,
+                    'primary_category': category,
+                },
+                work_type='preprint',
+                provider_type=join_provider_types('arxiv', 'preprint'),
+                doi=doi,
+                host_name='arXiv',
+                oa_status='green',
+                best_oa_url=pdf,
+                locations=[loc] if loc else None,
+            )
         except Exception as e:
             logger.exception("arXiv parse error: %s", e)
             return None

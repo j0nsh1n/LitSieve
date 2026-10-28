@@ -10,7 +10,9 @@ from app.services.work_types import (
     biblio_json,
     build_biblio,
     canonical_work_type,
+    join_provider_types,
     normalize_doi,
+    pick_canonical_work_type,
     provider_type_label,
     trim_openalex,
 )
@@ -39,7 +41,7 @@ def test_every_mapping_row(provider, raw, expected):
     ("crossref", "peer-review"),
     ("crossref", "component"),
     ("doaj", "book"),
-    ("pubmed", "journal-article"),
+    ("pubmed", "research support, n.i.h., extramural"),
 ])
 def test_unknown_or_absent_raw_type_is_unknown(provider, raw):
     assert canonical_work_type(provider, raw) == "unknown"
@@ -49,6 +51,26 @@ def test_provider_type_keeps_the_raw_value():
     assert provider_type_label("openalex", "book-chapter") == "openalex:book-chapter"
     assert provider_type_label("crossref", None) is None
     assert provider_type_label("", "book") == "book"
+
+
+def test_multiple_types_keep_raw_labels_and_pick_the_most_specific():
+    assert pick_canonical_work_type("pubmed", ["Journal Article", "Review"]) == "review-article"
+    assert join_provider_types("pubmed", ["Journal Article", "Review"]) == (
+        "pubmed:Journal Article; Review"
+    )
+    assert pick_canonical_work_type("eric", ["Journal Articles", "Reports - Research"]) == (
+        "journal-article"
+    )
+    assert pick_canonical_work_type("openaire", [
+        "Other literature type",
+        "Part of book or chapter of book",
+    ]) == "book-chapter"
+    assert pick_canonical_work_type("semanticscholar", ["Review", "JournalArticle"]) == (
+        "review-article"
+    )
+    assert join_provider_types("semanticscholar", ["Review", "JournalArticle"]) == (
+        "semanticscholar:Review; JournalArticle"
+    )
 
 
 @pytest.mark.parametrize("raw, expected", [

@@ -12,8 +12,8 @@
   poster. Live at `https://www.litpilot.org` from the production checkout,
   `main` through #106 (2026-10-16). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
-- Latest full suite (2026-10-28, `feat/keep-provider-metadata`): **1600 passed**
-  in 148.80 s, no skips or xfails. `ruff check .` clean; `pyright app` **0 errors**, 6 optional-import
+- Latest full suite (2026-10-28, `feat/keep-metadata-other-sources`): **1754 passed**
+  in 153.95 s, no skips or xfails. `ruff check .` clean; `pyright app` **0 errors**, 6 optional-import
   warnings (CI blocks on errors). `pip-audit` (2026-10-14): no known
   vulnerabilities; ROCm torch/triton are un-auditable. No dependency lockfile.
 - One `/search` workspace replaces the two UI modes. Old `/data-management`,
@@ -62,8 +62,11 @@
   but exclude `article_extra`.
 - P1.2 fills those fields on new OpenAlex, Crossref and DOAJ fetches, and
   writes provenance, locations and a trimmed provider record into
-  `article_extra`. HAL, OpenAIRE and Semantic Scholar still leave the columns
-  empty. Search, ranking, exports and older rows are unchanged.
+  `article_extra`. Search, ranking, exports and older rows are unchanged.
+- P1.3 fills the same columns on new fetches from ERIC, PubMed, Europe PMC,
+  bioRxiv, medRxiv, Semantic Scholar, HAL, OpenAIRE, Zenodo, arXiv, PLOS,
+  ClinicalTrials.gov and NASA ADS. Exports, ranking, search filters and the
+  UI stay unchanged.
 - New support-view/ticket records omit mode; old history remains readable.
 - Host (2026-10-16): `MAX_TOTAL_ACCOUNTS=100` (27 real accounts then); the
   study aid is `LLM_PROVIDER=ollama`, `OLLAMA_MODEL=qwen2.5:14b` on the
@@ -184,17 +187,18 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-28. P1.2 on `feat/keep-provider-metadata`: OpenAlex,
-  Crossref and DOAJ fill work metadata and `article_extra` on new fetches.
-  Ruff passes, Pyright has 0 errors and 6 optional-import warnings, and full
-  pytest has 1600 passed. No JS changed.
+- **Date:** 2026-10-28. P1.3 on `feat/keep-metadata-other-sources`: remaining
+  fetchers fill work metadata and `article_extra` on new fetches. Ruff
+  passes, Pyright has 0 errors and 6 optional-import warnings, and full
+  pytest has 1754 passed. No JS changed.
 - Validation used production venv executables from this isolated worktree
   without installation. Live-provider and real-browser checks were not run.
+  Semantic Scholar has no live fixture (field check returned only 429s).
   Tests ran under nice with the 6 GiB available-memory stop guard; available
-  memory was 17.5 GiB at the start of the successful full run. Scratch is in
-  `~/HealthDatabaseAccess-scratch/p12/`.
+  memory was 18 GiB at the start of the successful full run. Scratch is in
+  `~/HealthDatabaseAccess-scratch/p13/`.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
   and unscheduled roadmap backlog. Ship staging was last recorded at
   `f9485cf`; no host or deployment state changed in this slice.
 - **Next step:** review of this PR; no merge or deploy in this slice.
-  Remaining fetcher population is P1.3 (HAL, OpenAIRE, Semantic Scholar).
+  Export changes remain P1.4.

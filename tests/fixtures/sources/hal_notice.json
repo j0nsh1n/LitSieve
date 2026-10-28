@@ -1,0 +1,26 @@
+{
+  "response": {
+    "docs": [
+      {
+        "halId_s": "hal-01057111",
+        "title_s": [
+          "DBAASP: Database of Antimicrobial Activity and Structure of Peptides"
+        ],
+        "producedDateY_i": 2014,
+        "journalTitle_s": "FEMS Microbiology Letters",
+        "doiId_s": "10.1111/1574-6968.12489",
+        "docType_s": "ART",
+        "submitType_s": "notice",
+        "fileMain_s": null,
+        "linkExtUrl_s": "https://academic.oup.com/femsle/article-pdf/357/1/63/19354171/357-1-63.pdf",
+        "openAccess_bool": true,
+        "abstract_s": [
+          "A HAL notice with an external PDF and no deposited file."
+        ],
+        "authFullName_s": [
+          "Fixture Author"
+        ]
+      }
+    ]
+  }
+}

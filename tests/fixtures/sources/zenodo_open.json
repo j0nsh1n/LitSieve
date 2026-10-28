@@ -1,0 +1,50 @@
+{
+  "hits": {
+    "hits": [
+      {
+        "id": 18364505,
+        "metadata": {
+          "title": "Chronotype and the Vulnerable Youth: A Scoping Review",
+          "description": "<h1><span lang=\"EN-US\">Abstract</span></h1>\n<p><span lang=\"EN-US\">In the landscape of contemporary adolescent health, a critical friction exists where the normative biological imperative to shift toward an evening chronotype collides with the rigid, early temporal structures of educational institutions. As a synthesis of data that reveals more than just biological predisposition, this scoping review examines ten empirical studies involving over 75,000 youth to map the extent and nature of the evidence linking individual circadian preference to physical and mental well-being. These studies illuminate a mode of vulnerability otherwise obscured by viewing youth sleep solely through the lens of duration or hygiene. This article argues that eveningness is robustly and consistently associated with a constellation of adverse outcomes, particularly internalizing mental health disorders such as depression and anxiety, as well as externalizing behaviors like aggression and substance use. While links to metabolic risks remain inconclusive and potentially mediated by sleep duration, the analysis reveals a uniform correlation between evening preference and somatic burdens, including chronic headaches and musculoskeletal pain. By charting these associations across diverse geographical contexts and measurement tools, the review suggests that these health deficits are active artifacts of a social jetlag environment, where the chronic misalignment between an individual&rsquo;s internal clock and external schooling demands creates a pathogenic strain on adolescent development.</span></p>",
+          "doi": "10.5281/zenodo.18364505",
+          "access_right": "open",
+          "publication_date": "2026-01-23",
+          "resource_type": {
+            "title": "Journal article",
+            "type": "publication",
+            "subtype": "article"
+          },
+          "journal": {
+            "issue": "01",
+            "pages": "51-63",
+            "title": "Ennoia Advances in Social Science, Technology and Education",
+            "volume": "2"
+          },
+          "license": {
+            "id": "cc-by-4.0"
+          },
+          "creators": [
+            {
+              "name": "LaBad, Ryann",
+              "affiliation": "Ozamiz City School of Arts and Trades",
+              "orcid": "0009-0002-6623-5841"
+            },
+            {
+              "name": "Shih, Yi-Huang",
+              "affiliation": "Minghsin University of Science and Technology",
+              "orcid": "0000-0002-1461-0876"
+            }
+          ]
+        },
+        "files": [
+          {
+            "key": "5Chronotype and the Vulnerable Youth A Scoping Review.pdf",
+            "links": {
+              "self": "https://zenodo.org/api/records/18364505/files/5Chronotype%20and%20the%20Vulnerable%20Youth%20A%20Scoping%20Review.pdf/content"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

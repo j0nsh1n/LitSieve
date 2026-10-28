@@ -1,0 +1,13 @@
+{
+  "paperId": "abc123",
+  "title": "School start times and adolescent sleep",
+  "abstract": "A review of later school start times.",
+  "year": 2022,
+  "authors": [{"name": "Ada Lovelace"}],
+  "venue": "Sleep Health",
+  "externalIds": {"DOI": "10.1016/j.sleh.2022.01.001"},
+  "publicationTypes": ["Review", "JournalArticle"],
+  "openAccessPdf": {"url": "https://example.org/paper.pdf", "status": "GREEN"},
+  "journal": {"name": "Sleep Health", "volume": "8", "pages": "1-10"},
+  "publicationDate": "2022-03-01"
+}

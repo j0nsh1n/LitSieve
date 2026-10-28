@@ -9,6 +9,13 @@ import os
 from typing import Dict, List, Optional
 
 from app.fetchers.base import BaseFetcher, FetchError, HttpClient, json_of, reraise_fetch_error
+from app.services.work_types import (
+    as_list,
+    attach_work_fields,
+    canonical_work_type,
+    join_provider_types,
+    normalize_doi,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +50,7 @@ class NASAADSFetcher(BaseFetcher):
                     self.BASE_URL,
                     params={
                         'q': query,
-                        'fl': 'title,abstract,author,year,bibcode,pub',
+                        'fl': 'title,abstract,author,year,bibcode,pub,doi,doctype',
                         'rows': n,
                         'start': start,
                         'fq': 'abstract:*',
@@ -81,8 +88,13 @@ class NASAADSFetcher(BaseFetcher):
             year = str(doc.get('year') or '').strip()
             journal = (doc.get('pub') or '').strip()
             bibcode = (doc.get('bibcode') or '').strip()
-
-            return {
+            doi = None
+            for item in as_list(doc.get('doi')):
+                doi = normalize_doi(item)
+                if doi:
+                    break
+            raw_type = doc.get('doctype')
+            article = {
                 'article_id': bibcode,
                 'source': 'nasa_ads',
                 'title': title,
@@ -91,6 +103,16 @@ class NASAADSFetcher(BaseFetcher):
                 'authors': authors,
                 'journal': journal,
             }
+            return attach_work_fields(
+                article,
+                'nasa_ads',
+                doc,
+                work_type=canonical_work_type('nasa_ads', raw_type),
+                provider_type=join_provider_types('nasa_ads', raw_type),
+                doi=doi,
+                container_title=journal or None,
+                host_name='ADS',
+            )
         except Exception as e:
             logger.exception("NASA ADS parse error: %s", e)
             return None

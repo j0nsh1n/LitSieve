@@ -1,0 +1,108 @@
+{
+  "response": {
+    "results": {
+      "result": [
+        {
+          "header": {
+            "dri:objIdentifier": {
+              "$": "doi_________::668f1b6621abdcd6672c6ce03ddaf6dc"
+            },
+            "dri:dateOfCollection": {
+              "$": "2026-08-19T06:50:47.357351226"
+            },
+            "dri:dateOfTransformation": null
+          },
+          "metadata": {
+            "oaf:entity": {
+              "oaf:result": {
+                "title": {
+                  "@classid": "main title",
+                  "@classname": "main title",
+                  "@schemeid": "dnet:dataCite_title",
+                  "@schemename": "dnet:dataCite_title",
+                  "$": "New Deal, African Americans and The"
+                },
+                "description": {
+                  "$": "Abstract of a New Deal encyclopedia entry."
+                },
+                "dateofacceptance": {
+                  "$": "2005-01-01"
+                },
+                "pid": {
+                  "@classid": "doi",
+                  "@classname": "Digital Object Identifier",
+                  "@schemeid": "dnet:pid_types",
+                  "@schemename": "dnet:pid_types",
+                  "$": "10.4135/9781412952507.n459"
+                },
+                "resulttype": {
+                  "@classid": "publication",
+                  "@classname": "publication",
+                  "@schemeid": "dnet:result_typologies",
+                  "@schemename": "dnet:result_typologies"
+                },
+                "resourcetype": {
+                  "@classid": "publication",
+                  "@classname": "publication",
+                  "@schemeid": "dnet:result_typologies",
+                  "@schemename": "dnet:result_typologies"
+                },
+                "bestaccessright": {
+                  "@classid": "UNKNOWN",
+                  "@classname": "unspecified",
+                  "@schemeid": "dnet:access_modes",
+                  "@schemename": "dnet:access_modes"
+                },
+                "children": {
+                  "instance": {
+                    "accessright": {
+                      "@classid": "UNKNOWN",
+                      "@classname": "unspecified",
+                      "@schemeid": "dnet:access_modes",
+                      "@schemename": "dnet:access_modes"
+                    },
+                    "collectedfrom": {
+                      "@name": "Crossref",
+                      "@id": "openaire____::081b82f96300b6a6e3d282bad31cb6e2"
+                    },
+                    "hostedby": {
+                      "@name": "Unknown Repository",
+                      "@id": "openaire____::55045bd2a65019fd8e6741a755395c8c"
+                    },
+                    "dateofacceptance": {
+                      "$": "2005-01-01"
+                    },
+                    "instancetype": {
+                      "@classid": "0013",
+                      "@classname": "Part of book or chapter of book",
+                      "@schemeid": "dnet:publication_resource",
+                      "@schemename": "dnet:publication_resource"
+                    },
+                    "pid": {
+                      "@classid": "doi",
+                      "@classname": "Digital Object Identifier",
+                      "@schemeid": "dnet:pid_types",
+                      "@schemename": "dnet:pid_types",
+                      "$": "10.4135/9781412952507.n459"
+                    },
+                    "refereed": {
+                      "@classid": "0001",
+                      "@classname": "peerReviewed",
+                      "@schemeid": "dnet:review_levels",
+                      "@schemename": "dnet:review_levels"
+                    },
+                    "webresource": {
+                      "url": {
+                        "$": "https://doi.org/10.4135/9781412952507.n459"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

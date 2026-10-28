@@ -1,0 +1,40 @@
+{
+  "hits": {
+    "hits": [
+      {
+        "id": 15610254,
+        "metadata": {
+          "title": "Influence of Sleep Duration and Age on Short-Term Memory Performance in Adolescents and Adults",
+          "description": "<p>Sleep plays a critical role in memory consolidation, yet the impact of sleep duration on memory performance across different ages remains underexplored. This study examines how hours of sleep affect short-term memory recall in participants aged 10 to 42 years and whether age affects this relationship. Data was collected via an online survey combining self-reported sleep duration and a memory quiz based on image recall. Results indicate a moderate positive correlation between sleep duration and memory accuracy (r = 0.67, p &gt; 0.001). Regression analysis suggests that each additional hour of sleep corresponds to an approximately 7.82 percentage point increase in memory test performance relative to the average score. The influence of age on this relationship was also explored. These findings underscore the importance of sufficient sleep for cognitive functioning and highlight potential age-related differences in sleep-dependent memory processes.</p>",
+          "doi": "10.5281/zenodo.15610254",
+          "access_right": "restricted",
+          "publication_date": "2025-06-06",
+          "resource_type": {
+            "title": "Journal article",
+            "type": "publication",
+            "subtype": "article"
+          },
+          "journal": null,
+          "license": {
+            "id": "cc-by-4.0"
+          },
+          "creators": [
+            {
+              "name": "Mafi, Jayden",
+              "affiliation": "Northwood High School",
+              "orcid": "0009-0003-1056-5777"
+            }
+          ]
+        },
+        "files": [
+          {
+            "key": "Influence of Sleep Duration and Age on Short-Term Memory Performance in Adolescents and Adults (4).pdf",
+            "links": {
+              "self": "https://zenodo.org/api/records/15610254/files/Influence%20of%20Sleep%20Duration%20and%20Age%20on%20Short-Term%20Memory%20Performance%20in%20Adolescents%20and%20Adults%20(4).pdf/content"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

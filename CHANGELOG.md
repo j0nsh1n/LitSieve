@@ -28,6 +28,11 @@ and this project aims to follow Semantic Versioning for app version strings
   this".
 
 ### Changed
+- ERIC, PubMed, Europe PMC, bioRxiv, medRxiv, Semantic Scholar, HAL,
+  OpenAIRE, Zenodo, arXiv, PLOS, ClinicalTrials.gov and NASA ADS fill type,
+  DOI, container, host, OA and biblio on new fetches, matching OpenAlex,
+  Crossref and DOAJ. Older rows stay empty. Search, ranking, exports and
+  the on-screen list are unchanged.
 - OpenAlex, Crossref and DOAJ fill type, DOI, container, host, OA and biblio
   on new fetches, and store provenance, locations and a trimmed provider
   record in `article_extra` (zlib-compressed, stored only at 4096 bytes or
