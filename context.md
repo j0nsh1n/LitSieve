@@ -12,8 +12,8 @@
   poster. Live at `https://www.litpilot.org` from the production checkout,
   `main` through #106 (2026-10-16). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
-- Latest full suite (2026-10-16): **1246 passed**, no xfails; all 15 parity
-  rows pass. `ruff check .` clean; `pyright app` **0 errors**, 6 optional-import
+- Latest full suite (2026-10-28, `fix/safe-provider-queries`): **1354 passed**
+  in 152.71 s, no skips or xfails. `ruff check .` clean; `pyright app` **0 errors**, 6 optional-import
   warnings (CI blocks on errors). `pip-audit` (2026-10-14): no known
   vulnerabilities; ROCm torch/triton are un-auditable. No dependency lockfile.
 - One `/search` workspace replaces the two UI modes. Old `/data-management`,
@@ -45,6 +45,11 @@
   reports queued/running/done states and elapsed time per source. Every
   source, PubMed included, goes through `HttpClient`; a 2xx body that is not
   JSON (a bot wall) is a typed `network` error with a sentence.
+- P0.1 sanitizes DOAJ query syntax and encodes one URL path segment, escapes
+  HAL Solr syntax, and escapes PLOS terms after boolean tokenization. DOAJ
+  and HAL reject blank or punctuation-only topics as `bad_query` before a
+  request; source reports explain unreadable search words in plain English.
+  No keyword rewriting, schema or ranking change.
 - New support-view/ticket records omit mode; old history remains readable.
 - Host (2026-10-16): `MAX_TOTAL_ACCOUNTS=100` (27 real accounts then); the
   study aid is `LLM_PROVIDER=ollama`, `OLLAMA_MODEL=qwen2.5:14b` on the
@@ -89,7 +94,7 @@
 | `app/operator/` | named Ship actions (staging worktree, no shell interpolation) |
 | `app/services/` | pipeline, embeddings, clustering, summarize, llm, reader_mode / facts / verify, citations, mailer |
 | `app/storage/` | database, libraries, shares, user_db, quota, dbconn, helpdesk, ops_audit |
-| `app/fetchers/` | 16 public sources + `base.py` (HTTP, `json_of`, `clean_text`) + `terms.py` |
+| `app/fetchers/` | 16 public sources + `base.py` (HTTP, `json_of`, `clean_text`), `terms.py` and `querytext.py` |
 | `app/content/` | source_catalog, feature_guides, sample_corpus, ui_flags, looks |
 | `templates/` + `partials/` | Jinja shell + Search/guest partials |
 | `static/` | vanilla JS/CSS (no npm); cache-bust `?v=` |
@@ -165,21 +170,14 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-26. Branch `chore/cloudflared-maintenance`. Verified the
-  current Cloudflare release and eMudhra advisory, activated 2026.10.4 for
-  LitPilot, and checked tunnel registrations and public/local health. No
-  application code changed. The separate system-wide service's restart
-  loop remains uninvestigated.
-- **Date:** 2026-10-16. The 2026-10-15 audit is closed: #93 to #106 merged
-  and deployed, and Cloudflare lets `/health` through. The last three PRs
-  were backlog work: per-library job slots and saved sample vectors (#104),
-  job records and pruning (#105), control-edge contrast, the Night light
-  chip, `spec.md`'s "Narrow it down" wording and these docs (#106).
-- The Ship staging worktree (`~/.local/share/litsieve/staging`, branch
-  `operator-staging`) sits at `f9485cf`; move it to `main` before a Ship
-  deploy.
-- Open: the optional source keys and the bare `litpilot.org` record (both
-  need the owner). The first guest prepare on the host builds the sample
-  vector file (about 10 s); it persists across deploys, and later guests
-  prepare in under a second.
-- **Next step:** none scheduled; the backlog in `roadmap.md` is unscheduled.
+- **Date:** 2026-10-28. P0.1, branch `fix/safe-provider-queries`, implements
+  safe provider punctuation and `bad_query` source reports. Ruff passes,
+  Pyright has 0 errors and 6 optional-import warnings, full pytest has
+  1354 passed, and `node --check static/js/collect.js` exits 0.
+- Validation used production venv executables from this isolated worktree
+  without installation. Tests used request stubs and Node report rendering;
+  live-provider and real-browser checks were not run. Test-group peak RSS
+  was 1.91 GiB under the 6 GiB available-memory stop guard.
+- GLM-5.3-Flash through T3/OpenCode drafted the changelog and PR body; the
+  implementation agent checked and corrected them against the code.
+- **Next step:** parent review of the P0.1 PR; no merge or deploy in this slice.

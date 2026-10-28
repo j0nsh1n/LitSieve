@@ -18,6 +18,7 @@ from app.fetchers.base import (
     reraise_fetch_error,
     user_agent,
 )
+from app.fetchers.querytext import solr_safe
 
 
 class HALFetcher(BaseFetcher):
@@ -34,7 +35,9 @@ class HALFetcher(BaseFetcher):
         articles: List[Dict] = []
         start = 0
         page_size = min(100, max_results)
-        q = (query or "").strip() or "*:*"
+        q = solr_safe(query)
+        if not q:
+            raise FetchError("HAL needs search words.", kind="bad_query")
 
         while len(articles) < max_results:
             rows = min(page_size, max_results - len(articles))

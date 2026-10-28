@@ -17,6 +17,7 @@ from app.fetchers.base import (
     reraise_fetch_error,
     user_agent,
 )
+from app.fetchers.querytext import lucene_safe
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,9 @@ class DOAJFetcher(BaseFetcher):
         )
 
     def search_and_fetch(self, query: str, max_results: int = 500) -> List[Dict]:
+        query = lucene_safe(query)
+        if not query:
+            raise FetchError("DOAJ needs search words.", kind="bad_query")
         articles = []
         page = 1
         # Constant page size: DOAJ pages by number, so a smaller later page
@@ -42,7 +46,7 @@ class DOAJFetcher(BaseFetcher):
         while len(articles) < max_results:
             try:
                 r = self.http.get(
-                    f'{self.BASE_URL}/{quote(query)}',
+                    f'{self.BASE_URL}/{quote(query, safe="")}',
                     params={'page': page, 'pageSize': page_size},
                 )
                 data = json_of(r)
@@ -57,6 +61,13 @@ class DOAJFetcher(BaseFetcher):
                     break
                 page += 1
             except FetchError as e:
+                if (
+                    e.kind == "http" and str(e).startswith("HTTP 400:")
+                    and "disallowed lucene" in str(e).lower()
+                ):
+                    raise FetchError(
+                        "DOAJ couldn't read the search words.", kind="bad_query", articles=articles
+                    ) from e
                 logger.exception("DOAJ fetch error: %s", e)
                 reraise_fetch_error(e, articles)
             except Exception as e:
