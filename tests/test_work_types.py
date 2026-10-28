@@ -6,15 +6,20 @@ import pytest
 
 from app.services.work_types import (
     TYPE_MAP,
+    WORK_TYPE_CHIP_LABELS,
+    WORK_TYPE_NOT_STORED,
     WORK_TYPES,
     biblio_json,
     build_biblio,
     canonical_work_type,
     join_provider_types,
     normalize_doi,
+    parse_work_type_filter,
     pick_canonical_work_type,
     provider_type_label,
     trim_openalex,
+    work_type_chip_label,
+    work_type_matches_filter,
 )
 
 MAPPING_ROWS = [
@@ -29,6 +34,56 @@ def test_every_mapping_row(provider, raw, expected):
     assert expected in WORK_TYPES
     assert canonical_work_type(provider, raw) == expected
     assert canonical_work_type(provider.upper(), raw.upper()) == expected
+
+
+def test_chip_words_match_the_agreed_table():
+    assert WORK_TYPE_CHIP_LABELS == {
+        "journal-article": "Article",
+        "review-article": "Review article",
+        "book-review": "Book review",
+        "book": "Book",
+        "edited-book": "Book",
+        "book-chapter": "Chapter",
+        "reference-entry": "Reference entry",
+        "dissertation": "Thesis",
+        "report": "Report",
+        "preprint": "Preprint",
+        "conference-paper": "Conference paper",
+        "registry-record": "Trial registration",
+        "dataset": "Dataset",
+    }
+    assert work_type_chip_label("journal-article") == "Article"
+    assert work_type_chip_label("edited-book") == "Book"
+    assert work_type_chip_label("dissertation") == "Thesis"
+    assert work_type_chip_label("registry-record") == "Trial registration"
+
+
+@pytest.mark.parametrize("stored", [None, "", "   ", "unknown"])
+def test_missing_or_unknown_type_has_no_chip(stored):
+    assert work_type_chip_label(stored) is None
+
+
+def test_other_has_no_chip():
+    assert work_type_chip_label("other") is None
+
+
+def test_type_filter_keeps_legacy_rows_under_not_stored():
+    assert work_type_matches_filter(None, [WORK_TYPE_NOT_STORED])
+    assert work_type_matches_filter("", [WORK_TYPE_NOT_STORED])
+    assert work_type_matches_filter("unknown", [WORK_TYPE_NOT_STORED])
+    assert not work_type_matches_filter("book", [WORK_TYPE_NOT_STORED])
+    assert work_type_matches_filter("book", ["book"])
+    assert work_type_matches_filter("edited-book", ["edited-book", "book"])
+
+
+def test_parse_work_type_filter_accepts_vocabulary_and_not_stored():
+    assert parse_work_type_filter(None) is None
+    assert parse_work_type_filter([]) is None
+    assert parse_work_type_filter(["journal-article", "not-stored"]) == [
+        "journal-article", "not-stored",
+    ]
+    with pytest.raises(ValueError):
+        parse_work_type_filter(["scroll"])
 
 
 @pytest.mark.parametrize("provider, raw", [

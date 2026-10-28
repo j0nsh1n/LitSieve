@@ -12,11 +12,16 @@
   poster. Live at `https://www.litpilot.org` from the production checkout,
   `main` through #106 (2026-10-16). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
-- Latest full suite (2026-10-28, `feat/run-record`): **1872 passed** in
-  152.62 s, no skips or xfails. `ruff check .` clean; `pyright app`
+- Latest full suite (2026-10-28, `feat/type-chip-filter`): **1898 passed** in
+  162.47 s, no skips or xfails. `ruff check .` clean; `pyright app`
   **0 errors**, 6 optional-import warnings (CI blocks on errors).
   `pip-audit` (2026-10-14): no known vulnerabilities; ROCm torch/triton are
   un-auditable. No dependency lockfile.
+- P1.7 shows a type chip on Search cards and a Type filter next to Sources.
+  The filter runs before ranking and reads only `work_type`. Ranked hits get
+  that column in one batched query. Null and unknown types have no chip.
+  "Type not stored" keeps legacy rows. No type filter leaves ranking as it
+  was. Search.js cache-bust is `20261028d`.
 - P1.6 stores Collect inputs and Search questions in the library database
   (`fetch_runs`, `question_log`), about 50 rows each. Writes come from
   `_run_multi_fetch` (background and sync, including cancel and error) and
@@ -40,7 +45,7 @@
 - Empty Search offers topic selection and fetch (sources and optional contact
   email in the fetch popup); fetch and preparation share one wait screen, then
   Narrow it down offers apply/skip. Search by offers Question, PICO and a
-  paper seed; sort/source/starred chips keep the ranking query; More holds
+  paper seed; sort/source/type/starred chips keep the ranking query; More holds
   reports, duplicates, re-prepare, Start over, Set aside and Group by theme;
   Save your work exports visible results or the whole library.
 - Result identifiers/study type are inside the abstract. Stars, notes,
@@ -212,14 +217,14 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-28. P1.6 on `feat/run-record`. Each library keeps Collect
-  inputs and Search questions in `fetch_runs` / `question_log`. Email is
-  omitted. Clones and admin views do not see the rows. Start over clears them.
+- **Date:** 2026-10-28. P1.7 on `feat/type-chip-filter`. Search cards show a
+  type chip when `work_type` is stored. A Type filter next to Sources narrows
+  candidates before ranking. "Type not stored" keeps NULL/legacy rows.
 - Validation (production venv, this worktree, no install): `ruff check .`
-  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 1872
-  passed in 152.62 s. Scratch is `~/HealthDatabaseAccess-scratch/p16/`.
+  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 1898
+  passed in 162.47 s. Scratch is `~/HealthDatabaseAccess-scratch/p17/`.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
   and unscheduled roadmap backlog. Ship staging was last recorded at
   `f9485cf`; no host or deployment state changed in this slice.
-- **Next step:** parent review of the P1.6 PR; no merge or deploy in this
-  slice. Type chip and type filter on Search remain P1.7.
+- **Next step:** parent review of the P1.7 PR; no merge or deploy in this
+  slice. Spec.md holds for owner approval. Benchmark harness is P1.8.

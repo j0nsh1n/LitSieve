@@ -8,13 +8,84 @@ const searchState = {
  requestPending: false,
  filters: {
   top_k: 10, sort_by: 'similarity', pico_boost: false, lexical_boost: true,
-  source_filter: [], year_min: null, year_max: null,
+  source_filter: [], year_min: null, year_max: null, work_type_filter: [],
   display: { starred: false, noted: false, recent: false, sources: {} },
  },
 };
 const displayFilterState = searchState.filters.display;
 let librarySourceCounts = {};
+let libraryWorkTypeCounts = {};
 let libraryStarredCount = 0;
+const WORK_TYPE_CHIP_LABELS = {
+ 'journal-article': 'Article',
+ 'review-article': 'Review article',
+ 'book-review': 'Book review',
+ book: 'Book',
+ 'edited-book': 'Book',
+ 'book-chapter': 'Chapter',
+ 'reference-entry': 'Reference entry',
+ dissertation: 'Thesis',
+ report: 'Report',
+ preprint: 'Preprint',
+ 'conference-paper': 'Conference paper',
+ 'registry-record': 'Trial registration',
+ dataset: 'Dataset',
+};
+const WORK_TYPE_FILTER_LABELS = Object.assign({
+ other: 'Other',
+ 'not-stored': 'Type not stored',
+}, WORK_TYPE_CHIP_LABELS);
+const WORK_TYPE_FILTER_ORDER = [
+ 'journal-article', 'review-article', 'book-review', 'book', 'edited-book',
+ 'book-chapter', 'reference-entry', 'conference-paper', 'dissertation',
+ 'report', 'preprint', 'dataset', 'registry-record', 'other', 'not-stored',
+];
+
+function workTypeChipLabel(workType) {
+ if (!workType || workType === 'unknown') return '';
+ return WORK_TYPE_CHIP_LABELS[workType] || '';
+}
+
+function availableWorkTypeIds() {
+ return Object.keys(libraryWorkTypeCounts)
+  .filter((id) => Number(libraryWorkTypeCounts[id]) > 0)
+  .sort((a, b) => {
+   const ia = WORK_TYPE_FILTER_ORDER.indexOf(a);
+   const ib = WORK_TYPE_FILTER_ORDER.indexOf(b);
+   return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+  });
+}
+
+function workTypeFilterOptions() {
+ return availableWorkTypeIds().map((value) => ({
+  value,
+  label: WORK_TYPE_FILTER_LABELS[value] || value,
+  hint: `${libraryWorkTypeCounts[value]} in your library`,
+ }));
+}
+
+function selectedWorkTypesOrAll() {
+ const available = availableWorkTypeIds();
+ const selected = Array.isArray(searchState.filters.work_type_filter)
+  ? searchState.filters.work_type_filter : [];
+ if (!selected.length) return available.slice();
+ return available.filter((id) => selected.includes(id));
+}
+
+function storedWorkTypeFilter(picked) {
+ const available = availableWorkTypeIds();
+ const chosen = Array.isArray(picked) ? picked.filter((id) => available.includes(id)) : [];
+ if (!chosen.length) return [];
+ if (chosen.length === available.length && available.every((id) => chosen.includes(id))) {
+  return [];
+ }
+ return chosen;
+}
+
+function workTypeFilterForRequest(filters) {
+ const selected = Array.isArray(filters.work_type_filter) ? filters.work_type_filter.filter(Boolean) : [];
+ return selected.length ? selected.slice() : undefined;
+}
 let lastSuccessfulSession = null;
 
 function applySearchInputMethod(mode) {
@@ -162,6 +233,7 @@ function captureSearchSession(kind, opts = {}) {
   source_filter: filters.source_filter,
   year_min: filters.year_min,
   year_max: filters.year_max,
+  work_type_filter: filters.work_type_filter,
   filters: JSON.parse(JSON.stringify(searchState.filters)),
   saved_at: Date.now(),
  };
@@ -255,6 +327,12 @@ function applySearchSessionToForm(state) {
    if (legacyAllSources) {
     searchState.filters.source_filter = available;
    }
+  }
+  const savedTypes = savedFilters ? savedFilters.work_type_filter : state.work_type_filter;
+  if (Array.isArray(savedTypes)) {
+   const available = availableWorkTypeIds();
+   searchState.filters.work_type_filter = available.length
+    ? savedTypes.filter((id) => available.includes(id)) : savedTypes.slice();
   }
   if (savedFilters && savedFilters.display) {
    Object.assign(displayFilterState, savedFilters.display, {
@@ -379,7 +457,11 @@ function collectSearchFilters() {
  if (!hasPicoText()) {
   request.pico_boost = false;
  }
- return Object.assign({}, request, { source_filter: request.source_filter.slice() });
+ return Object.assign({}, request, {
+  source_filter: request.source_filter.slice(),
+  work_type_filter: Array.isArray(request.work_type_filter)
+   ? request.work_type_filter.slice() : [],
+ });
 }
 
 function hasPicoText() {
@@ -413,6 +495,7 @@ function wireSearchFilterAdapters() {
  syncSearchFiltersFromForm();
  document.getElementById('simple-sort-chip')?.addEventListener('click', promptSimpleSort);
  document.getElementById('simple-sources-chip')?.addEventListener('click', promptSimpleSources);
+ document.getElementById('simple-type-chip')?.addEventListener('click', promptSimpleTypes);
  document.getElementById('simple-starred-chip')?.addEventListener('click', promptSimpleStarred);
 }
 
@@ -661,6 +744,14 @@ async function applyAvailableSources() {
  try {
  const stats = await apiCall('/api/statistics');
  sources = stats.sources || {};
+ libraryWorkTypeCounts = Object.fromEntries(
+  Object.entries(stats.work_type_counts || {}).filter(([, n]) => Number(n) > 0)
+ );
+ if (searchState.filters.work_type_filter.length) {
+  searchState.filters.work_type_filter = searchState.filters.work_type_filter.filter(
+   (id) => id in libraryWorkTypeCounts
+  );
+ }
  refreshStarredCount(stats.starred);
  } catch (e) {
  return;
@@ -793,6 +884,13 @@ async function promptSimpleSearchScope(kind = 'text') {
     max: 2100,
     step: 1,
    },
+   ...(workTypeFilterOptions().length ? [{
+    id: 'types',
+    label: 'Type',
+    type: 'multi-choice',
+    value: selectedWorkTypesOrAll(),
+    options: workTypeFilterOptions(),
+   }] : []),
    ...(kind !== 'starred' ? [{
     id: 'lexical_boost', section: 'Ranking', label: 'Prefer exact words', type: 'choice',
     value: searchState.filters.lexical_boost ? 'on' : 'off',
@@ -819,6 +917,9 @@ async function promptSimpleSearchScope(kind = 'text') {
    if (ymin != null && (ymin < 1900 || ymin > 2100)) return 'From year must be between 1900 and 2100.';
    if (ymax != null && (ymax < 1900 || ymax > 2100)) return 'To year must be between 1900 and 2100.';
    if (ymin != null && ymax != null && ymin > ymax) return 'From year must be before To year.';
+   if (workTypeFilterOptions().length && !(vals.types || []).length) {
+    return 'Please select at least one type.';
+   }
    return null;
   },
  });
@@ -834,6 +935,9 @@ async function promptSimpleSearchScope(kind = 'text') {
  if (ymaxEl) ymaxEl.value = String(result.year_max || '').trim();
  if (result.lexical_boost != null) document.getElementById('lexical-boost').checked = result.lexical_boost === 'on';
  if (result.pico_boost != null) document.getElementById('pico-boost').checked = result.pico_boost === 'on';
+ if (Array.isArray(result.types)) {
+  searchState.filters.work_type_filter = storedWorkTypeFilter(result.types);
+ }
  syncSearchFiltersFromForm();
  return true;
 }
@@ -843,7 +947,7 @@ const SIMPLE_SORT_LABELS = {
 };
 
 function syncSimpleResultChips() {
- ['simple-sort-chip', 'simple-sources-chip', 'simple-starred-chip'].forEach((id) => {
+ ['simple-sort-chip', 'simple-sources-chip', 'simple-type-chip', 'simple-starred-chip'].forEach((id) => {
   const chip = document.getElementById(id);
   if (chip) chip.disabled = searchState.requestPending;
  });
@@ -854,6 +958,12 @@ function syncSimpleResultChips() {
   const all = Object.keys(librarySourceCounts).length;
   const selected = searchState.filters.source_filter.length;
   sources.textContent = selected === all ? 'Sources: All' : `Sources: ${selected} of ${all}`;
+ }
+ const types = document.getElementById('simple-type-chip');
+ if (types) {
+  const all = availableWorkTypeIds().length;
+  const selected = searchState.filters.work_type_filter.length;
+  types.textContent = (!selected || selected === all) ? 'Type: All' : `Type: ${selected} of ${all}`;
  }
  const starred = document.getElementById('simple-starred-chip');
  if (starred) {
@@ -889,6 +999,34 @@ async function promptSimpleSources() {
  });
  if (!values || searchState.requestPending) return;
  searchState.filters.source_filter = values.sources;
+ syncSearchFilterControls();
+ if (!lastSearchParams) return;
+ const replaySources = { skipOptions: true, replay: true };
+ if (lastSearchParams.mode === 'starred') await doStarredSearch(replaySources);
+ else if (lastSearchParams.mode === 'seed' && lastSearchParams.include_seed) {
+  await doMoreLikeThisPaper({ article_id: lastSearchParams.query_text }, replaySources);
+ } else await doSearch(replaySources);
+}
+
+async function promptSimpleTypes() {
+ if (searchState.requestPending) return;
+ const options = workTypeFilterOptions();
+ if (!options.length) {
+  showNotification('No paper types in this library yet.', 'info');
+  return;
+ }
+ const values = await openSiteForm({
+  title: 'Type',
+  message: 'Search uses the selected types before ranking. Type not stored keeps papers whose type was never saved.',
+  confirmLabel: 'Search these types',
+  fields: [{
+   id: 'types', label: 'Include types', type: 'multi-choice',
+   value: selectedWorkTypesOrAll(), options,
+  }],
+  validate: (vals) => vals.types.length ? null : 'Please select at least one type.',
+ });
+ if (!values || searchState.requestPending) return;
+ searchState.filters.work_type_filter = storedWorkTypeFilter(values.types);
  syncSearchFilterControls();
  if (!lastSearchParams) return;
  const replay = { skipOptions: true, replay: true };
@@ -956,6 +1094,7 @@ async function doSearch(opts) {
  lexical_boost: filters.lexical_boost,
  year_min: filters.year_min,
  year_max: filters.year_max,
+ work_type_filter: filters.work_type_filter,
  mode: method,
  };
  const session = opts?.replay ? lastSuccessfulSession : captureSearchSession(method);
@@ -973,6 +1112,7 @@ async function doSearch(opts) {
  year_min: filters.year_min,
  year_max: filters.year_max,
  lexical_boost: filters.lexical_boost,
+ work_type_filter: workTypeFilterForRequest(filters),
  },
  });
  const seed = data.seed;
@@ -997,6 +1137,7 @@ async function doSearch(opts) {
  lexical_boost: filters.lexical_boost,
  year_min: filters.year_min,
  year_max: filters.year_max,
+ work_type_filter: workTypeFilterForRequest(filters),
  },
  });
  }
@@ -1046,6 +1187,7 @@ async function doStarredSearch(opts) {
  lexical_boost: false,
  year_min: filters.year_min,
  year_max: filters.year_max,
+ work_type_filter: filters.work_type_filter,
  mode: 'starred',
  };
  const session = opts?.replay ? lastSuccessfulSession : captureSearchSession('starred');
@@ -1059,6 +1201,7 @@ async function doStarredSearch(opts) {
  source_filter: filters.source_filter,
  year_min: filters.year_min,
  year_max: filters.year_max,
+ work_type_filter: workTypeFilterForRequest(filters),
  },
  });
  const banner = document.getElementById('seed-banner');
@@ -1117,6 +1260,7 @@ async function doMoreLikeThisPaper(article, opts) {
  lexical_boost: filters.lexical_boost,
  year_min: filters.year_min,
  year_max: filters.year_max,
+ work_type_filter: filters.work_type_filter,
  mode: 'seed',
  include_seed: true,
  };
@@ -1133,6 +1277,7 @@ async function doMoreLikeThisPaper(article, opts) {
  year_max: filters.year_max,
  lexical_boost: filters.lexical_boost,
  include_seed: true,
+ work_type_filter: workTypeFilterForRequest(filters),
  },
  });
  const seed = data.seed || article;
@@ -1433,6 +1578,10 @@ function buildResultCard(article, idx) {
  if (journal) venueBits.push(journal);
  if (year) venueBits.push(year);
  const venue = venueBits.join(' · ');
+ const typeLabel = workTypeChipLabel(article.work_type);
+ const typeChip = typeLabel
+  ? `<span class="tag result-type-chip">${escapeHtml(typeLabel)}</span>`
+  : '';
  const byline = authors
   ? `${escapeHtml(authors)}${journal ? ' — ' + journal : ''}`
   : journal;
@@ -1453,7 +1602,7 @@ function buildResultCard(article, idx) {
  <span class="result-venue">${venue}</span>
  <span class="result-year">${year}</span>
  <span class="result-tags">
-  <span class="tag">${escapeHtml(getSourceName(article.source))}</span>
+  ${typeChip}<span class="tag">${escapeHtml(getSourceName(article.source))}</span>
  </span>
  </div>
  <h3 class="article-title result-row-title">${escapeHtml(article.title || '')}${resultMarksHtml(starred, !!String(noteVal).trim())}</h3>

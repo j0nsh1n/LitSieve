@@ -69,6 +69,39 @@ def test_year_range_hint_explains_publication_year_and_undated_papers():
     assert "Papers with unknown year are hidden when a range is set." not in template
 
 
+def _chip_label(work_type):
+    search = _read("static", "js", "search.js")
+    start = search.index("const WORK_TYPE_CHIP_LABELS")
+    end = search.index("function availableWorkTypeIds")
+    code = search[start:end]
+    script = r"""
+const vm = require('vm');
+const [code, workType] = JSON.parse(process.argv[1]);
+const sandbox = {};
+vm.runInNewContext(code + ';this.out = workTypeChipLabel(' + JSON.stringify(workType) + ');', sandbox);
+console.log(JSON.stringify(sandbox.out));
+"""
+    out = subprocess.run(
+        ["node", "-e", script, json.dumps([code, work_type])],
+        capture_output=True, text=True, check=True,
+    )
+    return json.loads(out.stdout)
+
+
+def test_js_type_chip_words_match_python():
+    from app.services.work_types import WORK_TYPE_CHIP_LABELS, work_type_chip_label
+
+    for stored, label in WORK_TYPE_CHIP_LABELS.items():
+        assert _chip_label(stored) == label
+        assert work_type_chip_label(stored) == label
+    assert _chip_label(None) == ""
+    assert _chip_label("unknown") == ""
+    assert _chip_label("other") == ""
+    card = _slice(_read("static", "js", "search.js"), "function buildResultCard(", "const noteRowHtml")
+    assert "workTypeChipLabel(article.work_type)" in card
+    assert "result-type-chip" in card
+
+
 def test_score_tooltip_says_the_list_is_sorted_by_it():
     card = _slice(_read("static", "js", "search.js"), "function buildResultCard(", "const url = getArticleUrl")
     assert "sorted" in card

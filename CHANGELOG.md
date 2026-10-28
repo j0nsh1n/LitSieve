@@ -9,6 +9,12 @@ and this project aims to follow Semantic Versioning for app version strings
 ## [Unreleased]
 
 ### Added
+- Search cards show a type chip when the paper has a stored type (Article,
+  Review article, Book, Chapter, Thesis, and the rest of the stored types).
+  Papers with no type, or an unknown type, have no chip. A Type filter sits
+  next to Sources. It narrows the library before ranking. "Type not stored"
+  keeps older papers whose type was never saved. With the filter off, ranking
+  matches today's results.
 - Each library keeps the last 50 Collect inputs and Search questions in its
   own database (`fetch_runs`, `question_log`). The contact email is never
   stored. Clones do not copy these rows. Start over clears them. Admin and
