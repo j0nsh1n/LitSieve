@@ -1,0 +1,32 @@
+{
+ "message": {
+  "items": [
+   {
+    "DOI": "10.4324/9780203309506",
+    "type": "book",
+    "title": [
+     "Black Sexual Politics"
+    ],
+    "publisher": "Routledge",
+    "ISBN": [
+     "9780203309506"
+    ],
+    "author": [
+     {
+      "given": "Patricia",
+      "family": "Hill Collins"
+     }
+    ],
+    "issued": {
+     "date-parts": [
+      [
+       2004,
+       8,
+       2
+      ]
+     ]
+    }
+   }
+  ]
+ }
+}

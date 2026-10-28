@@ -1,0 +1,43 @@
+{
+ "results": [
+  {
+   "id": "03da62cda4434b57b6d75481b8807e02",
+   "bibjson": {
+    "title": "Rest assured: Promoting sleep health in undergraduate education",
+    "abstract": "Background: Sleep deprivation among young adults is a pervasive problem driven by high levels of stress, excessive screen time, disruptive school and living environments, irregular sleep habits, high academic demands, early school start times, and low rates of physical activity. Difficulties with emotion regulation, high rates of anxiety and depression, and poor academic performance are only a few of the struggles faced by sleep deprived young adults. Although sleep apps and wearables are increasingly popular, knowledge of positive sleep health without the proper tools to motivate and instill behavior change can contribute to anxiety and negative cognitions about sleep, which only further fuel the problem. Methods: In this report we describe a series of undergraduate university curricula, housed within a unique undergraduate department, designed to enhance not only knowledge of sleep, but also associated behavior changes that have been demonstrated to improve sleep, mood, and anxiety among university students. Results: Numerous courses within the Child and Adolescent Mental Health Studies (CAMS) department at New York University address sleep directly, teaching students about the science of sleep and how they can improve their own sleep to enhance overall wellbeing. Our work to date demonstrates that students find these courses desirable and impactful. Conclusion: College courses present a unique opportunity to improve the health and wellbeing of young adults by teaching about sleep health. Undergraduate campuses may represent an underutilized locale from which to address population health.",
+    "year": "2025",
+    "author": [
+     {
+      "name": "Haley Nowlin"
+     },
+     {
+      "name": "Emily Badin"
+     },
+     {
+      "name": "Jess P. Shatkin"
+     }
+    ],
+    "journal": {
+     "title": "Sleep Medicine: X",
+     "publisher": "Elsevier"
+    },
+    "identifier": [
+     {
+      "id": "2590-1427",
+      "type": "eissn"
+     },
+     {
+      "id": "10.1016/j.sleepx.2025.100159",
+      "type": "doi"
+     }
+    ],
+    "link": [
+     {
+      "type": "fulltext",
+      "url": "http://www.sciencedirect.com/science/article/pii/S2590142725000229"
+     }
+    ]
+   }
+  }
+ ]
+}

@@ -12,8 +12,8 @@
   poster. Live at `https://www.litpilot.org` from the production checkout,
   `main` through #106 (2026-10-16). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
-- Latest full suite (2026-10-28, `feat/work-metadata-schema`): **1527 passed**
-  in 145.52 s, no skips or xfails. `ruff check .` clean; `pyright app` **0 errors**, 6 optional-import
+- Latest full suite (2026-10-28, `feat/keep-provider-metadata`): **1600 passed**
+  in 148.80 s, no skips or xfails. `ruff check .` clean; `pyright app` **0 errors**, 6 optional-import
   warnings (CI blocks on errors). `pip-audit` (2026-10-14): no known
   vulnerabilities; ROCm torch/triton are un-auditable. No dependency lockfile.
 - One `/search` workspace replaces the two UI modes. Old `/data-management`,
@@ -57,9 +57,13 @@
   `article_extra` and its staging mirror, and a shared article column list
   for readers, inserts and replace fetches. The provider-record helper stores
   UTF-8 JSON only when its zlib-compressed size is at most 4096 bytes.
-  Fetchers do not fill the fields yet. Search ranking uses the original
-  article columns; API responses omit unset metadata keys. Exports and quota
-  are unchanged; clones keep article fields but exclude `article_extra`.
+  Search ranking uses the original article columns; API responses omit unset
+  metadata keys. Exports and quota are unchanged; clones keep article fields
+  but exclude `article_extra`.
+- P1.2 fills those fields on new OpenAlex, Crossref and DOAJ fetches, and
+  writes provenance, locations and a trimmed provider record into
+  `article_extra`. HAL, OpenAIRE and Semantic Scholar still leave the columns
+  empty. Search, ranking, exports and older rows are unchanged.
 - New support-view/ticket records omit mode; old history remains readable.
 - Host (2026-10-16): `MAX_TOTAL_ACCOUNTS=100` (27 real accounts then); the
   study aid is `LLM_PROVIDER=ollama`, `OLLAMA_MODEL=qwen2.5:14b` on the
@@ -180,19 +184,17 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-28. P1.1 review fixes on `feat/work-metadata-schema`
-  (PR #111): public responses omit unset metadata keys, search ranking uses
-  `SEARCH_ARTICLE_COLUMNS`, and recovery tests cover interrupted ADD COLUMN
-  plus plaintext/SQLCipher swap rollback-then-retry. Ruff passes, Pyright
-  has 0 errors and 6 optional-import warnings, and full pytest has 1527
-  passed, including 38 schema tests. No JS changed.
+- **Date:** 2026-10-28. P1.2 on `feat/keep-provider-metadata`: OpenAlex,
+  Crossref and DOAJ fill work metadata and `article_extra` on new fetches.
+  Ruff passes, Pyright has 0 errors and 6 optional-import warnings, and full
+  pytest has 1600 passed. No JS changed.
 - Validation used production venv executables from this isolated worktree
   without installation. Live-provider and real-browser checks were not run.
   Tests ran under nice with the 6 GiB available-memory stop guard; available
-  memory was 16.93 GiB at the start of the successful full run. Scratch is in
-  `~/HealthDatabaseAccess-scratch/p11/`.
+  memory was 17.5 GiB at the start of the successful full run. Scratch is in
+  `~/HealthDatabaseAccess-scratch/p12/`.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
   and unscheduled roadmap backlog. Ship staging was last recorded at
   `f9485cf`; no host or deployment state changed in this slice.
-- **Next step:** re-review of PR #111; no merge or deploy in this slice.
-  Fetcher population remains P1.2.
+- **Next step:** review of this PR; no merge or deploy in this slice.
+  Remaining fetcher population is P1.3 (HAL, OpenAIRE, Semantic Scholar).

@@ -1,0 +1,318 @@
+{
+ "results": [
+  {
+   "id": "https://openalex.org/W4408664739",
+   "doi": "https://doi.org/10.3735/9781935306627.book-part-157",
+   "title": "Chapter 9: Making a New Deal: African Americans, Organized Labor, and Shifting Political Alliances",
+   "type": "book-chapter",
+   "publication_year": 2021,
+   "publication_date": "2021-08-15",
+   "abstract_inverted_index": {
+    "Until": [
+     0
+    ],
+    "the": [
+     1,
+     44,
+     47,
+     52,
+     58,
+     101
+    ],
+    "1930s,": [
+     2
+    ],
+    "Blacks": [
+     3
+    ],
+    "typically": [
+     4
+    ],
+    "voted": [
+     5
+    ],
+    "Republican,": [
+     6
+    ],
+    "which": [
+     7
+    ],
+    "was": [
+     8,
+     23,
+     30,
+     56,
+     61,
+     89
+    ],
+    "Abraham": [
+     9
+    ],
+    "Lincoln’s": [
+     10
+    ],
+    "party": [
+     11,
+     76
+    ],
+    "and": [
+     12
+    ],
+    "had": [
+     13,
+     69,
+     73
+    ],
+    "been": [
+     14,
+     70
+    ],
+    "associated": [
+     15,
+     64
+    ],
+    "with": [
+     16,
+     65
+    ],
+    "reform.": [
+     17
+    ],
+    "However,": [
+     18
+    ],
+    "when": [
+     19
+    ],
+    "Franklin": [
+     20
+    ],
+    "Delano": [
+     21
+    ],
+    "Roosevelt": [
+     22
+    ],
+    "running": [
+     24
+    ],
+    "for": [
+     25,
+     54,
+     87
+    ],
+    "reelection": [
+     26
+    ],
+    "in": [
+     27,
+     34,
+     46
+    ],
+    "1936,": [
+     28
+    ],
+    "there": [
+     29
+    ],
+    "a": [
+     31,
+     75,
+     96
+    ],
+    "dramatic": [
+     32
+    ],
+    "shift": [
+     33
+    ],
+    "political": [
+     35
+    ],
+    "alliances.": [
+     36
+    ],
+    "Seventy": [
+     37
+    ],
+    "five": [
+     38
+    ],
+    "percent": [
+     39
+    ],
+    "of": [
+     40,
+     51,
+     98
+    ],
+    "Black": [
+     41
+    ],
+    "voters": [
+     42
+    ],
+    "supported": [
+     43
+    ],
+    "Democrats": [
+     45
+    ],
+    "1936": [
+     48
+    ],
+    "election.": [
+     49
+    ],
+    "One": [
+     50
+    ],
+    "reasons": [
+     53
+    ],
+    "this": [
+     55,
+     88
+    ],
+    "that": [
+     57,
+     90
+    ],
+    "Republican": [
+     59
+    ],
+    "Party": [
+     60
+    ],
+    "no": [
+     62
+    ],
+    "longer": [
+     63
+    ],
+    "reform": [
+     66,
+     82
+    ],
+    "as": [
+     67
+    ],
+    "it": [
+     68
+    ],
+    "earlier.": [
+     71
+    ],
+    "It": [
+     72
+    ],
+    "become": [
+     74
+    ],
+    "more": [
+     77
+    ],
+    "represented": [
+     78
+    ],
+    "by": [
+     79
+    ],
+    "businessmen,": [
+     80
+    ],
+    "not": [
+     81
+    ],
+    "seekers.": [
+     83
+    ],
+    "The": [
+     84
+    ],
+    "other": [
+     85
+    ],
+    "reason": [
+     86
+    ],
+    "Roosevelt’s": [
+     91
+    ],
+    "New": [
+     92
+    ],
+    "Deal": [
+     93
+    ],
+    "programs": [
+     94
+    ],
+    "offered": [
+     95
+    ],
+    "degree": [
+     97
+    ],
+    "relief": [
+     99
+    ],
+    "from": [
+     100
+    ],
+    "Great": [
+     102
+    ],
+    "Depression.": [
+     103
+    ]
+   },
+   "authorships": [],
+   "biblio": {
+    "volume": null,
+    "issue": null,
+    "first_page": null,
+    "last_page": null
+   },
+   "volume": {
+    "id": "https://openalex.org/W4408368666",
+    "display_name": "Schlager Anthology of Black America"
+   },
+   "open_access": {
+    "is_oa": false,
+    "oa_status": "closed",
+    "oa_url": null,
+    "any_repository_has_fulltext": false
+   },
+   "primary_location": {
+    "is_oa": false,
+    "landing_page_url": "https://doi.org/10.3735/9781935306627.book-part-157",
+    "pdf_url": null,
+    "license": null,
+    "version": "publishedVersion",
+    "raw_source_name": "Schlager Anthology of Black America",
+    "source": {
+     "display_name": "Schlager Group eBooks",
+     "type": "ebook platform",
+     "host_organization_name": null
+    }
+   },
+   "best_oa_location": null,
+   "locations": [
+    {
+     "is_oa": false,
+     "landing_page_url": "https://doi.org/10.3735/9781935306627.book-part-157",
+     "pdf_url": null,
+     "license": null,
+     "version": "publishedVersion",
+     "raw_source_name": "Schlager Anthology of Black America",
+     "source": {
+      "display_name": "Schlager Group eBooks",
+      "type": "ebook platform",
+      "host_organization_name": null
+     }
+    }
+   ]
+  }
+ ]
+}

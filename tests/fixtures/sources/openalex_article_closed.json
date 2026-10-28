@@ -1,0 +1,363 @@
+{
+ "results": [
+  {
+   "id": "https://openalex.org/W2059599486",
+   "doi": "https://doi.org/10.3102/0013189x11402323",
+   "title": "School Start Times and the Sleep–Wake Cycle of Adolescents",
+   "type": "article",
+   "publication_year": 2011,
+   "publication_date": "2011-03-01",
+   "abstract_inverted_index": {
+    "The": [
+     0,
+     56
+    ],
+    "authors": [
+     1,
+     57
+    ],
+    "have": [
+     2
+    ],
+    "integrated": [
+     3
+    ],
+    "the": [
+     4,
+     8,
+     30,
+     36,
+     50,
+     74
+    ],
+    "major": [
+     5
+    ],
+    "findings": [
+     6,
+     60
+    ],
+    "on": [
+     7,
+     76
+    ],
+    "sleep–wake": [
+     9
+    ],
+    "cycle": [
+     10
+    ],
+    "and": [
+     11,
+     29,
+     81,
+     103,
+     119
+    ],
+    "its": [
+     12
+    ],
+    "performance": [
+     13,
+     52
+    ],
+    "correlates": [
+     14,
+     46
+    ],
+    "in": [
+     15,
+     64
+    ],
+    "adolescents.": [
+     16
+    ],
+    "Basic": [
+     17
+    ],
+    "research": [
+     18
+    ],
+    "shows": [
+     19
+    ],
+    "that": [
+     20,
+     47,
+     93,
+     104
+    ],
+    "lack": [
+     21
+    ],
+    "of": [
+     22,
+     33,
+     53
+    ],
+    "synchronicity": [
+     23
+    ],
+    "between": [
+     24
+    ],
+    "early": [
+     25
+    ],
+    "school": [
+     26,
+     100,
+     117
+    ],
+    "start": [
+     27,
+     69,
+     101
+    ],
+    "times": [
+     28,
+     102
+    ],
+    "circadian": [
+     31
+    ],
+    "rhythm": [
+     32
+    ],
+    "adolescents": [
+     34
+    ],
+    "(and": [
+     35
+    ],
+    "sleep": [
+     37
+    ],
+    "debt": [
+     38
+    ],
+    "accumulated": [
+     39
+    ],
+    "as": [
+     40
+    ],
+    "a": [
+     41
+    ],
+    "result)": [
+     42
+    ],
+    "involves": [
+     43
+    ],
+    "several": [
+     44
+    ],
+    "cognitive": [
+     45
+    ],
+    "may": [
+     48
+    ],
+    "harm": [
+     49
+    ],
+    "academic": [
+     51
+    ],
+    "adolescent": [
+     54,
+     94
+    ],
+    "students.": [
+     55
+    ],
+    "therefore": [
+     58
+    ],
+    "examined": [
+     59,
+     73
+    ],
+    "from": [
+     61,
+     98
+    ],
+    "pilot": [
+     62
+    ],
+    "interventions": [
+     63
+    ],
+    "which": [
+     65
+    ],
+    "schools": [
+     66
+    ],
+    "delayed": [
+     67
+    ],
+    "their": [
+     68
+    ],
+    "times;": [
+     70
+    ],
+    "specifically,": [
+     71
+    ],
+    "they": [
+     72
+    ],
+    "effects": [
+     75
+    ],
+    "students,": [
+     77
+    ],
+    "including": [
+     78
+    ],
+    "potential": [
+     79
+    ],
+    "pitfalls": [
+     80
+    ],
+    "strategies": [
+     82
+    ],
+    "to": [
+     83
+    ],
+    "consider": [
+     84
+    ],
+    "for": [
+     85
+    ],
+    "effective": [
+     86
+    ],
+    "scheduling": [
+     87
+    ],
+    "change.": [
+     88
+    ],
+    "There": [
+     89
+    ],
+    "is": [
+     90
+    ],
+    "sufficient": [
+     91
+    ],
+    "evidence": [
+     92
+    ],
+    "students": [
+     95
+    ],
+    "would": [
+     96
+    ],
+    "benefit": [
+     97
+    ],
+    "delaying": [
+     99
+    ],
+    "this": [
+     105
+    ],
+    "change": [
+     106
+    ],
+    "can": [
+     107
+    ],
+    "be": [
+     108
+    ],
+    "implemented": [
+     109
+    ],
+    "with": [
+     110
+    ],
+    "tolerable": [
+     111
+    ],
+    "consequences": [
+     112
+    ],
+    "if": [
+     113
+    ],
+    "adequately": [
+     114
+    ],
+    "strategized": [
+     115
+    ],
+    "by": [
+     116
+    ],
+    "districts": [
+     118
+    ],
+    "communities.": [
+     120
+    ]
+   },
+   "authorships": [
+    {
+     "author": {
+      "display_name": "Matthew Kirby"
+     }
+    },
+    {
+     "author": {
+      "display_name": "Stefania Maggi"
+     }
+    },
+    {
+     "author": {
+      "display_name": "Amedeo D’Angiulli"
+     }
+    }
+   ],
+   "biblio": {
+    "volume": "40",
+    "issue": "2",
+    "first_page": "56",
+    "last_page": "61"
+   },
+   "volume": null,
+   "open_access": {
+    "is_oa": false,
+    "oa_status": "closed",
+    "oa_url": null,
+    "any_repository_has_fulltext": false
+   },
+   "primary_location": {
+    "is_oa": false,
+    "landing_page_url": "https://doi.org/10.3102/0013189x11402323",
+    "pdf_url": null,
+    "license": null,
+    "version": "publishedVersion",
+    "raw_source_name": "Educational Researcher",
+    "source": {
+     "display_name": "Educational Researcher",
+     "type": "journal",
+     "host_organization_name": "SAGE Publishing"
+    }
+   },
+   "best_oa_location": null
+  }
+ ]
+}

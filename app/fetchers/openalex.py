@@ -8,8 +8,22 @@ import os
 from typing import Dict, List, Optional
 
 from app.fetchers.base import BaseFetcher, HttpClient, json_of, reraise_fetch_error
+from app.services.work_types import (
+    biblio_json,
+    build_biblio,
+    build_location,
+    canonical_work_type,
+    extra_payload,
+    normalize_doi,
+    provenance_for,
+    provider_type_label,
+)
 
 logger = logging.getLogger(__name__)
+
+# Live OpenAlex uses "ebook platform"; older fixtures use "ebook-platform".
+_EBOOK_PLATFORM_TYPES = frozenset({"ebook-platform", "ebook platform"})
+_HOST_SOURCE_TYPES = frozenset({"repository", *_EBOOK_PLATFORM_TYPES})
 
 
 class OpenAlexFetcher(BaseFetcher):
@@ -169,7 +183,36 @@ class OpenAlexFetcher(BaseFetcher):
             if name:
                 authors.append(name)
 
-        return {
+        raw_type = work.get("type")
+        work_type = canonical_work_type(self.SOURCE_NAME, raw_type)
+        volume_raw = work.get("volume")
+        volume = volume_raw if isinstance(volume_raw, dict) else {}
+        parent_title = (volume.get("display_name") or "").strip()
+        if work_type == "book-chapter" and parent_title:
+            container_title = parent_title
+        else:
+            container_title = journal or None
+        host_name = self._host_name(work)
+        oa_raw = work.get("open_access")
+        oa = oa_raw if isinstance(oa_raw, dict) else {}
+        oa_status = (oa.get("oa_status") or "").strip() or None
+        best_raw = work.get("best_oa_location")
+        best = best_raw if isinstance(best_raw, dict) else {}
+        best_oa_url = (best.get("pdf_url") or best.get("landing_page_url") or "").strip() or None
+        biblio_raw = work.get("biblio")
+        biblio = biblio_raw if isinstance(biblio_raw, dict) else {}
+        source_raw = best.get("source")
+        best_source = source_raw if isinstance(source_raw, dict) else {}
+        biblio_obj = build_biblio(
+            volume=biblio.get("volume"),
+            issue=biblio.get("issue"),
+            pages=self._pages(biblio),
+            published_date=work.get("publication_date"),
+            license=best.get("license") or best.get("license_id"),
+            parent_book_id=volume.get("id") if work_type == "book-chapter" else None,
+        )
+        doi = normalize_doi(work.get("doi") or (work.get("ids") or {}).get("doi"))
+        article = {
             "article_id": openalex_id,
             "source": self.SOURCE_NAME,
             "title": title,
@@ -177,7 +220,44 @@ class OpenAlexFetcher(BaseFetcher):
             "year": year,
             "authors": authors,
             "journal": journal,
+            "work_type": work_type,
+            "provider_type": provider_type_label(self.SOURCE_NAME, raw_type),
+            "doi": doi,
+            "container_title": container_title or None,
+            "host_name": host_name,
+            "oa_status": oa_status,
+            "best_oa_url": best_oa_url,
+            "evidence_basis": "abstract",
+            "biblio": biblio_json(biblio_obj),
         }
+        locations = []
+        loc = build_location(
+            url=best_oa_url,
+            kind="pdf" if best.get("pdf_url") else ("landing" if best.get("landing_page_url") else None),
+            host=best_source.get("display_name"),
+            version=best.get("version"),
+            license=best.get("license") or best.get("license_id"),
+            via=self.SOURCE_NAME,
+        )
+        if loc:
+            locations.append(loc)
+        article["_extra"] = extra_payload(
+            self.SOURCE_NAME,
+            work,
+            provenance=provenance_for(self.SOURCE_NAME, {
+                "work_type": article["work_type"],
+                "provider_type": article["provider_type"],
+                "doi": doi,
+                "container_title": article["container_title"],
+                "host_name": host_name,
+                "oa_status": oa_status,
+                "best_oa_url": best_oa_url,
+                "evidence_basis": "abstract",
+                "biblio": article["biblio"],
+            }),
+            locations=locations,
+        )
+        return article
 
     @staticmethod
     def _venue(work: Dict) -> str:
@@ -192,16 +272,33 @@ class OpenAlexFetcher(BaseFetcher):
         for location in locations:
             source = (location or {}).get("source") or {}
             name = (source.get("display_name") or "").strip()
-            if name and source.get("type") not in ("repository", "ebook-platform"):
+            if name and source.get("type") not in _HOST_SOURCE_TYPES:
                 return name
         for location in locations:
             source = (location or {}).get("source") or {}
-            if source.get("type") == "ebook-platform":
+            if source.get("type") in _EBOOK_PLATFORM_TYPES:
                 continue
             raw = ((location or {}).get("raw_source_name") or "").strip()
             if raw:
                 return raw
         return ""
+
+    @staticmethod
+    def _host_name(work: Dict) -> Optional[str]:
+        location = work.get("primary_location") or {}
+        source = (location or {}).get("source") or {}
+        if source.get("type") in _HOST_SOURCE_TYPES:
+            name = (source.get("display_name") or "").strip()
+            return name or None
+        return None
+
+    @staticmethod
+    def _pages(biblio: Dict) -> Optional[str]:
+        first = str(biblio.get("first_page") or "").strip()
+        last = str(biblio.get("last_page") or "").strip()
+        if first and last and first != last:
+            return f"{first}-{last}"
+        return first or last or None
 
     @staticmethod
     def _reconstruct_abstract(inverted_index: Dict) -> str:

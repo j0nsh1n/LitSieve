@@ -1,0 +1,681 @@
+{
+ "results": [
+  {
+   "id": "https://openalex.org/W4412783059",
+   "doi": "https://doi.org/10.1016/j.sleh.2025.07.003",
+   "title": "School start times and racial disparities in early adolescent sleep",
+   "type": "article",
+   "publication_year": 2025,
+   "publication_date": "2025-07-31",
+   "abstract_inverted_index": {
+    "OBJECTIVES:": [
+     0
+    ],
+    "Many": [
+     1
+    ],
+    "communities": [
+     2
+    ],
+    "in": [
+     3,
+     19,
+     33,
+     38,
+     112
+    ],
+    "the": [
+     4,
+     45,
+     56,
+     113,
+     177,
+     242
+    ],
+    "United": [
+     5
+    ],
+    "States": [
+     6
+    ],
+    "are": [
+     7,
+     28,
+     43
+    ],
+    "delaying": [
+     8
+    ],
+    "school": [
+     9,
+     25,
+     50,
+     59,
+     122,
+     145,
+     180,
+     226,
+     246
+    ],
+    "start": [
+     10,
+     26,
+     51,
+     60,
+     123,
+     146,
+     181,
+     203,
+     227,
+     247
+    ],
+    "times": [
+     11,
+     27,
+     61,
+     70,
+     124,
+     131,
+     147,
+     182,
+     204,
+     228,
+     248
+    ],
+    "to": [
+     12,
+     23,
+     207,
+     219
+    ],
+    "improve": [
+     13
+    ],
+    "youth": [
+     14
+    ],
+    "sleep.": [
+     15,
+     20
+    ],
+    "Racial": [
+     16
+    ],
+    "disparities": [
+     17,
+     32
+    ],
+    "exist": [
+     18
+    ],
+    "The": [
+     21,
+     222
+    ],
+    "extent": [
+     22
+    ],
+    "which": [
+     24
+    ],
+    "associated": [
+     29,
+     149
+    ],
+    "with": [
+     30,
+     150,
+     190
+    ],
+    "racial": [
+     31
+    ],
+    "sleep": [
+     34,
+     126,
+     155,
+     185,
+     208,
+     230,
+     253
+    ],
+    "is": [
+     35
+    ],
+    "unclear,": [
+     36
+    ],
+    "especially": [
+     37
+    ],
+    "early": [
+     39,
+     78,
+     171,
+     175,
+     214,
+     237
+    ],
+    "adolescent": [
+     40
+    ],
+    "populations": [
+     41
+    ],
+    "that": [
+     42
+    ],
+    "not": [
+     44
+    ],
+    "focus": [
+     46
+    ],
+    "of": [
+     47,
+     75,
+     224,
+     244,
+     252
+    ],
+    "research": [
+     48
+    ],
+    "on": [
+     49
+    ],
+    "times.": [
+     52
+    ],
+    "This": [
+     53,
+     239
+    ],
+    "study": [
+     54,
+     240
+    ],
+    "examined": [
+     55
+    ],
+    "associations": [
+     57
+    ],
+    "between": [
+     58,
+     121,
+     179
+    ],
+    "and": [
+     62,
+     68,
+     107,
+     125,
+     129,
+     153,
+     159,
+     183
+    ],
+    "actigraphy-assessed": [
+     63
+    ],
+    "sleep,": [
+     64
+    ],
+    "including": [
+     65,
+     245
+    ],
+    "duration,": [
+     66,
+     127,
+     156
+    ],
+    "onset,": [
+     67,
+     128,
+     158
+    ],
+    "offset": [
+     69,
+     130,
+     161
+    ],
+    "among": [
+     71,
+     169
+    ],
+    "a": [
+     72,
+     250
+    ],
+    "national": [
+     73
+    ],
+    "sample": [
+     74
+    ],
+    "racially": [
+     76,
+     212
+    ],
+    "diverse": [
+     77
+    ],
+    "adolescents.": [
+     79,
+     172,
+     238
+    ],
+    "METHODS:": [
+     80
+    ],
+    "=": [
+     81,
+     163,
+     194,
+     197,
+     200,
+     217
+    ],
+    "0.50;": [
+     82
+    ],
+    "2123": [
+     83
+    ],
+    "(60.3%)": [
+     84
+    ],
+    "non-Hispanic": [
+     85
+    ],
+    "White,": [
+     86
+    ],
+    "316": [
+     87
+    ],
+    "(8.7%)": [
+     88
+    ],
+    "Black": [
+     89
+    ],
+    "or": [
+     90,
+     96
+    ],
+    "African": [
+     91
+    ],
+    "American,": [
+     92,
+     98,
+     102
+    ],
+    "768": [
+     93
+    ],
+    "(21.6%)": [
+     94
+    ],
+    "Hispanic": [
+     95
+    ],
+    "Latinx": [
+     97,
+     174
+    ],
+    "104": [
+     99
+    ],
+    "(2.9%)": [
+     100
+    ],
+    "Asian": [
+     101
+    ],
+    "110": [
+     103
+    ],
+    "(3.0%)": [
+     104
+    ],
+    "White-Black": [
+     105
+    ],
+    "biracial,": [
+     106
+    ],
+    "125": [
+     108
+    ],
+    "(3.5%)": [
+     109
+    ],
+    "White-Asian": [
+     110
+    ],
+    "biracial)": [
+     111
+    ],
+    "Adolescent": [
+     114
+    ],
+    "Brain": [
+     115
+    ],
+    "Cognitive": [
+     116
+    ],
+    "Development": [
+     117
+    ],
+    "(ABCD)": [
+     118
+    ],
+    "Study,": [
+     119
+    ],
+    "links": [
+     120
+    ],
+    "(mean": [
+     132
+    ],
+    "levels,": [
+     133
+    ],
+    "variability)": [
+     134
+    ],
+    "were": [
+     135,
+     148,
+     205,
+     232
+    ],
+    "estimated": [
+     136
+    ],
+    "by": [
+     137
+    ],
+    "racialized": [
+     138
+    ],
+    "groups,": [
+     139
+    ],
+    "accounting": [
+     140
+    ],
+    "for": [
+     141,
+     210,
+     229,
+     235
+    ],
+    "covariates.": [
+     142
+    ],
+    "RESULTS:": [
+     143
+    ],
+    "Later": [
+     144
+    ],
+    "longer": [
+     151
+    ],
+    "weekday": [
+     152,
+     184
+    ],
+    "weekend": [
+     154
+    ],
+    "later": [
+     157,
+     160,
+     225
+    ],
+    "(βs": [
+     162,
+     216
+    ],
+    "0.087": [
+     164
+    ],
+    "-0.145,": [
+     165
+    ],
+    "ps": [
+     166
+    ],
+    "<": [
+     167
+    ],
+    ".005)": [
+     168
+    ],
+    "White": [
+     170,
+     191,
+     236
+    ],
+    "Among": [
+     173
+    ],
+    "adolescents,": [
+     176
+    ],
+    "association": [
+     178
+    ],
+    "duration": [
+     186,
+     209,
+     231
+    ],
+    "was": [
+     187
+    ],
+    "weaker": [
+     188
+    ],
+    "compared": [
+     189
+    ],
+    "adolescents": [
+     192,
+     215
+    ],
+    "(b": [
+     193
+    ],
+    "-0.088,": [
+     195
+    ],
+    "SE": [
+     196
+    ],
+    "0.029,": [
+     198
+    ],
+    "p": [
+     199
+    ],
+    ".03).": [
+     201
+    ],
+    "School": [
+     202
+    ],
+    "unrelated": [
+     206
+    ],
+    "other": [
+     211
+    ],
+    "minoritized": [
+     213
+    ],
+    "-0.124": [
+     218
+    ],
+    "0.124).": [
+     220
+    ],
+    "CONCLUSIONS:": [
+     221
+    ],
+    "benefits": [
+     223
+    ],
+    "only": [
+     233
+    ],
+    "evidenced": [
+     234
+    ],
+    "highlights": [
+     241
+    ],
+    "value": [
+     243
+    ],
+    "as": [
+     249
+    ],
+    "determinant": [
+     251
+    ],
+    "health": [
+     254
+    ],
+    "equity.": [
+     255
+    ]
+   },
+   "authorships": [
+    {
+     "author": {
+      "display_name": "Tiffany Yip"
+     }
+    },
+    {
+     "author": {
+      "display_name": "Jinjin Yan"
+     }
+    },
+    {
+     "author": {
+      "display_name": "Meng‐Run Zhang"
+     }
+    },
+    {
+     "author": {
+      "display_name": "Yijie Wang"
+     }
+    },
+    {
+     "author": {
+      "display_name": "Zhenqiang Zhao"
+     }
+    },
+    {
+     "author": {
+      "display_name": "Heining Cham"
+     }
+    },
+    {
+     "author": {
+      "display_name": "Margarita M. Alegria"
+     }
+    }
+   ],
+   "biblio": {
+    "volume": "12",
+    "issue": "1",
+    "first_page": "30",
+    "last_page": "38"
+   },
+   "volume": null,
+   "open_access": {
+    "is_oa": true,
+    "oa_status": "hybrid",
+    "oa_url": "https://www.sleephealthjournal.org/article/S2352-7218(25)00151-2/pdf",
+    "any_repository_has_fulltext": true
+   },
+   "primary_location": {
+    "is_oa": true,
+    "landing_page_url": "https://doi.org/10.1016/j.sleh.2025.07.003",
+    "pdf_url": "https://www.sleephealthjournal.org/article/S2352-7218(25)00151-2/pdf",
+    "license": "cc-by-nc-nd",
+    "version": "publishedVersion",
+    "raw_source_name": "Sleep Health",
+    "source": {
+     "display_name": "Sleep Health",
+     "type": "journal",
+     "host_organization_name": "Elsevier BV"
+    }
+   },
+   "best_oa_location": {
+    "is_oa": true,
+    "landing_page_url": "https://doi.org/10.1016/j.sleh.2025.07.003",
+    "pdf_url": "https://www.sleephealthjournal.org/article/S2352-7218(25)00151-2/pdf",
+    "license": "cc-by-nc-nd",
+    "version": "publishedVersion",
+    "raw_source_name": "Sleep Health",
+    "source": {
+     "display_name": "Sleep Health",
+     "type": "journal",
+     "host_organization_name": "Elsevier BV"
+    }
+   },
+   "locations": [
+    {
+     "is_oa": true,
+     "landing_page_url": "https://doi.org/10.1016/j.sleh.2025.07.003",
+     "pdf_url": "https://www.sleephealthjournal.org/article/S2352-7218(25)00151-2/pdf",
+     "license": "cc-by-nc-nd",
+     "version": "publishedVersion",
+     "raw_source_name": "Sleep Health",
+     "source": {
+      "display_name": "Sleep Health",
+      "type": "journal",
+      "host_organization_name": "Elsevier BV"
+     }
+    },
+    {
+     "is_oa": false,
+     "landing_page_url": "https://pubmed.ncbi.nlm.nih.gov/40750506",
+     "pdf_url": null,
+     "license": null,
+     "version": "publishedVersion",
+     "raw_source_name": "Sleep health",
+     "source": {
+      "display_name": "PubMed",
+      "type": "repository",
+      "host_organization_name": "National Institutes of Health"
+     }
+    },
+    {
+     "is_oa": true,
+     "landing_page_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12418717/",
+     "pdf_url": null,
+     "license": "cc-by-nc-nd",
+     "version": "publishedVersion",
+     "raw_source_name": "Sleep Health",
+     "source": {
+      "display_name": "PubMed Central",
+      "type": "repository",
+      "host_organization_name": "National Institutes of Health"
+     }
+    }
+   ]
+  }
+ ]
+}
