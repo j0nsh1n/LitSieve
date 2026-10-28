@@ -5,6 +5,8 @@ requests>=2.32.0
 urllib3>=2.8.0
 anyio>=4.14.2
 fsspec>=2026.6.0
+# filelock: CVE-2026-112940, CVE-2026-112913, CVE-2026-112907 (fixed in 4.2.1).
+filelock>=4.2.1
 numpy>=2.0.0
 
 # NLP and embeddings
