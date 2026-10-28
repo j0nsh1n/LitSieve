@@ -47,6 +47,10 @@ def _extra(db, article_id, source, *, staging=False):
 
 def test_norm_title_is_unicode_aware():
     assert ArticleDatabase._norm_title("Café") == ArticleDatabase._norm_title("Cafe")
+    assert ArticleDatabase._norm_title("Résumé of widgets") == "resume of widgets"
+    assert ArticleDatabase._norm_title("Resume of widgets") == "resume of widgets"
+    decomposed = "Re\u0301sume\u0301 of widgets"
+    assert ArticleDatabase._norm_title(decomposed) == "resume of widgets"
     japanese = ArticleDatabase._norm_title("睡眠と健康の研究")
     assert japanese
     assert "睡眠" in japanese
@@ -260,9 +264,9 @@ def test_nonempty_fields_are_kept_and_conflicts_recorded(db_path):
         assert row["container_title"] == "Sleep Health"
         provenance = json.loads(_extra(db, "W1", "openalex")[0])
         assert provenance["container_title"] == "crossref"
-        assert provenance["conflicts"]["work_type"]["value"] == "review-article"
-        assert provenance["conflicts"]["work_type"]["source"] == "crossref"
-        assert provenance["conflicts"]["oa_status"]["value"] == "gold"
+        assert provenance["conflicts"]["work_type"][0]["value"] == "review-article"
+        assert provenance["conflicts"]["work_type"][0]["source"] == "crossref"
+        assert provenance["conflicts"]["oa_status"][0]["value"] == "gold"
     finally:
         db.close()
 
@@ -450,5 +454,524 @@ def test_pipeline_forwards_merged_and_skipped_duplicate_counts(db_path, monkeypa
         assert result["crossref"]["merged"] == 1
         assert result["crossref"]["count"] == 0
         assert len(pipe.db.get_all_articles()) == 1
+    finally:
+        pipe.db.close()
+
+
+SHARED_TITLE = "A detailed study of shared widgets"
+
+
+def _conflict_pairs(provenance, field):
+    return {
+        (item["value"] if not isinstance(item["value"], list) else tuple(item["value"]),
+         item["source"])
+        for item in provenance["conflicts"][field]
+    }
+
+
+def _insert_sequence(db, first, batch, *, staging=False):
+    if staging:
+        db.ensure_staging_articles()
+    db.insert_articles([first], dedupe=True, staging=staging)
+    return db.insert_articles(batch, dedupe=True, staging=staging)
+
+
+def _staging_rows(db):
+    from app.storage.database import ARTICLE_COLUMNS, _row_to_article
+
+    rows = db.conn.execute(
+        f"SELECT {', '.join(ARTICLE_COLUMNS)} FROM staging_articles"
+    ).fetchall()
+    return [_row_to_article(row) for row in rows]
+
+
+@pytest.mark.parametrize("staging", [False, True])
+def test_same_key_refresh_does_not_overwrite_later_doi(db_path, staging):
+    seed = _paper(
+        article_id="A",
+        title=SHARED_TITLE,
+        year="2020",
+        authors=["Jane Doe"],
+        doi=None,
+    )
+    refresh = _paper(
+        article_id="A",
+        title=SHARED_TITLE,
+        year="2020",
+        authors=["Jane Doe"],
+        doi="10.1000/one",
+    )
+    other = _paper(
+        article_id="B",
+        source="crossref",
+        title=SHARED_TITLE,
+        year="2020",
+        authors=["Jane Doe"],
+        doi="10.1000/two",
+        oa_status="gold",
+    )
+    db = ArticleDatabase(str(db_path))
+    try:
+        stats = _insert_sequence(db, seed, [refresh, other], staging=staging)
+        rows = _staging_rows(db) if staging else db.get_all_articles()
+        dois = {row["doi"] for row in rows}
+        keys = {(row["article_id"], row["source"]) for row in rows}
+        assert stats["updated"] == 1
+        assert stats["inserted"] == 1
+        assert stats["skipped_duplicates"] == 0
+        assert stats["merged"] == 0
+        assert len(rows) == 2
+        assert dois == {"10.1000/one", "10.1000/two"}
+        assert keys == {("A", "openalex"), ("B", "crossref")}
+    finally:
+        db.close()
+
+
+@pytest.mark.parametrize("staging", [False, True])
+def test_same_key_refresh_keeps_nonempty_metadata_for_later_source(db_path, staging):
+    seed = _paper(
+        article_id="A",
+        title=SHARED_TITLE,
+        doi=None,
+    )
+    refresh = _paper(
+        article_id="A",
+        title=SHARED_TITLE,
+        oa_status="closed",
+        container_title="Sleep Health",
+        doi="10.1000/one",
+    )
+    other = _paper(
+        article_id="B",
+        source="crossref",
+        title=SHARED_TITLE,
+        doi="10.1000/one",
+        oa_status="gold",
+        container_title="Other Journal",
+    )
+    db = ArticleDatabase(str(db_path))
+    try:
+        stats = _insert_sequence(db, seed, [refresh, other], staging=staging)
+        rows = _staging_rows(db) if staging else db.get_all_articles()
+        assert stats["updated"] == 1
+        assert stats["skipped_duplicates"] == 1
+        assert len(rows) == 1
+        row = rows[0]
+        assert row["oa_status"] == "closed"
+        assert row["container_title"] == "Sleep Health"
+        assert row["doi"] == "10.1000/one"
+        provenance = json.loads(_extra(db, "A", "openalex", staging=staging)[0])
+        assert _conflict_pairs(provenance, "oa_status") == {("gold", "crossref")}
+        assert _conflict_pairs(provenance, "container_title") == {
+            ("Other Journal", "crossref")
+        }
+    finally:
+        db.close()
+
+
+def test_pubmed_surname_initials_match_given_surname(db_path):
+    from app.fetchers.pubmed import PubMedFetcher
+
+    formatted = PubMedFetcher._authors(
+        {"AuthorList": [{"LastName": "Doe", "Initials": "J"}]}
+    )
+    assert formatted == ["Doe J"]
+    first = _paper(authors=["Jane Doe"], doi=None)
+    second = _paper(
+        article_id="pmid-1",
+        source="pubmed",
+        authors=formatted,
+        doi=None,
+        work_type="journal-article",
+    )
+    db = ArticleDatabase(str(db_path))
+    try:
+        stats = db.insert_articles([first, second], dedupe=True)
+        assert stats["inserted"] == 1
+        assert stats["skipped_duplicates"] == 1
+        assert stats["merged"] == 1
+        assert len(db.get_all_articles()) == 1
+    finally:
+        db.close()
+
+
+def test_different_surnames_same_initial_stay_two_rows(db_path):
+    first = _paper(authors=["Smith J"], doi="10.1000/one")
+    second = _paper(
+        article_id="B",
+        source="pubmed",
+        authors=["Jones J"],
+        doi=None,
+    )
+    db = ArticleDatabase(str(db_path))
+    try:
+        stats = db.insert_articles([first, second], dedupe=True)
+        assert stats["inserted"] == 2
+        assert stats["skipped_duplicates"] == 0
+        assert len(db.get_all_articles()) == 2
+    finally:
+        db.close()
+
+
+def test_same_surname_conflicting_given_names_stay_two_rows(db_path):
+    first = _paper(authors=["Jane Smith"], doi="10.1000/one")
+    second = _paper(
+        article_id="B",
+        source="pubmed",
+        authors=["Robert Smith"],
+        doi=None,
+    )
+    db = ArticleDatabase(str(db_path))
+    try:
+        stats = db.insert_articles([first, second], dedupe=True)
+        assert stats["inserted"] == 2
+        assert len(db.get_all_articles()) == 2
+    finally:
+        db.close()
+
+
+def test_legacy_journal_conflict_blocks_title_merge(db_path):
+    first = _paper(
+        article_id="A",
+        title=SHARED_TITLE,
+        doi="10.1000/book",
+        journal="History Journal",
+    )
+    second = _paper(
+        article_id="B",
+        source="crossref",
+        title=SHARED_TITLE,
+        doi=None,
+        journal="Literary Review",
+        container_title="Literary Review",
+    )
+    db = ArticleDatabase(str(db_path))
+    try:
+        stats = db.insert_articles([first, second], dedupe=True)
+        assert stats["inserted"] == 2
+        assert stats["merged"] == 0
+        rows = db.get_all_articles()
+        assert len(rows) == 2
+        book = next(row for row in rows if row["article_id"] == "A")
+        assert book["journal"] == "History Journal"
+    finally:
+        db.close()
+
+
+@pytest.mark.parametrize("book_first", [True, False])
+def test_book_versus_review_stays_two_rows_both_orders(db_path, book_first):
+    book = _paper(
+        article_id="A",
+        title=SHARED_TITLE,
+        doi="10.1000/book",
+        authors=["Jane Doe"],
+        work_type="book",
+    )
+    review = _paper(
+        article_id="B",
+        source="crossref",
+        title=SHARED_TITLE,
+        doi=None,
+        authors=[],
+        journal="",
+        work_type="review-article",
+    )
+    incoming = [book, review] if book_first else [review, book]
+    db = ArticleDatabase(str(db_path))
+    try:
+        stats = db.insert_articles(incoming, dedupe=True)
+        assert stats["inserted"] == 2
+        assert stats["skipped_duplicates"] == 0
+        assert len(db.get_all_articles()) == 2
+    finally:
+        db.close()
+
+
+@pytest.mark.parametrize(
+    "left_type,right_type",
+    [
+        ("book", "book-chapter"),
+        ("preprint", "journal-article"),
+        ("dataset", "article"),
+    ],
+)
+def test_incompatible_work_types_stay_two_rows(db_path, left_type, right_type):
+    first = _paper(work_type=left_type, doi="10.1000/left")
+    second = _paper(
+        article_id="B",
+        source="crossref",
+        work_type=right_type,
+        doi=None,
+    )
+    db = ArticleDatabase(str(db_path))
+    try:
+        stats = db.insert_articles([first, second], dedupe=True)
+        assert stats["inserted"] == 2
+        assert len(db.get_all_articles()) == 2
+    finally:
+        db.close()
+
+
+@pytest.mark.parametrize(
+    "title",
+    ["Chapter One", "Chapter I", "Einleitung", "Sleep Health"],
+)
+@pytest.mark.parametrize("doi_first", [True, False])
+def test_generic_titles_do_not_merge_with_one_doi(db_path, title, doi_first):
+    with_doi = _paper(
+        article_id="A",
+        title=title,
+        doi="10.1000/generic",
+        authors=["Jane Doe"],
+        year="2020",
+    )
+    without_doi = _paper(
+        article_id="B",
+        source="crossref",
+        title=title,
+        doi=None,
+        authors=["Jane Doe"],
+        year="2020",
+    )
+    incoming = [with_doi, without_doi] if doi_first else [without_doi, with_doi]
+    db = ArticleDatabase(str(db_path))
+    try:
+        stats = db.insert_articles(incoming, dedupe=True)
+        assert stats["inserted"] == 2
+        assert stats["skipped_duplicates"] == 0
+        assert len(db.get_all_articles()) == 2
+    finally:
+        db.close()
+
+
+def test_empty_year_and_authors_are_filled(db_path):
+    first = _paper(doi="10.1016/example.year", year="", authors=[])
+    second = _paper(
+        article_id="10.1016/example.year",
+        source="crossref",
+        doi="10.1016/example.year",
+        year="2020",
+        authors=["Jane Doe"],
+    )
+    db = ArticleDatabase(str(db_path))
+    try:
+        db.insert_articles([first], dedupe=True)
+        stats = db.insert_articles([second], dedupe=True)
+        assert stats["merged"] == 1
+        row = db.get_all_articles()[0]
+        assert row["year"] == "2020"
+        assert row["authors"] == ["Jane Doe"]
+        provenance = json.loads(_extra(db, "W1", "openalex")[0])
+        assert provenance["year"] == "crossref"
+        assert provenance["authors"] == "crossref"
+    finally:
+        db.close()
+
+
+def test_populated_year_and_authors_are_kept(db_path):
+    first = _paper(
+        doi="10.1016/example.year2",
+        year="2019",
+        authors=["Ada Lovelace"],
+    )
+    second = _paper(
+        article_id="10.1016/example.year2",
+        source="crossref",
+        doi="10.1016/example.year2",
+        year="2020",
+        authors=["Jane Doe"],
+    )
+    db = ArticleDatabase(str(db_path))
+    try:
+        db.insert_articles([first], dedupe=True)
+        stats = db.insert_articles([second], dedupe=True)
+        row = db.get_all_articles()[0]
+        assert stats["skipped_duplicates"] == 1
+        assert row["year"] == "2019"
+        assert row["authors"] == ["Ada Lovelace"]
+        provenance = json.loads(_extra(db, "W1", "openalex")[0])
+        assert _conflict_pairs(provenance, "year") == {("2020", "crossref")}
+        assert _conflict_pairs(provenance, "authors") == {(("Jane Doe",), "crossref")}
+    finally:
+        db.close()
+
+
+def test_internal_accents_and_non_latin_titles_match_without_doi(db_path):
+    first = _paper(title="Résumé of widgets in adults", doi=None)
+    second = _paper(
+        article_id="pmid-resume",
+        source="pubmed",
+        title="Resume of widgets in adults",
+        doi=None,
+        work_type="journal-article",
+    )
+    japanese = _paper(
+        article_id="W-jp",
+        title="睡眠と健康の研究について",
+        doi=None,
+    )
+    other = _paper(
+        article_id="jp-2",
+        source="pubmed",
+        title="睡眠と健康の研究について",
+        doi=None,
+        work_type="journal-article",
+    )
+    db = ArticleDatabase(str(db_path))
+    try:
+        stats = db.insert_articles([first, second], dedupe=True)
+        assert stats["inserted"] == 1
+        assert stats["skipped_duplicates"] == 1
+        jp_stats = db.insert_articles([japanese, other], dedupe=True)
+        assert jp_stats["inserted"] == 1
+        assert jp_stats["skipped_duplicates"] == 1
+        assert len(db.get_all_articles()) == 2
+    finally:
+        db.close()
+
+
+def test_three_source_conflicts_keep_every_alternative(db_path):
+    first = _paper(doi="10.1016/example.oa", oa_status="closed")
+    gold = _paper(
+        article_id="10.1016/example.oa",
+        source="crossref",
+        doi="10.1016/example.oa",
+        oa_status="gold",
+    )
+    hybrid = _paper(
+        article_id="10.1016/example.oa",
+        source="pubmed",
+        doi="10.1016/example.oa",
+        oa_status="hybrid",
+    )
+    db = ArticleDatabase(str(db_path))
+    try:
+        db.insert_articles([first], dedupe=True)
+        db.insert_articles([gold], dedupe=True)
+        stats = db.insert_articles([hybrid], dedupe=True)
+        assert stats["skipped_duplicates"] == 1
+        row = db.get_all_articles()[0]
+        assert row["oa_status"] == "closed"
+        provenance = json.loads(_extra(db, "W1", "openalex")[0])
+        assert _conflict_pairs(provenance, "oa_status") == {
+            ("gold", "crossref"),
+            ("hybrid", "pubmed"),
+        }
+    finally:
+        db.close()
+
+
+def test_biblio_provenance_is_per_leaf(db_path):
+    first = _paper(
+        doi="10.1016/example.biblio",
+        biblio={"publisher": "OpenAlex Press"},
+        _extra={"provenance": {"biblio.publisher": "openalex"}},
+    )
+    second = _paper(
+        article_id="10.1016/example.biblio",
+        source="crossref",
+        doi="10.1016/example.biblio",
+        biblio={"publisher": "OpenAlex Press", "issue": "3"},
+    )
+    db = ArticleDatabase(str(db_path))
+    try:
+        db.insert_articles([first], dedupe=True)
+        stats = db.insert_articles([second], dedupe=True)
+        assert stats["merged"] == 1
+        row = db.get_all_articles()[0]
+        biblio = json.loads(row["biblio"]) if isinstance(row["biblio"], str) else row["biblio"]
+        assert biblio["publisher"] == "OpenAlex Press"
+        assert biblio["issue"] == "3"
+        provenance = json.loads(_extra(db, "W1", "openalex")[0])
+        assert provenance["biblio.publisher"] == "openalex"
+        assert provenance["biblio.issue"] == "crossref"
+        assert provenance.get("biblio") != "crossref"
+    finally:
+        db.close()
+
+
+def test_new_location_counts_as_merged(db_path):
+    first = _paper(doi="10.1016/example.loc")
+    filling = _paper(
+        article_id="10.1016/example.loc",
+        source="crossref",
+        doi="10.1016/example.loc",
+        _extra={"locations": [{"url": "https://example.org/pdf", "kind": "pdf"}]},
+    )
+    repeat = _paper(
+        article_id="10.1016/example.loc",
+        source="pubmed",
+        doi="10.1016/example.loc",
+        _extra={"locations": [{"url": "https://example.org/pdf", "kind": "pdf"}]},
+    )
+    db = ArticleDatabase(str(db_path))
+    try:
+        db.insert_articles([first], dedupe=True)
+        filled = db.insert_articles([filling], dedupe=True)
+        assert filled["skipped_duplicates"] == 1
+        assert filled["merged"] == 1
+        again = db.insert_articles([repeat], dedupe=True)
+        assert again["skipped_duplicates"] == 1
+        assert again["merged"] == 0
+        _prov, locations = _extra(db, "W1", "openalex")
+        assert json.loads(locations)[0]["url"] == "https://example.org/pdf"
+    finally:
+        db.close()
+
+
+def test_run_multi_fetch_forwards_merge_counts(db_path, monkeypatch):
+    from app.routes import corpus as corpus_mod
+    from app.storage import quota
+
+    first = _paper(doi="10.1016/example.route")
+    second = _paper(
+        article_id="10.1016/example.route",
+        source="crossref",
+        doi="10.1016/example.route",
+        container_title="Sleep Health",
+    )
+
+    class Crossref:
+        def __init__(self, email=None):
+            pass
+
+        def search_and_fetch(self, query, max_results):
+            return [dict(second)]
+
+    monkeypatch.setitem(pipeline_mod.FETCHERS, "crossref", Crossref)
+    monkeypatch.setattr(corpus_mod, "update_progress", lambda *a, **k: None)
+    monkeypatch.setattr(corpus_mod, "is_job_cancelled", lambda *a, **k: False)
+    monkeypatch.setattr(quota, "is_over_quota", lambda *_a, **_k: False)
+    monkeypatch.setattr(
+        quota,
+        "usage_report",
+        lambda *_a, **_k: {
+            "used_mb": 0.0,
+            "limit_mb": 0,
+            "percent": 0.0,
+            "over_limit": False,
+        },
+    )
+    pipe = LiteratureSearchPipeline(db_path=str(db_path))
+    try:
+        pipe.db.insert_articles([first], dedupe=True)
+        result = corpus_mod._run_multi_fetch(
+            pipe,
+            query="q",
+            sources=["crossref"],
+            max_results=5,
+            email=None,
+            clear_first=False,
+            uid="merge-route",
+            lib_id="L1",
+        )
+        assert result["total_fetched"] == 0
+        assert result["by_source"]["crossref"] == 0
+        assert result["inserted"]["crossref"] == 0
+        assert result["merged"]["crossref"] == 1
+        assert result["skipped_duplicates"]["crossref"] == 1
+        assert result["errors"] == {}
+        assert len(pipe.db.get_all_articles()) == 1
+        assert pipe.db.get_all_articles()[0]["container_title"] == "Sleep Health"
     finally:
         pipe.db.close()

@@ -28,10 +28,14 @@ and this project aims to follow Semantic Versioning for app version strings
   this".
 
 ### Changed
-- A later fetch of the same work fills empty metadata on the paper already
-  in the library instead of skipping the new copy. Same DOI is the same
-  work across sources; different DOIs stay separate even when the titles
-  match. Notes, stars and embeddings stay on the original record.
+- A later fetch of the same work fills empty metadata (including year and
+  authors) on the paper already in the library instead of skipping the new
+  copy. Same DOI is the same work across sources; different DOIs stay
+  separate even when the titles match. A title match also stays separate
+  when the journals disagree or the types cannot be the same work (book vs
+  review, book vs chapter, preprint vs article, dataset vs article). A
+  fetch that only updates papers you already have says so, instead of "no
+  results". Notes, stars and embeddings stay on the original record.
 - RIS, BibTeX, APA, CSV and TXT exports follow each record's type (journal
   article, book, chapter, report, thesis, preprint, and the rest). Older
   papers with no stored type still export as a journal article when they

@@ -117,3 +117,75 @@ const code = [
 ].join('\n');
 vm.runInNewContext(code, { sandbox, host });
 """
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="Node.js not installed")
+def test_fetch_report_distinguishes_no_new_rows_from_no_results():
+    node = subprocess.run(
+        ["node", "--input-type=module", "-e", _NODE_MERGE_REPORT_SNIPPET],
+        cwd=".",
+        capture_output=True,
+        text=True,
+        timeout=15,
+    )
+    assert node.returncode == 0, node.stderr + node.stdout
+    out = json.loads(node.stdout.strip().splitlines()[-1])
+    assert out["none"] == "· empty: no results"
+    assert out["duplicate"] == "· same: no new rows"
+    assert out["updated"] == "✓ extra: updated existing papers"
+    assert "no results" not in out["duplicate"]
+    assert "no results" not in out["updated"]
+
+
+_NODE_MERGE_REPORT_SNIPPET = r"""
+import fs from 'fs';
+import vm from 'vm';
+const dm = fs.readFileSync('static/js/collect.js', 'utf8');
+const sandbox = {
+  console,
+  window: {},
+  document: { getElementById: () => null, documentElement: { getAttribute: () => 'simple' } },
+  escapeHtml: (s) => String(s),
+  getSourceName: (s) => s,
+};
+function extractFn(src, name) {
+  const start = src.indexOf('function ' + name);
+  if (start < 0) throw new Error('missing ' + name);
+  let i = src.indexOf('{', start);
+  let depth = 0;
+  for (; i < src.length; i++) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') {
+      depth--;
+      if (depth === 0) return src.slice(start, i + 1);
+    }
+  }
+  throw new Error('unbalanced ' + name);
+}
+const code =
+  sandbox.escapeHtml.toString() + ';\n' +
+  'function getSourceName(s){return s;}\n' +
+  extractFn(dm, 'buildFetchSourceReportModel') + '\n' +
+  `
+  const none = buildFetchSourceReportModel({
+    by_source: { empty: 0 },
+    error_kinds: { empty: 'no_results' },
+  }, ['empty']);
+  const duplicate = buildFetchSourceReportModel({
+    by_source: { same: 0 },
+    skipped_duplicates: { same: 1 },
+    merged: { same: 0 },
+  }, ['same']);
+  const updated = buildFetchSourceReportModel({
+    by_source: { extra: 0 },
+    skipped_duplicates: { extra: 1 },
+    merged: { extra: 1 },
+  }, ['extra']);
+  console.log(JSON.stringify({
+    none: none.muted[0].line,
+    duplicate: duplicate.muted[0].line,
+    updated: updated.successes[0].line,
+  }));
+  `;
+vm.runInNewContext(code, sandbox);
+"""

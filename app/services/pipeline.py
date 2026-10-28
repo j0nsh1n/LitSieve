@@ -290,6 +290,7 @@ class LiteratureSearchPipeline:
                 results[source] = {
                     'count': count,
                     'fetched': len(articles),
+                    'inserted': inserted,
                     'skipped_duplicates': skipped_dups,
                     'merged': merged,
                     'error': report_error,
@@ -308,6 +309,7 @@ class LiteratureSearchPipeline:
                 results[src] = {
                     'count': 0,
                     'fetched': 0,
+                    'inserted': 0,
                     'skipped_duplicates': 0,
                     'merged': 0,
                     'error': 'Cancelled' if cancelled[0] else None,
@@ -319,6 +321,7 @@ class LiteratureSearchPipeline:
                 'count': data['count'],
                 'error': data['error'],
                 'error_kind': data.get('error_kind'),
+                'inserted': data.get('inserted', data['count']),
                 'skipped_duplicates': data.get('skipped_duplicates', 0),
                 'merged': data.get('merged', 0),
             }
