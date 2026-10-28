@@ -49,6 +49,7 @@ from app.services import sample_embeddings
 from app.services.enrich import attach_key_points
 from app.services.pipeline import FETCHERS
 from app.storage import quota
+from app.storage.database import omit_null_metadata
 from app.storage.libraries import owned_library_id
 from app.utils import (
     coverage_suggestions,
@@ -501,6 +502,8 @@ async def api_get_cluster_articles(
         return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
     try:
         articles = p.db.get_articles_by_cluster(cluster_id)
+        for article in articles:
+            omit_null_metadata(article)
         label = articles[0].get('cluster_label', f'Cluster {cluster_id}') if articles else f'Cluster {cluster_id}'
         attach_key_points(articles, p)
         if not include_abstract:
@@ -633,6 +636,7 @@ async def api_screening_excluded(
         code = None if not reason or reason == "all" else normalize_reason(reason, default="low_relevance")
         items = p.db.get_excluded_items(code)
         for item in items:
+            omit_null_metadata(item)
             item["label"] = set_aside_group_label(item["reason"])
         counts: dict = {}
         for item in items:

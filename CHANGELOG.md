@@ -32,7 +32,9 @@ and this project aims to follow Semantic Versioning for app version strings
   plus an `article_extra` table for provenance and compressed provider records
   capped at 4096 bytes. Existing libraries migrate on open, replace fetches
   copy the new fields atomically, and clones exclude provider records. Fetchers
-  do not fill the new fields yet; exports and on-screen behavior are unchanged.
+  do not fill the new fields yet. Search, cluster, and set-aside API responses
+  omit unset metadata keys, so legacy payloads keep their previous shape;
+  exports and on-screen behavior are unchanged.
 - Text fields, selects and buttons have a visible edge in every look: a
   `--control-edge` token (text mixed 58% into the surface) measures 3.3:1
   or more against the surface and page, where the old `--rule` hairline

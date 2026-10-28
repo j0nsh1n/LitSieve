@@ -36,7 +36,11 @@ from app.services.clustering import (
     ClusterLabeler,
 )
 from app.services.embeddings import EmbeddingEngine
-from app.storage.database import ArticleDatabase
+from app.storage.database import (
+    SEARCH_ARTICLE_COLUMNS,
+    ArticleDatabase,
+    omit_null_metadata,
+)
 from app.utils import parse_year
 
 
@@ -603,7 +607,7 @@ class LiteratureSearchPipeline:
             article_ids = [article_ids[i] for i in keep]
             article_embeddings = article_embeddings[keep]
 
-        articles_all = self.db.get_all_articles_with_clusters()
+        articles_all = self.db.get_all_articles_with_clusters(columns=SEARCH_ARTICLE_COLUMNS)
 
         if cluster_filter:
             wanted = set(cluster_filter)
@@ -689,7 +693,7 @@ class LiteratureSearchPipeline:
             key = keys[i]
             if key not in articles_all:
                 continue
-            article = dict(articles_all[key])
+            article = omit_null_metadata(dict(articles_all[key]))
             article['similarity_score'] = round(float(scores[i]), 4)
             article['semantic_score'] = round(float(sem_scores[i]), 4)
             if lex is not None:

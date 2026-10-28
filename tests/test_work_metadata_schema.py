@@ -14,7 +14,12 @@ import pytest
 from app.services.citations import collection_to_apa, collection_to_bibtex, collection_to_ris
 from app.services.pipeline import LiteratureSearchPipeline
 from app.storage import dbconn, shares
-from app.storage.database import ArticleDatabase
+from app.storage.database import (
+    ARTICLE_COLUMNS,
+    SEARCH_ARTICLE_COLUMNS,
+    ArticleDatabase,
+    omit_null_metadata,
+)
 
 
 @contextmanager
@@ -122,10 +127,51 @@ def test_legacy_search_results_are_byte_identical_to_main(old_path):
         rows = pipe.search_similar(
             'warming', top_k=10, query_embedding=np.array([1.0, 0.0], dtype=np.float32),
         )
-        assert _bytes(_legacy_rows(rows)) == _bytes(MAIN_OUTPUTS['search'])
-        assert all(row[name] is None for row in rows for name in METADATA)
+        assert _bytes(rows) == _bytes(MAIN_OUTPUTS['search'])
+        assert all(name not in row for row in rows for name in METADATA)
     finally:
         pipe.db.close()
+
+
+def test_legacy_cluster_and_excluded_responses_match_main(old_path):
+    key = (ARTICLES[0]['article_id'], ARTICLES[0]['source'])
+    with _open(old_path) as db:
+        db.insert_clusters({key: (7, 'Oceans')})
+        db.exclude_articles([key], reason='off_topic')
+        cluster = [omit_null_metadata(dict(row)) for row in db.get_articles_by_cluster(7)]
+        excluded = [omit_null_metadata(dict(row)) for row in db.get_excluded_items()]
+        assert _bytes(cluster) == _bytes(MAIN_OUTPUTS['cluster'])
+        assert _bytes(excluded) == _bytes(MAIN_OUTPUTS['excluded'])
+        assert all(name not in row for row in cluster + excluded for name in METADATA)
+        db.insert_articles([{**ARTICLES[0], **METADATA}], dedupe=False)
+        filled = omit_null_metadata(dict(db.get_articles_by_cluster(7)[0]))
+        assert {name: filled[name] for name in METADATA} == METADATA
+
+
+def test_search_path_does_not_read_biblio(old_path, monkeypatch):
+    seen = []
+    original = ArticleDatabase.get_all_articles_with_clusters
+
+    def wrapped(self, columns=ARTICLE_COLUMNS):
+        seen.append(tuple(columns))
+        return original(self, columns=columns)
+
+    monkeypatch.setattr(ArticleDatabase, 'get_all_articles_with_clusters', wrapped)
+    pipe = LiteratureSearchPipeline(db_path=str(old_path))
+    try:
+        pipe.db.insert_embeddings({
+            (article['article_id'], article['source']): np.array([1.0, float(i)], dtype=np.float32)
+            for i, article in enumerate(ARTICLES)
+        }, model_name='general')
+        pipe.search_similar(
+            'warming', top_k=10, query_embedding=np.array([1.0, 0.0], dtype=np.float32),
+        )
+    finally:
+        pipe.db.close()
+    assert seen
+    assert all('biblio' not in columns for columns in seen)
+    assert SEARCH_ARTICLE_COLUMNS == ARTICLE_COLUMNS[:7]
+    assert 'biblio' not in SEARCH_ARTICLE_COLUMNS
 
 
 def test_excluded_summary_does_not_decode_unused_authors(old_path):
@@ -308,12 +354,67 @@ def test_replace_fetch_copies_metadata_and_all_extra_values(old_path):
         assert not any(name.startswith('staging_') for _, name, _ in _schema(db.conn))
 
 
-def test_failed_extra_copy_rolls_back_live_articles_and_children(old_path):
-    key = (ARTICLES[0]['article_id'], ARTICLES[0]['source'])
+def test_interrupted_add_column_migration_recovers(old_path):
+    conn = dbconn.connect(str(old_path))
+    try:
+        for name in ARTICLE_COLUMNS[7:11]:
+            conn.execute(f'ALTER TABLE articles ADD COLUMN {name} TEXT')
+        conn.commit()
+        before = conn.execute(
+            'SELECT rowid, created_at, article_id, source, title, abstract, year, authors, journal '
+            'FROM articles ORDER BY rowid'
+        ).fetchall()
+    finally:
+        conn.close()
     with _open(old_path) as db:
+        after = db.conn.execute(
+            'SELECT rowid, created_at, article_id, source, title, abstract, year, authors, journal '
+            'FROM articles ORDER BY rowid'
+        ).fetchall()
+        assert after == before
+        columns = {row[1] for row in db.conn.execute('PRAGMA table_info(articles)')}
+        assert set(ARTICLE_COLUMNS).issubset(columns)
+        assert db.conn.execute('PRAGMA foreign_key_check').fetchall() == []
+        assert _bytes(_legacy_rows(db.get_all_articles())) == _bytes(MAIN_OUTPUTS['list'])
+        assert all(row[name] is None for row in db.get_all_articles() for name in METADATA)
+
+
+def _cipher_env(monkeypatch, cipher):
+    if cipher:
+        if os.environ.get('CI'):
+            __import__('sqlcipher3')
+        else:
+            pytest.importorskip('sqlcipher3', reason='sqlcipher3-binary not installed')
+        monkeypatch.setenv(dbconn.ENV_KEY, 'p11-fixture-key')
+    else:
+        monkeypatch.delenv(dbconn.ENV_KEY, raising=False)
+
+
+_SWAP_TABLES = (
+    'articles', 'article_extra', 'notes', 'screening', 'embeddings', 'key_points',
+    'staging_articles', 'staging_article_extra',
+)
+
+
+@pytest.mark.parametrize('cipher', [False, True])
+def test_failed_swap_rolls_back_then_retries(tmp_path, monkeypatch, cipher):
+    _cipher_env(monkeypatch, cipher)
+    path = tmp_path / ('encrypted.db' if cipher else 'old.db')
+    _create_old_db(path)
+    key = (ARTICLES[0]['article_id'], ARTICLES[0]['source'])
+    other = (ARTICLES[1]['article_id'], ARTICLES[1]['source'])
+    with _open(path) as db:
         db.insert_articles([{**ARTICLES[0], **METADATA}], dedupe=False)
         db.store_provider_record(*key, {'old': True})
+        db.store_provider_record(*other, {'extra': True})
         db.upsert_note(*key, note='Keep my note')
+        db.exclude_articles([key], reason='off_topic')
+        db.insert_embeddings({
+            key: np.array([1.0, 0.0], dtype=np.float32),
+            other: np.array([0.0, 1.0], dtype=np.float32),
+        }, model_name='general')
+        db.insert_key_points({key: ['Kept AI point']}, origin='ai')
+        db.insert_key_points({other: ['Extractive point']}, origin='extractive')
         db.ensure_staging_articles()
         db.insert_articles([{**ARTICLES[0], 'title': 'Replacement'}], staging=True)
         db.store_provider_record(*key, {'new': True}, staging=True)
@@ -321,12 +422,24 @@ def test_failed_extra_copy_rolls_back_live_articles_and_children(old_path):
                            BEGIN SELECT RAISE(ABORT, 'injected swap failure'); END""")
         db.conn.commit()
         before = {table: db.conn.execute(f'SELECT * FROM {table}').fetchall()
-                  for table in ('articles', 'article_extra', 'notes', 'staging_articles',
-                                'staging_article_extra')}
-        with pytest.raises(sqlite3.IntegrityError, match='injected swap failure'):
+                  for table in _SWAP_TABLES}
+        with pytest.raises(dbconn.integrity_errors(), match='injected swap failure'):
             db.replace_from_staging()
         assert {table: db.conn.execute(f'SELECT * FROM {table}').fetchall()
-                for table in before} == before
+                for table in _SWAP_TABLES} == before
+        assert not any(name.startswith('_swap_keep_') for _, name, _ in _schema(db.conn))
+        db.conn.execute('DROP TRIGGER fail_extra_copy')
+        db.conn.commit()
+        assert db.replace_from_staging() == 1
+        assert db.get_article_by_id(*key)['title'] == 'Replacement'
+        assert db.get_article_by_id(*other) is None
+        assert json.loads(zlib.decompress(_extra(db.conn)[0][5])) == {'new': True}
+        assert db.get_notes_map()[key]['note'] == 'Keep my note'
+        assert db.get_excluded_keys() == {key}
+        assert db.get_key_points_map()[key] == ['Kept AI point']
+        assert other not in db.get_key_points_map()
+        assert db.get_embedding_keys() == set()
+        assert not any(name.startswith('staging_') for _, name, _ in _schema(db.conn))
         assert not any(name.startswith('_swap_keep_') for _, name, _ in _schema(db.conn))
 
 
@@ -616,7 +729,22 @@ MAIN_OUTPUTS = {'ris': 'TY  - JOUR\n'
              'cluster_label': None,
              'similarity_score': 0.495,
              'semantic_score': 0.7071,
-             'lexical_score': 0.0}]}
+             'lexical_score': 0.0}],
+ 'cluster': [{'article_id': '10.1234/ab.cd',
+              'source': 'crossref',
+              'title': 'Ocean {Warming} Trends',
+              'abstract': 'Seas are\nwarming rapidly.',
+              'year': '2021',
+              'authors': ['Ada Lovelace', 'Grace Hopper'],
+              'journal': 'Nature Climate',
+              'cluster_label': 'Oceans',
+              'excluded': True}],
+ 'excluded': [{'article_id': '10.1234/ab.cd',
+               'source': 'crossref',
+               'title': 'Ocean {Warming} Trends',
+               'year': '2021',
+               'journal': 'Nature Climate',
+               'reason': 'off_topic'}]}
 
 METADATA = {'work_type': 'book-chapter',
  'provider_type': 'chapter',

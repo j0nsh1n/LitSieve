@@ -10,6 +10,7 @@ import re
 from typing import List
 
 from app.services.embeddings import PICOExtractor
+from app.storage.database import omit_null_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +84,8 @@ def attach_study_types(results: List[dict]) -> None:
 
 def enrich_search_results(results: List[dict], p, *, query_text: str = "", pico_boost: bool = False) -> None:
     """Shared post-rank enrichment for search / seed / starred."""
+    for article in results:
+        omit_null_metadata(article)
     attach_pico(results)
     if pico_boost and query_text:
         apply_pico_boost(results, query_text)
