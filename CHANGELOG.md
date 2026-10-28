@@ -70,6 +70,13 @@ and this project aims to follow Semantic Versioning for app version strings
   error text; the server log keeps it.
 
 ### Fixed
+- Collect topics with punctuation work with DOAJ, HAL and PLOS. DOAJ
+  removes disabled Lucene syntax and encodes the topic as one URL path
+  segment, so a slash such as "HIV/AIDS" cannot split the path. HAL escapes
+  Solr punctuation; PLOS escapes each term after its boolean tokenizer.
+  DOAJ and HAL refuse blank or punctuation-only topics before a request,
+  and unreadable queries show "This source couldn't read the search words.
+  Try simpler keywords." in the source reports.
 - Admin console (audit 16.1 to 16.9). Saving a banner draft no longer takes
   the live banner down: the draft is its own row, the Site tab shows what is
   on the site and the draft separately, and only Publish and Take down

@@ -73,7 +73,7 @@ class FetchError(Exception):
 
     def __init__(self, message: str, kind: str = "error", articles: Optional[List[Dict]] = None):
         super().__init__(message)
-        self.kind = kind  # rate_limited | network | http | no_results | error | cancelled | timeout | unavailable
+        self.kind = kind  # rate_limited | network | http | bad_query | no_results | error | cancelled | timeout | unavailable
         self.articles = articles or []
 
 

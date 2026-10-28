@@ -31,6 +31,11 @@ def test_fetch_source_states_and_timeouts_via_node():
     assert "✗ Bad [rate_limited]: temporary failure" in out["report"]
     assert "1 timed out" in out["report"]
     assert "1 with an error" in out["report"]
+    sentence = "This source couldn't read the search words. Try simpler keywords."
+    assert sentence in out["badQueryLive"]
+    assert out["badQueryReport"].count(sentence) == 2
+    assert "bad_query" not in out["badQueryReport"]
+    assert "raw provider error" not in out["badQueryReport"]
 
 
 _NODE_PROGRESS_SNIPPET = r"""
@@ -80,6 +85,18 @@ const code = [
       },
     });
     const live = [...host.innerHTML.matchAll(/<span class="fetch-live-detail">(.*?)<\\/span>/g)].map((m) => m[1]);
+    renderFetchLiveSources({
+      sources: ['doaj'],
+      by_source: { doaj: 0 },
+      source_status: { doaj: 'bad_query' },
+      source_progress: { doaj: { state: 'done', error_kind: 'bad_query' } },
+    });
+    const badQueryLive = host.innerHTML;
+    const badQueryReport = renderFetchSourceReportHtml(buildFetchSourceReportModel({
+      by_source: { doaj: 0, hal: 0 },
+      errors: { doaj: 'raw provider error' },
+      error_kinds: { doaj: 'bad_query', hal: 'bad_query' },
+    }, ['doaj', 'hal']));
     const data = {
       by_source: { pubmed: 7, timeout: 1 },
       errors: { timeout: 'deadline exceeded', Bad: 'temporary failure' },
@@ -90,6 +107,8 @@ const code = [
     const report = renderFetchSourceReportHtml(model);
     console.log(JSON.stringify({
       live,
+      badQueryLive,
+      badQueryReport,
       reportTimeouts: model.timeouts.length,
       reportErrors: model.muted.filter((row) => !row.zero).length,
       report,

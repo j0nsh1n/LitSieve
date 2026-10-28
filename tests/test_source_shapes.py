@@ -9,13 +9,14 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, unquote, urlsplit
 
 import pytest
 
 from app.fetchers.base import FetchError
 from app.fetchers.clinicaltrials import ClinicalTrialsFetcher
 from app.fetchers.doaj import DOAJFetcher
+from app.fetchers.hal import HALFetcher
 from app.fetchers.openaire import OpenAIREFetcher
 from app.fetchers.openalex import OpenAlexFetcher
 from app.fetchers.zenodo import ZenodoFetcher
@@ -54,6 +55,85 @@ def assert_plain(text):
 
 
 # ---------------------------------------------------------------- DOAJ
+
+QUESTION = "What role did the U.S. government play in changing society during the Great Depression?"
+
+
+@pytest.mark.parametrize("query,expected", [(QUESTION, QUESTION[:-1]), ("HIV/AIDS", "HIV AIDS")])
+def test_doaj_question_and_slash_stay_in_one_encoded_path_segment(monkeypatch, query, expected):
+    f = DOAJFetcher()
+    calls = []
+
+    def get(url, **kwargs):
+        calls.append(url)
+        return FakeResp({"results": []})
+
+    monkeypatch.setattr(f.http, "get", get)
+    assert f.search_and_fetch(query) == []
+    assert calls == [f"{f.BASE_URL}/{quote(expected, safe='')}"]
+    parsed = urlsplit(calls[0])
+    assert parsed.query == ""
+    assert "?" not in unquote(parsed.path)
+    assert parsed.path.count("/") == urlsplit(f.BASE_URL).path.count("/") + 1
+
+
+@pytest.mark.parametrize("fetcher", [DOAJFetcher, HALFetcher])
+@pytest.mark.parametrize("query", ["???", "", " \t ", "*:*", "[]{}", "&& ||"])
+def test_provider_empty_query_is_bad_query_without_a_request(monkeypatch, fetcher, query):
+    f = fetcher()
+
+    def unexpected_request(*args, **kwargs):
+        pytest.fail("Empty queries must not search the provider index")
+
+    monkeypatch.setattr(f.http, "get", unexpected_request)
+    with pytest.raises(FetchError) as caught:
+        f.search_and_fetch(query)
+    assert caught.value.kind == "bad_query"
+
+
+@pytest.mark.parametrize(
+    "status,body,kind",
+    [
+        (400, "Query contains disallowed Lucene features", "bad_query"),
+        (400, "disallowed Lucene", "bad_query"),
+        (400, "Invalid page number", "http"),
+        (403, "disallowed Lucene", "http"),
+    ],
+)
+def test_doaj_disallowed_lucene_is_bad_query_without_retry(monkeypatch, status, body, kind):
+    f = DOAJFetcher()
+    f.http.delay = 0
+    calls = []
+
+    class Rejected:
+        status_code = status
+        text = body
+
+    def request(*args, **kwargs):
+        calls.append(1)
+        return Rejected()
+
+    monkeypatch.setattr(f.http.session, "request", request)
+    with pytest.raises(FetchError) as caught:
+        f.search_and_fetch("heart")
+    assert caught.value.kind == kind
+    assert calls == [1]
+
+
+def test_hal_escapes_question_punctuation_in_request(monkeypatch):
+    f = HALFetcher()
+    calls = []
+
+    def get(url, params=None, **kwargs):
+        calls.append(params["q"])
+        return FakeResp({"response": {"docs": []}})
+
+    monkeypatch.setattr(f.http, "get", get)
+    with pytest.raises(FetchError) as caught:
+        f.search_and_fetch(QUESTION)
+    assert caught.value.kind == "no_results"
+    assert calls == [QUESTION[:-1] + r"\?"]
+
 
 def test_doaj_live_shape_has_plain_text_abstracts(monkeypatch):
     f = DOAJFetcher()

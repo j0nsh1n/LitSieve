@@ -18,7 +18,8 @@ from app.fetchers.base import (
     reraise_fetch_error,
     user_agent,
 )
-from app.fetchers.terms import boolean_terms
+from app.fetchers.querytext import solr_escape_term
+from app.fetchers.terms import OPERATORS, boolean_terms
 
 
 class PLOSFetcher(BaseFetcher):
@@ -34,7 +35,10 @@ class PLOSFetcher(BaseFetcher):
     @staticmethod
     def solr_query(query: str) -> str:
         """Every word in the title or the abstract; bare `title:a b` scoped only `a`."""
-        terms = " ".join(boolean_terms(query))
+        terms = " ".join(
+            term if term in OPERATORS else solr_escape_term(term)
+            for term in boolean_terms(query)
+        )
         return f"title:({terms}) OR abstract:({terms})" if terms else "*:*"
 
     def search_and_fetch(self, query: str, max_results: int = 500) -> List[Dict]:

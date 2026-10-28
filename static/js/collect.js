@@ -1049,6 +1049,9 @@ function renderFetchLiveSources(p) {
   } else if (errorKind === 'timeout' || kind === 'timeout') {
    detail = count > 0 ? `timed out (${count} paper${count === 1 ? '' : 's'})` : 'timed out';
    rowClass += ' is-failed';
+  } else if (errorKind === 'bad_query' || kind === 'bad_query') {
+   detail = "This source couldn't read the search words. Try simpler keywords.";
+   rowClass += ' is-failed';
   } else if (!done) {
    detail = 'searching…';
    rowClass += ' is-pending';
@@ -1270,6 +1273,15 @@ function buildFetchSourceReportModel(data, sources) {
     name,
     count,
     line: `◷ ${name}: timed out${partial}`,
+   });
+   return;
+  }
+  if (kind === 'bad_query') {
+   muted.push({
+    src,
+    name,
+    line: `${name}: This source couldn't read the search words. Try simpler keywords.`,
+    zero: false,
    });
    return;
   }
