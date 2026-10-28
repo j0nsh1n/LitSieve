@@ -8,6 +8,15 @@ sections 16 to 23) is fixed and deployed (#93 to #106); its findings keep
 their ids (`16.1`, `18.4`, ...) for anyone tracing a change back.
 
 ## Backlog (unscheduled)
+- Field test 2026-10-27 (`docs/FIELD_TEST_2026-10-27.md`, audit and phased
+  plan in `docs/SEARCH_AUDIT_2026-10-27.md`):
+  - DOAJ rejects any query containing `?`;
+  - keep each record's type, DOI and open-access status, and export by type
+    instead of always `JOUR`;
+  - stop using source or repository names as the journal;
+  - let books and chapters without abstracts through;
+  - rank by the question's relationship, not only its topic (benchmark first);
+  - decide on a Library of Congress primary-source channel
 - Optional source keys on the host when wanted (audit 23.4): `S2_API_KEY`,
   `OPENALEX_API_KEY`, `NCBI_API_KEY`, and `NASA_ADS_TOKEN` (NASA ADS
   reports unavailable without it)

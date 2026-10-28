@@ -1,13 +1,19 @@
 # context.md — LitSieve
 
 ## Current State
+- Tunnel maintenance (2026-10-26): host RPM `cloudflared-2026.10.4-1.fc44`
+  was already installed. Restarted `cloudflared-litpilot-token.service` to
+  replace its running 2026.10.3 process with 2026.10.4. Four connections
+  registered; public and loopback `/health` returned HTTP 200. Cloudflare's
+  eMudhra advisory requires 2026.10.2 or later. A separate system-wide
+  `cloudflared.service` was in an auto-restart loop; it was not changed.
 - App version **6.0.0**, released 2026-10-12. GitHub release `v6.0.0` (at
   `25356cb`) holds the tour video (1080p and 4K); the README opens with its
   poster. Live at `https://www.litpilot.org` from the production checkout,
   `main` through #106 (2026-10-16). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
 - Latest full suite (2026-10-28, `fix/safe-provider-queries`): **1354 passed**
-  in 156.92 s, no skips or xfails. `ruff check .` clean; `pyright app` **0 errors**, 6 optional-import
+  in 152.71 s, no skips or xfails. `ruff check .` clean; `pyright app` **0 errors**, 6 optional-import
   warnings (CI blocks on errors). `pip-audit` (2026-10-14): no known
   vulnerabilities; ROCm torch/triton are un-auditable. No dependency lockfile.
 - One `/search` workspace replaces the two UI modes. Old `/data-management`,
@@ -171,7 +177,7 @@ Guest User (is_guest) → sample corpus only; purged by age
 - Validation used production venv executables from this isolated worktree
   without installation. Tests used request stubs and Node report rendering;
   live-provider and real-browser checks were not run. Test-group peak RSS
-  was 1.99 GiB under the 6 GiB available-memory stop guard.
+  was 1.91 GiB under the 6 GiB available-memory stop guard.
 - GLM-5.3-Flash through T3/OpenCode drafted the changelog and PR body; the
   implementation agent checked and corrected them against the code.
 - **Next step:** parent review of the P0.1 PR; no merge or deploy in this slice.
