@@ -1,0 +1,82 @@
+{
+  "resultList": {
+    "result": [
+      {
+        "id": "PMC13659250",
+        "source": "PMC",
+        "pmid": null,
+        "pmcid": "PMC13659250",
+        "doi": null,
+        "title": "Sleep Is Integral to School Health and Adolescent Wellbeing: An Evidence‐Based Call to Action",
+        "abstractText": "Abstract for fixture.",
+        "pubYear": "2026",
+        "firstPublicationDate": "2026-10-01",
+        "firstIndexDate": "2026-10-16",
+        "isOpenAccess": "Y",
+        "license": "cc by-nc-nd",
+        "pageInfo": null,
+        "pubTypeList": {
+          "pubType": [
+            "research-article",
+            "Journal Article"
+          ]
+        },
+        "fullTextUrlList": {
+          "fullTextUrl": [
+            {
+              "availability": "Free",
+              "availabilityCode": "F",
+              "documentStyle": "html",
+              "site": "PubMedCentral",
+              "url": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC13659250/?tool=EBI"
+            },
+            {
+              "availability": "Free",
+              "availabilityCode": "F",
+              "documentStyle": "pdf",
+              "site": "PubMedCentral",
+              "url": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC13659250/pdf/?tool=EBI"
+            },
+            {
+              "availability": "Free",
+              "availabilityCode": "F",
+              "documentStyle": "html",
+              "site": "Europe_PMC",
+              "url": "https://europepmc.org/articles/PMC13659250"
+            },
+            {
+              "availability": "Free",
+              "availabilityCode": "F",
+              "documentStyle": "pdf",
+              "site": "Europe_PMC",
+              "url": "https://europepmc.org/articles/PMC13659250?pdf=render"
+            }
+          ]
+        },
+        "journalInfo": {
+          "volume": "96",
+          "issue": "10",
+          "journal": {
+            "title": "The Journal of school health"
+          }
+        },
+        "authorList": {
+          "author": [
+            {
+              "fullName": "Saletin J"
+            },
+            {
+              "fullName": "Ziporyn T"
+            },
+            {
+              "fullName": "Wolfson A"
+            },
+            {
+              "fullName": "Crowley S"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

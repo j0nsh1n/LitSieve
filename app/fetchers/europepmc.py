@@ -5,7 +5,7 @@ Fetches articles from Europe PMC REST API
 
 import logging
 from datetime import date
-from typing import Dict, List, Optional
+from typing import Dict, List, Mapping, Optional, Tuple
 
 from app.fetchers.base import (
     BaseFetcher,
@@ -15,6 +15,15 @@ from app.fetchers.base import (
     json_of,
     reraise_fetch_error,
     user_agent,
+)
+from app.services.work_types import (
+    as_list,
+    attach_work_fields,
+    build_biblio,
+    build_location,
+    join_provider_types,
+    normalize_doi,
+    pick_canonical_work_type,
 )
 
 logger = logging.getLogger(__name__)
@@ -110,18 +119,85 @@ class EuropePMCFetcher(BaseFetcher):
                 authors.append(name)
         return authors
 
+    @staticmethod
+    def _pub_types(record: Dict) -> List[str]:
+        raw = (record.get("pubTypeList") or {}).get("pubType")
+        return [str(item).strip() for item in as_list(raw) if str(item).strip()]
+
+    @staticmethod
+    def _oa_claim(record: Dict) -> Tuple[Optional[str], Optional[str]]:
+        pmcid = str(record.get("pmcid") or "").strip()
+        is_oa = str(record.get("isOpenAccess") or "").strip().upper() == "Y"
+        pdf = None
+        html = None
+        for item in as_list((record.get("fullTextUrlList") or {}).get("fullTextUrl")):
+            if not isinstance(item, Mapping):
+                continue
+            href = str(item.get("url") or "").strip()
+            if not href:
+                continue
+            code = str(item.get("availabilityCode") or "").upper()
+            style = str(item.get("documentStyle") or "").lower()
+            if code != "F":
+                continue
+            if style == "pdf" and not pdf:
+                pdf = href
+            elif not html:
+                html = href
+        if not (is_oa or pmcid):
+            return None, None
+        url = pdf or html
+        if not url and pmcid:
+            url = f"https://www.ncbi.nlm.nih.gov/pmc/articles/{pmcid}/pdf/"
+        if not url:
+            return None, None
+        return "green", url
+
     def _parse_article(self, record: Dict) -> Optional[Dict]:
         article_id = record.get("id", "")
         title = clean_text(record.get("title"))
         abstract = clean_text(record.get("abstractText"))
         if not article_id or not title or not abstract:
             return None
-        return {
+        journal = self._journal(record)
+        raw_types = self._pub_types(record)
+        oa_status, best_oa_url = self._oa_claim(record)
+        journal_info = record.get("journalInfo") or {}
+        if not isinstance(journal_info, Mapping):
+            journal_info = {}
+        locations = []
+        loc = build_location(
+            url=best_oa_url,
+            kind="pdf" if best_oa_url and "pdf" in best_oa_url.lower() else "fulltext",
+            via=self.SOURCE_NAME,
+        )
+        if loc:
+            locations.append(loc)
+        article = {
             "article_id": article_id,
             "source": self.SOURCE_NAME,
             "title": title,
             "abstract": abstract,
             "year": self._year(record),
             "authors": self._authors(record),
-            "journal": self._journal(record),
+            "journal": journal,
         }
+        return attach_work_fields(
+            article,
+            self.SOURCE_NAME,
+            record,
+            work_type=pick_canonical_work_type("europepmc", raw_types),
+            provider_type=join_provider_types(self.SOURCE_NAME, raw_types),
+            doi=normalize_doi(record.get("doi")),
+            container_title=journal or None,
+            oa_status=oa_status,
+            best_oa_url=best_oa_url,
+            biblio=build_biblio(
+                volume=journal_info.get("volume"),
+                issue=journal_info.get("issue") or journal_info.get("issueNumber"),
+                pages=record.get("pageInfo"),
+                published_date=record.get("firstPublicationDate"),
+                license=record.get("license"),
+            ),
+            locations=locations,
+        )

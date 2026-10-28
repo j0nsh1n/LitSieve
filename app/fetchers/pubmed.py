@@ -15,6 +15,13 @@ from typing import Any, Dict, List, Optional, cast
 from Bio import Entrez
 
 from app.fetchers.base import BaseFetcher, FetchError, HttpClient, reraise_fetch_error, user_agent
+from app.services.work_types import (
+    attach_work_fields,
+    build_biblio,
+    join_provider_types,
+    normalize_doi,
+    pick_canonical_work_type,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -109,6 +116,21 @@ class PubMedFetcher(BaseFetcher):
                 authors.append(str(author["CollectiveName"]))
         return authors
 
+    @staticmethod
+    def _attr(node: Any, name: str) -> str:
+        attrs = getattr(node, "attributes", None)
+        if isinstance(attrs, dict) and name in attrs:
+            return str(attrs[name] or "")
+        if isinstance(node, dict):
+            return str(node.get(name) or node.get(f"@{name}") or "")
+        return ""
+
+    def _id_of(self, nodes: Any, attr: str, wanted: str) -> str:
+        for node in nodes or []:
+            if self._attr(node, attr).lower() == wanted:
+                return str(node).strip()
+        return ""
+
     def _parse_article(self, record: Dict) -> Optional[Dict]:
         """Parse a PubMed article record"""
         try:
@@ -126,15 +148,49 @@ class PubMedFetcher(BaseFetcher):
             if not abstract or abstract == 'No abstract':
                 return None
 
-            return {
+            journal = str(article.get('Journal', {}).get('Title', ''))
+            issue = (article.get('Journal') or {}).get('JournalIssue') or {}
+            pages = str((article.get('Pagination') or {}).get('MedlinePgn') or '').strip() or None
+            raw_types = [str(item) for item in (article.get('PublicationTypeList') or []) if str(item).strip()]
+            doi = normalize_doi(
+                self._id_of(article.get('ELocationID'), 'EIdType', 'doi')
+                or self._id_of((record.get('PubmedData') or {}).get('ArticleIdList'), 'IdType', 'doi')
+            )
+            pmc = self._id_of((record.get('PubmedData') or {}).get('ArticleIdList'), 'IdType', 'pmc') or None
+            parsed = {
                 'article_id': pmid,
                 'source': self.SOURCE_NAME,
                 'title': str(title),
                 'abstract': abstract,
                 'year': self._year(article),
                 'authors': self._authors(article),
-                'journal': str(article.get('Journal', {}).get('Title', '')),
+                'journal': journal,
             }
+            return attach_work_fields(
+                parsed,
+                self.SOURCE_NAME,
+                {
+                    'pmid': pmid,
+                    'doi': doi,
+                    'pmc': pmc,
+                    'publication_types': raw_types,
+                    'journal': journal or None,
+                    'volume': str(issue.get('Volume') or '').strip() or None,
+                    'issue': str(issue.get('Issue') or '').strip() or None,
+                    'pages': pages,
+                    'year': parsed['year'] or None,
+                },
+                work_type=pick_canonical_work_type(self.SOURCE_NAME, raw_types),
+                provider_type=join_provider_types(self.SOURCE_NAME, raw_types),
+                doi=doi,
+                container_title=journal or None,
+                biblio=build_biblio(
+                    volume=issue.get('Volume'),
+                    issue=issue.get('Issue'),
+                    pages=pages,
+                    published_date=parsed['year'] or None,
+                ),
+            )
 
         except Exception as e:
             logger.exception("Error parsing article: %s", e)

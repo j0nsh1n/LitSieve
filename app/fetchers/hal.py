@@ -19,6 +19,13 @@ from app.fetchers.base import (
     user_agent,
 )
 from app.fetchers.querytext import solr_safe
+from app.services.work_types import (
+    attach_work_fields,
+    build_location,
+    canonical_work_type,
+    join_provider_types,
+    normalize_doi,
+)
 
 
 class HALFetcher(BaseFetcher):
@@ -51,7 +58,8 @@ class HALFetcher(BaseFetcher):
                         "start": start,
                         "fl": (
                             "halId_s,title_s,abstract_s,authFullName_s,"
-                            "producedDateY_i,journalTitle_s,doiId_s"
+                            "producedDateY_i,journalTitle_s,doiId_s,"
+                            "docType_s,submitType_s,fileMain_s"
                         ),
                     },
                 )
@@ -100,7 +108,17 @@ class HALFetcher(BaseFetcher):
             aid = self._first(doc.get("doiId_s")) or self._first(doc.get("halId_s"))
             if not aid:
                 return None
-            return {
+            raw_type = self._first(doc.get("docType_s"))
+            submit = self._first(doc.get("submitType_s")).lower()
+            file_main = self._first(doc.get("fileMain_s"))
+            is_file = submit == "file" and bool(file_main)
+            loc = build_location(
+                url=file_main if is_file else None,
+                kind="file",
+                host="HAL",
+                via="hal",
+            )
+            article = {
                 "article_id": aid,
                 "source": "hal",
                 "title": title,
@@ -109,6 +127,19 @@ class HALFetcher(BaseFetcher):
                 "authors": authors,
                 "journal": journal,
             }
+            return attach_work_fields(
+                article,
+                "hal",
+                doc,
+                work_type=canonical_work_type("hal", raw_type),
+                provider_type=join_provider_types("hal", raw_type),
+                doi=normalize_doi(self._first(doc.get("doiId_s"))),
+                container_title=journal or None,
+                host_name="HAL",
+                oa_status="green" if is_file else None,
+                best_oa_url=file_main if is_file else None,
+                locations=[loc] if loc else None,
+            )
         except Exception:
             return None
 

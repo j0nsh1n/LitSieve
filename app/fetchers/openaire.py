@@ -7,7 +7,7 @@ No key for basic classroom use. Aggregates European open-access deposits.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from app.fetchers.base import (
     BaseFetcher,
@@ -17,6 +17,13 @@ from app.fetchers.base import (
     json_of,
     reraise_fetch_error,
     user_agent,
+)
+from app.services.work_types import (
+    as_list,
+    attach_work_fields,
+    join_provider_types,
+    normalize_doi,
+    pick_canonical_work_type,
 )
 
 
@@ -52,6 +59,46 @@ def _node_list_text(node: Any) -> List[str]:
         return out
     t = _node_text(node)
     return [t] if t else []
+
+
+def _instance_claims(meta: Dict) -> Tuple[List[str], List[str], List[str]]:
+    """Normalize object-or-list shapes at instance, instancetype and hostedby."""
+    children_raw = meta.get("children")
+    children = children_raw if isinstance(children_raw, dict) else {}
+    types: List[str] = []
+    hosts: List[str] = []
+    urls: List[str] = []
+    for inst in as_list(children.get("instance")):
+        if not isinstance(inst, dict):
+            continue
+        for node in as_list(inst.get("instancetype")):
+            name = ""
+            if isinstance(node, dict):
+                name = str(node.get("@classname") or node.get("$") or "").strip()
+            else:
+                name = str(node).strip()
+            if name and name not in types:
+                types.append(name)
+        for node in as_list(inst.get("hostedby")):
+            name = ""
+            if isinstance(node, dict):
+                name = str(node.get("@name") or "").strip()
+            else:
+                name = str(node).strip()
+            if name and name.lower() != "unknown repository" and name not in hosts:
+                hosts.append(name)
+        for node in as_list(inst.get("webresource")):
+            href = _node_text(node.get("url") if isinstance(node, dict) else node)
+            if href and href not in urls:
+                urls.append(href)
+    return types, hosts, urls
+
+
+def _access_classname(meta: Dict) -> str:
+    node = meta.get("bestaccessright")
+    if isinstance(node, dict):
+        return str(node.get("@classname") or "").strip()
+    return str(node or "").strip()
 
 
 class OpenAIREFetcher(BaseFetcher):
@@ -152,9 +199,11 @@ class OpenAIREFetcher(BaseFetcher):
             pid = meta.get("pid")
             pids = pid if isinstance(pid, list) else [pid]
             aid = ""
+            doi = None
             for p in pids:
                 if isinstance(p, dict) and str(p.get("@classid", "")).lower() == "doi":
                     aid = _node_text(p)
+                    doi = normalize_doi(aid)
                     if aid:
                         break
             if not aid:
@@ -169,7 +218,20 @@ class OpenAIREFetcher(BaseFetcher):
             if not aid:
                 return None
 
-            return {
+            inst_types, hosts, _urls = _instance_claims(meta)
+            raw_types = inst_types or [_node_text((meta.get("resulttype") or {}).get("@classname"))]
+            access = _access_classname(meta).lower()
+            oa_status = None if access in ("", "unspecified", "unknown") else access
+            extra = {
+                "pid": meta.get("pid"),
+                "resulttype": meta.get("resulttype"),
+                "instancetype": inst_types,
+                "hostedby": hosts,
+                "bestaccessright": meta.get("bestaccessright"),
+                "journal": meta.get("journal"),
+                "dateofacceptance": meta.get("dateofacceptance"),
+            }
+            article = {
                 "article_id": aid,
                 "source": "openaire",
                 "title": title,
@@ -178,6 +240,17 @@ class OpenAIREFetcher(BaseFetcher):
                 "authors": authors,
                 "journal": journal,
             }
+            return attach_work_fields(
+                article,
+                "openaire",
+                extra,
+                work_type=pick_canonical_work_type("openaire", raw_types),
+                provider_type=join_provider_types("openaire", raw_types),
+                doi=doi,
+                container_title=journal or None,
+                host_name=hosts[0] if hosts else None,
+                oa_status=oa_status,
+            )
         except Exception:
             return None
 

@@ -1,0 +1,16 @@
+{
+  "response": {
+    "docs": [
+      {
+        "bibcode": "2020ApJ...888...12A",
+        "title": ["A study of sleep and stars"],
+        "abstract": "Astronomy abstract about sleep cycles of stars.",
+        "author": ["A. Astronomer"],
+        "year": "2020",
+        "pub": "The Astrophysical Journal",
+        "doi": ["10.3847/1538-4357/ab5c1a"],
+        "doctype": "article"
+      }
+    ]
+  }
+}

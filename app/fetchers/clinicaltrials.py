@@ -7,6 +7,7 @@ import logging
 from typing import Dict, List, Optional
 
 from app.fetchers.base import BaseFetcher, HttpClient, json_of, reraise_fetch_error
+from app.services.work_types import attach_work_fields, join_provider_types
 
 logger = logging.getLogger(__name__)
 
@@ -154,7 +155,7 @@ class ClinicalTrialsFetcher(BaseFetcher):
                 if name:
                     authors.append(name)
 
-            return {
+            article = {
                 "article_id": nct_id,
                 "source": self.SOURCE_NAME,
                 "title": title,
@@ -163,6 +164,16 @@ class ClinicalTrialsFetcher(BaseFetcher):
                 "authors": authors,
                 "journal": "ClinicalTrials.gov",
             }
+            return attach_work_fields(
+                article,
+                self.SOURCE_NAME,
+                record,
+                work_type="registry-record",
+                provider_type=join_provider_types(self.SOURCE_NAME, "registry-record"),
+                doi=None,
+                container_title=None,
+                host_name="ClinicalTrials.gov",
+            )
 
         except Exception as e:
             logger.exception("Error parsing study: %s", e)

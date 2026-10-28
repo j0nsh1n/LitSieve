@@ -65,6 +65,169 @@ TYPE_MAP: Dict[str, Dict[str, str]] = {
         "journal-article": "journal-article",
         "article": "journal-article",
     },
+    "eric": {
+        "journal articles": "journal-article",
+        "reports - research": "report",
+        "reports - evaluative": "report",
+        "reports - descriptive": "report",
+        "reports - general": "report",
+        "books": "book",
+        "collected works - general": "book",
+        "speeches/meeting papers": "conference-paper",
+        "dissertations/theses": "dissertation",
+        "dissertations/theses - doctoral dissertations": "dissertation",
+        "dissertations/theses - masters theses": "dissertation",
+        "information analyses": "review-article",
+        "numerical/quantitative data": "dataset",
+        "tests/questionnaires": "other",
+        "guides - classroom": "other",
+        "opinion papers": "other",
+    },
+    "pubmed": {
+        "journal article": "journal-article",
+        "review": "review-article",
+        "systematic review": "review-article",
+        "meta-analysis": "review-article",
+        "book": "book",
+        "book chapter": "book-chapter",
+        "case reports": "other",
+        "editorial": "other",
+        "letter": "other",
+        "comment": "other",
+        "dataset": "dataset",
+        "preprint": "preprint",
+        "clinical trial": "journal-article",
+        "randomized controlled trial": "journal-article",
+        "congress": "conference-paper",
+        "published erratum": "other",
+        "news": "other",
+    },
+    "europepmc": {
+        "journal article": "journal-article",
+        "research-article": "journal-article",
+        "review": "review-article",
+        "review-article": "review-article",
+        "systematic-review": "review-article",
+        "meta-analysis": "review-article",
+        "book review": "book-review",
+        "book-review": "book-review",
+        "preprint": "preprint",
+        "letter": "other",
+        "editorial": "other",
+        "case-report": "other",
+        "dataset": "dataset",
+        "book": "book",
+        "chapter": "book-chapter",
+        "conference-paper": "conference-paper",
+        "other": "other",
+    },
+    "semanticscholar": {
+        "journalarticle": "journal-article",
+        "review": "review-article",
+        "conference": "conference-paper",
+        "casereport": "other",
+        "clinicaltrial": "journal-article",
+        "dataset": "dataset",
+        "editorial": "other",
+        "lettersandcomments": "other",
+        "metaanalysis": "review-article",
+        "news": "other",
+        "study": "journal-article",
+        "book": "book",
+        "booksection": "book-chapter",
+    },
+    "hal": {
+        "art": "journal-article",
+        "comm": "conference-paper",
+        "couv": "book-chapter",
+        "ouv": "book",
+        "these": "dissertation",
+        "report": "report",
+        "hdr": "dissertation",
+        "proceedings": "conference-paper",
+        "mem": "dissertation",
+        "lecture": "other",
+        "undefined": "other",
+        "other": "other",
+        "poster": "other",
+        "patent": "other",
+        "issue": "other",
+        "blog": "other",
+        "notice": "other",
+        "img": "other",
+        "video": "other",
+        "software": "other",
+    },
+    "openaire": {
+        "part of book or chapter of book": "book-chapter",
+        "article": "journal-article",
+        "journal article": "journal-article",
+        "contribution to journal": "journal-article",
+        "other literature type": "other",
+        "thesis": "dissertation",
+        "doctoral thesis": "dissertation",
+        "bachelor thesis": "dissertation",
+        "master thesis": "dissertation",
+        "preprint": "preprint",
+        "book": "book",
+        "report": "report",
+        "conference object": "conference-paper",
+        "conference proceedings article": "conference-paper",
+        "dataset": "dataset",
+        "publication": "other",
+    },
+    "zenodo": {
+        "article": "journal-article",
+        "preprint": "preprint",
+        "report": "report",
+        "book": "book",
+        "section": "book-chapter",
+        "conferencepaper": "conference-paper",
+        "thesis": "dissertation",
+        "workingpaper": "report",
+        "deliverable": "report",
+        "patent": "other",
+        "other": "other",
+        "dataset": "dataset",
+        "publication": "other",
+    },
+    "arxiv": {
+        "preprint": "preprint",
+    },
+    "plos": {
+        "journal-article": "journal-article",
+        "article": "journal-article",
+        "research article": "journal-article",
+        "review": "review-article",
+    },
+    "clinicaltrials": {
+        "registry-record": "registry-record",
+    },
+    "nasa_ads": {
+        "article": "journal-article",
+        "eprint": "preprint",
+        "inproceedings": "conference-paper",
+        "inbook": "book-chapter",
+        "book": "book",
+        "phdthesis": "dissertation",
+        "mastersthesis": "dissertation",
+        "techreport": "report",
+        "review": "review-article",
+        "catalog": "other",
+        "circular": "other",
+        "proposal": "other",
+        "software": "other",
+        "dataset": "dataset",
+        "misc": "other",
+        "proceedings": "conference-paper",
+        "abstract": "other",
+    },
+    "biorxiv": {
+        "preprint": "preprint",
+    },
+    "medrxiv": {
+        "preprint": "preprint",
+    },
 }
 
 _DOI_PREFIXES = (
@@ -90,26 +253,90 @@ _BIBLIO_KEYS = (
 )
 
 
+# First match wins when a record carries several mapped types.
+TYPE_PREFERENCE = (
+    "review-article",
+    "book-review",
+    "book-chapter",
+    "reference-entry",
+    "edited-book",
+    "dissertation",
+    "conference-paper",
+    "dataset",
+    "registry-record",
+    "journal-article",
+    "book",
+    "preprint",
+    "report",
+    "other",
+)
+
+
+def as_list(value: Any) -> List[Any]:
+    """One-item list for a scalar or mapping; flatten a sequence."""
+    if value is None:
+        return []
+    if isinstance(value, (str, bytes, bytearray, dict)):
+        return [value]
+    if isinstance(value, Iterable):
+        return list(value)
+    return [value]
+
+
+def _raw_type_text(raw: Any) -> str:
+    if raw is None:
+        return ""
+    if isinstance(raw, Mapping):
+        for key in ("@classname", "classname", "name", "$", "text"):
+            text = _text(raw.get(key))
+            if text:
+                return text
+        return ""
+    return str(raw).strip()
+
+
 def canonical_work_type(provider: str, raw_type: Any) -> str:
     """Map a provider's type string onto the stored vocabulary, or unknown."""
-    if raw_type is None:
-        return "unknown"
-    raw = str(raw_type).strip().lower()
+    raw = _raw_type_text(raw_type).lower()
     if not raw:
         return "unknown"
     table = TYPE_MAP.get((provider or "").strip().lower(), {})
     return table.get(raw, "unknown")
 
 
+def pick_canonical_work_type(provider: str, raw_types: Any) -> str:
+    """Most specific mapped type from a provider's type list."""
+    mapped = [canonical_work_type(provider, raw) for raw in as_list(raw_types)]
+    known = [item for item in mapped if item != "unknown"]
+    if not known:
+        return "unknown"
+    rank = {name: index for index, name in enumerate(TYPE_PREFERENCE)}
+    return min(known, key=lambda item: rank.get(item, len(rank)))
+
+
 def provider_type_label(provider: str, raw_type: Any) -> Optional[str]:
     """Keep the raw type tagged with its source, e.g. openalex:book-chapter."""
-    if raw_type is None:
-        return None
-    raw = str(raw_type).strip()
+    raw = _raw_type_text(raw_type)
     if not raw:
         return None
     name = (provider or "").strip().lower()
     return f"{name}:{raw}" if name else raw
+
+
+def join_provider_types(provider: str, raw_types: Any) -> Optional[str]:
+    """All raw type labels, original order, tagged once with the provider."""
+    labels: List[str] = []
+    seen = set()
+    for raw in as_list(raw_types):
+        text = _raw_type_text(raw)
+        if text and text not in seen:
+            seen.add(text)
+            labels.append(text)
+    if not labels:
+        return None
+    name = (provider or "").strip().lower()
+    joined = "; ".join(labels)
+    return f"{name}:{joined}" if name else joined
 
 
 def normalize_doi(value: Any) -> Optional[str]:
@@ -199,21 +426,80 @@ def extra_payload(
     locations: Optional[Iterable[Mapping[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """Fetcher-side article['_extra'] body for insert_articles."""
+    name = (provider or "").strip().lower()
     trimmer = {
         "openalex": trim_openalex,
         "crossref": trim_crossref,
         "doaj": trim_doaj,
-    }.get((provider or "").strip().lower(), dict)
+        "eric": trim_eric,
+        "pubmed": trim_pubmed,
+        "europepmc": trim_europepmc,
+        "biorxiv": trim_europepmc,
+        "medrxiv": trim_europepmc,
+        "semanticscholar": trim_semanticscholar,
+        "hal": trim_hal,
+        "openaire": trim_openaire,
+        "zenodo": trim_zenodo,
+        "arxiv": trim_arxiv,
+        "plos": trim_plos,
+        "clinicaltrials": trim_clinicaltrials,
+        "nasa_ads": trim_nasa_ads,
+    }.get(name, dict)
+    body = record if isinstance(record, Mapping) else {}
     return {
         "provenance": dict(provenance or {}),
         "locations": [dict(item) for item in (locations or []) if item.get("url")],
-        "provider_record": trimmer(dict(record)),
+        "provider_record": trimmer(dict(body)),
     }
 
 
 def provenance_for(provider: str, fields: Mapping[str, Any]) -> Dict[str, str]:
     name = (provider or "").strip().lower()
     return {key: name for key, value in fields.items() if value is not None and value != ""}
+
+
+def attach_work_fields(
+    article: Dict[str, Any],
+    provider: str,
+    record: Mapping[str, Any],
+    *,
+    work_type: str,
+    provider_type: Optional[str],
+    doi: Optional[str],
+    container_title: Optional[str] = None,
+    host_name: Optional[str] = None,
+    oa_status: Optional[str] = None,
+    best_oa_url: Optional[str] = None,
+    biblio: Optional[Dict[str, Any]] = None,
+    locations: Optional[Iterable[Mapping[str, Any]]] = None,
+) -> Dict[str, Any]:
+    """Fill P1 metadata columns and `_extra` the same way on every fetcher."""
+    article["work_type"] = work_type
+    article["provider_type"] = provider_type
+    article["doi"] = doi
+    article["container_title"] = container_title or None
+    article["host_name"] = host_name
+    article["oa_status"] = oa_status
+    article["best_oa_url"] = best_oa_url
+    article["evidence_basis"] = "abstract"
+    article["biblio"] = biblio_json(biblio)
+    article["_extra"] = extra_payload(
+        provider,
+        record,
+        provenance=provenance_for(provider, {
+            "work_type": work_type,
+            "provider_type": provider_type,
+            "doi": doi,
+            "container_title": article["container_title"],
+            "host_name": host_name,
+            "oa_status": oa_status,
+            "best_oa_url": best_oa_url,
+            "evidence_basis": "abstract",
+            "biblio": article["biblio"],
+        }),
+        locations=locations,
+    )
+    return article
 
 
 def _text(value: Any) -> Optional[str]:
@@ -391,3 +677,156 @@ def trim_doaj(result: Mapping[str, Any]) -> Dict[str, Any]:
             ][:40],
         },
     }
+
+
+def trim_eric(doc: Mapping[str, Any]) -> Dict[str, Any]:
+    return _keep(doc, (
+        "id", "title", "publicationdateyear", "publicationtype", "source",
+        "url", "isbn", "issn", "peerreviewed",
+    ))
+
+
+def trim_pubmed(record: Mapping[str, Any]) -> Dict[str, Any]:
+    return _keep(record, (
+        "pmid", "doi", "pmc", "publication_types", "journal", "volume",
+        "issue", "pages", "year",
+    ))
+
+
+def trim_europepmc(record: Mapping[str, Any]) -> Dict[str, Any]:
+    journal_info = record.get("journalInfo") or {}
+    if not isinstance(journal_info, Mapping):
+        journal_info = {}
+    journal = journal_info.get("journal") or {}
+    if not isinstance(journal, Mapping):
+        journal = {}
+    return {
+        "id": record.get("id"),
+        "doi": record.get("doi"),
+        "pmid": record.get("pmid"),
+        "pmcid": record.get("pmcid"),
+        "source": record.get("source"),
+        "pubTypeList": record.get("pubTypeList"),
+        "isOpenAccess": record.get("isOpenAccess"),
+        "fullTextUrlList": record.get("fullTextUrlList"),
+        "firstPublicationDate": record.get("firstPublicationDate"),
+        "pageInfo": record.get("pageInfo"),
+        "journalInfo": {
+            "volume": journal_info.get("volume"),
+            "issue": journal_info.get("issue") or journal_info.get("issueNumber"),
+            "journal": {"title": journal.get("title")},
+        },
+    }
+
+
+def trim_semanticscholar(paper: Mapping[str, Any]) -> Dict[str, Any]:
+    journal = paper.get("journal") or {}
+    if not isinstance(journal, Mapping):
+        journal = {}
+    pdf = paper.get("openAccessPdf") or {}
+    if not isinstance(pdf, Mapping):
+        pdf = {}
+    ids = paper.get("externalIds") or {}
+    if not isinstance(ids, Mapping):
+        ids = {}
+    return {
+        "paperId": paper.get("paperId"),
+        "externalIds": {key: ids.get(key) for key in ("DOI", "PubMed", "PMC", "ArXiv") if ids.get(key)},
+        "publicationTypes": paper.get("publicationTypes"),
+        "venue": paper.get("venue"),
+        "publicationDate": paper.get("publicationDate"),
+        "journal": {
+            "name": journal.get("name"),
+            "volume": journal.get("volume"),
+            "pages": journal.get("pages"),
+        },
+        "openAccessPdf": {"url": pdf.get("url"), "status": pdf.get("status")},
+    }
+
+
+def trim_hal(doc: Mapping[str, Any]) -> Dict[str, Any]:
+    return _keep(doc, (
+        "halId_s", "doiId_s", "docType_s", "submitType_s", "fileMain_s",
+        "journalTitle_s", "producedDateY_i",
+    ))
+
+
+def trim_openaire(result: Mapping[str, Any]) -> Dict[str, Any]:
+    return _keep(result, (
+        "pid", "resulttype", "instancetype", "hostedby", "bestaccessright",
+        "journal", "dateofacceptance",
+    ))
+
+
+def trim_zenodo(record: Mapping[str, Any]) -> Dict[str, Any]:
+    meta = record.get("metadata") or {}
+    if not isinstance(meta, Mapping):
+        meta = {}
+    files = []
+    for item in (record.get("files") or [])[:8]:
+        if not isinstance(item, Mapping):
+            continue
+        links = item.get("links") or {}
+        if not isinstance(links, Mapping):
+            links = {}
+        files.append({"key": item.get("key"), "links": {"self": links.get("self")}})
+    journal = meta.get("journal") or {}
+    if not isinstance(journal, Mapping):
+        journal = {}
+    license_info = meta.get("license") or {}
+    if not isinstance(license_info, Mapping):
+        license_info = {}
+    resource = meta.get("resource_type") or {}
+    if not isinstance(resource, Mapping):
+        resource = {}
+    return {
+        "id": record.get("id"),
+        "metadata": {
+            "doi": meta.get("doi"),
+            "access_right": meta.get("access_right"),
+            "publication_date": meta.get("publication_date"),
+            "resource_type": {
+                "type": resource.get("type"),
+                "subtype": resource.get("subtype"),
+                "title": resource.get("title"),
+            },
+            "journal": {
+                "title": journal.get("title"),
+                "volume": journal.get("volume"),
+                "issue": journal.get("issue"),
+                "pages": journal.get("pages"),
+            },
+            "license": {"id": license_info.get("id")},
+        },
+        "files": files,
+    }
+
+
+def trim_arxiv(record: Mapping[str, Any]) -> Dict[str, Any]:
+    return _keep(record, ("id", "doi", "pdf", "published", "primary_category"))
+
+
+def trim_plos(doc: Mapping[str, Any]) -> Dict[str, Any]:
+    return _keep(doc, ("id", "journal", "publication_date", "article_type"))
+
+
+def trim_clinicaltrials(record: Mapping[str, Any]) -> Dict[str, Any]:
+    proto = record.get("protocolSection") or {}
+    if not isinstance(proto, Mapping):
+        proto = {}
+    ident = proto.get("identificationModule") or {}
+    if not isinstance(ident, Mapping):
+        ident = {}
+    status = proto.get("statusModule") or {}
+    if not isinstance(status, Mapping):
+        status = {}
+    return {
+        "nctId": ident.get("nctId"),
+        "briefTitle": ident.get("briefTitle"),
+        "startDate": (status.get("startDateStruct") or {}).get("date")
+        if isinstance(status.get("startDateStruct"), Mapping) else None,
+    }
+
+
+def trim_nasa_ads(doc: Mapping[str, Any]) -> Dict[str, Any]:
+    return _keep(doc, ("bibcode", "doi", "doctype", "pub", "year", "title"))

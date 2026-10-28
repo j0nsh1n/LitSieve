@@ -1,0 +1,58 @@
+{
+  "resultList": {
+    "result": [
+      {
+        "id": "42906262",
+        "source": "MED",
+        "pmid": "42906262",
+        "pmcid": null,
+        "doi": "10.1016/j.smrv.2026.102379",
+        "title": "Delayed school start-times and adolescent sleep duration: A systematic umbrella review.",
+        "abstractText": "Expert panels have long recommended delayed school start-times (SSTs) as necessary for addressing widespread adolescent sleep loss; nevertheless, adoption of recommendations has been slow. The major goals of this umbrella review were to explore the consistency of review teams' recommendations while describing and assessing review quality. We used systematic procedures to identify five meta-analyses and four narrative reviews. Authors of all nine reviews concluded that adolescent sleep duration (ASD) likely increased when SSTs were later but usually recommended limited adoption. Reviewers' hesitancy to recommend widespread adoption reflected (a) the modest average sleep gains reported in two reviews that met all AMSTAR2 critical criteria for producing sound estimates of effectiveness, (b) the lack of evidence that gains in sleep were sustained, and (c) the limited quality of primary studies. Potential moderating factors (e.g., students' background, school type and size) were explored but little progress was made due to missing data; however geographic location was identified as a potential moderator of SSTs' impact on ASD. Our results support the need for well-controlled local studies of SST delays that are guided by standard reporting protocols. We also recommend needs assessments to capture local sleep norms and unique community conditions. Registration: PROSPERO CRD42023373423.",
+        "pubYear": "2026",
+        "firstPublicationDate": "2026-10-17",
+        "firstIndexDate": "2026-10-23",
+        "isOpenAccess": "N",
+        "license": null,
+        "pageInfo": "102379",
+        "pubTypeList": {
+          "pubType": [
+            "Review",
+            "Journal Article"
+          ]
+        },
+        "fullTextUrlList": {
+          "fullTextUrl": [
+            {
+              "availability": "Subscription required",
+              "availabilityCode": "S",
+              "documentStyle": "doi",
+              "site": "DOI",
+              "url": "https://doi.org/10.1016/j.smrv.2026.102379"
+            }
+          ]
+        },
+        "journalInfo": {
+          "volume": "90",
+          "issue": null,
+          "journal": {
+            "title": "Sleep medicine reviews"
+          }
+        },
+        "authorList": {
+          "author": [
+            {
+              "fullName": "Floyd JA"
+            },
+            {
+              "fullName": "Jenuwine ES"
+            },
+            {
+              "fullName": "McBurrows L"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

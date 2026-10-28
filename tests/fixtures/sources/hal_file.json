@@ -1,0 +1,24 @@
+{
+  "response": {
+    "docs": [
+      {
+        "halId_s": "halshs-03118622",
+        "title_s": [
+          "Roosevelt et les Afro-Américans : une nouvelle donne ?"
+        ],
+        "authFullName_s": [
+          "Fixture Author"
+        ],
+        "producedDateY_i": 2014,
+        "journalTitle_s": "Cycnos",
+        "doiId_s": null,
+        "docType_s": "ART",
+        "submitType_s": "file",
+        "fileMain_s": "https://shs.hal.science/halshs-03118622/document",
+        "abstract_s": [
+          "A deposited HAL file about Roosevelt and African Americans."
+        ]
+      }
+    ]
+  }
+}

@@ -16,6 +16,14 @@ from app.fetchers.base import (
     reraise_fetch_error,
     user_agent,
 )
+from app.services.work_types import (
+    attach_work_fields,
+    build_biblio,
+    build_location,
+    join_provider_types,
+    normalize_doi,
+    pick_canonical_work_type,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +31,10 @@ logger = logging.getLogger(__name__)
 class SemanticScholarFetcher(BaseFetcher):
     SOURCE_NAME = 'semanticscholar'
     BASE_URL = 'https://api.semanticscholar.org/graph/v1'
-    FIELDS = 'paperId,title,abstract,year,authors,venue'
+    FIELDS = (
+        'paperId,title,abstract,year,authors,venue,'
+        'externalIds,publicationTypes,openAccessPdf,journal,publicationDate'
+    )
 
     def __init__(self, email: Optional[str] = None):
         # Without a key every request shares one public pool and most get 429.
@@ -92,15 +103,45 @@ class SemanticScholarFetcher(BaseFetcher):
             abstract = (paper.get('abstract') or '').strip()
             if not title or not abstract:
                 return None
-            return {
+            ids_raw = paper.get('externalIds')
+            ids = ids_raw if isinstance(ids_raw, dict) else {}
+            journal_raw = paper.get('journal')
+            journal_info = journal_raw if isinstance(journal_raw, dict) else {}
+            pdf_raw = paper.get('openAccessPdf')
+            pdf_info = pdf_raw if isinstance(pdf_raw, dict) else {}
+            venue = (paper.get('venue') or '').strip()
+            journal_name = (journal_info.get('name') or '').strip()
+            journal = venue or journal_name
+            container = journal_name or venue or None
+            raw_types = paper.get('publicationTypes') or []
+            pdf_url = (pdf_info.get('url') or '').strip() or None
+            loc = build_location(url=pdf_url, kind='pdf', via='semanticscholar')
+            article = {
                 'article_id': paper_id,
                 'source': 'semanticscholar',
                 'title': title,
                 'abstract': abstract,
                 'year': str(paper['year']) if paper.get('year') else '',
                 'authors': [a['name'] for a in paper.get('authors', []) if a.get('name')],
-                'journal': paper.get('venue') or '',
+                'journal': journal,
             }
+            return attach_work_fields(
+                article,
+                'semanticscholar',
+                paper,
+                work_type=pick_canonical_work_type('semanticscholar', raw_types),
+                provider_type=join_provider_types('semanticscholar', raw_types),
+                doi=normalize_doi(ids.get('DOI')),
+                container_title=container,
+                oa_status='green' if pdf_url else None,
+                best_oa_url=pdf_url,
+                biblio=build_biblio(
+                    volume=journal_info.get('volume'),
+                    pages=journal_info.get('pages'),
+                    published_date=paper.get('publicationDate'),
+                ),
+                locations=[loc] if loc else None,
+            )
         except Exception as e:
             logger.exception("Semantic Scholar parse error: %s", e)
             return None

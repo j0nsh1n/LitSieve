@@ -1,0 +1,235 @@
+{
+  "response": {
+    "results": {
+      "result": [
+        {
+          "header": {
+            "dri:objIdentifier": {
+              "$": "doi_dedup___::1f4a27b882c02b7948dcae36c0077b6f"
+            },
+            "dri:dateOfCollection": {
+              "$": "2026-08-19T06:49:10.632167491"
+            },
+            "dri:dateOfTransformation": null
+          },
+          "metadata": {
+            "oaf:entity": {
+              "oaf:result": {
+                "title": [
+                  {
+                    "@classid": "main title",
+                    "@classname": "main title",
+                    "@schemeid": "dnet:dataCite_title",
+                    "@schemename": "dnet:dataCite_title",
+                    "$": "African Americans in the Great Depression and New Deal"
+                  },
+                  {
+                    "@classid": "main title",
+                    "@classname": "main title",
+                    "@schemeid": "dnet:dataCite_title",
+                    "@schemename": "dnet:dataCite_title",
+                    "$": "african americans in the great depression and new deal"
+                  }
+                ],
+                "description": {
+                  "$": "Abstract of an Oxford encyclopedia chapter."
+                },
+                "creator": {
+                  "@rank": "1",
+                  "@name": "Mary-Elizabeth B",
+                  "@surname": "Murphy",
+                  "$": "Mary-Elizabeth B Murphy"
+                },
+                "dateofacceptance": {
+                  "$": "2020-11-19"
+                },
+                "pid": {
+                  "@classid": "doi",
+                  "@classname": "Digital Object Identifier",
+                  "@schemeid": "dnet:pid_types",
+                  "@schemename": "dnet:pid_types",
+                  "$": "10.1093/acrefore/9780199329175.013.632"
+                },
+                "resulttype": {
+                  "@classid": "publication",
+                  "@classname": "publication",
+                  "@schemeid": "dnet:result_typologies",
+                  "@schemename": "dnet:result_typologies"
+                },
+                "resourcetype": {
+                  "@classid": "publication",
+                  "@classname": "publication",
+                  "@schemeid": "dnet:result_typologies",
+                  "@schemename": "dnet:result_typologies"
+                },
+                "bestaccessright": {
+                  "@classid": "UNKNOWN",
+                  "@classname": "unspecified",
+                  "@schemeid": "dnet:access_modes",
+                  "@schemename": "dnet:access_modes"
+                },
+                "children": {
+                  "result": [
+                    {
+                      "@objidentifier": "doi_________::1f4a27b882c02b7948dcae36c0077b6f",
+                      "instance": {
+                        "accessright": {
+                          "@classid": "UNKNOWN",
+                          "@classname": "unspecified",
+                          "@schemeid": "dnet:access_modes",
+                          "@schemename": "dnet:access_modes"
+                        },
+                        "hostedby": {
+                          "@name": "Unknown Repository",
+                          "@id": "openaire____::55045bd2a65019fd8e6741a755395c8c"
+                        },
+                        "dateofacceptance": {
+                          "$": "2020-11-19"
+                        },
+                        "instancetype": {
+                          "@classid": "0013",
+                          "@classname": "Part of book or chapter of book",
+                          "@schemeid": "dnet:publication_resource",
+                          "@schemename": "dnet:publication_resource"
+                        },
+                        "refereed": {
+                          "@classid": "0001",
+                          "@classname": "peerReviewed",
+                          "@schemeid": "dnet:review_levels",
+                          "@schemename": "dnet:review_levels"
+                        },
+                        "url": {
+                          "$": "https://doi.org/10.1093/acrefore/9780199329175.013.632"
+                        },
+                        "webresource": {
+                          "url": {
+                            "$": "https://doi.org/10.1093/acrefore/9780199329175.013.632"
+                          }
+                        }
+                      },
+                      "creator": {
+                        "$": "Mary-Elizabeth B Murphy"
+                      },
+                      "publisher": {
+                        "$": "Oxford University PressNew York, NY"
+                      },
+                      "resulttype": {
+                        "@classid": "publication",
+                        "@classname": "publication",
+                        "@schemeid": "dnet:result_typologies",
+                        "@schemename": "dnet:result_typologies"
+                      },
+                      "collectedfrom": {
+                        "@name": "Crossref",
+                        "@id": "openaire____::081b82f96300b6a6e3d282bad31cb6e2"
+                      },
+                      "title": {
+                        "@classid": "main title",
+                        "@classname": "main title",
+                        "@schemeid": "dnet:dataCite_title",
+                        "@schemename": "dnet:dataCite_title",
+                        "$": "African Americans in the Great Depression and New Deal"
+                      },
+                      "description": {
+                        "$": "<jats:title>Abstract</jats:title>                   <jats:p>For African Americans, the Great Depression and the New Deal (1929–1940) marked a transformative era and laid the groundwork for the postwar black freedom struggle in the United States. The outbreak of the Great Depression in 1929 caused widespread suffering and despair in black communities across the country as women and men faced staggering rates of unemployment and poverty. Once Franklin Delano Roosevelt (FDR), a Democrat, was inaugu"
+                      },
+                      "pid": {
+                        "@classid": "doi",
+                        "@classname": "Digital Object Identifier",
+                        "@schemeid": "dnet:pid_types",
+                        "@schemename": "dnet:pid_types",
+                        "$": "10.1093/acrefore/9780199329175.013.632"
+                      },
+                      "dateofacceptance": {
+                        "$": "2020-11-19"
+                      }
+                    }
+                  ],
+                  "instance": {
+                    "accessright": {
+                      "@classid": "UNKNOWN",
+                      "@classname": "unspecified",
+                      "@schemeid": "dnet:access_modes",
+                      "@schemename": "dnet:access_modes"
+                    },
+                    "collectedfrom": [
+                      {
+                        "@name": "Crossref",
+                        "@id": "openaire____::081b82f96300b6a6e3d282bad31cb6e2"
+                      },
+                      {
+                        "@name": "Microsoft Academic Graph",
+                        "@id": "openaire____::5f532a3fc4f1ea403f37070f59a7a53a"
+                      }
+                    ],
+                    "hostedby": [
+                      {
+                        "@name": "Unknown Repository",
+                        "@id": "openaire____::55045bd2a65019fd8e6741a755395c8c"
+                      },
+                      {
+                        "@name": "Unknown Repository",
+                        "@id": "openaire____::55045bd2a65019fd8e6741a755395c8c"
+                      }
+                    ],
+                    "dateofacceptance": {
+                      "$": "2020-11-19"
+                    },
+                    "instancetype": [
+                      {
+                        "@classid": "0038",
+                        "@classname": "Other literature type",
+                        "@schemeid": "dnet:publication_resource",
+                        "@schemename": "dnet:publication_resource"
+                      },
+                      {
+                        "@classid": "0013",
+                        "@classname": "Part of book or chapter of book",
+                        "@schemeid": "dnet:publication_resource",
+                        "@schemename": "dnet:publication_resource"
+                      }
+                    ],
+                    "pid": {
+                      "@classid": "doi",
+                      "@classname": "Digital Object Identifier",
+                      "@schemeid": "dnet:pid_types",
+                      "@schemename": "dnet:pid_types",
+                      "$": "10.1093/acrefore/9780199329175.013.632"
+                    },
+                    "alternateidentifier": [
+                      {
+                        "@classid": "mag_id",
+                        "@classname": "Microsoft Academic Graph Identifier",
+                        "@schemeid": "dnet:pid_types",
+                        "@schemename": "dnet:pid_types",
+                        "$": 3098430208
+                      },
+                      {
+                        "@classid": "doi",
+                        "@classname": "Digital Object Identifier",
+                        "@schemeid": "dnet:pid_types",
+                        "@schemename": "dnet:pid_types",
+                        "$": "10.1093/acrefore/9780199329175.013.632"
+                      }
+                    ],
+                    "refereed": {
+                      "@classid": "0001",
+                      "@classname": "peerReviewed",
+                      "@schemeid": "dnet:review_levels",
+                      "@schemename": "dnet:review_levels"
+                    },
+                    "webresource": {
+                      "url": {
+                        "$": "https://doi.org/10.1093/acrefore/9780199329175.013.632"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

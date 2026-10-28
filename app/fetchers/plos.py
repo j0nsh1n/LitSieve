@@ -20,6 +20,14 @@ from app.fetchers.base import (
 )
 from app.fetchers.querytext import solr_escape_term
 from app.fetchers.terms import OPERATORS, boolean_terms
+from app.services.work_types import (
+    attach_work_fields,
+    build_biblio,
+    build_location,
+    canonical_work_type,
+    join_provider_types,
+    normalize_doi,
+)
 
 
 class PLOSFetcher(BaseFetcher):
@@ -104,7 +112,10 @@ class PLOSFetcher(BaseFetcher):
             aid = (doc.get("id") or "").strip()
             if not aid:
                 return None
-            return {
+            doi = normalize_doi(aid)
+            oa_url = f"https://doi.org/{doi}" if doi else None
+            loc = build_location(url=oa_url, kind="fulltext", via="plos")
+            article = {
                 "article_id": aid,
                 "source": "plos",
                 "title": title,
@@ -113,6 +124,19 @@ class PLOSFetcher(BaseFetcher):
                 "authors": authors,
                 "journal": str(journal),
             }
+            return attach_work_fields(
+                article,
+                "plos",
+                doc,
+                work_type=canonical_work_type("plos", "journal-article"),
+                provider_type=join_provider_types("plos", "journal-article"),
+                doi=doi,
+                container_title=str(journal) or None,
+                oa_status="gold",
+                best_oa_url=oa_url,
+                biblio=build_biblio(published_date=str(pub)[:10] if pub else None),
+                locations=[loc] if loc else None,
+            )
         except Exception:
             return None
 

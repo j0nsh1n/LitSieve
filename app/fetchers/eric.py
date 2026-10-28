@@ -9,6 +9,13 @@ import logging
 from typing import Dict, List, Optional
 
 from app.fetchers.base import BaseFetcher, FetchError, HttpClient, json_of, reraise_fetch_error
+from app.services.work_types import (
+    attach_work_fields,
+    build_biblio,
+    join_provider_types,
+    normalize_doi,
+    pick_canonical_work_type,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +40,10 @@ class ERICFetcher(BaseFetcher):
                     self.BASE_URL,
                     params={
                         'search': query,
-                        'fields': 'id,title,description,publicationdateyear,author,source',
+                        'fields': (
+                            'id,title,description,publicationdateyear,author,source,'
+                            'publicationtype,peerreviewed,url,isbn,issn'
+                        ),
                         'format': 'json',
                         'rows': n,
                         'start': start,
@@ -75,7 +85,8 @@ class ERICFetcher(BaseFetcher):
             journal = doc.get('source', '') or ''
             if journal == 'Online Submission':
                 journal = ''
-            return {
+            raw_types = doc.get('publicationtype') or []
+            article = {
                 'article_id': doc.get('id', ''),
                 'source': 'eric',
                 'title': title,
@@ -84,6 +95,16 @@ class ERICFetcher(BaseFetcher):
                 'authors': authors,
                 'journal': journal,
             }
+            return attach_work_fields(
+                article,
+                'eric',
+                doc,
+                work_type=pick_canonical_work_type('eric', raw_types),
+                provider_type=join_provider_types('eric', raw_types),
+                doi=normalize_doi(doc.get('url')),
+                container_title=journal or None,
+                biblio=build_biblio(isbn=doc.get('isbn')),
+            )
         except Exception as e:
             logger.exception("ERIC parse error: %s", e)
             return None
