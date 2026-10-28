@@ -8,6 +8,7 @@ import logging
 import pickle
 import re
 import threading
+import zlib
 from contextlib import contextmanager
 from typing import Dict, List, Optional, Tuple
 
@@ -16,6 +17,36 @@ import numpy as np
 from app.storage import dbconn
 
 logger = logging.getLogger(__name__)
+
+
+ARTICLE_COLUMNS = (
+    "article_id", "source", "title", "abstract", "year", "authors", "journal",
+    "work_type", "provider_type", "doi", "container_title", "host_name",
+    "oa_status", "best_oa_url", "evidence_basis", "biblio",
+)
+
+
+def _row_to_article(row) -> Dict:
+    article = dict(zip(ARTICLE_COLUMNS, row))
+    article["authors"] = json.loads(article["authors"]) if article["authors"] else []
+    return article
+
+
+def _article_table_ddl(table: str) -> str:
+    definitions = {
+        "article_id": "TEXT NOT NULL",
+        "source": "TEXT NOT NULL DEFAULT 'pubmed'",
+        "title": "TEXT NOT NULL",
+        "abstract": "TEXT NOT NULL",
+    }
+    columns = ", ".join(f"{name} {definitions.get(name, 'TEXT')}" for name in ARTICLE_COLUMNS)
+    return f"""
+        CREATE TABLE IF NOT EXISTS {table} (
+            {columns},
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (article_id, source)
+        )
+    """
 
 
 class ArticleDatabase:
@@ -74,19 +105,8 @@ class ArticleDatabase:
         cursor = self.conn.cursor()
 
         # Articles table
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS articles (
-                article_id TEXT NOT NULL,
-                source TEXT NOT NULL DEFAULT 'pubmed',
-                title TEXT NOT NULL,
-                abstract TEXT NOT NULL,
-                year TEXT,
-                authors TEXT,
-                journal TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                PRIMARY KEY (article_id, source)
-            )
-        """)
+        cursor.execute(_article_table_ddl("articles"))
+        self._create_article_extra()
 
         # Embeddings table. Embeddings are stored as raw numpy bytes plus the
         # dtype and shape needed to reconstruct them (no pickle — see S3).
@@ -192,6 +212,46 @@ class ArticleDatabase:
 
         self.conn.commit()
 
+    def _create_article_extra(self, *, staging: bool = False) -> None:
+        table = "staging_article_extra" if staging else "article_extra"
+        foreign_key = "" if staging else """,
+            FOREIGN KEY (article_id, source) REFERENCES articles (article_id, source)
+                ON DELETE CASCADE
+        """
+        self.conn.execute(f"""
+            CREATE TABLE IF NOT EXISTS {table} (
+                article_id TEXT NOT NULL,
+                source TEXT NOT NULL,
+                provenance TEXT NOT NULL DEFAULT '{{}}',
+                locations TEXT NOT NULL DEFAULT '[]',
+                related TEXT NOT NULL DEFAULT '[]',
+                provider_record BLOB,
+                raw_status TEXT,
+                fetch_run_id INTEGER,
+                PRIMARY KEY (article_id, source)
+                {foreign_key}
+            )
+        """)
+
+    def store_provider_record(
+        self, article_id: str, source: str, record: Dict, *, staging: bool = False
+    ) -> None:
+        """Store an already-trimmed record, or mark it too large without truncation."""
+        encoded = json.dumps(record, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        compressed = zlib.compress(encoded)
+        too_large = len(compressed) > 4096
+        table = "staging_article_extra" if staging else "article_extra"
+        with self._writing():
+            self.conn.execute(f"""
+                INSERT INTO {table} (article_id, source, provider_record, raw_status)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(article_id, source) DO UPDATE SET
+                    provider_record = excluded.provider_record,
+                    raw_status = excluded.raw_status
+            """, (article_id, source, None if too_large else compressed,
+                  "too_large" if too_large else None))
+            self.conn.commit()
+
     def migrate_schema(self):
         """Migrate old pmid-based schema to article_id+source schema"""
         cursor = self.conn.cursor()
@@ -289,19 +349,7 @@ class ArticleDatabase:
             cursor.execute("ALTER TABLE clusters RENAME TO clusters_old")
 
             # Recreate tables with new schema
-            cursor.execute("""
-                CREATE TABLE articles (
-                    article_id TEXT NOT NULL,
-                    source TEXT NOT NULL DEFAULT 'pubmed',
-                    title TEXT NOT NULL,
-                    abstract TEXT NOT NULL,
-                    year TEXT,
-                    authors TEXT,
-                    journal TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    PRIMARY KEY (article_id, source)
-                )
-            """)
+            cursor.execute(_article_table_ddl("articles"))
             cursor.execute("""
                 CREATE TABLE embeddings (
                     article_id TEXT NOT NULL,
@@ -326,9 +374,11 @@ class ArticleDatabase:
             """)
 
             # Copy data with source='pubmed'
-            cursor.execute("""
-                INSERT INTO articles (article_id, source, title, abstract, year, authors, journal, created_at)
-                SELECT pmid, 'pubmed', title, abstract, year, authors, journal, created_at
+            legacy_columns = ", ".join((*ARTICLE_COLUMNS[:7], "created_at"))
+            legacy_values = ", ".join(("pmid", "'pubmed'", *ARTICLE_COLUMNS[2:7], "created_at"))
+            cursor.execute(f"""
+                INSERT INTO articles ({legacy_columns})
+                SELECT {legacy_values}
                 FROM articles_old
             """)
             cursor.execute("""
@@ -350,6 +400,19 @@ class ArticleDatabase:
             self.conn.commit()
             logger.info("Schema migration complete.")
 
+        for table in ("articles", self.STAGING_TABLE):
+            cursor.execute(f"PRAGMA table_info({table})")
+            article_columns = {col[1] for col in cursor.fetchall()}
+            if article_columns:
+                for name in ARTICLE_COLUMNS[7:]:
+                    if name not in article_columns:
+                        cursor.execute(f"ALTER TABLE {table} ADD COLUMN {name} TEXT")
+                cursor.execute(f"CREATE INDEX IF NOT EXISTS idx_{table}_doi ON {table} (doi)")
+        self._create_article_extra()
+        if self._staging_exists(cursor):
+            self._create_article_extra(staging=True)
+        self.conn.commit()
+
     STAGING_TABLE = "staging_articles"
 
     def _staging_exists(self, cursor) -> bool:
@@ -362,25 +425,17 @@ class ArticleDatabase:
     def ensure_staging_articles(self) -> None:
         """Create the replace-fetch staging table (no FKs to live rows)."""
         with self._lock:
+            self.conn.execute(_article_table_ddl(self.STAGING_TABLE))
             self.conn.execute(
-                f"""
-                CREATE TABLE IF NOT EXISTS {self.STAGING_TABLE} (
-                    article_id TEXT NOT NULL,
-                    source TEXT NOT NULL DEFAULT 'pubmed',
-                    title TEXT NOT NULL,
-                    abstract TEXT NOT NULL,
-                    year TEXT,
-                    authors TEXT,
-                    journal TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    PRIMARY KEY (article_id, source)
-                )
-                """
+                f"CREATE INDEX IF NOT EXISTS idx_{self.STAGING_TABLE}_doi "
+                f"ON {self.STAGING_TABLE} (doi)"
             )
+            self._create_article_extra(staging=True)
             self.conn.commit()
 
     def drop_staging_articles(self) -> None:
         with self._lock:
+            self.conn.execute("DROP TABLE IF EXISTS staging_article_extra")
             self.conn.execute(f"DROP TABLE IF EXISTS {self.STAGING_TABLE}")
             self.conn.commit()
 
@@ -407,10 +462,12 @@ class ArticleDatabase:
             cursor.execute(f"SELECT COUNT(*) FROM {self.STAGING_TABLE}")
             n = int(cursor.fetchone()[0] or 0)
             if n <= 0:
+                cursor.execute("DROP TABLE IF EXISTS staging_article_extra")
                 cursor.execute(f"DROP TABLE IF EXISTS {self.STAGING_TABLE}")
                 self.conn.commit()
                 return 0
             try:
+                cursor.execute("BEGIN")
                 for tmp in (
                     "_swap_keep_notes",
                     "_swap_keep_ai_kp",
@@ -466,14 +523,22 @@ class ArticleDatabase:
                 cursor.execute("DELETE FROM clusters")
                 cursor.execute("DELETE FROM embeddings")
                 cursor.execute("DELETE FROM articles")
+                article_columns = ", ".join((*ARTICLE_COLUMNS, "created_at"))
                 cursor.execute(
                     f"""
-                    INSERT INTO articles
-                    (article_id, source, title, abstract, year, authors, journal, created_at)
-                    SELECT article_id, source, title, abstract, year, authors, journal, created_at
+                    INSERT INTO articles ({article_columns})
+                    SELECT {article_columns}
                     FROM {self.STAGING_TABLE}
                     """
                 )
+                extra_columns = (
+                    "article_id, source, provenance, locations, related, "
+                    "provider_record, raw_status, fetch_run_id"
+                )
+                cursor.execute(f"""
+                    INSERT INTO article_extra ({extra_columns})
+                    SELECT {extra_columns} FROM staging_article_extra
+                """)
                 cursor.execute(
                     """
                     INSERT INTO notes (article_id, source, note, starred, updated_at)
@@ -504,6 +569,7 @@ class ArticleDatabase:
                     FROM _swap_keep_emb
                     """
                 )
+                cursor.execute("DROP TABLE IF EXISTS staging_article_extra")
                 cursor.execute(f"DROP TABLE IF EXISTS {self.STAGING_TABLE}")
                 for tmp in (
                     "_swap_keep_notes",
@@ -515,8 +581,6 @@ class ArticleDatabase:
                 self.conn.commit()
             except Exception:
                 self.conn.rollback()
-                # CREATE TABLE ... AS runs outside the transaction, so a failed
-                # swap left its _swap_keep_* tables behind (audit 20.3).
                 for tmp in (
                     "_swap_keep_notes",
                     "_swap_keep_ai_kp",
@@ -582,6 +646,7 @@ class ArticleDatabase:
                 cursor.execute("DELETE FROM clusters")
                 cursor.execute("DELETE FROM embeddings")
                 cursor.execute("DELETE FROM articles")
+                cursor.execute("DROP TABLE IF EXISTS staging_article_extra")
                 cursor.execute(f"DROP TABLE IF EXISTS {self.STAGING_TABLE}")
                 self.conn.commit()
                 return {"deleted": before, "remaining": 0, "kept": 0}
@@ -603,6 +668,7 @@ class ArticleDatabase:
                 WHERE starred = 0 AND TRIM(COALESCE(note, '')) = ''
                 """
             )
+            cursor.execute("DROP TABLE IF EXISTS staging_article_extra")
             cursor.execute(f"DROP TABLE IF EXISTS {self.STAGING_TABLE}")
             self.conn.commit()
             cursor.execute("SELECT COUNT(*) FROM articles")
@@ -663,6 +729,11 @@ class ArticleDatabase:
         dropped = 0
         stale_derived = 0
         table = self.STAGING_TABLE if staging else "articles"
+        columns = ", ".join(ARTICLE_COLUMNS)
+        placeholders = ", ".join("?" for _ in ARTICLE_COLUMNS)
+        metadata_updates = ", ".join(
+            f"{name} = COALESCE(excluded.{name}, {name})" for name in ARTICLE_COLUMNS[7:]
+        )
 
         with self._writing():
             cursor = self.conn.cursor()
@@ -708,14 +779,15 @@ class ArticleDatabase:
 
                     cursor.execute(f"""
                         INSERT INTO {table}
-                        (article_id, source, title, abstract, year, authors, journal)
-                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        ({columns})
+                        VALUES ({placeholders})
                         ON CONFLICT(article_id, source) DO UPDATE SET
                             title = excluded.title,
                             abstract = excluded.abstract,
                             year = excluded.year,
                             authors = excluded.authors,
-                            journal = excluded.journal
+                            journal = excluded.journal,
+                            {metadata_updates}
                     """, (
                         aid,
                         source,
@@ -723,7 +795,8 @@ class ArticleDatabase:
                         article.get('abstract', ''),
                         article.get('year', ''),
                         json.dumps(article.get('authors', [])),
-                        article.get('journal', '')
+                        article.get('journal', ''),
+                        *(article.get(name) for name in ARTICLE_COLUMNS[7:]),
                     ))
                     if existed:
                         updated += 1
@@ -775,43 +848,22 @@ class ArticleDatabase:
         """Retrieve all articles from database"""
         with self._lock:
             cursor = self.conn.cursor()
-            cursor.execute("SELECT article_id, source, title, abstract, year, authors, journal FROM articles")
+            cursor.execute(f"SELECT {', '.join(ARTICLE_COLUMNS)} FROM articles")
             rows = cursor.fetchall()
 
-        articles = []
-        for row in rows:
-            articles.append({
-                'article_id': row[0],
-                'source': row[1],
-                'title': row[2],
-                'abstract': row[3],
-                'year': row[4],
-                'authors': json.loads(row[5]) if row[5] else [],
-                'journal': row[6]
-            })
-
-        return articles
+        return [_row_to_article(row) for row in rows]
 
     def get_article_by_id(self, article_id: str, source: str) -> Optional[Dict]:
         """Retrieve a specific article by article_id and source"""
         with self._lock:
             cursor = self.conn.cursor()
             cursor.execute(
-                "SELECT article_id, source, title, abstract, year, authors, journal FROM articles WHERE article_id = ? AND source = ?",
+                f"SELECT {', '.join(ARTICLE_COLUMNS)} FROM articles "
+                "WHERE article_id = ? AND source = ?",
                 (article_id, source)
             )
             row = cursor.fetchone()
-        if row:
-            return {
-                'article_id': row[0],
-                'source': row[1],
-                'title': row[2],
-                'abstract': row[3],
-                'year': row[4],
-                'authors': json.loads(row[5]) if row[5] else [],
-                'journal': row[6]
-            }
-        return None
+        return _row_to_article(row) if row else None
 
     def insert_embeddings(self, embeddings: Dict, model_name: str):
         """
@@ -930,30 +982,20 @@ class ArticleDatabase:
             cursor = self.conn.cursor()
             # Prefer exact id match, then id substring, then title substring.
             cursor.execute(
-                "SELECT article_id, source, title, abstract, year, authors, journal "
+                f"SELECT {', '.join(ARTICLE_COLUMNS)} "
                 "FROM articles WHERE article_id = ? COLLATE NOCASE LIMIT 1",
                 (seed,),
             )
             row = cursor.fetchone()
             if not row:
                 cursor.execute(
-                    "SELECT article_id, source, title, abstract, year, authors, journal "
+                    f"SELECT {', '.join(ARTICLE_COLUMNS)} "
                     "FROM articles WHERE article_id LIKE ? COLLATE NOCASE "
                     "OR title LIKE ? COLLATE NOCASE LIMIT 1",
                     (like, like),
                 )
                 row = cursor.fetchone()
-        if not row:
-            return None
-        return {
-            "article_id": row[0],
-            "source": row[1],
-            "title": row[2],
-            "abstract": row[3],
-            "year": row[4],
-            "authors": json.loads(row[5]) if row[5] else [],
-            "journal": row[6],
-        }
+        return _row_to_article(row) if row else None
 
     def get_library_export_rows(self, scope: str = "all") -> List[Dict]:
         """Articles with cluster + screening + note metadata for CSV export.
@@ -962,8 +1004,8 @@ class ArticleDatabase:
         """
         with self._lock:
             cursor = self.conn.cursor()
-            cursor.execute("""
-                SELECT a.article_id, a.source, a.title, a.abstract, a.year, a.authors, a.journal,
+            cursor.execute(f"""
+                SELECT {', '.join(f'a.{name}' for name in ARTICLE_COLUMNS)},
                        c.cluster_id, c.cluster_label,
                        s.reason,
                        n.note, n.starred
@@ -977,8 +1019,9 @@ class ArticleDatabase:
 
         out = []
         for row in rows:
-            excluded = row[9] is not None
-            starred = bool(row[11])
+            cluster_id, cluster_label, reason, note, star = row[len(ARTICLE_COLUMNS):]
+            excluded = reason is not None
+            starred = bool(star)
             if scope == "included" and excluded:
                 continue
             if scope == "excluded" and not excluded:
@@ -986,18 +1029,12 @@ class ArticleDatabase:
             if scope == "starred" and not starred:
                 continue
             out.append({
-                "article_id": row[0],
-                "source": row[1],
-                "title": row[2],
-                "abstract": row[3],
-                "year": row[4],
-                "authors": json.loads(row[5]) if row[5] else [],
-                "journal": row[6],
-                "cluster_id": row[7],
-                "cluster_label": row[8],
+                **_row_to_article(row),
+                "cluster_id": cluster_id,
+                "cluster_label": cluster_label,
                 "excluded": excluded,
-                "exclusion_reason": row[9] or "",
-                "note": row[10] or "",
+                "exclusion_reason": reason or "",
+                "note": note or "",
                 "starred": starred,
             })
         return out
@@ -1297,7 +1334,7 @@ class ArticleDatabase:
             cursor.execute("SELECT article_id, source FROM screening")
             return {(row[0], row[1]) for row in cursor.fetchall()}
 
-    def get_excluded_items(self, reason: Optional[str] = None) -> List[Dict[str, str]]:
+    def get_excluded_items(self, reason: Optional[str] = None) -> List[Dict]:
         """Excluded papers with their reason and enough of the article to show.
 
         ``reason`` narrows to one code (Simple Undo after Narrow it down asks
@@ -1305,8 +1342,13 @@ class ArticleDatabase:
         list. Newest exclusions first inside a reason.
         """
         from app.content.screening_reasons import normalize_reason
+        columns = ", ".join(
+            f"NULL AS {name}" if name in {"abstract", "authors"}
+            else f"{'s' if name in ARTICLE_COLUMNS[:2] else 'a'}.{name}"
+            for name in ARTICLE_COLUMNS
+        )
         sql = (
-            "SELECT s.article_id, s.source, s.reason, a.title, a.year, a.journal"
+            f"SELECT {columns}, s.reason"
             " FROM screening s"
             " LEFT JOIN articles a ON a.article_id = s.article_id AND a.source = s.source"
         )
@@ -1318,17 +1360,17 @@ class ArticleDatabase:
         with self._lock:
             cursor = self.conn.cursor()
             cursor.execute(sql, params)
-            return [
-                {
-                    "article_id": row[0],
-                    "source": row[1],
-                    "reason": row[2],
-                    "title": row[3] or "",
-                    "year": row[4] or "",
-                    "journal": row[5] or "",
-                }
-                for row in cursor.fetchall()
-            ]
+            rows = cursor.fetchall()
+        items = []
+        for row in rows:
+            article = _row_to_article(row)
+            article.pop("abstract")
+            article.pop("authors")
+            article["reason"] = row[len(ARTICLE_COLUMNS)]
+            for name in ("title", "year", "journal"):
+                article[name] = article[name] or ""
+            items.append(article)
+        return items
 
     def get_cluster_article_keys(self, cluster_id: int) -> List[Tuple[str, str]]:
         """Return (article_id, source) keys for every article in a cluster."""
@@ -1370,8 +1412,8 @@ class ArticleDatabase:
         """Get all articles in a specific cluster"""
         with self._lock:
             cursor = self.conn.cursor()
-            cursor.execute("""
-                SELECT a.article_id, a.source, a.title, a.abstract, a.year, a.authors, a.journal, c.cluster_label,
+            cursor.execute(f"""
+                SELECT {', '.join(f'a.{name}' for name in ARTICLE_COLUMNS)}, c.cluster_label,
                        s.article_id IS NOT NULL AS excluded
                 FROM articles a
                 JOIN clusters c ON a.article_id = c.article_id AND a.source = c.source
@@ -1382,16 +1424,11 @@ class ArticleDatabase:
 
         articles = []
         for row in rows:
+            cluster_label, excluded = row[len(ARTICLE_COLUMNS):]
             articles.append({
-                'article_id': row[0],
-                'source': row[1],
-                'title': row[2],
-                'abstract': row[3],
-                'year': row[4],
-                'authors': json.loads(row[5]) if row[5] else [],
-                'journal': row[6],
-                'cluster_label': row[7],
-                'excluded': bool(row[8])
+                **_row_to_article(row),
+                'cluster_label': cluster_label,
+                'excluded': bool(excluded)
             })
 
         return articles
@@ -1420,8 +1457,8 @@ class ArticleDatabase:
         """Retrieve all articles with their cluster info in one query (avoids O(N) calls)"""
         with self._lock:
             cursor = self.conn.cursor()
-            cursor.execute("""
-                SELECT a.article_id, a.source, a.title, a.abstract, a.year, a.authors, a.journal,
+            cursor.execute(f"""
+                SELECT {', '.join(f'a.{name}' for name in ARTICLE_COLUMNS)},
                        c.cluster_id, c.cluster_label
                 FROM articles a
                 LEFT JOIN clusters c ON a.article_id = c.article_id AND a.source = c.source
@@ -1430,17 +1467,12 @@ class ArticleDatabase:
 
         result = {}
         for row in rows:
+            cluster_id, cluster_label = row[len(ARTICLE_COLUMNS):]
             key = (row[0], row[1])
             result[key] = {
-                'article_id': row[0],
-                'source': row[1],
-                'title': row[2],
-                'abstract': row[3],
-                'year': row[4],
-                'authors': json.loads(row[5]) if row[5] else [],
-                'journal': row[6],
-                'cluster_id': row[7],
-                'cluster_label': row[8]
+                **_row_to_article(row),
+                'cluster_id': cluster_id,
+                'cluster_label': cluster_label
             }
         return result
 
