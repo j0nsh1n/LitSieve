@@ -18,6 +18,16 @@ from app.fetchers.base import (
     user_agent,
 )
 from app.fetchers.querytext import lucene_safe
+from app.services.work_types import (
+    biblio_json,
+    build_biblio,
+    build_location,
+    canonical_work_type,
+    extra_payload,
+    normalize_doi,
+    provenance_for,
+    provider_type_label,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -95,11 +105,27 @@ class DOAJFetcher(BaseFetcher):
             year = str(bib.get('year') or '').strip()
 
             journal = ''
-            journal_info = bib.get('journal', {})
+            journal_info = bib.get('journal', {}) or {}
             if journal_info:
                 journal = (journal_info.get('title') or '').strip()
+            publisher = (journal_info.get('publisher') or '').strip() or None
 
-            return {
+            doi = None
+            for ident in bib.get('identifier') or []:
+                if isinstance(ident, dict) and str(ident.get('type') or '').lower() == 'doi':
+                    doi = normalize_doi(ident.get('id'))
+                    if doi:
+                        break
+
+            fulltext_url = None
+            for link in bib.get('link') or []:
+                if isinstance(link, dict) and str(link.get('type') or '').lower() == 'fulltext':
+                    fulltext_url = (link.get('url') or '').strip() or None
+                    if fulltext_url:
+                        break
+
+            biblio_obj = build_biblio(publisher=publisher)
+            article = {
                 'article_id': result.get('id', ''),
                 'source': 'doaj',
                 'title': title,
@@ -107,7 +133,36 @@ class DOAJFetcher(BaseFetcher):
                 'year': year,
                 'authors': authors,
                 'journal': journal,
+                'work_type': canonical_work_type('doaj', 'journal-article'),
+                'provider_type': provider_type_label('doaj', 'journal-article'),
+                'doi': doi,
+                'container_title': journal or None,
+                'host_name': None,
+                'oa_status': 'gold' if fulltext_url else None,
+                'best_oa_url': fulltext_url,
+                'evidence_basis': 'abstract',
+                'biblio': biblio_json(biblio_obj),
             }
+            locations = []
+            loc = build_location(url=fulltext_url, kind='fulltext', via='doaj')
+            if loc:
+                locations.append(loc)
+            article['_extra'] = extra_payload(
+                'doaj',
+                result,
+                provenance=provenance_for('doaj', {
+                    'work_type': article['work_type'],
+                    'provider_type': article['provider_type'],
+                    'doi': doi,
+                    'container_title': article['container_title'],
+                    'oa_status': article['oa_status'],
+                    'best_oa_url': fulltext_url,
+                    'evidence_basis': 'abstract',
+                    'biblio': article['biblio'],
+                }),
+                locations=locations,
+            )
+            return article
         except Exception as e:
             logger.exception("DOAJ parse error: %s", e)
             return None

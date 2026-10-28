@@ -1,0 +1,56 @@
+{
+ "message": {
+  "items": [
+   {
+    "DOI": "10.3735/9781935306627.book-part-166",
+    "type": "book-chapter",
+    "title": [
+     "African Americans’ New Deal Letters to Franklin D. Roosevelt"
+    ],
+    "container-title": [
+     "Schlager Anthology of Black America"
+    ],
+    "publisher": "Schlager Group Inc.",
+    "ISBN": [
+     "9781935306627"
+    ],
+    "issued": {
+     "date-parts": [
+      [
+       2021,
+       8,
+       15
+      ]
+     ]
+    },
+    "published": {
+     "date-parts": [
+      [
+       2021,
+       8,
+       15
+      ]
+     ]
+    },
+    "published-print": {
+     "date-parts": [
+      [
+       2021,
+       8,
+       15
+      ]
+     ]
+    },
+    "link": [
+     {
+      "URL": "https://library.schlagergroup.com/content/data-mining?id=9781935306627-book-part-166",
+      "content-type": "text/html",
+      "intended-application": "text-mining"
+     }
+    ],
+    "URL": "https://doi.org/10.3735/9781935306627.book-part-166",
+    "abstract": "<jats:p>President Franklin Delano Roosevelt’s New Deal was designed to help Americans recover their economic footing during the Great Depression and be prepared for future economic downturns. Yet for most of the African American community, especially in the South, it was impossible to recover what they had never had. Roosevelt was the first Democratic candidate for president who had attracted the majority of the Black vote. Previously, most African Americans who could vote in states and localities that did not bar them from the polls had stuck with the Republicans, the party of Abraham Lincoln. But with his presence on radio and newsreels and the “alphabet soup” programs providing work for Americans all over the country, Roosevelt was as revered in the African American community as he was with most other voting Americans in the 1930s.</jats:p>"
+   }
+  ]
+ }
+}

@@ -39,7 +39,17 @@ def omit_null_metadata(article: Dict) -> Dict:
     for name in ARTICLE_COLUMNS[7:]:
         if article.get(name) is None:
             article.pop(name, None)
+    article.pop("_extra", None)
     return article
+
+
+def encode_provider_record(record: Dict) -> Tuple[Optional[bytes], Optional[str]]:
+    """zlib-compress UTF-8 JSON; over 4096 compressed bytes is NULL plus too_large."""
+    encoded = json.dumps(record, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    compressed = zlib.compress(encoded)
+    if len(compressed) > 4096:
+        return None, "too_large"
+    return compressed, None
 
 
 def _article_table_ddl(table: str) -> str:
@@ -247,9 +257,7 @@ class ArticleDatabase:
         self, article_id: str, source: str, record: Dict, *, staging: bool = False
     ) -> None:
         """Store an already-trimmed record, or mark it too large without truncation."""
-        encoded = json.dumps(record, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
-        compressed = zlib.compress(encoded)
-        too_large = len(compressed) > 4096
+        blob, status = encode_provider_record(record)
         table = "staging_article_extra" if staging else "article_extra"
         with self._writing():
             self.conn.execute(f"""
@@ -258,9 +266,33 @@ class ArticleDatabase:
                 ON CONFLICT(article_id, source) DO UPDATE SET
                     provider_record = excluded.provider_record,
                     raw_status = excluded.raw_status
-            """, (article_id, source, None if too_large else compressed,
-                  "too_large" if too_large else None))
+            """, (article_id, source, blob, status))
             self.conn.commit()
+
+    def _write_article_extra(self, cursor, article_id: str, source: str, extra: Dict, *, staging: bool) -> None:
+        table = "staging_article_extra" if staging else "article_extra"
+        record = extra.get("provider_record")
+        blob = status = None
+        if isinstance(record, dict):
+            blob, status = encode_provider_record(record)
+        provenance = extra.get("provenance") or {}
+        locations = extra.get("locations") or []
+        cursor.execute(f"""
+            INSERT INTO {table} (article_id, source, provenance, locations, provider_record, raw_status)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(article_id, source) DO UPDATE SET
+                provenance = excluded.provenance,
+                locations = excluded.locations,
+                provider_record = excluded.provider_record,
+                raw_status = excluded.raw_status
+        """, (
+            article_id,
+            source,
+            json.dumps(provenance, ensure_ascii=False, separators=(",", ":")),
+            json.dumps(locations, ensure_ascii=False, separators=(",", ":")),
+            blob,
+            status,
+        ))
 
     def migrate_schema(self):
         """Migrate old pmid-based schema to article_id+source schema"""
@@ -764,6 +796,8 @@ class ArticleDatabase:
 
             for article in articles:
                 try:
+                    raw_extra = article.pop("_extra", None)
+                    extra = raw_extra if isinstance(raw_extra, dict) else None
                     aid = article['article_id']
                     source = article.get('source', 'pubmed')
                     title = article.get('title', '')
@@ -806,8 +840,12 @@ class ArticleDatabase:
                         article.get('year', ''),
                         json.dumps(article.get('authors', [])),
                         article.get('journal', ''),
-                        *(article.get(name) for name in ARTICLE_COLUMNS[7:]),
+                        *(self._column_value(article, name) for name in ARTICLE_COLUMNS[7:]),
                     ))
+                    if extra:
+                        self._write_article_extra(
+                            cursor, aid, source, extra, staging=staging,
+                        )
                     if existed:
                         updated += 1
                         # Title/abstract are what embeddings and extractive
@@ -853,6 +891,13 @@ class ArticleDatabase:
             "dropped": dropped,
             "stale_derived": stale_derived,
         }
+
+    @staticmethod
+    def _column_value(article: Dict, name: str):
+        value = article.get(name)
+        if name == "biblio" and isinstance(value, dict):
+            return json.dumps(value, ensure_ascii=False, separators=(",", ":")) if value else None
+        return value
 
     def get_all_articles(self) -> List[Dict]:
         """Retrieve all articles from database"""

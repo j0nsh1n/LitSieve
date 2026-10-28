@@ -1,0 +1,24 @@
+{
+ "message": {
+  "items": [
+   {
+    "DOI": "10.1017/ccol0521417481",
+    "type": "edited-book",
+    "title": [
+     "The Cambridge Companion to Dante"
+    ],
+    "publisher": "Cambridge University Press",
+    "ISBN": [
+     "9780511999765"
+    ],
+    "editor": [
+     {
+      "given": "Rachel",
+      "family": "Jacoff",
+      "sequence": "first"
+     }
+    ]
+   }
+  ]
+ }
+}

@@ -28,11 +28,16 @@ and this project aims to follow Semantic Versioning for app version strings
   this".
 
 ### Changed
+- OpenAlex, Crossref and DOAJ fill type, DOI, container, host, OA and biblio
+  on new fetches, and store provenance, locations and a trimmed provider
+  record in `article_extra` (zlib-compressed, stored only at 4096 bytes or
+  less). Older rows stay empty. Search, ranking, exports and the on-screen
+  list are unchanged.
 - Library databases gain nine nullable work-metadata fields and a DOI index,
   plus an `article_extra` table for provenance and compressed provider records
   capped at 4096 bytes. Existing libraries migrate on open, replace fetches
-  copy the new fields atomically, and clones exclude provider records. Fetchers
-  do not fill the new fields yet. Search, cluster, and set-aside API responses
+  copy the new fields atomically, and clones exclude provider records.
+  Search, cluster, and set-aside API responses
   omit unset metadata keys, so legacy payloads keep their previous shape;
   exports and on-screen behavior are unchanged.
 - Text fields, selects and buttons have a visible edge in every look: a
