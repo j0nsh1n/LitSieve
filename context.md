@@ -12,8 +12,8 @@
   poster. Live at `https://www.litpilot.org` from the production checkout,
   `main` through #106 (2026-10-16). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
-- Latest full suite (2026-10-28, `feat/work-metadata-schema`): **1523 passed**
-  in 160.39 s, no skips or xfails. `ruff check .` clean; `pyright app` **0 errors**, 6 optional-import
+- Latest full suite (2026-10-28, `feat/work-metadata-schema`): **1527 passed**
+  in 145.52 s, no skips or xfails. `ruff check .` clean; `pyright app` **0 errors**, 6 optional-import
   warnings (CI blocks on errors). `pip-audit` (2026-10-14): no known
   vulnerabilities; ROCm torch/triton are un-auditable. No dependency lockfile.
 - One `/search` workspace replaces the two UI modes. Old `/data-management`,
@@ -57,8 +57,9 @@
   `article_extra` and its staging mirror, and a shared article column list
   for readers, inserts and replace fetches. The provider-record helper stores
   UTF-8 JSON only when its zlib-compressed size is at most 4096 bytes.
-  Fetchers do not fill the fields yet. Exports, ranking and quota are unchanged;
-  clones keep article fields but exclude `article_extra`.
+  Fetchers do not fill the fields yet. Search ranking uses the original
+  article columns; API responses omit unset metadata keys. Exports and quota
+  are unchanged; clones keep article fields but exclude `article_extra`.
 - New support-view/ticket records omit mode; old history remains readable.
 - Host (2026-10-16): `MAX_TOTAL_ACCOUNTS=100` (27 real accounts then); the
   study aid is `LLM_PROVIDER=ollama`, `OLLAMA_MODEL=qwen2.5:14b` on the
@@ -179,22 +180,19 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-28. P1.1 schema-only slice on
-  `feat/work-metadata-schema`, based on `167a6ba` with P0.1 and P0.2 merged.
-  Ruff passes, Pyright has 0 errors and 6 optional-import warnings, and full
-  pytest has 1523 passed, including 34 new schema tests. No JS changed.
+- **Date:** 2026-10-28. P1.1 review fixes on `feat/work-metadata-schema`
+  (PR #111): public responses omit unset metadata keys, search ranking uses
+  `SEARCH_ARTICLE_COLUMNS`, and recovery tests cover interrupted ADD COLUMN
+  plus plaintext/SQLCipher swap rollback-then-retry. Ruff passes, Pyright
+  has 0 errors and 6 optional-import warnings, and full pytest has 1527
+  passed, including 38 schema tests. No JS changed.
 - Validation used production venv executables from this isolated worktree
   without installation. Live-provider and real-browser checks were not run.
-  Tests ran under nice with the 6 GiB available-memory stop guard; minimum
-  available memory was 15.13 GiB on the successful full run. Scratch is in
-  `~/HealthDatabaseAccess-scratch/p11/`. Initial full-run failures came from
-  absolute data-path overrides in the local wrapper; the corrected wrapper
-  preserves fixture-relative paths and the rerun passes.
-- GLM-5.3-Flash through T3/OpenCode drafted the changelog, PR body and
-  context handoff. The implementation agent checked them against the code
-  and retained the existing context and open items.
+  Tests ran under nice with the 6 GiB available-memory stop guard; available
+  memory was 16.93 GiB at the start of the successful full run. Scratch is in
+  `~/HealthDatabaseAccess-scratch/p11/`.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
   and unscheduled roadmap backlog. Ship staging was last recorded at
   `f9485cf`; no host or deployment state changed in this slice.
-- **Next step:** parent blind migration review of the P1.1 PR; no merge or
-  deploy in this slice. Fetcher population remains P1.2.
+- **Next step:** re-review of PR #111; no merge or deploy in this slice.
+  Fetcher population remains P1.2.

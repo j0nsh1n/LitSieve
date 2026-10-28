@@ -24,11 +24,21 @@ ARTICLE_COLUMNS = (
     "work_type", "provider_type", "doi", "container_title", "host_name",
     "oa_status", "best_oa_url", "evidence_basis", "biblio",
 )
+SEARCH_ARTICLE_COLUMNS = ARTICLE_COLUMNS[:7]
 
 
-def _row_to_article(row) -> Dict:
-    article = dict(zip(ARTICLE_COLUMNS, row))
-    article["authors"] = json.loads(article["authors"]) if article["authors"] else []
+def _row_to_article(row, columns: Tuple[str, ...] = ARTICLE_COLUMNS) -> Dict:
+    article = dict(zip(columns, row))
+    if "authors" in article:
+        article["authors"] = json.loads(article["authors"]) if article["authors"] else []
+    return article
+
+
+def omit_null_metadata(article: Dict) -> Dict:
+    """Omit unset work-metadata keys so public payloads keep the pre-P1.1 shape."""
+    for name in ARTICLE_COLUMNS[7:]:
+        if article.get(name) is None:
+            article.pop(name, None)
     return article
 
 
@@ -1453,12 +1463,18 @@ class ArticleDatabase:
             for row in rows
         ]
 
-    def get_all_articles_with_clusters(self) -> Dict[Tuple[str, str], Dict]:
-        """Retrieve all articles with their cluster info in one query (avoids O(N) calls)"""
+    def get_all_articles_with_clusters(
+        self, columns: Tuple[str, ...] = ARTICLE_COLUMNS,
+    ) -> Dict[Tuple[str, str], Dict]:
+        """Retrieve all articles with their cluster info in one query (avoids O(N) calls).
+
+        ``columns`` defaults to the full article projection. Search ranking
+        passes ``SEARCH_ARTICLE_COLUMNS`` so it does not materialize metadata.
+        """
         with self._lock:
             cursor = self.conn.cursor()
             cursor.execute(f"""
-                SELECT {', '.join(f'a.{name}' for name in ARTICLE_COLUMNS)},
+                SELECT {', '.join(f'a.{name}' for name in columns)},
                        c.cluster_id, c.cluster_label
                 FROM articles a
                 LEFT JOIN clusters c ON a.article_id = c.article_id AND a.source = c.source
@@ -1467,10 +1483,10 @@ class ArticleDatabase:
 
         result = {}
         for row in rows:
-            cluster_id, cluster_label = row[len(ARTICLE_COLUMNS):]
+            cluster_id, cluster_label = row[len(columns):]
             key = (row[0], row[1])
             result[key] = {
-                **_row_to_article(row),
+                **_row_to_article(row, columns),
                 'cluster_id': cluster_id,
                 'cluster_label': cluster_label
             }
