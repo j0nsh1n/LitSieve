@@ -1,0 +1,14 @@
+{
+  "captured_at": "2026-10-28T00:00:00+00:00",
+  "git_sha": "testdata",
+  "app_version": "6.0.0",
+  "max_results": 5,
+  "questions": [
+    {
+      "id": "Q1",
+      "text": "How do later school start times affect sleep duration among adolescents?",
+      "topic": "health",
+      "sources": ["openalex", "pubmed"]
+    }
+  ]
+}

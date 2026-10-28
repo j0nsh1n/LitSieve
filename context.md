@@ -12,11 +12,15 @@
   poster. Live at `https://www.litpilot.org` from the production checkout,
   `main` through #106 (2026-10-16). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
-- Latest full suite (2026-10-28, `feat/run-record`): **1872 passed** in
-  152.62 s, no skips or xfails. `ruff check .` clean; `pyright app`
-  **0 errors**, 6 optional-import warnings (CI blocks on errors).
-  `pip-audit` (2026-10-14): no known vulnerabilities; ROCm torch/triton are
-  un-auditable. No dependency lockfile.
+- Latest full suite (2026-10-28, `feat/search-benchmark`): **1880 passed**
+  in 159.68 s, no skips or xfails. `ruff check .` clean; `pyright app
+  tools/eval_search.py` **0 errors**, 6 optional-import warnings (CI blocks
+  on errors). `pip-audit` (2026-10-14): no known vulnerabilities; ROCm
+  torch/triton are un-auditable. No dependency lockfile.
+- P1.8 adds `tools/eval_search.py` (capture, replay, score, labelsheet) and
+  five committed questions under `tools/bench/`. The `baseline_v1` corpus and
+  replay output live in `~/HealthDatabaseAccess-scratch/bench/` and are not
+  in git. Human labels are P1.9.
 - P1.6 stores Collect inputs and Search questions in the library database
   (`fetch_runs`, `question_log`), about 50 rows each. Writes come from
   `_run_multi_fetch` (background and sync, including cancel and error) and
@@ -140,7 +144,7 @@
 | `static/` | vanilla JS/CSS (no npm); cache-bust `?v=` |
 | `tests/` | pytest; policy in `tests/README.md` |
 | `docs/` | DEPLOY, SELFHOST, plans, SCALE_NOTES |
-| `tools/` | backup, watchdog, bench_scale, encrypt_databases, operator |
+| `tools/` | backup, watchdog, bench_scale, eval_search, encrypt_databases, operator |
 
 ## Domain Model
 - **User** (`users.db`): username, password hash, token_version; optional recovery
@@ -212,14 +216,17 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-28. P1.6 on `feat/run-record`. Each library keeps Collect
-  inputs and Search questions in `fetch_runs` / `question_log`. Email is
-  omitted. Clones and admin views do not see the rows. Start over clears them.
+- **Date:** 2026-10-28. P1.8 on `feat/search-benchmark`. `tools/eval_search.py`
+  captures, replays, scores, and writes label sheets. `baseline_v1` is in
+  `~/HealthDatabaseAccess-scratch/bench/` (not committed). Label sheets are
+  in `~/HealthDatabaseAccess-scratch/bench/labelsheets/`.
 - Validation (production venv, this worktree, no install): `ruff check .`
-  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 1872
-  passed in 152.62 s. Scratch is `~/HealthDatabaseAccess-scratch/p16/`.
+  clean, `pyright app tools/eval_search.py` 0 errors / 6 optional-import
+  warnings, pytest 1880 passed in 159.68 s. Scratch is
+  `~/HealthDatabaseAccess-scratch/p18/`.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
-  and unscheduled roadmap backlog. Ship staging was last recorded at
-  `f9485cf`; no host or deployment state changed in this slice.
-- **Next step:** parent review of the P1.6 PR; no merge or deploy in this
-  slice. Type chip and type filter on Search remain P1.7.
+  and unscheduled roadmap backlog. Capture of this baseline saw Semantic
+  Scholar HTTP 429 on Q1, Q3 and Q5; Europe PMC/medRxiv HTTP 503 on Q4; DOAJ
+  and HAL returned no_results on every question.
+- **Next step:** parent review of the P1.8 PR; no merge or deploy. P1.9 is
+  human labels on the five questions.
