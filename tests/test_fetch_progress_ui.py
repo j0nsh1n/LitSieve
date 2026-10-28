@@ -131,10 +131,17 @@ def test_fetch_report_distinguishes_no_new_rows_from_no_results():
     assert node.returncode == 0, node.stderr + node.stdout
     out = json.loads(node.stdout.strip().splitlines()[-1])
     assert out["none"] == "· empty: no results"
-    assert out["duplicate"] == "· same: no new rows"
-    assert out["updated"] == "✓ extra: updated existing papers"
+    assert out["duplicate"] == "✓ same: 1 already in your library"
+    assert out["duplicateZero"] is False
+    assert out["updated"] == "✓ extra: updated 1 existing paper"
+    assert "returned nothing" not in out["duplicateHtml"]
     assert "no results" not in out["duplicate"]
     assert "no results" not in out["updated"]
+    assert out["mixed"] == "✓ crossref: 2 new, 1 updated, 1 already in your library"
+    assert "returned nothing" not in out["mixedHtml"]
+    assert "rows" not in out["duplicate"]
+    assert "rows" not in out["updated"]
+    assert "rows" not in out["mixed"]
 
 
 _NODE_MERGE_REPORT_SNIPPET = r"""
@@ -166,6 +173,7 @@ const code =
   sandbox.escapeHtml.toString() + ';\n' +
   'function getSourceName(s){return s;}\n' +
   extractFn(dm, 'buildFetchSourceReportModel') + '\n' +
+  extractFn(dm, 'renderFetchSourceReportHtml') + '\n' +
   `
   const none = buildFetchSourceReportModel({
     by_source: { empty: 0 },
@@ -181,10 +189,19 @@ const code =
     skipped_duplicates: { extra: 1 },
     merged: { extra: 1 },
   }, ['extra']);
+  const mixed = buildFetchSourceReportModel({
+    by_source: { crossref: 2 },
+    skipped_duplicates: { crossref: 2 },
+    merged: { crossref: 1 },
+  }, ['crossref']);
   console.log(JSON.stringify({
     none: none.muted[0].line,
-    duplicate: duplicate.muted[0].line,
+    duplicate: duplicate.successes[0].line,
+    duplicateZero: Boolean(duplicate.successes[0].zero),
+    duplicateHtml: renderFetchSourceReportHtml(duplicate),
     updated: updated.successes[0].line,
+    mixed: mixed.successes[0].line,
+    mixedHtml: renderFetchSourceReportHtml(mixed),
   }));
   `;
 vm.runInNewContext(code, sandbox);

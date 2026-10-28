@@ -12,19 +12,20 @@
   poster. Live at `https://www.litpilot.org` from the production checkout,
   `main` through #106 (2026-10-16). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
-- Latest full suite (2026-10-28, `feat/merge-duplicates` review fixes):
-  **1809 passed** in 146.11 s, no skips or xfails. `ruff check .` clean;
+- Latest full suite (2026-10-28, `feat/merge-duplicates` re-review fixes):
+  **1855 passed** in 150.55 s, no skips or xfails. `ruff check .` clean;
   `pyright app` **0 errors**, 6 optional-import warnings (CI blocks on
   errors). `pip-audit` (2026-10-14): no known vulnerabilities; ROCm
   torch/triton are un-auditable. No dependency lockfile.
 - P1.5 merges a later copy of the same work into the stored row: DOI first,
   a DOI conflict blocks title merge, title match needs year ±1 plus compatible
   structured author and container (legacy `journal` counts), and generic
-  titles never title-match on either side. Incompatible types stay separate.
-  Empty metadata including year and authors is filled; title and abstract
-  are left alone. `skipped_duplicates` still counts merged-or-identical rows;
-  `merged` counts rows that gained a field or a new location. The fetch
-  report forwards those counts.
+  titles never title-match on either side. Known full given names must agree;
+  initials still match the expanded name. Edited books use the same vetoes as
+  books. Empty metadata including year and authors is filled; title and
+  abstract are left alone. `skipped_duplicates` still counts merged-or-identical
+  rows; `merged` counts rows that gained a field or a new location. The fetch
+  report names sources that only found papers already in the library.
 - One `/search` workspace replaces the two UI modes. Old `/data-management`,
   `/statistics`, and `/clusters` URLs 301 to Search; a read-only legacy
   preference check supplies a one-time layout notice.
@@ -201,16 +202,18 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-28. P1.5 review fixes on `feat/merge-duplicates` (PR #116).
-  Same-key upserts refresh the batch index; first-author parse is structured;
-  title matches veto known journal/type conflicts; generic titles apply on
-  both sides. Year/authors fill; combining marks drop; conflict alternatives
-  and biblio leaves keep provenance; the fetch report forwards merge counts.
+- **Date:** 2026-10-28. P1.5 re-review fixes on `feat/merge-duplicates` (PR #116).
+  Full given names veto title identity; edited-book aliases to book for type
+  vetoes; duplicate-only fetch reports say already in the library; the DOI
+  index keeps every owner so a refresh can rebind; title matching caches
+  normalized title and generic status and rejects DOI conflicts first.
 - Validation (production venv, this worktree, no install): `ruff check .`
-  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest
-  1809 passed in 146.11 s. Scratch is `~/HealthDatabaseAccess-scratch/p15/`.
+  clean, `pyright app` 0 errors / 6 optional-import warnings, `node --check
+  static/js/collect.js` ok, pytest 1855 passed in 150.55 s. Same-title 5k
+  then 100-row insert median 0.177 s (was 1.777 s). Scratch is
+  `~/HealthDatabaseAccess-scratch/p15/`.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
   and unscheduled roadmap backlog. Ship staging was last recorded at
   `f9485cf`; no host or deployment state changed in this slice.
-- **Next step:** re-review of PR #116; no merge or deploy in this slice.
-  Run-record in the library remains P1.6.
+- **Next step:** independent re-review of PR #116; no merge or deploy in
+  this slice. Run-record in the library remains P1.6.

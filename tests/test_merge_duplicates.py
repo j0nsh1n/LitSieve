@@ -485,6 +485,17 @@ def _staging_rows(db):
     return [_row_to_article(row) for row in rows]
 
 
+def _stored_rows(db, staging):
+    return _staging_rows(db) if staging else db.get_all_articles()
+
+
+def _insert_pair(db, first, second, *, staging=False, reverse=False):
+    if staging:
+        db.ensure_staging_articles()
+    incoming = [second, first] if reverse else [first, second]
+    return db.insert_articles(incoming, dedupe=True, staging=staging)
+
+
 @pytest.mark.parametrize("staging", [False, True])
 def test_same_key_refresh_does_not_overwrite_later_doi(db_path, staging):
     seed = _paper(
@@ -595,6 +606,51 @@ def test_pubmed_surname_initials_match_given_surname(db_path):
         db.close()
 
 
+@pytest.mark.parametrize("staging", [False, True])
+@pytest.mark.parametrize("reverse", [False, True])
+@pytest.mark.parametrize(
+    "left_authors,right_authors,expect_one",
+    [
+        (["Jane Smith"], ["John Smith"], False),
+        (["Jean Smith"], ["Jane Smith"], False),
+        (["Jane Smith"], ["Robert Smith"], False),
+        (["Jane Doe"], ["Doe J"], True),
+    ],
+)
+def test_full_given_names_and_initials(
+    db_path, staging, reverse, left_authors, right_authors, expect_one
+):
+    first = _paper(
+        article_id="A",
+        title=SHARED_TITLE,
+        authors=left_authors,
+        doi="10.1000/one",
+        journal="",
+    )
+    second = _paper(
+        article_id="B",
+        source="pubmed",
+        title=SHARED_TITLE,
+        authors=right_authors,
+        doi=None,
+        journal="",
+    )
+    db = ArticleDatabase(str(db_path))
+    try:
+        stats = _insert_pair(db, first, second, staging=staging, reverse=reverse)
+        rows = _stored_rows(db, staging)
+        if expect_one:
+            assert stats["inserted"] == 1
+            assert stats["skipped_duplicates"] == 1
+            assert len(rows) == 1
+        else:
+            assert stats["inserted"] == 2
+            assert stats["skipped_duplicates"] == 0
+            assert len(rows) == 2
+    finally:
+        db.close()
+
+
 def test_different_surnames_same_initial_stay_two_rows(db_path):
     first = _paper(authors=["Smith J"], doi="10.1000/one")
     second = _paper(
@@ -608,23 +664,6 @@ def test_different_surnames_same_initial_stay_two_rows(db_path):
         stats = db.insert_articles([first, second], dedupe=True)
         assert stats["inserted"] == 2
         assert stats["skipped_duplicates"] == 0
-        assert len(db.get_all_articles()) == 2
-    finally:
-        db.close()
-
-
-def test_same_surname_conflicting_given_names_stay_two_rows(db_path):
-    first = _paper(authors=["Jane Smith"], doi="10.1000/one")
-    second = _paper(
-        article_id="B",
-        source="pubmed",
-        authors=["Robert Smith"],
-        doi=None,
-    )
-    db = ArticleDatabase(str(db_path))
-    try:
-        stats = db.insert_articles([first, second], dedupe=True)
-        assert stats["inserted"] == 2
         assert len(db.get_all_articles()) == 2
     finally:
         db.close()
@@ -658,56 +697,53 @@ def test_legacy_journal_conflict_blocks_title_merge(db_path):
         db.close()
 
 
-@pytest.mark.parametrize("book_first", [True, False])
-def test_book_versus_review_stays_two_rows_both_orders(db_path, book_first):
-    book = _paper(
-        article_id="A",
-        title=SHARED_TITLE,
-        doi="10.1000/book",
-        authors=["Jane Doe"],
-        work_type="book",
-    )
-    review = _paper(
-        article_id="B",
-        source="crossref",
-        title=SHARED_TITLE,
-        doi=None,
-        authors=[],
-        journal="",
-        work_type="review-article",
-    )
-    incoming = [book, review] if book_first else [review, book]
-    db = ArticleDatabase(str(db_path))
-    try:
-        stats = db.insert_articles(incoming, dedupe=True)
-        assert stats["inserted"] == 2
-        assert stats["skipped_duplicates"] == 0
-        assert len(db.get_all_articles()) == 2
-    finally:
-        db.close()
-
-
+@pytest.mark.parametrize("staging", [False, True])
+@pytest.mark.parametrize("reverse", [False, True])
 @pytest.mark.parametrize(
     "left_type,right_type",
     [
+        ("book", "review-article"),
+        ("book", "book-review"),
         ("book", "book-chapter"),
+        ("edited-book", "review-article"),
+        ("edited-book", "book-review"),
+        ("edited-book", "book-chapter"),
         ("preprint", "journal-article"),
         ("dataset", "article"),
     ],
 )
-def test_incompatible_work_types_stay_two_rows(db_path, left_type, right_type):
-    first = _paper(work_type=left_type, doi="10.1000/left")
+def test_incompatible_work_types_stay_two_rows(
+    db_path, staging, reverse, left_type, right_type
+):
+    first = _paper(
+        article_id="A",
+        title=SHARED_TITLE,
+        doi="10.1000/one",
+        authors=["Jane Doe"],
+        journal="",
+        work_type=left_type,
+    )
     second = _paper(
         article_id="B",
         source="crossref",
-        work_type=right_type,
+        title=SHARED_TITLE,
         doi=None,
+        authors=["Jane Doe"],
+        journal="",
+        work_type=right_type,
     )
     db = ArticleDatabase(str(db_path))
     try:
-        stats = db.insert_articles([first, second], dedupe=True)
+        stats = _insert_pair(db, first, second, staging=staging, reverse=reverse)
+        rows = _stored_rows(db, staging)
         assert stats["inserted"] == 2
-        assert len(db.get_all_articles()) == 2
+        assert stats["skipped_duplicates"] == 0
+        assert len(rows) == 2
+        types = {row["work_type"] for row in rows}
+        assert types == {left_type, right_type}
+        dois = {row["doi"] for row in rows}
+        assert "10.1000/one" in dois
+        assert None in dois or "" in dois
     finally:
         db.close()
 
@@ -975,3 +1011,62 @@ def test_run_multi_fetch_forwards_merge_counts(db_path, monkeypatch):
         assert pipe.db.get_all_articles()[0]["container_title"] == "Sleep Health"
     finally:
         pipe.db.close()
+
+
+@pytest.mark.parametrize("staging", [False, True])
+@pytest.mark.parametrize("owner_refresh_first", [True, False])
+def test_doi_index_rebinds_when_owner_is_refreshed(
+    db_path, staging, owner_refresh_first
+):
+    seed_a = _paper(
+        article_id="A",
+        source="openalex",
+        doi="10.1000/one",
+        title="Introduction",
+    )
+    seed_b = _paper(
+        article_id="B",
+        source="pubmed",
+        doi="10.1000/two",
+        title="Preface",
+    )
+    refresh_b = _paper(
+        article_id="B",
+        source="pubmed",
+        doi="10.1000/one",
+        title="Preface",
+    )
+    refresh_a = _paper(
+        article_id="A",
+        source="openalex",
+        doi="10.1000/three",
+        title="Introduction",
+    )
+    later = _paper(
+        article_id="C",
+        source="pubmed",
+        doi="10.1000/one",
+        title="A different title of sufficient length",
+    )
+    db = ArticleDatabase(str(db_path))
+    try:
+        if staging:
+            db.ensure_staging_articles()
+        db.insert_articles([seed_a, seed_b], dedupe=True, staging=staging)
+        batch = (
+            [refresh_b, refresh_a, later]
+            if owner_refresh_first
+            else [refresh_a, refresh_b, later]
+        )
+        stats = db.insert_articles(batch, dedupe=True, staging=staging)
+        rows = _stored_rows(db, staging)
+        by_id = {row["article_id"]: row for row in rows}
+        assert stats["updated"] == 2
+        assert stats["inserted"] == 0
+        assert stats["skipped_duplicates"] == 1
+        assert len(rows) == 2
+        assert set(by_id) == {"A", "B"}
+        assert by_id["A"]["doi"] == "10.1000/three"
+        assert by_id["B"]["doi"] == "10.1000/one"
+    finally:
+        db.close()

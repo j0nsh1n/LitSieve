@@ -66,14 +66,13 @@ _INCOMPATIBLE_WORK_TYPES = frozenset({
     frozenset({"book", "book-review"}),
     frozenset({"book", "book-chapter"}),
     frozenset({"book", "review-article"}),
-    frozenset({"edited-book", "book-review"}),
-    frozenset({"edited-book", "book-chapter"}),
     frozenset({"preprint", "journal-article"}),
     frozenset({"dataset", "journal-article"}),
 })
 _IDENTITY_TYPE_ALIASES = {
     "article": "journal-article",
     "chapter": "book-chapter",
+    "edited-book": "book",
 }
 
 
@@ -820,17 +819,34 @@ class ArticleDatabase:
         return int(match.group(1)) if match else None
 
     @staticmethod
+    def _is_initials_given(text: str) -> bool:
+        compact = re.sub(r"[.\s]", "", text)
+        if not compact.isalpha() or len(compact) > 3:
+            return False
+        if len(compact) == 1:
+            return True
+        return compact.isupper() or "." in text
+
+    @staticmethod
     def _given_initials(given: str) -> str:
         text = (given or "").strip()
         if not text:
             return ""
-        compact = re.sub(r"[.\s]", "", text)
-        if compact.isalpha() and len(compact) <= 3 and (
-            len(compact) == 1 or compact.isupper() or "." in text
-        ):
-            return compact.casefold()
+        if ArticleDatabase._is_initials_given(text):
+            return re.sub(r"[.\s]", "", text).casefold()
         parts = re.findall(r"[^\W\d_]+", text, flags=re.UNICODE)
         return "".join(part[0] for part in parts if part).casefold()
+
+    @staticmethod
+    def _given_fields(given: str) -> Tuple[str, str]:
+        """Return (full given name, initials). Full name is empty for initials-only."""
+        text = (given or "").strip()
+        initials = ArticleDatabase._given_initials(text)
+        if not text or ArticleDatabase._is_initials_token(text) or (
+            ArticleDatabase._is_initials_given(text)
+        ):
+            return "", initials
+        return ArticleDatabase._norm_title(text), initials
 
     @staticmethod
     def _is_initials_token(token: str) -> bool:
@@ -845,38 +861,34 @@ class ArticleDatabase:
         return letters.isupper() or "." in text
 
     @staticmethod
-    def _parse_person_name(name: Any) -> Tuple[str, str]:
-        """Return (normalized family, given initials) for a first-author value."""
+    def _parse_person_name(name: Any) -> Tuple[str, str, str]:
+        """Return (family, full given name, initials) for a first-author value."""
         if isinstance(name, dict):
             family = name.get("family") or name.get("last") or ""
             given = name.get("given") or name.get("first") or ""
             if family:
-                return (
-                    ArticleDatabase._norm_title(str(family)),
-                    ArticleDatabase._given_initials(str(given)),
-                )
+                full, initials = ArticleDatabase._given_fields(str(given))
+                return ArticleDatabase._norm_title(str(family)), full, initials
             name = name.get("name") or name.get("display_name") or ""
         text = str(name or "").strip()
         if not text:
-            return "", ""
+            return "", "", ""
         if "," in text:
             family, given = text.split(",", 1)
-            return (
-                ArticleDatabase._norm_title(family),
-                ArticleDatabase._given_initials(given),
-            )
+            full, initials = ArticleDatabase._given_fields(given)
+            return ArticleDatabase._norm_title(family), full, initials
         parts = text.split()
         if len(parts) >= 2 and ArticleDatabase._is_initials_token(parts[-1]):
+            full, initials = ArticleDatabase._given_fields(parts[-1])
             return (
                 ArticleDatabase._norm_title(" ".join(parts[:-1])),
-                ArticleDatabase._given_initials(parts[-1]),
+                full,
+                initials,
             )
         if len(parts) == 1:
-            return ArticleDatabase._norm_title(parts[0]), ""
-        return (
-            ArticleDatabase._norm_title(parts[-1]),
-            ArticleDatabase._given_initials(" ".join(parts[:-1])),
-        )
+            return ArticleDatabase._norm_title(parts[0]), "", ""
+        full, initials = ArticleDatabase._given_fields(" ".join(parts[:-1]))
+        return ArticleDatabase._norm_title(parts[-1]), full, initials
 
     @staticmethod
     def _author_list(authors: Any) -> List:
@@ -890,15 +902,15 @@ class ArticleDatabase:
         return authors if isinstance(authors, list) else []
 
     @staticmethod
-    def _first_author(authors: Any) -> Tuple[str, str]:
+    def _first_author(authors: Any) -> Tuple[str, str, str]:
         names = ArticleDatabase._author_list(authors)
         if not names:
-            return "", ""
+            return "", "", ""
         return ArticleDatabase._parse_person_name(names[0])
 
     @staticmethod
     def _first_author_family(authors: Any) -> str:
-        family, _initials = ArticleDatabase._first_author(authors)
+        family, _given, _initials = ArticleDatabase._first_author(authors)
         return family
 
     @staticmethod
@@ -909,11 +921,17 @@ class ArticleDatabase:
 
     @staticmethod
     def _authors_conflict(existing: Any, incoming: Any) -> bool:
-        existing_family, existing_initials = ArticleDatabase._first_author(existing)
-        incoming_family, incoming_initials = ArticleDatabase._first_author(incoming)
+        existing_family, existing_given, existing_initials = (
+            ArticleDatabase._first_author(existing)
+        )
+        incoming_family, incoming_given, incoming_initials = (
+            ArticleDatabase._first_author(incoming)
+        )
         if not existing_family or not incoming_family:
             return False
         if existing_family != incoming_family:
+            return True
+        if existing_given and incoming_given and existing_given != incoming_given:
             return True
         return not ArticleDatabase._initials_compatible(
             existing_initials, incoming_initials
@@ -921,11 +939,17 @@ class ArticleDatabase:
 
     @staticmethod
     def _authors_match(existing: Any, incoming: Any) -> bool:
-        existing_family, existing_initials = ArticleDatabase._first_author(existing)
-        incoming_family, incoming_initials = ArticleDatabase._first_author(incoming)
+        existing_family, existing_given, existing_initials = (
+            ArticleDatabase._first_author(existing)
+        )
+        incoming_family, incoming_given, incoming_initials = (
+            ArticleDatabase._first_author(incoming)
+        )
         if not existing_family or not incoming_family:
             return False
         if existing_family != incoming_family:
+            return False
+        if existing_given and incoming_given and existing_given != incoming_given:
             return False
         return ArticleDatabase._initials_compatible(
             existing_initials, incoming_initials
@@ -1035,25 +1059,50 @@ class ArticleDatabase:
         )
         return authors_match or containers_match
 
+    @staticmethod
+    def _ensure_identity_cache(article: Dict) -> Tuple[str, bool, str]:
+        nt = article.get("_cached_norm_title")
+        generic = article.get("_cached_generic")
+        if "_cached_doi" not in article or nt is None or generic is None:
+            nt = ArticleDatabase._norm_title(article.get("title") or "")
+            article["_cached_norm_title"] = nt
+            article["_cached_generic"] = (not nt) or ArticleDatabase._is_generic_title(nt)
+            article["_cached_doi"] = ArticleDatabase._article_doi(article)
+        return (
+            article["_cached_norm_title"],
+            article["_cached_generic"],
+            article["_cached_doi"],
+        )
+
+    @staticmethod
+    def _doi_owners(
+        doi_index: Dict[str, List[Tuple[str, str]]], doi: str
+    ) -> List[Tuple[str, str]]:
+        return doi_index.get(doi) or []
+
     def _find_duplicate_key(
         self,
         article: Dict,
-        doi_index: Dict[str, Tuple[str, str]],
+        doi_index: Dict[str, List[Tuple[str, str]]],
         title_index: Dict[str, List[Tuple[str, str]]],
         records: Dict[Tuple[str, str], Dict],
     ) -> Optional[Tuple[str, str]]:
-        doi = self._article_doi(article)
-        if doi and doi in doi_index:
-            return doi_index[doi]
-        nt = self._norm_title(article.get("title") or "")
-        if not nt or self._is_generic_title(nt):
+        nt, generic, incoming_doi = self._ensure_identity_cache(article)
+        for owner in self._doi_owners(doi_index, incoming_doi):
+            if owner in records:
+                return owner
+        if not nt or generic:
             return None
         for key in title_index.get(nt, ()):
             existing = records.get(key)
             if existing is None:
                 continue
-            existing_nt = self._norm_title(existing.get("title") or "")
-            if self._is_generic_title(existing_nt):
+            _existing_nt, existing_generic, existing_doi = self._ensure_identity_cache(
+                existing
+            )
+            if incoming_doi and existing_doi and incoming_doi != existing_doi:
+                continue
+            if existing_generic:
                 continue
             if self._title_same_work(existing, article):
                 return key
@@ -1062,17 +1111,22 @@ class ArticleDatabase:
     def _unindex_key(
         self,
         key: Tuple[str, str],
-        doi_index: Dict[str, Tuple[str, str]],
+        doi_index: Dict[str, List[Tuple[str, str]]],
         title_index: Dict[str, List[Tuple[str, str]]],
         records: Dict[Tuple[str, str], Dict],
     ) -> None:
         old = records.pop(key, None)
         if not old:
             return
-        old_doi = self._article_doi(old)
-        if old_doi and doi_index.get(old_doi) == key:
-            del doi_index[old_doi]
-        old_nt = self._norm_title(old.get("title") or "")
+        old_nt, _old_generic, old_doi = self._ensure_identity_cache(old)
+        owners = doi_index.get(old_doi)
+        if owners:
+            try:
+                owners.remove(key)
+            except ValueError:
+                pass
+            if not owners:
+                del doi_index[old_doi]
         bucket = title_index.get(old_nt)
         if not bucket:
             return
@@ -1086,16 +1140,17 @@ class ArticleDatabase:
     def _index_article(
         self,
         article: Dict,
-        doi_index: Dict[str, Tuple[str, str]],
+        doi_index: Dict[str, List[Tuple[str, str]]],
         title_index: Dict[str, List[Tuple[str, str]]],
         records: Dict[Tuple[str, str], Dict],
     ) -> None:
         key = (article["article_id"], article.get("source") or "pubmed")
         records[key] = article
-        doi = self._article_doi(article)
-        if doi and doi not in doi_index:
-            doi_index[doi] = key
-        nt = self._norm_title(article.get("title") or "")
+        nt, _generic, doi = self._ensure_identity_cache(article)
+        if doi:
+            owners = doi_index.setdefault(doi, [])
+            if key not in owners:
+                owners.append(key)
         if nt and key not in title_index.get(nt, ()):
             title_index.setdefault(nt, []).append(key)
 
@@ -1104,7 +1159,7 @@ class ArticleDatabase:
         cursor,
         table: str,
         key: Tuple[str, str],
-        doi_index: Dict[str, Tuple[str, str]],
+        doi_index: Dict[str, List[Tuple[str, str]]],
         title_index: Dict[str, List[Tuple[str, str]]],
         records: Dict[Tuple[str, str], Dict],
     ) -> None:
@@ -1315,7 +1370,7 @@ class ArticleDatabase:
         extra: Optional[Dict],
         *,
         staging: bool,
-        doi_index: Dict[str, Tuple[str, str]],
+        doi_index: Dict[str, List[Tuple[str, str]]],
     ) -> bool:
         """Fill empty fields on existing from incoming. Returns True if a field or location was added."""
         incoming_source = incoming.get("source") or "pubmed"
@@ -1336,10 +1391,14 @@ class ArticleDatabase:
                 f"WHERE article_id = ? AND source = ?",
                 values,
             )
+            existing.pop("_cached_doi", None)
             doi = self._article_doi(existing)
+            existing["_cached_doi"] = doi
             key = (existing["article_id"], existing["source"])
-            if doi and doi not in doi_index:
-                doi_index[doi] = key
+            if doi:
+                owners = doi_index.setdefault(doi, [])
+                if key not in owners:
+                    owners.append(key)
         added_locations = self._merge_article_extra(
             cursor,
             existing["article_id"],
@@ -1386,7 +1445,7 @@ class ArticleDatabase:
 
         with self._writing():
             cursor = self.conn.cursor()
-            doi_index: Dict[str, Tuple[str, str]] = {}
+            doi_index: Dict[str, List[Tuple[str, str]]] = {}
             title_index: Dict[str, List[Tuple[str, str]]] = {}
             records: Dict[Tuple[str, str], Dict] = {}
             if dedupe:

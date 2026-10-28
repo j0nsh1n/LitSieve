@@ -1301,21 +1301,27 @@ function buildFetchSourceReportModel(data, sources) {
    });
    return;
   }
-  if (count === 0 && merged > 0) {
+  const unchanged = Math.max(0, skipped - merged);
+  const parts = [];
+  if (count > 0) {
+   parts.push(merged || unchanged ? `${count} new` : String(count));
+  }
+  if (merged > 0) {
+   parts.push(
+    count || unchanged
+     ? `${merged} updated`
+     : `updated ${merged} existing paper${merged === 1 ? '' : 's'}`
+   );
+  }
+  if (unchanged > 0) {
+   parts.push(`${unchanged} already in your library`);
+  }
+  if (parts.length) {
    successes.push({
     src,
     name,
-    count: merged,
-    line: `✓ ${name}: updated existing papers`,
-   });
-   return;
-  }
-  if (count === 0 && skipped > 0) {
-   muted.push({
-    src,
-    name,
-    line: `· ${name}: no new rows`,
-    zero: true,
+    count: count || merged + unchanged,
+    line: `✓ ${name}: ${parts.join(', ')}`,
    });
    return;
   }
@@ -1328,12 +1334,6 @@ function buildFetchSourceReportModel(data, sources) {
    });
    return;
   }
-  successes.push({
-   src,
-   name,
-   count,
-   line: `✓ ${name}: ${count}`,
-  });
  });
 
  successes.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
