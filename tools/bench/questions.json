@@ -1,0 +1,29 @@
+{
+  "questions": [
+    {
+      "id": "Q1",
+      "text": "What role did the U.S. government play in changing society during the Great Depression?",
+      "topic": "history"
+    },
+    {
+      "id": "Q2",
+      "text": "How did New Deal policies affect African Americans during the Great Depression?",
+      "topic": "history"
+    },
+    {
+      "id": "Q3",
+      "text": "How did British government evacuation policy affect children's schooling during the Second World War?",
+      "topic": "history"
+    },
+    {
+      "id": "Q4",
+      "text": "How do later school start times affect sleep duration among adolescents?",
+      "topic": "health"
+    },
+    {
+      "id": "Q5",
+      "text": "How does formative feedback affect secondary-school students' writing revision?",
+      "topic": "education"
+    }
+  ]
+}

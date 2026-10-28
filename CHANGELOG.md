@@ -9,6 +9,9 @@ and this project aims to follow Semantic Versioning for app version strings
 ## [Unreleased]
 
 ### Added
+- `tools/eval_search.py` captures a frozen search corpus, replays ranking
+  offline, scores human labels, and writes label sheets. Provider records
+  stay out of git.
 - Each library keeps the last 50 Collect inputs and Search questions in its
   own database (`fetch_runs`, `question_log`). The contact email is never
   stored. Clones do not copy these rows. Start over clears them. Admin and
@@ -32,6 +35,8 @@ and this project aims to follow Semantic Versioning for app version strings
   this".
 
 ### Changed
+- Label sheets include each paper's abstract and a link, shuffle the rows so
+  rank is not first, and write a readable HTML page per question.
 - A later fetch of the same work fills empty metadata (including year and
   authors) on the paper already in the library instead of skipping the new
   copy. Same DOI is the same work across sources; different DOIs stay
