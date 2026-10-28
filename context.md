@@ -194,15 +194,14 @@ Guest User (is_guest) → sample corpus only; purged by age
 ## Session Handoff
 - **Date:** 2026-10-28. P1.4 on `feat/type-aware-exports`: type-aware RIS,
   BibTeX, APA, CSV and TXT; DOI-first UR; L2 only for an open copy; ERIC
-  publisher fix. Ruff passes, Pyright has 0 errors and 6 optional-import
-  warnings, and full pytest has 1766 passed. Export-panel copy and the
-  citation-quality guide note the Zotero GEN caveat.
-- Validation used production venv executables from this isolated worktree
-  without installation. Live-provider and real-browser checks were not run.
-  Tests ran under nice with the 6 GiB available-memory stop guard; available
-  memory was 18.45 GiB at the start of the successful full run (16.88 GiB
-  after). Scratch is in `~/HealthDatabaseAccess-scratch/p14/`. Owner Zotero
-  import samples: `zotero_check.ris` and `zotero_check.bib` in that folder.
+  publisher fix. Student-facing export copy matches main; the Zotero GEN
+  caveat stays in CHANGELOG only. `static/js/search.js` is identical to
+  main, so its `?v=` token is unchanged.
+- Review-fix validation (production venv, this worktree, no install):
+  `ruff check .` clean, `node --check static/js/search.js` clean, pytest
+  1766 passed in 153.76 s. Scratch is `~/HealthDatabaseAccess-scratch/p14/`.
+  Owner Zotero import samples: `zotero_check.ris` and `zotero_check.bib`
+  in that folder.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
   and unscheduled roadmap backlog. Ship staging was last recorded at
   `f9485cf`; no host or deployment state changed in this slice.

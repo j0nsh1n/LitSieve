@@ -2129,7 +2129,7 @@ async function promptSimpleExportScope() {
   : ['ris', 'bibtex', 'csv', 'txt', 'apa'];
  const format = await openSiteChoice({
   title: 'Export format',
-  message: 'Choose a file format. Zotero imports RIS GEN as a journal article; use BibTeX @misc for a generic type.',
+  message: 'Choose a file format.',
   choices: [...formats.map((value, index) => ({
    value, label: value === 'bibtex' ? 'BibTeX' : value.toUpperCase(), primary: index === 0,
   })), { value: null, label: 'Cancel', cancel: true }],
