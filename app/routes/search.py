@@ -26,6 +26,7 @@ from app.services.enrich import (
 )
 from app.storage import quota
 from app.storage.dbconn import integrity_errors
+from app.storage.run_record import log_question
 from app.utils import (
     sort_articles,
 )
@@ -57,6 +58,21 @@ async def api_search(req: SearchRequest, request: Request):
             results, p, query_text=req.query_text, pico_boost=req.pico_boost,
         )
         sort_articles(results, req.sort_by)
+        log_question(
+            p.db,
+            kind="search",
+            question_text=req.query_text,
+            filters={
+                "sources": req.source_filter,
+                "clusters": req.cluster_filter,
+                "years": {"min": req.year_min, "max": req.year_max},
+                "lexical_boost": req.lexical_boost,
+                "pico_boost": req.pico_boost,
+                "top_k": req.top_k,
+            },
+            embedding_model=p.embedding_model_name,
+            result_rows=results,
+        )
         return {"results": results, "total": len(results)}
     except ValueError as e:
         return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
@@ -85,6 +101,21 @@ async def api_search_seed(req: SeedSearchRequest, request: Request):
         )
         results = data["results"]
         await run_in_thread(enrich_search_results, results, p)
+        log_question(
+            p.db,
+            kind="seed",
+            question_text=req.seed,
+            filters={
+                "sources": req.source_filter,
+                "clusters": req.cluster_filter,
+                "years": {"min": req.year_min, "max": req.year_max},
+                "lexical_boost": req.lexical_boost,
+                "pico_boost": False,
+                "top_k": req.top_k,
+            },
+            embedding_model=p.embedding_model_name,
+            result_rows=results,
+        )
         return {
             "seed": data["seed"],
             "results": results,
@@ -119,6 +150,21 @@ async def api_search_starred(req: StarredSearchRequest, request: Request):
         )
         results = data["results"]
         await run_in_thread(enrich_search_results, results, p)
+        log_question(
+            p.db,
+            kind="starred",
+            question_text="",
+            filters={
+                "sources": req.source_filter,
+                "clusters": req.cluster_filter,
+                "years": {"min": req.year_min, "max": req.year_max},
+                "lexical_boost": False,
+                "pico_boost": False,
+                "top_k": req.top_k,
+            },
+            embedding_model=p.embedding_model_name,
+            result_rows=results,
+        )
         return {
             "results": results,
             "total": len(results),

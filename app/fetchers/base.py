@@ -338,6 +338,12 @@ class BaseFetcher(ABC):
     """
 
     SOURCE_NAME: str = ""
+    sent_query: Optional[str] = None
+
+    def remember_sent_query(self, query: str) -> str:
+        """Record the query actually sent after sanitizing; defaults to input."""
+        self.sent_query = query
+        return query
 
     @abstractmethod
     def search(self, query: str, max_results: int = 1000) -> List[str]:
@@ -358,6 +364,7 @@ class BaseFetcher(ABC):
 
     def search_and_fetch(self, query: str, max_results: int = 1000) -> List[Dict]:
         """Complete workflow: search then fetch details"""
+        self.remember_sent_query(query)
         ids = self.search(query, max_results)
         if not ids:
             return []

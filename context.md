@@ -12,11 +12,19 @@
   poster. Live at `https://www.litpilot.org` from the production checkout,
   `main` through #106 (2026-10-16). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
-- Latest full suite (2026-10-28, `feat/merge-duplicates` re-review fixes):
-  **1855 passed** in 150.55 s, no skips or xfails. `ruff check .` clean;
-  `pyright app` **0 errors**, 6 optional-import warnings (CI blocks on
-  errors). `pip-audit` (2026-10-14): no known vulnerabilities; ROCm
-  torch/triton are un-auditable. No dependency lockfile.
+- Latest full suite (2026-10-28, `feat/run-record`): **1872 passed** in
+  152.62 s, no skips or xfails. `ruff check .` clean; `pyright app`
+  **0 errors**, 6 optional-import warnings (CI blocks on errors).
+  `pip-audit` (2026-10-14): no known vulnerabilities; ROCm torch/triton are
+  un-auditable. No dependency lockfile.
+- P1.6 stores Collect inputs and Search questions in the library database
+  (`fetch_runs`, `question_log`), about 50 rows each. Writes come from
+  `_run_multi_fetch` (background and sync, including cancel and error) and
+  from `/api/search`, seed, starred, and Narrow it down preview. Contact
+  email and API-key shaped strings are stripped. Clones drop the tables.
+  Start over deletes the rows. Replace-fetch staging does not touch them.
+  Admin and support routes do not read them. A failed write is logged and
+  the request still succeeds.
 - P1.5 merges a later copy of the same work into the stored row: DOI first,
   a DOI conflict blocks title merge, title match needs year ±1 plus compatible
   structured author and container (legacy `journal` counts), and generic
@@ -146,6 +154,8 @@
 - **AI settings**: per account `{USER_DATA_DIR}/{user_id}/ai_settings.json`
   (keys encrypted). Host env is the deploy default. A student base URL
   never rides with the host API key.
+- **Run record** (`fetch_runs`, `question_log`): private to the library file;
+  not cloned; Start over clears it
 - **Jobs**: fetch / embed / cluster progress per user; bind to an explicit owned
   library id when the client sends one, otherwise the active library at start
 - **Quota**: disk under `user_data/<uid>/` vs `MAX_USER_STORAGE_MB`; optional
@@ -202,18 +212,14 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-28. P1.5 re-review fixes on `feat/merge-duplicates` (PR #116).
-  Full given names veto title identity; edited-book aliases to book for type
-  vetoes; duplicate-only fetch reports say already in the library; the DOI
-  index keeps every owner so a refresh can rebind; title matching caches
-  normalized title and generic status and rejects DOI conflicts first.
+- **Date:** 2026-10-28. P1.6 on `feat/run-record`. Each library keeps Collect
+  inputs and Search questions in `fetch_runs` / `question_log`. Email is
+  omitted. Clones and admin views do not see the rows. Start over clears them.
 - Validation (production venv, this worktree, no install): `ruff check .`
-  clean, `pyright app` 0 errors / 6 optional-import warnings, `node --check
-  static/js/collect.js` ok, pytest 1855 passed in 150.55 s. Same-title 5k
-  then 100-row insert median 0.177 s (was 1.777 s). Scratch is
-  `~/HealthDatabaseAccess-scratch/p15/`.
+  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 1872
+  passed in 152.62 s. Scratch is `~/HealthDatabaseAccess-scratch/p16/`.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
   and unscheduled roadmap backlog. Ship staging was last recorded at
   `f9485cf`; no host or deployment state changed in this slice.
-- **Next step:** independent re-review of PR #116; no merge or deploy in
-  this slice. Run-record in the library remains P1.6.
+- **Next step:** parent review of the P1.6 PR; no merge or deploy in this
+  slice. Type chip and type filter on Search remain P1.7.

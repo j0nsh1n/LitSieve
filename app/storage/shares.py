@@ -44,6 +44,8 @@ MAX_MAX_USES = 10_000
 
 # Tables a share clone keeps. notes and clusters stay as empty tables; every
 # other table is dropped and the app recreates its empty schema on open.
+# fetch_runs and question_log stay off this list so a clone does not receive
+# another student's Collect inputs or Search questions.
 CLONE_TABLES = frozenset({"articles", "embeddings", "screening", "key_points", "notes", "clusters"})
 
 def generate_share_code() -> str:

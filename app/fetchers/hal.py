@@ -42,7 +42,7 @@ class HALFetcher(BaseFetcher):
         articles: List[Dict] = []
         start = 0
         page_size = min(100, max_results)
-        q = solr_safe(query)
+        q = self.remember_sent_query(solr_safe(query))
         if not q:
             raise FetchError("HAL needs search words.", kind="bad_query")
 

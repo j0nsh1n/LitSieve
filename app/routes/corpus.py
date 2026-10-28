@@ -51,9 +51,11 @@ from app.services.pipeline import FETCHERS
 from app.storage import quota
 from app.storage.database import omit_null_metadata
 from app.storage.libraries import owned_library_id
+from app.storage.run_record import begin_fetch_run, finish_fetch_run, log_question
 from app.utils import (
     coverage_suggestions,
 )
+from app.version import APP_VERSION
 
 logger = logging.getLogger(__name__)
 
@@ -100,11 +102,26 @@ async def api_progress(request: Request, library_id: Optional[str] = None):
     return snapshot
 
 
-def _run_multi_fetch(p, *, query, sources, max_results, email, clear_first, uid, lib_id):
+def _run_multi_fetch(
+    p, *, query, sources, max_results, email, clear_first, uid, lib_id,
+    topics=None, areas=None,
+):
     """Blocking multi-source fetch for sync wait= or background jobs."""
     # Live per-source narrative for the UI: only counts the API has produced.
     live_by_source: dict = {}
     live_status: dict = {}
+    run_id = begin_fetch_run(
+        p.db,
+        raw_input=query,
+        sources=list(sources),
+        topics=topics,
+        areas=areas,
+        mode="replace" if clear_first else "append",
+        max_results=max_results,
+        app_version=APP_VERSION,
+    )
+    results = None
+    outcome = "error"
     update_progress(
         uid, lib_id, 'fetch', done=0, total=len(sources),
         articles_so_far=0, message='Starting fetch…', cancel=False,
@@ -147,71 +164,76 @@ def _run_multi_fetch(p, *, query, sources, max_results, email, clear_first, uid,
 
     actually_cleared = False
     try:
-        results = p.fetch_articles_parallel(
-            query=query,
-            sources=sources,
-            max_results=max_results,
-            email=email or "",
-            progress_callback=on_source_done,
-            cancel_check=lambda: (
-                is_job_cancelled(uid, lib_id, 'fetch')
-                or quota.is_over_quota(uid, reclaimable=reclaimable)
-            ),
-            into_staging=bool(clear_first),
-        )
-        total = sum(v['count'] for v in results.values())
-        user_cancel = is_job_cancelled(uid, lib_id, 'fetch')
-        # Quota stop is not a user cancel. Do not swap a partial staging set
-        # over the live library — keep what the student already has.
-        hit_quota = quota.is_over_quota(uid, reclaimable=reclaimable)
-        if clear_first:
-            staged = p.db.count_staging_articles()
-            if staged > 0 and not user_cancel and not hit_quota:
-                p.db.replace_from_staging()
-                actually_cleared = True
-                total = staged
-            else:
-                p.db.drop_staging_articles()
-                if user_cancel or hit_quota:
-                    total = 0
-    except Exception:
-        if clear_first:
-            try:
-                p.db.drop_staging_articles()
-            except Exception:
-                logger.exception("Could not drop staging after failed replace-fetch")
-        raise
+        try:
+            results = p.fetch_articles_parallel(
+                query=query,
+                sources=sources,
+                max_results=max_results,
+                email=email or "",
+                progress_callback=on_source_done,
+                cancel_check=lambda: (
+                    is_job_cancelled(uid, lib_id, 'fetch')
+                    or quota.is_over_quota(uid, reclaimable=reclaimable)
+                ),
+                into_staging=bool(clear_first),
+            )
+            total = sum(v['count'] for v in results.values())
+            user_cancel = is_job_cancelled(uid, lib_id, 'fetch')
+            # Quota stop is not a user cancel. Do not swap a partial staging set
+            # over the live library — keep what the student already has.
+            hit_quota = quota.is_over_quota(uid, reclaimable=reclaimable)
+            if clear_first:
+                staged = p.db.count_staging_articles()
+                if staged > 0 and not user_cancel and not hit_quota:
+                    p.db.replace_from_staging()
+                    actually_cleared = True
+                    total = staged
+                else:
+                    p.db.drop_staging_articles()
+                    if user_cancel or hit_quota:
+                        total = 0
+        except Exception:
+            if clear_first:
+                try:
+                    p.db.drop_staging_articles()
+                except Exception:
+                    logger.exception("Could not drop staging after failed replace-fetch")
+            raise
 
-    p.invalidate_corpus_cache()
-    errors = {src: v['error'] for src, v in results.items() if v['error']}
-    error_kinds = {
-        src: v.get('error_kind')
-        for src, v in results.items()
-        if v.get('error_kind')
-    }
-    ok = {src: v['count'] for src, v in results.items() if not v['error']}
-    hit_quota = quota.is_over_quota(uid, reclaimable=reclaimable if not actually_cleared else 0)
-    status, cancelled_flag = quota.fetch_finish_status(
-        cancelled=is_job_cancelled(uid, lib_id, 'fetch'),
-        hit_quota=hit_quota,
-    )
-    return {
-        "status": status,
-        "quota_stopped": hit_quota,
-        "quota": quota.usage_report(uid),
-        "total_fetched": total,
-        "by_source": {src: v['count'] for src, v in results.items()},
-        "ok_sources": ok,
-        "errors": errors,
-        "error_kinds": error_kinds,
-        "cleared_first": actually_cleared,
-        "cancelled": cancelled_flag,
-        "inserted": {src: v.get("inserted", v["count"]) for src, v in results.items()},
-        "merged": {src: v.get("merged", 0) for src, v in results.items()},
-        "skipped_duplicates": {
-            src: v.get("skipped_duplicates", 0) for src, v in results.items()
-        },
-    }
+        p.invalidate_corpus_cache()
+        assert results is not None
+        errors = {src: v['error'] for src, v in results.items() if v['error']}
+        error_kinds = {
+            src: v.get('error_kind')
+            for src, v in results.items()
+            if v.get('error_kind')
+        }
+        ok = {src: v['count'] for src, v in results.items() if not v['error']}
+        hit_quota = quota.is_over_quota(uid, reclaimable=reclaimable if not actually_cleared else 0)
+        status, cancelled_flag = quota.fetch_finish_status(
+            cancelled=is_job_cancelled(uid, lib_id, 'fetch'),
+            hit_quota=hit_quota,
+        )
+        outcome = status
+        return {
+            "status": status,
+            "quota_stopped": hit_quota,
+            "quota": quota.usage_report(uid),
+            "total_fetched": total,
+            "by_source": {src: v['count'] for src, v in results.items()},
+            "ok_sources": ok,
+            "errors": errors,
+            "error_kinds": error_kinds,
+            "cleared_first": actually_cleared,
+            "cancelled": cancelled_flag,
+            "inserted": {src: v.get("inserted", v["count"]) for src, v in results.items()},
+            "merged": {src: v.get("merged", 0) for src, v in results.items()},
+            "skipped_duplicates": {
+                src: v.get("skipped_duplicates", 0) for src, v in results.items()
+            },
+        }
+    finally:
+        finish_fetch_run(p.db, run_id, outcome=outcome, results=results)
 
 
 @router.post("/api/fetch-articles-multi")
@@ -259,6 +281,8 @@ async def api_fetch_multi(req: MultiFetchRequest, request: Request):
         max_results=req.max_results,
         email=req.email,
         clear_first=req.clear_first,
+        topics=req.topics,
+        areas=req.areas,
     )
     if not req.wait:
         if not start_user_job(uid, lib_id, 'fetch', _run_multi_fetch, **job_kwargs):
@@ -685,6 +709,25 @@ async def api_screening_quick_preview(req: QuickScreenPreviewRequest, request: R
         # Embedding a query can be heavy — keep it off the event loop.
         result = await run_in_thread(
             p.propose_low_relevance, req.query, req.fraction,
+        )
+        ranked = list(result.get("candidates") or []) + list(
+            reversed(result.get("staying") or [])
+        )
+        log_question(
+            p.db,
+            kind="narrow_preview",
+            question_text=req.query,
+            filters={
+                "sources": None,
+                "clusters": None,
+                "years": None,
+                "lexical_boost": False,
+                "pico_boost": False,
+                "top_k": result.get("proposed_count"),
+                "fraction": req.fraction,
+            },
+            embedding_model=p.embedding_model_name,
+            result_rows=ranked,
         )
         return result
     except ValueError as e:
