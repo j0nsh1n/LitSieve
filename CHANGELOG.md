@@ -9,6 +9,10 @@ and this project aims to follow Semantic Versioning for app version strings
 ## [Unreleased]
 
 ### Added
+- Each library keeps the last 50 Collect inputs and Search questions in its
+  own database (`fetch_runs`, `question_log`). The contact email is never
+  stored. Clones do not copy these rows. Start over clears them. Admin and
+  support views do not read them.
 - Admin Overview has a tile for every queue (over quota, sign-in errors and
   disabled join the six that were there) with real totals rather than the
   queue page's cap of 25, refreshed every minute while the tab is open, and

@@ -44,7 +44,7 @@ class DOAJFetcher(BaseFetcher):
         )
 
     def search_and_fetch(self, query: str, max_results: int = 500) -> List[Dict]:
-        query = lucene_safe(query)
+        query = self.remember_sent_query(lucene_safe(query))
         if not query:
             raise FetchError("DOAJ needs search words.", kind="bad_query")
         articles = []

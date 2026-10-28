@@ -222,27 +222,34 @@ class LiteratureSearchPipeline:
         def fetch_one(source):
             publish(source, "running")
             if cancel_check and cancel_check():
-                return (source, [], "Cancelled", "cancelled")
+                return (source, [], "Cancelled", "cancelled", query)
             fetcher_cls = FETCHERS.get(source)
             if not fetcher_cls:
-                return (source, [], "Unknown source", "error")
+                return (source, [], "Unknown source", "error", query)
             set_cancel_check(cancel_check)
             set_fetch_deadline(time.monotonic() + budget)
+            fetcher = None
+            sent_query = query
             try:
                 fetcher = fetcher_cls(email=email)
                 # A fetch that returns just after the budget keeps its papers;
                 # an empty one that ran over reports the timeout.
                 articles = fetcher.search_and_fetch(query, max_results) or []
+                sent_query = getattr(fetcher, "sent_query", None) or query
                 if not articles:
                     check_fetch_deadline()
-                    return (source, [], None, "no_results")
-                return (source, articles, None, None)
+                    return (source, [], None, "no_results", sent_query)
+                return (source, articles, None, None, sent_query)
             except FetchError as e:
                 logger.error("Error fetching %s: %s", source, e)
-                return (source, e.articles, str(e), e.kind)
+                if fetcher is not None:
+                    sent_query = getattr(fetcher, "sent_query", None) or query
+                return (source, e.articles, str(e), e.kind, sent_query)
             except Exception as e:
                 logger.error("Error fetching %s: %s", source, e)
-                return (source, [], str(e), classify_error(e))
+                if fetcher is not None:
+                    sent_query = getattr(fetcher, "sent_query", None) or query
+                return (source, [], str(e), classify_error(e), sent_query)
             finally:
                 set_cancel_check(None)
                 set_fetch_deadline(None)
@@ -258,13 +265,19 @@ class LiteratureSearchPipeline:
                         f.cancel()
 
                 if future.cancelled():
-                    source, articles, error, error_kind = futures[future], [], "Cancelled", "cancelled"
+                    source, articles, error, error_kind, sent_query = (
+                        futures[future], [], "Cancelled", "cancelled", query
+                    )
                 else:
-                    source, articles, error, error_kind = future.result()
+                    source, articles, error, error_kind, sent_query = future.result()
                 # Insert immediately so a hung source does not block others' data.
                 inserted = 0
                 skipped_dups = 0
                 merged = 0
+                elapsed_s = (
+                    max(0.0, time.monotonic() - started[source])
+                    if source in started else 0.0
+                )
                 if articles and not (cancel_check and cancel_check() and error == "Cancelled"):
                     insert_stats = self.db.insert_articles(
                         articles, dedupe=True, staging=into_staging
@@ -295,6 +308,8 @@ class LiteratureSearchPipeline:
                     'merged': merged,
                     'error': report_error,
                     'error_kind': error_kind if report_error or error_kind == "no_results" else None,
+                    'sent_query': sent_query or query,
+                    'elapsed_s': round(elapsed_s, 3),
                 }
                 logger.info(
                     "  %s: %d articles (kind=%s)",
@@ -314,6 +329,8 @@ class LiteratureSearchPipeline:
                     'merged': 0,
                     'error': 'Cancelled' if cancelled[0] else None,
                     'error_kind': 'cancelled' if cancelled[0] else None,
+                    'sent_query': query,
+                    'elapsed_s': 0.0,
                 }
 
         return {
@@ -324,6 +341,8 @@ class LiteratureSearchPipeline:
                 'inserted': data.get('inserted', data['count']),
                 'skipped_duplicates': data.get('skipped_duplicates', 0),
                 'merged': data.get('merged', 0),
+                'sent_query': data.get('sent_query') or query,
+                'elapsed_s': data.get('elapsed_s') or 0.0,
             }
             for source, data in results.items()
         }

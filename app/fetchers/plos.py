@@ -53,7 +53,7 @@ class PLOSFetcher(BaseFetcher):
         articles: List[Dict] = []
         start = 0
         page_size = min(100, max_results)
-        solr_q = self.solr_query(query)
+        solr_q = self.remember_sent_query(self.solr_query(query))
 
         while len(articles) < max_results:
             rows = min(page_size, max_results - len(articles))

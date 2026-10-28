@@ -57,6 +57,8 @@ class MultiFetchRequest(BaseModel):
     wait: bool = False
     # Bind this job to a library this account owns. Omit to use the active library.
     library_id: Optional[str] = Field(default=None, max_length=128)
+    topics: Optional[List[str]] = None
+    areas: Optional[List[str]] = None
 
 
 class EmbeddingsRequest(BaseModel):

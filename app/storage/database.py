@@ -279,7 +279,156 @@ class ArticleDatabase:
             )
         """)
 
+        self._ensure_run_record_tables(cursor)
         self.conn.commit()
+
+    def _ensure_run_record_tables(self, cursor) -> None:
+        """Collect inputs and Search questions. Not cloned; Start over clears them."""
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS fetch_runs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                started_at TEXT NOT NULL,
+                finished_at TEXT,
+                raw_input TEXT NOT NULL,
+                sources_json TEXT NOT NULL,
+                topics_json TEXT NOT NULL DEFAULT '[]',
+                areas_json TEXT NOT NULL DEFAULT '[]',
+                mode TEXT NOT NULL,
+                max_results INTEGER,
+                outcome TEXT,
+                app_version TEXT NOT NULL,
+                per_source_json TEXT NOT NULL DEFAULT '{}'
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS question_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                question_text TEXT NOT NULL,
+                filters_json TEXT NOT NULL DEFAULT '{}',
+                embedding_model TEXT,
+                ranker_version TEXT NOT NULL,
+                result_keys_json TEXT NOT NULL DEFAULT '[]'
+            )
+        """)
+
+    def _prune_run_record_table(self, cursor, table: str, keep: int = 50) -> None:
+        cursor.execute(
+            f"""
+            DELETE FROM {table}
+            WHERE id NOT IN (
+                SELECT id FROM {table} ORDER BY id DESC LIMIT ?
+            )
+            """,
+            (keep,),
+        )
+
+    def insert_fetch_run(
+        self,
+        *,
+        started_at: str,
+        raw_input: str,
+        sources: List,
+        topics: List,
+        areas: List,
+        mode: str,
+        max_results: Optional[int],
+        app_version: str,
+    ) -> int:
+        from app.storage.run_record import KEEP_ROWS, json_text
+
+        with self._writing():
+            cursor = self.conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO fetch_runs (
+                    started_at, raw_input, sources_json, topics_json, areas_json,
+                    mode, max_results, app_version, per_source_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}')
+                """,
+                (
+                    started_at,
+                    raw_input,
+                    json_text(sources),
+                    json_text(topics),
+                    json_text(areas),
+                    mode,
+                    max_results,
+                    app_version,
+                ),
+            )
+            run_id = cursor.lastrowid
+            if run_id is None:
+                raise RuntimeError("fetch_runs insert produced no id")
+            self._prune_run_record_table(cursor, "fetch_runs", KEEP_ROWS)
+            self.conn.commit()
+            return int(run_id)
+
+    def update_fetch_run(
+        self,
+        run_id: int,
+        *,
+        finished_at: str,
+        outcome: str,
+        per_source: Dict,
+    ) -> None:
+        from app.storage.run_record import json_text
+
+        with self._writing():
+            self.conn.execute(
+                """
+                UPDATE fetch_runs
+                SET finished_at = ?, outcome = ?, per_source_json = ?
+                WHERE id = ?
+                """,
+                (finished_at, outcome, json_text(per_source), run_id),
+            )
+            self.conn.commit()
+
+    def insert_question_log(
+        self,
+        *,
+        created_at: str,
+        kind: str,
+        question_text: str,
+        filters: Dict,
+        embedding_model: Optional[str],
+        result_keys: List,
+    ) -> None:
+        from app.storage.run_record import KEEP_ROWS, RANKER_VERSION, json_text
+
+        with self._writing():
+            cursor = self.conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO question_log (
+                    created_at, kind, question_text, filters_json,
+                    embedding_model, ranker_version, result_keys_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    created_at,
+                    kind,
+                    question_text,
+                    json_text(filters),
+                    embedding_model,
+                    RANKER_VERSION,
+                    json_text(result_keys),
+                ),
+            )
+            self._prune_run_record_table(cursor, "question_log", KEEP_ROWS)
+            self.conn.commit()
+
+    def clear_run_records(self, cursor=None) -> None:
+        if cursor is not None:
+            cursor.execute("DELETE FROM fetch_runs")
+            cursor.execute("DELETE FROM question_log")
+            return
+        with self._writing():
+            self.conn.execute("DELETE FROM fetch_runs")
+            self.conn.execute("DELETE FROM question_log")
+            self.conn.commit()
 
     def _create_article_extra(self, *, staging: bool = False) -> None:
         table = "staging_article_extra" if staging else "article_extra"
@@ -502,6 +651,7 @@ class ArticleDatabase:
         self._create_article_extra()
         if self._staging_exists(cursor):
             self._create_article_extra(staging=True)
+        self._ensure_run_record_tables(cursor)
         self.conn.commit()
 
     STAGING_TABLE = "staging_articles"
@@ -737,6 +887,7 @@ class ArticleDatabase:
                 cursor.execute("DELETE FROM clusters")
                 cursor.execute("DELETE FROM embeddings")
                 cursor.execute("DELETE FROM articles")
+                self.clear_run_records(cursor)
                 cursor.execute("DROP TABLE IF EXISTS staging_article_extra")
                 cursor.execute(f"DROP TABLE IF EXISTS {self.STAGING_TABLE}")
                 self.conn.commit()
@@ -759,6 +910,7 @@ class ArticleDatabase:
                 WHERE starred = 0 AND TRIM(COALESCE(note, '')) = ''
                 """
             )
+            self.clear_run_records(cursor)
             cursor.execute("DROP TABLE IF EXISTS staging_article_extra")
             cursor.execute(f"DROP TABLE IF EXISTS {self.STAGING_TABLE}")
             self.conn.commit()
