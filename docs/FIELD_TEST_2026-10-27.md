@@ -1,8 +1,11 @@
 # Field test 2026-10-27: government action and African Americans in the Depression
 
-An outside evaluation of one student run. The question asked how
-government action during the Depression changed African Americans' lives.
-The run produced 15 results, exported as RIS. We did not have the RIS file;
+An outside evaluation of one student run. The student's stated question
+was "What role did the U.S. government play in changing society during the
+Great Depression?" The evaluation narrowed this to African Americans and the
+New Deal. Whether that narrower scope was ever typed into LitSieve is not
+known (see `docs/SEARCH_AUDIT_2026-10-27.md` §0). The run produced 15
+results, exported as RIS. We did not have the RIS file;
 its signed link had expired. Each finding below is checked against the code
 where that was possible.
 
