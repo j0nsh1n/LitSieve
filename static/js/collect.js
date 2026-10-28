@@ -1247,11 +1247,15 @@ function waitForJob(task, fillId, labelId, wrapId, formatLabel, timeoutMs, opts)
  */
 function buildFetchSourceReportModel(data, sources) {
  const counts = (data && data.by_source) || {};
+ const mergedCounts = (data && data.merged) || {};
+ const skippedCounts = (data && data.skipped_duplicates) || {};
  const errors = (data && data.errors) || {};
  const kinds = (data && data.error_kinds) || {};
  const sourceProgress = (data && data.source_progress) || {};
  const used = new Set(sources || []);
  Object.keys(counts).forEach((s) => used.add(s));
+ Object.keys(mergedCounts).forEach((s) => used.add(s));
+ Object.keys(skippedCounts).forEach((s) => used.add(s));
  Object.keys(errors).forEach((s) => used.add(s));
  Object.keys(kinds).forEach((s) => used.add(s));
  Object.keys(sourceProgress).forEach((s) => used.add(s));
@@ -1263,6 +1267,8 @@ function buildFetchSourceReportModel(data, sources) {
  used.forEach((src) => {
   const name = typeof getSourceName === 'function' ? getSourceName(src) : src;
   const count = Number(counts[src]) || 0;
+  const merged = Number(mergedCounts[src]) || 0;
+  const skipped = Number(skippedCounts[src]) || 0;
   const err = errors[src];
   const source = sourceProgress[src] || {};
   const kind = source.error_kind || kinds[src] || '';
@@ -1295,6 +1301,30 @@ function buildFetchSourceReportModel(data, sources) {
    });
    return;
   }
+  const unchanged = Math.max(0, skipped - merged);
+  const parts = [];
+  if (count > 0) {
+   parts.push(merged || unchanged ? `${count} new` : String(count));
+  }
+  if (merged > 0) {
+   parts.push(
+    count || unchanged
+     ? `${merged} updated`
+     : `updated ${merged} existing paper${merged === 1 ? '' : 's'}`
+   );
+  }
+  if (unchanged > 0) {
+   parts.push(`${unchanged} already in your library`);
+  }
+  if (parts.length) {
+   successes.push({
+    src,
+    name,
+    count: count || merged + unchanged,
+    line: `✓ ${name}: ${parts.join(', ')}`,
+   });
+   return;
+  }
   if (kind === 'no_results' || count === 0) {
    muted.push({
     src,
@@ -1304,12 +1334,6 @@ function buildFetchSourceReportModel(data, sources) {
    });
    return;
   }
-  successes.push({
-   src,
-   name,
-   count,
-   line: `✓ ${name}: ${count}`,
-  });
  });
 
  successes.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
@@ -1447,8 +1471,20 @@ function applyFetchResult(data, sources) {
   'warning'
  );
  } else if (errorCount === 0 && timeoutCount === 0) {
- setStatus('fetch-status', `Fetched ${data.total_fetched} articles - ${breakdown}`, 'success');
- showNotification(`Fetched ${data.total_fetched} articles!`, 'success');
+ const mergedTotal = Object.values(data.merged || {}).reduce(
+  (n, value) => n + (Number(value) || 0),
+  0
+ );
+ if ((Number(data.total_fetched) || 0) === 0 && mergedTotal > 0) {
+  setStatus('fetch-status', `Updated papers already in your library - ${breakdown}`, 'success');
+  showNotification('Updated papers already in your library.', 'success');
+ } else if ((Number(data.total_fetched) || 0) === 0) {
+  setStatus('fetch-status', `No new papers - ${breakdown}`, 'success');
+  showNotification('No new papers.', 'success');
+ } else {
+  setStatus('fetch-status', `Fetched ${data.total_fetched} articles - ${breakdown}`, 'success');
+  showNotification(`Fetched ${data.total_fetched} articles!`, 'success');
+ }
  } else if (errorCount + timeoutCount < sources.length) {
  const issues = [
   timeoutCount ? `${timeoutCount} source${timeoutCount === 1 ? '' : 's'} timed out` : '',

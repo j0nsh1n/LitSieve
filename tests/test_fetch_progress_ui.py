@@ -117,3 +117,92 @@ const code = [
 ].join('\n');
 vm.runInNewContext(code, { sandbox, host });
 """
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="Node.js not installed")
+def test_fetch_report_distinguishes_no_new_rows_from_no_results():
+    node = subprocess.run(
+        ["node", "--input-type=module", "-e", _NODE_MERGE_REPORT_SNIPPET],
+        cwd=".",
+        capture_output=True,
+        text=True,
+        timeout=15,
+    )
+    assert node.returncode == 0, node.stderr + node.stdout
+    out = json.loads(node.stdout.strip().splitlines()[-1])
+    assert out["none"] == "· empty: no results"
+    assert out["duplicate"] == "✓ same: 1 already in your library"
+    assert out["duplicateZero"] is False
+    assert out["updated"] == "✓ extra: updated 1 existing paper"
+    assert "returned nothing" not in out["duplicateHtml"]
+    assert "no results" not in out["duplicate"]
+    assert "no results" not in out["updated"]
+    assert out["mixed"] == "✓ crossref: 2 new, 1 updated, 1 already in your library"
+    assert "returned nothing" not in out["mixedHtml"]
+    assert "rows" not in out["duplicate"]
+    assert "rows" not in out["updated"]
+    assert "rows" not in out["mixed"]
+
+
+_NODE_MERGE_REPORT_SNIPPET = r"""
+import fs from 'fs';
+import vm from 'vm';
+const dm = fs.readFileSync('static/js/collect.js', 'utf8');
+const sandbox = {
+  console,
+  window: {},
+  document: { getElementById: () => null, documentElement: { getAttribute: () => 'simple' } },
+  escapeHtml: (s) => String(s),
+  getSourceName: (s) => s,
+};
+function extractFn(src, name) {
+  const start = src.indexOf('function ' + name);
+  if (start < 0) throw new Error('missing ' + name);
+  let i = src.indexOf('{', start);
+  let depth = 0;
+  for (; i < src.length; i++) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') {
+      depth--;
+      if (depth === 0) return src.slice(start, i + 1);
+    }
+  }
+  throw new Error('unbalanced ' + name);
+}
+const code =
+  sandbox.escapeHtml.toString() + ';\n' +
+  'function getSourceName(s){return s;}\n' +
+  extractFn(dm, 'buildFetchSourceReportModel') + '\n' +
+  extractFn(dm, 'renderFetchSourceReportHtml') + '\n' +
+  `
+  const none = buildFetchSourceReportModel({
+    by_source: { empty: 0 },
+    error_kinds: { empty: 'no_results' },
+  }, ['empty']);
+  const duplicate = buildFetchSourceReportModel({
+    by_source: { same: 0 },
+    skipped_duplicates: { same: 1 },
+    merged: { same: 0 },
+  }, ['same']);
+  const updated = buildFetchSourceReportModel({
+    by_source: { extra: 0 },
+    skipped_duplicates: { extra: 1 },
+    merged: { extra: 1 },
+  }, ['extra']);
+  const mixed = buildFetchSourceReportModel({
+    by_source: { crossref: 2 },
+    skipped_duplicates: { crossref: 2 },
+    merged: { crossref: 1 },
+  }, ['crossref']);
+  console.log(JSON.stringify({
+    none: none.muted[0].line,
+    duplicate: duplicate.successes[0].line,
+    duplicateZero: Boolean(duplicate.successes[0].zero),
+    duplicateHtml: renderFetchSourceReportHtml(duplicate),
+    updated: updated.successes[0].line,
+    mixed: mixed.successes[0].line,
+    mixedHtml: renderFetchSourceReportHtml(mixed),
+  }));
+  `;
+vm.runInNewContext(code, sandbox);
+"""

@@ -264,6 +264,7 @@ class LiteratureSearchPipeline:
                 # Insert immediately so a hung source does not block others' data.
                 inserted = 0
                 skipped_dups = 0
+                merged = 0
                 if articles and not (cancel_check and cancel_check() and error == "Cancelled"):
                     insert_stats = self.db.insert_articles(
                         articles, dedupe=True, staging=into_staging
@@ -271,6 +272,7 @@ class LiteratureSearchPipeline:
                     if isinstance(insert_stats, dict):
                         inserted = int(insert_stats.get("inserted") or 0)
                         skipped_dups = int(insert_stats.get("skipped_duplicates") or 0)
+                        merged = int(insert_stats.get("merged") or 0)
                     else:
                         inserted = len(articles)
 
@@ -288,7 +290,9 @@ class LiteratureSearchPipeline:
                 results[source] = {
                     'count': count,
                     'fetched': len(articles),
+                    'inserted': inserted,
                     'skipped_duplicates': skipped_dups,
+                    'merged': merged,
                     'error': report_error,
                     'error_kind': error_kind if report_error or error_kind == "no_results" else None,
                 }
@@ -305,7 +309,9 @@ class LiteratureSearchPipeline:
                 results[src] = {
                     'count': 0,
                     'fetched': 0,
+                    'inserted': 0,
                     'skipped_duplicates': 0,
+                    'merged': 0,
                     'error': 'Cancelled' if cancelled[0] else None,
                     'error_kind': 'cancelled' if cancelled[0] else None,
                 }
@@ -315,7 +321,9 @@ class LiteratureSearchPipeline:
                 'count': data['count'],
                 'error': data['error'],
                 'error_kind': data.get('error_kind'),
+                'inserted': data.get('inserted', data['count']),
                 'skipped_duplicates': data.get('skipped_duplicates', 0),
+                'merged': data.get('merged', 0),
             }
             for source, data in results.items()
         }

@@ -12,10 +12,20 @@
   poster. Live at `https://www.litpilot.org` from the production checkout,
   `main` through #106 (2026-10-16). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
-- Latest full suite (2026-10-28, `feat/type-aware-exports`): **1766 passed**
-  in 152.69 s, no skips or xfails. `ruff check .` clean; `pyright app` **0 errors**, 6 optional-import
-  warnings (CI blocks on errors). `pip-audit` (2026-10-14): no known
-  vulnerabilities; ROCm torch/triton are un-auditable. No dependency lockfile.
+- Latest full suite (2026-10-28, `feat/merge-duplicates` re-review fixes):
+  **1855 passed** in 150.55 s, no skips or xfails. `ruff check .` clean;
+  `pyright app` **0 errors**, 6 optional-import warnings (CI blocks on
+  errors). `pip-audit` (2026-10-14): no known vulnerabilities; ROCm
+  torch/triton are un-auditable. No dependency lockfile.
+- P1.5 merges a later copy of the same work into the stored row: DOI first,
+  a DOI conflict blocks title merge, title match needs year ±1 plus compatible
+  structured author and container (legacy `journal` counts), and generic
+  titles never title-match on either side. Known full given names must agree;
+  initials still match the expanded name. Edited books use the same vetoes as
+  books. Empty metadata including year and authors is filled; title and
+  abstract are left alone. `skipped_duplicates` still counts merged-or-identical
+  rows; `merged` counts rows that gained a field or a new location. The fetch
+  report names sources that only found papers already in the library.
 - One `/search` workspace replaces the two UI modes. Old `/data-management`,
   `/statistics`, and `/clusters` URLs 301 to Search; a read-only legacy
   preference check supplies a one-time layout notice.
@@ -192,19 +202,18 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-28. P1.4 on `feat/type-aware-exports`: type-aware RIS,
-  BibTeX, APA, CSV and TXT; DOI-first UR; L2 only for an open copy; ERIC
-  publisher fix. Student-facing export copy matches main; the Zotero GEN
-  caveat stays in CHANGELOG only. `static/js/search.js` is identical to
-  main, so its `?v=` token is unchanged.
-- Review-fix validation (production venv, this worktree, no install):
-  `ruff check .` clean, `node --check static/js/search.js` clean, pytest
-  1766 passed in 153.76 s. Scratch is `~/HealthDatabaseAccess-scratch/p14/`.
-  Owner Zotero import samples: `zotero_check.ris` and `zotero_check.bib`
-  in that folder.
+- **Date:** 2026-10-28. P1.5 re-review fixes on `feat/merge-duplicates` (PR #116).
+  Full given names veto title identity; edited-book aliases to book for type
+  vetoes; duplicate-only fetch reports say already in the library; the DOI
+  index keeps every owner so a refresh can rebind; title matching caches
+  normalized title and generic status and rejects DOI conflicts first.
+- Validation (production venv, this worktree, no install): `ruff check .`
+  clean, `pyright app` 0 errors / 6 optional-import warnings, `node --check
+  static/js/collect.js` ok, pytest 1855 passed in 150.55 s. Same-title 5k
+  then 100-row insert median 0.177 s (was 1.777 s). Scratch is
+  `~/HealthDatabaseAccess-scratch/p15/`.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
   and unscheduled roadmap backlog. Ship staging was last recorded at
   `f9485cf`; no host or deployment state changed in this slice.
-- **Next step:** owner Zotero import of the six sample records; review of
-  this PR; no merge or deploy in this slice. Merge-instead-of-skip remains
-  P1.5.
+- **Next step:** independent re-review of PR #116; no merge or deploy in
+  this slice. Run-record in the library remains P1.6.

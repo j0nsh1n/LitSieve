@@ -206,6 +206,11 @@ def _run_multi_fetch(p, *, query, sources, max_results, email, clear_first, uid,
         "error_kinds": error_kinds,
         "cleared_first": actually_cleared,
         "cancelled": cancelled_flag,
+        "inserted": {src: v.get("inserted", v["count"]) for src, v in results.items()},
+        "merged": {src: v.get("merged", 0) for src, v in results.items()},
+        "skipped_duplicates": {
+            src: v.get("skipped_duplicates", 0) for src, v in results.items()
+        },
     }
 
 
