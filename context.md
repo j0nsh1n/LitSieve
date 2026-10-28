@@ -216,14 +216,17 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-28. P1.8 on `feat/search-benchmark`. `tools/eval_search.py`
-  captures, replays, scores, and writes label sheets. `baseline_v1` is in
-  `~/HealthDatabaseAccess-scratch/bench/` (not committed). Label sheets are
-  in `~/HealthDatabaseAccess-scratch/bench/labelsheets/`.
+- **Date:** 2026-10-28. P1.8 review fix on `feat/search-benchmark`. Label
+  sheets now include abstract, DOI or source link, container and stored type,
+  shuffle rows with a stable seed, put rank columns last, and write `Q*.html`
+  beside each CSV. `baseline_v1` and regenerated sheets stay in
+  `~/HealthDatabaseAccess-scratch/bench/` (not committed).
 - Validation (production venv, this worktree, no install): `ruff check .`
   clean, `pyright app tools/eval_search.py` 0 errors / 6 optional-import
-  warnings, pytest 1880 passed in 159.68 s. Scratch is
-  `~/HealthDatabaseAccess-scratch/p18/`.
+  warnings, `tests/test_eval_search.py` 10 passed in 0.71 s. Scratch is
+  `~/HealthDatabaseAccess-scratch/p18/`. Sheets regenerated into
+  `~/HealthDatabaseAccess-scratch/bench/labelsheets/` from
+  `baseline_v1_results.json` (no recapture).
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
   and unscheduled roadmap backlog. Capture of this baseline saw Semantic
   Scholar HTTP 429 on Q1, Q3 and Q5; Europe PMC/medRxiv HTTP 503 on Q4; DOAJ

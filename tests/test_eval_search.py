@@ -168,20 +168,148 @@ def test_labelsheet_output(tmp_path, monkeypatch):
         "replay", "--corpus", str(TINY), "--out", str(results),
         "--work-dir", str(work),
     ]) == 0
+    payload = json.loads(results.read_text(encoding="utf-8"))
+    ranked = [h["key"] for h in payload["questions"][0]["rankings"]["lexical_on"]]
     sheets = tmp_path / "sheets"
     assert ev.main(["labelsheet", "--results", str(results), "--out", str(sheets)]) == 0
     readme = (sheets / "README.md").read_text(encoding="utf-8")
     assert "direct_answer" in readme
     assert "Models do not write these labels" in readme
+    assert "Q*.html" in readme
+    assert "CSV" in readme
+    with (sheets / "Q1.csv").open(encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        assert reader.fieldnames == list(ev.SHEET_COLUMNS)
+        assert reader.fieldnames[:4] == ["key", "title", "abstract", "link"]
+        assert reader.fieldnames[4:13] == [
+            "category", "rationale", "use_in_paper", "work_type", "access_state",
+            "checked_at", "inspection_depth", "duplicate_of", "labeller",
+        ]
+        assert reader.fieldnames[-2:] == ["rank_lexical_on", "rank_lexical_off"]
+        rows = list(reader)
+    keys = [row["key"] for row in rows]
+    assert "10.1234/paper-0" in keys
+    assert keys != ranked
+    by_key = {row["key"]: row for row in rows}
+    paper0 = by_key["10.1234/paper-0"]
+    assert paper0["split"] == "dev"
+    assert by_key["10.1234/paper-1"]["split"] == "test"
+    assert paper0["category"] == ""
+    assert paper0["labeller"] == ""
+    assert paper0["work_type"] == ""
+    assert paper0["abstract"] == (
+        "A trial of later start times found longer sleep among adolescents."
+    )
+    assert paper0["link"] == "https://doi.org/10.1234/paper-0"
+    assert paper0["container"] == "Sleep Health"
+    assert paper0["stored_type"] == "journal-article"
+    pubmed = by_key["pubmed:999000"]
+    assert pubmed["link"] == "https://pubmed.ncbi.nlm.nih.gov/999000/"
+    assert pubmed["abstract"].startswith("Lighting conditions")
+    page = (sheets / "Q1.html").read_text(encoding="utf-8")
+    assert "How do later school start times affect sleep duration among adolescents?" in page
+    assert paper0["title"] in page
+    assert paper0["abstract"] in page
+    assert paper0["link"] in page
+    assert "10.1234/paper-0" in page
+    assert "rank_lexical" not in page
+    assert "<link" not in page
+    assert "src=" not in page
+    second = tmp_path / "sheets2"
+    assert ev.main(["labelsheet", "--results", str(results), "--out", str(second)]) == 0
+    with (second / "Q1.csv").open(encoding="utf-8") as handle:
+        again = [row["key"] for row in csv.DictReader(handle)]
+    assert again == keys
+
+
+def test_labelsheet_html_escapes(tmp_path):
+    corpus = tmp_path / "corpus"
+    qdir = corpus / "Q1"
+    qdir.mkdir(parents=True)
+    articles = [
+        {
+            "article_id": "10.1234/x",
+            "source": "crossref",
+            "title": 'Foo <script>alert(1)</script> & "Bar"',
+            "abstract": "A <b>bold</b> abstract.",
+            "year": "2019",
+            "journal": "Sleep Health",
+            "container_title": "Sleep & Dreams",
+            "work_type": "journal-article",
+            "doi": "10.1234/x",
+        },
+        {
+            "article_id": "999",
+            "source": "pubmed",
+            "title": "No doi paper",
+            "abstract": "Plain abstract.",
+            "year": "2017",
+            "journal": "Sleep Health",
+            "work_type": "review-article",
+            "doi": None,
+        },
+    ]
+    (qdir / "crossref.json").write_text(json.dumps(articles), encoding="utf-8")
+    results = {
+        "corpus": str(corpus),
+        "questions": [{
+            "id": "Q1",
+            "text": "Does later start <help> sleep?",
+            "rankings": {
+                "lexical_on": [
+                    {
+                        "rank": 1, "key": "10.1234/x",
+                        "title": articles[0]["title"], "source": "crossref",
+                        "article_id": "10.1234/x", "year": "2019",
+                        "journal": "Sleep Health", "work_type": None,
+                    },
+                    {
+                        "rank": 2, "key": "pubmed:999",
+                        "title": "No doi paper", "source": "pubmed",
+                        "article_id": "999", "year": "2017",
+                        "journal": "Sleep Health", "work_type": None,
+                    },
+                ],
+                "lexical_off": [],
+            },
+        }],
+    }
+    results_path = tmp_path / "results.json"
+    results_path.write_text(json.dumps(results), encoding="utf-8")
+    sheets = tmp_path / "sheets"
+    assert ev.main(["labelsheet", "--results", str(results_path), "--out", str(sheets)]) == 0
+    page = (sheets / "Q1.html").read_text(encoding="utf-8")
+    assert "<script>alert(1)</script>" not in page
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in page
+    assert "&lt;help&gt;" in page
+    assert "&lt;b&gt;bold&lt;/b&gt;" in page
+    assert "Sleep &amp; Dreams" in page
+    assert "https://doi.org/10.1234/x" in page
+    assert "https://pubmed.ncbi.nlm.nih.gov/999/" in page
     with (sheets / "Q1.csv").open(encoding="utf-8") as handle:
         rows = list(csv.DictReader(handle))
-    keys = {row["key"] for row in rows}
-    assert "10.1234/paper-0" in keys
     by_key = {row["key"]: row for row in rows}
-    assert by_key["10.1234/paper-0"]["split"] == "dev"
-    assert by_key["10.1234/paper-1"]["split"] == "test"
-    assert by_key["10.1234/paper-0"]["category"] == ""
-    assert by_key["10.1234/paper-0"]["labeller"] == ""
+    assert by_key["10.1234/x"]["container"] == "Sleep & Dreams"
+    assert by_key["10.1234/x"]["stored_type"] == "journal-article"
+    assert by_key["pubmed:999"]["stored_type"] == "review-article"
+    assert by_key["pubmed:999"]["link"] == "https://pubmed.ncbi.nlm.nih.gov/999/"
+    expected = ev.shuffle_sheet_rows("Q1", [{"key": "10.1234/x"}, {"key": "pubmed:999"}])
+    assert [row["key"] for row in rows] == [row["key"] for row in expected]
+    second = tmp_path / "sheets2"
+    assert ev.main(["labelsheet", "--results", str(results_path), "--out", str(second)]) == 0
+    with (second / "Q1.csv").open(encoding="utf-8") as handle:
+        again = [row["key"] for row in csv.DictReader(handle)]
+    assert again == [row["key"] for row in rows]
+
+
+def test_shuffle_sheet_rows_is_stable_and_not_rank_order():
+    ranked = [{"key": f"k{i}", "rank_lexical_on": str(i + 1)} for i in range(10)]
+    first = ev.shuffle_sheet_rows("Q1", ranked)
+    second = ev.shuffle_sheet_rows("Q1", ranked)
+    assert [row["key"] for row in first] == [row["key"] for row in second]
+    assert [row["key"] for row in first] != [row["key"] for row in ranked]
+    other = ev.shuffle_sheet_rows("Q2", ranked)
+    assert [row["key"] for row in other] != [row["key"] for row in first]
 
 
 def test_score_metrics(tmp_path):

@@ -22,11 +22,13 @@ import json
 import logging
 import math
 import os
+import random
 import subprocess
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
+from html import escape
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
@@ -34,7 +36,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 from app.content.source_catalog import TOPIC_PACKS, TOPIC_SOURCE_HINTS
-from app.services.citations import article_doi, citation_model
+from app.services.citations import _real_journal, article_doi, article_url, citation_model
 from app.services.pipeline import FETCHERS, LiteratureSearchPipeline
 from app.version import APP_VERSION
 
@@ -77,6 +79,31 @@ LABEL_FIELDS = (
     "split",
     "use_in_paper",
 )
+SHEET_COLUMNS = (
+    "key",
+    "title",
+    "abstract",
+    "link",
+    "category",
+    "rationale",
+    "use_in_paper",
+    "work_type",
+    "access_state",
+    "checked_at",
+    "inspection_depth",
+    "duplicate_of",
+    "labeller",
+    "split",
+    "source",
+    "article_id",
+    "year",
+    "journal",
+    "container",
+    "stored_type",
+    "rank_lexical_on",
+    "rank_lexical_off",
+)
+SHEET_SHUFFLE_SALT = "litsieve-labelsheet-v1"
 
 RankerFn = Callable[..., Dict[str, Any]]
 
@@ -772,7 +799,9 @@ def cmd_score(args: argparse.Namespace) -> int:
 
 def labeller_readme() -> str:
     return (
-        "Label each row from the title, and from the abstract if you look it up. "
+        "Read the Q*.html page for that question. It has the title, year, "
+        "journal or book, abstract and link. Type labels into the matching CSV. "
+        "Ignore the rank columns at the end of the CSV.\n\n"
         "Models do not write these labels.\n\n"
         "Categories\n"
         "- direct_answer: the paper is about the relationship the question asks.\n"
@@ -827,51 +856,189 @@ def pooled_hits(qrow: Mapping[str, Any]) -> List[Dict[str, Any]]:
     return rows
 
 
+def _sheet_cell(value: Any) -> str:
+    if value is None:
+        return ""
+    return str(value)
+
+
+def index_corpus(
+    articles: Sequence[Mapping[str, Any]],
+) -> Tuple[Dict[Tuple[str, str], Dict[str, Any]], Dict[str, Dict[str, Any]]]:
+    by_pair: Dict[Tuple[str, str], Dict[str, Any]] = {}
+    by_key: Dict[str, Dict[str, Any]] = {}
+    for raw in articles:
+        article = dict(raw)
+        source = str(article.get("source") or "")
+        aid = str(article.get("article_id") or "")
+        if source and aid:
+            by_pair[(source, aid)] = article
+        key = stable_key(article)
+        if key:
+            by_key[key] = article
+    return by_pair, by_key
+
+
+def corpus_article(
+    hit: Mapping[str, Any],
+    by_pair: Mapping[Tuple[str, str], Mapping[str, Any]],
+    by_key: Mapping[str, Mapping[str, Any]],
+) -> Dict[str, Any]:
+    source = str(hit.get("source") or "")
+    aid = str(hit.get("article_id") or "")
+    if source and aid:
+        found = by_pair.get((source, aid))
+        if found is not None:
+            return dict(found)
+    key = str(hit.get("key") or "")
+    if key:
+        found = by_key.get(key)
+        if found is not None:
+            return dict(found)
+    return dict(hit)
+
+
+def sheet_link(article: Mapping[str, Any]) -> str:
+    doi = article_doi(dict(article))
+    if doi:
+        return f"https://doi.org/{doi}"
+    return article_url(dict(article)) or ""
+
+
+def sheet_container(article: Mapping[str, Any]) -> str:
+    title = str(article.get("container_title") or "").strip()
+    if title:
+        return title
+    return _real_journal(dict(article))
+
+
+def shuffle_sheet_rows(qid: str, rows: Sequence[Mapping[str, Any]]) -> List[Dict[str, Any]]:
+    out = [dict(row) for row in rows]
+    material = f"{SHEET_SHUFFLE_SALT}:{qid}".encode("utf-8")
+    seed = int.from_bytes(hashlib.sha256(material).digest()[:8], "big")
+    random.Random(seed).shuffle(out)
+    return out
+
+
+def render_labelsheet_html(
+    qid: str,
+    question: str,
+    rows: Sequence[Mapping[str, Any]],
+) -> str:
+    items: List[str] = []
+    for row in rows:
+        title = escape(_sheet_cell(row.get("title")), quote=True)
+        year = escape(_sheet_cell(row.get("year")), quote=True)
+        container = escape(_sheet_cell(row.get("container")), quote=True)
+        abstract = escape(_sheet_cell(row.get("abstract")), quote=True)
+        key = escape(_sheet_cell(row.get("key")), quote=True)
+        link = _sheet_cell(row.get("link"))
+        meta = " · ".join(bit for bit in (year, container) if bit)
+        link_html = ""
+        if link:
+            href = escape(link, quote=True)
+            link_html = f'<p class="link"><a href="{href}">{href}</a></p>\n'
+        items.append(
+            "<article>\n"
+            f"<h2>{title}</h2>\n"
+            f'<p class="meta">{meta}</p>\n'
+            f"<p>{abstract}</p>\n"
+            f"{link_html}"
+            f'<p class="key">{key}</p>\n'
+            "</article>"
+        )
+    qid_e = escape(qid, quote=True)
+    qtext = escape(question, quote=True)
+    body = "\n".join(items)
+    return (
+        "<!DOCTYPE html>\n"
+        '<html lang="en">\n'
+        "<head>\n"
+        '<meta charset="utf-8">\n'
+        f"<title>{qid_e}</title>\n"
+        "<style>\n"
+        "body{font-family:sans-serif;max-width:46rem;margin:1.5rem auto;"
+        "padding:0 1rem;line-height:1.45;color:#111}\n"
+        "h1{font-size:1.2rem}\n"
+        "h2{font-size:1.05rem;margin:0 0 0.2rem}\n"
+        "article{border-top:1px solid #ccc;padding:1rem 0}\n"
+        ".meta,.key{color:#444;font-size:0.9rem}\n"
+        "</style>\n"
+        "</head>\n"
+        "<body>\n"
+        f"<h1>{qid_e}</h1>\n"
+        f"<p>{qtext}</p>\n"
+        "<p>Fill the matching CSV. Papers are in the same order. "
+        "Rank columns are at the end of the CSV.</p>\n"
+        f"{body}\n"
+        "</body>\n"
+        "</html>\n"
+    )
+
+
+def labelsheet_corpus(results: Mapping[str, Any], corpus_arg: Optional[str]) -> Path:
+    raw = corpus_arg or results.get("corpus") or ""
+    text = str(raw).strip()
+    if not text:
+        raise SystemExit("labelsheet needs --corpus or a corpus path in the results file")
+    path = Path(text).expanduser().resolve()
+    if not path.is_dir():
+        raise SystemExit(f"corpus not found: {path}")
+    return path
+
+
+def _sheet_row(hit: Mapping[str, Any], article: Mapping[str, Any]) -> Dict[str, str]:
+    key = _sheet_cell(hit.get("key"))
+    return {
+        "key": key,
+        "title": _sheet_cell(article.get("title") or hit.get("title")),
+        "abstract": _sheet_cell(article.get("abstract")),
+        "link": sheet_link(article),
+        "category": "",
+        "rationale": "",
+        "use_in_paper": "",
+        "work_type": "",
+        "access_state": "",
+        "checked_at": "",
+        "inspection_depth": "",
+        "duplicate_of": "",
+        "labeller": "",
+        "split": assign_split(key) if key else "",
+        "source": _sheet_cell(article.get("source") or hit.get("source")),
+        "article_id": _sheet_cell(article.get("article_id") or hit.get("article_id")),
+        "year": _sheet_cell(article.get("year") or hit.get("year")),
+        "journal": _sheet_cell(article.get("journal") or hit.get("journal")),
+        "container": sheet_container(article),
+        "stored_type": _sheet_cell(article.get("work_type")),
+        "rank_lexical_on": _sheet_cell(hit.get("rank_lexical_on")),
+        "rank_lexical_off": _sheet_cell(hit.get("rank_lexical_off")),
+    }
+
+
 def cmd_labelsheet(args: argparse.Namespace) -> int:
     results = load_json(Path(args.results))
+    corpus = labelsheet_corpus(results, args.corpus)
     out = Path(args.out).expanduser().resolve()
     out.mkdir(parents=True, exist_ok=True)
     (out / "README.md").write_text(labeller_readme(), encoding="utf-8")
     for qrow in results.get("questions") or []:
         qid = str(qrow.get("id") or "Q")
-        path = out / f"{qid}.csv"
-        with path.open("w", encoding="utf-8", newline="") as handle:
-            writer = csv.DictWriter(
-                handle,
-                fieldnames=[
-                    *LABEL_FIELDS,
-                    "rank_lexical_on",
-                    "rank_lexical_off",
-                    "source",
-                    "article_id",
-                    "year",
-                    "journal",
-                ],
-            )
+        question = str(qrow.get("text") or "")
+        by_pair, by_key = index_corpus(load_corpus_articles(corpus / qid))
+        built = [
+            _sheet_row(hit, corpus_article(hit, by_pair, by_key))
+            for hit in pooled_hits(qrow)
+        ]
+        rows = shuffle_sheet_rows(qid, built)
+        csv_path = out / f"{qid}.csv"
+        with csv_path.open("w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=list(SHEET_COLUMNS))
             writer.writeheader()
-            for hit in pooled_hits(qrow):
-                key = str(hit.get("key") or "")
-                writer.writerow({
-                    "key": key,
-                    "title": hit.get("title") or "",
-                    "labeller": "",
-                    "category": "",
-                    "rationale": "",
-                    "work_type": hit.get("work_type") or "",
-                    "access_state": "",
-                    "checked_at": "",
-                    "inspection_depth": "",
-                    "duplicate_of": "",
-                    "split": assign_split(key) if key else "",
-                    "use_in_paper": "",
-                    "rank_lexical_on": hit.get("rank_lexical_on") or "",
-                    "rank_lexical_off": hit.get("rank_lexical_off") or "",
-                    "source": hit.get("source") or "",
-                    "article_id": hit.get("article_id") or "",
-                    "year": hit.get("year") or "",
-                    "journal": hit.get("journal") or "",
-                })
-        print(f"wrote {path}", flush=True)
+            writer.writerows(rows)
+        html_path = out / f"{qid}.html"
+        html_path.write_text(render_labelsheet_html(qid, question, rows), encoding="utf-8")
+        print(f"wrote {csv_path}", flush=True)
+        print(f"wrote {html_path}", flush=True)
     print(f"wrote {out / 'README.md'}", flush=True)
     return 0
 
@@ -904,6 +1071,11 @@ def build_parser() -> argparse.ArgumentParser:
     lab = sub.add_parser("labelsheet", help="Write blank CSVs for a human labeller")
     lab.add_argument("--results", required=True)
     lab.add_argument("--out", required=True)
+    lab.add_argument(
+        "--corpus",
+        default=None,
+        help="Frozen corpus directory (defaults to the path stored in results)",
+    )
     lab.set_defaults(func=cmd_labelsheet)
     return parser
 

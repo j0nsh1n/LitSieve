@@ -35,6 +35,8 @@ and this project aims to follow Semantic Versioning for app version strings
   this".
 
 ### Changed
+- Label sheets include each paper's abstract and a link, shuffle the rows so
+  rank is not first, and write a readable HTML page per question.
 - A later fetch of the same work fills empty metadata (including year and
   authors) on the paper already in the library instead of skipping the new
   copy. Same DOI is the same work across sources; different DOIs stay
