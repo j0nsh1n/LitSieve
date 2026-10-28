@@ -12,8 +12,8 @@
   poster. Live at `https://www.litpilot.org` from the production checkout,
   `main` through #106 (2026-10-16). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
-- Latest full suite (2026-10-28, `feat/keep-metadata-other-sources`): **1754 passed**
-  in 153.95 s, no skips or xfails. `ruff check .` clean; `pyright app` **0 errors**, 6 optional-import
+- Latest full suite (2026-10-28, `feat/type-aware-exports`): **1766 passed**
+  in 152.69 s, no skips or xfails. `ruff check .` clean; `pyright app` **0 errors**, 6 optional-import
   warnings (CI blocks on errors). `pip-audit` (2026-10-14): no known
   vulnerabilities; ROCm torch/triton are un-auditable. No dependency lockfile.
 - One `/search` workspace replaces the two UI modes. Old `/data-management`,
@@ -53,13 +53,18 @@
 - P0.2 removes fake-journal fallbacks, excludes known placeholders from
   RIS, BibTeX and APA, cleans Crossref titles and containers, and corrects
   the publication-year hint. Repository raw journal recovery remains.
+- P1.4 exports follow each record's type. RIS `UR` prefers the DOI, `L2` is
+  only a listed open copy, and the discovery page goes in `N1`. APA uses
+  `https://doi.org/<doi>` for every DOI. Zotero imports RIS `GEN` as a
+  journal article; BibTeX `@misc` is the generic type. ERIC non-journal
+  rows store the issuing organization as publisher.
 - P1.1 adds nine nullable work-metadata fields, nonunique DOI indexes,
   `article_extra` and its staging mirror, and a shared article column list
   for readers, inserts and replace fetches. The provider-record helper stores
   UTF-8 JSON only when its zlib-compressed size is at most 4096 bytes.
   Search ranking uses the original article columns; API responses omit unset
-  metadata keys. Exports and quota are unchanged; clones keep article fields
-  but exclude `article_extra`.
+  metadata keys. Quota is unchanged; clones keep article fields but exclude
+  `article_extra`.
 - P1.2 fills those fields on new OpenAlex, Crossref and DOAJ fetches, and
   writes provenance, locations and a trimmed provider record into
   `article_extra`. Search, ranking, exports and older rows are unchanged.
@@ -187,18 +192,19 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-28. P1.3 on `feat/keep-metadata-other-sources`: remaining
-  fetchers fill work metadata and `article_extra` on new fetches. Ruff
-  passes, Pyright has 0 errors and 6 optional-import warnings, and full
-  pytest has 1754 passed. No JS changed.
-- Validation used production venv executables from this isolated worktree
-  without installation. Live-provider and real-browser checks were not run.
-  Semantic Scholar has no live fixture (field check returned only 429s).
-  Tests ran under nice with the 6 GiB available-memory stop guard; available
-  memory was 18 GiB at the start of the successful full run. Scratch is in
-  `~/HealthDatabaseAccess-scratch/p13/`.
+- **Date:** 2026-10-28. P1.4 on `feat/type-aware-exports`: type-aware RIS,
+  BibTeX, APA, CSV and TXT; DOI-first UR; L2 only for an open copy; ERIC
+  publisher fix. Student-facing export copy matches main; the Zotero GEN
+  caveat stays in CHANGELOG only. `static/js/search.js` is identical to
+  main, so its `?v=` token is unchanged.
+- Review-fix validation (production venv, this worktree, no install):
+  `ruff check .` clean, `node --check static/js/search.js` clean, pytest
+  1766 passed in 153.76 s. Scratch is `~/HealthDatabaseAccess-scratch/p14/`.
+  Owner Zotero import samples: `zotero_check.ris` and `zotero_check.bib`
+  in that folder.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
   and unscheduled roadmap backlog. Ship staging was last recorded at
   `f9485cf`; no host or deployment state changed in this slice.
-- **Next step:** review of this PR; no merge or deploy in this slice.
-  Export changes remain P1.4.
+- **Next step:** owner Zotero import of the six sample records; review of
+  this PR; no merge or deploy in this slice. Merge-instead-of-skip remains
+  P1.5.

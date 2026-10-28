@@ -297,9 +297,12 @@ def test_search_and_exports_omit_extra_and_match_legacy_bytes(db_path):
         assert filled["doi"] == article["doi"]
         export_rows = pipe.db.get_library_export_rows()
         assert all("_extra" not in row for row in export_rows)
-        assert collection_to_ris(export_rows) == collection_to_ris([legacy])
-        assert collection_to_bibtex(export_rows) == collection_to_bibtex([legacy])
-        assert collection_to_apa(export_rows) == collection_to_apa([legacy])
+        filled_ris = collection_to_ris(export_rows)
+        assert "DO  - " in filled_ris
+        assert "https://doi.org/" in filled_ris
+        assert filled_ris != collection_to_ris([legacy])
+        assert collection_to_bibtex(export_rows) != collection_to_bibtex([legacy])
+        assert "doi.org" in collection_to_apa(export_rows)
 
         leak = dict(filled)
         leak["_extra"] = {"provider_record": {"secret": True}}

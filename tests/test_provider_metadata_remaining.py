@@ -86,7 +86,32 @@ def test_eric_report_without_url_leaves_doi_null():
     article = ERICFetcher()._parse_doc(load("eric_report.json")["response"]["docs"][0])
     assert article["work_type"] == "report"
     assert article["doi"] is None
-    assert article["container_title"] == "Abell Foundation"
+    assert article["container_title"] is None
+    assert article["journal"] == ""
+    assert json.loads(article["biblio"])["publisher"] == "Abell Foundation"
+
+
+def test_eric_non_journal_types_move_source_to_publisher():
+    report = ERICFetcher()._parse_doc(load("eric_report.json")["response"]["docs"][0])
+    assert report["container_title"] is None
+    assert json.loads(report["biblio"])["publisher"] == "Abell Foundation"
+    book = ERICFetcher()._parse_doc({
+        "id": "ED1",
+        "title": "A book",
+        "description": "Abstract.",
+        "source": "Harvard Education Press",
+        "publicationtype": ["Books"],
+        "isbn": "9780262014793",
+    })
+    assert book["work_type"] == "book"
+    assert book["container_title"] is None
+    assert book["journal"] == ""
+    biblio = json.loads(book["biblio"])
+    assert biblio["publisher"] == "Harvard Education Press"
+    assert biblio["isbn"] == ["9780262014793"]
+    journal = ERICFetcher()._parse_doc(load("eric_journal.json")["response"]["docs"][0])
+    assert journal["container_title"] == "Educational Researcher"
+    assert "publisher" not in json.loads(journal["biblio"] or "{}")
 
 
 def test_pubmed_review_beats_journal_article_and_fills_doi(monkeypatch):
@@ -341,9 +366,12 @@ def test_exports_and_search_omit_extra_and_match_legacy_bytes(db_path):
         assert "_extra" not in filled
         export_rows = pipe.db.get_library_export_rows()
         assert all("_extra" not in row for row in export_rows)
-        assert collection_to_ris(export_rows) == collection_to_ris([legacy])
-        assert collection_to_bibtex(export_rows) == collection_to_bibtex([legacy])
-        assert collection_to_apa(export_rows) == collection_to_apa([legacy])
+        filled_ris = collection_to_ris(export_rows)
+        assert "DO  - " in filled_ris
+        assert "https://doi.org/" in filled_ris
+        assert filled_ris != collection_to_ris([legacy])
+        assert collection_to_bibtex(export_rows) != collection_to_bibtex([legacy])
+        assert "doi.org" in collection_to_apa(export_rows)
         leak = dict(filled)
         leak["_extra"] = {"provider_record": {"secret": True}}
         assert "_extra" not in omit_null_metadata(leak)
