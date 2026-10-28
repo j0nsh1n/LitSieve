@@ -1,6 +1,12 @@
 # context.md — LitSieve
 
 ## Current State
+- Tunnel maintenance (2026-10-26): host RPM `cloudflared-2026.10.4-1.fc44`
+  was already installed. Restarted `cloudflared-litpilot-token.service` to
+  replace its running 2026.10.3 process with 2026.10.4. Four connections
+  registered; public and loopback `/health` returned HTTP 200. Cloudflare's
+  eMudhra advisory requires 2026.10.2 or later. A separate system-wide
+  `cloudflared.service` was in an auto-restart loop; it was not changed.
 - App version **6.0.0**, released 2026-10-12. GitHub release `v6.0.0` (at
   `25356cb`) holds the tour video (1080p and 4K); the README opens with its
   poster. Live at `https://www.litpilot.org` from the production checkout,
@@ -159,6 +165,11 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
+- **Date:** 2026-10-26. Branch `chore/cloudflared-maintenance`. Verified the
+  current Cloudflare release and eMudhra advisory, activated 2026.10.4 for
+  LitPilot, and checked tunnel registrations and public/local health. No
+  application code changed. The separate system-wide service's restart
+  loop remains uninvestigated.
 - **Date:** 2026-10-16. The 2026-10-15 audit is closed: #93 to #106 merged
   and deployed, and Cloudflare lets `/health` through. The last three PRs
   were backlog work: per-library job slots and saved sample vectors (#104),
