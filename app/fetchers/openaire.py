@@ -145,7 +145,7 @@ class OpenAIREFetcher(BaseFetcher):
 
             date = _node_text(meta.get("dateofacceptance") or meta.get("relevantdate"))
             year = date[:4] if date else ""
-            journal = _node_text(meta.get("journal")) or "OpenAIRE"
+            journal = _node_text(meta.get("journal"))
 
             # Prefer a DOI, else the first pid (a PMID is a JSON number, so it is
             # stringified), else the OpenAIRE object id.

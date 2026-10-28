@@ -98,9 +98,9 @@ class PLOSFetcher(BaseFetcher):
             authors = [str(a).strip() for a in authors if str(a).strip()]
             pub = doc.get("publication_date") or ""
             year = str(pub)[:4] if pub else ""
-            journal = doc.get("journal") or "PLOS"
+            journal = doc.get("journal") or ""
             if isinstance(journal, list):
-                journal = journal[0] if journal else "PLOS"
+                journal = journal[0] if journal else ""
             aid = (doc.get("id") or "").strip()
             if not aid:
                 return None

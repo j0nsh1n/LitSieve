@@ -96,7 +96,7 @@ class HALFetcher(BaseFetcher):
             authors = [str(a).strip() for a in authors if str(a).strip()]
             year = doc.get("producedDateY_i")
             year = str(year) if year else ""
-            journal = self._first(doc.get("journalTitle_s")) or "HAL"
+            journal = self._first(doc.get("journalTitle_s"))
             aid = self._first(doc.get("doiId_s")) or self._first(doc.get("halId_s"))
             if not aid:
                 return None

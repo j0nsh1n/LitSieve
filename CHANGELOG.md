@@ -70,6 +70,19 @@ and this project aims to follow Semantic Versioning for app version strings
   error text; the server log keeps it.
 
 ### Fixed
+- Fetchers leave missing journals empty instead of using OpenAIRE, HAL,
+  PLOS, Zenodo publishers, arXiv categories, preprint server names, or
+  ERIC's "Online Submission". OpenAlex skips e-book platforms and repository
+  names while keeping real journals recovered through `raw_source_name`.
+- RIS, BibTeX and APA omit known source and platform placeholders from
+  the journal, including those in older stored papers. PLOS ONE and PLOS
+  Biology remain journals. ClinicalTrials.gov keeps its stored label,
+  but exports omit that label as a journal; RIS still uses `TY  - JOUR`.
+- Crossref decodes HTML entities in titles and container names, so
+  "City &amp; Community" becomes "City & Community". Abstract handling
+  is unchanged.
+- Search's year-range hint explains that the filter uses publication
+  year and keeps undated papers after dated ones.
 - Collect topics with punctuation work with DOAJ, HAL and PLOS. DOAJ
   removes disabled Lucene syntax and encodes the topic as one URL path
   segment, so a slash such as "HIV/AIDS" cannot split the path. HAL escapes

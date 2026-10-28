@@ -109,11 +109,6 @@ class ArXivFetcher(BaseFetcher):
             if pub_el is not None and pub_el.text:
                 year = pub_el.text[:4]
 
-            journal = ''
-            cat_el = entry.find('ax:primary_category', ns)
-            if cat_el is not None:
-                journal = f"arXiv:{cat_el.get('term', '')}"
-
             return {
                 'article_id': arxiv_id,
                 'source': 'arxiv',
@@ -121,7 +116,7 @@ class ArXivFetcher(BaseFetcher):
                 'abstract': abstract,
                 'year': year,
                 'authors': authors,
-                'journal': journal,
+                'journal': '',
             }
         except Exception as e:
             logger.exception("arXiv parse error: %s", e)

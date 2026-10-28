@@ -8,7 +8,14 @@ import logging
 import re
 from typing import Dict, List, Optional
 
-from app.fetchers.base import BaseFetcher, HttpClient, json_of, reraise_fetch_error, user_agent
+from app.fetchers.base import (
+    BaseFetcher,
+    HttpClient,
+    clean_text,
+    json_of,
+    reraise_fetch_error,
+    user_agent,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +73,7 @@ class CrossRefFetcher(BaseFetcher):
         try:
             doi = item.get('DOI', '').strip()
             titles = item.get('title', [])
-            title = titles[0].strip() if titles else ''
+            title = clean_text(titles[0]) if titles else ''
 
             raw_abstract = item.get('abstract', '') or ''
             abstract = _JATS_TAG.sub('', raw_abstract).strip()
@@ -90,7 +97,7 @@ class CrossRefFetcher(BaseFetcher):
                 year = str(date_parts[0][0])
 
             containers = item.get('container-title', [])
-            journal = containers[0] if containers else ''
+            journal = clean_text(containers[0]) if containers else ''
 
             return {
                 'article_id': doi,

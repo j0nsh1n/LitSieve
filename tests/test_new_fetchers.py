@@ -48,7 +48,7 @@ def test_biorxiv_searches_europepmc_for_that_servers_preprints(monkeypatch):
         "10.64898/2026.10.06.757199",
     ]
     assert {a["source"] for a in arts} == {"biorxiv"}
-    assert {a["journal"] for a in arts} == {"bioRxiv preprint"}
+    assert {a["journal"] for a in arts} == {""}
     assert all(a["abstract"] and "<" not in a["abstract"] for a in arts)
     assert len(arts[0]["authors"]) == 14
 
@@ -65,7 +65,7 @@ def test_medrxiv_is_scoped_to_medrxiv(monkeypatch):
     arts = f.search_and_fetch("heart disease", max_results=2)
     assert calls[0]["query"].endswith('PUBLISHER:"medRxiv"')
     assert {a["source"] for a in arts} == {"medrxiv"}
-    assert {a["journal"] for a in arts} == {"medRxiv preprint"}
+    assert {a["journal"] for a in arts} == {""}
 
 
 def test_rxiv_skips_a_preprint_without_a_doi_and_reports_no_results(monkeypatch):

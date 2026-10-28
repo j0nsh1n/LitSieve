@@ -72,6 +72,9 @@ class ERICFetcher(BaseFetcher):
                 authors = [a.strip() for a in raw_authors.split(';') if a.strip()]
 
             year = doc.get('publicationdateyear')
+            journal = doc.get('source', '') or ''
+            if journal == 'Online Submission':
+                journal = ''
             return {
                 'article_id': doc.get('id', ''),
                 'source': 'eric',
@@ -79,7 +82,7 @@ class ERICFetcher(BaseFetcher):
                 'abstract': abstract,
                 'year': str(year) if year else '',
                 'authors': authors,
-                'journal': doc.get('source', '') or '',
+                'journal': journal,
             }
         except Exception as e:
             logger.exception("ERIC parse error: %s", e)

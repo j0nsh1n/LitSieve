@@ -60,6 +60,15 @@ def test_no_year_group_has_a_full_width_heading():
     assert ".results-group-heading, .results-group-note) {\n    grid-column: 1 / -1;" in css
 
 
+def test_year_range_hint_explains_publication_year_and_undated_papers():
+    template = _read("templates", "search.html")
+    assert (
+        "Uses the year each paper was published. "
+        "Papers with no year stay in the list, after the dated ones."
+    ) in template
+    assert "Papers with unknown year are hidden when a range is set." not in template
+
+
 def test_score_tooltip_says_the_list_is_sorted_by_it():
     card = _slice(_read("static", "js", "search.js"), "function buildResultCard(", "const url = getArticleUrl")
     assert "sorted" in card

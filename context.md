@@ -12,8 +12,8 @@
   poster. Live at `https://www.litpilot.org` from the production checkout,
   `main` through #106 (2026-10-16). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
-- Latest full suite (2026-10-28, `fix/safe-provider-queries`): **1354 passed**
-  in 152.71 s, no skips or xfails. `ruff check .` clean; `pyright app` **0 errors**, 6 optional-import
+- Latest full suite (2026-10-28, `fix/no-fake-journals`): **1489 passed**
+  in 144.51 s, no skips or xfails. `ruff check .` clean; `pyright app` **0 errors**, 6 optional-import
   warnings (CI blocks on errors). `pip-audit` (2026-10-14): no known
   vulnerabilities; ROCm torch/triton are un-auditable. No dependency lockfile.
 - One `/search` workspace replaces the two UI modes. Old `/data-management`,
@@ -50,6 +50,9 @@
   and HAL reject blank or punctuation-only topics as `bad_query` before a
   request; source reports explain unreadable search words in plain English.
   No keyword rewriting, schema or ranking change.
+- P0.2 removes fake-journal fallbacks, excludes known placeholders from
+  RIS, BibTeX and APA, cleans Crossref titles and containers, and corrects
+  the publication-year hint. Repository raw journal recovery remains.
 - New support-view/ticket records omit mode; old history remains readable.
 - Host (2026-10-16): `MAX_TOTAL_ACCOUNTS=100` (27 real accounts then); the
   study aid is `LLM_PROVIDER=ollama`, `OLLAMA_MODEL=qwen2.5:14b` on the
@@ -170,14 +173,14 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-28. P0.1, branch `fix/safe-provider-queries`, implements
-  safe provider punctuation and `bad_query` source reports. Ruff passes,
-  Pyright has 0 errors and 6 optional-import warnings, full pytest has
-  1354 passed, and `node --check static/js/collect.js` exits 0.
+- **Date:** 2026-10-28. P0.2, branch `fix/no-fake-journals`, starts at
+  `d877aac` with P0.1 merged. Ruff passes, Pyright has 0 errors and 6
+  optional-import warnings, full pytest has 1489 passed, and focused
+  metadata, citation and year-filter tests have 226 passed. No JS changed.
 - Validation used production venv executables from this isolated worktree
-  without installation. Tests used request stubs and Node report rendering;
-  live-provider and real-browser checks were not run. Test-group peak RSS
-  was 1.91 GiB under the 6 GiB available-memory stop guard.
+  without installation. Live-provider and real-browser checks were not run.
+  Tests ran under nice with the 6 GiB available-memory stop guard; minimum
+  available memory was 12.95 GiB. Scratch is in `~/HealthDatabaseAccess-scratch/p02/`.
 - GLM-5.3-Flash through T3/OpenCode drafted the changelog and PR body; the
   implementation agent checked and corrected them against the code.
-- **Next step:** parent review of the P0.1 PR; no merge or deploy in this slice.
+- **Next step:** parent review of the P0.2 PR; no merge or deploy in this slice.
