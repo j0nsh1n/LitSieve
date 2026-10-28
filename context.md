@@ -12,10 +12,15 @@
   poster. Live at `https://www.litpilot.org` from the production checkout,
   `main` through #106 (2026-10-16). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
-- Latest full suite (2026-10-28, `feat/type-aware-exports`): **1766 passed**
-  in 152.69 s, no skips or xfails. `ruff check .` clean; `pyright app` **0 errors**, 6 optional-import
+- Latest full suite (2026-10-28, `feat/merge-duplicates`): **1780 passed**
+  in 149.73 s, no skips or xfails. `ruff check .` clean; `pyright app` **0 errors**, 6 optional-import
   warnings (CI blocks on errors). `pip-audit` (2026-10-14): no known
   vulnerabilities; ROCm torch/triton are un-auditable. No dependency lockfile.
+- P1.5 merges a later copy of the same work into the stored row: DOI first,
+  a DOI conflict blocks title merge, title match needs year ±1 plus compatible
+  author and container, and generic titles never title-match. Empty metadata
+  is filled; title and abstract are left alone. `skipped_duplicates` still
+  counts merged-or-identical rows; `merged` counts rows that gained a field.
 - One `/search` workspace replaces the two UI modes. Old `/data-management`,
   `/statistics`, and `/clusters` URLs 301 to Search; a read-only legacy
   preference check supplies a one-time layout notice.
@@ -192,19 +197,15 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-28. P1.4 on `feat/type-aware-exports`: type-aware RIS,
-  BibTeX, APA, CSV and TXT; DOI-first UR; L2 only for an open copy; ERIC
-  publisher fix. Student-facing export copy matches main; the Zotero GEN
-  caveat stays in CHANGELOG only. `static/js/search.js` is identical to
-  main, so its `?v=` token is unchanged.
-- Review-fix validation (production venv, this worktree, no install):
-  `ruff check .` clean, `node --check static/js/search.js` clean, pytest
-  1766 passed in 153.76 s. Scratch is `~/HealthDatabaseAccess-scratch/p14/`.
-  Owner Zotero import samples: `zotero_check.ris` and `zotero_check.bib`
-  in that folder.
+- **Date:** 2026-10-28. P1.5 on `feat/merge-duplicates` from `origin/main`
+  `b772a6b`. New fetches of the same work merge empty metadata into the
+  stored `(article_id, source)` row; conflicting DOIs stay separate rows.
+  No JS change.
+- Validation (production venv, this worktree, no install): `ruff check .`
+  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest
+  1780 passed in 149.73 s. Scratch is `~/HealthDatabaseAccess-scratch/p15/`.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
   and unscheduled roadmap backlog. Ship staging was last recorded at
   `f9485cf`; no host or deployment state changed in this slice.
-- **Next step:** owner Zotero import of the six sample records; review of
-  this PR; no merge or deploy in this slice. Merge-instead-of-skip remains
-  P1.5.
+- **Next step:** review of this PR; no merge or deploy in this slice.
+  Run-record in the library remains P1.6.

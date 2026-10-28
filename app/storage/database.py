@@ -8,12 +8,15 @@ import logging
 import pickle
 import re
 import threading
+import unicodedata
 import zlib
 from contextlib import contextmanager
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
+from app.services.citations import _is_placeholder_journal
+from app.services.work_types import normalize_doi
 from app.storage import dbconn
 
 logger = logging.getLogger(__name__)
@@ -25,6 +28,24 @@ ARTICLE_COLUMNS = (
     "oa_status", "best_oa_url", "evidence_basis", "biblio",
 )
 SEARCH_ARTICLE_COLUMNS = ARTICLE_COLUMNS[:7]
+_MERGE_COLUMNS = ARTICLE_COLUMNS[7:]
+_GENERIC_TITLES = frozenset({
+    "introduction",
+    "conclusion",
+    "preface",
+    "foreword",
+    "index",
+    "front matter",
+    "back matter",
+    "bibliography",
+    "references",
+    "epilogue",
+    "prologue",
+    "acknowledgments",
+    "acknowledgements",
+    "editorial",
+})
+_CHAPTER_TITLE = re.compile(r"^chapter \d+$")
 
 
 def _row_to_article(row, columns: Tuple[str, ...] = ARTICLE_COLUMNS) -> Dict:
@@ -728,24 +749,365 @@ class ArticleDatabase:
 
     @staticmethod
     def _norm_title(title: str) -> str:
-        """Normalize title for cheap fetch-time near-duplicate checks."""
-        t = (title or "").lower()
-        t = re.sub(r"[^a-z0-9\s]", " ", t)
-        t = re.sub(r"\s+", " ", t).strip()
-        return t
+        """Normalize title for identity: casefold, NFKD, keep letters and digits."""
+        t = unicodedata.normalize("NFKD", title or "").casefold()
+        chars = [ch if ch.isalnum() or ch.isspace() else " " for ch in t]
+        return re.sub(r"\s+", " ", "".join(chars)).strip()
 
     @staticmethod
-    def _norm_doi(article_id: str, source: str) -> str:
-        """Normalize DOI-like ids (CrossRef and bare DOI strings)."""
-        raw = (article_id or "").strip().lower()
-        if not raw:
+    def _article_doi(article: Dict) -> str:
+        """Bare DOI from the doi column, else a DOI-shaped article_id."""
+        return (
+            normalize_doi(article.get("doi"))
+            or normalize_doi(article.get("article_id"))
+            or ""
+        )
+
+    @staticmethod
+    def _norm_doi(article_id: str, source: str, doi: Optional[str] = None) -> str:
+        """Normalize a DOI from the doi column or a DOI-shaped article_id."""
+        return ArticleDatabase._article_doi(
+            {"article_id": article_id, "source": source, "doi": doi}
+        )
+
+    @staticmethod
+    def _is_generic_title(nt: str, has_doi: bool) -> bool:
+        if not nt:
+            return True
+        if nt in _GENERIC_TITLES or _CHAPTER_TITLE.match(nt):
+            return True
+        return (not has_doi) and len(nt.split()) < 4
+
+    @staticmethod
+    def _year_int(year: Any) -> Optional[int]:
+        if year is None:
+            return None
+        match = re.search(r"\b(\d{4})\b", str(year))
+        return int(match.group(1)) if match else None
+
+    @staticmethod
+    def _first_author_family(authors: Any) -> str:
+        if not authors:
             return ""
-        raw = raw.replace("https://doi.org/", "").replace("http://doi.org/", "")
-        raw = raw.replace("doi:", "").strip()
-        # CrossRef always uses DOI as id; others only if it looks like one.
-        if source == "crossref" or raw.startswith("10."):
-            return raw
-        return ""
+        if isinstance(authors, str):
+            try:
+                authors = json.loads(authors)
+            except json.JSONDecodeError:
+                authors = [authors]
+        if not isinstance(authors, list) or not authors:
+            return ""
+        name = authors[0]
+        if isinstance(name, dict):
+            family = name.get("family") or name.get("last")
+            if family:
+                return ArticleDatabase._norm_title(str(family))
+            name = name.get("name") or name.get("display_name") or ""
+        text = str(name or "").strip()
+        if not text:
+            return ""
+        if "," in text:
+            family = text.split(",", 1)[0]
+        else:
+            parts = text.split()
+            family = parts[-1] if parts else ""
+        return ArticleDatabase._norm_title(family)
+
+    @staticmethod
+    def _value_empty(value: Any) -> bool:
+        if value is None:
+            return True
+        if isinstance(value, str) and not value.strip():
+            return True
+        if isinstance(value, (list, dict)) and not value:
+            return True
+        return False
+
+    @staticmethod
+    def _parse_biblio(value: Any) -> Dict:
+        if value is None or value == "":
+            return {}
+        if isinstance(value, dict):
+            return dict(value)
+        if isinstance(value, str):
+            try:
+                data = json.loads(value)
+            except json.JSONDecodeError:
+                return {}
+            return data if isinstance(data, dict) else {}
+        return {}
+
+    @staticmethod
+    def _field_equal(left: Any, right: Any) -> bool:
+        if isinstance(left, str) or isinstance(right, str):
+            return str(left or "").strip() == str(right or "").strip()
+        return left == right
+
+    @staticmethod
+    def _merge_locations(existing: Any, incoming: Any) -> List[Dict]:
+        out: List[Dict] = []
+        seen: set = set()
+        for loc in list(existing or []) + list(incoming or []):
+            if not isinstance(loc, dict):
+                continue
+            url = str(loc.get("url") or loc.get("URL") or "")
+            if url:
+                if url in seen:
+                    continue
+                seen.add(url)
+                out.append(loc)
+            elif loc not in out:
+                out.append(loc)
+        return out
+
+    def _title_same_work(self, existing: Dict, incoming: Dict) -> bool:
+        """Title-path identity: veto on DOI conflict; year ±1; author; container."""
+        existing_doi = self._article_doi(existing)
+        incoming_doi = self._article_doi(incoming)
+        if existing_doi and incoming_doi and existing_doi != incoming_doi:
+            return False
+        existing_year = self._year_int(existing.get("year"))
+        incoming_year = self._year_int(incoming.get("year"))
+        if existing_year is None or incoming_year is None:
+            return False
+        if abs(existing_year - incoming_year) > 1:
+            return False
+        existing_family = self._first_author_family(existing.get("authors"))
+        incoming_family = self._first_author_family(incoming.get("authors"))
+        if (
+            existing_family
+            and incoming_family
+            and existing_family != incoming_family
+        ):
+            return False
+        existing_container = self._norm_title(existing.get("container_title") or "")
+        incoming_container = self._norm_title(incoming.get("container_title") or "")
+        if (
+            existing_container
+            and incoming_container
+            and existing_container != incoming_container
+        ):
+            return False
+        return True
+
+    def _find_duplicate_key(
+        self,
+        article: Dict,
+        doi_index: Dict[str, Tuple[str, str]],
+        title_index: Dict[str, List[Tuple[str, str]]],
+        records: Dict[Tuple[str, str], Dict],
+    ) -> Optional[Tuple[str, str]]:
+        doi = self._article_doi(article)
+        if doi and doi in doi_index:
+            return doi_index[doi]
+        nt = self._norm_title(article.get("title") or "")
+        if not nt or self._is_generic_title(nt, bool(doi)):
+            return None
+        for key in title_index.get(nt, ()):
+            existing = records.get(key)
+            if existing is not None and self._title_same_work(existing, article):
+                return key
+        return None
+
+    def _index_article(
+        self,
+        article: Dict,
+        doi_index: Dict[str, Tuple[str, str]],
+        title_index: Dict[str, List[Tuple[str, str]]],
+        records: Dict[Tuple[str, str], Dict],
+    ) -> None:
+        key = (article["article_id"], article.get("source") or "pubmed")
+        records[key] = article
+        doi = self._article_doi(article)
+        if doi and doi not in doi_index:
+            doi_index[doi] = key
+        nt = self._norm_title(article.get("title") or "")
+        if nt and key not in title_index.get(nt, ()):
+            title_index.setdefault(nt, []).append(key)
+
+    def _merge_field_updates(
+        self, existing: Dict, incoming: Dict, incoming_source: str
+    ) -> Tuple[Dict[str, Any], Dict[str, str], Dict[str, Any]]:
+        updates: Dict[str, Any] = {}
+        filled: Dict[str, str] = {}
+        conflicts: Dict[str, Any] = {}
+
+        stored_journal = (existing.get("journal") or "").strip()
+        incoming_journal = (incoming.get("journal") or "").strip()
+        stored_placeholder = (not stored_journal) or _is_placeholder_journal(stored_journal)
+        incoming_real = bool(incoming_journal) and not _is_placeholder_journal(
+            incoming_journal
+        )
+        if stored_placeholder and incoming_real:
+            updates["journal"] = incoming_journal
+            filled["journal"] = incoming_source
+        elif (
+            incoming_real
+            and stored_journal
+            and not stored_placeholder
+            and stored_journal != incoming_journal
+        ):
+            conflicts["journal"] = {"value": incoming_journal, "source": incoming_source}
+
+        for name in _MERGE_COLUMNS:
+            if name == "biblio":
+                continue
+            incoming_value = incoming.get(name)
+            existing_value = existing.get(name)
+            if self._value_empty(incoming_value):
+                continue
+            if self._value_empty(existing_value):
+                updates[name] = incoming_value
+                filled[name] = incoming_source
+            elif not self._field_equal(existing_value, incoming_value):
+                conflicts[name] = {"value": incoming_value, "source": incoming_source}
+
+        existing_biblio = self._parse_biblio(existing.get("biblio"))
+        incoming_biblio = self._parse_biblio(incoming.get("biblio"))
+        if incoming_biblio:
+            if not existing_biblio:
+                updates["biblio"] = incoming_biblio
+                filled["biblio"] = incoming_source
+            else:
+                merged_biblio = dict(existing_biblio)
+                biblio_changed = False
+                biblio_conflicts: Dict[str, Any] = {}
+                for key, value in incoming_biblio.items():
+                    if self._value_empty(value):
+                        continue
+                    if self._value_empty(merged_biblio.get(key)):
+                        merged_biblio[key] = value
+                        biblio_changed = True
+                    elif merged_biblio.get(key) != value:
+                        biblio_conflicts[key] = value
+                if biblio_changed:
+                    updates["biblio"] = merged_biblio
+                    filled["biblio"] = incoming_source
+                if biblio_conflicts:
+                    conflicts["biblio"] = {
+                        "value": biblio_conflicts,
+                        "source": incoming_source,
+                    }
+        return updates, filled, conflicts
+
+    def _merge_article_extra(
+        self,
+        cursor,
+        article_id: str,
+        source: str,
+        extra: Optional[Dict],
+        filled: Dict[str, str],
+        conflicts: Dict[str, Any],
+        *,
+        staging: bool,
+    ) -> None:
+        table = "staging_article_extra" if staging else "article_extra"
+        row = cursor.execute(
+            f"SELECT provenance, locations, provider_record, raw_status "
+            f"FROM {table} WHERE article_id = ? AND source = ?",
+            (article_id, source),
+        ).fetchone()
+        blob = status = None
+        if row:
+            try:
+                provenance = json.loads(row[0] or "{}")
+            except json.JSONDecodeError:
+                provenance = {}
+            try:
+                locations = json.loads(row[1] or "[]")
+            except json.JSONDecodeError:
+                locations = []
+            if not isinstance(provenance, dict):
+                provenance = {}
+            if not isinstance(locations, list):
+                locations = []
+            blob, status = row[2], row[3]
+        else:
+            provenance, locations = {}, []
+            record = (extra or {}).get("provider_record")
+            if isinstance(record, dict):
+                blob, status = encode_provider_record(record)
+
+        for field, src in filled.items():
+            provenance[field] = src
+        if conflicts:
+            existing_conflicts = provenance.get("conflicts")
+            if not isinstance(existing_conflicts, dict):
+                existing_conflicts = {}
+            for field, payload in conflicts.items():
+                existing_conflicts.setdefault(field, payload)
+            provenance["conflicts"] = existing_conflicts
+
+        incoming_locations = (extra or {}).get("locations") or []
+        locations = self._merge_locations(locations, incoming_locations)
+        if (
+            not filled
+            and not conflicts
+            and not incoming_locations
+            and row is None
+        ):
+            return
+        cursor.execute(
+            f"""
+            INSERT INTO {table}
+                (article_id, source, provenance, locations, provider_record, raw_status)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(article_id, source) DO UPDATE SET
+                provenance = excluded.provenance,
+                locations = excluded.locations
+            """,
+            (
+                article_id,
+                source,
+                json.dumps(provenance, ensure_ascii=False, separators=(",", ":")),
+                json.dumps(locations, ensure_ascii=False, separators=(",", ":")),
+                blob,
+                status,
+            ),
+        )
+
+    def _merge_into(
+        self,
+        cursor,
+        existing: Dict,
+        incoming: Dict,
+        extra: Optional[Dict],
+        *,
+        staging: bool,
+        doi_index: Dict[str, Tuple[str, str]],
+    ) -> bool:
+        """Fill empty fields on existing from incoming. Returns True if a field was filled."""
+        incoming_source = incoming.get("source") or "pubmed"
+        updates, filled, conflicts = self._merge_field_updates(
+            existing, incoming, incoming_source
+        )
+        if updates:
+            assignments = []
+            values: List[Any] = []
+            for name, value in updates.items():
+                assignments.append(f"{name} = ?")
+                values.append(self._column_value({name: value}, name))
+                existing[name] = value
+            values.extend([existing["article_id"], existing["source"]])
+            table = self.STAGING_TABLE if staging else "articles"
+            cursor.execute(
+                f"UPDATE {table} SET {', '.join(assignments)} "
+                f"WHERE article_id = ? AND source = ?",
+                values,
+            )
+            doi = self._article_doi(existing)
+            key = (existing["article_id"], existing["source"])
+            if doi and doi not in doi_index:
+                doi_index[doi] = key
+        self._merge_article_extra(
+            cursor,
+            existing["article_id"],
+            existing["source"],
+            extra,
+            filled,
+            conflicts,
+            staging=staging,
+        )
+        return bool(filled)
 
     def insert_articles(
         self, articles: List[Dict], dedupe: bool = True, *, staging: bool = False
@@ -756,18 +1118,21 @@ class ArticleDatabase:
         Uses ON CONFLICT DO UPDATE (not REPLACE) so foreign-key children are
         not cascade-deleted when metadata is refreshed.
 
-        When dedupe=True, skip rows whose normalized title (or DOI) already
-        exists under another source in the collection or earlier in this batch.
+        When dedupe=True, an incoming row that is the same work as a stored
+        row (or an earlier row in this batch) merges empty metadata into that
+        row instead of inserting a second copy. Same (article_id, source)
+        still upserts in place.
 
         staging=True writes replace-fetch rows into staging_articles (dedupe
         against staging only) so the live library stays intact until swap.
 
         Returns:
-            dict with inserted, updated, skipped_duplicates, dropped counts.
+            dict with inserted, updated, skipped_duplicates, merged, dropped.
         """
         inserted = 0
         updated = 0
         skipped_duplicates = 0
+        merged = 0
         dropped = 0
         stale_derived = 0
         table = self.STAGING_TABLE if staging else "articles"
@@ -779,20 +1144,15 @@ class ArticleDatabase:
 
         with self._writing():
             cursor = self.conn.cursor()
-            existing_titles: set = set()
-            existing_dois: set = set()
+            doi_index: Dict[str, Tuple[str, str]] = {}
+            title_index: Dict[str, List[Tuple[str, str]]] = {}
+            records: Dict[Tuple[str, str], Dict] = {}
             if dedupe:
-                cursor.execute(f"SELECT article_id, source, title FROM {table}")
-                for aid, src, title in cursor.fetchall():
-                    nt = self._norm_title(title)
-                    if nt:
-                        existing_titles.add(nt)
-                    doi = self._norm_doi(aid, src)
-                    if doi:
-                        existing_dois.add(doi)
-
-            batch_titles: set = set()
-            batch_dois: set = set()
+                cursor.execute(f"SELECT {columns} FROM {table}")
+                for row in cursor.fetchall():
+                    self._index_article(
+                        _row_to_article(row), doi_index, title_index, records
+                    )
 
             for article in articles:
                 try:
@@ -801,8 +1161,6 @@ class ArticleDatabase:
                     aid = article['article_id']
                     source = article.get('source', 'pubmed')
                     title = article.get('title', '')
-                    nt = self._norm_title(title)
-                    doi = self._norm_doi(aid, source)
 
                     cursor.execute(
                         f"SELECT title, abstract FROM {table} "
@@ -812,13 +1170,22 @@ class ArticleDatabase:
                     prior = cursor.fetchone()
                     existed = prior is not None
 
-                    # Same primary key → upsert OK. Cross-source title/DOI dups skip.
                     if dedupe and not existed:
-                        if doi and (doi in existing_dois or doi in batch_dois):
+                        match = self._find_duplicate_key(
+                            article, doi_index, title_index, records
+                        )
+                        if match is not None:
+                            gained = self._merge_into(
+                                cursor,
+                                records[match],
+                                article,
+                                extra,
+                                staging=staging,
+                                doi_index=doi_index,
+                            )
                             skipped_duplicates += 1
-                            continue
-                        if nt and (nt in existing_titles or nt in batch_titles):
-                            skipped_duplicates += 1
+                            if gained:
+                                merged += 1
                             continue
 
                     cursor.execute(f"""
@@ -870,24 +1237,31 @@ class ArticleDatabase:
                             stale_derived += 1
                     else:
                         inserted += 1
-                        if nt:
-                            batch_titles.add(nt)
-                            existing_titles.add(nt)
-                        if doi:
-                            batch_dois.add(doi)
-                            existing_dois.add(doi)
+                        if dedupe:
+                            stored = {
+                                name: article.get(name) for name in ARTICLE_COLUMNS
+                            }
+                            stored["article_id"] = aid
+                            stored["source"] = source
+                            stored["title"] = title
+                            stored["authors"] = article.get("authors") or []
+                            self._index_article(
+                                stored, doi_index, title_index, records
+                            )
                 except Exception as e:
                     dropped += 1
                     logger.warning("Error inserting article %s: %s", article.get('article_id'), e)
             self.conn.commit()
         logger.info(
-            "Articles upsert: inserted=%d updated=%d skipped_dups=%d dropped=%d stale_derived=%d",
-            inserted, updated, skipped_duplicates, dropped, stale_derived,
+            "Articles upsert: inserted=%d updated=%d skipped_dups=%d merged=%d "
+            "dropped=%d stale_derived=%d",
+            inserted, updated, skipped_duplicates, merged, dropped, stale_derived,
         )
         return {
             "inserted": inserted,
             "updated": updated,
             "skipped_duplicates": skipped_duplicates,
+            "merged": merged,
             "dropped": dropped,
             "stale_derived": stale_derived,
         }

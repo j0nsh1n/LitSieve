@@ -397,9 +397,11 @@ def test_duplicate_skip_does_not_write_extra(db_path):
     db = __import__("app.storage.database", fromlist=["ArticleDatabase"]).ArticleDatabase(str(db_path))
     try:
         stats = db.insert_articles([first, second], dedupe=True)
-        assert stats["inserted"] == 1
-        assert stats["skipped_duplicates"] == 1
+        # Title-only identity now requires compatible author and container, so
+        # these remain two rows (PLOS also carries a DOI the HAL file lacks).
+        assert stats["inserted"] == 2
+        assert stats["skipped_duplicates"] == 0
         assert extra_row(db, first["article_id"], first["source"]) is not None
-        assert extra_row(db, second["article_id"], second["source"]) is None
+        assert extra_row(db, second["article_id"], second["source"]) is not None
     finally:
         db.close()
