@@ -52,6 +52,7 @@ async def api_search(req: SearchRequest, request: Request):
             cluster_filter=req.cluster_filter,
             year_min=req.year_min, year_max=req.year_max,
             lexical_boost=req.lexical_boost,
+            work_type_filter=req.work_type_filter,
         )
         await run_in_thread(
             enrich_search_results,
@@ -66,6 +67,7 @@ async def api_search(req: SearchRequest, request: Request):
                 "sources": req.source_filter,
                 "clusters": req.cluster_filter,
                 "years": {"min": req.year_min, "max": req.year_max},
+                "types": req.work_type_filter,
                 "lexical_boost": req.lexical_boost,
                 "pico_boost": req.pico_boost,
                 "top_k": req.top_k,
@@ -97,7 +99,7 @@ async def api_search_seed(req: SeedSearchRequest, request: Request):
             p.search_by_seed, req.seed, req.top_k,
             req.source_filter, req.cluster_filter,
             req.year_min, req.year_max, req.lexical_boost,
-            req.include_seed,
+            req.include_seed, req.work_type_filter,
         )
         results = data["results"]
         await run_in_thread(enrich_search_results, results, p)
@@ -109,6 +111,7 @@ async def api_search_seed(req: SeedSearchRequest, request: Request):
                 "sources": req.source_filter,
                 "clusters": req.cluster_filter,
                 "years": {"min": req.year_min, "max": req.year_max},
+                "types": req.work_type_filter,
                 "lexical_boost": req.lexical_boost,
                 "pico_boost": False,
                 "top_k": req.top_k,
@@ -147,6 +150,7 @@ async def api_search_starred(req: StarredSearchRequest, request: Request):
             cluster_filter=req.cluster_filter,
             year_min=req.year_min,
             year_max=req.year_max,
+            work_type_filter=req.work_type_filter,
         )
         results = data["results"]
         await run_in_thread(enrich_search_results, results, p)
@@ -158,6 +162,7 @@ async def api_search_starred(req: StarredSearchRequest, request: Request):
                 "sources": req.source_filter,
                 "clusters": req.cluster_filter,
                 "years": {"min": req.year_min, "max": req.year_max},
+                "types": req.work_type_filter,
                 "lexical_boost": False,
                 "pico_boost": False,
                 "top_k": req.top_k,

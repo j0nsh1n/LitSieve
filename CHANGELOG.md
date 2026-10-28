@@ -9,6 +9,12 @@ and this project aims to follow Semantic Versioning for app version strings
 ## [Unreleased]
 
 ### Added
+- Search cards show a type chip when the paper has a stored type (Article,
+  Review article, Book, Chapter, Thesis, and the rest of the stored types).
+  Papers with no type, or an unknown type, have no chip. A Type filter sits
+  next to Sources. It narrows the library before ranking. "Type not stored"
+  keeps older papers whose type was never saved. With the filter off, ranking
+  matches today's results.
 - `tools/eval_search.py` captures a frozen search corpus, replays ranking
   offline, scores human labels, and writes label sheets. Provider records
   stay out of git.

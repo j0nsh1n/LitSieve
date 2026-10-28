@@ -70,6 +70,10 @@ def test_sources_chip():
     assert 'id="simple-sources-chip"' in _search_templates()
 
 
+def test_type_chip():
+    assert 'id="simple-type-chip"' in _search_templates()
+
+
 def test_more_like_my_starred_from_starred_chip():
     assert 'id="simple-starred-chip"' in _search_templates()
 
@@ -81,6 +85,7 @@ def test_ranking_options_in_search_options_popup():
     assert start >= 0
     body = fn[start:fn.find("\n}\n", start)]
     assert "lexical_boost" in body and "pico_boost" in body
+    assert "types" in body
 
 
 # Slice 4 -------------------------------------------------------------------

@@ -12,11 +12,16 @@
   poster. Live at `https://www.litpilot.org` from the production checkout,
   `main` through #106 (2026-10-16). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
-- Latest full suite (2026-10-28, `feat/search-benchmark`): **1880 passed**
-  in 159.68 s, no skips or xfails. `ruff check .` clean; `pyright app
-  tools/eval_search.py` **0 errors**, 6 optional-import warnings (CI blocks
-  on errors). `pip-audit` (2026-10-14): no known vulnerabilities; ROCm
-  torch/triton are un-auditable. No dependency lockfile.
+- Latest full suite (2026-10-28, `feat/type-chip-filter` after merging P1.8):
+  **1908 passed** in 173.49 s, no skips or xfails. `ruff check .` clean;
+  `pyright app` **0 errors**, 6 optional-import warnings (CI blocks on errors).
+  `pip-audit` (2026-10-14): no known vulnerabilities; ROCm torch/triton are
+  un-auditable. No dependency lockfile.
+- P1.7 shows a type chip on Search cards and a Type filter next to Sources.
+  The filter runs before ranking and reads only `work_type`. Ranked hits get
+  that column in one batched query. Null and unknown types have no chip.
+  "Type not stored" keeps legacy rows. No type filter leaves ranking as it
+  was. Search.js cache-bust is `20261028d`.
 - P1.8 adds `tools/eval_search.py` (capture, replay, score, labelsheet) and
   five committed questions under `tools/bench/`. The `baseline_v1` corpus and
   replay output live in `~/HealthDatabaseAccess-scratch/bench/` and are not
@@ -44,7 +49,7 @@
 - Empty Search offers topic selection and fetch (sources and optional contact
   email in the fetch popup); fetch and preparation share one wait screen, then
   Narrow it down offers apply/skip. Search by offers Question, PICO and a
-  paper seed; sort/source/starred chips keep the ranking query; More holds
+  paper seed; sort/source/type/starred chips keep the ranking query; More holds
   reports, duplicates, re-prepare, Start over, Set aside and Group by theme;
   Save your work exports visible results or the whole library.
 - Result identifiers/study type are inside the abstract. Stars, notes,
@@ -216,20 +221,23 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-28. P1.8 review fix on `feat/search-benchmark`. Label
-  sheets now include abstract, DOI or source link, container and stored type,
-  shuffle rows with a stable seed, put rank columns last, and write `Q*.html`
-  beside each CSV. `baseline_v1` and regenerated sheets stay in
-  `~/HealthDatabaseAccess-scratch/bench/` (not committed).
+- **Date:** 2026-10-28. `feat/type-chip-filter` merged `origin/main` after
+  P1.8. Search cards show a type chip when `work_type` is stored. A Type
+  filter next to Sources narrows candidates before ranking. "Type not stored"
+  keeps NULL and legacy rows. The benchmark harness is on main:
+  `tools/eval_search.py` captures, replays, scores, and writes label sheets.
+  Frozen `baseline_v1` and sheets stay in `~/HealthDatabaseAccess-scratch/bench/`
+  and are not committed. Label sheets include abstract, DOI or source link,
+  container and stored type, shuffle with a stable seed, put rank columns last,
+  and write `Q*.html` beside each CSV.
 - Validation (production venv, this worktree, no install): `ruff check .`
-  clean, `pyright app tools/eval_search.py` 0 errors / 6 optional-import
-  warnings, `tests/test_eval_search.py` 10 passed in 0.71 s. Scratch is
-  `~/HealthDatabaseAccess-scratch/p18/`. Sheets regenerated into
-  `~/HealthDatabaseAccess-scratch/bench/labelsheets/` from
-  `baseline_v1_results.json` (no recapture).
+  clean, `pyright app` 0 errors / 6 optional-import warnings,
+  `node --check static/js/search.js` clean, pytest 1908 passed in 173.49 s.
+  Scratch is `~/HealthDatabaseAccess-scratch/p17/`.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
-  and unscheduled roadmap backlog. Capture of this baseline saw Semantic
-  Scholar HTTP 429 on Q1, Q3 and Q5; Europe PMC/medRxiv HTTP 503 on Q4; DOAJ
-  and HAL returned no_results on every question.
-- **Next step:** parent review of the P1.8 PR; no merge or deploy. P1.9 is
-  human labels on the five questions.
+  and unscheduled roadmap backlog. Ship staging was last recorded at
+  `f9485cf`. P1.9 is human labels on the five questions. Capture of
+  `baseline_v1` saw Semantic Scholar HTTP 429 on Q1, Q3 and Q5, Europe PMC
+  and medRxiv HTTP 503 on Q4, and DOAJ and HAL `no_results` on every question.
+- **Next step:** parent review of the P1.7 PR. The spec.md Search-bullet
+  type chip and filter edit still waits on owner approval.

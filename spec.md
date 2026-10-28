@@ -74,9 +74,9 @@ a substitute for school library databases.
 - Search: per-result **Not relevant** (`off_topic`); export / report panel
 - Search: hybrid rank (0.7 × semantic cosine + 0.3 × TF-IDF cosine, both on
   their own 0-1 scale; the card shows that blended score and the list is
-  sorted by it), year/source filters (a year range lists papers with no
+  sorted by it), year/source/type filters (a year range lists papers with no
   usable year after the results, under "No year listed"; decided
-  2026-10-16), seed
+  2026-10-16; cards show a type chip when the type is stored), seed
   paper, **more like starred** (starred papers **remain** in the result list),
   notes/stars, export on-screen results as RIS
 - Optional AI Refine / Ask / **Explain this study**: one abstract at a time;

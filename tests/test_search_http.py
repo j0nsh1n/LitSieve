@@ -231,6 +231,35 @@ def test_starred_search_after_starring(app_module):
     )
 
 
+@pytest.mark.parametrize("path, body", [
+    ("/api/search", {"query_text": "health", "top_k": 3, "work_type_filter": ["scroll"]}),
+    ("/api/search/seed", {"seed": "x", "work_type_filter": ["papyrus"]}),
+    ("/api/search/starred", {"work_type_filter": ["tablet"]}),
+])
+def test_unknown_work_type_filter_is_422(app_module, path, body):
+    c = TestClient(app_module.app)
+    headers = _register(c)
+    r = c.post(path, json=body, headers=headers)
+    assert r.status_code == 422, r.text
+    assert "Type not stored" in r.text
+
+
+def test_known_work_type_filter_is_accepted(app_module):
+    c = TestClient(app_module.app)
+    headers = _register(c)
+    _seed(app_module, c, headers)
+    r = c.post(
+        "/api/search",
+        json={
+            "query_text": "health",
+            "top_k": 3,
+            "work_type_filter": ["journal-article", "not-stored"],
+        },
+        headers=headers,
+    )
+    assert r.status_code == 200, r.text
+
+
 # --- Notes -----------------------------------------------------------------
 
 def test_note_roundtrip(app_module):

@@ -204,6 +204,28 @@ assert.equal(requireSelectedSources(collectSearchFilters(), false), false);
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js not installed")
+def test_type_filter_persists_and_is_sent_on_replay():
+    run_search_js(r"""
+setStats({sources: {pubmed: 2}, starred: 0,
+ work_type_counts: {'journal-article': 2, 'not-stored': 1}});
+await applyAvailableSources();
+el('query-text').value = 'saved question';
+await doSearch({skipOptions: true});
+assert.equal('work_type_filter' in requests.at(-1).body, false);
+openSiteForm = async (form) => {
+ assert.equal(form.title, 'Type');
+ assert.deepEqual(form.fields[0].options.map((v) => v.value),
+  ['journal-article', 'not-stored']);
+ return {types: ['journal-article']};
+};
+await promptSimpleTypes();
+assert.deepEqual([...requests.at(-1).body.work_type_filter], ['journal-article']);
+assert.deepEqual([...readSearchSession().filters.work_type_filter], ['journal-article']);
+assert.equal(el('simple-type-chip').textContent, 'Type: 1 of 2');
+""")
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="Node.js not installed")
 def test_chips_cannot_start_competing_reruns_until_request_finishes():
     run_search_js(r"""
 await applyAvailableSources();
@@ -217,6 +239,7 @@ assert.equal(searchState.requestPending, true);
 assert.equal(requests.at(-1).body.source_filter.join(','), 'pubmed');
 assert.ok(el('simple-sources-chip').disabled);
 assert.ok(el('simple-sort-chip').disabled);
+assert.ok(el('simple-type-chip').disabled);
 assert.ok(el('simple-starred-chip').disabled);
 const n = requests.length;
 openSiteForm = async () => { prompts++; return {sources: ['sample'], sort: 'year'}; };

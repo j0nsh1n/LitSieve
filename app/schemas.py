@@ -4,14 +4,32 @@ from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.errors import sentence
+from app.services.work_types import parse_work_type_filter
 from app.storage.shares import (
     DEFAULT_EXPIRES_DAYS,
     MAX_EXPIRES_DAYS,
     MAX_MAX_USES,
 )
 
+_UNKNOWN_WORK_TYPE = sentence(
+    "That type is not on the list. Choose a stored type, or Type not stored."
+)
 
-class SearchRequest(BaseModel):
+
+class WorkTypeFilteredRequest(BaseModel):
+    work_type_filter: Optional[List[str]] = None
+
+    @field_validator("work_type_filter")
+    @classmethod
+    def _known_work_types(cls, value: Optional[List[str]]) -> Optional[List[str]]:
+        try:
+            return parse_work_type_filter(value)
+        except ValueError:
+            raise ValueError(_UNKNOWN_WORK_TYPE) from None
+
+
+class SearchRequest(WorkTypeFilteredRequest):
     query_text: str
     top_k: int = 10
     sort_by: str = "similarity"
@@ -25,7 +43,7 @@ class SearchRequest(BaseModel):
     lexical_boost: bool = True
 
 
-class SeedSearchRequest(BaseModel):
+class SeedSearchRequest(WorkTypeFilteredRequest):
     seed: str
     top_k: int = 10
     cluster_filter: Optional[List[int]] = None
@@ -37,7 +55,7 @@ class SeedSearchRequest(BaseModel):
     include_seed: bool = False
 
 
-class StarredSearchRequest(BaseModel):
+class StarredSearchRequest(WorkTypeFilteredRequest):
     top_k: int = 10
     source_filter: Optional[List[str]] = None
     cluster_filter: Optional[List[int]] = None

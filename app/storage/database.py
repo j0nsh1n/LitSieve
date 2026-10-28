@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 
 from app.services.citations import _is_placeholder_journal
-from app.services.work_types import normalize_doi
+from app.services.work_types import normalize_doi, work_type_count_key
 from app.storage import dbconn
 
 logger = logging.getLogger(__name__)
@@ -2364,6 +2364,34 @@ class ArticleDatabase:
             }
         return result
 
+    def get_article_work_types(self) -> Dict[Tuple[str, str], Optional[str]]:
+        """article_id, source, work_type only — used to filter before ranking."""
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT article_id, source, work_type FROM articles")
+            rows = cursor.fetchall()
+        return {(row[0], row[1]): row[2] for row in rows}
+
+    def get_work_types_for_keys(
+        self, keys: List[Tuple[str, str]],
+    ) -> Dict[Tuple[str, str], Optional[str]]:
+        """One batched work_type read for the ranked top-K keys."""
+        if not keys:
+            return {}
+        placeholders = ",".join(["(?, ?)"] * len(keys))
+        params: List[Any] = []
+        for article_id, source in keys:
+            params.extend([article_id, source])
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                "SELECT article_id, source, work_type FROM articles "
+                f"WHERE (article_id, source) IN ({placeholders})",
+                params,
+            )
+            rows = cursor.fetchall()
+        return {(row[0], row[1]): row[2] for row in rows}
+
     def get_year_counts(self) -> Dict[str, int]:
         """Papers per publication year (unknown years under 'unknown')."""
         from app.utils import parse_year
@@ -2402,6 +2430,9 @@ class ArticleDatabase:
             cursor.execute("SELECT year FROM articles")
             year_rows = cursor.fetchall()
 
+            cursor.execute("SELECT work_type, COUNT(*) FROM articles GROUP BY work_type")
+            work_type_rows = cursor.fetchall()
+
             cursor.execute("SELECT COUNT(*) FROM notes WHERE TRIM(note) != ''")
             notes_count = int(cursor.fetchone()[0] or 0)
             cursor.execute("SELECT COUNT(*) FROM notes WHERE starred = 1")
@@ -2418,6 +2449,11 @@ class ArticleDatabase:
             key = str(y) if y else "unknown"
             year_counts[key] = year_counts.get(key, 0) + 1
 
+        work_type_counts: Dict[str, int] = {}
+        for raw, n in work_type_rows:
+            key = work_type_count_key(raw)
+            work_type_counts[key] = work_type_counts.get(key, 0) + int(n)
+
         return {
             'total_articles': article_count,
             'articles_with_embeddings': embedding_count,
@@ -2425,6 +2461,7 @@ class ArticleDatabase:
             'excluded_articles': excluded_count,
             'sources': sources,
             'year_counts': year_counts,
+            'work_type_counts': work_type_counts,
             'notes': notes_count,
             'starred': starred_count,
             'ai_key_points': ai_key_points,

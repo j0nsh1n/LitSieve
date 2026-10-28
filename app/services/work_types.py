@@ -23,6 +23,33 @@ WORK_TYPES = (
     "other",
 )
 
+# Sentinel for NULL / empty / unknown rows in the Search type filter.
+WORK_TYPE_NOT_STORED = "not-stored"
+
+WORK_TYPE_CHIP_LABELS = {
+    "journal-article": "Article",
+    "review-article": "Review article",
+    "book-review": "Book review",
+    "book": "Book",
+    "edited-book": "Book",
+    "book-chapter": "Chapter",
+    "reference-entry": "Reference entry",
+    "dissertation": "Thesis",
+    "report": "Report",
+    "preprint": "Preprint",
+    "conference-paper": "Conference paper",
+    "registry-record": "Trial registration",
+    "dataset": "Dataset",
+}
+
+WORK_TYPE_FILTER_LABELS = {
+    **WORK_TYPE_CHIP_LABELS,
+    "other": "Other",
+    WORK_TYPE_NOT_STORED: "Type not stored",
+}
+
+ALLOWED_WORK_TYPE_FILTERS = frozenset(WORK_TYPES) | {WORK_TYPE_NOT_STORED}
+
 # provider -> raw type -> canonical. Unknown or absent raw values map to unknown.
 TYPE_MAP: Dict[str, Dict[str, str]] = {
     "openalex": {
@@ -293,6 +320,51 @@ def _raw_type_text(raw: Any) -> str:
                 return text
         return ""
     return str(raw).strip()
+
+
+def stored_work_type_is_missing(stored: Any) -> bool:
+    """True for NULL, blank, and unknown — no chip, and 'Type not stored'."""
+    text = str(stored or "").strip()
+    return not text or text == "unknown"
+
+
+def work_type_chip_label(stored: Any) -> Optional[str]:
+    """Plain chip words for a stored type; None when the card should hide it."""
+    if stored_work_type_is_missing(stored):
+        return None
+    return WORK_TYPE_CHIP_LABELS.get(str(stored).strip())
+
+
+def work_type_count_key(stored: Any) -> str:
+    """Group missing types under the filter sentinel for library counts."""
+    if stored_work_type_is_missing(stored):
+        return WORK_TYPE_NOT_STORED
+    return str(stored).strip()
+
+
+def work_type_matches_filter(stored: Any, wanted: Iterable[str]) -> bool:
+    wanted_set = set(wanted)
+    if stored_work_type_is_missing(stored):
+        return WORK_TYPE_NOT_STORED in wanted_set
+    return str(stored).strip() in wanted_set
+
+
+def parse_work_type_filter(values: Optional[Iterable[str]]) -> Optional[List[str]]:
+    """None/empty means no type filter. Unknown names raise ValueError."""
+    if not values:
+        return None
+    out: List[str] = []
+    seen = set()
+    for raw in values:
+        text = str(raw or "").strip()
+        if not text:
+            continue
+        if text not in ALLOWED_WORK_TYPE_FILTERS:
+            raise ValueError(text)
+        if text not in seen:
+            seen.add(text)
+            out.append(text)
+    return out or None
 
 
 def canonical_work_type(provider: str, raw_type: Any) -> str:
