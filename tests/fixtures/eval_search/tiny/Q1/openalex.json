@@ -1,0 +1,24 @@
+[
+  {
+    "article_id": "10.1234/paper-0",
+    "source": "openalex",
+    "title": "Later school start times increase adolescent sleep duration",
+    "abstract": "A trial of later start times found longer sleep among adolescents.",
+    "year": "2018",
+    "authors": ["Doe J"],
+    "journal": "Sleep Health",
+    "work_type": "journal-article",
+    "doi": "10.1234/paper-0"
+  },
+  {
+    "article_id": "10.1234/paper-1",
+    "source": "openalex",
+    "title": "New Deal housing policy and urban change",
+    "abstract": "Housing agencies during the Great Depression reshaped cities.",
+    "year": "2011",
+    "authors": ["Roe A"],
+    "journal": "Journal of History",
+    "work_type": "journal-article",
+    "doi": "10.1234/paper-1"
+  }
+]

@@ -12,9 +12,9 @@
   poster. Live at `https://www.litpilot.org` from the production checkout,
   `main` through #106 (2026-10-16). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
-- Latest full suite (2026-10-28, `feat/type-chip-filter`): **1898 passed** in
-  162.47 s, no skips or xfails. `ruff check .` clean; `pyright app`
-  **0 errors**, 6 optional-import warnings (CI blocks on errors).
+- Latest full suite (2026-10-28, `feat/type-chip-filter` after merging P1.8):
+  **1908 passed** in 173.49 s, no skips or xfails. `ruff check .` clean;
+  `pyright app` **0 errors**, 6 optional-import warnings (CI blocks on errors).
   `pip-audit` (2026-10-14): no known vulnerabilities; ROCm torch/triton are
   un-auditable. No dependency lockfile.
 - P1.7 shows a type chip on Search cards and a Type filter next to Sources.
@@ -22,6 +22,10 @@
   that column in one batched query. Null and unknown types have no chip.
   "Type not stored" keeps legacy rows. No type filter leaves ranking as it
   was. Search.js cache-bust is `20261028d`.
+- P1.8 adds `tools/eval_search.py` (capture, replay, score, labelsheet) and
+  five committed questions under `tools/bench/`. The `baseline_v1` corpus and
+  replay output live in `~/HealthDatabaseAccess-scratch/bench/` and are not
+  in git. Human labels are P1.9.
 - P1.6 stores Collect inputs and Search questions in the library database
   (`fetch_runs`, `question_log`), about 50 rows each. Writes come from
   `_run_multi_fetch` (background and sync, including cancel and error) and
@@ -145,7 +149,7 @@
 | `static/` | vanilla JS/CSS (no npm); cache-bust `?v=` |
 | `tests/` | pytest; policy in `tests/README.md` |
 | `docs/` | DEPLOY, SELFHOST, plans, SCALE_NOTES |
-| `tools/` | backup, watchdog, bench_scale, encrypt_databases, operator |
+| `tools/` | backup, watchdog, bench_scale, eval_search, encrypt_databases, operator |
 
 ## Domain Model
 - **User** (`users.db`): username, password hash, token_version; optional recovery
@@ -217,14 +221,23 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-28. P1.7 on `feat/type-chip-filter`. Search cards show a
-  type chip when `work_type` is stored. A Type filter next to Sources narrows
-  candidates before ranking. "Type not stored" keeps NULL/legacy rows.
+- **Date:** 2026-10-28. `feat/type-chip-filter` merged `origin/main` after
+  P1.8. Search cards show a type chip when `work_type` is stored. A Type
+  filter next to Sources narrows candidates before ranking. "Type not stored"
+  keeps NULL and legacy rows. The benchmark harness is on main:
+  `tools/eval_search.py` captures, replays, scores, and writes label sheets.
+  Frozen `baseline_v1` and sheets stay in `~/HealthDatabaseAccess-scratch/bench/`
+  and are not committed. Label sheets include abstract, DOI or source link,
+  container and stored type, shuffle with a stable seed, put rank columns last,
+  and write `Q*.html` beside each CSV.
 - Validation (production venv, this worktree, no install): `ruff check .`
-  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 1898
-  passed in 162.47 s. Scratch is `~/HealthDatabaseAccess-scratch/p17/`.
+  clean, `pyright app` 0 errors / 6 optional-import warnings,
+  `node --check static/js/search.js` clean, pytest 1908 passed in 173.49 s.
+  Scratch is `~/HealthDatabaseAccess-scratch/p17/`.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
   and unscheduled roadmap backlog. Ship staging was last recorded at
-  `f9485cf`; no host or deployment state changed in this slice.
-- **Next step:** parent review of the P1.7 PR; no merge or deploy in this
-  slice. Spec.md holds for owner approval. Benchmark harness is P1.8.
+  `f9485cf`. P1.9 is human labels on the five questions. Capture of
+  `baseline_v1` saw Semantic Scholar HTTP 429 on Q1, Q3 and Q5, Europe PMC
+  and medRxiv HTTP 503 on Q4, and DOAJ and HAL `no_results` on every question.
+- **Next step:** parent review of the P1.7 PR. The spec.md Search-bullet
+  type chip and filter edit still waits on owner approval.
