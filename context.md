@@ -50,7 +50,11 @@
   write-up is `~/HealthDatabaseAccess-scratch/bench/p25a_results.md`. The
   best run that stays under a 5% harmful-error rate sorts 16 of 91 dev papers
   and does not improve ndcg@10. The report lists each question's ndcg@10
-  and relevant@10. No group setting is ready to show students.
+  and relevant@10. No group setting is ready to show students. The one lead
+  is F2 (decomposed yes/no per concept): with the different-group cut at
+  0.65 it sorts 38 of 91 papers, puts 2 of 27 good papers in different
+  (over the 5% cap), and still raises ndcg@10. The dev slice has only 2
+  how_why papers, so it is too small to calibrate four groups.
 - P1.6 stores Collect inputs and Search questions in the library database
   (`fetch_runs`, `question_log`), about 50 rows each. Writes come from
   `_run_multi_fetch` (background and sync, including cancel and error) and
