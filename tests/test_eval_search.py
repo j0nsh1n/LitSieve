@@ -436,3 +436,66 @@ def test_score_metrics(tmp_path):
     assert row["export_accuracy"] == 1.0
     # owner vs second on three keys: agree, disagree, agree → po=2/3.
     assert row["kappa"] is not None
+
+
+def test_bm25_scores_stay_in_unit_interval():
+    docs = [
+        "later school start times and adolescent sleep duration sleep sleep",
+        "unrelated mining geology quartz",
+        "",
+    ]
+    scores = ev.bm25_scores("later school start times sleep", docs)
+    assert len(scores) == 3
+    assert all(0.0 <= s <= 1.0 for s in scores)
+    assert scores[0] > scores[1]
+    assert scores[1] == 0.0 or scores[1] < scores[0]
+    empty = ev.bm25_scores("zzzznotaword", docs)
+    assert empty == [0.0, 0.0, 0.0]
+
+
+def test_p22_ranker_is_registered():
+    assert "p22_sweep" in ev.RANKERS
+    names = [name for name, *_ in ev.p22_configs()]
+    assert len(names) == 48
+    assert "blend_w0.3_tfidf_raw" in names
+    assert "bonus_w0.15_bm25_keywords" in names
+
+
+def test_p22_sweep_replay_uses_keywords_query(tmp_path, monkeypatch):
+    _patch_embeddings(monkeypatch)
+    results = tmp_path / "results.json"
+    assert ev.main([
+        "replay", "--corpus", str(TINY), "--ranker", "p22_sweep",
+        "--work-dir", str(tmp_path / "work"), "--out", str(results),
+    ]) == 0
+    payload = json.loads(results.read_text(encoding="utf-8"))
+    rankings = payload["questions"][0]["rankings"]
+    assert "lexical_on" in rankings
+    assert "blend_w0.3_tfidf_raw" in rankings
+    assert "bonus_w0.1_bm25_keywords" in rankings
+    raw_q = ev.lexical_query_text(
+        "How do later school start times affect sleep duration among adolescents?",
+        "raw",
+    )
+    key_q = ev.lexical_query_text(
+        "How do later school start times affect sleep duration among adolescents?",
+        "keywords",
+    )
+    assert "How" in raw_q
+    assert "How" not in key_q
+    assert "sleep" in key_q
+    assert "adolescents" in key_q
+
+
+def test_choose_p22_prefers_simple_near_best():
+    scored = []
+    for qid in ("Q1", "Q2"):
+        scored.append({"id": qid, "ranking": "lexical_on", "ndcg@10": 0.40})
+        scored.append({"id": qid, "ranking": "bonus_w0.3_bm25_keywords", "ndcg@10": 0.50})
+        scored.append({"id": qid, "ranking": "bonus_w0.05_tfidf_keywords", "ndcg@10": 0.495})
+        scored.append({"id": qid, "ranking": "blend_w0.05_tfidf_raw", "ndcg@10": 0.494})
+        scored.append({"id": qid, "ranking": "bonus_w0.3_tfidf_raw", "ndcg@10": 0.30})
+    choice = ev.choose_p22(scored)
+    # 0.50 is best; 0.494 and 0.495 are inside 0.01; smallest w + tfidf + blend + raw wins.
+    assert choice["name"] == "blend_w0.05_tfidf_raw"
+    assert choice["beats_baseline"] is True

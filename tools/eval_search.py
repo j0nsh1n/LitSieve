@@ -23,6 +23,7 @@ import logging
 import math
 import os
 import random
+import re
 import subprocess
 import sys
 import time
@@ -38,6 +39,7 @@ sys.path.insert(0, str(REPO_ROOT))
 from app.content.source_catalog import TOPIC_PACKS, TOPIC_SOURCE_HINTS
 from app.services.citations import _real_journal, article_doi, article_url, citation_model
 from app.services.pipeline import FETCHERS, LiteratureSearchPipeline
+from app.services.question_concepts import question_keywords
 from app.version import APP_VERSION
 
 logger = logging.getLogger("eval_search")
@@ -359,6 +361,276 @@ RANKERS: Dict[str, RankerFn] = {
 def register_ranker(name: str, fn: RankerFn) -> None:
     """P2.2 / P2.5 plug an alternative ranker in without rewriting replay."""
     RANKERS[name] = fn
+
+
+P22_WEIGHTS = (0.05, 0.1, 0.15, 0.2, 0.25, 0.3)
+P22_FORMULAS = ("blend", "bonus")
+P22_METHODS = ("tfidf", "bm25")
+P22_QUERY_KINDS = ("raw", "keywords")
+BM25_K1 = 1.5
+BM25_B = 0.75
+_BM25_TOKEN = re.compile(r"(?u)\b\w\w+\b")
+
+
+def p22_ranker_name(formula: str, weight: float, method: str, query_kind: str) -> str:
+    return f"{formula}_w{weight:g}_{method}_{query_kind}"
+
+
+def p22_configs() -> List[Tuple[str, str, float, str, str]]:
+    rows: List[Tuple[str, str, float, str, str]] = []
+    for formula in P22_FORMULAS:
+        for weight in P22_WEIGHTS:
+            for method in P22_METHODS:
+                for query_kind in P22_QUERY_KINDS:
+                    name = p22_ranker_name(formula, weight, method, query_kind)
+                    rows.append((name, formula, weight, method, query_kind))
+    return rows
+
+
+def lexical_query_text(query: str, kind: str) -> str:
+    if kind == "keywords":
+        return " ".join(question_keywords(query))
+    return query or ""
+
+
+def paper_text(article: Mapping[str, Any]) -> str:
+    return f"{article.get('title') or ''} {article.get('abstract') or ''}".strip()
+
+
+def tfidf_scores(query_text: str, docs: Sequence[str]) -> List[float]:
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    from sklearn.metrics.pairwise import cosine_similarity as sk_cosine
+
+    if not docs:
+        return []
+    try:
+        vec = TfidfVectorizer(stop_words="english", ngram_range=(1, 2))
+        mat = vec.fit_transform(list(docs))
+        q = vec.transform([query_text or ""])
+        return [float(x) for x in sk_cosine(q, mat).ravel().tolist()]
+    except Exception:
+        return [0.0] * len(docs)
+
+
+def bm25_tokens(text: str) -> List[str]:
+    return [m.group(0).casefold() for m in _BM25_TOKEN.finditer(text or "")]
+
+
+def bm25_scores(
+    query_text: str,
+    docs: Sequence[str],
+    *,
+    k1: float = BM25_K1,
+    b: float = BM25_B,
+) -> List[float]:
+    """Okapi BM25 scaled by the query's theoretical max, not the shortlist.
+
+    The cap is sum_q idf(q)·(k1+1), the score a document would get if every
+    query term had infinite tf at average length. Min-max on the shortlist is
+    what audit 19.1 rejected.
+    """
+    n_docs = len(docs)
+    if n_docs == 0:
+        return []
+    tokenized = [bm25_tokens(doc) for doc in docs]
+    avgdl = sum(len(toks) for toks in tokenized) / n_docs
+    df: Dict[str, int] = {}
+    for toks in tokenized:
+        for term in set(toks):
+            df[term] = df.get(term, 0) + 1
+    query_terms = list(dict.fromkeys(bm25_tokens(query_text)))
+    if not query_terms:
+        return [0.0] * n_docs
+    idf = {
+        term: math.log(1.0 + (n_docs - df.get(term, 0) + 0.5) / (df.get(term, 0) + 0.5))
+        for term in query_terms
+    }
+    max_score = sum(idf[term] * (k1 + 1.0) for term in query_terms)
+    if max_score <= 0:
+        return [0.0] * n_docs
+    out: List[float] = []
+    for toks in tokenized:
+        tf_map: Dict[str, int] = {}
+        for term in toks:
+            tf_map[term] = tf_map.get(term, 0) + 1
+        dl = len(toks)
+        score = 0.0
+        for term in query_terms:
+            tf = tf_map.get(term, 0)
+            if tf <= 0:
+                continue
+            denom = tf + k1 * (1.0 - b + b * dl / (avgdl or 1.0))
+            score += idf[term] * (tf * (k1 + 1.0)) / denom
+        out.append(min(1.0, max(0.0, score / max_score)))
+    return out
+
+
+def lexical_scores(query_text: str, docs: Sequence[str], method: str) -> List[float]:
+    if method == "bm25":
+        return bm25_scores(query_text, docs)
+    return tfidf_scores(query_text, docs)
+
+
+def combine_rank_score(
+    semantic: float,
+    lexical: float,
+    formula: str,
+    weight: float,
+) -> Tuple[float, float]:
+    """Return (sort score, semantic) so bonus ties break on meaning."""
+    sem = float(semantic)
+    lex = float(lexical)
+    w = float(weight)
+    if formula == "bonus":
+        return (min(1.0, sem + w * lex), sem)
+    return ((1.0 - w) * sem + w * lex, sem)
+
+
+def _rerank_hits(
+    articles: Sequence[Mapping[str, Any]],
+    sem_scores: Sequence[float],
+    lex_scores: Sequence[float],
+    formula: str,
+    weight: float,
+    top_k: int,
+) -> List[Dict[str, Any]]:
+    combined = [
+        combine_rank_score(sem, lex, formula, weight)
+        for sem, lex in zip(sem_scores, lex_scores)
+    ]
+    order = sorted(
+        range(len(articles)),
+        key=lambda i: combined[i],
+        reverse=True,
+    )
+    out: List[Dict[str, Any]] = []
+    for rank, i in enumerate(order[:top_k], start=1):
+        article = dict(articles[i])
+        total, _sem = combined[i]
+        article["similarity_score"] = round(float(total), 4)
+        article["semantic_score"] = round(float(sem_scores[i]), 4)
+        article["lexical_score"] = round(float(lex_scores[i]), 4)
+        out.append(_hit_snapshot(article, rank))
+    return out
+
+
+def rank_p22_sweep(
+    pipeline: LiteratureSearchPipeline,
+    query: str,
+    top_k: int = TOP_K,
+) -> Dict[str, Any]:
+    """One semantic shortlist, every P2.2 formula/weight/method/query setting."""
+    baseline = rank_baseline(pipeline, query, top_k)
+    rankings = dict(baseline.get("rankings") or {})
+    timings = dict(baseline.get("timings") or {})
+    k0 = max(top_k * 5, 50)
+    t0 = time.perf_counter()
+    shortlist = pipeline.search_similar(query, top_k=k0, lexical_boost=False)
+    timings["shortlist_s"] = round(time.perf_counter() - t0, 4)
+    docs = [paper_text(article) for article in shortlist]
+    sem_scores = [float(article.get("similarity_score") or 0.0) for article in shortlist]
+    lex_cache: Dict[Tuple[str, str], List[float]] = {}
+    for method in P22_METHODS:
+        for query_kind in P22_QUERY_KINDS:
+            qtext = lexical_query_text(query, query_kind)
+            lex_cache[(method, query_kind)] = lexical_scores(qtext, docs, method)
+    for name, formula, weight, method, query_kind in p22_configs():
+        rankings[name] = _rerank_hits(
+            shortlist,
+            sem_scores,
+            lex_cache[(method, query_kind)],
+            formula,
+            weight,
+            top_k,
+        )
+    return {"rankings": rankings, "timings": timings}
+
+
+register_ranker("p22_sweep", rank_p22_sweep)
+
+
+def parse_p22_name(name: str) -> Optional[Tuple[str, float, str, str]]:
+    parts = str(name or "").split("_")
+    # formula_w0.15_tfidf_keywords  →  [formula, w0.15, tfidf, keywords]
+    if len(parts) != 4 or not parts[1].startswith("w"):
+        return None
+    formula, method, query_kind = parts[0], parts[2], parts[3]
+    try:
+        weight = float(parts[1][1:])
+    except ValueError:
+        return None
+    if formula not in P22_FORMULAS or method not in P22_METHODS:
+        return None
+    if query_kind not in P22_QUERY_KINDS:
+        return None
+    return formula, weight, method, query_kind
+
+
+def p22_simplicity(name: str) -> Tuple[float, int, int, int]:
+    parsed = parse_p22_name(name)
+    if parsed is None:
+        return (99.0, 9, 9, 9)
+    formula, weight, method, query_kind = parsed
+    return (
+        weight,
+        0 if method == "tfidf" else 1,
+        0 if formula == "blend" else 1,
+        0 if query_kind == "raw" else 1,
+    )
+
+
+def choose_p22(
+    scored: Sequence[Mapping[str, Any]],
+    *,
+    baseline_name: str = "lexical_on",
+    ndcg_window: float = 0.01,
+    max_drop: float = 0.05,
+) -> Dict[str, Any]:
+    """Pick the simplest setting near the best overall nDCG that does not tank a question."""
+    by_rank: Dict[str, Dict[str, Mapping[str, Any]]] = {}
+    for row in scored:
+        qid = str(row.get("id") or "")
+        if qid == "OVERALL":
+            continue
+        name = str(row.get("ranking") or "")
+        by_rank.setdefault(name, {})[qid] = row
+    baseline = by_rank.get(baseline_name) or {}
+    candidates: List[Tuple[str, float, Dict[str, float]]] = []
+    for name, rows in by_rank.items():
+        if parse_p22_name(name) is None:
+            continue
+        ndcgs = {
+            qid: float(row.get("ndcg@10") or 0.0) for qid, row in rows.items()
+        }
+        dropped = False
+        for qid, ndcg in ndcgs.items():
+            base = float((baseline.get(qid) or {}).get("ndcg@10") or 0.0)
+            if ndcg < base - max_drop:
+                dropped = True
+                break
+        if dropped:
+            continue
+        overall = sum(ndcgs.values()) / len(ndcgs) if ndcgs else 0.0
+        candidates.append((name, overall, ndcgs))
+    if not candidates:
+        return {"name": None, "reason": "no setting stayed within the per-question drop cap"}
+    best = max(row[1] for row in candidates)
+    near = [row for row in candidates if row[1] >= best - ndcg_window]
+    near.sort(key=lambda row: (*p22_simplicity(row[0]), -row[1], row[0]))
+    name, overall, ndcgs = near[0]
+    base_overall = (
+        sum(float((baseline.get(qid) or {}).get("ndcg@10") or 0.0) for qid in ndcgs)
+        / len(ndcgs)
+        if ndcgs else 0.0
+    )
+    return {
+        "name": name,
+        "overall_ndcg": round(overall, 4),
+        "baseline_overall_ndcg": round(base_overall, 4),
+        "best_overall_ndcg": round(best, 4),
+        "beats_baseline": overall > base_overall,
+        "ndcgs": {k: round(v, 4) for k, v in ndcgs.items()},
+    }
 
 
 def _fetch_one(
@@ -798,6 +1070,88 @@ def _print_table(rows: Sequence[Mapping[str, Any]]) -> None:
         print("  ".join(str(row.get(c, "")).ljust(widths[c]) for c in cols))
 
 
+def _overall_for(rows: Sequence[Mapping[str, Any]], ranking: str, split_filter: str) -> Dict[str, Any]:
+    return {
+        "id": "OVERALL",
+        "ranking": ranking,
+        "split": split_filter,
+        "relevant@5": _mean([r.get("relevant@5") for r in rows]),
+        "relevant@10": _mean([r.get("relevant@10") for r in rows]),
+        "ndcg@10": _mean([r.get("ndcg@10") for r in rows]),
+        "topic_only@10": _mean([r.get("topic_only@10") for r in rows]),
+        "unlabelled@10": _mean([r.get("unlabelled@10") for r in rows]),
+        "type_accuracy": _mean([r.get("type_accuracy") for r in rows]),
+        "export_accuracy": _mean([r.get("export_accuracy") for r in rows]),
+        "duplicate_rate": _mean([r.get("duplicate_rate") for r in rows]),
+        "kappa": _mean([r.get("kappa") for r in rows]),
+    }
+
+
+def write_p22_sweep_md(
+    payload: Mapping[str, Any],
+    path: Path,
+    *,
+    choice: Optional[Mapping[str, Any]] = None,
+) -> None:
+    scored = list(payload.get("questions") or [])
+    overalls = list(payload.get("overalls") or [])
+    if not overalls:
+        overall = payload.get("overall")
+        if isinstance(overall, dict):
+            overalls = [overall]
+    metrics = ("relevant@5", "relevant@10", "ndcg@10", "topic_only@10")
+    header = "| setting | " + " | ".join(metrics) + " |"
+    rule = "|---|---|---|---|---|"
+
+    def _row(name: str, row: Mapping[str, Any]) -> str:
+        cells = " | ".join(str(row.get(m, "")) for m in metrics)
+        return f"| {name} | {cells} |"
+
+    overall_by = {str(r.get("ranking")): r for r in overalls}
+    names = []
+    seen = set()
+    for row in [*overalls, *scored]:
+        name = str(row.get("ranking") or "")
+        if name and name not in seen:
+            seen.add(name)
+            names.append(name)
+    lines = [
+        "# P2.2 word-bonus dev sweep",
+        "",
+        "Dev split only. Baseline is today's hybrid (`lexical_on`).",
+        "",
+        "## Overall",
+        "",
+        header,
+        rule,
+    ]
+    for name in names:
+        row = overall_by.get(name)
+        if row:
+            lines.append(_row(name, row))
+    qids: List[str] = []
+    for row in scored:
+        qid = str(row.get("id") or "")
+        if qid and qid not in qids:
+            qids.append(qid)
+    by_q: Dict[str, Dict[str, Mapping[str, Any]]] = {}
+    for row in scored:
+        by_q.setdefault(str(row.get("id")), {})[str(row.get("ranking"))] = row
+    for qid in qids:
+        lines.extend(["", f"## {qid}", "", header, rule])
+        rows = by_q.get(qid) or {}
+        for name in names:
+            row = rows.get(name)
+            if row:
+                lines.append(_row(name, row))
+    if choice:
+        lines.extend(["", "## Choice", ""])
+        for key, value in choice.items():
+            lines.append(f"- {key}: {value}")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def cmd_score(args: argparse.Namespace) -> int:
     results = load_json(Path(args.results))
     labels = load_labels(Path(args.labels))
@@ -809,35 +1163,36 @@ def cmd_score(args: argparse.Namespace) -> int:
         names = list(rankings) or ["lexical_on"]
         for name in names:
             scored.append(score_question(qrow, labels.get(qid, []), split_filter, name))
-    overall_on = [r for r in scored if r.get("ranking") == "lexical_on"]
-    overall = {
-        "id": "OVERALL",
-        "ranking": "lexical_on",
-        "split": split_filter,
-        "relevant@5": _mean([r.get("relevant@5") for r in overall_on]),
-        "relevant@10": _mean([r.get("relevant@10") for r in overall_on]),
-        "ndcg@10": _mean([r.get("ndcg@10") for r in overall_on]),
-        "topic_only@10": _mean([r.get("topic_only@10") for r in overall_on]),
-        "unlabelled@10": _mean([r.get("unlabelled@10") for r in overall_on]),
-        "type_accuracy": _mean([r.get("type_accuracy") for r in overall_on]),
-        "export_accuracy": _mean([r.get("export_accuracy") for r in overall_on]),
-        "duplicate_rate": _mean([r.get("duplicate_rate") for r in overall_on]),
-        "kappa": _mean([r.get("kappa") for r in overall_on]),
-    }
-    table = [*scored, overall]
+    by_ranking: Dict[str, List[Dict[str, Any]]] = {}
+    for row in scored:
+        by_ranking.setdefault(str(row.get("ranking") or ""), []).append(row)
+    overalls = [
+        _overall_for(rows, name, split_filter) for name, rows in by_ranking.items()
+    ]
+    overall = next((r for r in overalls if r.get("ranking") == "lexical_on"), None)
+    if overall is None:
+        overall = overalls[0] if overalls else _overall_for([], "lexical_on", split_filter)
+    table = [*scored, *overalls]
     _print_table(table)
+    choice = choose_p22(scored) if any(parse_p22_name(str(r.get("ranking"))) for r in scored) else None
     payload = {
         "results": str(Path(args.results)),
         "labels": str(Path(args.labels)),
         "split": split_filter,
         "questions": scored,
         "overall": overall,
+        "overalls": overalls,
+        "choice": choice,
     }
     out = Path(args.out) if args.out else Path(args.results).with_name(
         Path(args.results).stem + ".scores.json"
     )
     write_json(out, payload)
     print(f"wrote {out}", flush=True)
+    if args.table:
+        table_path = Path(args.table).expanduser()
+        write_p22_sweep_md(payload, table_path, choice=choice)
+        print(f"wrote {table_path}", flush=True)
     return 0
 
 
@@ -1110,6 +1465,7 @@ def build_parser() -> argparse.ArgumentParser:
     sco.add_argument("--labels", required=True)
     sco.add_argument("--split", choices=("dev", "test", "all"), default="all")
     sco.add_argument("--out", default=None)
+    sco.add_argument("--table", default=None, help="Write a Markdown sweep table")
     sco.set_defaults(func=cmd_score)
 
     lab = sub.add_parser("labelsheet", help="Write blank CSVs for a human labeller")
