@@ -340,7 +340,11 @@ def test_legacy_rows_stay_null(db_path):
         row = db.get_article_by_id("legacy-1", "pubmed")
         for name in ARTICLE_COLUMNS[7:]:
             assert row[name] is None
-        assert extra_row(db, "legacy-1", "pubmed") is None
+        extra = extra_row(db, "legacy-1", "pubmed")
+        assert extra is not None
+        provenance = json.loads(extra[0])
+        assert "link_evidence" in provenance
+        assert json.loads(extra[1]) == []
         stripped = omit_null_metadata(dict(row))
         assert all(name not in stripped for name in ARTICLE_COLUMNS[7:])
     finally:

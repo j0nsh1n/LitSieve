@@ -32,4 +32,8 @@ their ids (`16.1`, `18.4`, ...) for anyone tracing a change back.
 - Decide what account delete removes from the support tables (tickets,
   notes, admin actions, sign-in events); today they keep the deleted
   account's id, and only sign-in events age out (90 days) (audit 20.5)
+- Trust older papers' open-copy fields again: per-row trust for never-merged
+  legacy rows; a clone marker the encryption tool preserves; lazily marking
+  pre-existing clones. Starting point is the round-4 review of PR #128
+  (`reviews/b6_sol_r4.md`).
 - Not building: clinical evidence grades, paywalled DBs, live teacher shares / LMS

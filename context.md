@@ -12,12 +12,12 @@
   poster. Live at `https://www.litpilot.org` from the production checkout,
   `main` through #106 (2026-10-16). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
-- Latest full suite (2026-10-29, `fix/laya-worker-default`):
-  **2159 passed** in 166.09 s, no skips or xfails. `ruff check .` clean;
+- Latest full suite (2026-10-29, `feat/link-evidence` per-source allow-lists):
+  **2236 passed** in 175.15 s, no skips or xfails. `ruff check .` clean;
   `pyright app` **0 errors**, 6 optional-import warnings (CI blocks on
-  errors).
-  `pip-audit` (2026-10-14): no known vulnerabilities; ROCm torch/triton are
-  un-auditable. No dependency lockfile.
+  errors). `pip-audit` (2026-10-14): no known vulnerabilities; ROCm
+  torch/triton are un-auditable. No dependency lockfile.
+  `certifi>=2026.10.19`.
 - P2.8: a starred Search card with no open copy listed, and no P2.4 open
   other copy, can show "Different work you can read (N)" (at most 3).
   Neighbors come from stored embeddings through `search_similar` (same path
@@ -38,15 +38,21 @@
   only on a starred none_listed card and keeps a page request when another
   card is starred. Each listed URL keeps "Open copy listed" if any stored
   occurrence of that URL meets the P2.3 open rule, including after five
-  copies are already selected. A merged-in copy uses that source's
-  `oa_status` and `best_oa_url` in provenance. Missing evidence leaves it
+  copies are already selected. A merged-in copy is open when that source's
+  stored `link_evidence` observation says so. Missing evidence leaves it
   unlabeled. The copies payload includes `has_open_copy`.
 - P2.3 shows an access label on Search cards from stored OA fields, with a
-  Free to read filter next to Type. Closed cards keep every reporting
-  source. Open labels need a real HTTP(S) host. Crossref needs a
-  recognised CC licence identifier and version. The chip sits outside the
-  source/type tags that Catalog and collapsed phone Table rows hide.
-  style.css cache-bust is `20261029a`.
+  Free to read filter next to Type. Open labels use per-source observations
+  in `article_extra.provenance.link_evidence` written by a fetch. A
+  location is a witness only when every field is the right type and its
+  value is in that source's allow-list (OpenAlex kind is pdf, landing, or
+  none; Zenodo kind is file; Europe PMC kind is pdf or fulltext). Rows with
+  no observations stay "No open copy listed", including clones and papers
+  that were never merged. Closed cards keep every reporting source. Open
+  labels need a real HTTP(S) host. Crossref needs a recognised CC licence
+  identifier and version. The chip sits outside the source/type tags that
+  Catalog and collapsed phone Table rows hide. style.css cache-bust is
+  `20261029a`.
 - P2.7: Narrow it down uses stored `work_type`. Books and chapters with no
   abstract stay in; the preview names how many. Book reviews and trial
   registrations can be set aside only if the student ticks that box.
@@ -286,21 +292,22 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-29. `fix/laya-worker-default` from origin/main
-  (`57dfa3e`, PR #130 merge). The Laya sidecar builds
-  `Router(preload=False, default="english")` and warms up on
-  "This is a warmup sentence." so Laya 0.4.17 keeps short Latin topics and
-  startup on the English checkpoint. The production venv switch is not in
-  this PR.
+- Latest full suite (2026-10-29, `feat/link-evidence` per-source allow-lists):
+  **2236 passed** in 175.15 s, no skips or xfails. `ruff check .` clean;
+- PR #131 (merged) builds the Laya sidecar with `Router(preload=False,
+  default="english")` and an English warm-up sentence, so Laya 0.4.17 keeps
+  short Latin topics on the English checkpoint. The production venv switch
+  to `~/.local/share/laya-0.4.17/` happens at the Phase 2 deploy.
 - PR #122 (merged) keeps only the P2.2 sweep tooling. Its gate FAILED on the
   15-question benchmark (test ndcg@10 0.5712 vs today's 0.5755), so Search
   ranking is unchanged. Leave-one-question-out shortlists inside each fold,
   and `score-test` refuses a second test pass. Notes:
-  `~/HealthDatabaseAccess-scratch/bench/p22_dev_sweep_v2.md`.
+  `~/HealthDatabaseAccess-scratch/bench/p22_dev_sweep_v2.md`. P2.5b `run-f2`
+  and `score-test` stay off ranking.
 - Validation (production venv, this worktree, no install): `ruff check .`
-  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2159
-  passed in 166.09 s. Scratch is
-  `~/HealthDatabaseAccess-scratch/pytest-fix-laya-worker-default`.
+  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2236
+  passed in 175.15 s. Scratch is
+  `~/HealthDatabaseAccess-scratch/pytest-fix-b8-r1b`. No JS or CSS change.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
   and unscheduled roadmap backlog. Ship staging is at `266195e`. P1.9 labels
   are done: a three-model panel plus the owner's review of 29 rows, in
@@ -309,5 +316,5 @@ Guest User (is_guest) → sample corpus only; purged by age
   split is still unscored. That is a different score from the scored
   15-question v2 P2.2 test pass and from the v2 Laya test score. The
   evidence redesign from #126 follows in a separate PR.
-- **Next step:** independent review of this PR. Do not merge from the
-  builder. The production Laya venv switch is a later Phase 2 deploy.
+- **Next step:** merge PR #128 (Sol round 6: SHIP), then the Phase 2 deploy,
+  including the Laya 0.4.17 venv switch.
