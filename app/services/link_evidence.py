@@ -1,4 +1,4 @@
-"""Per-source link evidence: adapters, merge reducer, and legacy merge detection."""
+"""Per-source link evidence: adapters and merge reducer."""
 
 from __future__ import annotations
 
@@ -45,7 +45,6 @@ _LOCATION_KEYS = (
     "basis",
     "details",
 )
-_RESERVED_PROVENANCE = frozenset({LINK_EVIDENCE_KEY, "conflicts"})
 
 
 class UnreadableLinkEvidence(ValueError):
@@ -166,13 +165,76 @@ def evidence_from_article(article: Mapping[str, Any]) -> Optional[Dict[str, Any]
     return payload if status == EVIDENCE_OK else None
 
 
+_WRONG_TYPE = object()
+_SHAPE_KEYS = ("basis", "kind", "licence", "licence_scope")
+_DOAJ_FULLTEXT_KINDS = frozenset({None, "fulltext"})
+_HAL_FILE_KINDS = frozenset({None, "file"})
+
+
+def _typed_text(value: Any) -> Any:
+    """Stripped string, None if missing or blank, or _WRONG_TYPE."""
+    if value is None:
+        return None
+    if isinstance(value, (dict, list)) or not isinstance(value, str):
+        return _WRONG_TYPE
+    text = value.strip()
+    return text or None
+
+
 def location_matches_adapter(source: str, loc: Mapping[str, Any]) -> bool:
-    """True when this location's basis is one the source adapter can emit."""
-    allowed = SOURCE_ADAPTER_BASES.get(str(source or "").strip().lower())
+    """True when source, basis, kind, licence and scope match that adapter."""
+    if not isinstance(source, str):
+        return False
+    if not isinstance(loc, Mapping):
+        return False
+    source_key = source.strip().lower()
+    allowed = SOURCE_ADAPTER_BASES.get(source_key)
     if allowed is None:
         return False
-    basis = _text(loc.get("basis")) or BASIS_LISTED_ONLY
-    return basis in allowed
+    for key in _SHAPE_KEYS:
+        if _typed_text(loc.get(key)) is _WRONG_TYPE:
+            return False
+    if _typed_text(loc.get("license")) is _WRONG_TYPE:
+        return False
+    basis = _typed_text(loc.get("basis"))
+    if basis is None:
+        basis = BASIS_LISTED_ONLY
+    if basis not in allowed:
+        return False
+    kind = _typed_text(loc.get("kind"))
+    licence = _typed_text(loc.get("licence"))
+    if licence is None:
+        licence = _typed_text(loc.get("license"))
+    licence_scope = _typed_text(loc.get("licence_scope"))
+    return _adapter_emits(source_key, basis, kind, licence, licence_scope)
+
+
+def _adapter_emits(
+    source: str,
+    basis: str,
+    kind: Optional[str],
+    licence: Optional[str],
+    licence_scope: Optional[str],
+) -> bool:
+    if source == "crossref":
+        if basis == BASIS_CROSSREF_ENTRY:
+            return licence is not None and licence_scope == LICENCE_SCOPE_ENTRY
+        return basis == BASIS_LISTED_ONLY and licence is None and licence_scope is None
+    if source == "hal":
+        if basis == BASIS_HAL_FILE:
+            return kind in _HAL_FILE_KINDS and licence is None and licence_scope is None
+        return basis == BASIS_LISTED_ONLY and licence is None and licence_scope is None
+    if source == "doaj":
+        if basis == BASIS_DOAJ_FULLTEXT:
+            return kind in _DOAJ_FULLTEXT_KINDS and licence is None and licence_scope is None
+        return basis == BASIS_LISTED_ONLY and licence is None and licence_scope is None
+    if basis == BASIS_LISTED_ONLY:
+        return licence is None and licence_scope is None
+    if basis in {BASIS_OA_BEST, BASIS_LOCATION_OPEN}:
+        if licence is None:
+            return licence_scope is None
+        return licence_scope == LICENCE_SCOPE_ENTRY
+    return False
 
 
 def observation_matches_adapter(observation: Mapping[str, Any]) -> bool:
@@ -186,6 +248,8 @@ def observation_matches_adapter(observation: Mapping[str, Any]) -> bool:
     if not all(isinstance(item, Mapping) for item in locations):
         return False
     source = owner[0]
+    if source not in SOURCE_ADAPTER_BASES:
+        return False
     return all(location_matches_adapter(source, item) for item in locations)
 
 
@@ -217,37 +281,6 @@ def _owner_fields(
     if not isinstance(observed_at, str):
         observed_at = None
     return source, record_id, observed_at
-
-
-def is_never_merged(row: Any) -> bool:
-    """True when provenance shows no value from a source other than the row."""
-    if not isinstance(row, Mapping):
-        return True
-    own = str(row.get("source") or "").strip().lower()
-    provenance = _provenance_of(row)
-    if provenance is None:
-        return True
-    if not isinstance(provenance, Mapping):
-        return False
-    if not provenance:
-        return True
-    for key, value in provenance.items():
-        if key in _RESERVED_PROVENANCE:
-            continue
-        if _source_text(value) and _source_text(value) != own:
-            return False
-    conflicts = provenance.get("conflicts")
-    if not isinstance(conflicts, Mapping):
-        return True
-    for payload in conflicts.values():
-        entries = payload if isinstance(payload, list) else [payload]
-        for entry in entries:
-            if not isinstance(entry, Mapping):
-                continue
-            other = _source_text(entry.get("source"))
-            if other and other != own:
-                return False
-    return True
 
 
 def observation_from_record(incoming: Mapping[str, Any]) -> Dict[str, Any]:
@@ -515,29 +548,6 @@ def _incoming_locations(incoming: Mapping[str, Any]) -> List[Mapping[str, Any]]:
     if not isinstance(raw, list):
         return []
     return [item for item in raw if isinstance(item, Mapping)]
-
-
-def _provenance_of(row: Mapping[str, Any]) -> Any:
-    extra = row.get("_extra")
-    raw = None
-    if isinstance(extra, Mapping):
-        raw = extra.get("provenance")
-    if raw is None:
-        raw = row.get("provenance")
-    if raw is None:
-        return None
-    if isinstance(raw, str):
-        if not raw.strip():
-            return None
-        try:
-            return json.loads(raw)
-        except json.JSONDecodeError:
-            return raw
-    return raw
-
-
-def _source_text(value: Any) -> str:
-    return str(value or "").strip().lower()
 
 
 def _text(value: Any) -> Optional[str]:

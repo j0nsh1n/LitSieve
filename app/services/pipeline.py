@@ -53,7 +53,6 @@ from app.storage.database import (
     ArticleDatabase,
     omit_null_metadata,
 )
-from app.storage.shares import connection_is_clone, library_is_clone
 from app.utils import parse_year
 
 
@@ -127,36 +126,6 @@ class LiteratureSearchPipeline:
         self._cached_emb_ids = None
         self._cached_emb_matrix = None
         self._cached_emb_gen = -1
-        self._trust_legacy_cached: Optional[bool] = None
-
-    def trust_legacy_access(self) -> bool:
-        """False in a cloned library.
-
-        A clone marker on this library file is cached. A redemption hit is
-        cached. A miss from the redemption fallback is not, so a join still
-        in flight cannot freeze a stale "not a clone" answer.
-        """
-        if self._trust_legacy_cached is False:
-            return False
-        try:
-            if connection_is_clone(self.db.conn):
-                self._trust_legacy_cached = False
-                return False
-        except Exception:
-            self._trust_legacy_cached = False
-            return False
-        user_id = getattr(self, "_lra_user_id", None)
-        library_id = getattr(self, "_lra_library_id", None)
-        if not user_id or not library_id:
-            return True
-        try:
-            if library_is_clone(str(user_id), str(library_id), conn=self.db.conn):
-                self._trust_legacy_cached = False
-                return False
-        except Exception:
-            self._trust_legacy_cached = False
-            return False
-        return True
 
     def invalidate_corpus_cache(self) -> None:
         """Drop the embeddings matrix cache (call after corpus mutations)."""
@@ -693,12 +662,10 @@ class LiteratureSearchPipeline:
 
         if free_to_read:
             stored_access = self.db.get_article_access_fields()
-            trust_legacy = self.trust_legacy_access()
             keep = [
                 i for i, key in enumerate(article_ids)
                 if access_state(
                     stored_access.get(key) or {"source": key[1]},
-                    trust_legacy=trust_legacy,
                 ).state
                 == OPEN_LISTED
             ]
@@ -761,11 +728,10 @@ class LiteratureSearchPipeline:
             return
         keys = [(article["article_id"], article["source"]) for article in articles]
         stored = self.db.get_access_fields_for_keys(keys)
-        trust_legacy = self.trust_legacy_access()
         for article in articles:
             key = (article["article_id"], article["source"])
             fields = stored.get(key) or {"source": article.get("source")}
-            info = access_state(fields, trust_legacy=trust_legacy)
+            info = access_state(fields)
             article["access"] = access_public_dict(info)
 
     def _hybrid_rerank(
@@ -1243,7 +1209,6 @@ class LiteratureSearchPipeline:
 
         if not keys:
             return []
-        trust_legacy = self.trust_legacy_access()
         starred = self.db.get_starred_copy_fields(keys)
         dois: List[str] = []
         seen_doi: set = set()
@@ -1278,13 +1243,11 @@ class LiteratureSearchPipeline:
             ):
                 if raw.get(field) is not None:
                     article[field] = raw[field]
-            if access_state(article, trust_legacy=trust_legacy).state != NONE_LISTED:
+            if access_state(article).state != NONE_LISTED:
                 continue
             doi = work_doi(article.get("doi"))
             peer_rows = list(peers_by_doi.get(doi, [])) if doi else []
-            if other_copies_result(
-                article, peer_rows, trust_legacy=trust_legacy,
-            ).has_open_copy:
+            if other_copies_result(article, peer_rows).has_open_copy:
                 continue
             idx = id_to_idx.get(key)
             if idx is None:

@@ -1,7 +1,8 @@
-"""Per-source link evidence: reducer, adapters, legacy merge detection."""
+"""Per-source link evidence: reducer, adapters, and read-time witnesses."""
 
 from __future__ import annotations
 
+import copy
 import itertools
 import json
 import os
@@ -26,7 +27,7 @@ from app.services.link_evidence import (
     canonical_json,
     evidence_url_key,
     incoming_record_from_article,
-    is_never_merged,
+    location_matches_adapter,
     merge_link_evidence,
     observation_from_record,
     observation_matches_adapter,
@@ -35,12 +36,7 @@ from app.services.link_evidence import (
 from app.services.pipeline import FETCHERS, LiteratureSearchPipeline
 from app.storage import dbconn
 from app.storage.database import ArticleDatabase
-from app.storage.shares import (
-    CLONE_APPLICATION_ID,
-    connection_is_clone,
-    generate_share_code,
-    library_is_clone,
-)
+from app.storage.shares import generate_share_code
 from app.storage.user_db import UserDatabase
 
 if os.environ.get("CI"):
@@ -81,72 +77,6 @@ def _incoming(source, rec_id, url, status, observed_at, **extra):
     return incoming_record_from_article(
         article, {"locations": locations or []}, observed_at,
     )
-
-
-def test_is_never_merged_single_source_row(monkeypatch):
-    monkeypatch.delenv(dbconn.ENV_KEY, raising=False)
-    db = ArticleDatabase(":memory:")
-    try:
-        db.insert_articles([_paper(
-            "W1", "openalex", oa_status="gold",
-            best_oa_url="https://example.org/oa.pdf",
-            _extra={"provenance": {"oa_status": "openalex", "doi": "openalex"}},
-        )])
-        extra = db.conn.execute(
-            "SELECT provenance FROM article_extra WHERE article_id=? AND source=?",
-            ("W1", "openalex"),
-        ).fetchone()
-        row = {
-            "source": "openalex",
-            "provenance": json.loads(extra[0]),
-        }
-        assert is_never_merged(row) is True
-    finally:
-        db.close()
-
-
-def test_is_never_merged_filled_field_row(monkeypatch):
-    monkeypatch.delenv(dbconn.ENV_KEY, raising=False)
-    db = ArticleDatabase(":memory:")
-    try:
-        db.insert_articles([_paper("123", "pubmed")])
-        db.insert_articles([_paper(
-            "W1", "openalex", oa_status="gold",
-            best_oa_url="https://example.org/oa.pdf",
-        )])
-        extra = db.conn.execute("SELECT provenance FROM article_extra").fetchone()
-        row = {"source": "pubmed", "provenance": json.loads(extra[0])}
-        assert row["provenance"].get("oa_status") == "openalex"
-        assert is_never_merged(row) is False
-    finally:
-        db.close()
-
-
-def test_is_never_merged_conflict_row(monkeypatch):
-    monkeypatch.delenv(dbconn.ENV_KEY, raising=False)
-    db = ArticleDatabase(":memory:")
-    try:
-        db.insert_articles([_paper(
-            "123", "pubmed", oa_status="closed",
-            best_oa_url="https://publisher.example/closed",
-        )])
-        db.insert_articles([_paper(
-            "W1", "openalex", oa_status="gold",
-            best_oa_url="https://zenodo.org/paper.pdf",
-        )])
-        extra = db.conn.execute("SELECT provenance FROM article_extra").fetchone()
-        row = {"source": "pubmed", "provenance": json.loads(extra[0])}
-        assert "conflicts" in row["provenance"]
-        assert is_never_merged(row) is False
-    finally:
-        db.close()
-
-
-def test_is_never_merged_null_provenance():
-    assert is_never_merged({"source": "pubmed"}) is True
-    assert is_never_merged({"source": "pubmed", "provenance": None}) is True
-    assert is_never_merged({"source": "pubmed", "provenance": {}}) is True
-    assert is_never_merged({"source": "pubmed", "provenance": "{}"}) is True
 
 
 def test_reducer_ignores_claimed_link_evidence():
@@ -470,12 +400,11 @@ def _redeem(udb, owner_id, owner_lib, student_id, student_lib):
     return share
 
 
-def _assert_no_open(row, *, trust_legacy, closed_url=None):
-    card = access_state(row, trust_legacy=trust_legacy)
-    copies = other_copies_result(row, trust_legacy=trust_legacy)
+def _assert_no_open(row, *, closed_url=None):
+    card = access_state(row)
+    copies = other_copies_result(row)
     payload = other_copies_payload(
         {(str(row.get("article_id") or "id"), str(row.get("source") or "src")): row},
-        trust_legacy=trust_legacy,
     )
     assert card.state != OPEN_LISTED
     assert card.url is None
@@ -489,7 +418,7 @@ def _assert_no_open(row, *, trust_legacy, closed_url=None):
         )
 
 
-def test_never_merged_without_extra_still_uses_legacy_in_non_clone(monkeypatch, tmp_path):
+def test_legacy_row_without_evidence_is_not_open(monkeypatch, tmp_path):
     monkeypatch.delenv(dbconn.ENV_KEY, raising=False)
     db = ArticleDatabase(str(tmp_path / "owner.db"))
     try:
@@ -500,9 +429,19 @@ def test_never_merged_without_extra_still_uses_legacy_in_non_clone(monkeypatch, 
         db.conn.execute("DELETE FROM article_extra")
         db.conn.commit()
         row = db.get_all_articles()[0]
-        assert is_never_merged(row) is True
-        assert access_state(row).state == OPEN_LISTED
-        assert access_state(row).url == NEVER_MERGED_OPEN
+        _assert_no_open(row, closed_url=NEVER_MERGED_OPEN)
+        pipe = LiteratureSearchPipeline(db_path=str(tmp_path / "owner.db"))
+        try:
+            articles = [{"article_id": "W1", "source": "openalex"}]
+            pipe._attach_access(articles)
+            assert articles[0]["access"]["state"] != OPEN_LISTED
+            listed = pipe.search_similar(
+                "Same work from two sources", top_k=10, lexical_boost=False,
+                free_to_read=True,
+            )
+            assert listed == []
+        finally:
+            pipe.close()
     finally:
         db.close()
 
@@ -543,8 +482,6 @@ def test_cloned_merged_row_pubmed_url_never_open(monkeypatch, tmp_path):
 
     shares_mod.clone_library_data(owner["id"], "lib", student["id"], "cloned")
     _redeem(udb, owner["id"], "lib", student["id"], "cloned")
-    trust = not library_is_clone(student["id"], "cloned", user_db=udb)
-    assert trust is False
     clone_db = ArticleDatabase(str(clone_path))
     try:
         extras = clone_db.conn.execute(
@@ -554,15 +491,9 @@ def test_cloned_merged_row_pubmed_url_never_open(monkeypatch, tmp_path):
         row = _access_row(clone_db, "123", "pubmed")
         assert row["oa_status"] == "gold"
         assert row["best_oa_url"] == PUBMED_CLOSED
-        assert is_never_merged(row) is True
-        _assert_no_open(row, trust_legacy=trust, closed_url=PUBMED_CLOSED)
+        _assert_no_open(row, closed_url=PUBMED_CLOSED)
         pipe = LiteratureSearchPipeline(db_path=str(clone_path))
         try:
-            pipe._lra_user_id = student["id"]
-            pipe._lra_library_id = "cloned"
-            from app import core
-            monkeypatch.setattr(core, "user_db", udb)
-            assert pipe.trust_legacy_access() is False
             articles = [{"article_id": "123", "source": "pubmed"}]
             pipe._attach_access(articles)
             assert articles[0]["access"]["state"] != OPEN_LISTED
@@ -601,87 +532,23 @@ def test_cloned_never_merged_row_opens_after_clone_fetch(monkeypatch, tmp_path):
 
     shares_mod.clone_library_data(owner["id"], "lib", student["id"], "cloned")
     _redeem(udb, owner["id"], "lib", student["id"], "cloned")
-    trust = not library_is_clone(student["id"], "cloned", user_db=udb)
     clone_db = ArticleDatabase(str(clone_path))
     try:
         row = _access_row(clone_db, "W1", "openalex")
-        assert is_never_merged(row) is True
-        _assert_no_open(row, trust_legacy=trust, closed_url=NEVER_MERGED_OPEN)
+        _assert_no_open(row, closed_url=NEVER_MERGED_OPEN)
         clone_db.insert_articles([_paper(
             "W1", "openalex", oa_status="gold", best_oa_url=NEVER_MERGED_OPEN,
             _observed_at="2026-10-29T12:00:00.000000Z",
         )])
         fetched = _access_row(clone_db, "W1", "openalex")
-        card = access_state(fetched, trust_legacy=trust)
-        copies = other_copies_result(fetched, trust_legacy=trust)
+        card = access_state(fetched)
+        copies = other_copies_result(fetched)
         assert card.state == OPEN_LISTED
         assert card.url == NEVER_MERGED_OPEN
         p28_eligible = card.state != OPEN_LISTED and not copies.has_open_copy
         assert p28_eligible is False
     finally:
         clone_db.close()
-
-
-def test_redemption_alone_treats_library_as_clone(monkeypatch, tmp_path):
-    monkeypatch.delenv(dbconn.ENV_KEY, raising=False)
-    udb = UserDatabase(db_path=str(tmp_path / "users.db"))
-    owner = udb.create_user("owner", "hash")
-    student = udb.create_user("student", "hash")
-    _redeem(udb, owner["id"], "lib", student["id"], "old-clone")
-    db = ArticleDatabase(str(tmp_path / "old-clone.db"))
-    try:
-        db.insert_articles([_paper(
-            "W1", "openalex", oa_status="gold", best_oa_url=NEVER_MERGED_OPEN,
-        )])
-        db.conn.execute("DELETE FROM article_extra")
-        db.conn.commit()
-        row = _access_row(db, "W1", "openalex")
-        assert library_is_clone(student["id"], "old-clone", user_db=udb) is True
-        trust = not library_is_clone(student["id"], "old-clone", user_db=udb)
-        _assert_no_open(row, trust_legacy=trust, closed_url=NEVER_MERGED_OPEN)
-    finally:
-        db.close()
-
-
-def test_clone_lookup_error_means_not_open(monkeypatch, tmp_path):
-    monkeypatch.delenv(dbconn.ENV_KEY, raising=False)
-
-    class Boom:
-        def library_was_cloned(self, *_args, **_kwargs):
-            raise RuntimeError("redemptions unavailable")
-
-    assert library_is_clone("u", "l", user_db=Boom()) is True
-    db = ArticleDatabase(str(tmp_path / "lib.db"))
-    try:
-        db.insert_articles([_paper(
-            "W1", "openalex", oa_status="gold", best_oa_url=NEVER_MERGED_OPEN,
-        )])
-        db.conn.execute("DELETE FROM article_extra")
-        db.conn.commit()
-        row = _access_row(db, "W1", "openalex")
-        trust = not library_is_clone("u", "l", user_db=Boom())
-        _assert_no_open(row, trust_legacy=trust, closed_url=NEVER_MERGED_OPEN)
-    finally:
-        db.close()
-
-
-def test_non_clone_library_still_trusts_never_merged(monkeypatch, tmp_path):
-    monkeypatch.delenv(dbconn.ENV_KEY, raising=False)
-    udb = UserDatabase(db_path=str(tmp_path / "users.db"))
-    owner = udb.create_user("owner", "hash")
-    assert library_is_clone(owner["id"], "lib", user_db=udb) is False
-    db = ArticleDatabase(str(tmp_path / "owner.db"))
-    try:
-        db.insert_articles([_paper(
-            "W1", "openalex", oa_status="gold", best_oa_url=NEVER_MERGED_OPEN,
-        )])
-        row = _access_row(db, "W1", "openalex")
-        trust = not library_is_clone(owner["id"], "lib", user_db=udb)
-        card = access_state(row, trust_legacy=trust)
-        assert card.state == OPEN_LISTED
-        assert card.url == NEVER_MERGED_OPEN
-    finally:
-        db.close()
 
 
 def test_legacy_merged_conflict_copy_is_not_open(monkeypatch):
@@ -708,7 +575,6 @@ def test_legacy_merged_conflict_copy_is_not_open(monkeypatch):
         extra = db.conn.execute("SELECT provenance FROM article_extra").fetchone()
         row = db.get_all_articles()[0]
         row["provenance"] = json.loads(extra[0])
-        assert is_never_merged(row) is False
         assert access_state(row).state == "none_listed"
         found = other_copies_result(row)
         by_url = {item.url: item.open_listed for item in found.copies}
@@ -1151,9 +1017,9 @@ def _clone_setup(monkeypatch, tmp_path):
     return shares_mod, udb, owner, student, owner_path, clone_path
 
 
-def test_clone_marker_is_written_before_replace(monkeypatch, tmp_path):
+def test_clone_library_data_drops_extra_and_is_not_open(monkeypatch, tmp_path):
     monkeypatch.delenv(dbconn.ENV_KEY, raising=False)
-    shares_mod, udb, owner, student, owner_path, clone_path = _clone_setup(
+    shares_mod, _udb, owner, student, owner_path, clone_path = _clone_setup(
         monkeypatch, tmp_path,
     )
     db = ArticleDatabase(str(owner_path))
@@ -1166,46 +1032,20 @@ def test_clone_marker_is_written_before_replace(monkeypatch, tmp_path):
         )])
     finally:
         db.close()
-
-    seen = {}
-    real_replace = shares_mod.os.replace
-
-    def wrapped(src, dst):
-        conn = dbconn.connect(f"file:{src}?mode=ro", uri=True)
-        try:
-            seen["marked"] = connection_is_clone(conn)
-            seen["app_id"] = conn.execute("PRAGMA application_id").fetchone()[0]
-        finally:
-            conn.close()
-        return real_replace(src, dst)
-
-    monkeypatch.setattr(shares_mod.os, "replace", wrapped)
     shares_mod.clone_library_data(owner["id"], "lib", student["id"], "cloned")
-    assert seen["marked"] is True
-    assert seen["app_id"] == CLONE_APPLICATION_ID
     clone_db = ArticleDatabase(str(clone_path))
     try:
-        assert connection_is_clone(clone_db.conn) is True
-        assert library_is_clone(
-            student["id"], "cloned", user_db=udb, conn=clone_db.conn,
-        ) is True
+        extras = clone_db.conn.execute(
+            "SELECT COUNT(*) FROM article_extra"
+        ).fetchone()[0]
+        assert extras == 0
         row = _access_row(clone_db, "123", "pubmed")
-        pipe = LiteratureSearchPipeline(db_path=str(clone_path))
-        try:
-            pipe._lra_user_id = student["id"]
-            pipe._lra_library_id = "cloned"
-            from app import core
-            monkeypatch.setattr(core, "user_db", udb)
-            assert pipe.trust_legacy_access() is False
-            _assert_no_open(row, trust_legacy=pipe.trust_legacy_access(),
-                            closed_url=PUBMED_CLOSED)
-        finally:
-            pipe.close()
+        _assert_no_open(row, closed_url=PUBMED_CLOSED)
     finally:
         clone_db.close()
 
 
-def test_join_race_does_not_cache_legacy_trust(monkeypatch, tmp_path):
+def test_join_race_clone_is_not_open(monkeypatch, tmp_path):
     monkeypatch.delenv(dbconn.ENV_KEY, raising=False)
     from app import core
     from app.storage import shares as shares_mod
@@ -1236,10 +1076,12 @@ def test_join_race_does_not_cache_legacy_trust(monkeypatch, tmp_path):
     def concurrent_read(*_args, **_kwargs):
         q = core.get_pipeline(student["id"], "new-clone")
         held.append(q)
-        observed["before_commit"] = q.trust_legacy_access()
-        observed["before_commit_is_clone"] = library_is_clone(
-            student["id"], "new-clone", user_db=udb, db_path=clone_path,
-        )
+        row = q.db.get_article_access_fields()[("seed", "pubmed")]
+        row = dict(row)
+        row["article_id"] = "seed"
+        row["source"] = "pubmed"
+        observed["during_join"] = access_state(row).state
+        observed["during_join_open"] = other_copies_result(row).has_open_copy
 
     with patch.object(
         shares_mod, "library_db_path",
@@ -1261,26 +1103,17 @@ def test_join_race_does_not_cache_legacy_trust(monkeypatch, tmp_path):
     ):
         shares_mod.join_share(udb, student["id"], "race-student", share["code"])
         q = held[0]
-        observed["redemption_committed"] = library_is_clone(
-            student["id"], "new-clone", user_db=udb, db_path=clone_path,
-        )
-        observed["after_commit_cached_trust"] = q.trust_legacy_access()
         row = q.db.get_article_access_fields()[("seed", "pubmed")]
         row = dict(row)
         row["article_id"] = "seed"
         row["source"] = "pubmed"
-        card = access_state(row, trust_legacy=q.trust_legacy_access())
-        copies = other_copies_result(row, trust_legacy=q.trust_legacy_access())
-        assert observed["before_commit"] is False
-        assert observed["before_commit_is_clone"] is True
-        assert observed["redemption_committed"] is True
-        assert observed["after_commit_cached_trust"] is False
-        assert card.state == NONE_LISTED
-        assert copies.has_open_copy is False
+        _assert_no_open(row, closed_url=PUBMED_CLOSED)
+        assert observed["during_join"] == NONE_LISTED
+        assert observed["during_join_open"] is False
         core.release_pipeline(student["id"], "new-clone")
 
 
-def test_owner_deletion_does_not_erase_clone_identity(monkeypatch, tmp_path):
+def test_owner_deletion_clone_stays_closed(monkeypatch, tmp_path):
     monkeypatch.delenv(dbconn.ENV_KEY, raising=False)
     shares_mod, udb, owner, student, owner_path, clone_path = _clone_setup(
         monkeypatch, tmp_path,
@@ -1295,42 +1128,28 @@ def test_owner_deletion_does_not_erase_clone_identity(monkeypatch, tmp_path):
         db.close()
     shares_mod.clone_library_data(owner["id"], "lib", student["id"], "lifecycle")
     _redeem(udb, owner["id"], "lib", student["id"], "lifecycle")
-    from app import core
-    monkeypatch.setattr(core, "user_db", udb)
     pipe = LiteratureSearchPipeline(db_path=str(clone_path))
     try:
-        pipe._lra_user_id = student["id"]
-        pipe._lra_library_id = "lifecycle"
         row = _access_row(pipe.db, "seed", "pubmed")
-        assert pipe.trust_legacy_access() is False
-        _assert_no_open(row, trust_legacy=False, closed_url=PUBMED_CLOSED)
+        _assert_no_open(row, closed_url=PUBMED_CLOSED)
         assert udb.delete_user(owner["id"])
-        assert library_is_clone(
-            student["id"], "lifecycle", user_db=udb, db_path=clone_path,
-        ) is True
-        assert pipe.trust_legacy_access() is False
         _assert_no_open(
             _access_row(pipe.db, "seed", "pubmed"),
-            trust_legacy=pipe.trust_legacy_access(),
             closed_url=PUBMED_CLOSED,
         )
     finally:
         pipe.close()
     fresh = LiteratureSearchPipeline(db_path=str(clone_path))
     try:
-        fresh._lra_user_id = student["id"]
-        fresh._lra_library_id = "lifecycle"
-        assert fresh.trust_legacy_access() is False
         _assert_no_open(
             _access_row(fresh.db, "seed", "pubmed"),
-            trust_legacy=fresh.trust_legacy_access(),
             closed_url=PUBMED_CLOSED,
         )
     finally:
         fresh.close()
 
 
-def test_redemption_fallback_does_not_cache_a_negative(monkeypatch, tmp_path):
+def test_unmarked_clone_without_evidence_is_not_open(monkeypatch, tmp_path):
     monkeypatch.delenv(dbconn.ENV_KEY, raising=False)
     udb = UserDatabase(db_path=str(tmp_path / "users.db"))
     owner = udb.create_user("owner", "hash")
@@ -1344,30 +1163,16 @@ def test_redemption_fallback_does_not_cache_a_negative(monkeypatch, tmp_path):
         db.conn.commit()
     finally:
         db.close()
-    from app import core
-    monkeypatch.setattr(core, "user_db", udb)
     pipe = LiteratureSearchPipeline(db_path=str(tmp_path / "racing.db"))
     try:
-        pipe._lra_user_id = student["id"]
-        pipe._lra_library_id = "racing-clone"
-        assert pipe.trust_legacy_access() is True
-        trace = []
-        udb.conn.set_trace_callback(trace.append)
-        articles = [{"article_id": "W1", "source": "openalex"} for _ in range(100)]
-        pipe._attach_access(articles)
-        selects = [
-            statement for statement in trace
-            if "SELECT 1 FROM share_redemptions" in statement
-            and "student_library_id" in statement
-        ]
-        assert len(selects) == 1
-        udb.conn.set_trace_callback(None)
-        _redeem(udb, owner["id"], "lib", student["id"], "racing-clone")
-        assert library_is_clone(student["id"], "racing-clone", user_db=udb) is True
-        assert pipe.trust_legacy_access() is False
         row = _access_row(pipe.db, "W1", "openalex")
-        _assert_no_open(row, trust_legacy=pipe.trust_legacy_access(),
-                        closed_url=NEVER_MERGED_OPEN)
+        _assert_no_open(row, closed_url=NEVER_MERGED_OPEN)
+        _redeem(udb, owner["id"], "lib", student["id"], "racing-clone")
+        _assert_no_open(
+            _access_row(pipe.db, "W1", "openalex"),
+            closed_url=NEVER_MERGED_OPEN,
+        )
+        articles = [{"article_id": "W1", "source": "openalex"}]
         pipe._attach_access(articles)
         assert articles[0]["access"]["state"] != OPEN_LISTED
     finally:
@@ -1407,7 +1212,7 @@ def test_malformed_source_basis_is_never_open_and_preserved(
         db.conn.execute("UPDATE article_extra SET provenance = ?", (before,))
         db.conn.commit()
         row = _access_row(db, "W1", "openalex")
-        _assert_no_open(row, trust_legacy=False, closed_url=url)
+        _assert_no_open(row, closed_url=url)
         decision = link_access(stored[LINK_EVIDENCE_KEY], url)
         assert decision.open_listed is False
         result = db.insert_articles([dict(
@@ -1502,16 +1307,25 @@ def _real_adapter_articles():
     return articles
 
 
-def test_every_adapter_output_matches_the_allow_list():
-    assert set(SOURCE_ADAPTER_BASES) == set(FETCHERS)
+_REQUIRED_ADAPTERS = frozenset({
+    "hal", "openalex", "doaj", "crossref", "zenodo", "openaire", "europepmc",
+})
+_SHAPE_MUTATIONS = (
+    ("source", "not-a-source"),
+    ("basis", "forged_basis"),
+    ("kind", {"bad": "kind"}),
+    ("licence", {"bad": "licence"}),
+    ("licence_scope", {"bad": "scope"}),
+)
+
+
+def _adapter_observations():
     stamp = "2026-10-29T12:00:00.000000Z"
-    seen = set()
+    observations = []
     for source, article in _real_adapter_articles():
         extra = article.get("_extra") if isinstance(article.get("_extra"), dict) else {}
         rec = incoming_record_from_article(article, extra, stamp)
-        obs = observation_from_record(rec)
-        assert observation_matches_adapter(obs), (source, obs)
-        seen.add(source)
+        observations.append(observation_from_record(rec))
     for source in FETCHERS:
         extra = {}
         status = "gold"
@@ -1527,7 +1341,159 @@ def test_every_adapter_output_matches_the_allow_list():
             source, f"{source}-id", f"https://example.org/{source}", status, stamp,
             **extra,
         )
-        obs = observation_from_record(rec)
-        assert observation_matches_adapter(obs), (source, obs)
-        seen.add(source)
+        observations.append(observation_from_record(rec))
+    return observations
+
+
+def test_every_adapter_output_matches_the_allow_list():
+    assert set(SOURCE_ADAPTER_BASES) == set(FETCHERS)
+    observations = _adapter_observations()
+    seen = {obs["source"] for obs in observations}
+    for obs in observations:
+        assert observation_matches_adapter(obs), obs
+        for loc in obs["locations"]:
+            assert location_matches_adapter(obs["source"], loc), (obs["source"], loc)
     assert seen == set(FETCHERS)
+    assert _REQUIRED_ADAPTERS <= seen
+    assert any(
+        obs["source"] == "crossref"
+        and any(
+            loc.get("basis") == "crossref_entry" and loc.get("licence")
+            for loc in obs["locations"]
+        )
+        for obs in observations
+    )
+
+
+def test_real_adapter_outputs_fail_when_each_shape_field_mutates():
+    for obs in _adapter_observations():
+        assert observation_matches_adapter(obs)
+        for field, value in _SHAPE_MUTATIONS:
+            mutated = copy.deepcopy(obs)
+            if field == "source":
+                mutated["source"] = value
+            elif not mutated["locations"]:
+                continue
+            else:
+                mutated["locations"][0][field] = value
+            assert not observation_matches_adapter(mutated), (obs["source"], field)
+            if field != "source" and mutated["locations"]:
+                assert not location_matches_adapter(
+                    obs["source"], mutated["locations"][0],
+                ), (obs["source"], field)
+
+
+def _doaj_fulltext_observation(changes):
+    loc = {
+        "url": "https://example.org/doaj",
+        "basis": "doaj_fulltext",
+        "kind": "fulltext",
+        "oa_status": "gold",
+        "licence": None,
+        "licence_scope": None,
+    }
+    loc.update(changes)
+    return {
+        "source": "doaj",
+        "source_record_id": "D1",
+        "observed_at": "2026-10-29T12:00:00Z",
+        "locations": [loc],
+    }
+
+
+@pytest.mark.parametrize("name, changes", [
+    ("landing_closed", {"kind": "landing", "oa_status": "closed"}),
+    ("kind_mapping", {"kind": {"bad": "kind"}}),
+    ("impossible_licence_scope", {
+        "licence": "https://creativecommons.org/licenses/by/4.0/",
+        "licence_scope": "entry",
+    }),
+])
+def test_doaj_injected_shapes_are_not_witnesses(monkeypatch, name, changes):
+    monkeypatch.delenv(dbconn.ENV_KEY, raising=False)
+    url = "https://example.org/doaj"
+    obs = _doaj_fulltext_observation(changes)
+    assert observation_matches_adapter(obs) is False
+    assert location_matches_adapter("doaj", obs["locations"][0]) is False
+    evidence = {"version": 1, "observations": [obs]}
+    assert link_access(evidence, url).open_listed is False
+    row = _paper("seed", "openalex", oa_status="gold", best_oa_url=url)
+    row["provenance"] = {LINK_EVIDENCE_KEY: evidence}
+    _assert_no_open(row, closed_url=url)
+    db = ArticleDatabase(":memory:")
+    try:
+        seed = _paper("seed", "openalex", oa_status="gold", best_oa_url=url)
+        db.insert_articles([seed])
+        raw = json.dumps({LINK_EVIDENCE_KEY: evidence})
+        db.conn.execute("UPDATE article_extra SET provenance = ?", (raw,))
+        db.conn.commit()
+        result = db.insert_articles([dict(seed, journal="Changed by refresh")])
+        after = db.conn.execute("SELECT provenance FROM article_extra").fetchone()[0]
+        assert result["updated"] == 0
+        assert result["dropped"] == 1
+        assert after == raw
+        journal = db.conn.execute("SELECT journal FROM articles").fetchone()[0]
+        assert journal != "Changed by refresh"
+    finally:
+        db.close()
+    assert name
+
+
+def test_wrong_typed_kind_is_not_a_witness():
+    url = "https://example.org/doc"
+    loc = {
+        "url": url,
+        "basis": "oa_best",
+        "oa_status": "gold",
+        "kind": {"bad": "kind"},
+        "licence": None,
+        "licence_scope": None,
+    }
+    assert location_matches_adapter("openalex", loc) is False
+    evidence = {
+        "version": 1,
+        "observations": [{
+            "source": "openalex",
+            "source_record_id": "W1",
+            "observed_at": "2026-10-29T12:00:00.000000Z",
+            "locations": [loc],
+        }],
+    }
+    assert observation_matches_adapter(evidence["observations"][0]) is False
+    assert link_access(evidence, url).open_listed is False
+    row = _paper("W1", "openalex", oa_status="gold", best_oa_url=url)
+    row["provenance"] = {LINK_EVIDENCE_KEY: evidence}
+    _assert_no_open(row, closed_url=url)
+
+
+@pytest.mark.parametrize("source, loc", [
+    ("doaj", {
+        "url": "https://example.org/fulltext",
+        "basis": "doaj_fulltext",
+        "kind": "fulltext",
+        "oa_status": "gold",
+        "licence": "https://creativecommons.org/licenses/by/4.0/",
+        "licence_scope": None,
+    }),
+    ("hal", {
+        "url": "https://hal.science/hal-1/document",
+        "basis": "hal_file",
+        "kind": "file",
+        "oa_status": "green",
+        "licence": "https://creativecommons.org/licenses/by/4.0/",
+        "licence_scope": None,
+    }),
+])
+def test_licence_rejected_where_adapter_emits_none(source, loc):
+    assert location_matches_adapter(source, loc) is False
+    evidence = {
+        "version": 1,
+        "observations": [{
+            "source": source,
+            "source_record_id": "rec",
+            "observed_at": "2026-10-29T12:00:00.000000Z",
+            "locations": [loc],
+        }],
+    }
+    assert observation_matches_adapter(evidence["observations"][0]) is False
+    assert link_access(evidence, loc["url"]).open_listed is False

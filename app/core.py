@@ -183,7 +183,6 @@ def get_pipeline(
                 embedding_model="general",
             )
             setattr(pipe, "_lra_cache_key", key)
-            setattr(pipe, "_lra_user_id", user_id)
             setattr(pipe, "_lra_library_id", lib_id)
             _pipelines[key] = pipe
             # Evict least-recently-used pipelines to bound memory.

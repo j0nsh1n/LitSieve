@@ -1309,17 +1309,6 @@ class UserDatabase:
             ).fetchone()
         return row is not None
 
-    def library_was_cloned(self, student_user_id: str, student_library_id: str) -> bool:
-        """True when this library id was created by redeeming a share."""
-        with self._lock:
-            row = self.conn.execute(
-                "SELECT 1 FROM share_redemptions "
-                "WHERE student_user_id = ? AND student_library_id = ? "
-                "LIMIT 1",
-                (student_user_id, student_library_id),
-            ).fetchone()
-        return row is not None
-
     def record_redemption(
         self,
         share_id: str,

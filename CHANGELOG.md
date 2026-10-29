@@ -9,20 +9,21 @@ and this project aims to follow Semantic Versioning for app version strings
 ## [Unreleased]
 
 ### Fixed
-- After two sources merge, a listed URL is open when a stored observation
-  from that source says so. Records that were never merged keep the existing
-  access label. Merged records with no stored observations stay "No open
-  copy listed" until a later fetch. The card, Free to read, other copies,
-  and Different work share this rule. A later replace-fetch keeps those
-  earlier listings for papers that stay in the library. A stored URL with a
-  different scheme, trailing slash, fragment, IPv6 host, or login is a
-  different copy. IPv6 identity keeps the brackets around the host. Broken
-  stored evidence stays "No open copy listed". A stored observation whose
-  source, record id, or timestamp is not a string is unused, and a later
-  fetch leaves that stored value unchanged. A stored observation whose
-  source and basis do not match what that source writes is unused, and a
-  later fetch leaves it unchanged. A cloned library lists no open copy
-  until that clone fetches the paper itself.
+- A listed URL is open only when a stored observation from that source,
+  written by a fetch, says so. Rows with no stored observations stay
+  "No open copy listed" until a later fetch. That includes papers that
+  were never merged and papers in a cloned library. The card, Free to
+  read, other copies, and Different work share this rule. A later
+  replace-fetch keeps those earlier listings for papers that stay in the
+  library. A stored URL with a different scheme, trailing slash, fragment,
+  IPv6 host, or login is a different copy. IPv6 identity keeps the
+  brackets around the host. Broken stored evidence stays "No open copy
+  listed". A stored observation whose source, record id, or timestamp is
+  not a string is unused, and a later fetch leaves that stored value
+  unchanged. A stored observation is unused unless its source, basis,
+  kind, licence, and licence scope match what that source writes, and a
+  later fetch leaves it unchanged. Clones still drop stored observations
+  until they fetch.
 
 - Narrow it down's "Set aside N papers" count, confirm button, and the papers
   it actually sets aside follow the optional book-review checkbox and any

@@ -143,6 +143,14 @@ def _paper(article_id, source, title, abstract, **kwargs):
         "journal": "J",
     }
     article.update(kwargs)
+    if article.get("source") == "doaj" and article.get("best_oa_url"):
+        extra = dict(article.get("_extra") or {})
+        extra.setdefault("locations", [{
+            "url": article["best_oa_url"],
+            "kind": "fulltext",
+            "via": "doaj",
+        }])
+        article["_extra"] = extra
     return article
 
 

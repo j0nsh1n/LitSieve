@@ -15,6 +15,7 @@ from app.services.access import (
     other_copies,
     other_copies_result,
 )
+from app.services.link_evidence import incoming_record_from_article, observation_from_record
 from app.services.pipeline import LiteratureSearchPipeline
 from app.storage import dbconn
 from app.storage.database import ArticleDatabase
@@ -35,6 +36,24 @@ def _article(**kwargs):
         article["locations"] = locations
     article.update(kwargs)
     return article
+
+
+def _with_evidence(article):
+    extra = article.get("_extra") if isinstance(article.get("_extra"), dict) else {}
+    if "locations" not in extra and article.get("locations"):
+        extra = dict(extra)
+        extra["locations"] = article["locations"]
+    rec = incoming_record_from_article(article, extra, "2026-10-29T00:00:00Z")
+    obs = observation_from_record(rec)
+    out = dict(article)
+    provenance = {}
+    if isinstance(out.get("provenance"), dict):
+        provenance.update(out["provenance"])
+    if isinstance(extra.get("provenance"), dict):
+        provenance.update(extra["provenance"])
+    provenance["link_evidence"] = {"version": 1, "observations": [obs]}
+    out["provenance"] = provenance
+    return out
 
 
 def _urls(copies):
@@ -71,7 +90,7 @@ def test_same_doi_row_locations_and_best_oa_url_are_listed():
             "via": "zenodo",
         }],
     )
-    copies = other_copies(card, [peer])
+    copies = other_copies(card, [_with_evidence(peer)])
     assert _urls(copies) == ["https://zenodo.org/record/1/files/a.pdf"]
     assert copies[0].where == "Zenodo"
     assert copies[0].open_listed is True
@@ -214,7 +233,7 @@ def test_stored_crossref_record_keeps_non_text_mining_copy(tmp_path, monkeypatch
 
 
 def test_crossref_with_cc_licence_is_listed_as_open():
-    copies = other_copies(_article(
+    copies = other_copies(_with_evidence(_article(
         article_id="10.3/cc",
         source="crossref",
         locations=[{
@@ -222,7 +241,7 @@ def test_crossref_with_cc_licence_is_listed_as_open():
             "via": "crossref",
             "license": "https://creativecommons.org/licenses/by/4.0/",
         }],
-    ))
+    )))
     assert copies == [CopyInfo("CrossRef", "https://example.org/cc.pdf", True)]
 
 
@@ -254,7 +273,7 @@ def test_later_open_peer_labels_card_location():
         oa_status="gold",
         best_oa_url="https://zenodo.org/records/9/files/paper.pdf",
     )
-    copies = other_copies(card, [peer])
+    copies = other_copies(card, [_with_evidence(peer)])
     assert copies == [
         CopyInfo("OpenAlex", "https://zenodo.org/records/9/files/paper.pdf", True),
     ]
@@ -280,11 +299,11 @@ def test_later_open_peer_labels_earlier_closed_peer():
         host_name="Zenodo",
         best_oa_url="https://zenodo.org/records/9/files/paper.pdf",
     )
-    copies = other_copies(card, [closed, opened])
+    copies = other_copies(card, [closed, _with_evidence(opened)])
     assert copies == [
         CopyInfo("Zenodo", "https://zenodo.org/records/9/files/paper.pdf", True),
     ]
-    reversed_copies = other_copies(card, [opened, closed])
+    reversed_copies = other_copies(card, [_with_evidence(opened), closed])
     assert reversed_copies == copies
 
 
@@ -306,7 +325,7 @@ def test_open_peer_labels_one_of_five_selected_locations():
         oa_status="gold",
         best_oa_url="https://example.org/copy/2",
     )
-    copies = other_copies(card, [peer])
+    copies = other_copies(card, [_with_evidence(peer)])
     assert _urls(copies) == [f"https://example.org/copy/{i}" for i in range(COPY_LIMIT)]
     assert copies[2].open_listed is True
     assert [item.open_listed for item in copies] == [False, False, True, False, False]
@@ -336,7 +355,7 @@ def test_sixth_open_url_sets_has_open_copy_without_joining_the_list():
             "via": "openalex",
         }],
     )
-    found = other_copies_result(card, [peer])
+    found = other_copies_result(card, [_with_evidence(peer)])
     assert _urls(found.copies) == [f"https://example.org/copy/{i}" for i in range(COPY_LIMIT)]
     assert [item.open_listed for item in found.copies] == [False] * COPY_LIMIT
     assert found.has_open_copy is True
@@ -538,6 +557,11 @@ def _neighbor_paper():
         "doi": "10.1234/other",
         "oa_status": "gold",
         "best_oa_url": "https://example.org/neighbor.pdf",
+        "_extra": {"locations": [{
+            "url": "https://example.org/neighbor.pdf",
+            "kind": "fulltext",
+            "via": "doaj",
+        }]},
     }
 
 

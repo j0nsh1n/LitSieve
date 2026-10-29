@@ -12,8 +12,8 @@
   poster. Live at `https://www.litpilot.org` from the production checkout,
   `main` through #106 (2026-10-16). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
-- Latest full suite (2026-10-29, `feat/link-evidence` clone marker):
-  **2229 passed** in 167.34 s, no skips or xfails. `ruff check .` clean;
+- Latest full suite (2026-10-29, `feat/link-evidence` fresh evidence only):
+  **2229 passed** in 168.28 s, no skips or xfails. `ruff check .` clean;
   `pyright app` **0 errors**, 6 optional-import warnings (CI blocks on
   errors). `pip-audit` (2026-10-14): no known vulnerabilities; ROCm
   torch/triton are un-auditable. No dependency lockfile.
@@ -42,13 +42,14 @@
   stored `link_evidence` observation says so. Missing evidence leaves it
   unlabeled. The copies payload includes `has_open_copy`.
 - P2.3 shows an access label on Search cards from stored OA fields, with a
-  Free to read filter next to Type. After a merge, open labels use per-source
-  observations in `article_extra.provenance.link_evidence`. Never-merged rows
-  still use the row's own OA fields. Merged rows without observations stay
-  closed. Closed cards keep every reporting source. Open labels need a real
-  HTTP(S) host. Crossref needs a recognised CC licence identifier and version.
-  The chip sits outside the source/type tags that Catalog and collapsed phone
-  Table rows hide. style.css cache-bust is `20261029a`.
+  Free to read filter next to Type. Open labels use per-source observations
+  in `article_extra.provenance.link_evidence` written by a fetch. Rows with
+  no observations stay "No open copy listed", including clones and papers
+  that were never merged. Closed cards keep every reporting source. Open
+  labels need a real HTTP(S) host. Crossref needs a recognised CC licence
+  identifier and version. The chip sits outside the source/type tags that
+  Catalog and collapsed phone Table rows hide. style.css cache-bust is
+  `20261029a`.
 - P2.7: Narrow it down uses stored `work_type`. Books and chapters with no
   abstract stay in; the preview names how many. Book reviews and trial
   registrations can be set aside only if the student ticks that box.
@@ -285,20 +286,18 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-29. PR #128 (`feat/link-evidence`) clone identity lives
-  in the clone file as SQLite `PRAGMA application_id = 0x4C53434C` (`LSCL`).
-  `clone_library_data` writes it before `os.replace`. Readers check that
-  marker first. `share_redemptions` is the fallback for clones made before
-  the marker. The pipeline caches only a clone-positive answer. A redemption
-  miss is not cached. A failed lookup treats the library as a clone. A
-  cloned library lists no open copy until that clone's own fetch writes
-  `link_evidence`. Never-merged rows follow the same rule. Clones still drop
-  `article_extra`. Copied article columns stay unchanged. A stored
-  observation is a witness only when its source, basis, kind, and licence
-  fields match a shape that source's adapter writes. Anything else stays
-  unused and is left unchanged on write. Local branch `fix-b7-r2` from
-  `origin/feat/link-evidence` at `1e8b726`. simple_tools.js cache-bust is
-  `20261029c`; search.js and style.css stay `20261029a`.
+- **Date:** 2026-10-29. PR #128 (`feat/link-evidence`) counts a link as an
+  open copy only when versioned `link_evidence` written by a fetch says so.
+  Rows with no observations stay "No open copy listed" in every library.
+  The clone SQLite marker and the `share_redemptions` clone lookup are
+  gone. `clone_library_data` matches main: clones drop `article_extra` and
+  have no evidence until they fetch. Copied article columns stay unchanged.
+  A stored observation is a witness only when its source, basis, kind,
+  licence, and licence scope match a shape that source's adapter writes.
+  Types are checked first. A dict or list in those fields is unused. Local
+  branch `fix-b8` from `origin/feat/link-evidence` at `887fa2e`.
+  simple_tools.js cache-bust is `20261029c`; search.js and style.css stay
+  `20261029a`.
 - PR #122 (merged) keeps only the P2.2 sweep tooling. Its gate FAILED on the
   15-question benchmark (test ndcg@10 0.5712 vs today's 0.5755), so Search
   ranking is unchanged. Leave-one-question-out shortlists inside each fold,
@@ -307,8 +306,8 @@ Guest User (is_guest) → sample corpus only; purged by age
   and `score-test` stay off ranking.
 - Validation (production venv, this worktree, no install): `ruff check .`
   clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2229
-  passed in 167.34 s. Scratch is
-  `~/HealthDatabaseAccess-scratch/pytest-fix-b7-r2`. No JS or CSS change.
+  passed in 168.28 s. Scratch is
+  `~/HealthDatabaseAccess-scratch/pytest-fix-b8`. No JS or CSS change.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
   and unscheduled roadmap backlog. Ship staging is at `266195e`. P1.9 labels
   are done: a three-model panel plus the owner's review of 29 rows, in
@@ -317,5 +316,5 @@ Guest User (is_guest) → sample corpus only; purged by age
   split is still unscored. That is a different score from the scored
   15-question v2 P2.2 test pass and from the v2 Laya test score. The
   evidence redesign from #126 follows in a separate PR.
-- **Next step:** independent review of the clone marker and adapter allow-list
-  on PR #128.
+- **Next step:** independent review of fresh-evidence-only open copies and
+  the strict adapter-shape validator on PR #128.
