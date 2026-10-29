@@ -61,6 +61,11 @@ is always asked. Yes/no probabilities are independent.
     python tools/eval_laya_groups.py run
     python tools/eval_laya_groups.py run-f2
     python tools/eval_laya_groups.py score-test
+    python tools/eval_laya_groups.py run-ft --checkpoint DIR
+    python tools/eval_laya_groups.py score-ft-test
+
+``run-ft`` loads a local checkpoint and does not call the sidecar.
+``score-ft-test`` reads the test split once.
 """
 
 from __future__ import annotations
@@ -3258,6 +3263,693 @@ def execute_score_test(args: argparse.Namespace) -> int:
     return 0
 
 
+FT_SETTING = "ft-two-choice"
+LAYA_PYTHON = Path.home() / ".local/share/laya-0.4.17/bin/python"
+FT_INSTRUCTIONS = (
+    "Which relevance group is this paper in? "
+    "answers means it reports results on the question's outcome, and its population or place is not contradicted. "
+    "how_why explains a mechanism or an implementation. "
+    "context is experience, background, or setting. "
+    "different is a related subject or incidental."
+)
+FT_CRITERIA = {
+    "answers": "Reports results on the question's outcome, and its population or place is not contradicted.",
+    "how_why": "Explains a mechanism or how something is implemented.",
+    "context": "Experience, context, or background for the question.",
+    "different": "Related subject or incidental to the question.",
+}
+# Published round-2 score. run-ft does not call that model again.
+ROUND2_F2 = {
+    "setting": "f2b-full-outcome-p0",
+    "dev": {
+        "n": 271, "coverage": 0.631, "accuracy": 0.485, "macro_f1": 0.354,
+        "harmful": 0.050, "harm_n": "5/101", "ndcg@10": 0.431, "relevant@10": 3.07,
+        "d_ndcg": 0.034, "d_rel": 0.27,
+    },
+    "test": {
+        "n": 169, "coverage": 0.598, "accuracy": 0.386, "macro_f1": 0.277,
+        "harmful": 0.052, "harm_n": "3/58", "ndcg@10": 0.418, "relevant@10": 1.80,
+        "d_ndcg": -0.158, "d_rel": -0.60,
+    },
+}
+
+
+def group_question() -> Dict[str, Any]:
+    """The single choice question used to train and score the fine-tune."""
+    return {"type": "choice", "instructions": FT_INSTRUCTIONS, "criteria": dict(FT_CRITERIA)}
+
+
+def group_state(question: str, title: str, abstract: str) -> str:
+    """State text: the question, the title, and the abstract span already chosen."""
+    title_s = " ".join((title or "").split()) or "(no title)"
+    abstract_s = " ".join((abstract or "").split())
+    return f"Question: {question.strip()}\nTitle: {title_s}\nAbstract: {abstract_s}"
+
+
+def ft_states(prepared: Sequence[Mapping[str, Any]]) -> List[dict]:
+    """One state per top-30 paper. The abstract span is the first two sentences."""
+    rows = []
+    for item in prepared:
+        question = str(item["question"]["text"])
+        qid = str(item["question"]["id"])
+        for paper in item["papers"]:
+            lead = first_sentences(str(paper.get("abstract") or ""), 2)
+            rows.append({
+                "qid": qid,
+                "key": str(paper.get("key") or ""),
+                "state": group_state(question, str(paper.get("title") or ""), lead),
+            })
+    return rows
+
+
+def rows_from_predict(results: Sequence[Mapping[str, Any]], question_id: str = "group") -> List[dict]:
+    """Map ``Agent.predict_batch`` results to the choice-row shape the scorer uses."""
+    rows = []
+    for result in results:
+        answers = result.get("answers") if isinstance(result, Mapping) else None
+        answer = answers.get(question_id) if isinstance(answers, Mapping) else None
+        if not isinstance(answer, Mapping):
+            raise RuntimeError("local checkpoint returned no group answer")
+        raw = answer.get("probabilities")
+        probs = {}
+        if isinstance(raw, Mapping):
+            for key, value in raw.items():
+                if isinstance(value, (int, float)) and not isinstance(value, bool):
+                    probs[str(key)] = float(value)
+        choice = answer.get("choice")
+        rows.append({
+            "choice": choice,
+            "p": float(probs.get(str(choice), 0.0)),
+            "probabilities": probs,
+        })
+    return rows
+
+
+def answers_tag_precision(
+    records: Sequence[Mapping[str, Any]], minimum: float = 0.8,
+) -> Dict[str, Any]:
+    """Precision of an answers tag when P(answers) is at least ``minimum``.
+
+    Papers with no gold label are ignored. ``not_sorted`` gold counts as a miss.
+    """
+    flagged = []
+    for row in records:
+        gold = row.get("gold")
+        if gold not in GROUPS and gold != "not_sorted":
+            continue
+        probability = float((row.get("probs") or {}).get("answers", 0.0))
+        if probability + 1e-12 >= minimum:
+            flagged.append(gold == "answers")
+    count = len(flagged)
+    hits = sum(1 for hit in flagged if hit)
+    return {
+        "precision": (hits / count) if count else None,
+        "tp": hits,
+        "flagged": count,
+        "minimum": minimum,
+    }
+
+
+def predict_local(
+    checkpoint: Path,
+    states: Sequence[Mapping[str, Any]],
+    batch_size: int = 8,
+    latency_n: int = 30,
+) -> Dict[str, Any]:
+    """Score states with a local Laya checkpoint. Does not open a network port."""
+    for key, value in (("HF_HUB_OFFLINE", "1"), ("TRANSFORMERS_OFFLINE", "1")):
+        os.environ[key] = value
+    os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+    from laya import load
+
+    texts = [str(row["state"]) for row in states]
+    questions = {"group": group_question()}
+    started = time.perf_counter()
+    agent = load(str(checkpoint))
+    load_ms = (time.perf_counter() - started) * 1000.0
+    latency: Dict[str, Any] = {
+        "load_ms": round(load_ms, 1),
+        "cold_ms": None,
+        "warm_ms": [],
+        "warm_median_ms": None,
+        "batch": min(latency_n, len(texts)),
+    }
+    filled: List[Optional[dict]] = [None] * len(states)
+
+    def fill(indexes: Sequence[int]) -> List[dict]:
+        chunk = [texts[index] for index in indexes]
+        predicted = agent.predict_batch(chunk, questions, batch_size=max(1, len(chunk)))
+        mapped = rows_from_predict(predicted)
+        if len(mapped) != len(indexes):
+            raise RuntimeError("local checkpoint row count does not match states")
+        for index, row in zip(indexes, mapped):
+            filled[index] = row
+        return mapped
+
+    n_lat = min(latency_n, len(texts))
+    if n_lat:
+        fill(range(n_lat))
+        latency["cold_ms"] = round((time.perf_counter() - started) * 1000.0, 1)
+        warm = []
+        for _ in range(5):
+            tick = time.perf_counter()
+            agent.predict_batch(list(texts[:n_lat]), questions, batch_size=n_lat)
+            warm.append((time.perf_counter() - tick) * 1000.0)
+        latency["warm_ms"] = [round(value, 1) for value in warm]
+        latency["warm_median_ms"] = round(sorted(warm)[len(warm) // 2], 1)
+    rest = list(range(n_lat, len(texts)))
+    step = max(1, batch_size)
+    for start in range(0, len(rest), step):
+        fill(rest[start:start + step])
+    packed = []
+    for row, pred in zip(states, filled):
+        if pred is None:
+            raise RuntimeError("missing local prediction")
+        packed.append({
+            "qid": row["qid"],
+            "key": row["key"],
+            "choice": pred["choice"],
+            "p": pred["p"],
+            "probabilities": pred["probabilities"],
+        })
+    return {"checkpoint": str(checkpoint), "latency": latency, "rows": packed}
+
+
+def _join_ft_records(
+    prepared: Sequence[Mapping[str, Any]], predicted: Sequence[Mapping[str, Any]],
+) -> List[dict]:
+    by_pair = {(str(row["qid"]), str(row["key"])): row for row in predicted}
+    records = []
+    for item in prepared:
+        qid = str(item["question"]["id"])
+        for paper in item["papers"]:
+            got = by_pair[(qid, str(paper["key"]))]
+            probs = to_group_probs("choice", got.get("probabilities") or {})
+            records.append(_record(item, paper, probs))
+    return records
+
+
+def _coverage_records(prepared: Sequence[Mapping[str, Any]]) -> Tuple[List[dict], str, Dict[str, float]]:
+    records = []
+    items = []
+    for item in prepared:
+        qid = str(item["question"]["id"])
+        for paper in item["papers"]:
+            score = concept_coverage(item["concepts"], paper["title"], paper["abstract"])
+            gold = item["gold"].get(paper["key"])
+            records.append({
+                "qid": qid,
+                "key": paper["key"],
+                "gold": gold,
+                "score": score,
+                "probs": {},
+            })
+            if gold in GROUPS:
+                items.append({"gold": gold, "score": score})
+    _tuned, floor, cuts = tune_coverage(items)
+    return records, floor, dict(cuts)
+
+
+def _public_ft_records(records: Sequence[Mapping[str, Any]]) -> List[dict]:
+    return [
+        {
+            "qid": str(row["qid"]),
+            "key": str(row["key"]),
+            "probs": {group: float(row["probs"].get(group, 0.0)) for group in GROUPS},
+        }
+        for row in records
+    ]
+
+
+def _public_coverage_records(records: Sequence[Mapping[str, Any]]) -> List[dict]:
+    return [
+        {"qid": str(row["qid"]), "key": str(row["key"]), "score": float(row["score"])}
+        for row in records
+    ]
+
+
+def _table_line(row: Mapping[str, Any]) -> str:
+    harm = row.get("harm_cell")
+    if harm is None:
+        harm = _harm_cell(row)
+    return (
+        "| {setting} | {n} | {coverage} | {accuracy} | {macro_f1} | {harmful} | {harm} | "
+        "{ndcg} | {rel} | {dndcg} | {drel} |"
+    ).format(
+        setting=row.get("setting") or "",
+        n="" if row.get("n") is None else row.get("n"),
+        coverage=_fmt(row.get("coverage")),
+        accuracy=_fmt(row.get("accuracy")),
+        macro_f1=_fmt(row.get("macro_f1")),
+        harmful=_fmt(row.get("harmful")),
+        harm=harm or "",
+        ndcg=_fmt(row.get("ndcg@10")),
+        rel=_fmt(row.get("relevant@10"), 2),
+        dndcg=_fmt(row.get("d_ndcg")),
+        drel=_fmt(row.get("d_rel"), 2),
+    )
+
+
+def _reference_line(split: str) -> str:
+    row = dict(ROUND2_F2[split])
+    row["setting"] = ROUND2_F2["setting"] + " (round 2, not re-run)"
+    row["harm_cell"] = row.pop("harm_n")
+    row["good_n"] = ""
+    return _table_line(row)
+
+
+def render_ft_dev(payload: Mapping[str, Any]) -> str:
+    info = payload["dev_info"]
+    lines = [
+        "# Fine-tuned Laya relevance groups",
+        "",
+        "Dev labels only. This file does not score the test split until score-ft-test runs.",
+        "The fine-tune asks one choice question. Round 2's best setting is copied from the published dev table and is not re-run.",
+        "",
+        "## Dev",
+        "",
+        "| setting | n | coverage | accuracy | macro-F1 | harmful | harm n | ndcg@10 | rel@10 | d ndcg | d rel |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for row in info["overall_rows"]:
+        lines.append(_table_line(row))
+    lines.append(_reference_line("dev"))
+    lines.extend([
+        "",
+        "## Leave-one-question-out",
+        "",
+        "Thresholds for the fine-tune and for concept coverage were fit without that row's question.",
+        "",
+        "| setting | n | coverage | accuracy | macro-F1 | harmful | harm n | ndcg@10 | d ndcg |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ])
+    for row in info["loo_rows"]:
+        lines.append(
+            "| {setting} | {n} | {coverage} | {accuracy} | {macro_f1} | {harmful} | {harm} | {ndcg} | {dndcg} |".format(
+                setting=row["setting"],
+                n=row.get("n") if row.get("n") is not None else "",
+                coverage=_fmt(row.get("coverage")),
+                accuracy=_fmt(row.get("accuracy")),
+                macro_f1=_fmt(row.get("macro_f1")),
+                harmful=_fmt(row.get("harmful")),
+                harm=_harm_cell(row),
+                ndcg=_fmt(row.get("ndcg@10")),
+                dndcg=_fmt(row.get("d_ndcg")),
+            )
+        )
+    lines.extend([
+        "",
+        "## Per question",
+        "",
+        "| setting | question | n | coverage | accuracy | macro-F1 | harmful | ndcg@10 | d ndcg |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ])
+    for row in info["question_rows"]:
+        lines.append(
+            "| {setting} | {question} | {n} | {coverage} | {accuracy} | {macro_f1} | {harmful} | {ndcg} | {dndcg} |".format(
+                setting=row["setting"],
+                question=row["question"],
+                n=row.get("n") if row.get("n") is not None else "",
+                coverage=_fmt(row.get("coverage")),
+                accuracy=_fmt(row.get("accuracy")),
+                macro_f1=_fmt(row.get("macro_f1")),
+                harmful=_fmt(row.get("harmful")),
+                ndcg=_fmt(row.get("ndcg@10")),
+                dndcg=_fmt(row.get("d_ndcg")),
+            )
+        )
+    tag = info["tag_precision"]
+    latency = info.get("latency") or {}
+    lines.extend([
+        "",
+        "## Tag",
+        "",
+        (
+            f"Dev precision of answers at P(answers) >= {tag['minimum']}: "
+            f"{_fmt(tag.get('precision'))} ({tag['tp']}/{tag['flagged']})."
+        ),
+        "",
+        "## Latency",
+        "",
+        (
+            f"Cold wall time, including checkpoint load plus one batch of {latency.get('batch')}, "
+            f"was {_fmt(latency.get('cold_ms'), 0)} ms. "
+            f"Five warm runs of that batch: {', '.join(str(v) for v in latency.get('warm_ms') or [])} ms. "
+            f"Median warm run {_fmt(latency.get('warm_median_ms'), 0)} ms."
+        ),
+        "",
+        "## Recommendation",
+        "",
+        "Dev thresholds are fit. The test split is not scored in this file.",
+        "",
+    ])
+    return "\n".join(lines)
+
+
+def _run_checkpoint_predict(args: argparse.Namespace, states: Sequence[dict], out_path: Path) -> Dict[str, Any]:
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    state_path = out_path.with_suffix(".states.json")
+    state_path.write_text(json.dumps(states), encoding="utf-8")
+    cmd = [
+        "nice", "-n", "10", str(args.laya_python), str(Path(__file__).resolve()),
+        "predict-local",
+        "--checkpoint", str(args.checkpoint),
+        "--states", str(state_path),
+        "--out", str(out_path),
+        "--batch-size", str(args.batch_size),
+    ]
+    env = os.environ.copy()
+    env["HF_HUB_OFFLINE"] = "1"
+    env["TRANSFORMERS_OFFLINE"] = "1"
+    env["TOKENIZERS_PARALLELISM"] = "false"
+    env["OMP_NUM_THREADS"] = "4"
+    subprocess.check_call(cmd, env=env)
+    return json.loads(out_path.read_text(encoding="utf-8"))
+
+
+def execute_predict_local(args: argparse.Namespace) -> int:
+    states = json.loads(Path(args.states).read_text(encoding="utf-8"))
+    payload = predict_local(Path(args.checkpoint), states, batch_size=args.batch_size)
+    Path(args.out).write_text(json.dumps(payload), encoding="utf-8")
+    print(f"wrote {args.out} rows={len(payload['rows'])}", flush=True)
+    return 0
+
+
+def execute_run_ft(args: argparse.Namespace) -> int:
+    questions = load_questions(Path(args.questions))
+    results = load_results(Path(args.results))
+    prepared, label_rows = prepare_eval(
+        questions, results, Path(args.corpus), Path(args.labels),
+    )
+    states = ft_states(prepared)
+    pred_path = Path(args.predictions)
+    if args.reuse_predictions and pred_path.is_file():
+        predicted = json.loads(pred_path.read_text(encoding="utf-8"))
+        if str(predicted.get("checkpoint") or "") != str(Path(args.checkpoint)):
+            print("predictions file is for a different checkpoint; refusing to reuse", flush=True)
+            return 2
+    else:
+        predicted = _run_checkpoint_predict(args, states, pred_path)
+    records = _join_ft_records(prepared, predicted["rows"])
+    items = [{"gold": row["gold"], "probs": row["probs"]} for row in records if row.get("gold") in GROUPS]
+    tuned = tune_thresholds(items)
+    print("loading eval_search for dev ranking scores", flush=True)
+    scorer = _eval_search()
+    qrows = [item["qrow"] for item in prepared]
+    baseline = ranking_table(scorer, qrows, label_rows, {})
+    pred_of = _threshold_pred(tuned.thresholds)
+    overall, per_q = score_grouped(
+        FT_SETTING, records, pred_of, prepared, label_rows, scorer, baseline, "dev",
+        _fmt_cuts(tuned.thresholds),
+    )
+    loo = loo_summary_for(FT_SETTING, records, prepared, label_rows, scorer, baseline)
+    cov_records, floor, cuts = _coverage_records(prepared)
+    cov_sid = f"concept-coverage/{floor}"
+
+    def cov_pred(row: Mapping[str, Any]) -> str:
+        return group_from_coverage(float(row["score"]), cuts, floor)
+
+    cov_overall, cov_q = score_grouped(
+        cov_sid, cov_records, cov_pred, prepared, label_rows, scorer, baseline, "dev",
+        _fmt_cuts(cuts) + f" floor:{floor}",
+    )
+    loo_cov = loo_coverage_summary(cov_sid, cov_records, prepared, label_rows, scorer, baseline)
+    today = {
+        "setting": "lexical_on",
+        "n": overall["n"],
+        "coverage": None,
+        "accuracy": None,
+        "macro_f1": None,
+        "harmful": None,
+        "harm_n": "",
+        "good_n": "",
+        "ndcg@10": baseline.get("ndcg@10"),
+        "relevant@10": baseline.get("relevant@10"),
+        "d_ndcg": 0.0,
+        "d_rel": 0.0,
+    }
+    qids = [str(item["question"]["id"]) for item in prepared]
+    payload = {
+        "chosen": FT_SETTING,
+        "checkpoint": str(Path(args.checkpoint)),
+        "paths": {
+            "questions": str(args.questions),
+            "results": str(args.results),
+            "labels": str(args.labels),
+            "corpus": str(args.corpus),
+        },
+        "settings": {
+            FT_SETTING: {
+                "thresholds": {group: float(tuned.thresholds[group]) for group in GROUPS},
+                "records": _public_ft_records(records),
+            }
+        },
+        "coverage_fit": {
+            "sid": cov_sid,
+            "floor": floor,
+            "cuts": {group: float(cuts[group]) for group in cuts},
+            "records": _public_coverage_records(cov_records),
+        },
+        "dev_info": {
+            "chosen_row": overall,
+            "base_row": cov_overall,
+            "overall_rows": [overall, cov_overall, today],
+            "loo_rows": [loo, loo_cov],
+            "question_rows": [row for row in per_q + cov_q if row["setting"] in {FT_SETTING, cov_sid}],
+            "tag_precision": answers_tag_precision(records),
+            "latency": predicted.get("latency") or {},
+            "support": support_counts(top_golds(prepared)),
+            "qids": qids,
+            "cuts": _fmt_cuts(tuned.thresholds),
+        },
+        "round2_f2": ROUND2_F2,
+        "test": None,
+    }
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    text = render_ft_dev(payload)
+    out.write_text(text, encoding="utf-8")
+    out.with_suffix(".json").write_text(json.dumps(payload), encoding="utf-8")
+    print(f"wrote {out}", flush=True)
+    print(
+        f"dev ndcg {_fmt(overall.get('ndcg@10'))} coverage {_fmt(cov_overall.get('ndcg@10'))} "
+        f"harm {_fmt(overall.get('harmful'))}",
+        flush=True,
+    )
+    return 0
+
+
+def build_ft_test(payload: Mapping[str, Any]) -> Dict[str, Any]:
+    """Score the saved fine-tune on the test split. Does not load a checkpoint."""
+    paths = payload["paths"]
+    questions = load_questions(Path(paths["questions"]))
+    results = load_results(Path(paths["results"]))
+    labels_dir = Path(paths["labels"])
+    by_id = {str(row["id"]): row for row in results["questions"]}
+    prepared = []
+    label_rows: Dict[str, List[dict]] = {}
+    for question in questions:
+        qid = str(question["id"])
+        rows = load_label_rows(labels_dir / f"{qid}.csv")
+        label_rows[qid] = rows
+        prepared.append({"question": question, "qrow": by_id[qid], "papers": []})
+    topics = {str(item["question"]["id"]): str(item["question"].get("topic") or "") for item in prepared}
+    gold = _test_gold(label_rows)
+    scorer = _eval_search()
+    qrows = [item["qrow"] for item in prepared]
+    baseline = ranking_table(scorer, qrows, label_rows, {}, "test")
+    chosen = str(payload["chosen"])
+    saved = payload["settings"][chosen]
+    thresholds = saved["thresholds"]
+    ft_records = _attach_gold(saved["records"], gold)
+    coverage = payload["coverage_fit"]
+    cov_records = _attach_gold(coverage["records"], gold)
+    cuts = coverage["cuts"]
+    floor = str(coverage["floor"])
+    cov_sid = str(coverage["sid"])
+
+    def cov_pred(row: Mapping[str, Any]) -> str:
+        return group_from_coverage(float(row["score"]), cuts, floor)
+
+    ft_overall, ft_q = score_grouped(
+        chosen, ft_records, _threshold_pred(thresholds), prepared, label_rows, scorer,
+        baseline, "test", "dev thresholds",
+    )
+    cov_overall, _cov_q = score_grouped(
+        cov_sid, cov_records, cov_pred, prepared, label_rows, scorer, baseline, "test",
+        _fmt_cuts(cuts) + f" floor:{floor}",
+    )
+    for row in ft_q:
+        row["topic"] = topics.get(str(row["question"]), "")
+    today = {
+        "setting": "lexical_on",
+        "n": ft_overall["n"],
+        "coverage": None,
+        "accuracy": None,
+        "macro_f1": None,
+        "harmful": None,
+        "harm_n": "",
+        "good_n": "",
+        "ndcg@10": baseline.get("ndcg@10"),
+        "relevant@10": baseline.get("relevant@10"),
+        "d_ndcg": 0.0,
+        "d_rel": 0.0,
+    }
+    worse = worse_question_ids(ft_q, topics)
+    dev = payload["dev_info"]
+    verdict = gate_verdict(
+        dev_ndcg=_as_float(dev["chosen_row"].get("ndcg@10")),
+        dev_base=_as_float(dev["base_row"].get("ndcg@10")),
+        test_ndcg=_as_float(ft_overall.get("ndcg@10")),
+        test_base=_as_float(cov_overall.get("ndcg@10")),
+        test_harm=_as_float(ft_overall.get("harmful")),
+        worse_questions=worse,
+    )
+    tag = answers_tag_precision(ft_records)
+    beats_dev = "yes" if (
+        _as_float(dev["chosen_row"].get("ndcg@10")) is not None
+        and _as_float(dev["base_row"].get("ndcg@10")) is not None
+        and _as_float(dev["chosen_row"].get("ndcg@10")) > _as_float(dev["base_row"].get("ndcg@10"))
+    ) else "no"
+    beats_test = "yes" if (
+        _as_float(ft_overall.get("ndcg@10")) is not None
+        and _as_float(cov_overall.get("ndcg@10")) is not None
+        and _as_float(ft_overall.get("ndcg@10")) > _as_float(cov_overall.get("ndcg@10"))
+    ) else "no"
+    harm_ok = "yes" if (
+        _as_float(ft_overall.get("harmful")) is not None
+        and _as_float(ft_overall.get("harmful")) <= HARM_CAP + 1e-12
+    ) else "no"
+    gate_note = (
+        f"Beats concept coverage on dev ndcg@10: {beats_dev}. "
+        f"Beats concept coverage on test ndcg@10: {beats_test}. "
+        f"Test harmful errors at or below 5%: {harm_ok}. "
+        f"Health or education questions worse than today's test order: {', '.join(worse) if worse else 'none'}. "
+        f"Verdict: {verdict}."
+    )
+    test_view = {
+        "overall_rows": [ft_overall, cov_overall, today],
+        "question_rows": ft_q,
+        "gate_note": gate_note,
+        "tag_precision": tag,
+        "verdict": verdict,
+        "worse": worse,
+        "chosen": ft_overall,
+        "coverage": cov_overall,
+        "today_ndcg": baseline.get("ndcg@10"),
+    }
+    lines = [
+        "## Test split",
+        "",
+        "Scored once, with the dev thresholds. The cuts were not fit again. The checkpoint was not loaded again.",
+        "",
+        "| setting | n | coverage | accuracy | macro-F1 | harmful | harm n | ndcg@10 | rel@10 | d ndcg | d rel |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for row in test_view["overall_rows"]:
+        lines.append(_table_line(row))
+    lines.append(_reference_line("test"))
+    lines.extend([
+        "",
+        "Per question for the chosen setting. Health and education rows decide the third gate.",
+        "",
+        "| setting | question | topic | n | coverage | accuracy | macro-F1 | harmful | ndcg@10 | d ndcg |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ])
+    for row in ft_q:
+        lines.append(
+            "| {setting} | {question} | {topic} | {n} | {coverage} | {accuracy} | {macro_f1} | {harmful} | {ndcg} | {dndcg} |".format(
+                setting=row["setting"],
+                question=row["question"],
+                topic=row.get("topic") or "",
+                n=row.get("n") if row.get("n") is not None else "",
+                coverage=_fmt(row.get("coverage")),
+                accuracy=_fmt(row.get("accuracy")),
+                macro_f1=_fmt(row.get("macro_f1")),
+                harmful=_fmt(row.get("harmful")),
+                ndcg=_fmt(row.get("ndcg@10")),
+                dndcg=_fmt(row.get("d_ndcg")),
+            )
+        )
+    lines.extend([
+        "",
+        (
+            f"Test precision of answers at P(answers) >= {tag['minimum']}: "
+            f"{_fmt(tag.get('precision'))} ({tag['tp']}/{tag['flagged']})."
+        ),
+        "",
+        "## Gate",
+        "",
+        gate_note,
+        "",
+    ])
+    recommendation = (
+        f"The fine-tuned setting is {chosen}. "
+        f"Dev ndcg@10 was {_fmt(dev['chosen_row'].get('ndcg@10'))} against concept coverage "
+        f"{_fmt(dev['base_row'].get('ndcg@10'))}. "
+        f"The one test score had ndcg@10 {_fmt(ft_overall.get('ndcg@10'))} against concept coverage "
+        f"{_fmt(cov_overall.get('ndcg@10'))} and today's {_fmt(baseline.get('ndcg@10'))}, "
+        f"with harmful errors {_fmt(ft_overall.get('harmful'))}. "
+        f"Health and education questions behind today's test order: {', '.join(worse) if worse else 'none'}. "
+        f"Gate verdict: {verdict}."
+    )
+    return {
+        "markdown": "\n".join(lines) + "\n",
+        "recommendation": recommendation,
+        "test": {
+            "verdict": verdict,
+            "gate_note": gate_note,
+            "worse": worse,
+            "chosen": ft_overall,
+            "coverage": cov_overall,
+            "today_ndcg": baseline.get("ndcg@10"),
+            "tag_precision": tag,
+            "question_rows": ft_q,
+        },
+    }
+
+
+def execute_score_ft_test(args: argparse.Namespace) -> int:
+    out = Path(args.out).expanduser()
+    metrics_path = out.with_suffix(".json")
+    stamp = Path(str(out) + ".test-stamp.json")
+    if not metrics_path.is_file():
+        print(f"missing dev metrics {metrics_path}", flush=True)
+        return 2
+    if not out.is_file():
+        print(f"missing dev report {out}", flush=True)
+        return 2
+    payload = json.loads(metrics_path.read_text(encoding="utf-8"))
+    if payload.get("test"):
+        print(f"test split already scored in {metrics_path}", flush=True)
+        return 3
+    if "## Test split" in out.read_text(encoding="utf-8"):
+        print(f"test section already in {out}", flush=True)
+        return 3
+    chosen = str(payload.get("chosen") or "")
+    if not chosen:
+        print("dev run did not choose a setting", flush=True)
+        return 2
+    if not claim_test_stamp(stamp, chosen):
+        print(f"test split already scored: {stamp}", flush=True)
+        return 3
+    # The stamp stays even if a later step fails: the test labels have been read.
+    block = build_ft_test(payload)
+    new_md = _splice_test(out.read_text(encoding="utf-8"), block["markdown"], block["recommendation"])
+    new_payload = dict(payload)
+    new_payload["test"] = block["test"]
+    new_payload["recommendation"] = block["recommendation"]
+    metrics_tmp = Path(str(metrics_path) + ".tmp")
+    md_tmp = Path(str(out) + ".tmp")
+    metrics_tmp.write_text(json.dumps(new_payload), encoding="utf-8")
+    md_tmp.write_text(new_md, encoding="utf-8")
+    os.replace(md_tmp, out)
+    os.replace(metrics_tmp, metrics_path)
+    print(f"wrote {out}", flush=True)
+    print(f"gate {block['test']['verdict']}", flush=True)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -3289,6 +3981,27 @@ def build_parser() -> argparse.ArgumentParser:
     score = sub.add_parser("score-test", help="Score the saved dev choice on the test split once")
     score.add_argument("--out", default=str(scratch / "p25b_results.md"))
     score.set_defaults(func=execute_score_test)
+    ft = sub.add_parser("run-ft", help="Score a local checkpoint on the dev split")
+    ft.add_argument("--checkpoint", required=True)
+    ft.add_argument("--corpus", default=str(scratch / "baseline_v2"))
+    ft.add_argument("--results", default=str(scratch / "baseline_v2_results.json"))
+    ft.add_argument("--labels", default=str(scratch / "labels_final_v2"))
+    ft.add_argument("--questions", default=str(scratch / "v2" / "questions_all.json"))
+    ft.add_argument("--out", default=str(scratch / "p25c_results.md"))
+    ft.add_argument("--predictions", default=str(scratch / "p25c_predictions.json"))
+    ft.add_argument("--reuse-predictions", action="store_true")
+    ft.add_argument("--laya-python", default=str(LAYA_PYTHON))
+    ft.add_argument("--batch-size", type=int, default=8)
+    ft.set_defaults(func=execute_run_ft)
+    ft_score = sub.add_parser("score-ft-test", help="Score the fine-tune on the test split once")
+    ft_score.add_argument("--out", default=str(scratch / "p25c_results.md"))
+    ft_score.set_defaults(func=execute_score_ft_test)
+    local = sub.add_parser("predict-local", help="Write group probabilities for a local checkpoint")
+    local.add_argument("--checkpoint", required=True)
+    local.add_argument("--states", required=True)
+    local.add_argument("--out", required=True)
+    local.add_argument("--batch-size", type=int, default=8)
+    local.set_defaults(func=execute_predict_local)
     return parser
 
 

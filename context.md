@@ -292,29 +292,21 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- Latest full suite (2026-10-29, `feat/link-evidence` per-source allow-lists):
-  **2236 passed** in 175.15 s, no skips or xfails. `ruff check .` clean;
-- PR #131 (merged) builds the Laya sidecar with `Router(preload=False,
-  default="english")` and an English warm-up sentence, so Laya 0.4.17 keeps
-  short Latin topics on the English checkpoint. The production venv switch
-  to `~/.local/share/laya-0.4.17/` happens at the Phase 2 deploy.
-- PR #122 (merged) keeps only the P2.2 sweep tooling. Its gate FAILED on the
-  15-question benchmark (test ndcg@10 0.5712 vs today's 0.5755), so Search
-  ranking is unchanged. Leave-one-question-out shortlists inside each fold,
-  and `score-test` refuses a second test pass. Notes:
-  `~/HealthDatabaseAccess-scratch/bench/p22_dev_sweep_v2.md`. P2.5b `run-f2`
-  and `score-test` stay off ranking.
-- Validation (production venv, this worktree, no install): `ruff check .`
-  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2236
-  passed in 175.15 s. Scratch is
-  `~/HealthDatabaseAccess-scratch/pytest-fix-b8-r1b`. No JS or CSS change.
-- Open items remain the optional source keys, bare `litpilot.org` DNS record,
-  and unscheduled roadmap backlog. Ship staging is at `266195e`. P1.9 labels
-  are done: a three-model panel plus the owner's review of 29 rows, in
-  `~/HealthDatabaseAccess-scratch/bench/labels_final/` and
-  `labels_final_v2/` (not in git). The original five-question held-out
-  split is still unscored. That is a different score from the scored
-  15-question v2 P2.2 test pass and from the v2 Laya test score. The
-  evidence redesign from #126 follows in a separate PR.
-- **Next step:** merge PR #128 (Sol round 6: SHIP), then the Phase 2 deploy,
-  including the Laya 0.4.17 venv switch.
+- **Date:** 2026-10-29. Branch `feat/laya-local-checkpoint` (PR #132).
+  `tools/eval_laya_groups.py` gains `run-ft`, `predict-local`, and
+  `score-ft-test`. `run-ft` shells out to the Laya 0.4.17 interpreter and
+  does not call port 7880. `score-ft-test` reads the benchmark test split
+  once. Search ranking is unchanged.
+- Phase 2 is merged and deployed at `fd15238` (#120–#131). The Laya sidecar
+  runs on the 0.4.17 venv through a systemd drop-in; PR #131 keeps it on the
+  English checkpoint.
+- Fine-tuned checkpoints `litsieve-relevance-v1`, `v2`, and `v3-binary` live
+  in `~/.local/share/laya-ft/`. None is registered with the production
+  router. The leading candidate is v3-binary as a soft boost (today's score +
+  0.045 × P(answers)); its final check is a one-time score on held-out set 2
+  (H11–H20). Reports: `~/HealthDatabaseAccess-scratch/bench/p25c`–`p25g`.
+- Open items remain the optional source keys, the bare litpilot.org DNS
+  record, and the unscheduled roadmap backlog. Labels live in
+  `~/HealthDatabaseAccess-scratch/bench/labels_final*/` and are not in git.
+- **Next step:** act on the held-out set 2 verdict. Do not connect any
+  checkpoint to production without the owner's approval.

@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import argparse
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
@@ -497,6 +499,97 @@ def test_splice_test_keeps_a_blank_line_before_the_recommendation():
     assert "old" not in out
     assert out.endswith("Pick failed.\n")
     assert "## Test split" in out
+
+
+def test_group_state_uses_two_sentences_and_the_owner_definition():
+    state = ev.group_state(
+        "Does evening caffeine make it harder to fall asleep?",
+        "Coffee intake and sleep latency",
+        "Adults who drank coffee took longer to fall asleep. The delay was about twenty minutes.",
+    )
+    assert state.startswith("Question: Does evening caffeine")
+    assert "Title: Coffee intake and sleep latency" in state
+    assert "population or place is not contradicted" in ev.FT_INSTRUCTIONS
+    assert set(ev.FT_CRITERIA) == set(ev.GROUPS)
+    prepared = [{
+        "question": {"id": "T1", "text": "How does vaping affect lung function?"},
+        "papers": [{
+            "key": "pubmed:1",
+            "title": "Vaping study",
+            "abstract": "First result sentence. Second sentence. Third sentence should drop.",
+        }],
+    }]
+    rows = ev.ft_states(prepared)
+    assert rows[0]["qid"] == "T1"
+    assert "First result sentence. Second sentence." in rows[0]["state"]
+    assert "Third sentence" not in rows[0]["state"]
+
+
+def test_rows_from_predict_and_tag_precision():
+    mapped = ev.rows_from_predict([{
+        "answers": {
+            "group": {
+                "choice": "answers",
+                "probabilities": {"answers": 0.91, "how_why": 0.03, "context": 0.03, "different": 0.03},
+            }
+        }
+    }])
+    assert mapped[0]["choice"] == "answers"
+    assert mapped[0]["p"] == pytest.approx(0.91)
+    records = [
+        {"gold": "answers", "probs": {"answers": 0.91}},
+        {"gold": "answers", "probs": {"answers": 0.85}},
+        {"gold": "different", "probs": {"answers": 0.88}},
+        {"gold": "not_sorted", "probs": {"answers": 0.95}},
+        {"gold": "answers", "probs": {"answers": 0.5}},
+        {"gold": None, "probs": {"answers": 0.99}},
+    ]
+    tag = ev.answers_tag_precision(records)
+    assert tag["flagged"] == 4
+    assert tag["tp"] == 2
+    assert tag["precision"] == pytest.approx(0.5)
+
+
+def test_run_ft_commands_do_not_use_the_sidecar(tmp_path):
+    parser = ev.build_parser()
+    ckpt = str(tmp_path / "ft")
+    dev = parser.parse_args(["run-ft", "--checkpoint", ckpt])
+    assert dev.func is ev.execute_run_ft
+    assert dev.out.endswith("p25c_results.md")
+    assert not hasattr(dev, "laya_url")
+    held = parser.parse_args(["score-ft-test"])
+    assert held.func is ev.execute_score_ft_test
+    local = parser.parse_args([
+        "predict-local", "--checkpoint", ckpt, "--states", "s.json", "--out", "o.json",
+    ])
+    assert local.func is ev.execute_predict_local
+
+
+def test_score_ft_test_needs_the_report_before_reading_test_labels(tmp_path, monkeypatch):
+    out = tmp_path / "p25c_results.md"
+    out.with_suffix(".json").write_text(json.dumps({"chosen": "ft"}), encoding="utf-8")
+    monkeypatch.setattr(ev, "build_ft_test", lambda payload: pytest.fail("read test labels"))
+    args = argparse.Namespace(out=str(out))
+    assert ev.execute_score_ft_test(args) == 2
+    assert not Path(str(out) + ".test-stamp.json").exists()
+
+
+def test_score_ft_test_keeps_the_stamp_after_a_failed_pass(tmp_path, monkeypatch):
+    out = tmp_path / "p25c_results.md"
+    out.write_text("# dev\n", encoding="utf-8")
+    out.with_suffix(".json").write_text(json.dumps({"chosen": "ft"}), encoding="utf-8")
+    calls = []
+
+    def fail_after_scoring(payload):
+        calls.append(payload)
+        raise RuntimeError("disk full")
+
+    monkeypatch.setattr(ev, "build_ft_test", fail_after_scoring)
+    args = argparse.Namespace(out=str(out))
+    with pytest.raises(RuntimeError):
+        ev.execute_score_ft_test(args)
+    assert ev.execute_score_ft_test(args) == 3
+    assert len(calls) == 1
 
 
 def test_run_f2_commands_are_wired():

@@ -52,6 +52,10 @@ and this project aims to follow Semantic Versioning for app version strings
 
 
 ### Added
+- `tools/eval_laya_groups.py` can score a local Laya checkpoint on the dev
+  split with `run-ft`, and score that saved choice on the test split once
+  with `score-ft-test`. `run-ft` does not call the production sidecar.
+  Search ranking is unchanged.
 - On a starred Search card with no open copy listed anywhere, "Different work
   you can read (N)" lists up to three other papers from the same library that
   have an open copy listed and are close in meaning. Each row is labelled
