@@ -12,8 +12,8 @@
   poster. Live at `https://www.litpilot.org` from the production checkout,
   `main` through #106 (2026-10-16). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
-- Latest full suite (2026-10-29, `fix/access-bounds-visibility`):
-  **2127 passed** in 166.41 s, no skips or xfails. `ruff check .` clean;
+- Latest full suite (2026-10-29, `feat/narrow-by-type`):
+  **2144 passed** in 201.90 s, no skips or xfails. `ruff check .` clean;
   `pyright app` **0 errors**, 6 optional-import warnings (CI blocks on
   errors).
   `pip-audit` (2026-10-14): no known vulnerabilities; ROCm torch/triton are
@@ -47,6 +47,10 @@
   recognised CC licence identifier and version. The chip sits outside the
   source/type tags that Catalog and collapsed phone Table rows hide.
   style.css cache-bust is `20261029a`.
+- P2.7: Narrow it down uses stored `work_type`. Books and chapters with no
+  abstract stay in; the preview names how many. Book reviews and trial
+  registrations can be set aside only if the student ticks that box.
+  Preview still writes nothing. simple_tools.js cache-bust is `20261029b`.
 - P1.7 shows a type chip on Search cards and a Type filter next to Sources.
   The filter runs before ranking and reads only `work_type`. Ranked hits get
   that column in one batched query. Null and unknown types have no chip.
@@ -270,20 +274,16 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-29. `feat/laya-groups-eval-2` from origin/main `266195e`.
-  Adds `run-f2` and `score-test` in `tools/eval_laya_groups.py`. Search and
-  the UI stay as they are. Search.js and style.css cache-bust stay
-  `20261029a`. The dev pick is `f2b-full-outcome-p0`. The one test score
-  failed the gate. Test ndcg@10 is 0.418, concept coverage is 0.445, and
-  today's order is 0.575. Harmful errors are 3 of 58. Q4, Q5, and Q12 are
-  below today's test order. 100 of 271 dev papers and 68 of 169 test papers
-  stay unsorted. A cold batch of 30 full abstracts took 9331 ms. The warm
-  median was 401 ms. A full question sends 4 batches. Q9 and Q15 send 1.
-  The write-up is `~/HealthDatabaseAccess-scratch/bench/p25b_results.md`.
+- **Date:** 2026-10-29. `feat/narrow-by-type` from origin/main `05f8c6e`
+  (contains `266195e`). Narrow it down checks stored paper type. Books and
+  chapters with no abstract stay in. Book reviews and trial registrations
+  are optional, behind an unticked checkbox. Preview still writes nothing.
+  Search.js and style.css cache-bust stay `20261029a`. simple_tools.js is
+  `20261029b`.
 - Validation (production venv, this worktree, no install): `ruff check .`
-  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2139
-  passed in 177.73 s. Scratch is
-  `~/HealthDatabaseAccess-scratch/pytest-feat-laya-groups-eval-2`.
+  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2144
+  passed in 201.90 s. Scratch is
+  `~/HealthDatabaseAccess-scratch/pytest-narrow-by-type`.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
   and unscheduled roadmap backlog. Ship staging is at `266195e`. P1.9 labels
   are done: a three-model panel plus the owner's review of 29 rows, in
@@ -291,5 +291,5 @@ Guest User (is_guest) → sample corpus only; purged by age
   five-question test split is still unscored, and it is a different score
   from the v2 Laya test score. P2.2, PR #122, remains open and on hold. The
   evidence redesign from #126 follows in a separate PR.
-- **Next step:** independent review of this PR. Leave the merge to the
-  reviewer. These groups stay off the student ranking.
+- **Next step:** independent review of this PR. Do not merge from the
+  builder.

@@ -68,6 +68,11 @@ a substitute for school library databases.
   - Near-duplicates with preferred-source resolution and selectable strictness;
     **Narrow it down** ranks against the research question and applies only on
     confirm (`low_relevance` is a system reason); screening report export.
+    **Narrow it down** also checks paper type. It never sets aside a book or
+    chapter just because it has no abstract. It can set aside book reviews
+    and trial registrations, but only if the student ticks that box. It
+    shows what it will remove and why, and changes nothing until the student
+    confirms.
   - Group by theme offers density, k-means, and hierarchical grouping, with
     exclude/restore; grouping is optional and never auto-runs after fetch.
   - Per-result **Not relevant** (`off_topic`), optional reasons, and Undo.

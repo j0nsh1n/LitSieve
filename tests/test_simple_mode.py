@@ -690,6 +690,23 @@ def test_simple_screen_apply_and_undo_use_low_relevance():
     assert "clearSimpleScreenUndoItems" in undo_fn
 
 
+def test_narrow_it_down_type_copy_and_optional_checkbox():
+    html = _read("templates", "partials", "simple_screening_card.html")
+    assert "data-simple-screen-kept-no-abstract" in html
+    assert html.count('<input type="checkbox" data-simple-screen-also-types>') == 2
+    assert "data-simple-screen-also-types checked" not in html
+    js = _simple_js()
+    assert "books and chapters kept: no abstract to judge" in js
+    assert "Also set aside ${optN} book reviews and trial registrations" in js
+    assert "_mergeSimpleScreenTypeAside" in js
+    apply_fn = js[js.find("async function doSimpleScreenApply") : js.find("function doSimpleScreenSkip")]
+    assert "_mergeSimpleScreenTypeAside(items, data)" in apply_fn
+    merge = js[js.find("function _mergeSimpleScreenTypeAside") : js.find("function wireSimpleScreeningCard")]
+    assert "_simpleScreenAlsoTypesOn()" in merge
+    page = _read("templates", "search.html")
+    assert 'src="/static/js/simple_tools.js?v=20261029b"' in page
+
+
 def test_simple_screen_confirm_question_box_after_prepare():
     """After prepare, Simple mode must not silently assume the fetch topic is the question."""
     html = _read("templates", "partials", "simple_screening_card.html")
@@ -748,8 +765,10 @@ def test_simple_screen_counts_fetched_once_not_per_radio():
     # Parallel fetch of all levels
     assert "Object.keys(SIMPLE_SCREEN_LEVELS)" in dm or "SIMPLE_SCREEN_LEVELS" in dm
     wire = dm[dm.find("function wireSimpleScreeningCard") : dm.find("async function doSimpleScreenPreview")]
-    # Radios: no change listener that calls loadSimpleScreenCounts
-    assert 'name="simple-screen-level"' not in wire or "addEventListener('change'" not in wire
+    radio = wire[wire.find('name="simple-screen-level"'):wire.find("wireSimpleScreenAlsoTypes")]
+    assert "addEventListener('change'" in radio
+    assert "loadSimpleScreenCounts" not in radio
+    assert "applySimpleScreenCountLabels" in radio
 
 
 def test_simple_screen_options_open_in_a_popup():
