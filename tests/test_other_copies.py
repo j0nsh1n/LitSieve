@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
-from app.services.access import COPY_LIMIT, CopyInfo, other_copies
+from app.services.access import COPY_LIMIT, CopyInfo, access_state, other_copies
+from app.storage import dbconn
+from app.storage.database import ArticleDatabase
 
 
 def _article(**kwargs):
@@ -293,3 +297,144 @@ def test_fallback_where_is_publisher_page():
         locations=[{"url": "https://publisher.example/work"}],
     ))
     assert copies[0].where == "publisher page"
+
+
+def _same_work_paper(*, article_id, source, oa_status=None, best_oa_url=None):
+    paper = {
+        "article_id": article_id,
+        "source": source,
+        "title": "Same work from two sources",
+        "abstract": "An abstract that is long enough to store.",
+        "year": "2020",
+        "authors": ["Jane Doe"],
+        "doi": "10.1234/same",
+    }
+    if oa_status is not None:
+        paper["oa_status"] = oa_status
+    if best_oa_url is not None:
+        paper["best_oa_url"] = best_oa_url
+    return paper
+
+
+def _retained_card(db):
+    rows = db.get_all_articles()
+    assert len(rows) == 1
+    card = rows[0]
+    extra = db.conn.execute(
+        "SELECT provenance, locations FROM article_extra "
+        "WHERE article_id = ? AND source = ?",
+        (card["article_id"], card["source"]),
+    ).fetchone()
+    if extra:
+        card["provenance"] = json.loads(extra[0] or "{}")
+        card["locations"] = json.loads(extra[1] or "[]")
+    return card
+
+
+def _merge_closed_pubmed_then(monkeypatch, incoming):
+    monkeypatch.delenv(dbconn.ENV_KEY, raising=False)
+    db = ArticleDatabase(":memory:")
+    db.insert_articles([_same_work_paper(
+        article_id="123",
+        source="pubmed",
+        oa_status="closed",
+        best_oa_url="https://publisher.example/closed",
+    )], dedupe=True)
+    db.insert_articles([incoming], dedupe=True)
+    return db, _retained_card(db)
+
+
+def _zenodo_copy(copies):
+    return [item for item in copies if item.url == "https://zenodo.org/paper.pdf"]
+
+
+def test_merged_openalex_copy_is_open_when_retained_row_is_closed(monkeypatch):
+    db, card = _merge_closed_pubmed_then(monkeypatch, _same_work_paper(
+        article_id="W1",
+        source="openalex",
+        oa_status="gold",
+        best_oa_url="https://zenodo.org/paper.pdf",
+    ))
+    try:
+        assert access_state(card).state == "none_listed"
+        copies = other_copies(card)
+        assert _zenodo_copy(copies) == [
+            CopyInfo("OpenAlex", "https://zenodo.org/paper.pdf", True),
+        ]
+        assert card["provenance"]["conflicts"]["oa_status"][0]["value"] == "gold"
+        assert card["provenance"]["conflicts"]["best_oa_url"][0]["value"] == (
+            "https://zenodo.org/paper.pdf"
+        )
+    finally:
+        db.close()
+
+
+def test_merged_closed_copy_is_not_labeled_open(monkeypatch):
+    db, card = _merge_closed_pubmed_then(monkeypatch, _same_work_paper(
+        article_id="W1",
+        source="openalex",
+        oa_status="closed",
+        best_oa_url="https://zenodo.org/paper.pdf",
+    ))
+    try:
+        assert access_state(card).state == "none_listed"
+        copies = other_copies(card)
+        assert _zenodo_copy(copies) == [
+            CopyInfo("OpenAlex", "https://zenodo.org/paper.pdf", False),
+        ]
+    finally:
+        db.close()
+
+
+def test_merged_copy_without_oa_status_is_not_labeled_open(monkeypatch):
+    db, card = _merge_closed_pubmed_then(monkeypatch, _same_work_paper(
+        article_id="W1",
+        source="openalex",
+        best_oa_url="https://zenodo.org/paper.pdf",
+    ))
+    try:
+        assert access_state(card).state == "none_listed"
+        copies = other_copies(card)
+        assert _zenodo_copy(copies) == [
+            CopyInfo("OpenAlex", "https://zenodo.org/paper.pdf", False),
+        ]
+        assert "oa_status" not in card["provenance"]["conflicts"]
+    finally:
+        db.close()
+
+
+def test_unrelated_provenance_oa_status_does_not_open_a_copy():
+    copies = other_copies(_article(
+        oa_status="closed",
+        extra={
+            "provenance": {
+                "conflicts": {
+                    "oa_status": {"value": "gold", "source": "openalex"},
+                    "best_oa_url": {
+                        "value": "https://publisher.example/closed.pdf",
+                        "source": "pubmed",
+                    },
+                },
+            },
+        },
+    ))
+    assert copies == [
+        CopyInfo("PubMed", "https://publisher.example/closed.pdf", False),
+    ]
+
+
+def test_unlicensed_crossref_provenance_url_stays_omitted():
+    copies = other_copies(_article(
+        extra={
+            "provenance": {
+                "conflicts": {
+                    "oa_status": {"value": "gold", "source": "crossref"},
+                    "best_oa_url": {
+                        "value": "https://api.elsevier.com/content/article/doi/10",
+                        "source": "crossref",
+                    },
+                },
+            },
+        },
+    ))
+    assert copies == []

@@ -343,7 +343,9 @@ def _collect_row_copies(
             "via": row.get("source"),
         })
     for loc in _urls_from_provenance(row):
-        take(row, loc)
+        # Provenance URLs belong to a merged-in source. Score them from that
+        # source's stored OA evidence, never the retained row's.
+        take(_provenance_copy_row(row, loc), loc)
 
 
 def _copy_from_location(
@@ -440,17 +442,76 @@ def _extra_mapping(article: Mapping[str, Any]) -> Mapping[str, Any]:
     return {}
 
 
-def _urls_from_provenance(article: Mapping[str, Any]) -> List[Mapping[str, Any]]:
+def _provenance_mapping(article: Mapping[str, Any]) -> Mapping[str, Any]:
     extra = _extra_mapping(article)
     raw = extra.get("provenance") if extra else None
     if raw is None:
         raw = article.get("provenance")
     if isinstance(raw, str):
         raw = _parse_json(raw)
-    if not isinstance(raw, Mapping):
+    return raw if isinstance(raw, Mapping) else {}
+
+
+def _provenance_conflicts(article: Mapping[str, Any]) -> Mapping[str, Any]:
+    raw = _provenance_mapping(article).get("conflicts")
+    return raw if isinstance(raw, Mapping) else {}
+
+
+def _conflict_entries(conflicts: Mapping[str, Any], field: str) -> List[Mapping[str, Any]]:
+    payload = conflicts.get(field)
+    if payload is None:
         return []
-    conflicts = raw.get("conflicts")
-    if not isinstance(conflicts, Mapping):
+    entries = payload if isinstance(payload, list) else [payload]
+    return [entry for entry in entries if isinstance(entry, Mapping)]
+
+
+def _conflict_value_for_source(
+    conflicts: Mapping[str, Any], field: str, source: str,
+) -> Any:
+    wanted = str(source or "").strip().lower()
+    if not wanted:
+        return None
+    for entry in _conflict_entries(conflicts, field):
+        if str(entry.get("source") or "").strip().lower() == wanted:
+            return entry.get("value")
+    return None
+
+
+def _provenance_open_evidence(
+    article: Mapping[str, Any], source: str, url: Any,
+) -> Tuple[Any, Optional[str]]:
+    """OA fields stored for this merged source. Missing evidence stays unset."""
+    conflicts = _provenance_conflicts(article)
+    oa_status = _conflict_value_for_source(conflicts, "oa_status", source)
+    wanted = str(source or "").strip().lower()
+    this_key = _url_key(_http_url(url) or "")
+    best_oa_url = None
+    if wanted and this_key:
+        for entry in _conflict_entries(conflicts, "best_oa_url"):
+            if str(entry.get("source") or "").strip().lower() != wanted:
+                continue
+            candidate = _http_url(entry.get("value"))
+            if candidate and _url_key(candidate) == this_key:
+                best_oa_url = candidate
+                break
+    return oa_status, best_oa_url
+
+
+def _provenance_copy_row(
+    article: Mapping[str, Any], loc: Mapping[str, Any],
+) -> dict:
+    via = str(loc.get("via") or "").strip()
+    oa_status, best_oa_url = _provenance_open_evidence(article, via, loc.get("url"))
+    return {
+        "source": via or article.get("source"),
+        "oa_status": oa_status,
+        "best_oa_url": best_oa_url,
+    }
+
+
+def _urls_from_provenance(article: Mapping[str, Any]) -> List[Mapping[str, Any]]:
+    conflicts = _provenance_conflicts(article)
+    if not conflicts:
         return []
     out: List[Mapping[str, Any]] = []
     for field, payload in conflicts.items():
