@@ -14,6 +14,9 @@ and this project aims to follow Semantic Versioning for app version strings
   papers with an open copy listed. Nothing is checked over the network.
   Crossref text-mining links never count unless that link has a CC licence
   URL.
+- `app/services/question_concepts.py` reads a research question into
+  keywords and actor, action, outcome, population, period and place
+  phrases. Search does not call it yet.
 - Search cards show a type chip when the paper has a stored type (Article,
   Review article, Book, Chapter, Thesis, and the rest of the stored types).
   Papers with no type, or an unknown type, have no chip. A Type filter sits
@@ -130,6 +133,13 @@ and this project aims to follow Semantic Versioning for app version strings
   "No open copy listed (<sources>)". An open label needs a real HTTP(S)
   link with a hostname. A Crossref link counts when that entry has a
   Creative Commons licence URL such as /licenses/by/4.0/.
+- Question concept helper keeps effect and impact as content unless they
+  are the frame noun, as in "what impact did" or "the effect of". It
+  reads a population after "in". Lowercase "us" is not a place. Search
+  still does not call it.
+- Benchmark replay snapshots now copy each paper's stored type, DOI and
+  container title from the frozen corpus, so type_accuracy scores those
+  fields.
 - APA prints `https://doi.org/<doi>` for every paper with a DOI, not only
   Crossref. RIS `UR` prefers that DOI link; `L2` is only a listed open
   copy, never a Crossref `via=crossref` link; the discovery page goes in

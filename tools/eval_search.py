@@ -287,6 +287,47 @@ def _hit_snapshot(article: Mapping[str, Any], rank: int) -> Dict[str, Any]:
     return snap
 
 
+def _article_key(article: Mapping[str, Any]) -> Tuple[Any, Any]:
+    return (article.get("article_id"), article.get("source"))
+
+
+def _stored_by_key(articles: Sequence[Mapping[str, Any]]) -> Dict[Tuple[Any, Any], Mapping[str, Any]]:
+    return {_article_key(article): article for article in articles}
+
+
+def _fill_one_hit(
+    hit: Mapping[str, Any],
+    stored: Mapping[Tuple[Any, Any], Mapping[str, Any]],
+) -> Dict[str, Any]:
+    """Copy type, DOI and container from the stored row onto a ranking snapshot.
+
+    Search ranking loads SEARCH_ARTICLE_COLUMNS, so those fields never reach
+    ``_hit_snapshot`` unless the harness joins them after ranking.
+    """
+    out = dict(hit)
+    full = stored.get(_article_key(hit)) or {}
+    work_type = full.get("work_type")
+    if work_type not in (None, ""):
+        out["work_type"] = work_type
+    doi = full.get("doi") or out.get("doi") or article_doi(dict(full)) or article_doi(dict(out))
+    if doi:
+        out["doi"] = doi
+    container = full.get("container_title")
+    if container not in (None, ""):
+        out["container_title"] = container
+    return out
+
+
+def _fill_rankings(
+    rankings: Mapping[str, Any],
+    stored: Mapping[Tuple[Any, Any], Mapping[str, Any]],
+) -> Dict[str, Any]:
+    filled: Dict[str, Any] = {}
+    for name, hits in rankings.items():
+        filled[name] = [_fill_one_hit(hit, stored) for hit in (hits or [])]
+    return filled
+
+
 def rank_baseline(
     pipeline: LiteratureSearchPipeline,
     query: str,
@@ -540,6 +581,9 @@ def cmd_replay(args: argparse.Namespace) -> int:
                 pipeline.invalidate_corpus_cache()
             embed_s = time.perf_counter() - t_emb
             ranked = ranker(pipeline, query, TOP_K)
+            rankings = _fill_rankings(
+                ranked.get("rankings") or {}, _stored_by_key(stored),
+            )
         finally:
             pipeline.db.close()
         timings = dict(ranked.get("timings") or {})
@@ -550,7 +594,7 @@ def cmd_replay(args: argparse.Namespace) -> int:
             "topic": qrow.get("topic"),
             "n_captured": len(articles),
             "n_library": len(stored),
-            "rankings": ranked.get("rankings") or {},
+            "rankings": rankings,
             "timings": timings,
         })
         print(

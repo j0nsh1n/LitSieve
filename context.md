@@ -12,9 +12,10 @@
   poster. Live at `https://www.litpilot.org` from the production checkout,
   `main` through #106 (2026-10-16). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
-- Latest full suite (2026-10-28, `feat/access-label` review-fix): **1972
-  passed** in 161.84 s, no skips or xfails. `ruff check .` clean;
-  `pyright app` **0 errors**, 6 optional-import warnings (CI blocks on errors).
+- Latest full suite (2026-10-28, `feat/access-label` review-fix after merging
+  main including #120): **2038 passed** in 164.95 s, no skips or xfails.
+  `ruff check .` clean; `pyright app` **0 errors**, 6 optional-import
+  warnings (CI blocks on errors).
   `pip-audit` (2026-10-14): no known vulnerabilities; ROCm torch/triton are
   un-auditable. No dependency lockfile.
 - P2.3 shows an access label on Search cards from stored OA fields, with a
@@ -27,9 +28,12 @@
   "Type not stored" keeps legacy rows. No type filter leaves ranking as it
   was.
 - P1.8 adds `tools/eval_search.py` (capture, replay, score, labelsheet) and
-  five committed questions under `tools/bench/`. The `baseline_v1` corpus and
-  replay output live in `~/HealthDatabaseAccess-scratch/bench/` and are not
-  in git. Human labels are P1.9.
+  five committed questions under `tools/bench/`. Replay snapshots now copy
+  stored `work_type`, `doi` and `container_title` from the corpus row after
+  ranking. The `baseline_v1` corpus and replay output live in
+  `~/HealthDatabaseAccess-scratch/bench/` and are not in git. Human labels
+  are P1.9. P2.1 adds `app/services/question_concepts.py`; Search does not
+  import it yet.
 - P1.6 stores Collect inputs and Search questions in the library database
   (`fetch_runs`, `question_log`), about 50 rows each. Writes come from
   `_run_multi_fetch` (background and sync, including cancel and error) and
@@ -228,12 +232,14 @@ Guest User (is_guest) → sample corpus only; purged by age
 - **Date:** 2026-10-28. `feat/access-label` (P2.3) review-fix: closed cards
   keep every reporting source on the access payload, HTTP(S) URLs need a
   valid host, and Crossref licences need a CC licence path. Search.js
-  cache-bust is still `20261028e`.
+  cache-bust is still `20261028e`. Merged `origin/main` (PR #120) so the
+  changelog and handoff keep both sides.
 - Validation (production venv, this worktree, no install): `ruff check .`
-  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 1972
-  passed in 161.84 s. Scratch is
+  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2038
+  passed in 164.95 s. Scratch is
   `~/HealthDatabaseAccess-scratch/pytest-fix-b1-r1`.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
   and unscheduled roadmap backlog. Ship staging was last recorded at
-  `f9485cf`. P1.9 is human labels on the five questions.
+  `f9485cf`. P1.9 is human labels on the five questions. P2.2 is wiring
+  concepts into ranking.
 - **Next step:** parent review of this PR. Do not merge from the builder.
