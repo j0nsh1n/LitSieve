@@ -283,13 +283,18 @@ class Tuned:
 
 
 def _rank_key(tuned: Tuned) -> Tuple[float, ...]:
-    return (
-        1.0 if tuned.eligible else 0.0,
-        tuned.macro_f1 if tuned.macro_f1 is not None else -1.0,
-        -(tuned.harmful if tuned.harmful is not None else 1.0),
-        tuned.coverage if tuned.coverage is not None else -1.0,
-        tuned.accuracy if tuned.accuracy is not None else -1.0,
-    )
+    """Rank a calibrated candidate.
+
+    A candidate under the harmful-error cap ranks by macro-F1. When none are
+    under the cap, the lowest harmful-error rate wins, and macro-F1 breaks ties.
+    """
+    f1 = tuned.macro_f1 if tuned.macro_f1 is not None else -1.0
+    harm = tuned.harmful if tuned.harmful is not None else 1.0
+    covered = tuned.coverage if tuned.coverage is not None else -1.0
+    accurate = tuned.accuracy if tuned.accuracy is not None else -1.0
+    if tuned.eligible:
+        return (1.0, f1, -harm, covered, accurate)
+    return (0.0, -harm, f1, covered, accurate)
 
 
 def tune_thresholds(items: Sequence[Mapping[str, Any]]) -> Tuned:
@@ -1021,6 +1026,39 @@ def ranking_table(
             "relevant@10": _mean([row.get("relevant@10") for row in per])}
 
 
+def _as_float(value: Any) -> Optional[float]:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value)
+
+
+def ranking_deltas(
+    rank_questions: Sequence[Mapping[str, Any]],
+    baseline_questions: Sequence[Mapping[str, Any]],
+) -> Dict[str, Dict[str, Optional[float]]]:
+    """Per-question ndcg@10 and relevant@10, and the change from lexical_on.
+
+    The overall mean is not a substitute. A gain on one question can cancel
+    a loss on another.
+    """
+    base = {str(row.get("id")): row for row in baseline_questions}
+    out: Dict[str, Dict[str, Optional[float]]] = {}
+    for row in rank_questions:
+        qid = str(row.get("id"))
+        origin = base.get(qid, {})
+        ndcg = _as_float(row.get("ndcg@10"))
+        rel = _as_float(row.get("relevant@10"))
+        base_ndcg = _as_float(origin.get("ndcg@10"))
+        base_rel = _as_float(origin.get("relevant@10"))
+        out[qid] = {
+            "ndcg@10": ndcg,
+            "relevant@10": rel,
+            "d_ndcg": None if ndcg is None or base_ndcg is None else ndcg - base_ndcg,
+            "d_rel": None if rel is None or base_rel is None else rel - base_rel,
+        }
+    return out
+
+
 def _mean(values: Iterable[Any]) -> Optional[float]:
     nums = [float(value) for value in values if isinstance(value, (int, float))]
     if not nums:
@@ -1084,12 +1122,13 @@ def render_report(payload: Mapping[str, Any]) -> str:
         "",
         "## Per question",
         "",
-        "| setting | question | n | coverage | accuracy | macro-F1 | harmful |",
-        "| --- | --- | --- | --- | --- | --- | --- |",
+        "| setting | question | n | coverage | accuracy | macro-F1 | harmful | ndcg@10 | rel@10 | d ndcg | d rel |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ])
     for row in payload["question_rows"]:
         lines.append(
-            "| {setting} | {question} | {n} | {coverage} | {accuracy} | {macro_f1} | {harmful} |".format(
+            "| {setting} | {question} | {n} | {coverage} | {accuracy} | {macro_f1} | {harmful} | "
+            "{ndcg} | {rel} | {dndcg} | {drel} |".format(
                 setting=row["setting"],
                 question=row["question"],
                 n=row["n"],
@@ -1097,6 +1136,10 @@ def render_report(payload: Mapping[str, Any]) -> str:
                 accuracy=_fmt(row.get("accuracy")),
                 macro_f1=_fmt(row.get("macro_f1")),
                 harmful=_fmt(row.get("harmful")),
+                ndcg=_fmt(row.get("ndcg@10")),
+                rel=_fmt(row.get("relevant@10"), 2),
+                dndcg=_fmt(row.get("d_ndcg")),
+                drel=_fmt(row.get("d_rel"), 2),
             )
         )
     lines.extend(["", "## Top 5 at a harmful-error rate of 5% or less", ""])
@@ -1487,8 +1530,11 @@ def execute(args: argparse.Namespace) -> int:
         overall["cuts"] = _fmt_cuts(tuned.thresholds)
         overall["eligible"] = bool(tuned.eligible)
         overall_rows.append(overall)
+        deltas = ranking_deltas(rank["questions"], baseline_rank["questions"])
         for qid in qids:
-            question_rows.append(metric_row(sid, records, tuned, qid))
+            qrow = metric_row(sid, records, tuned, qid)
+            qrow.update(deltas.get(qid, {}))
+            question_rows.append(qrow)
 
     for sid, records in store.items():
         items = [{"gold": row["gold"], "probs": row["probs"]} for row in records if row.get("gold") in GROUPS]
@@ -1530,6 +1576,7 @@ def execute(args: argparse.Namespace) -> int:
         eligible=base_tuned.eligible,
     )
     rank = ranking_table(scorer, [item["qrow"] for item in prepared], label_rows, base_maps)
+    base_deltas = ranking_deltas(rank["questions"], baseline_rank["questions"])
     baseline_row = {
         "setting": f"concept-coverage/{base_floor}",
         "n": len(_classified(base_pairs)),
@@ -1555,7 +1602,7 @@ def execute(args: argparse.Namespace) -> int:
             if row["qid"] == qid and (row.get("gold") in GROUPS or row.get("gold") == "not_sorted")
         ]
         harm_n, good_n = harmful_counts(q_pairs)
-        question_rows.append({
+        qrow = {
             "setting": baseline_row["setting"],
             "question": qid,
             "n": len(_classified(q_pairs)),
@@ -1565,7 +1612,9 @@ def execute(args: argparse.Namespace) -> int:
             "harmful": harmful_rate(q_pairs),
             "harm_n": harm_n,
             "good_n": good_n,
-        })
+        }
+        qrow.update(base_deltas.get(qid, {}))
+        question_rows.append(qrow)
 
     # Today's order, so the table shows the unreordered scores as a reference row.
     today = {
@@ -1590,12 +1639,12 @@ def execute(args: argparse.Namespace) -> int:
     def sort_key(row: Mapping[str, Any]) -> Tuple[float, ...]:
         harm = row.get("harmful")
         eligible = bool(row.get("eligible")) and row["setting"] not in {"lexical_on"}
-        return (
-            1.0 if eligible else 0.0,
-            float(row["macro_f1"]) if isinstance(row.get("macro_f1"), float) else -1.0,
-            -(float(harm) if isinstance(harm, float) else 1.0),
-            float(row["coverage"]) if isinstance(row.get("coverage"), float) else -1.0,
-        )
+        f1 = float(row["macro_f1"]) if isinstance(row.get("macro_f1"), float) else -1.0
+        harm_value = float(harm) if isinstance(harm, float) else 1.0
+        covered = float(row["coverage"]) if isinstance(row.get("coverage"), float) else -1.0
+        if eligible:
+            return (1.0, f1, -harm_value, covered)
+        return (0.0, -harm_value, f1, covered)
 
     laya_rows = [row for row in overall_rows if row["setting"] in store]
     top5 = [row for row in sorted(laya_rows, key=sort_key, reverse=True) if row.get("eligible")][:5]
@@ -1670,15 +1719,13 @@ def execute(args: argparse.Namespace) -> int:
         if budget.stopped:
             latency_note = f"Latency was skipped because the run stopped ({budget.reason})."
 
-    fresh = sum(1 for entry in log if not entry.get("cached"))
     cached_n = sum(1 for entry in log if entry.get("cached"))
     skipped = ""
     if budget.stopped:
         skipped = f" Run stopped: {budget.reason}."
     budget_note = (
         f"Experiment budget was {budget.limit} new sidecar batches. "
-        f"This run made {budget.used} new batches and reused {cached_n} cached batches "
-        f"({fresh} logged network or cache lookups). "
+        f"This run made {budget.used} new batches and reused {cached_n} cached batches. "
         f"Screened F1, F3, and F2 on title plus two abstract sentences, concept wording, phrasing p0. "
         f"The screen winner was `{winner or 'none'}`. "
         "F2 asks one yes/no batch per concept slot, so a winning F2 spends the rest of the budget on "

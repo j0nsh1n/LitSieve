@@ -13,7 +13,7 @@
   `main` through #106 (2026-10-16). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
 - Latest full suite (2026-10-28, `feat/laya-groups-eval`):
-  **2053 passed** in 172.30 s, no skips or xfails. `ruff check .` clean;
+  **2056 passed** in 238.99 s, no skips or xfails. `ruff check .` clean;
   `pyright app` **0 errors**, 6 optional-import warnings (CI blocks on
   errors).
   `pip-audit` (2026-10-14): no known vulnerabilities; ROCm torch/triton are
@@ -39,7 +39,8 @@
   the dev split of the frozen top 30. The test split is not scored. The
   write-up is `~/HealthDatabaseAccess-scratch/bench/p25a_results.md`. The
   best run that stays under a 5% harmful-error rate sorts 16 of 91 dev papers
-  and does not improve ndcg@10. No group setting is ready to show students.
+  and does not improve ndcg@10. The report lists each question's ndcg@10
+  and relevant@10. No group setting is ready to show students.
 - P1.6 stores Collect inputs and Search questions in the library database
   (`fetch_runs`, `question_log`), about 50 rows each. Writes come from
   `_run_multi_fetch` (background and sync, including cancel and error) and
@@ -235,18 +236,22 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-28. `feat/laya-groups-eval` adds the offline Laya group
-  check. 54 sidecar batches on the dev split, plus one cold batch and five
-  warm batches. No search or UI change. The test split was not scored.
-- Title-only F1 with the concept wording is the strongest setting under a
-  5% harmful-error cap. It sorts 16 of 91 dev papers and lowers ndcg@10.
-  F2 sorts 56% and raises ndcg@10, and it puts 3 of 27 good papers in
-  different.
+- **Date:** 2026-10-28. `feat/laya-groups-eval` review fix. Ineligible
+  calibrations now keep the lowest harmful-error rate before macro-F1.
+  The dev report saves ndcg@10 and relevant@10 for each question. No search
+  or UI change. The held-out test split was not scored. The rerun reused
+  the 54 cached batches and made no new sidecar calls.
+- Title-only F1 with the concept wording is still the strongest setting
+  under a 5% harmful-error cap. It sorts 16 of 91 dev papers and lowers
+  ndcg@10. The only threshold that moved is F2's different-group cut, from
+  0.50 to 0.65. That setting now sorts 38 of 91 papers, puts 2 of 27 good
+  papers in different, and still raises ndcg@10. The top 5 list is unchanged.
 - Validation (production venv, this worktree, no install): `ruff check .`
-  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2053
-  passed in 172.30 s. Scratch is
-  `~/HealthDatabaseAccess-scratch/pytest-feat-laya-groups-eval`.
+  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2056
+  passed in 238.99 s. Scratch is `~/HealthDatabaseAccess-scratch/pytest-fix-a3-r1`.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
   and unscheduled roadmap backlog. Ship staging was last recorded at
-  `f9485cf`. The test split is still unscored.
+  `f9485cf`. P1.9 is still the human labels on the five questions. The
+  held-out test split is still unscored. P2.2, PR #122, remains open and
+  on hold.
 - **Next step:** parent review of this PR. Do not merge from the builder.

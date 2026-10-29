@@ -52,6 +52,10 @@ and this project aims to follow Semantic Versioning for app version strings
   this".
 
 ### Changed
+- The offline Laya group check, when no threshold stays within a 5%
+  harmful-error rate, keeps the lowest harmful rate before macro-F1.
+  The dev report lists ndcg@10 and relevant@10 for each question, and how
+  those scores changed from today's order.
 - Label sheets include each paper's abstract and a link, shuffle the rows so
   rank is not first, and write a readable HTML page per question.
 - A later fetch of the same work fills empty metadata (including year and
