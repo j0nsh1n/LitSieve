@@ -12,12 +12,12 @@
   poster. Live at `https://www.litpilot.org` from the production checkout,
   `main` through #106 (2026-10-16). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
-- Latest full suite (2026-10-29, `feat/narrow-by-type`):
-  **2144 passed** in 201.90 s, no skips or xfails. `ruff check .` clean;
+- Latest full suite (2026-10-29, `feat/link-evidence` per-source allow-lists):
+  **2236 passed** in 175.15 s, no skips or xfails. `ruff check .` clean;
   `pyright app` **0 errors**, 6 optional-import warnings (CI blocks on
-  errors).
-  `pip-audit` (2026-10-14): no known vulnerabilities; ROCm torch/triton are
-  un-auditable. No dependency lockfile.
+  errors). `pip-audit` (2026-10-14): no known vulnerabilities; ROCm
+  torch/triton are un-auditable. No dependency lockfile.
+  `certifi>=2026.10.19`.
 - P2.8: a starred Search card with no open copy listed, and no P2.4 open
   other copy, can show "Different work you can read (N)" (at most 3).
   Neighbors come from stored embeddings through `search_similar` (same path
@@ -38,15 +38,21 @@
   only on a starred none_listed card and keeps a page request when another
   card is starred. Each listed URL keeps "Open copy listed" if any stored
   occurrence of that URL meets the P2.3 open rule, including after five
-  copies are already selected. A merged-in copy uses that source's
-  `oa_status` and `best_oa_url` in provenance. Missing evidence leaves it
+  copies are already selected. A merged-in copy is open when that source's
+  stored `link_evidence` observation says so. Missing evidence leaves it
   unlabeled. The copies payload includes `has_open_copy`.
 - P2.3 shows an access label on Search cards from stored OA fields, with a
-  Free to read filter next to Type. Closed cards keep every reporting
-  source. Open labels need a real HTTP(S) host. Crossref needs a
-  recognised CC licence identifier and version. The chip sits outside the
-  source/type tags that Catalog and collapsed phone Table rows hide.
-  style.css cache-bust is `20261029a`.
+  Free to read filter next to Type. Open labels use per-source observations
+  in `article_extra.provenance.link_evidence` written by a fetch. A
+  location is a witness only when every field is the right type and its
+  value is in that source's allow-list (OpenAlex kind is pdf, landing, or
+  none; Zenodo kind is file; Europe PMC kind is pdf or fulltext). Rows with
+  no observations stay "No open copy listed", including clones and papers
+  that were never merged. Closed cards keep every reporting source. Open
+  labels need a real HTTP(S) host. Crossref needs a recognised CC licence
+  identifier and version. The chip sits outside the source/type tags that
+  Catalog and collapsed phone Table rows hide. style.css cache-bust is
+  `20261029a`.
 - P2.7: Narrow it down uses stored `work_type`. Books and chapters with no
   abstract stay in; the preview names how many. Book reviews and trial
   registrations can be set aside only if the student ticks that box.
@@ -121,8 +127,11 @@
   remains a browser preference. Account opens as a dockable panel over any
   page for signed-in users. Shared assets carry dated `?v=` values.
 - Laya sidecar (`tools/laya_worker.py`, port 7880) is socket-activated and
-  exits after 5 idle minutes; Search wakes it. Its checkpoint is uncalibrated
-  for questions with 11+ options (topic areas has 13).
+  exits after 5 idle minutes; Search wakes it. It builds
+  `Router(preload=False, default="english")` and warms up on an English
+  sentence so short topics and startup stay on the English checkpoint.
+  Its checkpoint is uncalibrated for questions with 11+ options (topic
+  areas has 13).
 - Guest sessions use sample papers, cannot fetch public sources and expire
   after 30 minutes. Search includes all available sources when unset.
 - Ship rollback dispatches detached when supported, carries its actor, and
@@ -283,27 +292,21 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-29. Branch `feat/laya-local-checkpoint`.
+- **Date:** 2026-10-29. Branch `feat/laya-local-checkpoint` (PR #132).
   `tools/eval_laya_groups.py` gains `run-ft`, `predict-local`, and
   `score-ft-test`. `run-ft` shells out to the Laya 0.4.17 interpreter and
   does not call port 7880. `score-ft-test` reads the benchmark test split
   once. Search ranking is unchanged.
-- The 2-epoch checkpoint stays at
-  `~/.local/share/laya-ft/litsieve-relevance-v1`. It is not registered with
-  the production router. The benchmark gate is FAIL. Test harmful errors
-  are 0.052, 3 of 58, and Q5, Q9, and Q12 rank worse than today's order.
-  Test precision of the answers tag at 0.8 is 0.727, 8 of 11. The report
-  is `~/HealthDatabaseAccess-scratch/bench/p25c_results.md`. The English
-  cache snapshot hashes are unchanged.
-- Validation, production venv, no install: `ruff check .` clean,
-  `pyright app` 0 errors and 6 optional-import warnings, pytest 2161
-  passed in 158.65 s.
+- Phase 2 is merged and deployed at `fd15238` (#120–#131). The Laya sidecar
+  runs on the 0.4.17 venv through a systemd drop-in; PR #131 keeps it on the
+  English checkpoint.
+- Fine-tuned checkpoints `litsieve-relevance-v1`, `v2`, and `v3-binary` live
+  in `~/.local/share/laya-ft/`. None is registered with the production
+  router. The leading candidate is v3-binary as a soft boost (today's score +
+  0.045 × P(answers)); its final check is a one-time score on held-out set 2
+  (H11–H20). Reports: `~/HealthDatabaseAccess-scratch/bench/p25c`–`p25g`.
 - Open items remain the optional source keys, the bare litpilot.org DNS
-  record, and the unscheduled roadmap backlog. P1.9 labels are done, in
-  `~/HealthDatabaseAccess-scratch/bench/labels_final/` and
-  `labels_final_v2/`, and they are not in git. The original five-question
-  held-out split is still unscored. That score is separate from the
-  15-question v2 passes. The evidence redesign from #126 follows in a
-  separate PR.
-- **Next step:** review the tooling PR. Do not merge it from the builder.
-  Do not deploy the checkpoint.
+  record, and the unscheduled roadmap backlog. Labels live in
+  `~/HealthDatabaseAccess-scratch/bench/labels_final*/` and are not in git.
+- **Next step:** act on the held-out set 2 verdict. Do not connect any
+  checkpoint to production without the owner's approval.

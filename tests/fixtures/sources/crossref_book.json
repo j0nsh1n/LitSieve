@@ -25,7 +25,20 @@
        2
       ]
      ]
-    }
+    },
+    "abstract": "<jats:p>A study of race, gender, and sexuality in African American life after the civil rights movement.</jats:p>",
+    "link": [
+     {
+      "URL": "https://www.taylorfrancis.com/books/mono/10.4324/9780203309506",
+      "content-type": "text/html",
+      "intended-application": "text-mining"
+     }
+    ],
+    "license": [
+     {
+      "URL": "https://creativecommons.org/licenses/by/4.0/"
+     }
+    ]
    }
   ]
  }

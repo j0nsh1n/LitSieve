@@ -5,10 +5,12 @@ from __future__ import annotations
 import pytest
 
 from app.services.access import NONE_LISTED, OPEN_LISTED, access_public_dict, access_state
+from app.services.link_evidence import incoming_record_from_article, observation_from_record
 
 
 def _info(**kwargs):
     article = {
+        "article_id": kwargs.pop("article_id", "W1"),
         "source": kwargs.pop("source", "openalex"),
         "oa_status": kwargs.pop("oa_status", None),
         "best_oa_url": kwargs.pop("best_oa_url", None),
@@ -20,6 +22,20 @@ def _info(**kwargs):
     if locations is not None:
         article["locations"] = locations
     article.update(kwargs)
+    extra_payload = dict(extra) if isinstance(extra, dict) else {}
+    if locations is not None and "locations" not in extra_payload:
+        extra_payload["locations"] = locations if isinstance(locations, list) else []
+    rec = incoming_record_from_article(
+        article, extra_payload, "2026-10-29T00:00:00Z",
+    )
+    obs = observation_from_record(rec)
+    provenance = {}
+    if isinstance(extra, dict) and isinstance(extra.get("provenance"), dict):
+        provenance.update(extra["provenance"])
+    if isinstance(article.get("provenance"), dict):
+        provenance.update(article["provenance"])
+    provenance["link_evidence"] = {"version": 1, "observations": [obs]}
+    article["provenance"] = provenance
     return access_state(article)
 
 
@@ -278,17 +294,39 @@ def test_odd_article_shapes_never_raise():
 
 
 def test_crossref_keyed_row_uses_merged_openalex_url():
-    info = _info(
-        source="crossref",
-        oa_status="gold",
-        best_oa_url="https://openalex.org/oa.pdf",
-        locations=[{
-            "url": "https://api.elsevier.com/content/article/doi/10",
-            "via": "crossref",
-        }],
-    )
+    from app.services.link_evidence import merge_link_evidence
+
+    stamp = "2026-10-29T00:00:00Z"
+    oa_url = "https://openalex.org/oa.pdf"
+    crossref_locs = [{
+        "url": "https://api.elsevier.com/content/article/doi/10",
+        "via": "crossref",
+    }]
+    evidence = merge_link_evidence(None, incoming_record_from_article(
+        {"source": "crossref", "article_id": "10.1/x"},
+        {"locations": crossref_locs},
+        stamp,
+    ))
+    evidence = merge_link_evidence(evidence, incoming_record_from_article(
+        {
+            "source": "openalex",
+            "article_id": "W1",
+            "oa_status": "gold",
+            "best_oa_url": oa_url,
+        },
+        {},
+        stamp,
+    ))
+    info = access_state({
+        "source": "crossref",
+        "article_id": "10.1/x",
+        "oa_status": "gold",
+        "best_oa_url": oa_url,
+        "locations": crossref_locs,
+        "provenance": {"link_evidence": evidence},
+    })
     assert info.state == OPEN_LISTED
-    assert info.url == "https://openalex.org/oa.pdf"
+    assert info.url == oa_url
 
 
 def test_access_public_dict_omits_url_when_none_listed():

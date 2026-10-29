@@ -29,7 +29,13 @@ from app.fetchers.plos import PLOSFetcher
 from app.fetchers.pubmed import PubMedFetcher
 from app.fetchers.semanticscholar import SemanticScholarFetcher
 from app.fetchers.zenodo import ZenodoFetcher
-from app.services.access import OPEN_LISTED, access_public_dict, access_state
+from app.services.access import (
+    NONE_LISTED,
+    OPEN_LISTED,
+    access_public_dict,
+    access_state,
+    other_copies_result,
+)
 from app.services.clustering import (
     NOISE_CLUSTER_ID,
     NOISE_CLUSTER_LABEL,
@@ -658,7 +664,9 @@ class LiteratureSearchPipeline:
             stored_access = self.db.get_article_access_fields()
             keep = [
                 i for i, key in enumerate(article_ids)
-                if access_state(stored_access.get(key) or {"source": key[1]}).state
+                if access_state(
+                    stored_access.get(key) or {"source": key[1]},
+                ).state
                 == OPEN_LISTED
             ]
             if not keep:
@@ -1188,7 +1196,6 @@ class LiteratureSearchPipeline:
         work_type_filter: Optional[List[str]] = None,
     ) -> List[Dict]:
         """Open copies of nearby papers when a starred card has none."""
-        from app.services.access import NONE_LISTED, other_copies_result
         from app.services.different_work import (
             MIN_SIMILARITY,
             SUGGESTION_LIMIT,

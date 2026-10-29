@@ -48,6 +48,7 @@ MAX_MAX_USES = 10_000
 # another student's Collect inputs or Search questions.
 CLONE_TABLES = frozenset({"articles", "embeddings", "screening", "key_points", "notes", "clusters"})
 
+
 def generate_share_code() -> str:
     """Return an unguessable XXXX-YYYY classroom code."""
     raw = "".join(secrets.choice(_CODE_ALPHABET) for _ in range(8))
