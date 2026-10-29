@@ -9,6 +9,9 @@ and this project aims to follow Semantic Versioning for app version strings
 ## [Unreleased]
 
 ### Fixed
+- Narrow it down's "Set aside N papers" count, confirm button, and the papers
+  it actually sets aside follow the optional book-review checkbox and any
+  papers you Keep.
 - The P2.2 sweep leave-one-question-out shortlist is built inside each fold
   from the training questions. `score --split test` and `--split all` refuse
   to pick a setting. `score-test` scores the saved dev choice and today's
@@ -90,6 +93,9 @@ and this project aims to follow Semantic Versioning for app version strings
   this".
 
 ### Changed
+- Narrow it down checks paper type. It never sets aside a book or chapter
+  just because it has no abstract. It can set aside book reviews and trial
+  registrations, but only if the student ticks that box.
 - The offline Laya group check, when no threshold stays within a 5%
   harmful-error rate, keeps the lowest harmful rate before macro-F1.
   The dev report lists ndcg@10 and relevant@10 for each question, and how

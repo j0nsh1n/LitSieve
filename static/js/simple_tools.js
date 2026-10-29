@@ -301,6 +301,8 @@ let _simpleTriageLevel = '';
 let _simpleTriageQuery = '';
 let _simpleTriageGo = [];
 let _simpleTriageStay = [];
+let _simpleTriageKeptKeys = new Set();
+let _simpleTriageAsideKeys = new Set();
 let _simpleTriageKey = '';
 let _simpleTriageKeyHandler = null;
 let _simpleScreenLastItems = null;
@@ -1279,6 +1281,105 @@ function applySimpleScreenCountLabels() {
   const t = Number(data.total_ranked) || total || 0;
   el.textContent = t ? `${n} of ${t}` : String(n);
  });
+ const selected = _simpleScreenCounts[simpleScreenSelectedLevel()];
+ renderSimpleScreenTypeNotes(selected);
+}
+
+function renderSimpleScreenTypeNotes(data) {
+ const keptN = data && Array.isArray(data.kept_no_abstract)
+  ? data.kept_no_abstract.length : 0;
+ const optN = data && Array.isArray(data.optional_type_aside)
+  ? data.optional_type_aside.length : 0;
+ document.querySelectorAll('[data-simple-screen-kept-no-abstract]').forEach((el) => {
+  el.hidden = keptN <= 0;
+  if (keptN > 0) {
+   el.textContent = `${keptN} books and chapters kept: no abstract to judge`;
+  }
+ });
+ document.querySelectorAll('[data-simple-screen-also-types-label]').forEach((label) => {
+  label.hidden = optN <= 0;
+  if (optN <= 0) {
+   const box = label.querySelector('[data-simple-screen-also-types]');
+   if (box) box.checked = false;
+  }
+ });
+ document.querySelectorAll('[data-simple-screen-also-types-text]').forEach((el) => {
+  el.textContent = `Also set aside ${optN} book reviews and trial registrations`;
+ });
+}
+
+function wireSimpleScreenAlsoTypes() {
+ const boxes = document.querySelectorAll('[data-simple-screen-also-types]');
+ boxes.forEach((box) => {
+  if (box.dataset.wiredAlsoTypes === '1') return;
+  box.dataset.wiredAlsoTypes = '1';
+  box.addEventListener('change', () => {
+   boxes.forEach((other) => {
+    if (other !== box) other.checked = box.checked;
+   });
+   _syncOptionalTypeAsidePlacement();
+   renderScreenTriage();
+  });
+ });
+}
+
+function _simpleScreenAlsoTypesOn() {
+ return Array.from(document.querySelectorAll('[data-simple-screen-also-types]'))
+  .some((el) => el.checked);
+}
+
+function _simpleScreenOptionalPapers(data) {
+ const src = data || _simpleScreenCounts[simpleScreenSelectedLevel()] || {};
+ return Array.isArray(src.optional_type_aside) ? src.optional_type_aside : [];
+}
+
+function _optionalTypePaperShouldGo(key) {
+ if (_simpleTriageKeptKeys.has(key)) return false;
+ if (_simpleScreenAlsoTypesOn()) return true;
+ return _simpleTriageAsideKeys.has(key);
+}
+
+function _syncOptionalTypeAsidePlacement(data) {
+ if (!_simpleTriageUsed) return;
+ const extra = _simpleScreenOptionalPapers(data);
+ if (!extra.length) return;
+ extra.forEach((paper) => {
+  const key = _screenPaperKey(paper);
+  const shouldGo = _optionalTypePaperShouldGo(key);
+  _simpleTriageGo = _simpleTriageGo.filter((p) => _screenPaperKey(p) !== key);
+  _simpleTriageStay = _simpleTriageStay.filter((p) => _screenPaperKey(p) !== key);
+  if (shouldGo) _simpleTriageGo.push(paper);
+  else _simpleTriageStay.push(paper);
+ });
+ _simpleScreenCandidates = _simpleTriageGo.slice();
+}
+
+function _mergeSimpleScreenTypeAside(items, data) {
+ if (!_simpleScreenAlsoTypesOn()) return items;
+ const extra = _simpleScreenOptionalPapers(data);
+ const seen = new Set(items.map((it) => `${it.article_id}::${it.source}`));
+ const out = items.slice();
+ extra.forEach((c) => {
+  const key = `${c.article_id}::${c.source}`;
+  if (seen.has(key) || _simpleTriageKeptKeys.has(key)) return;
+  seen.add(key);
+  out.push({ article_id: c.article_id, source: c.source });
+ });
+ return out;
+}
+
+function _simpleScreenApplyItems(data) {
+ if (_screenTriageMatches()) {
+  return _simpleTriageGo.map((c) => ({
+   article_id: c.article_id,
+   source: c.source,
+  }));
+ }
+ const candidates = ((data && data.candidates) || []).map((c) => ({
+  article_id: c.article_id,
+  source: c.source,
+ }));
+ return _mergeSimpleScreenTypeAside(candidates, data);
 }
 
 function wireSimpleScreeningCard() {
@@ -1295,6 +1396,10 @@ function wireSimpleScreeningCard() {
  if (undoBtn) undoBtn.addEventListener('click', doSimpleScreenUndo);
  const dupsUndoBtn = document.getElementById('simple-screen-dups-undo');
  if (dupsUndoBtn) dupsUndoBtn.addEventListener('click', doSimpleScreenDuplicatesUndo);
+ document.querySelectorAll('input[name="simple-screen-level"]').forEach((el) => {
+  el.addEventListener('change', () => applySimpleScreenCountLabels());
+ });
+ wireSimpleScreenAlsoTypes();
  const openBtn = document.getElementById('simple-screen-open-btn');
  if (openBtn) openBtn.addEventListener('click', openSimpleScreenModal);
  document.querySelectorAll('[data-simple-screen-close]').forEach((el) => {
@@ -1345,13 +1450,15 @@ function wireSimpleScreeningCard() {
    closeSimpleScreenTriage();
   });
  });
- // Radios only switch labels already loaded — no re-fetch.
+ // Radios reuse loaded counts. They do not re-fetch.
 }
 
 function _simpleScreenEnsureQuery(query) {
  if (_simpleScreenCounts._query !== query) {
   _simpleScreenCounts = { low: null, medium: null, high: null, _query: query };
   _simpleTriageUsed = false;
+  _simpleTriageKeptKeys = new Set();
+  _simpleTriageAsideKeys = new Set();
  }
 }
 
@@ -1562,8 +1669,15 @@ function moveScreenTriagePaper(dest) {
  if (!paper) return;
  _simpleTriageGo = _simpleTriageGo.filter((p) => _screenPaperKey(p) !== key);
  _simpleTriageStay = _simpleTriageStay.filter((p) => _screenPaperKey(p) !== key);
- if (dest === 'go') _simpleTriageGo.unshift(paper);
- else _simpleTriageStay.push(paper);
+ if (dest === 'go') {
+  _simpleTriageGo.unshift(paper);
+  _simpleTriageAsideKeys.add(key);
+  _simpleTriageKeptKeys.delete(key);
+ } else {
+  _simpleTriageStay.push(paper);
+  _simpleTriageKeptKeys.add(key);
+  _simpleTriageAsideKeys.delete(key);
+ }
  _simpleScreenCandidates = _simpleTriageGo.slice();
  selectScreenTriagePaper(key, false);
 }
@@ -1670,9 +1784,13 @@ async function doSimpleScreenPreview() {
   _simpleScreenCandidates = candidates.slice();
   _simpleTriageGo = candidates.slice();
   _simpleTriageStay = staying.slice();
+  _simpleTriageKeptKeys = new Set();
+  _simpleTriageAsideKeys = new Set();
   _simpleTriageUsed = true;
   _simpleTriageLevel = level;
   _simpleTriageQuery = query;
+  _syncOptionalTypeAsidePlacement(data);
+  renderSimpleScreenTypeNotes(data);
   if (!candidates.length && !staying.length) {
    setStatus('simple-screen-status', 'Nothing to set aside at this level.', 'info');
    return;
@@ -1714,19 +1832,7 @@ async function doSimpleScreenApply() {
    });
    _simpleScreenCounts[level] = data;
   }
-  const candidates = data.candidates || [];
-  let items;
-  if (_screenTriageMatches()) {
-   items = _simpleTriageGo.map((c) => ({
-    article_id: c.article_id,
-    source: c.source,
-   }));
-  } else {
-   items = candidates.map((c) => ({
-    article_id: c.article_id,
-    source: c.source,
-   }));
-  }
+  const items = _simpleScreenApplyItems(data);
   if (!items.length) {
    setStatus('simple-screen-status', 'Nothing to set aside at this level.', 'info');
    return;

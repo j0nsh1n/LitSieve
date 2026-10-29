@@ -12,8 +12,8 @@
   poster. Live at `https://www.litpilot.org` from the production checkout,
   `main` through #106 (2026-10-16). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
-- Latest full suite (2026-10-29, `fix/access-bounds-visibility`):
-  **2127 passed** in 166.41 s, no skips or xfails. `ruff check .` clean;
+- Latest full suite (2026-10-29, `feat/narrow-by-type`):
+  **2144 passed** in 201.90 s, no skips or xfails. `ruff check .` clean;
   `pyright app` **0 errors**, 6 optional-import warnings (CI blocks on
   errors).
   `pip-audit` (2026-10-14): no known vulnerabilities; ROCm torch/triton are
@@ -47,6 +47,12 @@
   recognised CC licence identifier and version. The chip sits outside the
   source/type tags that Catalog and collapsed phone Table rows hide.
   style.css cache-bust is `20261029a`.
+- P2.7: Narrow it down uses stored `work_type`. Books and chapters with no
+  abstract stay in; the preview names how many. Book reviews and trial
+  registrations can be set aside only if the student ticks that box.
+  Preview still writes nothing. simple_tools.js cache-bust is `20261029c`.
+  The confirm count, button, and submitted keys follow the optional
+  checkbox and any papers the student Keeps.
 - P1.7 shows a type chip on Search cards and a Type filter next to Sources.
   The filter runs before ranking and reads only `work_type`. Ranked hits get
   that column in one batched query. Null and unknown types have no chip.
@@ -277,22 +283,23 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-29. Branch `feat/word-bonus`, PR #122. Review-fix after
-  merging `origin/main` (`05f8c6e`). Leave-one-question-out shortlists
-  inside each fold from training questions. `score --split test` and
-  `--split all` refuse P2.2 sweep selection. `score-test` scores the saved
-  dev choice and today's ranking once. Search ranking, card copy, CSV
-  columns and the spec ranking sentence stay as on main. Gate is still
-  FAIL. Corrected LOO from cached `p22_v2_dev_scores.json` (no test-split
-  re-score): Q4 has no pick, Q11 picked `blend_w0.2_bm25_keywords`
-  (0.3183 vs today's 0.4982). The other 13 folds still picked
-  `bonus_w0.2_bm25_keywords`. Search.js and style.css cache-bust stay
-  `20261029a`.
-- Validation (production venv, this worktree, no install): `ruff check .`
-  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2152
-  passed in 213.00 s. Scratch is
-  `~/HealthDatabaseAccess-scratch/pytest-fix-a6-r1`. Sweep notes:
+- **Date:** 2026-10-29. `feat/narrow-by-type` (PR #130, P2.7 type-only)
+  after merging `origin/main` (PR #122). Narrow it down keeps books and
+  chapters with no abstract and offers an unticked line for book reviews and
+  trial registrations. Review r1 fix 2: optional rows, Keep choices, the "Set
+  aside N papers" count, the confirm button and the applied keys use one
+  selected set. Fix 1 (server-side offered-key boundary) was declined: the
+  generic screening endpoint already lets a student set aside any of their own
+  papers, with CSRF and ownership checks, and it is undoable. simple_tools.js
+  cache-bust is `20261029c`; search.js and style.css stay `20261029a`.
+- PR #122 (merged) keeps only the P2.2 sweep tooling. Its gate FAILED on the
+  15-question benchmark (test ndcg@10 0.5712 vs today's 0.5755), so Search
+  ranking is unchanged. Leave-one-question-out shortlists inside each fold,
+  and `score-test` refuses a second test pass. Notes:
   `~/HealthDatabaseAccess-scratch/bench/p22_dev_sweep_v2.md`.
+- Validation (`fix-a8-r1`, production venv, no install): `ruff check .`
+  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2145
+  passed in 217.74 s.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
   and unscheduled roadmap backlog. Ship staging is at `266195e`. P1.9 labels
   are done: a three-model panel plus the owner's review of 29 rows, in
@@ -301,5 +308,4 @@ Guest User (is_guest) → sample corpus only; purged by age
   split is still unscored. That is a different score from the scored
   15-question v2 P2.2 test pass and from the v2 Laya test score. The
   evidence redesign from #126 follows in a separate PR.
-- **Next step:** independent review of PR #122. Do not merge from the
-  builder.
+- **Next step:** merge PR #130 when CI passes. Do not merge from the builder.
