@@ -109,6 +109,8 @@ def test_access_chip_wording_and_forbidden_claims():
     assert "Open copy listed" in helper
     assert "No open copy listed" in helper
     assert "result-access-chip" in helper
+    assert "access.sources" in helper
+    assert "sources.join(', ')" in helper
     lowered = helper.lower()
     assert "verified" not in lowered
     assert "free pdf" not in lowered

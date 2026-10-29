@@ -127,8 +127,17 @@ def test_legacy_search_results_are_byte_identical_to_main(old_path):
         rows = pipe.search_similar(
             'warming', top_k=10, query_embedding=np.array([1.0, 0.0], dtype=np.float32),
         )
-        assert _bytes(rows) == _bytes(MAIN_OUTPUTS['search'])
+        payload = []
+        for row in rows:
+            item = dict(row)
+            access = item.pop('access')
+            assert access['state'] == 'none_listed'
+            assert 'url' not in access
+            assert access['sources']
+            payload.append(item)
+        assert _bytes(payload) == _bytes(MAIN_OUTPUTS['search'])
         assert all(name not in row for row in rows for name in METADATA)
+        assert [row['access']['sources'] for row in rows] == [['CrossRef'], ['PubMed']]
     finally:
         pipe.db.close()
 

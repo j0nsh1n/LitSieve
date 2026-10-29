@@ -8,7 +8,7 @@ import json
 import numpy as np
 import pytest
 
-from app.services.access import OPEN_LISTED
+from app.services.access import NONE_LISTED, OPEN_LISTED
 from app.services.pipeline import LiteratureSearchPipeline
 from app.storage.database import (
     ARTICLE_COLUMNS,
@@ -108,10 +108,14 @@ def test_search_results_include_access_for_the_chip(pipe):
     by_id = {row["article_id"]: row for row in rows}
     assert by_id["a"]["access"]["state"] == OPEN_LISTED
     assert by_id["a"]["access"]["url"] == "https://example.org/a.pdf"
-    assert "access" not in by_id["b"]
+    assert by_id["b"]["access"]["state"] == NONE_LISTED
+    assert "url" not in by_id["b"]["access"]
+    assert by_id["b"]["access"]["sources"] == ["CrossRef"]
     assert by_id["c"]["access"]["state"] == OPEN_LISTED
     assert by_id["c"]["access"]["url"] == "https://example.org/c.pdf"
-    assert "access" not in by_id["legacy"]
+    assert by_id["legacy"]["access"]["state"] == NONE_LISTED
+    assert "url" not in by_id["legacy"]["access"]
+    assert by_id["legacy"]["access"]["sources"] == ["PubMed"]
     assert all("_extra" not in row for row in rows)
 
 
@@ -127,6 +131,37 @@ def test_free_to_read_narrows_candidates_before_ranking(pipe):
     )
     assert _ids(listed_all) == ["a", "c"]
     assert all(row["access"]["state"] == OPEN_LISTED for row in listed_all)
+
+
+def test_closed_multi_source_keeps_all_display_names(pipe):
+    pipe.db.insert_articles([
+        _paper(
+            "merged", "openalex", "Closed zyptron review",
+            "A closed zyptron paper listed by two sources.",
+            oa_status="closed",
+            _extra={"locations": [
+                {"url": "https://doi.org/10.0/merged", "via": "openalex"},
+                {
+                    "url": "https://api.elsevier.com/content/article/doi/10",
+                    "kind": "text-mining",
+                    "via": "crossref",
+                },
+            ]},
+        ),
+    ], dedupe=False)
+    pipe.db.insert_embeddings(
+        {("merged", "openalex"): np.array([0.95, 0.05], dtype=np.float32)},
+        model_name="general",
+    )
+    rows = pipe.search_similar("zyptron", top_k=10, lexical_boost=False)
+    access = {row["article_id"]: row for row in rows}["merged"]["access"]
+    assert access["state"] == NONE_LISTED
+    assert "url" not in access
+    assert access["sources"] == ["OpenAlex", "CrossRef"]
+    listed = pipe.search_similar(
+        "zyptron", top_k=10, lexical_boost=False, free_to_read=True,
+    )
+    assert "merged" not in _ids(listed)
 
 
 def test_crossref_unlicensed_links_are_dropped_by_the_filter(pipe):

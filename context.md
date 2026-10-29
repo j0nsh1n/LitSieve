@@ -12,16 +12,20 @@
   poster. Live at `https://www.litpilot.org` from the production checkout,
   `main` through #106 (2026-10-16). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
-- Latest full suite (2026-10-28, `feat/type-chip-filter` after merging P1.8):
-  **1908 passed** in 173.49 s, no skips or xfails. `ruff check .` clean;
+- Latest full suite (2026-10-28, `feat/access-label` review-fix): **1972
+  passed** in 161.84 s, no skips or xfails. `ruff check .` clean;
   `pyright app` **0 errors**, 6 optional-import warnings (CI blocks on errors).
   `pip-audit` (2026-10-14): no known vulnerabilities; ROCm torch/triton are
   un-auditable. No dependency lockfile.
+- P2.3 shows an access label on Search cards from stored OA fields, with a
+  Free to read filter next to Type. Closed cards keep every reporting
+  source. Open labels need a real HTTP(S) host. Crossref needs a CC
+  licence path. Search.js cache-bust is `20261028e`.
 - P1.7 shows a type chip on Search cards and a Type filter next to Sources.
   The filter runs before ranking and reads only `work_type`. Ranked hits get
   that column in one batched query. Null and unknown types have no chip.
   "Type not stored" keeps legacy rows. No type filter leaves ranking as it
-  was. Search.js cache-bust is `20261028d`.
+  was.
 - P1.8 adds `tools/eval_search.py` (capture, replay, score, labelsheet) and
   five committed questions under `tools/bench/`. The `baseline_v1` corpus and
   replay output live in `~/HealthDatabaseAccess-scratch/bench/` and are not
@@ -221,18 +225,14 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-28. `feat/access-label` (P2.3) adds an access chip on
-  each Search card from stored OA fields only: "Open copy listed" with a
-  link, or "No open copy listed (<source>)". A Free to read chip sits next
-  to Type and keeps papers with an open copy listed, using the same before-
-  ranking pattern as the Type filter. Crossref text-mining links never
-  count unless that link has a CC licence URL. `access_state` lives in
-  `app/services/access.py`. No schema change. Search.js cache-bust is
-  `20261028e`.
+- **Date:** 2026-10-28. `feat/access-label` (P2.3) review-fix: closed cards
+  keep every reporting source on the access payload, HTTP(S) URLs need a
+  valid host, and Crossref licences need a CC licence path. Search.js
+  cache-bust is still `20261028e`.
 - Validation (production venv, this worktree, no install): `ruff check .`
-  clean, `pyright app` 0 errors / 6 optional-import warnings,
-  `node --check static/js/search.js` clean, pytest 1961 passed in 155.35 s.
-  Scratch is `~/HealthDatabaseAccess-scratch/pytest-feat-access-label`.
+  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 1972
+  passed in 161.84 s. Scratch is
+  `~/HealthDatabaseAccess-scratch/pytest-fix-b1-r1`.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
   and unscheduled roadmap backlog. Ship staging was last recorded at
   `f9485cf`. P1.9 is human labels on the five questions.

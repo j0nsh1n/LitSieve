@@ -141,6 +141,25 @@ def test_crossref_link_with_cc_licence_counts():
     assert info.url == "https://example.org/cc.pdf"
 
 
+@pytest.mark.parametrize("license", [
+    "https://notcreativecommons.org/restricted",
+    "https://creativecommons.org/",
+    "https://example.org/?q=creativecommons.org",
+    "see creativecommons.org for details",
+])
+def test_crossref_non_licence_text_does_not_count(license):
+    info = _info(
+        source="crossref",
+        locations=[{
+            "url": "https://example.org/cc.pdf",
+            "via": "crossref",
+            "license": license,
+        }],
+    )
+    assert info.state == NONE_LISTED
+    assert info.url is None
+
+
 def test_crossref_bibliographic_licence_is_not_an_entry_licence():
     info = _info(
         source="crossref",
@@ -172,6 +191,50 @@ def test_non_http_url_does_not_count():
     assert _info(oa_status="gold", best_oa_url="javascript:alert(1)").state == NONE_LISTED
     assert _info(oa_status="gold", best_oa_url="/paper.pdf").state == NONE_LISTED
     assert _info(oa_status="gold", best_oa_url="https://").state == NONE_LISTED
+
+
+@pytest.mark.parametrize("url", [
+    "https:///paper.pdf",
+    "https://not a host/paper",
+])
+def test_malformed_http_url_in_best_oa_url_is_none_listed(url):
+    info = _info(oa_status="gold", best_oa_url=url)
+    assert info.state == NONE_LISTED
+    assert info.url is None
+
+
+@pytest.mark.parametrize("url", [
+    "https:///paper.pdf",
+    "https://not a host/paper",
+])
+def test_malformed_http_url_in_locations_is_none_listed(url):
+    info = _info(
+        source="doaj",
+        locations=[{"url": url, "kind": "fulltext", "via": "doaj"}],
+    )
+    assert info.state == NONE_LISTED
+    assert info.url is None
+
+
+def test_valid_http_and_https_urls_count():
+    https_best = _info(oa_status="gold", best_oa_url="https://example.org/paper.pdf")
+    assert https_best.state == OPEN_LISTED
+    assert https_best.url == "https://example.org/paper.pdf"
+    http_best = _info(oa_status="gold", best_oa_url="http://example.org/oa")
+    assert http_best.state == OPEN_LISTED
+    assert http_best.url == "http://example.org/oa"
+    https_loc = _info(
+        source="doaj",
+        locations=[{"url": "https://example.org/full.pdf", "kind": "fulltext", "via": "doaj"}],
+    )
+    assert https_loc.state == OPEN_LISTED
+    assert https_loc.url == "https://example.org/full.pdf"
+    http_loc = _info(
+        source="doaj",
+        locations=[{"url": "http://example.org/full.pdf", "kind": "fulltext", "via": "doaj"}],
+    )
+    assert http_loc.state == OPEN_LISTED
+    assert http_loc.url == "http://example.org/full.pdf"
 
 
 def test_legacy_null_fields_are_none_listed():
@@ -248,3 +311,21 @@ def test_merged_location_via_adds_source_names():
     )
     assert info.state == OPEN_LISTED
     assert info.sources == ("OpenAlex", "CrossRef")
+
+
+def test_closed_merged_locations_keep_source_names():
+    info = _info(
+        source="openalex",
+        oa_status="closed",
+        locations=[
+            {"url": "https://openalex.org/work", "via": "openalex"},
+            {"url": "https://api.elsevier.com/x", "via": "crossref"},
+        ],
+    )
+    assert info.state == NONE_LISTED
+    assert info.url is None
+    assert info.sources == ("OpenAlex", "CrossRef")
+    assert access_public_dict(info) == {
+        "state": NONE_LISTED,
+        "sources": ["OpenAlex", "CrossRef"],
+    }

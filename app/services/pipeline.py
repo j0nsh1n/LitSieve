@@ -720,10 +720,7 @@ class LiteratureSearchPipeline:
             key = (article["article_id"], article["source"])
             fields = stored.get(key) or {"source": article.get("source")}
             info = access_state(fields)
-            if info.state == OPEN_LISTED:
-                article["access"] = access_public_dict(info)
-            else:
-                article.pop("access", None)
+            article["access"] = access_public_dict(info)
 
     def _hybrid_rerank(
         self,

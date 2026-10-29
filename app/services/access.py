@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import ipaddress
 import json
+import re
 from typing import Any, Iterable, List, Mapping, NamedTuple, Optional, Tuple
+from urllib.parse import urlsplit
 
 from app.content.source_catalog import source_display_name
 
@@ -13,6 +16,13 @@ NONE_LISTED = "none_listed"
 # OpenAlex oa_status values that mean a copy was listed as open.
 _OPEN_OA_STATUS = frozenset({"gold", "green", "hybrid", "bronze", "diamond", "open"})
 _CLOSED_OA_STATUS = frozenset({"closed", "embargo", "restricted"})
+_CC_HOSTS = frozenset({"creativecommons.org", "www.creativecommons.org"})
+_CC_LICENCE_PATH = re.compile(
+    r"^/(?:licenses/[a-z0-9.+-]+/\d+\.\d+|publicdomain/(?:zero|mark)/\d+\.\d+)"
+    r"(?:/.*)?$",
+    re.IGNORECASE,
+)
+_HOST_LABEL = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$")
 
 
 class AccessInfo(NamedTuple):
@@ -94,10 +104,17 @@ def _is_crossref_link(via: str, source_id: str) -> bool:
 
 
 def _has_cc_licence(value: Any) -> bool:
-    text = str(value or "").strip().lower()
-    if not text:
+    url = _http_url(value)
+    if not url:
         return False
-    return "creativecommons.org" in text
+    try:
+        parsed = urlsplit(url)
+        host = (parsed.hostname or "").lower()
+    except Exception:
+        return False
+    if host not in _CC_HOSTS:
+        return False
+    return bool(_CC_LICENCE_PATH.match(parsed.path or ""))
 
 
 def _http_url(value: Any) -> Optional[str]:
@@ -107,11 +124,45 @@ def _http_url(value: Any) -> Optional[str]:
         text = str(value).strip()
     except Exception:
         return None
+    if not text or _has_illegal_url_chars(text):
+        return None
     lowered = text.lower()
-    if lowered.startswith("https://") or lowered.startswith("http://"):
-        host = text.split("://", 1)[-1]
-        return text if host.strip() else None
-    return None
+    if not (lowered.startswith("https://") or lowered.startswith("http://")):
+        return None
+    try:
+        parsed = urlsplit(text)
+        if parsed.scheme.lower() not in {"http", "https"}:
+            return None
+        if not parsed.netloc:
+            return None
+        host = parsed.hostname
+        port = parsed.port
+    except Exception:
+        return None
+    if not host or not _valid_hostname(host):
+        return None
+    if port is not None and not (1 <= port <= 65535):
+        return None
+    return text
+
+
+def _has_illegal_url_chars(text: str) -> bool:
+    return any(ch.isspace() or ord(ch) < 32 or ord(ch) == 127 for ch in text)
+
+
+def _valid_hostname(host: str) -> bool:
+    try:
+        ipaddress.ip_address(host)
+        return True
+    except ValueError:
+        pass
+    if len(host) > 253:
+        return False
+    if host.endswith("."):
+        host = host[:-1]
+        if not host:
+            return False
+    return all(_HOST_LABEL.fullmatch(label) for label in host.split("."))
 
 
 def _locations(article: Mapping[str, Any]) -> List[Mapping[str, Any]]:

@@ -126,6 +126,10 @@ and this project aims to follow Semantic Versioning for app version strings
   error text; the server log keeps it.
 
 ### Fixed
+- Closed Search cards name every source that reported on the paper in
+  "No open copy listed (<sources>)". An open label needs a real HTTP(S)
+  link with a hostname. A Crossref link counts when that entry has a
+  Creative Commons licence URL such as /licenses/by/4.0/.
 - APA prints `https://doi.org/<doi>` for every paper with a DOI, not only
   Crossref. RIS `UR` prefers that DOI link; `L2` is only a listed open
   copy, never a Crossref `via=crossref` link; the discovery page goes in
