@@ -11,11 +11,18 @@ import threading
 import unicodedata
 import zlib
 from contextlib import contextmanager
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
 from app.services.citations import _is_placeholder_journal
+from app.services.link_evidence import (
+    LINK_EVIDENCE_KEY,
+    UnreadableLinkEvidence,
+    incoming_record_from_article,
+    merge_link_evidence,
+)
 from app.services.work_types import normalize_doi, work_type_count_key
 from app.storage import dbconn
 
@@ -81,6 +88,17 @@ def _row_to_article(row, columns: Tuple[str, ...] = ARTICLE_COLUMNS) -> Dict:
     if "authors" in article:
         article["authors"] = json.loads(article["authors"]) if article["authors"] else []
     return article
+
+
+def _access_fields_row(row) -> Dict:
+    return {
+        "article_id": row[0],
+        "source": row[1],
+        "oa_status": row[2],
+        "best_oa_url": row[3],
+        "locations": row[4],
+        "provenance": row[5],
+    }
 
 
 def omit_null_metadata(article: Dict) -> Dict:
@@ -467,14 +485,63 @@ class ArticleDatabase:
             """, (article_id, source, blob, status))
             self.conn.commit()
 
-    def _write_article_extra(self, cursor, article_id: str, source: str, extra: Dict, *, staging: bool) -> None:
+    def _write_article_extra(
+        self,
+        cursor,
+        article_id: str,
+        source: str,
+        extra: Dict,
+        *,
+        staging: bool,
+        incoming_record: Dict,
+    ) -> bool:
         table = "staging_article_extra" if staging else "article_extra"
+        row = cursor.execute(
+            f"SELECT provenance, locations, provider_record, raw_status "
+            f"FROM {table} WHERE article_id = ? AND source = ?",
+            (article_id, source),
+        ).fetchone()
+        existing_prov = self._load_provenance(row[0] if row else None)
+        existing_evidence = existing_prov.get(LINK_EVIDENCE_KEY)
+        extra = extra or {}
+        incoming_prov = extra.get("provenance") or {}
+        if not isinstance(incoming_prov, dict):
+            incoming_prov = {}
+        incoming_prov = {
+            key: value for key, value in incoming_prov.items()
+            if key != LINK_EVIDENCE_KEY
+        }
+        if incoming_prov:
+            provenance = dict(incoming_prov)
+        elif row:
+            provenance = {
+                key: value for key, value in existing_prov.items()
+                if key != LINK_EVIDENCE_KEY
+            }
+        else:
+            provenance = {}
+        evidence = merge_link_evidence(existing_evidence, incoming_record)
+        provenance[LINK_EVIDENCE_KEY] = evidence
+        if "locations" in extra:
+            locations = extra.get("locations") or []
+        elif row:
+            try:
+                locations = json.loads(row[1] or "[]")
+            except json.JSONDecodeError:
+                locations = []
+            if not isinstance(locations, list):
+                locations = []
+        else:
+            locations = []
         record = extra.get("provider_record")
-        blob = status = None
         if isinstance(record, dict):
             blob, status = encode_provider_record(record)
-        provenance = extra.get("provenance") or {}
-        locations = extra.get("locations") or []
+        elif row:
+            blob, status = row[2], row[3]
+        else:
+            blob = status = None
+        before = json.dumps(existing_evidence, sort_keys=True, default=str) if existing_evidence else ""
+        after = json.dumps(evidence, sort_keys=True, default=str)
         cursor.execute(f"""
             INSERT INTO {table} (article_id, source, provenance, locations, provider_record, raw_status)
             VALUES (?, ?, ?, ?, ?, ?)
@@ -491,6 +558,7 @@ class ArticleDatabase:
             blob,
             status,
         ))
+        return before != after
 
     def migrate_schema(self):
         """Migrate old pmid-based schema to article_id+source schema"""
@@ -1166,15 +1234,26 @@ class ArticleDatabase:
         for loc in list(existing or []) + list(incoming or []):
             if not isinstance(loc, dict):
                 continue
-            url = str(loc.get("url") or loc.get("URL") or "")
-            if url:
-                if url in seen:
-                    continue
-                seen.add(url)
-                out.append(loc)
-            elif loc not in out:
-                out.append(loc)
+            marker = json.dumps(loc, sort_keys=True, default=str, separators=(",", ":"))
+            if marker in seen:
+                continue
+            seen.add(marker)
+            out.append(loc)
         return out
+
+    @staticmethod
+    def _load_provenance(raw: Any) -> Dict[str, Any]:
+        if raw is None or raw == "":
+            return {}
+        if isinstance(raw, dict):
+            return dict(raw)
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise UnreadableLinkEvidence("unreadable provenance") from exc
+        if not isinstance(data, dict):
+            raise UnreadableLinkEvidence("unreadable provenance")
+        return data
 
     def _title_same_work(self, existing: Dict, incoming: Dict) -> bool:
         """Title-path identity: veto on DOI conflict; year ±1; author; container."""
@@ -1410,6 +1489,7 @@ class ArticleDatabase:
         conflicts: Dict[str, Any],
         *,
         staging: bool,
+        incoming_record: Dict,
     ) -> bool:
         table = "staging_article_extra" if staging else "article_extra"
         row = cursor.execute(
@@ -1419,16 +1499,11 @@ class ArticleDatabase:
         ).fetchone()
         blob = status = None
         if row:
-            try:
-                provenance = json.loads(row[0] or "{}")
-            except json.JSONDecodeError:
-                provenance = {}
+            provenance = self._load_provenance(row[0])
             try:
                 locations = json.loads(row[1] or "[]")
             except json.JSONDecodeError:
                 locations = []
-            if not isinstance(provenance, dict):
-                provenance = {}
             if not isinstance(locations, list):
                 locations = []
             blob, status = row[2], row[3]
@@ -1438,7 +1513,10 @@ class ArticleDatabase:
             if isinstance(record, dict):
                 blob, status = encode_provider_record(record)
 
+        existing_evidence = provenance.get(LINK_EVIDENCE_KEY)
         for field, src in filled.items():
+            if field == LINK_EVIDENCE_KEY:
+                continue
             provenance[field] = src
         if conflicts:
             existing_conflicts = provenance.get("conflicts")
@@ -1454,11 +1532,17 @@ class ArticleDatabase:
         before_len = len(locations)
         locations = self._merge_locations(locations, incoming_locations)
         added_locations = len(locations) > before_len
+        evidence = merge_link_evidence(existing_evidence, incoming_record)
+        provenance[LINK_EVIDENCE_KEY] = evidence
+        evidence_changed = json.dumps(existing_evidence, sort_keys=True, default=str) != json.dumps(
+            evidence, sort_keys=True, default=str
+        )
         if (
             not filled
             and not conflicts
             and not incoming_locations
             and row is None
+            and not evidence_changed
         ):
             return False
         cursor.execute(
@@ -1479,7 +1563,7 @@ class ArticleDatabase:
                 status,
             ),
         )
-        return added_locations
+        return added_locations or evidence_changed
 
     @staticmethod
     def _conflict_entry(payload: Any) -> Optional[Dict[str, Any]]:
@@ -1523,6 +1607,7 @@ class ArticleDatabase:
         *,
         staging: bool,
         doi_index: Dict[str, List[Tuple[str, str]]],
+        incoming_record: Dict,
     ) -> bool:
         """Fill empty fields on existing from incoming. Returns True if a field or location was added."""
         incoming_source = incoming.get("source") or "pubmed"
@@ -1559,6 +1644,7 @@ class ArticleDatabase:
             filled,
             conflicts,
             staging=staging,
+            incoming_record=incoming_record,
         )
         return bool(filled) or added_locations
 
@@ -1600,6 +1686,9 @@ class ArticleDatabase:
             doi_index: Dict[str, List[Tuple[str, str]]] = {}
             title_index: Dict[str, List[Tuple[str, str]]] = {}
             records: Dict[Tuple[str, str], Dict] = {}
+            batch_observed_at = datetime.now(timezone.utc).strftime(
+                "%Y-%m-%dT%H:%M:%S.%fZ"
+            )
             if dedupe:
                 cursor.execute(f"SELECT {columns} FROM {table}")
                 for row in cursor.fetchall():
@@ -1609,8 +1698,14 @@ class ArticleDatabase:
 
             for article in articles:
                 try:
+                    cursor.execute("SAVEPOINT article_write")
+                    article = dict(article)
+                    observed_at = article.pop("_observed_at", None) or batch_observed_at
                     raw_extra = article.pop("_extra", None)
-                    extra = raw_extra if isinstance(raw_extra, dict) else None
+                    extra = dict(raw_extra) if isinstance(raw_extra, dict) else None
+                    incoming_record = incoming_record_from_article(
+                        article, extra, str(observed_at),
+                    )
                     aid = article['article_id']
                     source = article.get('source', 'pubmed')
                     title = article.get('title', '')
@@ -1635,10 +1730,12 @@ class ArticleDatabase:
                                 extra,
                                 staging=staging,
                                 doi_index=doi_index,
+                                incoming_record=incoming_record,
                             )
                             skipped_duplicates += 1
                             if gained:
                                 merged += 1
+                            cursor.execute("RELEASE SAVEPOINT article_write")
                             continue
 
                     cursor.execute(f"""
@@ -1662,10 +1759,14 @@ class ArticleDatabase:
                         article.get('journal', ''),
                         *(self._column_value(article, name) for name in ARTICLE_COLUMNS[7:]),
                     ))
-                    if extra:
-                        self._write_article_extra(
-                            cursor, aid, source, extra, staging=staging,
-                        )
+                    self._write_article_extra(
+                        cursor,
+                        aid,
+                        source,
+                        extra or {},
+                        staging=staging,
+                        incoming_record=incoming_record,
+                    )
                     if existed:
                         updated += 1
                         # Title/abstract are what embeddings and extractive
@@ -1699,7 +1800,13 @@ class ArticleDatabase:
                             title_index,
                             records,
                         )
+                    cursor.execute("RELEASE SAVEPOINT article_write")
                 except Exception as e:
+                    try:
+                        cursor.execute("ROLLBACK TO SAVEPOINT article_write")
+                        cursor.execute("RELEASE SAVEPOINT article_write")
+                    except Exception:
+                        pass
                     dropped += 1
                     logger.warning("Error inserting article %s: %s", article.get('article_id'), e)
             self.conn.commit()
@@ -2393,22 +2500,18 @@ class ArticleDatabase:
         return {(row[0], row[1]): row[2] for row in rows}
 
     def get_article_access_fields(self) -> Dict[Tuple[str, str], Dict]:
-        """oa_status, best_oa_url, and locations — used to filter before ranking."""
+        """oa_status, best_oa_url, locations, and provenance — used to filter before ranking."""
         with self._lock:
             cursor = self.conn.cursor()
             cursor.execute(
-                "SELECT a.article_id, a.source, a.oa_status, a.best_oa_url, e.locations "
+                "SELECT a.article_id, a.source, a.oa_status, a.best_oa_url, "
+                "e.locations, e.provenance "
                 "FROM articles a LEFT JOIN article_extra e "
                 "ON a.article_id = e.article_id AND a.source = e.source"
             )
             rows = cursor.fetchall()
         return {
-            (row[0], row[1]): {
-                "source": row[1],
-                "oa_status": row[2],
-                "best_oa_url": row[3],
-                "locations": row[4],
-            }
+            (row[0], row[1]): _access_fields_row(row)
             for row in rows
         }
 
@@ -2425,7 +2528,8 @@ class ArticleDatabase:
         with self._lock:
             cursor = self.conn.cursor()
             cursor.execute(
-                "SELECT a.article_id, a.source, a.oa_status, a.best_oa_url, e.locations "
+                "SELECT a.article_id, a.source, a.oa_status, a.best_oa_url, "
+                "e.locations, e.provenance "
                 "FROM articles a LEFT JOIN article_extra e "
                 "ON a.article_id = e.article_id AND a.source = e.source "
                 f"WHERE (a.article_id, a.source) IN ({placeholders})",
@@ -2433,12 +2537,7 @@ class ArticleDatabase:
             )
             rows = cursor.fetchall()
         return {
-            (row[0], row[1]): {
-                "source": row[1],
-                "oa_status": row[2],
-                "best_oa_url": row[3],
-                "locations": row[4],
-            }
+            (row[0], row[1]): _access_fields_row(row)
             for row in rows
         }
 

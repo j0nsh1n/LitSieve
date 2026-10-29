@@ -12,8 +12,8 @@
   poster. Live at `https://www.litpilot.org` from the production checkout,
   `main` through #106 (2026-10-16). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
-- Latest full suite (2026-10-29, `fix/access-bounds-visibility`):
-  **2127 passed** in 166.41 s, no skips or xfails. `ruff check .` clean;
+- Latest full suite (2026-10-29, `feat/link-evidence`):
+  **2154 passed** in 175.59 s, no skips or xfails. `ruff check .` clean;
   `pyright app` **0 errors**, 6 optional-import warnings (CI blocks on
   errors).
   `pip-audit` (2026-10-14): no known vulnerabilities; ROCm torch/triton are
@@ -38,15 +38,17 @@
   only on a starred none_listed card and keeps a page request when another
   card is starred. Each listed URL keeps "Open copy listed" if any stored
   occurrence of that URL meets the P2.3 open rule, including after five
-  copies are already selected. A merged-in copy uses that source's
-  `oa_status` and `best_oa_url` in provenance. Missing evidence leaves it
+  copies are already selected. A merged-in copy is open when that source's
+  stored `link_evidence` observation says so. Missing evidence leaves it
   unlabeled. The copies payload includes `has_open_copy`.
 - P2.3 shows an access label on Search cards from stored OA fields, with a
-  Free to read filter next to Type. Closed cards keep every reporting
-  source. Open labels need a real HTTP(S) host. Crossref needs a
-  recognised CC licence identifier and version. The chip sits outside the
-  source/type tags that Catalog and collapsed phone Table rows hide.
-  style.css cache-bust is `20261029a`.
+  Free to read filter next to Type. After a merge, open labels use per-source
+  observations in `article_extra.provenance.link_evidence`. Never-merged rows
+  still use the row's own OA fields. Merged rows without observations stay
+  closed. Closed cards keep every reporting source. Open labels need a real
+  HTTP(S) host. Crossref needs a recognised CC licence identifier and version.
+  The chip sits outside the source/type tags that Catalog and collapsed phone
+  Table rows hide. style.css cache-bust is `20261029a`.
 - P1.7 shows a type chip on Search cards and a Type filter next to Sources.
   The filter runs before ranking and reads only `work_type`. Ranked hits get
   that column in one batched query. Null and unknown types have no chip.
@@ -264,24 +266,23 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-29. `fix/access-bounds-visibility` from origin/main
-  `c124604`. Ports the three passing #126 fixes: uncapped open-copy
-  existence (`CopySet.has_open_copy`), bounded P2.8 requests (one seed,
-  length limits, lightweight DOI projection), and access-label visibility
-  in Catalog and phone Table. Leaves the evidence redesign and
-  `_merge_locations` on main. Search.js and style.css cache-bust
-  `20261029a`. Screenshots in
-  `~/HealthDatabaseAccess-scratch/audit-2026-10-27/phase2/screens_b5/`.
+- **Date:** 2026-10-29. `feat/link-evidence` from origin/main `266195e`
+  (PR #127). Stores per-source link observations in
+  `article_extra.provenance.link_evidence` (version 1). Merge is a pure
+  set-union. Card, Free to read, other copies, and Different work call
+  `link_access`. Never-merged rows still use the P2.3 row fields. Merged
+  rows without observations stay "No open copy listed". No schema change
+  and no UI wording change. Four-source serialized evidence is 1112 bytes.
+  Clones still drop `article_extra`. A cloned merged row then looks
+  never-merged and uses the row's remaining OA columns.
 - Validation (production venv, this worktree, no install): `ruff check .`
-  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2127
-  passed in 166.41 s. Scratch is
-  `~/HealthDatabaseAccess-scratch/pytest-access-bounds-visibility`.
+  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2154
+  passed in 175.59 s. Scratch is
+  `~/HealthDatabaseAccess-scratch/pytest-link-evidence`.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
   and unscheduled roadmap backlog. Ship staging was last recorded at
-  `522ff7e`. P1.9 labels are done: a three-model panel plus the owner's
+  `266195e`. P1.9 labels are done: a three-model panel plus the owner's
   review of 29 rows, in `~/HealthDatabaseAccess-scratch/bench/labels_final/`
   (not in git). The held-out test split is still unscored. P2.2, PR #122,
-  remains open and on hold. The evidence redesign from #126 follows in a
-  separate PR.
-- **Next step:** independent review of this PR. Do not merge from the
-  builder. Do not close #126.
+  remains open and on hold.
+- **Next step:** independent review of this PR.

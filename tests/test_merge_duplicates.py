@@ -373,6 +373,7 @@ def test_stats_count_merged_or_identical(db_path):
         source="crossref",
         doi="10.1016/example.stats",
         work_type="journal-article",
+        _observed_at="2026-10-29T08:00:00.000000Z",
     )
     filling = _paper(
         article_id="10.1016/example.stats2",
@@ -389,7 +390,10 @@ def test_stats_count_merged_or_identical(db_path):
         db.insert_articles([first], dedupe=True)
         identical_stats = db.insert_articles([identical], dedupe=True)
         assert identical_stats["skipped_duplicates"] == 1
-        assert identical_stats["merged"] == 0
+        assert identical_stats["merged"] == 1
+        again = db.insert_articles([identical], dedupe=True)
+        assert again["skipped_duplicates"] == 1
+        assert again["merged"] == 0
         db.insert_articles([seed], dedupe=True)
         fill_stats = db.insert_articles([filling], dedupe=True)
         assert fill_stats["skipped_duplicates"] == 1
@@ -932,6 +936,7 @@ def test_new_location_counts_as_merged(db_path):
         article_id="10.1016/example.loc",
         source="crossref",
         doi="10.1016/example.loc",
+        _observed_at="2026-10-29T08:00:00.000000Z",
         _extra={"locations": [{"url": "https://example.org/pdf", "kind": "pdf"}]},
     )
     repeat = _paper(
@@ -946,9 +951,12 @@ def test_new_location_counts_as_merged(db_path):
         filled = db.insert_articles([filling], dedupe=True)
         assert filled["skipped_duplicates"] == 1
         assert filled["merged"] == 1
-        again = db.insert_articles([repeat], dedupe=True)
+        again = db.insert_articles([filling], dedupe=True)
         assert again["skipped_duplicates"] == 1
         assert again["merged"] == 0
+        other_source = db.insert_articles([repeat], dedupe=True)
+        assert other_source["skipped_duplicates"] == 1
+        assert other_source["merged"] == 1
         _prov, locations = _extra(db, "W1", "openalex")
         assert json.loads(locations)[0]["url"] == "https://example.org/pdf"
     finally:

@@ -9,6 +9,11 @@ and this project aims to follow Semantic Versioning for app version strings
 ## [Unreleased]
 
 ### Fixed
+- After two sources merge, a listed URL is open when a stored observation
+  from that source says so. Records that were never merged keep the existing
+  access label. Merged records with no stored observations stay "No open
+  copy listed" until a later fetch. The card, Free to read, other copies,
+  and Different work share this rule.
 - Whether any open copy of the same work exists is decided before the five
   copy list is capped. A sixth open URL still turns Different work off.
 - Different work accepts one seed, a question of at most 1,000 characters,
