@@ -79,6 +79,7 @@ a substitute for school library databases.
   2026-10-16; cards show a type chip when the type is stored), seed
   paper, **more like starred** (starred papers **remain** in the result list),
   notes/stars, export on-screen results as RIS
+- Search: each card shows an access label taken from what the databases report. "Open copy listed" appears when a source lists a free copy with a link; otherwise the card shows "No open copy listed (<source>)". Nothing is checked over the network, so the label never says "verified". Crossref text-mining links never count as an open copy. A **Free to read** filter keeps the papers that have an open copy listed.
 - Optional AI Refine / Ask / **Explain this study**: one abstract at a time;
   never silent bulk rewrite. Explain this study is a structured plain-language
   reading (audiences `high_school` | `general_reader`) of an abstract already

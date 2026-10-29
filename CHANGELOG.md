@@ -9,6 +9,11 @@ and this project aims to follow Semantic Versioning for app version strings
 ## [Unreleased]
 
 ### Added
+- Search cards show an access label from stored OA fields: "Open copy listed"
+  (a link) or "No open copy listed (<source>)". A Free to read filter keeps
+  papers with an open copy listed. Nothing is checked over the network.
+  Crossref text-mining links count only when that link has a recognised
+  Creative Commons licence URL.
 - `app/services/question_concepts.py` reads a research question into
   keywords and actor, action, outcome, population, period and place
   phrases. Search does not call it yet.
@@ -124,6 +129,10 @@ and this project aims to follow Semantic Versioning for app version strings
   error text; the server log keeps it.
 
 ### Fixed
+- Closed Search cards name every source that reported on the paper in
+  "No open copy listed (<sources>)". An open label needs a real HTTP(S)
+  link with a hostname. A Crossref link counts when that entry has a
+  Creative Commons licence URL such as /licenses/by/4.0/.
 - Question concept helper keeps effect and impact as content unless they
   are the frame noun, as in "what impact did" or "the effect of". It
   reads a population after "in". Lowercase "us" is not a place. Search

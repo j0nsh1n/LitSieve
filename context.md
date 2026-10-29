@@ -12,16 +12,22 @@
   poster. Live at `https://www.litpilot.org` from the production checkout,
   `main` through #106 (2026-10-16). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
-- Latest full suite (2026-10-28, `feat/question-concepts` r1): **1974 passed**
-  in 164.32 s, no skips or xfails. `ruff check .` clean; `pyright app`
-  **0 errors**, 6 optional-import warnings (CI blocks on errors).
+- Latest full suite (2026-10-28, `feat/access-label` CC-licence review-fix):
+  **2043 passed** in 203.21 s, no skips or xfails. `ruff check .` clean;
+  `pyright app` **0 errors**, 6 optional-import warnings (CI blocks on
+  errors).
   `pip-audit` (2026-10-14): no known vulnerabilities; ROCm torch/triton are
   un-auditable. No dependency lockfile.
+- P2.3 shows an access label on Search cards from stored OA fields, with a
+  Free to read filter next to Type. Closed cards keep every reporting
+  source. Open labels need a real HTTP(S) host. Crossref needs a
+  recognised CC licence identifier and version. Search.js cache-bust is
+  `20261028e`.
 - P1.7 shows a type chip on Search cards and a Type filter next to Sources.
   The filter runs before ranking and reads only `work_type`. Ranked hits get
   that column in one batched query. Null and unknown types have no chip.
   "Type not stored" keeps legacy rows. No type filter leaves ranking as it
-  was. Search.js cache-bust is `20261028d`.
+  was.
 - P1.8 adds `tools/eval_search.py` (capture, replay, score, labelsheet) and
   five committed questions under `tools/bench/`. Replay snapshots now copy
   stored `work_type`, `doi` and `container_title` from the corpus row after
@@ -224,18 +230,18 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-28. Branch `fix-a1-r1` tracking `feat/question-concepts`
-  (PR #120). Review-fix r1: effect/impact stay as content unless they are
-  the frame noun, population after "in", whole-token invariant with an
-  independent tokenizer, lowercase "us" is not a place. Five benchmark
-  expected concepts are unchanged. Search still does not import the helper.
+- **Date:** 2026-10-28. `feat/access-label` (P2.3) review-fix round 2:
+  Crossref open labels need a recognised CC licence identifier and
+  version (by, by-sa, by-nd, by-nc, by-nc-sa, by-nc-nd, plus CC0 and
+  Public Domain Mark 1.0). Invented paths and versions such as
+  `not-a-license/4.0` and `by/99.99` stay closed. Deed and jurisdiction
+  suffixes still count. Search.js cache-bust is still `20261028e`.
 - Validation (production venv, this worktree, no install): `ruff check .`
-  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 1974
-  passed in 164.32 s. Scratch is
-  `~/HealthDatabaseAccess-scratch/pytest-fix-a1-r1`.
-  Frozen replay key order still matches `baseline_v1_results.json`. Score
-  `--split dev` OVERALL type_accuracy 0.7871, export_accuracy 0.8901.
+  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2043
+  passed in 203.21 s. Scratch is
+  `~/HealthDatabaseAccess-scratch/pytest-fix-b1-r2`.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
   and unscheduled roadmap backlog. Ship staging was last recorded at
-  `f9485cf`. P2.2 is wiring concepts into ranking.
-- **Next step:** re-review of PR #120 after the r1 push.
+  `f9485cf`. P1.9 is human labels on the five questions. P2.2 is wiring
+  concepts into ranking.
+- **Next step:** parent review of this PR. Do not merge from the builder.

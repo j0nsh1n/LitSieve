@@ -226,6 +226,24 @@ assert.equal(el('simple-type-chip').textContent, 'Type: 1 of 2');
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js not installed")
+def test_free_to_read_persists_and_is_sent_on_replay():
+    run_search_js(r"""
+await applyAvailableSources();
+el('query-text').value = 'saved question';
+await doSearch({skipOptions: true});
+assert.equal('free_to_read' in requests.at(-1).body, false);
+await toggleFreeToRead();
+assert.equal(requests.at(-1).body.free_to_read, true);
+assert.equal(readSearchSession().filters.free_to_read, true);
+assert.equal(el('simple-free-to-read-chip').getAttribute('aria-pressed'), 'true');
+await toggleFreeToRead();
+assert.equal('free_to_read' in requests.at(-1).body, false);
+assert.equal(readSearchSession().filters.free_to_read, false);
+assert.equal(el('simple-free-to-read-chip').getAttribute('aria-pressed'), 'false');
+""")
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="Node.js not installed")
 def test_chips_cannot_start_competing_reruns_until_request_finishes():
     run_search_js(r"""
 await applyAvailableSources();
@@ -240,6 +258,7 @@ assert.equal(requests.at(-1).body.source_filter.join(','), 'pubmed');
 assert.ok(el('simple-sources-chip').disabled);
 assert.ok(el('simple-sort-chip').disabled);
 assert.ok(el('simple-type-chip').disabled);
+assert.ok(el('simple-free-to-read-chip').disabled);
 assert.ok(el('simple-starred-chip').disabled);
 const n = requests.length;
 openSiteForm = async () => { prompts++; return {sources: ['sample'], sort: 'year'}; };

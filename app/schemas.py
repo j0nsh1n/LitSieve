@@ -19,6 +19,7 @@ _UNKNOWN_WORK_TYPE = sentence(
 
 class WorkTypeFilteredRequest(BaseModel):
     work_type_filter: Optional[List[str]] = None
+    free_to_read: bool = False
 
     @field_validator("work_type_filter")
     @classmethod

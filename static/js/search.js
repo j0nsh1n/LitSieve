@@ -9,6 +9,7 @@ const searchState = {
  filters: {
   top_k: 10, sort_by: 'similarity', pico_boost: false, lexical_boost: true,
   source_filter: [], year_min: null, year_max: null, work_type_filter: [],
+  free_to_read: false,
   display: { starred: false, noted: false, recent: false, sources: {} },
  },
 };
@@ -85,6 +86,28 @@ function storedWorkTypeFilter(picked) {
 function workTypeFilterForRequest(filters) {
  const selected = Array.isArray(filters.work_type_filter) ? filters.work_type_filter.filter(Boolean) : [];
  return selected.length ? selected.slice() : undefined;
+}
+
+function accessChipHtml(article) {
+ const access = article && article.access && typeof article.access === 'object'
+  ? article.access : {};
+ const url = typeof access.url === 'string' ? access.url.trim() : '';
+ const open = access.state === 'open_listed' && /^https?:\/\//i.test(url);
+ if (open) {
+  return `<a class="tag result-access-chip" href="${escapeAttr(url)}" target="_blank" rel="noopener">Open copy listed</a>`;
+ }
+ let sources = Array.isArray(access.sources)
+  ? access.sources.map((name) => String(name || '').trim()).filter(Boolean) : [];
+ if (!sources.length && article && article.source) {
+  const name = typeof getSourceName === 'function' ? getSourceName(article.source) : String(article.source);
+  if (name) sources = [name];
+ }
+ const suffix = sources.length ? ` (${escapeHtml(sources.join(', '))})` : '';
+ return `<span class="tag result-access-chip">No open copy listed${suffix}</span>`;
+}
+
+function freeToReadForRequest(filters) {
+ return filters && filters.free_to_read ? true : undefined;
 }
 let lastSuccessfulSession = null;
 
@@ -234,6 +257,7 @@ function captureSearchSession(kind, opts = {}) {
   year_min: filters.year_min,
   year_max: filters.year_max,
   work_type_filter: filters.work_type_filter,
+  free_to_read: !!filters.free_to_read,
   filters: JSON.parse(JSON.stringify(searchState.filters)),
   saved_at: Date.now(),
  };
@@ -334,6 +358,8 @@ function applySearchSessionToForm(state) {
    searchState.filters.work_type_filter = available.length
     ? savedTypes.filter((id) => available.includes(id)) : savedTypes.slice();
   }
+  const savedFree = savedFilters ? savedFilters.free_to_read : state.free_to_read;
+  searchState.filters.free_to_read = savedFree === true;
   if (savedFilters && savedFilters.display) {
    Object.assign(displayFilterState, savedFilters.display, {
     sources: Object.assign({}, savedFilters.display.sources || {}),
@@ -496,6 +522,7 @@ function wireSearchFilterAdapters() {
  document.getElementById('simple-sort-chip')?.addEventListener('click', promptSimpleSort);
  document.getElementById('simple-sources-chip')?.addEventListener('click', promptSimpleSources);
  document.getElementById('simple-type-chip')?.addEventListener('click', promptSimpleTypes);
+ document.getElementById('simple-free-to-read-chip')?.addEventListener('click', toggleFreeToRead);
  document.getElementById('simple-starred-chip')?.addEventListener('click', promptSimpleStarred);
 }
 
@@ -891,6 +918,16 @@ async function promptSimpleSearchScope(kind = 'text') {
     value: selectedWorkTypesOrAll(),
     options: workTypeFilterOptions(),
    }] : []),
+   {
+    id: 'free_to_read',
+    label: 'Free to read',
+    type: 'choice',
+    value: searchState.filters.free_to_read ? 'on' : 'off',
+    options: [
+     { value: 'off', label: 'All papers' },
+     { value: 'on', label: 'Open copy listed' },
+    ],
+   },
    ...(kind !== 'starred' ? [{
     id: 'lexical_boost', section: 'Ranking', label: 'Prefer exact words', type: 'choice',
     value: searchState.filters.lexical_boost ? 'on' : 'off',
@@ -938,6 +975,9 @@ async function promptSimpleSearchScope(kind = 'text') {
  if (Array.isArray(result.types)) {
   searchState.filters.work_type_filter = storedWorkTypeFilter(result.types);
  }
+ if (result.free_to_read != null) {
+  searchState.filters.free_to_read = result.free_to_read === 'on';
+ }
  syncSearchFiltersFromForm();
  return true;
 }
@@ -947,7 +987,7 @@ const SIMPLE_SORT_LABELS = {
 };
 
 function syncSimpleResultChips() {
- ['simple-sort-chip', 'simple-sources-chip', 'simple-type-chip', 'simple-starred-chip'].forEach((id) => {
+ ['simple-sort-chip', 'simple-sources-chip', 'simple-type-chip', 'simple-free-to-read-chip', 'simple-starred-chip'].forEach((id) => {
   const chip = document.getElementById(id);
   if (chip) chip.disabled = searchState.requestPending;
  });
@@ -964,6 +1004,11 @@ function syncSimpleResultChips() {
   const all = availableWorkTypeIds().length;
   const selected = searchState.filters.work_type_filter.length;
   types.textContent = (!selected || selected === all) ? 'Type: All' : `Type: ${selected} of ${all}`;
+ }
+ const free = document.getElementById('simple-free-to-read-chip');
+ if (free) {
+  free.classList.toggle('is-on', !!searchState.filters.free_to_read);
+  free.setAttribute('aria-pressed', String(!!searchState.filters.free_to_read));
  }
  const starred = document.getElementById('simple-starred-chip');
  if (starred) {
@@ -1036,6 +1081,18 @@ async function promptSimpleTypes() {
  } else await doSearch(replay);
 }
 
+async function toggleFreeToRead() {
+ if (searchState.requestPending) return;
+ searchState.filters.free_to_read = !searchState.filters.free_to_read;
+ syncSearchFilterControls();
+ if (!lastSearchParams) return;
+ const replay = { skipOptions: true, replay: true };
+ if (lastSearchParams.mode === 'starred') await doStarredSearch(replay);
+ else if (lastSearchParams.mode === 'seed' && lastSearchParams.include_seed) {
+  await doMoreLikeThisPaper({ article_id: lastSearchParams.query_text }, replay);
+ } else await doSearch(replay);
+}
+
 async function promptSimpleStarred() {
  if (searchState.requestPending) return;
  const choices = [{ label: displayFilterState.starred ? 'Show all current hits' : 'Show starred current hits', value: 'show' }];
@@ -1095,6 +1152,7 @@ async function doSearch(opts) {
  year_min: filters.year_min,
  year_max: filters.year_max,
  work_type_filter: filters.work_type_filter,
+ free_to_read: !!filters.free_to_read,
  mode: method,
  };
  const session = opts?.replay ? lastSuccessfulSession : captureSearchSession(method);
@@ -1113,6 +1171,7 @@ async function doSearch(opts) {
  year_max: filters.year_max,
  lexical_boost: filters.lexical_boost,
  work_type_filter: workTypeFilterForRequest(filters),
+ free_to_read: freeToReadForRequest(filters),
  },
  });
  const seed = data.seed;
@@ -1138,6 +1197,7 @@ async function doSearch(opts) {
  year_min: filters.year_min,
  year_max: filters.year_max,
  work_type_filter: workTypeFilterForRequest(filters),
+ free_to_read: freeToReadForRequest(filters),
  },
  });
  }
@@ -1188,6 +1248,7 @@ async function doStarredSearch(opts) {
  year_min: filters.year_min,
  year_max: filters.year_max,
  work_type_filter: filters.work_type_filter,
+ free_to_read: !!filters.free_to_read,
  mode: 'starred',
  };
  const session = opts?.replay ? lastSuccessfulSession : captureSearchSession('starred');
@@ -1202,6 +1263,7 @@ async function doStarredSearch(opts) {
  year_min: filters.year_min,
  year_max: filters.year_max,
  work_type_filter: workTypeFilterForRequest(filters),
+ free_to_read: freeToReadForRequest(filters),
  },
  });
  const banner = document.getElementById('seed-banner');
@@ -1261,6 +1323,7 @@ async function doMoreLikeThisPaper(article, opts) {
  year_min: filters.year_min,
  year_max: filters.year_max,
  work_type_filter: filters.work_type_filter,
+ free_to_read: !!filters.free_to_read,
  mode: 'seed',
  include_seed: true,
  };
@@ -1278,6 +1341,7 @@ async function doMoreLikeThisPaper(article, opts) {
  lexical_boost: filters.lexical_boost,
  include_seed: true,
  work_type_filter: workTypeFilterForRequest(filters),
+ free_to_read: freeToReadForRequest(filters),
  },
  });
  const seed = data.seed || article;
@@ -1582,6 +1646,7 @@ function buildResultCard(article, idx) {
  const typeChip = typeLabel
   ? `<span class="tag result-type-chip">${escapeHtml(typeLabel)}</span>`
   : '';
+ const accessChip = accessChipHtml(article);
  const byline = authors
   ? `${escapeHtml(authors)}${journal ? ' — ' + journal : ''}`
   : journal;
@@ -1602,7 +1667,7 @@ function buildResultCard(article, idx) {
  <span class="result-venue">${venue}</span>
  <span class="result-year">${year}</span>
  <span class="result-tags">
-  ${typeChip}<span class="tag">${escapeHtml(getSourceName(article.source))}</span>
+  ${typeChip}${accessChip}<span class="tag">${escapeHtml(getSourceName(article.source))}</span>
  </span>
  </div>
  <h3 class="article-title result-row-title">${escapeHtml(article.title || '')}${resultMarksHtml(starred, !!String(noteVal).trim())}</h3>
