@@ -12,23 +12,30 @@
   poster. Live at `https://www.litpilot.org` from the production checkout,
   `main` through #106 (2026-10-16). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
-- Latest full suite (2026-10-28, `feat/other-copies` B2 r3 after merging
-  `origin/main`): **2093 passed** in 172.24 s, no skips or xfails.
-  `ruff check .` clean; `pyright app` **0 errors**, 6 optional-import
-  warnings (CI blocks on errors).
+- Latest full suite (2026-10-28, `feat/different-work`): **2116 passed** in
+  173.35 s, no skips or xfails. `ruff check .` clean; `pyright app`
+  **0 errors**, 6 optional-import warnings (CI blocks on errors).
   `pip-audit` (2026-10-14): no known vulnerabilities; ROCm torch/triton are
   un-auditable. No dependency lockfile.
+- P2.8: a starred Search card with no open copy listed, and no P2.4 open
+  other copy, can show "Different work you can read (N)" (at most 3).
+  Neighbors come from stored embeddings through `search_similar` (same path
+  as more-like-starred / seed), cosine floor 0.45, same-work and set-aside
+  rows dropped. The difference line uses year, stored type, and
+  `question_concepts` on the current Search question. JSON route
+  `POST /api/articles/different-work`, no schema change. Search.js
+  cache-bust is `20261028h`.
 - P2.4: a starred Search card with no open copy listed can show other listed
   copies of the same work (same-record locations, same DOI including
   set-aside rows, merged extra URLs). One batched JSON route, no schema
-  change, cap five. Search.js cache-bust is `20261028g`. Same-work DOI
-  lookup uses `normalize_doi` on stored rows. Trailing-slash origins share
-  one URL key. The client mounts copies only on a starred none_listed card
-  and keeps a page request when another card is starred. Each listed URL
-  keeps "Open copy listed" if any stored occurrence of that URL meets the
-  P2.3 open rule, including after five copies are already selected. A
-  merged-in copy uses that source's `oa_status` and `best_oa_url` in
-  provenance. Missing evidence leaves it unlabeled.
+  change, cap five. Same-work DOI lookup uses `normalize_doi` on stored
+  rows. Trailing-slash origins share one URL key. The client mounts copies
+  only on a starred none_listed card and keeps a page request when another
+  card is starred. Each listed URL keeps "Open copy listed" if any stored
+  occurrence of that URL meets the P2.3 open rule, including after five
+  copies are already selected. A merged-in copy uses that source's
+  `oa_status` and `best_oa_url` in provenance. Missing evidence leaves it
+  unlabeled.
 - P2.3 shows an access label on Search cards from stored OA fields, with a
   Free to read filter next to Type. Closed cards keep every reporting
   source. Open labels need a real HTTP(S) host. Crossref needs a
@@ -43,8 +50,8 @@
   stored `work_type`, `doi` and `container_title` from the corpus row after
   ranking. The `baseline_v1` corpus and replay output live in
   `~/HealthDatabaseAccess-scratch/bench/` and are not in git. P1.9 labels
-  are in `bench/labels_final/`. P2.1 adds `app/services/question_concepts.py`; Search does not
-  import it yet.
+  are in `bench/labels_final/`. P2.1 adds `app/services/question_concepts.py`.
+  Search uses it for the P2.8 difference line.
 - P2.5a adds `tools/eval_laya_groups.py`. It scores Laya relevance groups on
   the dev split of the frozen top 30. The test split is not scored. The
   write-up is `~/HealthDatabaseAccess-scratch/bench/p25a_results.md`. The
@@ -250,20 +257,21 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-28. `fix-b2-r3` on `feat/other-copies` (PR #123, P2.4).
-  A merged-in copy is labeled open from that source's stored `oa_status`
-  and `best_oa_url` in provenance, not from the kept row. No matching
-  evidence means the copy is not open. Unlicensed Crossref links stay
-  omitted. Search.js cache-bust remains `20261028g`. This branch also
-  merged `origin/main`, including P2.5a (`tools/eval_laya_groups.py`).
+- **Date:** 2026-10-28. `feat/different-work` (P2.8) from `origin/main`
+  `4155e0c` (PR #123 merge). Starred cards with no open copy anywhere may
+  show different-work suggestions from stored embeddings. Cosine floor
+  0.45 from frozen baseline_v1 neighbors (Q1-Q3 on-topic pairs sit about
+  0.51-0.67; history related-pair medians about 0.37-0.42; health and
+  education neighbors are higher so the cap of 3 binds first). Search.js
+  cache-bust is `20261028h`.
 - Validation (production venv, this worktree, no install): `ruff check .`
-  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2093
-  passed in 172.24 s. Scratch is
-  `~/HealthDatabaseAccess-scratch/pytest-fix-b2-r3`.
+  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2116
+  passed in 173.35 s. Scratch is
+  `~/HealthDatabaseAccess-scratch/pytest-feat-different-work`.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
   and unscheduled roadmap backlog. Ship staging was last recorded at
   `522ff7e`. P1.9 labels are done: a three-model panel plus the owner's
   review of 29 rows, in `~/HealthDatabaseAccess-scratch/bench/labels_final/`
   (not in git). The held-out test split is still unscored. P2.2, PR #122,
   remains open and on hold.
-- **Next step:** parent re-review of PR #123. Do not merge from the builder.
+- **Next step:** open the PR to main. Do not merge from the builder.
