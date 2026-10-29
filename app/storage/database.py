@@ -2486,7 +2486,11 @@ class ArticleDatabase:
         }
 
     def get_copy_fields_for_dois(self, dois: List[str]) -> List[Dict]:
-        """OA and extra fields for every library row with one of these DOIs."""
+        """OA and extra fields for every library row with one of these DOIs.
+
+        Match on a key/DOI projection first, then load locations and
+        provenance only for the keys that actually match.
+        """
         wanted = set()
         for raw in dois:
             normalized = normalize_doi(raw)
@@ -2497,18 +2501,30 @@ class ArticleDatabase:
         with self._lock:
             cursor = self.conn.cursor()
             cursor.execute(
+                "SELECT article_id, source, doi FROM articles "
+                "WHERE doi IS NOT NULL AND TRIM(doi) != ''",
+            )
+            matched: List[Tuple[str, str]] = []
+            for article_id, source, doi in cursor.fetchall():
+                if normalize_doi(doi) in wanted:
+                    matched.append((article_id, source))
+            if not matched:
+                return []
+            placeholders = ",".join(["(?, ?)"] * len(matched))
+            params: List[Any] = []
+            for article_id, source in matched:
+                params.extend([article_id, source])
+            cursor.execute(
                 "SELECT a.article_id, a.source, a.doi, a.oa_status, a.best_oa_url, "
                 "a.host_name, e.locations, e.provenance "
                 "FROM articles a LEFT JOIN article_extra e "
                 "ON a.article_id = e.article_id AND a.source = e.source "
-                "WHERE a.doi IS NOT NULL AND TRIM(a.doi) != ''",
+                f"WHERE (a.article_id, a.source) IN ({placeholders})",
+                params,
             )
             rows = cursor.fetchall()
-        out: List[Dict] = []
-        for row in rows:
-            if normalize_doi(row[2]) not in wanted:
-                continue
-            out.append({
+        return [
+            {
                 "article_id": row[0],
                 "source": row[1],
                 "doi": row[2],
@@ -2517,8 +2533,9 @@ class ArticleDatabase:
                 "host_name": row[5],
                 "locations": row[6],
                 "provenance": row[7],
-            })
-        return out
+            }
+            for row in rows
+        ]
 
     def get_year_counts(self) -> Dict[str, int]:
         """Papers per publication year (unknown years under 'unknown')."""

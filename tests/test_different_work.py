@@ -401,3 +401,43 @@ def test_pipeline_empty_without_embeddings(tmp_path, monkeypatch):
         assert p.suggest_different_work([("seed", "crossref")]) == []
     finally:
         p.db.close()
+
+
+def _select_statements(statements):
+    return [sql for sql in statements if sql.lstrip()[:6].upper() == "SELECT"]
+
+
+def _full_access_reads(selects):
+    """SELECTs that load locations/provenance for the whole library."""
+    found = []
+    for sql in selects:
+        compact = " ".join(sql.split()).lower()
+        if "article_extra" not in compact:
+            continue
+        if "locations" not in compact:
+            continue
+        if " in (" in compact:
+            continue
+        found.append(sql)
+    return found
+
+
+def test_one_request_bounds_selects_and_full_access_reads(pipe):
+    pipe.suggest_different_work([("seed", "crossref")])
+    statements = []
+    pipe.db.conn.set_trace_callback(statements.append)
+    try:
+        rows = pipe.suggest_different_work([("seed", "crossref")])
+    finally:
+        pipe.db.conn.set_trace_callback(None)
+    assert rows
+    selects = _select_statements(statements)
+    assert len(selects) <= 9
+    assert len(_full_access_reads(selects)) <= 1
+    projection = [
+        sql for sql in selects
+        if "trim(doi)" in " ".join(sql.split()).lower()
+        and "article_extra" not in sql.lower()
+        and "locations" not in sql.lower()
+    ]
+    assert len(projection) == 1

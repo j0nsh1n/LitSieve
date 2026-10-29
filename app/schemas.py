@@ -139,14 +139,14 @@ class OtherCopiesRequest(BaseModel):
 
 
 class DifferentWorkRequest(BaseModel):
-    articles: List[ArticleKey] = Field(default_factory=list, max_length=200)
+    articles: List[ArticleKey] = Field(default_factory=list, max_length=1)
     library_id: Optional[str] = Field(default=None, max_length=128)
-    query_text: str = ""
-    source_filter: Optional[List[str]] = None
-    cluster_filter: Optional[List[int]] = None
+    query_text: str = Field(default="", max_length=1000)
+    source_filter: Optional[List[str]] = Field(default=None, max_length=50)
+    cluster_filter: Optional[List[int]] = Field(default=None, max_length=50)
     year_min: Optional[int] = None
     year_max: Optional[int] = None
-    work_type_filter: Optional[List[str]] = None
+    work_type_filter: Optional[List[str]] = Field(default=None, max_length=50)
 
     @field_validator("work_type_filter")
     @classmethod
