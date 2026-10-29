@@ -72,8 +72,11 @@ def router():
     global _router, _device
     if _router is None:
         from laya import Router  # imported lazily: torch loads here
-        _router = Router(preload=False)
-        _router.predict({"text": "warm up"}, {"q": {"type": "noul", "instructions": "warm up"}})
+        _router = Router(preload=False, default="english")
+        _router.predict(
+            {"text": "This is a warmup sentence."},
+            {"q": {"type": "noul", "instructions": "warm up"}},
+        )
         try:
             import torch
             _device = "cuda" if torch.cuda.is_available() else "cpu"
