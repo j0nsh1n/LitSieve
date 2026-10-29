@@ -81,6 +81,13 @@
   thresholds on the dev split. `score-test` scores that choice once.
   Search still ranks as it does today. The write-up is
   `~/HealthDatabaseAccess-scratch/bench/p25b_results.md`.
+- P2.2 re-ran the word-match sweep on the 15-question `baseline_v2` corpus.
+  The chosen setting (`bonus_w0.2_bm25_keywords`) beat today's ranking on
+  dev (ndcg@10 0.4381 vs 0.3973) and lost on test (0.5712 vs 0.5755), with
+  Q1, Q5 and Q14 dropping more than 0.05. Search ranking is unchanged. Gate
+  is FAIL. Leave-one-question-out now shortlists inside each fold. Q4 has
+  no pick and Q11 picked `blend_w0.2_bm25_keywords`. Sweep notes:
+  `~/HealthDatabaseAccess-scratch/bench/p22_dev_sweep_v2.md`.
 - P1.6 stores Collect inputs and Search questions in the library database
   (`fetch_runs`, `question_log`), about 50 rows each. Writes come from
   `_run_multi_fetch` (background and sync, including cancel and error) and
@@ -276,24 +283,29 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-29. `feat/narrow-by-type` (local `fix-a8-r1`). Review
-  r1 fix 2 only: optional type rows, Keep choices, the "Set aside N papers"
-  count, the confirm button, and the keys sent on apply use one selected
-  set. Fix 1 (server-side offered-key boundary) was not implemented. The
-  generic screening endpoint already lets a student set aside any of their
-  own papers, CSRF and ownership checks apply, and it is undoable.
-  Search.js and style.css cache-bust stay `20261029a`. simple_tools.js is
-  `20261029c`.
-- Validation (production venv, this worktree, no install): `ruff check .`
+- **Date:** 2026-10-29. `feat/narrow-by-type` (PR #130, P2.7 type-only)
+  after merging `origin/main` (PR #122). Narrow it down keeps books and
+  chapters with no abstract and offers an unticked line for book reviews and
+  trial registrations. Review r1 fix 2: optional rows, Keep choices, the "Set
+  aside N papers" count, the confirm button and the applied keys use one
+  selected set. Fix 1 (server-side offered-key boundary) was declined: the
+  generic screening endpoint already lets a student set aside any of their own
+  papers, with CSRF and ownership checks, and it is undoable. simple_tools.js
+  cache-bust is `20261029c`; search.js and style.css stay `20261029a`.
+- PR #122 (merged) keeps only the P2.2 sweep tooling. Its gate FAILED on the
+  15-question benchmark (test ndcg@10 0.5712 vs today's 0.5755), so Search
+  ranking is unchanged. Leave-one-question-out shortlists inside each fold,
+  and `score-test` refuses a second test pass. Notes:
+  `~/HealthDatabaseAccess-scratch/bench/p22_dev_sweep_v2.md`.
+- Validation (`fix-a8-r1`, production venv, no install): `ruff check .`
   clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2145
-  passed in 217.74 s. Scratch is
-  `~/HealthDatabaseAccess-scratch/pytest-fix-a8-r1`.
+  passed in 217.74 s.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
   and unscheduled roadmap backlog. Ship staging is at `266195e`. P1.9 labels
   are done: a three-model panel plus the owner's review of 29 rows, in
-  `~/HealthDatabaseAccess-scratch/bench/labels_final/` (not in git). That
-  five-question test split is still unscored, and it is a different score
-  from the v2 Laya test score. P2.2, PR #122, remains open and on hold. The
+  `~/HealthDatabaseAccess-scratch/bench/labels_final/` and
+  `labels_final_v2/` (not in git). The original five-question held-out
+  split is still unscored. That is a different score from the scored
+  15-question v2 P2.2 test pass and from the v2 Laya test score. The
   evidence redesign from #126 follows in a separate PR.
-- **Next step:** independent re-review of PR #130. Do not merge from the
-  fixer.
+- **Next step:** merge PR #130 when CI passes. Do not merge from the builder.
