@@ -60,15 +60,21 @@
   are in `bench/labels_final/`. P2.1 adds `app/services/question_concepts.py`.
   Search uses it for the P2.8 difference line.
 - P2.5a adds `tools/eval_laya_groups.py`. It scores Laya relevance groups on
-  the dev split of the frozen top 30. The test split is not scored. The
-  write-up is `~/HealthDatabaseAccess-scratch/bench/p25a_results.md`. The
-  best run that stays under a 5% harmful-error rate sorts 16 of 91 dev papers
+  the dev split of the frozen top 30. The `run` command does not score the
+  test split. The write-up is `~/HealthDatabaseAccess-scratch/bench/p25a_results.md`.
+  The best run that stays under a 5% harmful-error rate sorts 16 of 91 dev papers
   and does not improve ndcg@10. The report lists each question's ndcg@10
   and relevant@10. No group setting is ready to show students. The one lead
   is F2 (decomposed yes/no per concept): with the different-group cut at
   0.65 it sorts 38 of 91 papers, puts 2 of 27 good papers in different
   (over the 5% cap), and still raises ndcg@10. The dev slice has only 2
   how_why papers, so it is too small to calibrate four groups.
+- P2.5b adds `run-f2` and `score-test` to `tools/eval_laya_groups.py`.
+  `run-f2` asks whether a paper reports the outcome, is about the actor,
+  contradicts the population or place, and reports findings, then fits
+  thresholds on the dev split. `score-test` scores that choice once.
+  Search still ranks as it does today. The write-up is
+  `~/HealthDatabaseAccess-scratch/bench/p25b_results.md`.
 - P2.2 re-ran the word-match sweep on the 15-question `baseline_v2` corpus.
   The chosen setting (`bonus_w0.2_bm25_keywords`) beat today's ranking on
   dev (ndcg@10 0.4381 vs 0.3973) and lost on test (0.5712 vs 0.5755), with
@@ -270,14 +276,14 @@ Guest User (is_guest) → sample corpus only; purged by age
 
 ## Session Handoff
 - **Date:** 2026-10-29. Branch `feat/word-bonus`, PR #122. Merged
-  `origin/main` (`266195e`) and re-ran the P2.2 word-match sweep on the
-  15-question `baseline_v2` corpus, dev split only. Chosen setting
-  `bonus_w0.2_bm25_keywords` beat today's 0.7/0.3 TF-IDF ranking on dev
-  (ndcg@10 0.4381 vs 0.3973) and lost on the one test pass (0.5712 vs
-  0.5755). Q1, Q5 and Q14 dropped more than 0.05 on test, so the product
-  ranking, card copy, CSV columns and spec ranking sentence stay as on
-  main. The PR keeps the sweep ranker in `tools/eval_search.py` and
-  `app/services/lexical.py`. Search.js and style.css cache-bust stay
+  `origin/main` (`05f8c6e`, includes P2.5b). Re-ran the P2.2 word-match
+  sweep on the 15-question `baseline_v2` corpus, dev split only. Chosen
+  setting `bonus_w0.2_bm25_keywords` beat today's 0.7/0.3 TF-IDF ranking
+  on dev (ndcg@10 0.4381 vs 0.3973) and lost on the one test pass
+  (0.5712 vs 0.5755). Q1, Q5 and Q14 dropped more than 0.05 on test, so
+  the product ranking, card copy, CSV columns and spec ranking sentence
+  stay as on main. The PR keeps the sweep ranker in `tools/eval_search.py`
+  and `app/services/lexical.py`. Search.js and style.css cache-bust stay
   `20261029a`.
 - Validation (production venv, this worktree, no install): `ruff check .`
   clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2133
@@ -285,10 +291,12 @@ Guest User (is_guest) → sample corpus only; purged by age
   `~/HealthDatabaseAccess-scratch/pytest-fix-a2-rerun`. Sweep notes:
   `~/HealthDatabaseAccess-scratch/bench/p22_dev_sweep_v2.md`.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
-  and unscheduled roadmap backlog. Ship staging was last recorded at
-  `522ff7e`. P1.9 labels are done: a three-model panel plus the owner's
-  review of 29 rows, in `~/HealthDatabaseAccess-scratch/bench/labels_final/`
-  and `labels_final_v2/` (not in git). The evidence redesign from #126
-  follows in a separate PR.
+  and unscheduled roadmap backlog. Ship staging is at `266195e`. P1.9 labels
+  are done: a three-model panel plus the owner's review of 29 rows, in
+  `~/HealthDatabaseAccess-scratch/bench/labels_final/` and
+  `labels_final_v2/` (not in git). The original five-question held-out
+  split is still unscored. That is a different score from the scored
+  15-question v2 P2.2 test pass and from the v2 Laya test score. The
+  evidence redesign from #126 follows in a separate PR.
 - **Next step:** independent review of PR #122. Do not merge from the
   builder.
