@@ -295,18 +295,24 @@ def _other_copies_payload(
 def _other_copies(
     article: Mapping[str, Any], same_work_rows: List[Any],
 ) -> List[CopyInfo]:
-    seen: set[str] = set()
     main = _main_link_key(article)
-    if main:
-        seen.add(main)
-    out: List[CopyInfo] = []
+    selected: dict[str, CopyInfo] = {}
 
     def take(row: Mapping[str, Any], loc: Mapping[str, Any]) -> None:
-        if len(out) >= COPY_LIMIT:
+        copy = _copy_from_location(row, loc)
+        if copy is None:
             return
-        copy = _copy_from_location(row, loc, seen)
-        if copy:
-            out.append(copy)
+        key = _url_key(copy.url)
+        if not key or key == main:
+            return
+        existing = selected.get(key)
+        if existing is None:
+            if len(selected) >= COPY_LIMIT:
+                return
+            selected[key] = copy
+            return
+        if copy.open_listed and not existing.open_listed:
+            selected[key] = existing._replace(open_listed=True)
 
     _collect_row_copies(article, take)
     article_key = (
@@ -314,15 +320,13 @@ def _other_copies(
         str(article.get("source") or ""),
     )
     for raw in same_work_rows:
-        if len(out) >= COPY_LIMIT:
-            break
         if not isinstance(raw, Mapping):
             continue
         peer_key = (str(raw.get("article_id") or ""), str(raw.get("source") or ""))
         if peer_key == article_key and peer_key != ("", ""):
             continue
         _collect_row_copies(raw, take)
-    return out
+    return list(selected.values())
 
 
 def _collect_row_copies(
@@ -343,22 +347,17 @@ def _collect_row_copies(
 
 
 def _copy_from_location(
-    row: Mapping[str, Any], loc: Mapping[str, Any], seen: set,
+    row: Mapping[str, Any], loc: Mapping[str, Any],
 ) -> Optional[CopyInfo]:
     url = _http_url(loc.get("url"))
-    if not url:
-        return None
-    key = _url_key(url)
-    if not key or key in seen:
+    if not url or not _url_key(url):
         return None
     via = str(loc.get("via") or "").strip().lower()
     source_id = str(row.get("source") or "").strip().lower()
     if _is_crossref_link(via, source_id):
         if not _has_cc_licence(loc.get("license") or loc.get("licence")):
             return None
-    seen.add(key)
-    where = _copy_where(loc, row)
-    return CopyInfo(where, url, _copy_is_open(row, loc, url))
+    return CopyInfo(_copy_where(loc, row), url, _copy_is_open(row, loc, url))
 
 
 def _copy_is_open(

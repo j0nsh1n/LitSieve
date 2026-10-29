@@ -181,6 +181,82 @@ def test_closed_copy_has_no_open_label():
     assert copies[0].where == "publisher page"
 
 
+def test_later_open_peer_labels_card_location():
+    card = _article(
+        article_id="123",
+        source="pubmed",
+        doi="10.1234/same",
+        locations=[{
+            "url": "https://zenodo.org/records/9/files/paper.pdf",
+            "via": "openalex",
+            "host": "Zenodo",
+        }],
+    )
+    peer = _article(
+        article_id="W9",
+        source="openalex",
+        doi="10.1234/same",
+        oa_status="gold",
+        best_oa_url="https://zenodo.org/records/9/files/paper.pdf",
+    )
+    copies = other_copies(card, [peer])
+    assert copies == [
+        CopyInfo("Zenodo", "https://zenodo.org/records/9/files/paper.pdf", True),
+    ]
+
+
+def test_later_open_peer_labels_earlier_closed_peer():
+    card = _article(article_id="123", source="pubmed", doi="10.1234/same")
+    closed = _article(
+        article_id="cr-1",
+        source="crossref",
+        doi="10.1234/same",
+        locations=[{
+            "url": "https://zenodo.org/records/9/files/paper.pdf",
+            "host": "Zenodo",
+            "via": "openalex",
+        }],
+    )
+    opened = _article(
+        article_id="W9",
+        source="openalex",
+        doi="10.1234/same",
+        oa_status="gold",
+        host_name="Zenodo",
+        best_oa_url="https://zenodo.org/records/9/files/paper.pdf",
+    )
+    copies = other_copies(card, [closed, opened])
+    assert copies == [
+        CopyInfo("Zenodo", "https://zenodo.org/records/9/files/paper.pdf", True),
+    ]
+    reversed_copies = other_copies(card, [opened, closed])
+    assert reversed_copies == copies
+
+
+def test_open_peer_labels_one_of_five_selected_locations():
+    locations = [
+        {"url": f"https://example.org/copy/{i}", "host": f"Host {i}"}
+        for i in range(COPY_LIMIT + 1)
+    ]
+    card = _article(
+        article_id="123",
+        source="pubmed",
+        doi="10.1234/same",
+        locations=locations,
+    )
+    peer = _article(
+        article_id="W9",
+        source="openalex",
+        doi="10.1234/same",
+        oa_status="gold",
+        best_oa_url="https://example.org/copy/2",
+    )
+    copies = other_copies(card, [peer])
+    assert _urls(copies) == [f"https://example.org/copy/{i}" for i in range(COPY_LIMIT)]
+    assert copies[2].open_listed is True
+    assert [item.open_listed for item in copies] == [False, False, True, False, False]
+
+
 def test_cap_is_five():
     locations = [
         {"url": f"https://example.org/copy/{i}", "host": f"Host {i}"}

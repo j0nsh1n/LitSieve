@@ -12,8 +12,8 @@
   poster. Live at `https://www.litpilot.org` from the production checkout,
   `main` through #106 (2026-10-16). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
-- Latest full suite (2026-10-28, `feat/other-copies` B2 r1): **2072 passed**
-  in 168.45 s, no skips or xfails. `ruff check .` clean; `pyright app` **0
+- Latest full suite (2026-10-28, `feat/other-copies` B2 r2): **2075 passed**
+  in 167.62 s, no skips or xfails. `ruff check .` clean; `pyright app` **0
   errors**, 6 optional-import warnings (CI blocks on errors).
   `pip-audit` (2026-10-14): no known vulnerabilities; ROCm torch/triton are
   un-auditable. No dependency lockfile.
@@ -23,7 +23,9 @@
   change, cap five. Search.js cache-bust is `20261028g`. Same-work DOI
   lookup uses `normalize_doi` on stored rows. Trailing-slash origins share
   one URL key. The client mounts copies only on a starred none_listed card
-  and keeps a page request when another card is starred.
+  and keeps a page request when another card is starred. Each listed URL
+  keeps "Open copy listed" if any stored occurrence of that URL meets the
+  P2.3 open rule, including after five copies are already selected.
 - P2.3 shows an access label on Search cards from stored OA fields, with a
   Free to read filter next to Type. Closed cards keep every reporting
   source. Open labels need a real HTTP(S) host. Crossref needs a
@@ -235,17 +237,15 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-28. `fix-b2-r1` on `feat/other-copies` (PR #123, P2.4
-  round 1). Same-work copies match stored DOIs after `normalize_doi`
-  (prefix and case). Root URLs with and without `/` share one key. The
-  Search loader mounts only on a starred none_listed card, so unstar drops
-  a pending disclosure. Page and single-card loads share one generation, so
-  starring a second card keeps copies already loading for the page.
-  Search.js cache-bust is `20261028g`.
+- **Date:** 2026-10-28. `fix-b2-r2` on `feat/other-copies` (PR #123, P2.4
+  round 2). Other listed copies gathers open evidence per URL before the
+  five-copy cap, so a later same-DOI peer can mark a listed URL as "Open
+  copy listed". Unlicensed Crossref links stay omitted. Search.js
+  cache-bust remains `20261028g`.
 - Validation (production venv, this worktree, no install): `ruff check .`
-  clean, `pyright app` 0 errors / 6 optional-import warnings, `node --check
-  static/js/search.js`, pytest 2072 passed in 168.45 s. Scratch is
-  `~/HealthDatabaseAccess-scratch/pytest-fix-b2-r1`.
+  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2075
+  passed in 167.62 s. Scratch is
+  `~/HealthDatabaseAccess-scratch/pytest-fix-b2-r2`.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
   and unscheduled roadmap backlog. Ship staging was last recorded at
   `f9485cf`. P1.9 is human labels on the five questions. P2.2 is wiring

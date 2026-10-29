@@ -13,7 +13,10 @@ and this project aims to follow Semantic Versioning for app version strings
   prefix or different capital letters. Unstarring a paper hides that list
   even if a copy request was already in flight. Starring another paper on
   the same page still shows copies that were loading for the other cards.
-  A website URL with and without a trailing slash is one copy.
+  A website URL with and without a trailing slash is one copy. A listed
+  URL says "Open copy listed" when any stored source for that URL meets
+  the open rule.
+
 
 ### Added
 - On a starred Search card with no open copy listed, "Other listed copies (N)"
