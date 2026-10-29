@@ -118,6 +118,26 @@ def test_access_chip_wording_and_forbidden_claims():
     template = _read("templates", "search.html")
     assert 'id="simple-free-to-read-chip"' in template
     assert "Free to read" in template
+    assert 'src="/static/js/search.js?v=20261028g"' in template
+
+
+def test_other_copies_disclosure_wording():
+    search = _read("static", "js", "search.js")
+    helper = _slice(search, "function otherCopiesHtml(", "function mountOtherCopies")
+    assert "Other listed copies (" in helper
+    assert 'target="_blank"' in helper
+    assert 'rel="noopener"' in helper
+    assert "Open copy listed" in helper
+    lowered = helper.lower()
+    assert "verified" not in lowered
+    assert "full text available" not in lowered
+    assert "free" not in lowered
+    assert "function loadOtherCopiesForResults(" in search
+    assert "/api/articles/other-copies" in search
+    assert "none_listed" in search
+    css = _read("static", "css", "style.css")
+    assert ".result-other-copies" in css
+    assert 'href="/static/css/style.css?v=20261028f"' in _read("templates", "base.html")
 
 
 def test_score_tooltip_says_the_list_is_sorted_by_it():

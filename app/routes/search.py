@@ -17,13 +17,16 @@ from app.core import (
 from app.errors import sentence_for
 from app.schemas import (
     NoteRequest,
+    OtherCopiesRequest,
     SearchRequest,
     SeedSearchRequest,
     StarredSearchRequest,
 )
+from app.services.access import other_copies_payload
 from app.services.enrich import (
     enrich_search_results,
 )
+from app.services.work_types import normalize_doi
 from app.storage import quota
 from app.storage.dbconn import integrity_errors
 from app.storage.run_record import log_question
@@ -182,6 +185,39 @@ async def api_search_starred(req: StarredSearchRequest, request: Request):
         }
     except ValueError as e:
         return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
+    except Exception as e:
+        return server_error()
+    finally:
+        release_pipeline(uid)
+
+
+@router.post("/api/articles/other-copies")
+async def api_other_copies(req: OtherCopiesRequest, request: Request):
+    """Listed copies of starred papers with no open copy on this result page."""
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    uid = user["user_id"]
+    try:
+        p = get_owned_pipeline(uid, req.library_id)
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
+    try:
+        keys = [(item.article_id, item.source) for item in req.articles]
+        starred = p.db.get_starred_copy_fields(keys)
+        dois: list[str] = []
+        seen_doi = set()
+        for row in starred.values():
+            stored = str(row.get("doi") or "").strip()
+            normalized = normalize_doi(row.get("doi"))
+            for doi in (stored, normalized):
+                if doi and doi not in seen_doi:
+                    seen_doi.add(doi)
+                    dois.append(doi)
+        peers = p.db.get_copy_fields_for_dois(dois)
+        return {"articles": other_copies_payload(starred, peers)}
     except Exception as e:
         return server_error()
     finally:

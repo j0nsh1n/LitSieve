@@ -8,7 +8,23 @@ and this project aims to follow Semantic Versioning for app version strings
 
 ## [Unreleased]
 
+### Fixed
+- Other listed copies finds the same work when a stored DOI uses a doi.org
+  prefix or different capital letters. Unstarring a paper hides that list
+  even if a copy request was already in flight. Starring another paper on
+  the same page still shows copies that were loading for the other cards.
+  A website URL with and without a trailing slash is one copy. A listed
+  URL says "Open copy listed" when any stored source for that URL meets
+  the open rule. A copy folded in by merge is labeled from that source's
+  own stored OA fields, not from the kept record.
+
+
 ### Added
+- On a starred Search card with no open copy listed, "Other listed copies (N)"
+  names other known places for the same work (same DOI or a merged record),
+  each with a link. A copy that meets the stored open rule also says "Open
+  copy listed". The list uses stored data only, at most five URLs. Crossref
+  text-mining links appear only with a recognised Creative Commons licence.
 - `tools/eval_laya_groups.py` checks whether Laya can sort a question's top 30
   papers into answers, how or why, context, and different. It scores the dev
   split only. Search is unchanged.
