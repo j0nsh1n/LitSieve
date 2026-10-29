@@ -9,6 +9,9 @@ and this project aims to follow Semantic Versioning for app version strings
 ## [Unreleased]
 
 ### Fixed
+- Different work suggestions load when that disclosure is opened, not when
+  the card is drawn. An empty result removes the disclosure. With a year
+  filter on, the closest open paper is kept even if it has no year.
 - Other listed copies finds the same work when a stored DOI uses a doi.org
   prefix or different capital letters. Unstarring a paper hides that list
   even if a copy request was already in flight. Starring another paper on

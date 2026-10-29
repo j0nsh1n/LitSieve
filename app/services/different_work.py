@@ -76,12 +76,10 @@ def pick_different_work(
     seed_doi = work_doi(starred.get("doi"))
     blocked = set(same_work_keys or ())
     blocked.add(seed_key)
-    picked: List[Mapping[str, Any]] = []
+    eligible: List[Mapping[str, Any]] = []
     for row in ranked:
         if not isinstance(row, Mapping):
             continue
-        if len(picked) >= limit:
-            break
         key = article_key(row)
         if key in blocked or key == ("", ""):
             continue
@@ -97,9 +95,13 @@ def pick_different_work(
         url = _open_url(row)
         if not url:
             continue
-        picked.append(row)
+        eligible.append(row)
         blocked.add(key)
-    return picked
+    eligible.sort(
+        key=lambda row: float(row.get("similarity_score") or 0),
+        reverse=True,
+    )
+    return eligible[:limit]
 
 
 def suggestion_public_dict(

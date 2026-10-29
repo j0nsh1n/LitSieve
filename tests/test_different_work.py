@@ -93,6 +93,18 @@ def test_pick_orders_by_similarity_and_caps_at_three():
     assert [row["article_id"] for row in picked] == ["a", "b", "c"]
 
 
+def test_pick_reorders_cosine_before_cap():
+    seed = {"article_id": "seed", "source": "pubmed"}
+    ranked = [
+        _open("dated1", 0.70),
+        _open("dated2", 0.60),
+        _open("dated3", 0.55),
+        _open("undated", 0.90),
+    ]
+    picked = pick_different_work(seed, ranked)
+    assert [row["article_id"] for row in picked] == ["undated", "dated1", "dated2"]
+
+
 def test_pick_drops_below_similarity_cut():
     seed = {"article_id": "seed", "source": "pubmed"}
     ranked = [
@@ -263,6 +275,68 @@ def test_pipeline_difference_line_uses_year_and_type(pipe):
 
 def test_pipeline_skips_when_an_open_other_copy_exists(pipe):
     assert pipe.suggest_different_work([("copied", "crossref")]) == []
+
+
+def test_pipeline_keeps_closest_undated_when_year_bound_groups_last(
+    tmp_path, monkeypatch,
+):
+    p = LiteratureSearchPipeline(db_path=str(tmp_path / "undated-order.db"))
+    p.db.insert_articles([
+        _paper(
+            "seed", "crossref", "Closed seed",
+            "A closed paper about the zyptron pathway.",
+            year="2008", doi="10.1234/seed",
+        ),
+        _paper(
+            "undated", "openalex", "Closest undated",
+            "Open zyptron neighbor with no year.",
+            year="", doi="10.1234/u",
+            oa_status="gold", best_oa_url="https://example.org/undated.pdf",
+        ),
+        _paper(
+            "dated1", "doaj", "Dated one",
+            "Weaker dated zyptron paper.",
+            year="2020", doi="10.1234/d1",
+            oa_status="gold", best_oa_url="https://example.org/d1.pdf",
+        ),
+        _paper(
+            "dated2", "zenodo", "Dated two",
+            "Another weaker dated zyptron paper.",
+            year="2020", doi="10.1234/d2",
+            oa_status="gold", best_oa_url="https://example.org/d2.pdf",
+        ),
+        _paper(
+            "dated3", "plos", "Dated three",
+            "The weakest dated zyptron paper.",
+            year="2020", doi="10.1234/d3",
+            oa_status="gold", best_oa_url="https://example.org/d3.pdf",
+        ),
+    ], dedupe=False)
+    p.db.insert_embeddings(
+        {
+            ("seed", "crossref"): _vec(1.0, 0.0),
+            ("undated", "openalex"): _vec(1.0, 0.01),
+            ("dated1", "doaj"): _vec(1.0, 0.5),
+            ("dated2", "zenodo"): _vec(1.0, 0.6),
+            ("dated3", "plos"): _vec(1.0, 0.7),
+        },
+        model_name="general",
+    )
+    p.db.upsert_note("seed", "crossref", starred=True)
+    monkeypatch.setattr(
+        p.embedding_engine, "embed_query",
+        lambda _q: _vec(1.0, 0.0),
+    )
+    try:
+        rows = p.suggest_different_work(
+            [("seed", "crossref")], year_min=2000,
+        )
+        urls = [item["url"] for item in rows[0]["suggestions"]]
+        assert urls[0] == "https://example.org/undated.pdf"
+        assert "https://example.org/undated.pdf" in urls
+        assert len(urls) == 3
+    finally:
+        p.db.close()
 
 
 def test_pipeline_empty_without_embeddings(tmp_path, monkeypatch):
