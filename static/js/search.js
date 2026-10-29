@@ -1947,8 +1947,10 @@ function buildResultCard(article, idx) {
  </div>
  <span class="result-venue">${venue}</span>
  <span class="result-year">${year}</span>
- <span class="result-tags">
-  ${typeChip}${accessChip}<span class="tag">${escapeHtml(getSourceName(article.source))}</span>
+ <span class="result-head-chips">
+  ${accessChip}<span class="result-tags">
+  ${typeChip}<span class="tag">${escapeHtml(getSourceName(article.source))}</span>
+ </span>
  </span>
  </div>
  <h3 class="article-title result-row-title">${escapeHtml(article.title || '')}${resultMarksHtml(starred, !!String(noteVal).trim())}</h3>

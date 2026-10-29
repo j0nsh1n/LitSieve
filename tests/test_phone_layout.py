@@ -77,6 +77,8 @@ def test_phone_compact_rows_have_thumb_sized_open_button():
     toggle = re.search(r'\.result-toggle \{([^}]+)\}', phone)
     assert toggle and "min-height: 2.75rem" in toggle.group(1) and "min-width: 2.75rem" in toggle.group(1)
     assert '.result-row:not(.is-open) .result-tags { display: none; }' in phone
+    assert '.result-row:not(.is-open) .result-access-chip { display: none; }' not in phone
+    assert '.result-row:not(.is-open) .result-access-chip { display: flex; }' in phone
     venue = re.search(r'\.result-row:not\(\.is-open\) \.result-venue \{([^}]+)\}', phone)
     assert venue and "text-overflow: ellipsis" in venue.group(1)
 
