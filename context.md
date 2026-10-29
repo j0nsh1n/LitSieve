@@ -12,8 +12,8 @@
   poster. Live at `https://www.litpilot.org` from the production checkout,
   `main` through #106 (2026-10-16). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
-- Latest full suite (2026-10-28, `fix-b3-r1` on `feat/different-work`):
-  **2119 passed** in 160.87 s, no skips or xfails. `ruff check .` clean;
+- Latest full suite (2026-10-29, `fix/access-bounds-visibility`):
+  **2127 passed** in 166.41 s, no skips or xfails. `ruff check .` clean;
   `pyright app` **0 errors**, 6 optional-import warnings (CI blocks on
   errors).
   `pip-audit` (2026-10-14): no known vulnerabilities; ROCm torch/triton are
@@ -26,8 +26,10 @@
   3, so a year filter cannot drop a closer undated paper. The client loads
   suggestions when the disclosure opens. The difference line uses year,
   stored type, and `question_concepts` on the current Search question. JSON
-  route `POST /api/articles/different-work`, no schema change. Search.js
-  cache-bust is `20261028i`.
+  route `POST /api/articles/different-work` takes one seed, a 1,000-character
+  question, and at most 50 entries per filter list. Same-DOI lookup reads a
+  key/DOI projection first. Open-copy existence uses `has_open_copy` before
+  the five-copy display cap. Search.js cache-bust is `20261029a`.
 - P2.4: a starred Search card with no open copy listed can show other listed
   copies of the same work (same-record locations, same DOI including
   set-aside rows, merged extra URLs). One batched JSON route, no schema
@@ -38,11 +40,13 @@
   occurrence of that URL meets the P2.3 open rule, including after five
   copies are already selected. A merged-in copy uses that source's
   `oa_status` and `best_oa_url` in provenance. Missing evidence leaves it
-  unlabeled.
+  unlabeled. The copies payload includes `has_open_copy`.
 - P2.3 shows an access label on Search cards from stored OA fields, with a
   Free to read filter next to Type. Closed cards keep every reporting
   source. Open labels need a real HTTP(S) host. Crossref needs a
-  recognised CC licence identifier and version.
+  recognised CC licence identifier and version. The chip sits outside the
+  source/type tags that Catalog and collapsed phone Table rows hide.
+  style.css cache-bust is `20261029a`.
 - P1.7 shows a type chip on Search cards and a Type filter next to Sources.
   The filter runs before ranking and reads only `work_type`. Ranked hits get
   that column in one batched query. Null and unknown types have no chip.
@@ -260,21 +264,24 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-28. `fix-b3-r1` on `feat/different-work` (PR #125, P2.8).
-  Different-work suggestions load when the disclosure opens. Eligible
-  neighbors are sorted by cosine before the cap of 3 so a year bound cannot
-  hide a closer undated paper. Cosine floor 0.45 from frozen baseline_v1
-  neighbors (Q1-Q3 on-topic pairs sit about 0.51-0.67; history related-pair
-  medians about 0.37-0.42; health and education neighbors are higher so the
-  cap of 3 binds first). Search.js cache-bust is `20261028i`.
+- **Date:** 2026-10-29. `fix/access-bounds-visibility` from origin/main
+  `c124604`. Ports the three passing #126 fixes: uncapped open-copy
+  existence (`CopySet.has_open_copy`), bounded P2.8 requests (one seed,
+  length limits, lightweight DOI projection), and access-label visibility
+  in Catalog and phone Table. Leaves the evidence redesign and
+  `_merge_locations` on main. Search.js and style.css cache-bust
+  `20261029a`. Screenshots in
+  `~/HealthDatabaseAccess-scratch/audit-2026-10-27/phase2/screens_b5/`.
 - Validation (production venv, this worktree, no install): `ruff check .`
-  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2119
-  passed in 160.87 s. Scratch is
-  `~/HealthDatabaseAccess-scratch/pytest-fix-b3-r1`.
+  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2127
+  passed in 166.41 s. Scratch is
+  `~/HealthDatabaseAccess-scratch/pytest-access-bounds-visibility`.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
   and unscheduled roadmap backlog. Ship staging was last recorded at
   `522ff7e`. P1.9 labels are done: a three-model panel plus the owner's
   review of 29 rows, in `~/HealthDatabaseAccess-scratch/bench/labels_final/`
   (not in git). The held-out test split is still unscored. P2.2, PR #122,
-  remains open and on hold.
-- **Next step:** parent re-review of PR #125. Do not merge from the builder.
+  remains open and on hold. The evidence redesign from #126 follows in a
+  separate PR.
+- **Next step:** independent review of this PR. Do not merge from the
+  builder. Do not close #126.

@@ -17,6 +17,11 @@ def test_open_other_copy_skips_different_work():
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js not installed")
+def test_sixth_open_url_skips_different_work():
+    _run_node(_SIXTH_OPEN_HARNESS)
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="Node.js not installed")
 def test_pending_different_work_does_not_restore_after_unstar():
     _run_node(_UNSTAR_HARNESS)
 
@@ -227,6 +232,37 @@ _OPEN_COPY_HARNESS = _SANDBOX + r"""
   articles: [{
    article_id: 'A', source: 'pubmed',
    copies: [{ where: 'Zenodo', url: 'https://zenodo.org/a.pdf', open_listed: true }],
+  }],
+ });
+ await loading;
+ assert.equal(pending.length, 1);
+ assert.equal(card.querySelector('.result-different-work'), null);
+ console.log('different-work-js-complete');
+})().catch((err) => { console.error(err); process.exit(1); });
+"""
+
+_SIXTH_OPEN_HARNESS = _SANDBOX + r"""
+(async () => {
+ resetPage();
+ const article = {
+  article_id: 'A', source: 'pubmed', starred: true,
+  access: { state: 'none_listed' },
+ };
+ const card = makeCard('A', 'pubmed');
+ cards.push(card);
+ const load = vm.runInContext('loadOtherCopiesForResults', sandbox);
+ const loading = load([article]);
+ assert.equal(pending.length, 1);
+ assert.equal(pending[0].path, '/api/articles/other-copies');
+ pending[0].resolve({
+  articles: [{
+   article_id: 'A', source: 'pubmed',
+   has_open_copy: true,
+   copies: [0, 1, 2, 3, 4].map((i) => ({
+    where: 'Host ' + i,
+    url: 'https://example.org/copy/' + i,
+    open_listed: false,
+   })),
   }],
  });
  await loading;
