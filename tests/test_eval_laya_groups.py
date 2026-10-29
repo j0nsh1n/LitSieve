@@ -340,6 +340,181 @@ def test_per_question_ranking_keeps_a_loss_visible():
     assert base[-2:] == ["0.000", "0.00"]
 
 
+def test_f2b_slots_skip_empty_concepts():
+    assert [name for name, _target in ev.f2b_slots(QuestionConcepts())] == ["F"]
+    period_only = QuestionConcepts(period=("Great Depression",))
+    assert [name for name, _target in ev.f2b_slots(period_only)] == ["F"]
+    adolescents = QuestionConcepts(population=("adolescents",))
+    assert [name for name, _target in ev.f2b_slots(adolescents)] == ["C", "F"]
+    place = QuestionConcepts(place=("U.S.",))
+    assert [name for name, _target in ev.f2b_slots(place)] == ["C", "F"]
+    full = QuestionConcepts(
+        actor=("New Deal policies",),
+        outcome=("employment",),
+        population=("African Americans",),
+        place=("the South",),
+    )
+    assert [name for name, _target in ev.f2b_slots(full)] == ["R", "A", "C", "F"]
+
+
+def test_f2b_cells_at_the_corners():
+    actor_no = {"R": 1.0, "A": 0.0, "C": 0.0, "F": 1.0}
+    assert ev.combine_f2b(actor_no, "outcome")["answers"] == pytest.approx(1)
+    assert ev.combine_f2b(actor_no, "actor")["different"] == pytest.approx(1)
+    assert ev.combine_f2b({"F": 1.0}, "open")["answers"] == pytest.approx(1)
+    assert ev.combine_f2b({"F": 1.0}, "outcome")["context"] == pytest.approx(1)
+    contradicted = {"R": 1.0, "A": 1.0, "C": 1.0, "F": 1.0}
+    for rule in ev.F2B_RULES:
+        assert ev.combine_f2b(contradicted, rule)["different"] == pytest.approx(1)
+    findings_no = {"R": 1.0, "A": 1.0, "C": 0.0, "F": 0.0}
+    assert ev.combine_f2b(findings_no, "outcome")["how_why"] == pytest.approx(1)
+    soft = ev.combine_f2b({"R": 0.7, "A": 0.4, "C": 0.2, "F": 0.8}, "actor")
+    assert sum(soft.values()) == pytest.approx(1.0)
+    missing_outcome = ev.combine_f2b({"A": 1.0, "F": 1.0}, "outcome")
+    assert missing_outcome["answers"] == pytest.approx(0)
+    assert missing_outcome["context"] == pytest.approx(1)
+    assert ev.combine_f2b({"F": 1.0}, "open")["answers"] == pytest.approx(1)
+    actor_missing_outcome = ev.combine_f2b({"A": 1.0, "F": 1.0}, "actor")
+    assert actor_missing_outcome["answers"] == pytest.approx(0)
+    assert actor_missing_outcome["context"] == pytest.approx(1)
+
+
+def test_mock_laya_f2b_skips_empty_slots():
+    calls = []
+
+    def caller(instructions, options, states):
+        calls.append(instructions)
+        assert states == ["Paper"]
+        assert set(options) == {"yes", "no"}
+        return [{"choice": "yes", "p": 1.0, "probabilities": {"yes": 1.0, "no": 0.0}}]
+
+    concepts = QuestionConcepts(actor=("New Deal policies",), population=("African Americans",))
+    question = {
+        "id": "Q2",
+        "text": "How did New Deal policies affect African Americans during the Great Depression?",
+    }
+    rows = ev.run_spec_on_question(
+        ev.Spec("f2b", "two", "actor", "p0"), question, concepts, ["Paper"], caller
+    )
+    assert rows is not None
+    assert len(calls) == 3
+    assert not any("report results about" in text for text in calls)
+    assert set(rows[0]["yes"]) == {"A", "C", "F"}
+
+    calls.clear()
+    keyword = {"id": "Q15", "text": "microplastics drinking water human health"}
+    rows = ev.run_spec_on_question(
+        ev.Spec("f2b", "full", "outcome", "p0"), keyword, QuestionConcepts(), ["Paper"], caller
+    )
+    assert rows is not None
+    assert len(calls) == 1
+    assert "findings" in calls[0]
+    assert rows[0]["probs"]["context"] == pytest.approx(1)
+
+
+def test_loo_fit_does_not_see_the_held_out_question():
+    q1 = [
+        {"qid": "Q1", "key": f"d{i}", "gold": "different", "probs": _probs(0.9, 0.1)}
+        for i in range(10)
+    ]
+    q2 = {"qid": "Q2", "key": "a", "gold": "answers", "probs": _probs(0.6, 0.4)}
+    held = ev.loo_predictions(q1 + [q2], ["Q1", "Q2"])
+    assert held["Q2"]["a"] == "different"
+    joint = ev.tune_thresholds(
+        [{"gold": row["gold"], "probs": row["probs"]} for row in q1 + [q2]]
+    )
+    assert joint.thresholds["different"] in (0.65, 0.80)
+    assert ev.apply_thresholds(q2["probs"], joint.thresholds) == "not_sorted"
+
+
+def test_pick_f2b_uses_harm_cap_then_ndcg():
+    low_gain = {"setting": "low", "harmful": 0.0, "d_ndcg": -0.2, "macro_f1": 0.9, "coverage": 1.0}
+    better = {"setting": "better", "harmful": 0.04, "d_ndcg": 0.1, "macro_f1": 0.2, "coverage": 0.5}
+    huge = {"setting": "huge", "harmful": 0.5, "d_ndcg": 0.9, "macro_f1": 0.99, "coverage": 1.0}
+    assert ev.pick_f2b([low_gain, better, huge])["setting"] == "better"
+    milder = {"setting": "mild", "harmful": 0.2, "d_ndcg": -0.5, "macro_f1": 0.1, "coverage": 0.2}
+    worse = {"setting": "worse", "harmful": 0.4, "d_ndcg": 0.8, "macro_f1": 0.9, "coverage": 1.0}
+    assert ev.pick_f2b([worse, milder])["setting"] == "mild"
+
+
+def test_gate_verdict_needs_every_condition():
+    good = {
+        "dev_ndcg": 0.5,
+        "dev_base": 0.4,
+        "test_ndcg": 0.5,
+        "test_base": 0.4,
+        "test_harm": 0.05,
+        "worse_questions": (),
+    }
+    assert ev.gate_verdict(**good) == "PASS"
+    assert ev.gate_verdict(**{**good, "test_harm": 0.06}) == "FAIL"
+    assert ev.gate_verdict(**{**good, "worse_questions": ("Q4",)}) == "FAIL"
+    assert ev.gate_verdict(**{**good, "dev_ndcg": 0.3}) == "FAIL"
+    assert ev.gate_verdict(**{**good, "dev_ndcg": 0.4}) == "FAIL"
+    assert ev.gate_verdict(**{**good, "test_ndcg": 0.4}) == "FAIL"
+
+
+def test_worse_question_ids():
+    rows = [
+        {"question": "Q4", "d_ndcg": -0.01},
+        {"question": "Q5", "d_ndcg": 0.0},
+        {"question": "Q1", "d_ndcg": -0.5},
+        {"question": "Q9", "d_ndcg": None},
+    ]
+    topics = {"Q4": "health", "Q5": "education", "Q1": "history", "Q9": "health"}
+    assert ev.worse_question_ids(rows, topics) == ["Q4"]
+
+
+def test_f2b_batches():
+    full = QuestionConcepts(actor=("a",), outcome=("o",), population=("p",), place=("Europe",))
+    assert ev.f2b_batches_per_search(full, "p0") == 4
+    assert ev.f2b_batches_per_search(QuestionConcepts(), "avg") == 2
+
+
+def test_test_stamp_blocks_a_second_claim(tmp_path):
+    path = tmp_path / "p25b_results.md.test-stamp.json"
+    assert ev.claim_test_stamp(path, "f2b-two-outcome-p0") is True
+    assert ev.claim_test_stamp(path, "other") is False
+    saved = path.read_text(encoding="utf-8")
+    assert "f2b-two-outcome-p0" in saved
+    assert "other" not in saved
+
+
+def test_top_golds_ignore_labels_outside_the_top_30():
+    prepared = [{
+        "gold": {"in-top": "answers", "outside": "different", "blank": None},
+        "papers": [{"key": "in-top"}, {"key": "unlabelled"}],
+    }]
+    assert ev.top_golds(prepared) == ["answers"]
+    assert ev.support_counts(ev.top_golds(prepared))["answers"] == 1
+    assert ev.support_counts(ev.top_golds(prepared))["different"] == 0
+
+
+def test_splice_test_keeps_a_blank_line_before_the_recommendation():
+    text = "# Title\n\n## Recommendation\n\nold\n"
+    out = ev._splice_test(text, "## Test split\n\nscored\n", "Pick failed.")
+    assert "\n\n## Recommendation\n\n" in out
+    assert "old" not in out
+    assert out.endswith("Pick failed.\n")
+    assert "## Test split" in out
+
+
+def test_run_f2_commands_are_wired():
+    parser = ev.build_parser()
+    dev = parser.parse_args(["run-f2"])
+    assert dev.func is ev.execute_round2
+    assert dev.out.endswith("p25b_results.md")
+    assert dev.results.endswith("baseline_v2_results.json")
+    assert dev.budget == ev.F2B_BUDGET
+    assert dev.latency is True
+    held = parser.parse_args(["score-test"])
+    assert held.func is ev.execute_score_test
+    assert held.out.endswith("p25b_results.md")
+    screen = parser.parse_args(["run"])
+    assert screen.func is ev.execute
+    assert screen.budget == ev.EXPERIMENT_BUDGET
+
+
 def test_reorder_keeps_score_order_inside_a_group():
     hits = [
         {"key": "a", "rank": 1},

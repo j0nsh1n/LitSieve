@@ -60,15 +60,21 @@
   are in `bench/labels_final/`. P2.1 adds `app/services/question_concepts.py`.
   Search uses it for the P2.8 difference line.
 - P2.5a adds `tools/eval_laya_groups.py`. It scores Laya relevance groups on
-  the dev split of the frozen top 30. The test split is not scored. The
-  write-up is `~/HealthDatabaseAccess-scratch/bench/p25a_results.md`. The
-  best run that stays under a 5% harmful-error rate sorts 16 of 91 dev papers
+  the dev split of the frozen top 30. The `run` command does not score the
+  test split. The write-up is `~/HealthDatabaseAccess-scratch/bench/p25a_results.md`.
+  The best run that stays under a 5% harmful-error rate sorts 16 of 91 dev papers
   and does not improve ndcg@10. The report lists each question's ndcg@10
   and relevant@10. No group setting is ready to show students. The one lead
   is F2 (decomposed yes/no per concept): with the different-group cut at
   0.65 it sorts 38 of 91 papers, puts 2 of 27 good papers in different
   (over the 5% cap), and still raises ndcg@10. The dev slice has only 2
   how_why papers, so it is too small to calibrate four groups.
+- P2.5b adds `run-f2` and `score-test` to `tools/eval_laya_groups.py`.
+  `run-f2` asks whether a paper reports the outcome, is about the actor,
+  contradicts the population or place, and reports findings, then fits
+  thresholds on the dev split. `score-test` scores that choice once.
+  Search still ranks as it does today. The write-up is
+  `~/HealthDatabaseAccess-scratch/bench/p25b_results.md`.
 - P1.6 stores Collect inputs and Search questions in the library database
   (`fetch_runs`, `question_log`), about 50 rows each. Writes come from
   `_run_multi_fetch` (background and sync, including cancel and error) and
@@ -264,24 +270,26 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-29. `fix/access-bounds-visibility` from origin/main
-  `c124604`. Ports the three passing #126 fixes: uncapped open-copy
-  existence (`CopySet.has_open_copy`), bounded P2.8 requests (one seed,
-  length limits, lightweight DOI projection), and access-label visibility
-  in Catalog and phone Table. Leaves the evidence redesign and
-  `_merge_locations` on main. Search.js and style.css cache-bust
-  `20261029a`. Screenshots in
-  `~/HealthDatabaseAccess-scratch/audit-2026-10-27/phase2/screens_b5/`.
+- **Date:** 2026-10-29. `feat/laya-groups-eval-2` from origin/main `266195e`.
+  Adds `run-f2` and `score-test` in `tools/eval_laya_groups.py`. Search and
+  the UI stay as they are. Search.js and style.css cache-bust stay
+  `20261029a`. The dev pick is `f2b-full-outcome-p0`. The one test score
+  failed the gate. Test ndcg@10 is 0.418, concept coverage is 0.445, and
+  today's order is 0.575. Harmful errors are 3 of 58. Q4, Q5, and Q12 are
+  below today's test order. 100 of 271 dev papers and 68 of 169 test papers
+  stay unsorted. A cold batch of 30 full abstracts took 9331 ms. The warm
+  median was 401 ms. A full question sends 4 batches. Q9 and Q15 send 1.
+  The write-up is `~/HealthDatabaseAccess-scratch/bench/p25b_results.md`.
 - Validation (production venv, this worktree, no install): `ruff check .`
-  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2127
-  passed in 166.41 s. Scratch is
-  `~/HealthDatabaseAccess-scratch/pytest-access-bounds-visibility`.
+  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2139
+  passed in 177.73 s. Scratch is
+  `~/HealthDatabaseAccess-scratch/pytest-feat-laya-groups-eval-2`.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
-  and unscheduled roadmap backlog. Ship staging was last recorded at
-  `522ff7e`. P1.9 labels are done: a three-model panel plus the owner's
-  review of 29 rows, in `~/HealthDatabaseAccess-scratch/bench/labels_final/`
-  (not in git). The held-out test split is still unscored. P2.2, PR #122,
-  remains open and on hold. The evidence redesign from #126 follows in a
-  separate PR.
-- **Next step:** independent review of this PR. Do not merge from the
-  builder. Do not close #126.
+  and unscheduled roadmap backlog. Ship staging is at `266195e`. P1.9 labels
+  are done: a three-model panel plus the owner's review of 29 rows, in
+  `~/HealthDatabaseAccess-scratch/bench/labels_final/` (not in git). That
+  five-question test split is still unscored, and it is a different score
+  from the v2 Laya test score. P2.2, PR #122, remains open and on hold. The
+  evidence redesign from #126 follows in a separate PR.
+- **Next step:** independent review of this PR. Leave the merge to the
+  reviewer. These groups stay off the student ranking.
