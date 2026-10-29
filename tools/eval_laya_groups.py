@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Offline check: can Laya sort each question's top 30 into relevance groups?
 
-Dev split only. This tool never reads test-split categories into a score.
-The held-out test split stays for a later, single scoring pass.
+``run`` and ``run-f2`` score the dev split only. They do not read test-split
+categories. ``score-test`` reads those categories once, for the setting
+``run-f2`` already chose, and refuses a second pass.
 
 Groups, from the seven label categories:
 
@@ -35,7 +36,31 @@ Concept-coverage baseline: share of the non-empty actor, outcome, and population
 phrases whose words all appear in the title and abstract. Bands on that share
 are cut on the dev split.
 
+Owner-standard F2 (``cell_f2b``, command ``run-f2``) asks up to four yes/no
+questions. A concept slot with no phrase is not asked. The findings question
+is always asked. Yes/no probabilities are independent.
+
+    R  Does this paper report results about the outcome?
+    A  Is this paper about the actor or exposure?
+    C  Does it study a different population or place? Yes means a contradiction.
+       Period is not part of this check. No stated population is not a contradiction.
+    F  Does it report findings? No means it only describes a policy, method, or setting.
+
+    rule outcome:
+        answers when R is yes, F is not no, and C is not yes. A is not required.
+        A missing R cannot be answers.
+    rule actor:
+        same as outcome, and A must be yes when A was asked.
+    rule open:
+        same as actor, but a missing R does not block answers.
+
+    Then, for every rule: C yes is different. F no is how_why when the actor
+    check passes or was not asked, and different when A is no. Anything still
+    on the actor, or with the actor not asked, is context. The rest is different.
+
     python tools/eval_laya_groups.py run
+    python tools/eval_laya_groups.py run-f2
+    python tools/eval_laya_groups.py score-test
 """
 
 from __future__ import annotations
@@ -46,6 +71,7 @@ import hashlib
 import importlib.util
 import itertools
 import json
+import os
 import re
 import subprocess
 import sys
@@ -79,6 +105,11 @@ EXPERIMENT_BUDGET = 54
 LAYA_URL = "http://127.0.0.1:7880"
 CALL_TIMEOUT_S = 180.0
 HARM_CAP = 0.05
+F2B_RULES: Tuple[str, ...] = ("outcome", "actor", "open")
+F2B_INPUTS: Tuple[str, ...] = ("two", "full")
+F2B_PHRASINGS: Tuple[str, ...] = ("p0", "p1", "avg")
+HEALTH_EDU_TOPICS = frozenset({"health", "education"})
+F2B_BUDGET = 300
 
 _WORD = re.compile(
     r"U\.S\.?"
@@ -171,6 +202,246 @@ def combine_f2(
             cell *= p if bit else (1.0 - p)
         totals[cell_group(flags)] += cell
     return totals
+
+
+def population_place_phrase(concepts: QuestionConcepts) -> str:
+    """Population and place only. Period is not the owner's contradiction check."""
+    return join_phrases(tuple(concepts.population) + tuple(concepts.place))
+
+
+def f2b_slots(concepts: QuestionConcepts) -> List[Tuple[str, str]]:
+    """Questions to ask. An empty concept slot is skipped. Findings is always asked."""
+    slots: List[Tuple[str, str]] = []
+    outcome = join_phrases(concepts.outcome)
+    actor = join_phrases(concepts.actor)
+    where = population_place_phrase(concepts)
+    if outcome:
+        slots.append(("R", outcome))
+    if actor:
+        slots.append(("A", actor))
+    if where:
+        slots.append(("C", where))
+    slots.append(("F", ""))
+    return slots
+
+
+def f2b_batches_per_search(concepts: QuestionConcepts, phrasing: str) -> int:
+    """Sidecar batches for one question's top 30. Averaging two phrasings doubles the calls."""
+    checks = len(f2b_slots(concepts))
+    if phrasing == "avg":
+        return checks * 2
+    return checks
+
+
+def f2b_options(slot: str, target: str, phrasing: int) -> Dict[str, str]:
+    """Two wordings. Phrasing 0 follows the owner's checks. Phrasing 1 says the same thing again."""
+    second = int(phrasing) > 0
+    if slot == "R":
+        if not second:
+            return {
+                "yes": f"Yes. This paper reports results about {target}.",
+                "no": f"No. This paper does not report results about {target}.",
+            }
+        return {
+            "yes": f"Yes. The results in this paper are about {target}.",
+            "no": f"No. The results in this paper are not about {target}.",
+        }
+    if slot == "A":
+        if not second:
+            return {
+                "yes": f"Yes. This paper is about {target}.",
+                "no": f"No. This paper is not about {target}.",
+            }
+        return {
+            "yes": f"Yes. The actor or exposure in this paper is {target}.",
+            "no": f"No. The actor or exposure in this paper is not {target}.",
+        }
+    if slot == "C":
+        if not second:
+            return {
+                "yes": f"Yes. It studies a different population or place than {target}.",
+                "no": f"No. It does not study a different population or place than {target}.",
+            }
+        return {
+            "yes": f"Yes. Its population or place contradicts {target}.",
+            "no": f"No. Its population or place does not contradict {target}.",
+        }
+    if slot != "F":
+        raise ValueError(slot)
+    if not second:
+        return {
+            "yes": "Yes. It reports findings.",
+            "no": "No. It only describes a policy, a method, or a setting.",
+        }
+    return {
+        "yes": "Yes. It reports findings, not only a description.",
+        "no": "No. It states no findings and only describes a policy, method, or setting.",
+    }
+
+
+def f2b_instruction(question: str, slot: str, target: str) -> str:
+    asked = f'A student asked "{question}".'
+    if slot == "R":
+        return f"{asked} Does this paper report results about {target}?"
+    if slot == "A":
+        return f"{asked} Is this paper about {target}?"
+    if slot == "C":
+        return (
+            f"{asked} Does it study a different population or place than {target}? "
+            "No stated population is not a contradiction."
+        )
+    return (
+        f"{asked} Does it report findings, or only describe a policy, method, or setting?"
+    )
+
+
+def cell_f2b(flags: Mapping[str, bool], rule: str) -> str:
+    """Map one boolean draw of the owner-standard questions to a group.
+
+    ``flags`` holds only the questions that were asked. See the module docstring
+    for the three rules. A missing population check is not a contradiction.
+    """
+    if rule not in F2B_RULES:
+        raise ValueError(rule)
+    if "C" in flags and flags["C"]:
+        return "different"
+    actor_ok = bool(flags["A"]) if "A" in flags else True
+    findings_ok = bool(flags["F"]) if "F" in flags else True
+    if rule == "open":
+        outcome_ok = bool(flags["R"]) if "R" in flags else True
+    else:
+        outcome_ok = bool(flags["R"]) if "R" in flags else False
+    answers_actor = actor_ok if rule in {"actor", "open"} else True
+    if outcome_ok and findings_ok and answers_actor:
+        return "answers"
+    if "F" in flags and not flags["F"]:
+        return "how_why" if actor_ok else "different"
+    if actor_ok:
+        return "context"
+    return "different"
+
+
+def combine_f2b(yes: Mapping[str, Optional[float]], rule: str) -> Dict[str, float]:
+    """Turn P(yes) for the asked owner-standard questions into group probabilities.
+
+    None, or a missing key, means that question was not asked. The values sum to 1
+    when at least one question was asked, and to 0 when none were.
+    """
+    given: Dict[str, float] = {}
+    for name in ("R", "A", "C", "F"):
+        value = yes.get(name)
+        if value is None:
+            continue
+        given[name] = _clip(float(value))
+    totals = {group: 0.0 for group in GROUPS}
+    if not given:
+        return totals
+    names = list(given)
+    for bits in itertools.product((False, True), repeat=len(names)):
+        flags = dict(zip(names, bits))
+        cell = 1.0
+        for name, bit in flags.items():
+            probability = given[name]
+            cell *= probability if bit else (1.0 - probability)
+        totals[cell_f2b(flags, rule)] += cell
+    return totals
+
+
+def f2b_setting_id(inp: str, rule: str, phrasing: str) -> str:
+    return f"f2b-{inp}-{rule}-{phrasing}"
+
+
+def pick_f2b_key(row: Mapping[str, Any]) -> Tuple[float, ...]:
+    """Stay under the harmful-error cap, then take the ndcg@10 gain. Macro-F1 breaks ties."""
+    harm = row.get("harmful")
+    harm_value = float(harm) if isinstance(harm, (int, float)) and not isinstance(harm, bool) else 1.0
+    delta = row.get("d_ndcg")
+    delta_value = float(delta) if isinstance(delta, (int, float)) and not isinstance(delta, bool) else -999.0
+    f1 = row.get("macro_f1")
+    f1_value = float(f1) if isinstance(f1, (int, float)) and not isinstance(f1, bool) else -1.0
+    covered = row.get("coverage")
+    covered_value = float(covered) if isinstance(covered, (int, float)) and not isinstance(covered, bool) else -1.0
+    if harm_value <= HARM_CAP + 1e-12:
+        return (1.0, delta_value, f1_value, covered_value)
+    return (0.0, -harm_value, delta_value, f1_value)
+
+
+def pick_f2b(rows: Sequence[Mapping[str, Any]]) -> Mapping[str, Any]:
+    """Pick on dev. A setting over the cap is used only when none are under it."""
+    if not rows:
+        raise ValueError("no settings to pick")
+    return max(rows, key=pick_f2b_key)
+
+
+def items_for_fold(records: Sequence[Mapping[str, Any]], held_out: str) -> List[dict]:
+    """Dev rows for every question except the held-out one."""
+    return [
+        {"gold": row["gold"], "probs": row["probs"]}
+        for row in records
+        if row.get("qid") != held_out and row.get("gold") in GROUPS
+    ]
+
+
+def loo_predictions(
+    records: Sequence[Mapping[str, Any]],
+    qids: Sequence[str],
+) -> Dict[str, Dict[str, str]]:
+    """Fit thresholds on 14 questions and predict the 15th. The held-out gold is not in the fit."""
+    out: Dict[str, Dict[str, str]] = {}
+    for held in qids:
+        tuned = tune_thresholds(items_for_fold(records, held))
+        preds: Dict[str, str] = {}
+        for row in records:
+            if row.get("qid") != held:
+                continue
+            preds[str(row["key"])] = apply_thresholds(row["probs"], tuned.thresholds)
+        out[held] = preds
+    return out
+
+
+def gate_verdict(
+    *,
+    dev_ndcg: Optional[float],
+    dev_base: Optional[float],
+    test_ndcg: Optional[float],
+    test_base: Optional[float],
+    test_harm: Optional[float],
+    worse_questions: Sequence[str],
+) -> str:
+    """PASS only when every published condition holds. One miss is FAIL."""
+    beats_dev = dev_ndcg is not None and dev_base is not None and dev_ndcg > dev_base
+    beats_test = test_ndcg is not None and test_base is not None and test_ndcg > test_base
+    harm_ok = test_harm is not None and test_harm <= HARM_CAP + 1e-12
+    if beats_dev and beats_test and harm_ok and not list(worse_questions):
+        return "PASS"
+    return "FAIL"
+
+
+def worse_question_ids(
+    question_rows: Sequence[Mapping[str, Any]],
+    topics: Mapping[str, str],
+) -> List[str]:
+    """Health and education questions whose group order is below today's order."""
+    found: List[str] = []
+    for row in question_rows:
+        qid = str(row.get("question") or "")
+        if topics.get(qid) not in HEALTH_EDU_TOPICS:
+            continue
+        delta = row.get("d_ndcg")
+        if isinstance(delta, (int, float)) and not isinstance(delta, bool) and delta < 0:
+            found.append(qid)
+    return found
+
+
+def claim_test_stamp(path: Path, chosen: str) -> bool:
+    """Create the one-shot stamp. A second claim returns False and writes nothing."""
+    try:
+        fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+    except FileExistsError:
+        return False
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        json.dump({"status": "started", "chosen": chosen}, handle)
+    return True
 
 
 def apply_thresholds(probs: Mapping[str, float], thresholds: Mapping[str, float]) -> str:
@@ -752,6 +1023,26 @@ def run_spec_on_question(
     is not linear.
     """
     phrasing = _phrasing_index(spec)
+    if spec.form == "f2b":
+        yes_cols: Dict[str, List[float]] = {}
+        for slot, target in f2b_slots(concepts):
+            options = f2b_options(slot, target, phrasing)
+            rows = choose(
+                f2b_instruction(str(question["text"]), slot, target),
+                options,
+                texts,
+            )
+            if rows is None:
+                return None
+            yes_cols[slot] = []
+            for row in rows:
+                probs = probs_from_choice(row, options)
+                yes_cols[slot].append(float(probs.get("yes", 0.0)))
+        combined = []
+        for index in range(len(texts)):
+            yes = {slot: values[index] for slot, values in yes_cols.items()}
+            combined.append({"probs": combine_f2b(yes, spec.mode), "yes": yes})
+        return combined
     if spec.form == "f2":
         yes_cols: Dict[str, List[float]] = {}
         for slot, target in f2_slots(concepts):
@@ -799,9 +1090,11 @@ def run_spec_on_question(
 def spec_cost(questions: Sequence[Mapping[str, Any]], spec: Spec) -> int:
     if spec.phrasing == "avg":
         return 0
-    if spec.form != "f2":
-        return len(questions)
-    return sum(len(f2_slots(question_concepts(str(q["text"])))) for q in questions)
+    if spec.form == "f2":
+        return sum(len(f2_slots(question_concepts(str(q["text"])))) for q in questions)
+    if spec.form == "f2b":
+        return sum(len(f2b_slots(question_concepts(str(q["text"])))) for q in questions)
+    return len(questions)
 
 
 def load_questions(path: Path) -> List[dict]:
@@ -818,8 +1111,8 @@ def load_label_rows(path: Path) -> List[Dict[str, str]]:
         return list(csv.DictReader(handle))
 
 
-def dev_gold_for(rows: Sequence[Mapping[str, str]]) -> Dict[str, str]:
-    """Dev-split primary labels only. Test categories are dropped here."""
+def gold_for(rows: Sequence[Mapping[str, str]], split: str) -> Dict[str, str]:
+    """Primary labels for one split. The other split's categories are dropped."""
     by_labeller: Dict[str, List[Mapping[str, str]]] = {}
     for row in rows:
         name = (row.get("labeller") or "owner").strip() or "owner"
@@ -829,13 +1122,18 @@ def dev_gold_for(rows: Sequence[Mapping[str, str]]) -> Dict[str, str]:
     chosen = "owner" if "owner" in by_labeller else sorted(by_labeller)[0]
     gold: Dict[str, str] = {}
     for row in by_labeller[chosen]:
-        if (row.get("split") or "").strip().lower() != "dev":
+        if (row.get("split") or "").strip().lower() != split:
             continue
         key = (row.get("key") or "").strip()
         group = category_to_group(str(row.get("category") or ""))
         if key and group:
             gold[key] = group
     return gold
+
+
+def dev_gold_for(rows: Sequence[Mapping[str, str]]) -> Dict[str, str]:
+    """Dev-split primary labels only. Test categories are dropped here."""
+    return gold_for(rows, "dev")
 
 
 def load_abstracts(corpus: Path, qid: str) -> Tuple[Dict[Tuple[str, str], dict], Dict[str, dict]]:
@@ -886,6 +1184,18 @@ def support_counts(golds: Iterable[str]) -> Dict[str, int]:
         if gold in counts:
             counts[gold] += 1
     return counts
+
+
+def top_golds(prepared: Sequence[Mapping[str, Any]]) -> List[str]:
+    """Dev groups for papers in the ranked top 30. Labels outside that list do not count."""
+    found: List[str] = []
+    for item in prepared:
+        gold = item["gold"]
+        for paper in item["papers"]:
+            group = gold.get(paper["key"])
+            if group:
+                found.append(str(group))
+    return found
 
 
 def pairs_for(
@@ -1014,6 +1324,7 @@ def ranking_table(
     questions: Sequence[Mapping[str, Any]],
     label_rows: Mapping[str, Sequence[Mapping[str, str]]],
     group_maps: Mapping[str, Mapping[str, str]],
+    split: str = "dev",
 ) -> Dict[str, Any]:
     per = []
     for qrow in questions:
@@ -1021,7 +1332,7 @@ def ranking_table(
         hits = reorder_hits(qrow["rankings"]["lexical_on"], group_maps.get(qid, {}))
         fake = dict(qrow)
         fake["rankings"] = {"lexical_on": hits}
-        per.append(scorer.score_question(fake, label_rows.get(qid, []), "dev", "lexical_on"))
+        per.append(scorer.score_question(fake, label_rows.get(qid, []), split, "lexical_on"))
     return {"questions": per, "ndcg@10": _mean([row.get("ndcg@10") for row in per]),
             "relevant@10": _mean([row.get("relevant@10") for row in per])}
 
@@ -1782,6 +2093,1171 @@ def execute(args: argparse.Namespace) -> int:
     return 0
 
 
+def average_yes(left: Mapping[str, float], right: Mapping[str, float]) -> Dict[str, float]:
+    """Mean P(yes) per slot. Both phrasings ask the same slots."""
+    slots = sorted(set(left) | set(right))
+    return {slot: (float(left[slot]) + float(right[slot])) / 2.0 for slot in slots}
+
+
+def _pairs_from(records: Sequence[Mapping[str, Any]], pred_of: Callable[[Mapping[str, Any]], str]) -> List[Tuple[str, str]]:
+    pairs = []
+    for row in records:
+        gold = row.get("gold")
+        if gold not in GROUPS and gold != "not_sorted":
+            continue
+        pairs.append((str(gold), pred_of(row)))
+    return pairs
+
+
+def _maps_from(
+    records: Sequence[Mapping[str, Any]],
+    pred_of: Callable[[Mapping[str, Any]], str],
+) -> Dict[str, Dict[str, str]]:
+    maps: Dict[str, Dict[str, str]] = {}
+    for row in records:
+        maps.setdefault(str(row["qid"]), {})[str(row["key"])] = pred_of(row)
+    return maps
+
+
+def summary_from_pairs(
+    sid: str,
+    pairs: Sequence[Tuple[str, str]],
+    rank: Mapping[str, Any],
+    baseline: Mapping[str, Any],
+    cuts: str,
+) -> Dict[str, Any]:
+    harm_n, good_n = harmful_counts(pairs)
+    harm = harmful_rate(pairs)
+    base_ndcg = baseline.get("ndcg@10")
+    base_rel = baseline.get("relevant@10")
+    ndcg = rank.get("ndcg@10")
+    rel = rank.get("relevant@10")
+    return {
+        "setting": sid,
+        "n": len(_classified(pairs)),
+        "coverage": coverage(pairs),
+        "accuracy": accuracy(pairs),
+        "macro_f1": macro_f1(pairs),
+        "harmful": harm,
+        "harm_n": harm_n,
+        "good_n": good_n,
+        "ndcg@10": ndcg,
+        "relevant@10": rel,
+        "d_ndcg": None if ndcg is None or base_ndcg is None else ndcg - base_ndcg,
+        "d_rel": None if rel is None or base_rel is None else rel - base_rel,
+        "cuts": cuts,
+        "eligible": harm is not None and harm <= HARM_CAP + 1e-12,
+    }
+
+
+def question_summaries(
+    sid: str,
+    records: Sequence[Mapping[str, Any]],
+    pred_of: Callable[[Mapping[str, Any]], str],
+    rank: Mapping[str, Any],
+    baseline: Mapping[str, Any],
+    qids: Sequence[str],
+) -> List[dict]:
+    deltas = ranking_deltas(rank["questions"], baseline["questions"])
+    by_q: Dict[str, List[Mapping[str, Any]]] = {}
+    for row in records:
+        by_q.setdefault(str(row["qid"]), []).append(row)
+    out = []
+    for qid in qids:
+        pairs = _pairs_from(by_q.get(qid, []), pred_of)
+        harm_n, good_n = harmful_counts(pairs)
+        item = {
+            "setting": sid,
+            "question": qid,
+            "n": len(_classified(pairs)),
+            "coverage": coverage(pairs),
+            "accuracy": accuracy(pairs),
+            "macro_f1": macro_f1(pairs),
+            "harmful": harmful_rate(pairs),
+            "harm_n": harm_n,
+            "good_n": good_n,
+        }
+        item.update(deltas.get(qid, {}))
+        out.append(item)
+    return out
+
+
+def score_grouped(
+    sid: str,
+    records: Sequence[Mapping[str, Any]],
+    pred_of: Callable[[Mapping[str, Any]], str],
+    prepared: Sequence[Mapping[str, Any]],
+    label_rows: Mapping[str, Sequence[Mapping[str, str]]],
+    scorer: Any,
+    baseline: Mapping[str, Any],
+    split: str,
+    cuts: str,
+) -> Tuple[dict, List[dict]]:
+    qids = [str(item["question"]["id"]) for item in prepared]
+    rank = ranking_table(
+        scorer,
+        [item["qrow"] for item in prepared],
+        label_rows,
+        _maps_from(records, pred_of),
+        split,
+    )
+    overall = summary_from_pairs(sid, _pairs_from(records, pred_of), rank, baseline, cuts)
+    return overall, question_summaries(sid, records, pred_of, rank, baseline, qids)
+
+
+def loo_summary_for(
+    sid: str,
+    records: Sequence[Mapping[str, Any]],
+    prepared: Sequence[Mapping[str, Any]],
+    label_rows: Mapping[str, Sequence[Mapping[str, str]]],
+    scorer: Any,
+    baseline: Mapping[str, Any],
+) -> Dict[str, Any]:
+    """Fit on 14 dev questions, score the 15th, then pool those 15 scores."""
+    qids = [str(item["question"]["id"]) for item in prepared]
+    preds = loo_predictions(records, qids)
+
+    def pred_of(row: Mapping[str, Any]) -> str:
+        return preds.get(str(row["qid"]), {}).get(str(row["key"]), "not_sorted")
+
+    overall, _questions = score_grouped(
+        sid, records, pred_of, prepared, label_rows, scorer, baseline, "dev", "loo"
+    )
+    return overall
+
+
+def loo_coverage_summary(
+    sid: str,
+    score_rows: Sequence[Mapping[str, Any]],
+    prepared: Sequence[Mapping[str, Any]],
+    label_rows: Mapping[str, Sequence[Mapping[str, str]]],
+    scorer: Any,
+    baseline: Mapping[str, Any],
+) -> Dict[str, Any]:
+    qids = [str(item["question"]["id"]) for item in prepared]
+    fitted: Dict[str, Tuple[str, Dict[str, float]]] = {}
+    for held in qids:
+        items = [
+            {"gold": row["gold"], "score": row["score"]}
+            for row in score_rows
+            if row["qid"] != held and row.get("gold") in GROUPS
+        ]
+        _tuned, floor, cuts = tune_coverage(items)
+        fitted[held] = (floor, cuts)
+
+    def pred_of(row: Mapping[str, Any]) -> str:
+        floor, cuts = fitted[str(row["qid"])]
+        return group_from_coverage(float(row["score"]), cuts, floor)
+
+    overall, _questions = score_grouped(
+        sid, score_rows, pred_of, prepared, label_rows, scorer, baseline, "dev", "loo"
+    )
+    return overall
+
+
+def prepare_eval(
+    questions: Sequence[Mapping[str, Any]],
+    results: Mapping[str, Any],
+    corpus: Path,
+    labels_dir: Path,
+) -> Tuple[List[dict], Dict[str, List[dict]]]:
+    """Load papers and dev gold. Test categories are not stored on the papers."""
+    by_id = {str(row["id"]): row for row in results["questions"]}
+    prepared: List[dict] = []
+    label_rows: Dict[str, List[dict]] = {}
+    for question in questions:
+        qid = str(question["id"])
+        qrow = by_id[qid]
+        hits = list(qrow["rankings"]["lexical_on"])
+        by_pair, by_doi = load_abstracts(corpus, qid)
+        papers = []
+        missing = 0
+        for hit in hits:
+            title, abstract = hit_text_fields(hit, by_pair, by_doi)
+            if not abstract:
+                missing += 1
+            papers.append({
+                "key": str(hit.get("key") or ""),
+                "title": title,
+                "abstract": abstract,
+                "rank": hit.get("rank"),
+            })
+        rows = load_label_rows(labels_dir / f"{qid}.csv")
+        label_rows[qid] = rows
+        concepts = question_concepts(str(question["text"]))
+        prepared.append({
+            "question": question,
+            "qrow": qrow,
+            "papers": papers,
+            "gold": dev_gold_for(rows),
+            "concepts": concepts,
+            "missing_abstracts": missing,
+        })
+        print(
+            f"{qid} top={len(hits)} dev={sum(1 for paper in papers if paper['key'] in prepared[-1]['gold'])} "
+            f"missing_abstract={missing} checks={[slot for slot, _target in f2b_slots(concepts)]}",
+            flush=True,
+        )
+    return prepared, label_rows
+
+
+def _record(item: Mapping[str, Any], paper: Mapping[str, Any], probs: Mapping[str, float], yes: Optional[Mapping[str, float]] = None) -> dict:
+    row = {
+        "qid": item["question"]["id"],
+        "key": paper["key"],
+        "title": paper["title"],
+        "gold": item["gold"].get(paper["key"]),
+        "probs": probs,
+    }
+    if yes is not None:
+        row["yes"] = dict(yes)
+    return row
+
+
+def fetch_f2b_yes(
+    prepared: Sequence[Mapping[str, Any]],
+    budget: Budget,
+    cache: Dict[str, Any],
+    cache_path: Path,
+    url: str,
+    log: List[dict],
+) -> Optional[Dict[Tuple[str, int, str], List[Dict[str, float]]]]:
+    """One batch per input, phrasing, question, and asked check. Rules are applied later."""
+    table: Dict[Tuple[str, int, str], List[Dict[str, float]]] = {}
+    for inp in F2B_INPUTS:
+        for phrasing in (0, 1):
+            for item in prepared:
+                qid = str(item["question"]["id"])
+                slots = f2b_slots(item["concepts"])
+                texts = fit_states([
+                    paper_text(paper["title"], paper["abstract"], inp) for paper in item["papers"]
+                ])
+                columns: Dict[str, List[float]] = {}
+                for slot, target in slots:
+                    options = f2b_options(slot, target, phrasing)
+                    rows = cached_choice(
+                        budget,
+                        cache,
+                        cache_path,
+                        url,
+                        f2b_instruction(str(item["question"]["text"]), slot, target),
+                        options,
+                        texts,
+                        log,
+                        f"f2b-{inp}-p{phrasing} {qid} {slot}",
+                    )
+                    if rows is None:
+                        return None
+                    columns[slot] = [
+                        float(probs_from_choice(row, options).get("yes", 0.0)) for row in rows
+                    ]
+                table[(inp, phrasing, qid)] = [
+                    {slot: columns[slot][index] for slot in columns}
+                    for index in range(len(item["papers"]))
+                ]
+    return table
+
+
+def records_for_rule(
+    prepared: Sequence[Mapping[str, Any]],
+    table: Mapping[Tuple[str, int, str], List[Dict[str, float]]],
+    inp: str,
+    rule: str,
+    phrasing: str,
+) -> List[dict]:
+    records = []
+    for item in prepared:
+        qid = str(item["question"]["id"])
+        if phrasing == "avg":
+            yes_rows = [
+                average_yes(left, right)
+                for left, right in zip(table[(inp, 0, qid)], table[(inp, 1, qid)])
+            ]
+        else:
+            index = 0 if phrasing == "p0" else 1
+            yes_rows = table[(inp, index, qid)]
+        for paper, yes in zip(item["papers"], yes_rows):
+            records.append(_record(item, paper, combine_f2b(yes, rule), yes))
+    return records
+
+
+def fetch_f1_title(
+    prepared: Sequence[Mapping[str, Any]],
+    choose: Caller,
+) -> Optional[List[dict]]:
+    spec = Spec("f1", "title", "concepts", "p0")
+    collected = []
+    for item in prepared:
+        texts = [paper_text(paper["title"], paper["abstract"], "title") for paper in item["papers"]]
+        predicted = run_spec_on_question(spec, item["question"], item["concepts"], texts, choose)
+        if predicted is None:
+            return None
+        for paper, row in zip(item["papers"], predicted):
+            collected.append(_record(item, paper, row["probs"]))
+    return collected
+
+
+def _public_prob_records(records: Sequence[Mapping[str, Any]]) -> List[dict]:
+    published = []
+    for row in records:
+        published.append({
+            "qid": row["qid"],
+            "key": row["key"],
+            "probs": {group: float(row["probs"].get(group, 0.0)) for group in GROUPS},
+        })
+    return published
+
+
+def _threshold_pred(thresholds: Mapping[str, float]) -> Callable[[Mapping[str, Any]], str]:
+    def pred_of(row: Mapping[str, Any]) -> str:
+        return apply_thresholds(row["probs"], thresholds)
+
+    return pred_of
+
+
+def _coverage_rows(prepared: Sequence[Mapping[str, Any]]) -> List[dict]:
+    rows = []
+    for item in prepared:
+        qid = item["question"]["id"]
+        for paper in item["papers"]:
+            score = concept_coverage(item["concepts"], paper["title"], paper["abstract"])
+            rows.append({
+                "qid": qid,
+                "key": paper["key"],
+                "title": paper["title"],
+                "gold": item["gold"].get(paper["key"]),
+                "score": score,
+            })
+    return rows
+
+
+def _slot_names(concepts: QuestionConcepts) -> str:
+    labels = {"R": "outcome", "A": "actor", "C": "population/place", "F": "findings"}
+    return " ".join(labels[slot] for slot, _target in f2b_slots(concepts))
+
+
+def _harm_cell(row: Mapping[str, Any]) -> str:
+    harm_n = row.get("harm_n")
+    good_n = row.get("good_n")
+    if harm_n == "" or good_n == "":
+        return ""
+    if harm_n is None or good_n is None:
+        return ""
+    return f"{harm_n}/{good_n}"
+
+
+def render_round2(payload: Mapping[str, Any]) -> str:
+    """Dev report. It does not contain a test-split score."""
+    lines = [
+        "# Laya relevance groups, owner-standard questions, dev split",
+        "",
+        "Dev labels only. This file does not score the test split. "
+        "Thresholds were fit on these dev rows. Leave-one-question-out fits on 14 questions "
+        "and scores the 15th.",
+        "",
+        "## Call budget",
+        "",
+        payload["budget_note"],
+        "",
+        "## Support",
+        "",
+        payload["support_note"],
+        "",
+        "## Checks asked",
+        "",
+        "Outcome, actor, and population or place are skipped when `question_concepts` leaves that slot empty. "
+        "Period is not a contradiction check. Findings is always asked.",
+        "",
+        "| question | topic | checks |",
+        "| --- | --- | --- |",
+    ]
+    for row in payload["slot_rows"]:
+        lines.append(f"| {row['question']} | {row['topic']} | {row['checks']} |")
+    lines.extend([
+        "",
+        "## Combination rules",
+        "",
+        "Yes and no are treated as independent. A missing check is not a no.",
+        "",
+        "Rule outcome: answers requires a yes on outcome results, a yes on findings when that question was asked, "
+        "and no contradiction. The actor is not required. A question with no outcome phrase cannot be answers.",
+        "",
+        "Rule actor: same as outcome, and the actor question must be yes when it was asked.",
+        "",
+        "Rule open: same as actor, except a missing outcome phrase does not block answers.",
+        "",
+        "For every rule, a contradiction is different. Findings-no is how_why when the paper is about the actor "
+        "or the actor was not asked, and different when the actor question is no. "
+        "A paper that is not an answer and not a findings-no lands in context when it is about the actor "
+        "or the actor was not asked. Otherwise it is different.",
+        "",
+        "Phrasing avg is the mean P(yes) of the two wordings, then the same rule. "
+        "Title plus two abstract sentences is input `two`. The whole abstract is input `full`.",
+        "",
+        "## Full table",
+        "",
+        "| setting | n | coverage | accuracy | macro-F1 | harmful | harm n | ndcg@10 | rel@10 | d ndcg | d rel | thresholds |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ])
+    for row in payload["overall_rows"]:
+        lines.append(
+            "| {setting} | {n} | {coverage} | {accuracy} | {macro_f1} | {harmful} | {harm_cell} | "
+            "{ndcg} | {rel} | {dndcg} | {drel} | {cuts} |".format(
+                setting=row["setting"],
+                n=row.get("n") if row.get("n") is not None else "",
+                coverage=_fmt(row.get("coverage")),
+                accuracy=_fmt(row.get("accuracy")),
+                macro_f1=_fmt(row.get("macro_f1")),
+                harmful=_fmt(row.get("harmful")),
+                harm_cell=_harm_cell(row),
+                ndcg=_fmt(row.get("ndcg@10")),
+                rel=_fmt(row.get("relevant@10"), 2),
+                dndcg=_fmt(row.get("d_ndcg")),
+                drel=_fmt(row.get("d_rel"), 2),
+                cuts=row.get("cuts") or "",
+            )
+        )
+    lines.extend([
+        "",
+        "## Leave-one-question-out",
+        "",
+        "Thresholds for each row were fit without that row's question. "
+        "The harmful-error rate pools the 15 held-out questions.",
+        "",
+        "| setting | n | coverage | accuracy | macro-F1 | harmful | harm n | ndcg@10 | d ndcg |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ])
+    for row in payload["loo_rows"]:
+        lines.append(
+            "| {setting} | {n} | {coverage} | {accuracy} | {macro_f1} | {harmful} | {harm_cell} | {ndcg} | {dndcg} |".format(
+                setting=row["setting"],
+                n=row.get("n") if row.get("n") is not None else "",
+                coverage=_fmt(row.get("coverage")),
+                accuracy=_fmt(row.get("accuracy")),
+                macro_f1=_fmt(row.get("macro_f1")),
+                harmful=_fmt(row.get("harmful")),
+                harm_cell=_harm_cell(row),
+                ndcg=_fmt(row.get("ndcg@10")),
+                dndcg=_fmt(row.get("d_ndcg")),
+            )
+        )
+    lines.extend([
+        "",
+        "## Per question",
+        "",
+        "Coverage, accuracy, and macro-F1 for the chosen setting, F1 title-concepts, and concept coverage.",
+        "",
+        "| setting | question | n | coverage | accuracy | macro-F1 | harmful | ndcg@10 | rel@10 | d ndcg | d rel |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ])
+    for row in payload["question_rows"]:
+        lines.append(
+            "| {setting} | {question} | {n} | {coverage} | {accuracy} | {macro_f1} | {harmful} | "
+            "{ndcg} | {rel} | {dndcg} | {drel} |".format(
+                setting=row["setting"],
+                question=row["question"],
+                n=row.get("n") if row.get("n") is not None else "",
+                coverage=_fmt(row.get("coverage")),
+                accuracy=_fmt(row.get("accuracy")),
+                macro_f1=_fmt(row.get("macro_f1")),
+                harmful=_fmt(row.get("harmful")),
+                ndcg=_fmt(row.get("ndcg@10")),
+                rel=_fmt(row.get("relevant@10"), 2),
+                dndcg=_fmt(row.get("d_ndcg")),
+                drel=_fmt(row.get("d_rel"), 2),
+            )
+        )
+    lines.extend([
+        "",
+        "## Latency",
+        "",
+        payload["latency_note"],
+        "",
+        "## Recommendation",
+        "",
+        payload["recommendation"],
+        "",
+    ])
+    return "\n".join(lines)
+
+
+def _recommend_dev(info: Mapping[str, Any]) -> str:
+    chosen = info["chosen_row"]
+    base = info["base_row"]
+    f1 = info["f1_row"]
+    loo = info["loo_chosen"]
+    n = info["n_dev"]
+    unsorted_n = info["unsorted_n"]
+    sentences = []
+    if info["dev_eligible"]:
+        sentences.append(
+            f"The chosen setting is {chosen['setting']}."
+        )
+        sentences.append(
+            "On dev it was the setting at or under a 5% harmful-error rate with the largest gain "
+            "in group-ordered ndcg@10."
+        )
+    else:
+        sentences.append(
+            f"No setting kept dev harmful errors at or below 5%. The chosen setting is {chosen['setting']}."
+        )
+        sentences.append(
+            "The tie break was the lowest harmful-error rate, then the largest ndcg@10 gain."
+        )
+    sentences.append(
+        f"It sorts {n - unsorted_n} of {n} dev papers and leaves {unsorted_n} unsorted. "
+        f"Harmful errors were {_fmt(chosen.get('harmful'))} "
+        f"({_harm_cell(chosen)}). "
+        f"Dev ndcg@10 was {_fmt(chosen.get('ndcg@10'))} against today's {_fmt(info['today_ndcg'])} "
+        f"and concept coverage's {_fmt(base.get('ndcg@10'))}."
+    )
+    sentences.append(
+        f"Leave-one-question-out for that setting had harmful errors {_fmt(loo.get('harmful'))} "
+        f"and ndcg@10 {_fmt(loo.get('ndcg@10'))} ({_fmt(loo.get('d_ndcg'))} vs today's order)."
+    )
+    sentences.append(
+        f"F1 title-concepts had dev ndcg@10 {_fmt(f1.get('ndcg@10'))} "
+        f"and harmful errors {_fmt(f1.get('harmful'))}."
+    )
+    sentences.append(
+        f"One search sends {info['batches_full']} batches of 30 when every check is asked, "
+        f"and {info['batches_min']} to {info['batches_max']} on these 15 questions. "
+        f"Questions with only the findings check: {info['findings_only']}."
+    )
+    sentences.append("The test split is not scored in this file.")
+    return " ".join(sentences)
+
+
+def _recommend_final(dev: Mapping[str, Any], test: Mapping[str, Any]) -> str:
+    """Eight sentences. The test numbers appear once, after the dev pick is fixed."""
+    chosen = dev["chosen_row"]
+    base = dev["base_row"]
+    test_chosen = test["chosen"]
+    test_base = test["coverage"]
+    worse_text = ", ".join(test["worse"]) if test["worse"] else "none"
+    if dev["dev_eligible"]:
+        how_picked = (
+            "the dev setting at or under a 5% harmful-error rate with the largest ndcg@10 gain"
+        )
+    else:
+        how_picked = (
+            "the lowest-harm fallback, because no dev setting stayed at or under a 5% harmful-error rate"
+        )
+    if test["verdict"] == "PASS":
+        students = "The numbers clear the gate on this frozen set, and they are not a student-facing ranking change."
+    else:
+        students = "I would not put these groups in front of students, because the gate failed on the single test score."
+    sentences = [
+        f"The chosen setting is {chosen['setting']}, {how_picked}.",
+        (
+            f"Dev ndcg@10 was {_fmt(chosen.get('ndcg@10'))} against today's {_fmt(dev['today_ndcg'])} "
+            f"and concept coverage's {_fmt(base.get('ndcg@10'))}, with harmful errors {_fmt(chosen.get('harmful'))} "
+            f"and {dev['unsorted_n']} of {dev['n_dev']} papers left unsorted."
+        ),
+        (
+            f"Leave-one-question-out had harmful errors {_fmt(dev['loo_chosen'].get('harmful'))} "
+            f"and ndcg@10 {_fmt(dev['loo_chosen'].get('ndcg@10'))}."
+        ),
+        (
+            f"The one test score had ndcg@10 {_fmt(test_chosen.get('ndcg@10'))} against concept coverage "
+            f"{_fmt(test_base.get('ndcg@10'))} and today's {_fmt(test['today_ndcg'])}, with harmful errors "
+            f"{_fmt(test_chosen.get('harmful'))} ({_harm_cell(test_chosen)}) and {test['unsorted_n']} of "
+            f"{test_chosen.get('n')} papers left unsorted."
+        ),
+        f"Health and education questions behind today's test order: {worse_text}.",
+        f"Gate verdict: {test['verdict']}.",
+        (
+            f"One search sends {dev['batches_full']} batches of 30 when every check is asked, "
+            f"and {dev['findings_only']} ask only the findings check."
+        ),
+        students,
+    ]
+    return " ".join(sentences)
+
+
+def _write_predictions(path: Path, records: Sequence[Mapping[str, Any]], thresholds: Mapping[str, float], splits: Mapping[Tuple[str, str], str]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as handle:
+        for record in records:
+            gold = record.get("gold") if record.get("gold") else ""
+            yes = record.get("yes") or {}
+            handle.write(json.dumps({
+                "qid": record["qid"],
+                "key": record["key"],
+                "title": record["title"],
+                "split": splits.get((str(record["qid"]), str(record["key"])), ""),
+                "gold_group": gold if gold else "",
+                "pred_group": apply_thresholds(record["probs"], thresholds),
+                "probabilities": {group: round(float(record["probs"].get(group, 0.0)), 4) for group in GROUPS},
+                "yes": {slot: round(float(value), 4) for slot, value in yes.items()},
+            }, ensure_ascii=False) + "\n")
+
+
+def _split_index(label_rows: Mapping[str, Sequence[Mapping[str, str]]]) -> Dict[Tuple[str, str], str]:
+    found: Dict[Tuple[str, str], str] = {}
+    for qid, rows in label_rows.items():
+        for row in rows:
+            key = (row.get("key") or "").strip()
+            if not key:
+                continue
+            found[(str(qid), key)] = (row.get("split") or "").strip().lower()
+    return found
+
+
+def execute_round2(args: argparse.Namespace) -> int:
+    out = Path(args.out).expanduser()
+    stamp = Path(str(out) + ".test-stamp.json")
+    metrics_path = out.with_suffix(".json")
+    if stamp.exists():
+        print(f"refusing to refit after the test split was scored: {stamp}", flush=True)
+        return 3
+    if metrics_path.is_file():
+        previous = json.loads(metrics_path.read_text(encoding="utf-8"))
+        if isinstance(previous, dict) and previous.get("test"):
+            print(f"refusing to refit after the test split was scored: {metrics_path}", flush=True)
+            return 3
+    questions = load_questions(Path(args.questions))
+    results = load_results(Path(args.results))
+    corpus = Path(args.corpus).expanduser()
+    labels_dir = Path(args.labels).expanduser()
+    cache_path = Path(args.cache).expanduser()
+    cache = load_cache(cache_path)
+    budget = Budget(int(args.budget))
+    log: List[dict] = []
+    prepared, label_rows = prepare_eval(questions, results, corpus, labels_dir)
+    planned = sum(len(f2b_slots(item["concepts"])) for item in prepared) * len(F2B_INPUTS) * 2
+    planned += len(prepared)
+    print(f"planned new-or-cached batches {planned} budget {budget.limit}", flush=True)
+
+    def choose(instructions: str, options: Dict[str, str], states: Sequence[str]) -> Any:
+        return cached_choice(
+            budget,
+            cache,
+            cache_path,
+            args.laya_url,
+            instructions,
+            options,
+            fit_states(states),
+            log,
+            "f1-title-concepts-p0",
+        )
+
+    f1_records = fetch_f1_title(prepared, choose)
+    if f1_records is None:
+        print(f"stopped during f1-title-concepts-p0: {budget.reason}", flush=True)
+        return 2
+    table = fetch_f2b_yes(prepared, budget, cache, cache_path, args.laya_url, log)
+    if table is None:
+        print(f"stopped during f2b: {budget.reason}", flush=True)
+        return 2
+    print("loading eval_search for dev ranking scores", flush=True)
+    scorer = _eval_search()
+    qrows = [item["qrow"] for item in prepared]
+    baseline_rank = ranking_table(scorer, qrows, label_rows, {}, "dev")
+
+    store: Dict[str, List[dict]] = {"f1-title-concepts-p0": f1_records}
+    for inp in F2B_INPUTS:
+        for rule in F2B_RULES:
+            for phrasing in F2B_PHRASINGS:
+                sid = f2b_setting_id(inp, rule, phrasing)
+                store[sid] = records_for_rule(prepared, table, inp, rule, phrasing)
+
+    tuned_by: Dict[str, Tuned] = {}
+    overall_by: Dict[str, dict] = {}
+    for sid, records in store.items():
+        items = [{"gold": row["gold"], "probs": row["probs"]} for row in records if row.get("gold") in GROUPS]
+        tuned = tune_thresholds(items)
+        tuned_by[sid] = tuned
+        pred_of = _threshold_pred(tuned.thresholds)
+        overall, _qrows = score_grouped(
+            sid, records, pred_of, prepared, label_rows, scorer, baseline_rank, "dev", _fmt_cuts(tuned.thresholds)
+        )
+        overall_by[sid] = overall
+
+    coverage_records = _coverage_rows(prepared)
+    coverage_items = [
+        {"gold": row["gold"], "score": row["score"]}
+        for row in coverage_records
+        if row.get("gold") in GROUPS
+    ]
+    _base_tuned, base_floor, base_cuts = tune_coverage(coverage_items)
+
+    def coverage_pred(row: Mapping[str, Any]) -> str:
+        return group_from_coverage(float(row["score"]), base_cuts, base_floor)
+
+    coverage_sid = f"concept-coverage/{base_floor}"
+    coverage_overall, coverage_questions = score_grouped(
+        coverage_sid,
+        coverage_records,
+        coverage_pred,
+        prepared,
+        label_rows,
+        scorer,
+        baseline_rank,
+        "dev",
+        _fmt_cuts(base_cuts) + f" floor:{base_floor}",
+    )
+    f2b_rows = [overall_by[sid] for sid in overall_by if sid.startswith("f2b-")]
+    chosen_row = dict(pick_f2b(f2b_rows))
+    chosen = str(chosen_row["setting"])
+    f1_row = overall_by["f1-title-concepts-p0"]
+    ranked_ids = [str(row["setting"]) for row in sorted(f2b_rows, key=pick_f2b_key, reverse=True)]
+    loo_ids = list(ranked_ids)
+    loo_rows = []
+    loo_by: Dict[str, dict] = {}
+    for sid in loo_ids:
+        print(f"loo {sid}", flush=True)
+        summary = loo_summary_for(sid, store[sid], prepared, label_rows, scorer, baseline_rank)
+        loo_by[sid] = summary
+        loo_rows.append(summary)
+    print(f"loo {coverage_sid}", flush=True)
+    loo_coverage = loo_coverage_summary(
+        coverage_sid, coverage_records, prepared, label_rows, scorer, baseline_rank
+    )
+    loo_by[coverage_sid] = loo_coverage
+    loo_rows.append(loo_coverage)
+    print("loo f1-title-concepts-p0", flush=True)
+    loo_f1 = loo_summary_for(
+        "f1-title-concepts-p0", store["f1-title-concepts-p0"], prepared, label_rows, scorer, baseline_rank
+    )
+    loo_by["f1-title-concepts-p0"] = loo_f1
+    loo_rows.append(loo_f1)
+
+    show_ids = [chosen, "f1-title-concepts-p0", coverage_sid]
+    question_rows: List[dict] = []
+    for sid in show_ids:
+        if sid == coverage_sid:
+            question_rows.extend(coverage_questions)
+            continue
+        pred_of = _threshold_pred(tuned_by[sid].thresholds)
+        _overall, rows = score_grouped(
+            sid, store[sid], pred_of, prepared, label_rows, scorer, baseline_rank, "dev", overall_by[sid]["cuts"]
+        )
+        question_rows.extend(rows)
+
+    dev_golds = top_golds(prepared)
+    support = support_counts(dev_golds)
+    n_dev = sum(1 for gold in dev_golds if gold in GROUPS)
+    chosen_pairs = _pairs_from(store[chosen], _threshold_pred(tuned_by[chosen].thresholds))
+    unsorted_n = sum(1 for _gold, pred in _classified(chosen_pairs) if pred == "not_sorted")
+    slot_rows = [
+        {
+            "question": str(item["question"]["id"]),
+            "topic": str(item["question"].get("topic") or ""),
+            "checks": _slot_names(item["concepts"]),
+        }
+        for item in prepared
+    ]
+    findings_only = ", ".join(
+        row["question"] for row in slot_rows if row["checks"] == "findings"
+    ) or "none"
+    spec = parse_sid(chosen)
+    phrasing = spec.phrasing if spec is not None else "p0"
+    batch_counts = [
+        f2b_batches_per_search(item["concepts"], phrasing) for item in prepared
+    ]
+    topics = {str(item["question"]["id"]): str(item["question"].get("topic") or "") for item in prepared}
+    today = {
+        "setting": "lexical_on",
+        "n": n_dev,
+        "coverage": None,
+        "accuracy": None,
+        "macro_f1": None,
+        "harmful": None,
+        "harm_n": "",
+        "good_n": "",
+        "ndcg@10": baseline_rank.get("ndcg@10"),
+        "relevant@10": baseline_rank.get("relevant@10"),
+        "d_ndcg": 0.0,
+        "d_rel": 0.0,
+        "cuts": "",
+        "eligible": False,
+    }
+    overall_rows = [overall_by[sid] for sid in ranked_ids]
+    overall_rows.append(f1_row)
+    overall_rows.append(coverage_overall)
+    overall_rows.append(today)
+    dev_info = {
+        "chosen_row": chosen_row,
+        "base_row": coverage_overall,
+        "f1_row": f1_row,
+        "loo_chosen": loo_by[chosen],
+        "n_dev": n_dev,
+        "unsorted_n": unsorted_n,
+        "today_ndcg": baseline_rank.get("ndcg@10"),
+        "dev_eligible": bool(chosen_row.get("eligible")),
+        "batches_full": f2b_batches_per_search(
+            QuestionConcepts(actor=("a",), outcome=("o",), population=("p",)),
+            phrasing,
+        ),
+        "batches_min": min(batch_counts) if batch_counts else 0,
+        "batches_max": max(batch_counts) if batch_counts else 0,
+        "findings_only": findings_only,
+    }
+    cached_n = sum(1 for entry in log if entry.get("cached"))
+    budget_note = (
+        f"Experiment budget was {budget.limit} new sidecar batches. "
+        f"This run made {budget.used} new batches and reused {cached_n} cached batches. "
+        f"Planned batches were {planned}: F1 title-concepts once per question, then two inputs "
+        f"and two phrasings for each asked owner-standard check. The three rules reuse those answers."
+    )
+    support_note = (
+        f"{n_dev} dev papers inside the top 30 enter the scores. "
+        f"Unclassified gold is excluded. This slice has {support['not_sorted']} of those. "
+        f"Answers {support['answers']}, how_why {support['how_why']}, "
+        f"context {support['context']}, different {support['different']}. "
+        f"Missing abstracts: {sum(item['missing_abstracts'] for item in prepared)}."
+    )
+    payload = {
+        "budget_note": budget_note,
+        "support_note": support_note,
+        "slot_rows": slot_rows,
+        "overall_rows": overall_rows,
+        "loo_rows": loo_rows,
+        "question_rows": question_rows,
+        "latency_note": "Latency was not measured.",
+        "recommendation": _recommend_dev(dev_info),
+        "chosen": chosen,
+        "paths": {
+            "results": str(Path(args.results).expanduser()),
+            "labels": str(labels_dir),
+            "questions": str(Path(args.questions).expanduser()),
+        },
+        "topics": topics,
+        "dev_info": {
+            "chosen_row": chosen_row,
+            "base_row": coverage_overall,
+            "f1_row": f1_row,
+            "loo_chosen": loo_by[chosen],
+            "loo_f1": loo_f1,
+            "loo_coverage": loo_coverage,
+            "n_dev": n_dev,
+            "unsorted_n": unsorted_n,
+            "today_ndcg": baseline_rank.get("ndcg@10"),
+            "dev_eligible": bool(chosen_row.get("eligible")),
+            "batches_full": dev_info["batches_full"],
+            "batches_min": dev_info["batches_min"],
+            "batches_max": dev_info["batches_max"],
+            "findings_only": findings_only,
+            "phrasing": phrasing,
+            "support": support,
+        },
+        "settings": {
+            chosen: {
+                "thresholds": tuned_by[chosen].thresholds,
+                "records": _public_prob_records(store[chosen]),
+            },
+            "f1-title-concepts-p0": {
+                "thresholds": tuned_by["f1-title-concepts-p0"].thresholds,
+                "records": _public_prob_records(store["f1-title-concepts-p0"]),
+            },
+        },
+        "coverage_fit": {
+            "sid": coverage_sid,
+            "cuts": base_cuts,
+            "floor": base_floor,
+            "records": [
+                {"qid": row["qid"], "key": row["key"], "score": row["score"]}
+                for row in coverage_records
+            ],
+        },
+    }
+    pred_dir = Path(args.pred_dir).expanduser()
+    pred_path = pred_dir / f"{chosen}.jsonl"
+    _write_predictions(pred_path, store[chosen], tuned_by[chosen].thresholds, _split_index(label_rows))
+    print(f"wrote {pred_path}", flush=True)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(render_round2(payload), encoding="utf-8")
+    metrics_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    print(f"wrote {out}", flush=True)
+    print(f"chose {chosen}", flush=True)
+
+    if args.latency and spec is not None:
+        item = prepared[0]
+        texts = fit_states([
+            paper_text(paper["title"], paper["abstract"], spec.inp) for paper in item["papers"]
+        ])
+        slot, target = f2b_slots(item["concepts"])[0]
+        options = f2b_options(slot, target, 0)
+        instructions = f2b_instruction(str(item["question"]["text"]), slot, target)
+        measured = measure_latency(args.laya_url, instructions, options, texts)
+        payload["latency_note"] = (
+            f"Chosen setting `{chosen}`. Timed one batch of {len(texts)} on {item['question']['id']}, "
+            f"check {slot}, input `{spec.inp}`, wording p0. "
+            f"A search uses {dev_info['batches_min']} to {dev_info['batches_max']} such batches "
+            f"({dev_info['batches_full']} when outcome, actor, population or place, and findings are all asked"
+            + (" twice, once per wording" if phrasing == "avg" else "")
+            + "). "
+            + str(measured.get("detail") or "")
+        )
+        out.write_text(render_round2(payload), encoding="utf-8")
+        metrics_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        print(payload["latency_note"], flush=True)
+    return 0
+
+
+def _attach_gold(records: Sequence[Mapping[str, Any]], gold: Mapping[Tuple[str, str], str]) -> List[dict]:
+    attached = []
+    for row in records:
+        copy = dict(row)
+        copy["gold"] = gold.get((str(row["qid"]), str(row["key"])))
+        attached.append(copy)
+    return attached
+
+
+def _test_gold(label_rows: Mapping[str, Sequence[Mapping[str, str]]]) -> Dict[Tuple[str, str], str]:
+    found: Dict[Tuple[str, str], str] = {}
+    for qid, rows in label_rows.items():
+        for key, group in gold_for(rows, "test").items():
+            found[(str(qid), key)] = group
+    return found
+
+
+def _render_test_section(test: Mapping[str, Any]) -> str:
+    lines = [
+        "## Test split",
+        "",
+        "Scored once, with the dev thresholds. The cuts were not fit again.",
+        "",
+        "| setting | n | coverage | accuracy | macro-F1 | harmful | harm n | ndcg@10 | rel@10 | d ndcg | d rel |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for row in test["overall_rows"]:
+        lines.append(
+            "| {setting} | {n} | {coverage} | {accuracy} | {macro_f1} | {harmful} | {harm_cell} | "
+            "{ndcg} | {rel} | {dndcg} | {drel} |".format(
+                setting=row["setting"],
+                n=row.get("n") if row.get("n") is not None else "",
+                coverage=_fmt(row.get("coverage")),
+                accuracy=_fmt(row.get("accuracy")),
+                macro_f1=_fmt(row.get("macro_f1")),
+                harmful=_fmt(row.get("harmful")),
+                harm_cell=_harm_cell(row),
+                ndcg=_fmt(row.get("ndcg@10")),
+                rel=_fmt(row.get("relevant@10"), 2),
+                dndcg=_fmt(row.get("d_ndcg")),
+                drel=_fmt(row.get("d_rel"), 2),
+            )
+        )
+    lines.extend([
+        "",
+        "Per question for the chosen setting. Health and education rows decide the third gate.",
+        "",
+        "| setting | question | topic | n | coverage | accuracy | macro-F1 | harmful | ndcg@10 | d ndcg |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ])
+    for row in test["question_rows"]:
+        lines.append(
+            "| {setting} | {question} | {topic} | {n} | {coverage} | {accuracy} | {macro_f1} | {harmful} | {ndcg} | {dndcg} |".format(
+                setting=row["setting"],
+                question=row["question"],
+                topic=row.get("topic") or "",
+                n=row.get("n") if row.get("n") is not None else "",
+                coverage=_fmt(row.get("coverage")),
+                accuracy=_fmt(row.get("accuracy")),
+                macro_f1=_fmt(row.get("macro_f1")),
+                harmful=_fmt(row.get("harmful")),
+                ndcg=_fmt(row.get("ndcg@10")),
+                dndcg=_fmt(row.get("d_ndcg")),
+            )
+        )
+    lines.extend([
+        "",
+        "## Gate",
+        "",
+        test["gate_note"],
+        "",
+    ])
+    return "\n".join(lines)
+
+
+def _splice_test(text: str, section: str, recommendation: str) -> str:
+    if "## Test split" in text:
+        raise RuntimeError("test section already in the report")
+    marker = "## Recommendation"
+    block = section
+    if marker not in text:
+        return text.rstrip() + "\n\n" + block + "\n## Recommendation\n\n" + recommendation + "\n"
+    head, _sep, _tail = text.partition(marker)
+    return head + block + "\n## Recommendation\n\n" + recommendation + "\n"
+
+
+def build_test_block(payload: Mapping[str, Any]) -> Dict[str, Any]:
+    """Score the saved dev choice on the test split. Does not search new thresholds."""
+    paths = payload["paths"]
+    questions = load_questions(Path(paths["questions"]))
+    results = load_results(Path(paths["results"]))
+    labels_dir = Path(paths["labels"])
+    by_id = {str(row["id"]): row for row in results["questions"]}
+    prepared = []
+    label_rows: Dict[str, List[dict]] = {}
+    for question in questions:
+        qid = str(question["id"])
+        rows = load_label_rows(labels_dir / f"{qid}.csv")
+        label_rows[qid] = rows
+        prepared.append({"question": question, "qrow": by_id[qid], "papers": []})
+    topics = {str(item["question"]["id"]): str(item["question"].get("topic") or "") for item in prepared}
+    gold = _test_gold(label_rows)
+    scorer = _eval_search()
+    qrows = [item["qrow"] for item in prepared]
+    baseline = ranking_table(scorer, qrows, label_rows, {}, "test")
+    chosen = str(payload["chosen"])
+    saved = payload["settings"][chosen]
+    f1_saved = payload["settings"]["f1-title-concepts-p0"]
+    coverage_fit = payload["coverage_fit"]
+    chosen_records = _attach_gold(saved["records"], gold)
+    f1_records = _attach_gold(f1_saved["records"], gold)
+    coverage_records = _attach_gold(coverage_fit["records"], gold)
+    cuts = coverage_fit["cuts"]
+    floor = str(coverage_fit["floor"])
+
+    def coverage_pred(row: Mapping[str, Any]) -> str:
+        return group_from_coverage(float(row["score"]), cuts, floor)
+
+    rows_out = []
+    question_rows = []
+    named = [
+        (chosen, chosen_records, _threshold_pred(saved["thresholds"]), "dev thresholds"),
+        ("f1-title-concepts-p0", f1_records, _threshold_pred(f1_saved["thresholds"]), "dev thresholds"),
+        (
+            str(coverage_fit["sid"]),
+            coverage_records,
+            coverage_pred,
+            _fmt_cuts(cuts) + f" floor:{floor}",
+        ),
+    ]
+    summaries = {}
+    for sid, records, pred_of, cut_label in named:
+        overall, per_q = score_grouped(
+            sid, records, pred_of, prepared, label_rows, scorer, baseline, "test", cut_label
+        )
+        summaries[sid] = overall
+        rows_out.append(overall)
+        if sid == chosen:
+            for row in per_q:
+                row["topic"] = topics.get(str(row["question"]), "")
+            question_rows = per_q
+    today = {
+        "setting": "lexical_on",
+        "n": summaries[chosen]["n"],
+        "coverage": None,
+        "accuracy": None,
+        "macro_f1": None,
+        "harmful": None,
+        "harm_n": "",
+        "good_n": "",
+        "ndcg@10": baseline.get("ndcg@10"),
+        "relevant@10": baseline.get("relevant@10"),
+        "d_ndcg": 0.0,
+        "d_rel": 0.0,
+        "cuts": "",
+    }
+    rows_out.append(today)
+    worse = worse_question_ids(question_rows, topics)
+    dev = payload["dev_info"]
+    verdict = gate_verdict(
+        dev_ndcg=_as_float(dev["chosen_row"].get("ndcg@10")),
+        dev_base=_as_float(dev["base_row"].get("ndcg@10")),
+        test_ndcg=_as_float(summaries[chosen].get("ndcg@10")),
+        test_base=_as_float(summaries[str(coverage_fit["sid"])].get("ndcg@10")),
+        test_harm=_as_float(summaries[chosen].get("harmful")),
+        worse_questions=worse,
+    )
+    chosen_pairs = _pairs_from(chosen_records, _threshold_pred(saved["thresholds"]))
+    unsorted_n = sum(1 for _gold, pred in _classified(chosen_pairs) if pred == "not_sorted")
+    test_view = {
+        "chosen": summaries[chosen],
+        "coverage": summaries[str(coverage_fit["sid"])],
+        "f1": summaries["f1-title-concepts-p0"],
+        "today_ndcg": baseline.get("ndcg@10"),
+        "worse": worse,
+        "verdict": verdict,
+        "unsorted_n": unsorted_n,
+        "overall_rows": rows_out,
+        "question_rows": question_rows,
+    }
+    beats_dev = "yes" if (
+        _as_float(dev["chosen_row"].get("ndcg@10")) is not None
+        and _as_float(dev["base_row"].get("ndcg@10")) is not None
+        and _as_float(dev["chosen_row"].get("ndcg@10")) > _as_float(dev["base_row"].get("ndcg@10"))
+    ) else "no"
+    beats_test = "yes" if (
+        _as_float(summaries[chosen].get("ndcg@10")) is not None
+        and _as_float(summaries[str(coverage_fit["sid"])].get("ndcg@10")) is not None
+        and _as_float(summaries[chosen].get("ndcg@10")) > _as_float(summaries[str(coverage_fit["sid"])].get("ndcg@10"))
+    ) else "no"
+    harm_ok = "yes" if (
+        _as_float(summaries[chosen].get("harmful")) is not None
+        and _as_float(summaries[chosen].get("harmful")) <= HARM_CAP + 1e-12
+    ) else "no"
+    gate_note = (
+        f"Beats concept coverage on dev ndcg@10: {beats_dev}. "
+        f"Beats concept coverage on test ndcg@10: {beats_test}. "
+        f"Test harmful errors at or below 5%: {harm_ok}. "
+        f"Health or education questions worse than today's test order: {', '.join(worse) if worse else 'none'}. "
+        f"Verdict: {verdict}."
+    )
+    test_view["gate_note"] = gate_note
+    recommendation = _recommend_final(dev, test_view)
+    return {
+        "markdown": _render_test_section(test_view),
+        "recommendation": recommendation,
+        "test": {
+            "verdict": verdict,
+            "gate_note": gate_note,
+            "worse": worse,
+            "chosen": summaries[chosen],
+            "coverage": summaries[str(coverage_fit["sid"])],
+            "f1": summaries["f1-title-concepts-p0"],
+            "today_ndcg": baseline.get("ndcg@10"),
+            "unsorted_n": unsorted_n,
+            "question_rows": question_rows,
+        },
+    }
+
+
+def execute_score_test(args: argparse.Namespace) -> int:
+    out = Path(args.out).expanduser()
+    metrics_path = out.with_suffix(".json")
+    stamp = Path(str(out) + ".test-stamp.json")
+    if not metrics_path.is_file():
+        print(f"missing dev metrics {metrics_path}", flush=True)
+        return 2
+    payload = json.loads(metrics_path.read_text(encoding="utf-8"))
+    if payload.get("test"):
+        print(f"test split already scored in {metrics_path}", flush=True)
+        return 3
+    if "## Test split" in out.read_text(encoding="utf-8"):
+        print(f"test section already in {out}", flush=True)
+        return 3
+    chosen = str(payload.get("chosen") or "")
+    if not chosen:
+        print("dev run did not choose a setting", flush=True)
+        return 2
+    if not claim_test_stamp(stamp, chosen):
+        print(f"test split already scored: {stamp}", flush=True)
+        return 3
+    try:
+        block = build_test_block(payload)
+        new_md = _splice_test(out.read_text(encoding="utf-8"), block["markdown"], block["recommendation"])
+        new_payload = dict(payload)
+        new_payload["test"] = block["test"]
+        new_payload["recommendation"] = block["recommendation"]
+        metrics_tmp = Path(str(metrics_path) + ".tmp")
+        md_tmp = Path(str(out) + ".tmp")
+        metrics_tmp.write_text(json.dumps(new_payload, indent=2), encoding="utf-8")
+        md_tmp.write_text(new_md, encoding="utf-8")
+        os.replace(md_tmp, out)
+        os.replace(metrics_tmp, metrics_path)
+    except Exception:
+        if stamp.exists():
+            stamp.unlink()
+        raise
+    print(f"wrote {out}", flush=True)
+    print(f"gate {block['test']['verdict']}", flush=True)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -1798,6 +3274,21 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--budget", type=int, default=EXPERIMENT_BUDGET)
     run.add_argument("--latency", action=argparse.BooleanOptionalAction, default=True)
     run.set_defaults(func=execute)
+    f2 = sub.add_parser("run-f2", help="Owner-standard yes/no groups on the dev split")
+    f2.add_argument("--corpus", default=str(scratch / "baseline_v2"))
+    f2.add_argument("--results", default=str(scratch / "baseline_v2_results.json"))
+    f2.add_argument("--labels", default=str(scratch / "labels_final_v2"))
+    f2.add_argument("--questions", default=str(scratch / "v2" / "questions_all.json"))
+    f2.add_argument("--out", default=str(scratch / "p25b_results.md"))
+    f2.add_argument("--pred-dir", default=str(scratch / "p25b_predictions"))
+    f2.add_argument("--cache", default=str(scratch / "p25b_cache.json"))
+    f2.add_argument("--laya-url", default=LAYA_URL)
+    f2.add_argument("--budget", type=int, default=F2B_BUDGET)
+    f2.add_argument("--latency", action=argparse.BooleanOptionalAction, default=True)
+    f2.set_defaults(func=execute_round2)
+    score = sub.add_parser("score-test", help="Score the saved dev choice on the test split once")
+    score.add_argument("--out", default=str(scratch / "p25b_results.md"))
+    score.set_defaults(func=execute_score_test)
     return parser
 
 
