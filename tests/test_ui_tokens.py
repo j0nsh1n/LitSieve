@@ -691,8 +691,7 @@ def test_phase8_search_workbench_and_score_meter():
     assert "result-row" in js
     # Hover title defines the 0–1 similarity score for users.
     assert "scoreHelp" in js
-    assert "Meaning match plus a small bonus" in js
-    assert "score-breakdown" in js
+    assert "Similarity score (0–1)" in js
     # Low/Medium/High tier labels no longer drive the result chrome.
     assert "simTier" not in js
     css = CSS

@@ -45,9 +45,6 @@ from app.storage.database import (
 )
 from app.utils import parse_year
 
-SEMANTIC_WEIGHT = 0.7
-LEXICAL_WEIGHT = 0.3
-
 
 def group_undated_last(results: List[Dict]) -> None:
     """Under a year bound, mark papers with no usable year and list them last.
@@ -59,6 +56,10 @@ def group_undated_last(results: List[Dict]) -> None:
         article['no_year'] = parse_year(article.get('year')) == 0
     results.sort(key=lambda a: a['no_year'])
 
+
+# Hybrid rank: meaning first, exact words second (both cosine, 0-1).
+SEMANTIC_WEIGHT = 0.7
+LEXICAL_WEIGHT = 0.3
 
 FETCHERS = {
     'pubmed': PubMedFetcher,
@@ -855,7 +856,6 @@ class LiteratureSearchPipeline:
                 if key in articles_all:
                     article = dict(articles_all[key])
                     article['similarity_score'] = float(similarity)
-                    article['semantic_score'] = round(float(similarity), 4)
                     similar_articles.append(article)
 
         if year_min is not None or year_max is not None:

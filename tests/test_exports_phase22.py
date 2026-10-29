@@ -103,9 +103,9 @@ def test_selection_csv_carries_page_scores_and_clusters(app_module):
     rows = _csv_rows(r.text)[1:]
     assert len(rows) == 10
     assert [row[1] for row in rows] == [f"{0.9 - i * 0.05:.3f}" for i in range(10)]
-    assert rows[0][10:12] == ["2", "Alpha group"]
-    assert rows[1][10:12] == ["3", "Beta group"]
-    assert rows[2][10:12] == ["", ""]  # unclustered only
+    assert rows[0][8:10] == ["2", "Alpha group"]
+    assert rows[1][8:10] == ["3", "Beta group"]
+    assert rows[2][8:10] == ["", ""]  # unclustered only
 
 
 def test_selection_csv_ignores_bad_scores_and_labels(app_module):
@@ -120,8 +120,8 @@ def test_selection_csv_ignores_bad_scores_and_labels(app_module):
     assert r.status_code == 200, r.text
     rows = _csv_rows(r.text)[1:]
     assert rows[0][1] == ""
-    assert rows[1][1] == "-1.000" and rows[1][11] == ""
-    assert rows[2][1] == "0.500" and rows[2][11] == "Sent label"
+    assert rows[1][1] == "-1.000" and rows[1][9] == ""
+    assert rows[2][1] == "0.500" and rows[2][9] == "Sent label"
 
 
 def test_clean_score_bounds():

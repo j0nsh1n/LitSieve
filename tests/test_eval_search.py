@@ -501,3 +501,27 @@ def test_choose_p22_prefers_simple_near_best():
     # 0.50 is best; 0.494 and 0.495 are inside 0.01; smallest w + tfidf + blend + raw wins.
     assert choice["name"] == "blend_w0.05_tfidf_raw"
     assert choice["beats_baseline"] is True
+
+
+def test_leave_one_out_p22_picks_on_the_other_questions():
+    scored = []
+    for qid, bonus, blend in (
+        ("Q1", 0.52, 0.515),
+        ("Q2", 0.52, 0.515),
+        ("Q3", 0.52, 0.20),
+    ):
+        scored.append({"id": qid, "ranking": "lexical_on", "ndcg@10": 0.40})
+        scored.append({"id": qid, "ranking": "bonus_w0.3_bm25_keywords", "ndcg@10": bonus})
+        scored.append({"id": qid, "ranking": "blend_w0.05_tfidf_raw", "ndcg@10": blend})
+        scored.append({"id": qid, "ranking": "bonus_w0.3_tfidf_raw", "ndcg@10": 0.30})
+    loo = ev.leave_one_out_p22(scored, top_n=2)
+    names = [row["name"] for row in loo["top"]]
+    assert names[0] == "bonus_w0.3_bm25_keywords"
+    assert names[1] == "blend_w0.05_tfidf_raw"
+    by_held = {fold["held_out"]: fold for fold in loo["folds"]}
+    assert by_held["Q3"]["picked"] == "blend_w0.05_tfidf_raw"
+    assert by_held["Q3"]["held_ndcg"] == 0.20
+    assert by_held["Q3"]["beats_held_baseline"] is False
+    assert by_held["Q1"]["picked"] == "bonus_w0.3_bm25_keywords"
+    assert by_held["Q1"]["held_ndcg"] == 0.52
+    assert by_held["Q1"]["beats_held_baseline"] is True

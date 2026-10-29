@@ -538,6 +538,86 @@ def choose_p22(
     }
 
 
+def _overall_ndcg_by_rank(
+    scored: Sequence[Mapping[str, Any]],
+) -> List[Tuple[str, float]]:
+    by_rank: Dict[str, List[float]] = {}
+    for row in scored:
+        qid = str(row.get("id") or "")
+        name = str(row.get("ranking") or "")
+        if not qid or qid == "OVERALL" or parse_p22_name(name) is None:
+            continue
+        by_rank.setdefault(name, []).append(float(row.get("ndcg@10") or 0.0))
+    rows = [
+        (name, (sum(vals) / len(vals) if vals else 0.0))
+        for name, vals in by_rank.items()
+    ]
+    rows.sort(key=lambda item: (-item[1], *p22_simplicity(item[0]), item[0]))
+    return rows
+
+
+def leave_one_out_p22(
+    scored: Sequence[Mapping[str, Any]],
+    *,
+    top_n: int = 5,
+    baseline_name: str = "lexical_on",
+    ndcg_window: float = 0.01,
+    max_drop: float = 0.05,
+) -> Dict[str, Any]:
+    """Pick on n-1 questions, then score the held-out question.
+
+    Candidates are the top ``top_n`` settings by overall nDCG. Each fold uses
+    the same choose rule as the full set.
+    """
+    ranked = _overall_ndcg_by_rank(scored)
+    top = [name for name, _ in ranked[:top_n]]
+    allowed = set(top)
+    allowed.add(baseline_name)
+    qids: List[str] = []
+    by_rank: Dict[str, Dict[str, Mapping[str, Any]]] = {}
+    for row in scored:
+        qid = str(row.get("id") or "")
+        name = str(row.get("ranking") or "")
+        if not qid or qid == "OVERALL":
+            continue
+        if qid not in qids:
+            qids.append(qid)
+        by_rank.setdefault(name, {})[qid] = row
+    folds: List[Dict[str, Any]] = []
+    for held in qids:
+        train = [
+            row for row in scored
+            if str(row.get("id") or "") != held
+            and str(row.get("ranking") or "") in allowed
+        ]
+        pick = choose_p22(
+            train,
+            baseline_name=baseline_name,
+            ndcg_window=ndcg_window,
+            max_drop=max_drop,
+        )
+        picked = pick.get("name")
+        held_ndcg = None
+        if picked:
+            held_ndcg = (by_rank.get(str(picked)) or {}).get(held, {}).get("ndcg@10")
+        base_ndcg = (by_rank.get(baseline_name) or {}).get(held, {}).get("ndcg@10")
+        folds.append({
+            "held_out": held,
+            "picked": picked,
+            "held_ndcg": held_ndcg,
+            "baseline_ndcg": base_ndcg,
+            "train_overall_ndcg": pick.get("overall_ndcg"),
+            "beats_held_baseline": (
+                None if held_ndcg is None or base_ndcg is None
+                else float(held_ndcg) > float(base_ndcg)
+            ),
+        })
+    return {
+        "top": [{"name": name, "overall_ndcg": round(ndcg, 4)} for name, ndcg in ranked[:top_n]],
+        "folds": folds,
+    }
+
+
 def _fetch_one(
     source: str,
     query: str,
@@ -1053,6 +1133,25 @@ def write_p22_sweep_md(
         lines.extend(["", "## Choice", ""])
         for key, value in choice.items():
             lines.append(f"- {key}: {value}")
+    loo = payload.get("leave_one_out")
+    if isinstance(loo, dict):
+        lines.extend(["", "## Leave-one-question-out", ""])
+        lines.append("Top 5 settings by overall ndcg@10. Each fold picks on the other questions, then scores the held-out one.")
+        lines.extend(["", "| rank | setting | overall ndcg@10 |", "|---|---|---|"])
+        for i, row in enumerate(loo.get("top") or [], start=1):
+            lines.append(f"| {i} | {row.get('name')} | {row.get('overall_ndcg')} |")
+        lines.extend([
+            "",
+            "| held out | picked | held ndcg@10 | baseline ndcg@10 | beats baseline |",
+            "|---|---|---|---|---|",
+        ])
+        for fold in loo.get("folds") or []:
+            beats = fold.get("beats_held_baseline")
+            beats_s = "" if beats is None else ("yes" if beats else "no")
+            lines.append(
+                f"| {fold.get('held_out')} | {fold.get('picked')} | "
+                f"{fold.get('held_ndcg')} | {fold.get('baseline_ndcg')} | {beats_s} |"
+            )
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -1079,7 +1178,9 @@ def cmd_score(args: argparse.Namespace) -> int:
         overall = overalls[0] if overalls else _overall_for([], "lexical_on", split_filter)
     table = [*scored, *overalls]
     _print_table(table)
-    choice = choose_p22(scored) if any(parse_p22_name(str(r.get("ranking"))) for r in scored) else None
+    has_p22 = any(parse_p22_name(str(r.get("ranking"))) for r in scored)
+    choice = choose_p22(scored) if has_p22 else None
+    loo = leave_one_out_p22(scored) if has_p22 else None
     payload = {
         "results": str(Path(args.results)),
         "labels": str(Path(args.labels)),
@@ -1088,6 +1189,7 @@ def cmd_score(args: argparse.Namespace) -> int:
         "overall": overall,
         "overalls": overalls,
         "choice": choice,
+        "leave_one_out": loo,
     }
     out = Path(args.out) if args.out else Path(args.results).with_name(
         Path(args.results).stem + ".scores.json"

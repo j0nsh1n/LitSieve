@@ -69,6 +69,11 @@
   0.65 it sorts 38 of 91 papers, puts 2 of 27 good papers in different
   (over the 5% cap), and still raises ndcg@10. The dev slice has only 2
   how_why papers, so it is too small to calibrate four groups.
+- P2.2 re-ran the word-match sweep on the 15-question `baseline_v2` corpus.
+  The chosen setting (`bonus_w0.2_bm25_keywords`) beat today's ranking on
+  dev (ndcg@10 0.4381 vs 0.3973) and lost on test (0.5712 vs 0.5755), with
+  Q1, Q5 and Q14 dropping more than 0.05. Search ranking is unchanged. Sweep
+  notes: `~/HealthDatabaseAccess-scratch/bench/p22_dev_sweep_v2.md`.
 - P1.6 stores Collect inputs and Search questions in the library database
   (`fetch_runs`, `question_log`), about 50 rows each. Writes come from
   `_run_multi_fetch` (background and sync, including cancel and error) and
@@ -264,24 +269,26 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-29. `fix/access-bounds-visibility` from origin/main
-  `c124604`. Ports the three passing #126 fixes: uncapped open-copy
-  existence (`CopySet.has_open_copy`), bounded P2.8 requests (one seed,
-  length limits, lightweight DOI projection), and access-label visibility
-  in Catalog and phone Table. Leaves the evidence redesign and
-  `_merge_locations` on main. Search.js and style.css cache-bust
-  `20261029a`. Screenshots in
-  `~/HealthDatabaseAccess-scratch/audit-2026-10-27/phase2/screens_b5/`.
+- **Date:** 2026-10-29. Branch `feat/word-bonus`, PR #122. Merged
+  `origin/main` (`266195e`) and re-ran the P2.2 word-match sweep on the
+  15-question `baseline_v2` corpus, dev split only. Chosen setting
+  `bonus_w0.2_bm25_keywords` beat today's 0.7/0.3 TF-IDF ranking on dev
+  (ndcg@10 0.4381 vs 0.3973) and lost on the one test pass (0.5712 vs
+  0.5755). Q1, Q5 and Q14 dropped more than 0.05 on test, so the product
+  ranking, card copy, CSV columns and spec ranking sentence stay as on
+  main. The PR keeps the sweep ranker in `tools/eval_search.py` and
+  `app/services/lexical.py`. Search.js and style.css cache-bust stay
+  `20261029a`.
 - Validation (production venv, this worktree, no install): `ruff check .`
-  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2127
-  passed in 166.41 s. Scratch is
-  `~/HealthDatabaseAccess-scratch/pytest-access-bounds-visibility`.
+  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2133
+  passed in 183.79 s. Scratch is
+  `~/HealthDatabaseAccess-scratch/pytest-fix-a2-rerun`. Sweep notes:
+  `~/HealthDatabaseAccess-scratch/bench/p22_dev_sweep_v2.md`.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
   and unscheduled roadmap backlog. Ship staging was last recorded at
   `522ff7e`. P1.9 labels are done: a three-model panel plus the owner's
   review of 29 rows, in `~/HealthDatabaseAccess-scratch/bench/labels_final/`
-  (not in git). The held-out test split is still unscored. P2.2, PR #122,
-  remains open and on hold. The evidence redesign from #126 follows in a
-  separate PR.
-- **Next step:** independent review of this PR. Do not merge from the
-  builder. Do not close #126.
+  and `labels_final_v2/` (not in git). The evidence redesign from #126
+  follows in a separate PR.
+- **Next step:** independent review of PR #122. Do not merge from the
+  builder.

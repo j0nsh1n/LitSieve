@@ -2172,13 +2172,6 @@ input[type="range"]::-moz-range-thumb:hover {
     color: var(--text-soft);
     margin: 0 0 var(--space-3);
 }
-.score-breakdown {
-    font-size: var(--fs-xs);
-    color: var(--text-soft);
-    line-height: var(--lh-snug);
-    padding-top: var(--space-1);
-    max-width: 9rem;
-}
 .score-meter {
     display: grid;
     place-items: center;

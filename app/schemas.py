@@ -298,8 +298,6 @@ class ExportArticleKey(BaseModel):
     source: str
     # What the page showed for this paper; the server re-checks both before use.
     similarity_score: Optional[float] = None
-    meaning_score: Optional[float] = None
-    word_bonus: Optional[float] = None
     cluster_label: Optional[str] = None
 
 
