@@ -127,8 +127,11 @@
   remains a browser preference. Account opens as a dockable panel over any
   page for signed-in users. Shared assets carry dated `?v=` values.
 - Laya sidecar (`tools/laya_worker.py`, port 7880) is socket-activated and
-  exits after 5 idle minutes; Search wakes it. Its checkpoint is uncalibrated
-  for questions with 11+ options (topic areas has 13).
+  exits after 5 idle minutes; Search wakes it. It builds
+  `Router(preload=False, default="english")` and warms up on an English
+  sentence so short topics and startup stay on the English checkpoint.
+  Its checkpoint is uncalibrated for questions with 11+ options (topic
+  areas has 13).
 - Guest sessions use sample papers, cannot fetch public sources and expire
   after 30 minutes. Search includes all available sources when unset.
 - Ship rollback dispatches detached when supported, carries its actor, and
@@ -289,18 +292,12 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-29. PR #128 (`feat/link-evidence`) round-5 fix on local
-  branch `fix-b8-r1` from `origin/feat/link-evidence` at `f7d3f6b`. One
-  `SOURCE_ADAPTER_SHAPES` table, one validator. Kind, basis, licence, and
-  licence_scope must be the right type and in that source's set, taken
-  from the fetcher (OpenAlex pdf/landing/none, Zenodo file, Europe PMC
-  pdf/fulltext). Impossible stored shapes stay closed. A later live or
-  staged refresh leaves those stored bytes unchanged. Coverage tests
-  use real parser output first, including a Crossref fixture that
-  parses. They fail if real DOAJ output or the real list disappears.
-  Unused `LICENCE_SCOPE_RECORD`, `empty_evidence`, `parse_link_evidence`,
-  and `evidence_from_article` are gone. simple_tools.js cache-bust is
-  `20261029c`; search.js and style.css stay `20261029a`.
+- Latest full suite (2026-10-29, `feat/link-evidence` per-source allow-lists):
+  **2236 passed** in 175.15 s, no skips or xfails. `ruff check .` clean;
+- PR #131 (merged) builds the Laya sidecar with `Router(preload=False,
+  default="english")` and an English warm-up sentence, so Laya 0.4.17 keeps
+  short Latin topics on the English checkpoint. The production venv switch
+  to `~/.local/share/laya-0.4.17/` happens at the Phase 2 deploy.
 - PR #122 (merged) keeps only the P2.2 sweep tooling. Its gate FAILED on the
   15-question benchmark (test ndcg@10 0.5712 vs today's 0.5755), so Search
   ranking is unchanged. Leave-one-question-out shortlists inside each fold,
@@ -319,5 +316,5 @@ Guest User (is_guest) → sample corpus only; purged by age
   split is still unscored. That is a different score from the scored
   15-question v2 P2.2 test pass and from the v2 Laya test score. The
   evidence redesign from #126 follows in a separate PR.
-- **Next step:** independent review of the per-source allow-list and real
-  parser coverage tests on PR #128.
+- **Next step:** merge PR #128 (Sol round 6: SHIP), then the Phase 2 deploy,
+  including the Laya 0.4.17 venv switch.
