@@ -19,6 +19,7 @@ from app.services.access import (
 from app.services.link_evidence import (
     LINK_EVIDENCE_KEY,
     canonical_json,
+    evidence_url_key,
     incoming_record_from_article,
     is_never_merged,
     merge_link_evidence,
@@ -518,18 +519,42 @@ def _article_with_extra(db):
     return row
 
 
-@pytest.mark.parametrize("closed, opened", [
-    ("http://example.org/doc", "https://example.org/doc"),
-    ("https://example.org/doc", "https://example.org/doc/"),
-    ("https://example.org/doc#a", "https://example.org/doc#b"),
-])
+_URL_IDENTITY_CASES = [
+    ("scheme", "http://example.org/doc", "https://example.org/doc", False),
+    ("slash", "https://example.org/doc", "https://example.org/doc/", False),
+    ("fragment", "https://example.org/doc#a", "https://example.org/doc#b", False),
+    ("query", "https://example.org/doc?a=1", "https://example.org/doc?a=2", False),
+    ("query order", "https://example.org/doc?a=1&b=2", "https://example.org/doc?b=2&a=1", False),
+    ("path case", "https://example.org/Doc", "https://example.org/doc", False),
+    ("host case", "https://EXAMPLE.org/doc", "https://example.org/doc", True),
+    ("https default port", "https://example.org:443/doc", "https://example.org/doc", True),
+    ("http default port", "http://example.org:80/doc", "http://example.org/doc", True),
+    ("https nondefault 80", "https://example.org:80/doc", "https://example.org/doc", False),
+    ("http nondefault 443", "http://example.org:443/doc", "http://example.org/doc", False),
+    ("ipv6 default port", "https://[2001:db8::1]:443/doc", "https://[2001:db8::1]/doc", True),
+    ("ipv6 port collision", "https://[2001:db8::1]:8080/doc", "https://[2001:db8::1:8080]/doc", False),
+    ("credentials", "https://alice@example.org/doc", "https://bob@example.org/doc", False),
+]
+
+
+def test_ipv6_identity_keeps_host_brackets():
+    closed = "https://[2001:db8::1]:8080/doc"
+    opened = "https://[2001:db8::1:8080]/doc"
+    assert evidence_url_key(closed) == "https://[2001:db8::1]:8080/doc"
+    assert evidence_url_key(opened) == "https://[2001:db8::1:8080]/doc"
+    assert evidence_url_key(closed) != evidence_url_key(opened)
+    assert evidence_url_key("https://[2001:db8::1]:443/doc") == "https://[2001:db8::1]/doc"
+
+
+@pytest.mark.parametrize("name, closed, opened, same", _URL_IDENTITY_CASES)
 def test_p24_does_not_move_open_label_across_url_identity(
-    monkeypatch, closed, opened,
+    monkeypatch, name, closed, opened, same,
 ):
     monkeypatch.delenv(dbconn.ENV_KEY, raising=False)
     db = ArticleDatabase(":memory:")
     stamp = "2026-10-29T08:00:00.000000Z"
     try:
+        assert (evidence_url_key(closed) == evidence_url_key(opened)) is same
         db.insert_articles([_paper(
             "123", "pubmed", oa_status="closed", best_oa_url=closed,
             _observed_at=stamp,
@@ -542,17 +567,27 @@ def test_p24_does_not_move_open_label_across_url_identity(
         row = db.get_all_articles()[0]
         row["provenance"] = json.loads(extra[0])
         evidence = row["provenance"][LINK_EVIDENCE_KEY]
-        assert link_access(evidence, closed).open_listed is False
+        assert link_access(evidence, closed).open_listed is same
         assert link_access(evidence, opened).open_listed is True
-        assert access_state(row).url == opened
         found = other_copies_result(row)
         by_url = {item.url: item.open_listed for item in found.copies}
-        assert by_url.get(closed) is not True
-        assert opened not in by_url or by_url[opened] is True
-        open_urls = [item.url for item in found.copies if item.open_listed]
-        assert closed not in open_urls
-        if opened != access_state(row).url:
-            assert opened in open_urls
+        if same:
+            assert access_state(row).state == OPEN_LISTED
+        else:
+            assert access_state(row).url == opened
+            assert by_url.get(closed) is not True
+            open_urls = [item.url for item in found.copies if item.open_listed]
+            assert closed not in open_urls
+            if opened != access_state(row).url:
+                assert opened in open_urls
+            if name == "ipv6 port collision":
+                mainrow = dict(row, source="openaire", article_id=closed)
+                maincopies = other_copies_result(mainrow)
+                assert maincopies.has_open_copy is True
+                assert any(
+                    item.url == opened and item.open_listed
+                    for item in maincopies.copies
+                )
     finally:
         db.close()
 
@@ -591,6 +626,81 @@ def test_incomplete_observation_is_not_a_witness():
     }).state == "none_listed"
 
 
+@pytest.mark.parametrize("field, value", [
+    ("source", {"bad": "source"}),
+    ("source_record_id", ["W1"]),
+    ("observed_at", {"bad": "time"}),
+])
+def test_wrong_typed_ownership_is_not_a_witness(field, value):
+    url = "https://example.org/shared"
+    evidence = {
+        "version": 1,
+        "observations": [{
+            "source": "openalex",
+            "source_record_id": "W1",
+            "observed_at": "2026-10-29T08:00:00.000000Z",
+            "locations": [{
+                "url": url, "basis": "oa_best", "oa_status": "gold",
+            }],
+        }],
+    }
+    evidence["observations"][0][field] = value
+    decision = link_access(evidence, url)
+    assert decision.open_listed is False
+    assert decision.witnesses == ()
+    assert "{'bad': 'source'}" not in str(decision.witnesses)
+    assert "['W1']" not in str(decision.witnesses)
+    assert "{'bad': 'time'}" not in str(decision.witnesses)
+    row = {
+        "source": "openalex",
+        "article_id": "W1",
+        "oa_status": "gold",
+        "best_oa_url": url,
+        "provenance": {LINK_EVIDENCE_KEY: evidence},
+    }
+    assert access_state(row).state == "none_listed"
+    found = other_copies_result(row)
+    assert found.has_open_copy is False
+    assert not any(item.open_listed for item in found.copies)
+
+
+@pytest.mark.parametrize("field, value", [
+    ("source", {"bad": "source"}),
+    ("source_record_id", ["W1"]),
+    ("observed_at", {"bad": "time"}),
+])
+def test_wrong_typed_ownership_is_left_unchanged_on_write(monkeypatch, field, value):
+    monkeypatch.delenv(dbconn.ENV_KEY, raising=False)
+    url = "https://example.org/shared"
+    stamp = "2026-10-29T08:00:00.000000Z"
+    paper = _paper(
+        "W1", "openalex", oa_status="gold", best_oa_url=url, _observed_at=stamp,
+    )
+    for staging in (False, True):
+        db = ArticleDatabase(":memory:")
+        try:
+            if staging:
+                db.ensure_staging_articles()
+            db.insert_articles([paper], staging=staging)
+            table = "staging_article_extra" if staging else "article_extra"
+            stored = json.loads(db.conn.execute(
+                f"SELECT provenance FROM {table}"
+            ).fetchone()[0])
+            stored[LINK_EVIDENCE_KEY]["observations"][0][field] = value
+            before = json.dumps(stored)
+            db.conn.execute(f"UPDATE {table} SET provenance = ?", (before,))
+            db.conn.commit()
+            result = db.insert_articles(
+                [dict(paper, journal="Changed journal")], staging=staging,
+            )
+            after = db.conn.execute(f"SELECT provenance FROM {table}").fetchone()[0]
+            assert result["updated"] == 0
+            assert result["dropped"] == 1
+            assert after == before
+        finally:
+            db.close()
+
+
 def test_broken_locations_list_rejects_the_row_update(monkeypatch):
     monkeypatch.delenv(dbconn.ENV_KEY, raising=False)
     db = ArticleDatabase(":memory:")
@@ -622,6 +732,37 @@ def test_broken_locations_list_rejects_the_row_update(monkeypatch):
             "SELECT provenance FROM article_extra"
         ).fetchone()[0])
         assert stored == old
+    finally:
+        db.close()
+
+
+@pytest.mark.parametrize("unsupported", [
+    {"original-payload": {"retain-this": "value"}},
+    "keep-me",
+])
+def test_malformed_unsupported_is_left_byte_for_byte(monkeypatch, unsupported):
+    monkeypatch.delenv(dbconn.ENV_KEY, raising=False)
+    url = "https://example.org/shared"
+    stamp = "2026-10-29T08:00:00.000000Z"
+    paper = _paper(
+        "W1", "openalex", oa_status="gold", best_oa_url=url, _observed_at=stamp,
+    )
+    db = ArticleDatabase(":memory:")
+    try:
+        db.insert_articles([paper])
+        stored = json.loads(db.conn.execute(
+            "SELECT provenance FROM article_extra"
+        ).fetchone()[0])
+        stored[LINK_EVIDENCE_KEY]["unsupported"] = unsupported
+        before = json.dumps(stored)
+        db.conn.execute("UPDATE article_extra SET provenance = ?", (before,))
+        db.conn.commit()
+        result = db.insert_articles([paper])
+        after = db.conn.execute("SELECT provenance FROM article_extra").fetchone()[0]
+        assert result["updated"] == 0
+        assert result["dropped"] == 1
+        assert after == before
+        assert json.loads(after)[LINK_EVIDENCE_KEY]["unsupported"] == unsupported
     finally:
         db.close()
 

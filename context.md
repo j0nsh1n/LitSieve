@@ -12,10 +12,10 @@
   poster. Live at `https://www.litpilot.org` from the production checkout,
   `main` through #106 (2026-10-16). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
-- Latest full suite (2026-10-29, `feat/link-evidence` B6 r1):
-  **2165 passed** in 235.96 s, no skips or xfails. `ruff check .` clean;
+- Latest full suite (2026-10-29, `feat/link-evidence` B6 r2):
+  **2197 passed** in 221.95 s, no skips or xfails. `ruff check .` clean;
   `pyright app` **0 errors**, 6 optional-import warnings (CI blocks on
-  errors). No dependency lockfile.
+  errors). No dependency lockfile. `certifi>=2026.10.19`.
 - P2.8: a starred Search card with no open copy listed, and no P2.4 open
   other copy, can show "Different work you can read (N)" (at most 3).
   Neighbors come from stored embeddings through `search_similar` (same path
@@ -270,26 +270,24 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-29. Merged origin/main (PR #129, `feat/laya-groups-eval-2`)
-  into `feat/link-evidence` (PR #128). `tools/eval_laya_groups.py` has
-  `run-f2` and `score-test`. Search and the UI stay as they are. Search.js
-  and style.css cache-bust stay `20261029a`. The Laya dev pick is
-  `f2b-full-outcome-p0`. The one test score failed the gate. Test ndcg@10
-  is 0.418, concept coverage is 0.445, and today's order is 0.575. Harmful
-  errors are 3 of 58. Q4, Q5, and Q12 are below today's test order. 100 of
-  271 dev papers and 68 of 169 test papers stay unsorted. A cold batch of
-  30 full abstracts took 9331 ms. The warm median was 401 ms. A full
-  question sends 4 batches. Q9 and Q15 send 1. The write-up is
-  `~/HealthDatabaseAccess-scratch/bench/p25b_results.md`. Link-evidence
-  round-1 fixes 2-6 remain. Clone policy (fix 1) is unchanged.
-- Validation (production venv, this worktree, no install): last recorded
-  on this branch, pytest 2165 passed in 235.96 s; on main, pytest 2139
-  passed in 177.73 s. Re-run after the round-2 fixes.
+- **Date:** 2026-10-29. `feat/link-evidence` (PR #128) round-2 review fixes
+  from `reviews/b6_sol_r2.md`, after merging origin/main (PR #129). URL
+  identity keeps IPv6 brackets, so `[2001:db8::1]:8080` and `[2001:db8::1:8080]`
+  stay different hosts. Login names stay in the key too. Ownership fields
+  must be strings before any coercion. A wrong-typed source, record id, or
+  timestamp is never a witness, and a later write leaves that stored value
+  unchanged. `certifi>=2026.10.19`. Clone policy (fix 1) is unchanged.
+  Search.js and style.css cache-bust stay `20261029a`. P2.5b `run-f2` and
+  `score-test` are on this branch from main. Those groups stay off ranking.
+- Validation (production venv, this worktree, no install): `ruff check .`
+  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2197
+  passed in 221.95 s. Scratch is
+  `~/HealthDatabaseAccess-scratch/pytest-fix-b6-r2`.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
   and unscheduled roadmap backlog. Ship staging is at `266195e`. P1.9 labels
   are done: a three-model panel plus the owner's review of 29 rows, in
   `~/HealthDatabaseAccess-scratch/bench/labels_final/` (not in git). That
   five-question test split is still unscored, and it is a different score
   from the v2 Laya test score. P2.2, PR #122, remains open and on hold.
-- **Next step:** B6 round-2 fixes for IPv6 URL identity, typed ownership,
-  and the certifi floor. These Laya groups stay off the student ranking.
+- **Next step:** owner decision on cloned merged rows (review fix 1). Independent
+  review of these round-2 fixes.

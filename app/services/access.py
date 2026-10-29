@@ -23,6 +23,7 @@ from app.services.link_evidence import (
     evidence_url_key,
     inspect_link_evidence,
     is_never_merged,
+    observation_ownership,
 )
 from app.services.work_types import normalize_doi
 
@@ -180,13 +181,12 @@ def _index_link_decisions(evidence: Mapping[str, Any]) -> dict[str, LinkDecision
 def _witness_from_location(
     observation: Mapping[str, Any], loc: Mapping[str, Any], url: str,
 ) -> Tuple[Optional[LinkWitness], Optional[str]]:
+    owner = observation_ownership(observation)
+    if owner is None:
+        return None, "missing_evidence"
+    source, record_id, observed_at = owner
     basis = str(loc.get("basis") or "").strip()
     kind = str(loc.get("kind") or "").strip().lower()
-    source = str(observation.get("source") or "").strip().lower()
-    record_id = str(observation.get("source_record_id") or "").strip()
-    observed_at = str(observation.get("observed_at") or "").strip()
-    if not source or not record_id or not observed_at:
-        return None, "missing_evidence"
     if basis == BASIS_CROSSREF_ENTRY:
         if str(loc.get("licence_scope") or "") != LICENCE_SCOPE_ENTRY:
             return None, "missing_entry_licence"
@@ -543,6 +543,8 @@ def _collect_row_copies(
     if status == EVIDENCE_OK and evidence is not None:
         for observation in evidence.get("observations") or []:
             if not isinstance(observation, Mapping):
+                continue
+            if observation_ownership(observation) is None:
                 continue
             locations = observation.get("locations")
             if not isinstance(locations, list):

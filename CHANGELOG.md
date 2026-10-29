@@ -15,8 +15,11 @@ and this project aims to follow Semantic Versioning for app version strings
   copy listed" until a later fetch. The card, Free to read, other copies,
   and Different work share this rule. A later replace-fetch keeps those
   earlier listings for papers that stay in the library. A stored URL with a
-  different scheme, trailing slash, or fragment is a different copy. Broken
-  stored evidence stays "No open copy listed".
+  different scheme, trailing slash, fragment, IPv6 host, or login is a
+  different copy. IPv6 identity keeps the brackets around the host. Broken
+  stored evidence stays "No open copy listed". A stored observation whose
+  source, record id, or timestamp is not a string is unused, and a later
+  fetch leaves that stored value unchanged.
 - Whether any open copy of the same work exists is decided before the five
   copy list is capped. A sixth open URL still turns Different work off.
 - Different work accepts one seed, a question of at most 1,000 characters,

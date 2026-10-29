@@ -48,7 +48,14 @@ def evidence_url_key(url: str) -> Optional[str]:
         port = parsed.port
         if (scheme == "http" and port == 80) or (scheme == "https" and port == 443):
             port = None
-        netloc = host if port is None else f"{host}:{port}"
+        host_part = f"[{host}]" if ":" in host else host
+        netloc = host_part if port is None else f"{host_part}:{port}"
+        username = parsed.username
+        if username is not None:
+            if parsed.password is not None:
+                netloc = f"{username}:{parsed.password}@{netloc}"
+            else:
+                netloc = f"{username}@{netloc}"
         path = parsed.path or ""
         query = parsed.query
         fragment = parsed.fragment
@@ -138,6 +145,36 @@ def evidence_status_from_article(article: Mapping[str, Any]) -> Tuple[str, Optio
 def evidence_from_article(article: Mapping[str, Any]) -> Optional[Dict[str, Any]]:
     status, payload = evidence_status_from_article(article)
     return payload if status == EVIDENCE_OK else None
+
+
+def observation_ownership(
+    observation: Mapping[str, Any],
+) -> Optional[Tuple[str, str, str]]:
+    """Nonempty string ownership, or None when a field is missing or typed wrong."""
+    source, record_id, observed_at = _owner_fields(observation)
+    if source is None or record_id is None or observed_at is None:
+        return None
+    source = source.strip().lower()
+    record_id = record_id.strip()
+    observed_at = observed_at.strip()
+    if not source or not record_id or not observed_at:
+        return None
+    return source, record_id, observed_at
+
+
+def _owner_fields(
+    observation: Mapping[str, Any],
+) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+    source = observation.get("source")
+    record_id = observation.get("source_record_id")
+    observed_at = observation.get("observed_at")
+    if not isinstance(source, str):
+        source = None
+    if not isinstance(record_id, str):
+        record_id = None
+    if not isinstance(observed_at, str):
+        observed_at = None
+    return source, record_id, observed_at
 
 
 def is_never_merged(row: Any) -> bool:
@@ -263,14 +300,14 @@ def _load_existing_for_write(existing_evidence: Any) -> Tuple[List[Any], List[An
         raise UnreadableLinkEvidence("unreadable link_evidence")
     version = raw.get("version")
     observations = raw.get("observations")
-    unsupported = list(raw.get("unsupported") or [])
-    if version is None and observations is None and not unsupported:
-        # Unversioned leftover blob: keep it, do not treat as observations.
-        if raw:
-            return [], [json.loads(canonical_json(dict(raw)))]
-        return [], []
     if version != EVIDENCE_VERSION:
+        if version is None and observations is None and "unsupported" not in raw:
+            # Unversioned leftover blob: keep it, do not treat as observations.
+            if raw:
+                return [], [json.loads(canonical_json(dict(raw)))]
+            return [], []
         return [], [json.loads(canonical_json(dict(raw)))]
+    unsupported = _unsupported_items(raw)
     if not isinstance(observations, list):
         raise UnreadableLinkEvidence("unreadable link_evidence")
     kept = []
@@ -278,14 +315,29 @@ def _load_existing_for_write(existing_evidence: Any) -> Tuple[List[Any], List[An
         if not isinstance(item, Mapping):
             raise UnreadableLinkEvidence("unreadable link_evidence")
         _require_location_list(item.get("locations"))
+        _require_owner_strings(item)
         kept.append(dict(item))
     extra = [item for item in unsupported if item is not None]
     return kept, extra
 
 
-def _require_location_list(locations: Any) -> List[Any]:
-    if locations is None:
+def _unsupported_items(raw: Mapping[str, Any]) -> List[Any]:
+    if "unsupported" not in raw:
         return []
+    value = raw.get("unsupported")
+    if not isinstance(value, list):
+        raise UnreadableLinkEvidence("unreadable link_evidence")
+    return list(value)
+
+
+def _require_owner_strings(item: Mapping[str, Any]) -> Tuple[str, str, str]:
+    source, record_id, observed_at = _owner_fields(item)
+    if source is None or record_id is None or observed_at is None:
+        raise UnreadableLinkEvidence("unreadable link_evidence")
+    return source, record_id, observed_at
+
+
+def _require_location_list(locations: Any) -> List[Any]:
     if not isinstance(locations, list) or not all(
         isinstance(item, Mapping) for item in locations
     ):
@@ -295,14 +347,15 @@ def _require_location_list(locations: Any) -> List[Any]:
 
 def _normalize_observation(item: Mapping[str, Any]) -> Dict[str, Any]:
     locations = _require_location_list(item.get("locations"))
+    source, record_id, observed_at = _require_owner_strings(item)
     normalized_locations = _unique_sorted(
         [_normalize_location(loc) for loc in locations],
         lambda loc: loc,
     )
     return {
-        "source": str(item.get("source") or ""),
-        "source_record_id": str(item.get("source_record_id") or ""),
-        "observed_at": str(item.get("observed_at") or ""),
+        "source": source,
+        "source_record_id": record_id,
+        "observed_at": observed_at,
         "locations": normalized_locations,
     }
 
