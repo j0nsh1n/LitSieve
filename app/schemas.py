@@ -138,6 +138,25 @@ class OtherCopiesRequest(BaseModel):
     library_id: Optional[str] = Field(default=None, max_length=128)
 
 
+class DifferentWorkRequest(BaseModel):
+    articles: List[ArticleKey] = Field(default_factory=list, max_length=200)
+    library_id: Optional[str] = Field(default=None, max_length=128)
+    query_text: str = ""
+    source_filter: Optional[List[str]] = None
+    cluster_filter: Optional[List[int]] = None
+    year_min: Optional[int] = None
+    year_max: Optional[int] = None
+    work_type_filter: Optional[List[str]] = None
+
+    @field_validator("work_type_filter")
+    @classmethod
+    def _known_work_types(cls, value: Optional[List[str]]) -> Optional[List[str]]:
+        try:
+            return parse_work_type_filter(value)
+        except ValueError:
+            raise ValueError(_UNKNOWN_WORK_TYPE) from None
+
+
 class AIArticleRequest(BaseModel):
     """Identify one paper in the active library for optional AI assist."""
     article_id: str

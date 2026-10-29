@@ -16,6 +16,7 @@ from app.core import (
 )
 from app.errors import sentence_for
 from app.schemas import (
+    DifferentWorkRequest,
     NoteRequest,
     OtherCopiesRequest,
     SearchRequest,
@@ -218,6 +219,38 @@ async def api_other_copies(req: OtherCopiesRequest, request: Request):
                     dois.append(doi)
         peers = p.db.get_copy_fields_for_dois(dois)
         return {"articles": other_copies_payload(starred, peers)}
+    except Exception as e:
+        return server_error()
+    finally:
+        release_pipeline(uid)
+
+
+@router.post("/api/articles/different-work")
+async def api_different_work(req: DifferentWorkRequest, request: Request):
+    """Nearby open papers when a starred result has no open copy listed."""
+    user = current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    if csrf_failed(request):
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    uid = user["user_id"]
+    try:
+        p = get_owned_pipeline(uid, req.library_id)
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"detail": sentence_for(e)})
+    try:
+        keys = [(item.article_id, item.source) for item in req.articles]
+        articles = await run_in_thread(
+            p.suggest_different_work,
+            keys,
+            req.query_text,
+            req.source_filter,
+            req.cluster_filter,
+            req.year_min,
+            req.year_max,
+            req.work_type_filter,
+        )
+        return {"articles": articles}
     except Exception as e:
         return server_error()
     finally:

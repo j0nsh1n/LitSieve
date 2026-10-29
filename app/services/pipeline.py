@@ -1145,6 +1145,116 @@ class LiteratureSearchPipeline:
         )[:top_k]
         return {"seed": article, "results": results}
 
+    def suggest_different_work(
+        self,
+        keys: List[Tuple[str, str]],
+        query_text: str = "",
+        source_filter: Optional[List[str]] = None,
+        cluster_filter: Optional[List[int]] = None,
+        year_min: Optional[int] = None,
+        year_max: Optional[int] = None,
+        work_type_filter: Optional[List[str]] = None,
+    ) -> List[Dict]:
+        """Open copies of nearby papers when a starred card has none."""
+        from app.services.access import NONE_LISTED, other_copies
+        from app.services.different_work import (
+            MIN_SIMILARITY,
+            SUGGESTION_LIMIT,
+            difference_line,
+            pick_different_work,
+            suggestion_public_dict,
+            work_doi,
+        )
+        from app.services.question_concepts import question_concepts
+        from app.services.work_types import normalize_doi
+
+        if not keys:
+            return []
+        starred = self.db.get_starred_copy_fields(keys)
+        dois: List[str] = []
+        seen_doi: set = set()
+        for row in starred.values():
+            stored = str(row.get("doi") or "").strip()
+            normalized = normalize_doi(row.get("doi"))
+            for doi in (stored, normalized):
+                if doi and doi not in seen_doi:
+                    seen_doi.add(doi)
+                    dois.append(doi)
+        peers = self.db.get_copy_fields_for_dois(dois)
+        peers_by_doi: Dict[str, List[Dict]] = {}
+        for peer in peers:
+            doi = work_doi(peer.get("doi"))
+            if doi:
+                peers_by_doi.setdefault(doi, []).append(peer)
+
+        concepts = question_concepts(query_text) if str(query_text or "").strip() else None
+        ids, matrix = self._load_embeddings_cached()
+        id_to_idx = {key: i for i, key in enumerate(ids)}
+
+        out: List[Dict] = []
+        for key in keys:
+            raw = starred.get(key)
+            if not raw:
+                continue
+            article = self.db.get_article_by_id(key[0], key[1])
+            if not article:
+                continue
+            for field in (
+                "doi", "oa_status", "best_oa_url", "host_name", "locations", "provenance",
+            ):
+                if raw.get(field) is not None:
+                    article[field] = raw[field]
+            if access_state(article).state != NONE_LISTED:
+                continue
+            doi = work_doi(article.get("doi"))
+            peer_rows = list(peers_by_doi.get(doi, [])) if doi else []
+            copies = other_copies(article, peer_rows)
+            if any(copy.open_listed for copy in copies):
+                continue
+            idx = id_to_idx.get(key)
+            if idx is None:
+                continue
+            extra_exclude = {key}
+            for peer in peer_rows:
+                extra_exclude.add((
+                    str(peer.get("article_id") or ""),
+                    str(peer.get("source") or ""),
+                ))
+            ranked = self.search_similar(
+                query_text="",
+                top_k=SUGGESTION_LIMIT + 8,
+                source_filter=source_filter,
+                cluster_filter=cluster_filter,
+                year_min=year_min,
+                year_max=year_max,
+                lexical_boost=False,
+                query_embedding=matrix[idx],
+                extra_exclude=extra_exclude,
+                work_type_filter=work_type_filter,
+                free_to_read=True,
+            )
+            picked = pick_different_work(
+                article,
+                ranked,
+                min_similarity=MIN_SIMILARITY,
+                limit=SUGGESTION_LIMIT,
+                same_work_keys=extra_exclude,
+            )
+            suggestions = []
+            for item in picked:
+                public = suggestion_public_dict(
+                    item, difference_line(article, item, concepts),
+                )
+                if public:
+                    suggestions.append(public)
+            if suggestions:
+                out.append({
+                    "article_id": key[0],
+                    "source": key[1],
+                    "suggestions": suggestions,
+                })
+        return out
+
     def get_cluster_briefings(self) -> List[Dict]:
         """Rule-based topic overview cards for each cluster."""
         from app.utils import build_cluster_briefing

@@ -118,7 +118,7 @@ def test_access_chip_wording_and_forbidden_claims():
     template = _read("templates", "search.html")
     assert 'id="simple-free-to-read-chip"' in template
     assert "Free to read" in template
-    assert 'src="/static/js/search.js?v=20261028g"' in template
+    assert 'src="/static/js/search.js?v=20261028i"' in template
 
 
 def test_other_copies_disclosure_wording():
@@ -138,6 +138,25 @@ def test_other_copies_disclosure_wording():
     css = _read("static", "css", "style.css")
     assert ".result-other-copies" in css
     assert 'href="/static/css/style.css?v=20261028f"' in _read("templates", "base.html")
+
+
+def test_different_work_disclosure_wording():
+    search = _read("static", "js", "search.js")
+    helper = _slice(search, "function differentWorkHtml(", "function mountDifferentWork")
+    assert "Different work you can read (" in helper
+    assert "Different paper" in helper
+    assert "Open copy listed" in helper
+    assert 'target="_blank"' in helper
+    assert 'rel="noopener"' in helper
+    lowered = helper.lower()
+    assert "verified" not in lowered
+    assert "full text" not in lowered
+    assert "free" not in lowered
+    assert "same findings" not in lowered
+    assert "equivalent" not in lowered
+    assert "function loadDifferentWorkForResults(" in search
+    assert "/api/articles/different-work" in search
+    assert "cardHasOpenOtherCopy" in search
 
 
 def test_score_tooltip_says_the_list_is_sorted_by_it():

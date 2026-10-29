@@ -203,6 +203,168 @@ async function loadOtherCopiesForResults(articles) {
   const copies = otherCopiesCache.get(key);
   if (copies && copies.length) mountOtherCopies(card, copies);
  });
+ if (stale()) return;
+ await loadDifferentWorkForResults();
+}
+
+let differentWorkCache = new Map();
+let differentWorkInflight = new Set();
+
+function differentWorkHtml(items) {
+ const rows = Array.isArray(items) ? items : [];
+ if (!rows.length) return '';
+ const lis = rows.map((item) => {
+  const url = item && typeof item.url === 'string' ? item.url.trim() : '';
+  if (!/^https?:\/\//i.test(url)) return '';
+  const title = item && item.title ? String(item.title) : 'Untitled paper';
+  const diff = item && item.difference
+   ? String(item.difference) : 'Different paper on a similar topic';
+  return `<li><a href="${escapeAttr(url)}" target="_blank" rel="noopener">${escapeHtml(title)}</a>`
+   + ' <span class="tag">Different paper</span>'
+   + ` <span class="result-different-work-why">${escapeHtml(diff)}</span>`
+   + ' <span class="tag">Open copy listed</span></li>';
+ }).filter(Boolean);
+ if (!lis.length) return '';
+ return `<details class="result-other-copies result-different-work"><summary>Different work you can read (${lis.length})</summary><ul>${lis.join('')}</ul></details>`;
+}
+
+function insertDifferentWorkNode(card, node) {
+ const copies = card.querySelector('.result-other-copies');
+ if (copies && !copies.classList.contains('result-different-work')) {
+  copies.insertAdjacentElement('afterend', node);
+  return;
+ }
+ const head = card.querySelector('.result-row-head');
+ if (head) head.insertAdjacentElement('afterend', node);
+ else card.prepend(node);
+}
+
+function bindDifferentWorkOpen(card, node) {
+ if (!node || node.dataset.dwBound === '1') return;
+ node.dataset.dwBound = '1';
+ node.addEventListener('toggle', () => {
+  if (!node.open) return;
+  void loadDifferentWorkForCard(card);
+ });
+}
+
+function mountDifferentWork(card, items, opened) {
+ if (!card) return;
+ const existing = card.querySelector('.result-different-work');
+ const html = differentWorkHtml(items);
+ if (!html) {
+  if (existing) existing.remove();
+  return;
+ }
+ const wrap = document.createElement('div');
+ wrap.innerHTML = html;
+ const node = wrap.firstElementChild;
+ if (!node) return;
+ if (opened) node.open = true;
+ if (existing) existing.replaceWith(node);
+ else insertDifferentWorkNode(card, node);
+}
+
+function mountDifferentWorkPlaceholder(card) {
+ if (!card || card.querySelector('.result-different-work')) return;
+ const node = document.createElement('details');
+ node.className = 'result-other-copies result-different-work';
+ const summary = document.createElement('summary');
+ summary.textContent = 'Different work you can read';
+ node.appendChild(summary);
+ insertDifferentWorkNode(card, node);
+ bindDifferentWorkOpen(card, node);
+}
+
+function cardHasOpenOtherCopy(card) {
+ if (!card) return false;
+ const key = `${card.dataset.articleId || ''}\t${card.dataset.source || ''}`;
+ const copies = otherCopiesCache.get(key);
+ if (!Array.isArray(copies) || !copies.length) return false;
+ return copies.some((copy) => copy && copy.open_listed);
+}
+
+function differentWorkRequestBody(keys) {
+ const body = withPageLibrary({ articles: keys.slice(0, 200) });
+ const queryText = lastSearchParams && lastSearchParams.query_text
+  ? String(lastSearchParams.query_text) : '';
+ if (queryText) body.query_text = queryText;
+ const sources = searchState.filters.source_filter;
+ if (Array.isArray(sources) && sources.length) body.source_filter = sources.slice();
+ if (searchState.filters.year_min != null) body.year_min = searchState.filters.year_min;
+ if (searchState.filters.year_max != null) body.year_max = searchState.filters.year_max;
+ const types = workTypeFilterForRequest(searchState.filters);
+ if (types && types.length) body.work_type_filter = types;
+ return body;
+}
+
+function applyDifferentWorkToCard(card, items, opened) {
+ if (!cardCanShowOtherCopies(card) || cardHasOpenOtherCopy(card)) {
+  mountDifferentWork(card, []);
+  return;
+ }
+ if (items && items.length) mountDifferentWork(card, items, opened);
+ else mountDifferentWork(card, []);
+}
+
+async function loadDifferentWorkForCard(card) {
+ if (!card) return;
+ const gen = otherCopiesGen;
+ const libraryId = otherCopiesLibraryId();
+ const stale = () => gen !== otherCopiesGen || libraryId !== otherCopiesLibraryId();
+ if (!cardCanShowOtherCopies(card) || cardHasOpenOtherCopy(card)) {
+  mountDifferentWork(card, []);
+  return;
+ }
+ const articleId = card.dataset.articleId;
+ const source = card.dataset.source;
+ if (!articleId || !source) return;
+ const key = `${articleId}\t${source}`;
+ if (differentWorkCache.has(key)) {
+  applyDifferentWorkToCard(card, differentWorkCache.get(key), true);
+  return;
+ }
+ if (differentWorkInflight.has(key)) return;
+ differentWorkInflight.add(key);
+ try {
+  const data = await apiCall('/api/articles/different-work', {
+   method: 'POST',
+   body: differentWorkRequestBody([{ article_id: articleId, source }]),
+  });
+  if (stale()) return;
+  const rows = data && Array.isArray(data.articles) ? data.articles : [];
+  let items = [];
+  for (const row of rows) {
+   const rowKey = otherCopiesKey(row);
+   const suggestions = Array.isArray(row.suggestions) ? row.suggestions : [];
+   differentWorkCache.set(rowKey, suggestions);
+   if (rowKey === key) items = suggestions;
+  }
+  if (!differentWorkCache.has(key)) differentWorkCache.set(key, []);
+  applyDifferentWorkToCard(card, differentWorkCache.get(key) || items, true);
+ } catch (_err) {
+  if (stale()) return;
+ } finally {
+  differentWorkInflight.delete(key);
+ }
+}
+
+function loadDifferentWorkForResults() {
+ const gen = otherCopiesGen;
+ const libraryId = otherCopiesLibraryId();
+ if (gen !== otherCopiesGen || libraryId !== otherCopiesLibraryId()) return;
+ document.querySelectorAll('#results-list .result-row').forEach((card) => {
+  if (!cardCanShowOtherCopies(card) || cardHasOpenOtherCopy(card)) {
+   mountDifferentWork(card, []);
+   return;
+  }
+  const key = `${card.dataset.articleId || ''}\t${card.dataset.source || ''}`;
+  if (differentWorkCache.has(key)) {
+   applyDifferentWorkToCard(card, differentWorkCache.get(key));
+   return;
+  }
+  mountDifferentWorkPlaceholder(card);
+ });
 }
 
 function freeToReadForRequest(filters) {
@@ -1885,6 +2047,8 @@ function buildResultCard(article, idx) {
  if (!next) {
   otherCopiesCache.delete(otherCopiesKey(article));
   mountOtherCopies(card, []);
+  differentWorkCache.delete(otherCopiesKey(article));
+  mountDifferentWork(card, []);
  }
  if (displayFilterState.starred) showSearchResults();
  else if (next) void loadOtherCopiesForResults([{ ...article, starred: true }]);
@@ -2207,6 +2371,8 @@ function showSearchResults(fullList) {
  if (fresh) {
   lastResults = fullList;
   otherCopiesCache = new Map();
+  differentWorkCache = new Map();
+  differentWorkInflight = new Set();
   otherCopiesGen += 1;
  }
  const bar = document.getElementById('display-filters');
