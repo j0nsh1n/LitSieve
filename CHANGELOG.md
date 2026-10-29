@@ -87,6 +87,10 @@ and this project aims to follow Semantic Versioning for app version strings
   harmful-error rate, keeps the lowest harmful rate before macro-F1.
   The dev report lists ndcg@10 and relevant@10 for each question, and how
   those scores changed from today's order.
+- `python tools/eval_laya_groups.py run-f2` asks Laya four yes/no questions
+  and combines the answers with three written rules. `score-test` scores
+  that dev choice on the held-out split once, then refuses a second pass.
+  Search still ranks as it does today.
 - Label sheets include each paper's abstract and a link, shuffle the rows so
   rank is not first, and write a readable HTML page per question.
 - A later fetch of the same work fills empty metadata (including year and
