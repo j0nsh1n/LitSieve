@@ -149,8 +149,24 @@ function mountOtherCopies(card, copies) {
  }
 }
 
+function otherCopiesLibraryId() {
+ if (typeof pageLibraryId === 'function') return String(pageLibraryId() || '');
+ return String(activeLibraryId() || '');
+}
+
+function cardCanShowOtherCopies(card) {
+ if (!card) return false;
+ const starBtn = card.querySelector('.star-btn');
+ if (!starBtn || !starBtn.classList.contains('is-starred')) return false;
+ const chip = card.querySelector('.result-access-chip');
+ if (!chip) return false;
+ return String(chip.textContent || '').trim().indexOf('No open copy listed') === 0;
+}
+
 async function loadOtherCopiesForResults(articles) {
- const gen = ++otherCopiesGen;
+ const gen = otherCopiesGen;
+ const libraryId = otherCopiesLibraryId();
+ const stale = () => gen !== otherCopiesGen || libraryId !== otherCopiesLibraryId();
  const keys = [];
  for (const article of articles || []) {
   if (!article || !article.starred) continue;
@@ -167,7 +183,7 @@ async function loadOtherCopiesForResults(articles) {
     method: 'POST',
     body: withPageLibrary({ articles: keys.slice(0, 200) }),
    });
-   if (gen !== otherCopiesGen) return;
+   if (stale()) return;
    const rows = data && Array.isArray(data.articles) ? data.articles : [];
    for (const row of rows) {
     otherCopiesCache.set(otherCopiesKey(row), Array.isArray(row.copies) ? row.copies : []);
@@ -177,11 +193,12 @@ async function loadOtherCopiesForResults(articles) {
     if (!otherCopiesCache.has(key)) otherCopiesCache.set(key, []);
    }
   } catch (_err) {
-   if (gen !== otherCopiesGen) return;
+   if (stale()) return;
   }
  }
- if (gen !== otherCopiesGen) return;
+ if (stale()) return;
  document.querySelectorAll('#results-list .result-row').forEach((card) => {
+  if (!cardCanShowOtherCopies(card)) return;
   const key = `${card.dataset.articleId || ''}\t${card.dataset.source || ''}`;
   const copies = otherCopiesCache.get(key);
   if (copies && copies.length) mountOtherCopies(card, copies);

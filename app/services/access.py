@@ -419,9 +419,7 @@ def _url_key(url: str) -> Optional[str]:
         host = (parsed.hostname or "").lower()
         if not host:
             return None
-        path = parsed.path or ""
-        if path != "/" and path.endswith("/"):
-            path = path.rstrip("/")
+        path = (parsed.path or "").rstrip("/")
         port = parsed.port
         if port in (80, 443):
             port = None

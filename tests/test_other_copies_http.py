@@ -141,6 +141,61 @@ def test_other_copies_require_csrf(app_module):
     assert r.status_code == 403
 
 
+def test_peer_doi_matches_after_normalize(app_module):
+    c = TestClient(app_module.app)
+    headers = _register(c, "doicase")
+    uid = _uid("doicase")
+    pipe = core.get_pipeline(uid)
+    try:
+        pipe.db.insert_articles([
+            _paper(
+                "10.1234/abc", "crossref",
+                doi="10.1234/abc",
+                oa_status=None,
+            ),
+            _paper(
+                "W-peer", "openalex",
+                doi="https://doi.org/10.1234/ABC",
+                oa_status="gold",
+                best_oa_url="https://zenodo.org/record/9/files/a.pdf",
+                host_name="Zenodo",
+                _extra={"locations": [{
+                    "url": "https://zenodo.org/record/9/files/a.pdf",
+                    "host": "Zenodo",
+                    "via": "zenodo",
+                }]},
+            ),
+            _paper(
+                "other-doi", "pubmed",
+                doi="10.9999/unrelated",
+                oa_status="gold",
+                best_oa_url="https://example.org/unrelated.pdf",
+                host_name="Other",
+            ),
+        ], dedupe=False)
+        pipe.db.upsert_note("10.1234/abc", "crossref", starred=True)
+        stored = pipe.db.conn.execute(
+            "SELECT doi FROM articles WHERE article_id = ? AND source = ?",
+            ("W-peer", "openalex"),
+        ).fetchone()
+        assert stored[0] == "https://doi.org/10.1234/ABC"
+    finally:
+        core.release_pipeline(uid)
+    r = _post_copies(c, headers, [
+        {"article_id": "10.1234/abc", "source": "crossref"},
+    ])
+    assert r.status_code == 200, r.text
+    rows = r.json()["articles"]
+    assert len(rows) == 1
+    copies = rows[0]["copies"]
+    urls = [item["url"] for item in copies]
+    assert "https://zenodo.org/record/9/files/a.pdf" in urls
+    assert "https://example.org/unrelated.pdf" not in urls
+    zenodo = next(item for item in copies if "zenodo" in item["url"])
+    assert zenodo["where"] == "Zenodo"
+    assert zenodo["open_listed"] is True
+
+
 def test_starred_none_listed_returns_other_copies(app_module):
     c = TestClient(app_module.app)
     headers = _register(c)

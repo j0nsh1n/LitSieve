@@ -113,6 +113,26 @@ def test_dedupes_by_normalized_url():
     assert copies[0].where == "PubMed Central"
 
 
+def test_root_origin_slash_is_one_copy_and_does_not_eat_the_cap():
+    copies = other_copies(_article(
+        locations=[
+            {"url": "https://example.org", "host": "Example"},
+            {"url": "https://example.org/", "host": "Example slash"},
+            {"url": "https://other.example/a", "host": "A"},
+            {"url": "https://other.example/b", "host": "B"},
+            {"url": "https://other.example/c", "host": "C"},
+            {"url": "https://other.example/d", "host": "D"},
+            {"url": "https://other.example/e", "host": "E"},
+        ],
+    ))
+    urls = _urls(copies)
+    origin_hits = [url for url in urls if url.rstrip("/") == "https://example.org"]
+    assert len(origin_hits) == 1
+    assert len(copies) == COPY_LIMIT
+    assert "https://other.example/d" in urls
+    assert "https://other.example/e" not in urls
+
+
 def test_invalid_urls_are_skipped():
     copies = other_copies(_article(
         locations=[

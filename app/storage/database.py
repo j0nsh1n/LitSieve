@@ -2483,17 +2483,13 @@ class ArticleDatabase:
 
     def get_copy_fields_for_dois(self, dois: List[str]) -> List[Dict]:
         """OA and extra fields for every library row with one of these DOIs."""
-        values = []
-        seen = set()
+        wanted = set()
         for raw in dois:
-            text = str(raw or "").strip()
-            if not text or text in seen:
-                continue
-            seen.add(text)
-            values.append(text)
-        if not values:
+            normalized = normalize_doi(raw)
+            if normalized:
+                wanted.add(normalized)
+        if not wanted:
             return []
-        placeholders = ",".join(["?"] * len(values))
         with self._lock:
             cursor = self.conn.cursor()
             cursor.execute(
@@ -2501,12 +2497,14 @@ class ArticleDatabase:
                 "a.host_name, e.locations, e.provenance "
                 "FROM articles a LEFT JOIN article_extra e "
                 "ON a.article_id = e.article_id AND a.source = e.source "
-                f"WHERE a.doi IN ({placeholders})",
-                values,
+                "WHERE a.doi IS NOT NULL AND TRIM(a.doi) != ''",
             )
             rows = cursor.fetchall()
-        return [
-            {
+        out: List[Dict] = []
+        for row in rows:
+            if normalize_doi(row[2]) not in wanted:
+                continue
+            out.append({
                 "article_id": row[0],
                 "source": row[1],
                 "doi": row[2],
@@ -2515,9 +2513,8 @@ class ArticleDatabase:
                 "host_name": row[5],
                 "locations": row[6],
                 "provenance": row[7],
-            }
-            for row in rows
-        ]
+            })
+        return out
 
     def get_year_counts(self) -> Dict[str, int]:
         """Papers per publication year (unknown years under 'unknown')."""
