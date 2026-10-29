@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import argparse
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
@@ -548,18 +550,46 @@ def test_rows_from_predict_and_tag_precision():
     assert tag["precision"] == pytest.approx(0.5)
 
 
-def test_run_ft_commands_do_not_use_the_sidecar():
+def test_run_ft_commands_do_not_use_the_sidecar(tmp_path):
     parser = ev.build_parser()
-    dev = parser.parse_args(["run-ft", "--checkpoint", "/tmp/ft"])
+    ckpt = str(tmp_path / "ft")
+    dev = parser.parse_args(["run-ft", "--checkpoint", ckpt])
     assert dev.func is ev.execute_run_ft
     assert dev.out.endswith("p25c_results.md")
     assert not hasattr(dev, "laya_url")
     held = parser.parse_args(["score-ft-test"])
     assert held.func is ev.execute_score_ft_test
     local = parser.parse_args([
-        "predict-local", "--checkpoint", "/tmp/ft", "--states", "s.json", "--out", "o.json",
+        "predict-local", "--checkpoint", ckpt, "--states", "s.json", "--out", "o.json",
     ])
     assert local.func is ev.execute_predict_local
+
+
+def test_score_ft_test_needs_the_report_before_reading_test_labels(tmp_path, monkeypatch):
+    out = tmp_path / "p25c_results.md"
+    out.with_suffix(".json").write_text(json.dumps({"chosen": "ft"}), encoding="utf-8")
+    monkeypatch.setattr(ev, "build_ft_test", lambda payload: pytest.fail("read test labels"))
+    args = argparse.Namespace(out=str(out))
+    assert ev.execute_score_ft_test(args) == 2
+    assert not Path(str(out) + ".test-stamp.json").exists()
+
+
+def test_score_ft_test_keeps_the_stamp_after_a_failed_pass(tmp_path, monkeypatch):
+    out = tmp_path / "p25c_results.md"
+    out.write_text("# dev\n", encoding="utf-8")
+    out.with_suffix(".json").write_text(json.dumps({"chosen": "ft"}), encoding="utf-8")
+    calls = []
+
+    def fail_after_scoring(payload):
+        calls.append(payload)
+        raise RuntimeError("disk full")
+
+    monkeypatch.setattr(ev, "build_ft_test", fail_after_scoring)
+    args = argparse.Namespace(out=str(out))
+    with pytest.raises(RuntimeError):
+        ev.execute_score_ft_test(args)
+    assert ev.execute_score_ft_test(args) == 3
+    assert len(calls) == 1
 
 
 def test_run_f2_commands_are_wired():

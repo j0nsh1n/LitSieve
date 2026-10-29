@@ -3916,11 +3916,14 @@ def execute_score_ft_test(args: argparse.Namespace) -> int:
     if not metrics_path.is_file():
         print(f"missing dev metrics {metrics_path}", flush=True)
         return 2
+    if not out.is_file():
+        print(f"missing dev report {out}", flush=True)
+        return 2
     payload = json.loads(metrics_path.read_text(encoding="utf-8"))
     if payload.get("test"):
         print(f"test split already scored in {metrics_path}", flush=True)
         return 3
-    if out.is_file() and "## Test split" in out.read_text(encoding="utf-8"):
+    if "## Test split" in out.read_text(encoding="utf-8"):
         print(f"test section already in {out}", flush=True)
         return 3
     chosen = str(payload.get("chosen") or "")
@@ -3930,22 +3933,18 @@ def execute_score_ft_test(args: argparse.Namespace) -> int:
     if not claim_test_stamp(stamp, chosen):
         print(f"test split already scored: {stamp}", flush=True)
         return 3
-    try:
-        block = build_ft_test(payload)
-        new_md = _splice_test(out.read_text(encoding="utf-8"), block["markdown"], block["recommendation"])
-        new_payload = dict(payload)
-        new_payload["test"] = block["test"]
-        new_payload["recommendation"] = block["recommendation"]
-        metrics_tmp = Path(str(metrics_path) + ".tmp")
-        md_tmp = Path(str(out) + ".tmp")
-        metrics_tmp.write_text(json.dumps(new_payload), encoding="utf-8")
-        md_tmp.write_text(new_md, encoding="utf-8")
-        os.replace(md_tmp, out)
-        os.replace(metrics_tmp, metrics_path)
-    except Exception:
-        if stamp.exists():
-            stamp.unlink()
-        raise
+    # The stamp stays even if a later step fails: the test labels have been read.
+    block = build_ft_test(payload)
+    new_md = _splice_test(out.read_text(encoding="utf-8"), block["markdown"], block["recommendation"])
+    new_payload = dict(payload)
+    new_payload["test"] = block["test"]
+    new_payload["recommendation"] = block["recommendation"]
+    metrics_tmp = Path(str(metrics_path) + ".tmp")
+    md_tmp = Path(str(out) + ".tmp")
+    metrics_tmp.write_text(json.dumps(new_payload), encoding="utf-8")
+    md_tmp.write_text(new_md, encoding="utf-8")
+    os.replace(md_tmp, out)
+    os.replace(metrics_tmp, metrics_path)
     print(f"wrote {out}", flush=True)
     print(f"gate {block['test']['verdict']}", flush=True)
     return 0
