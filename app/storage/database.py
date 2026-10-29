@@ -2397,7 +2397,8 @@ class ArticleDatabase:
         with self._lock:
             cursor = self.conn.cursor()
             cursor.execute(
-                "SELECT a.article_id, a.source, a.oa_status, a.best_oa_url, e.locations "
+                "SELECT a.article_id, a.source, a.oa_status, a.best_oa_url, "
+                "e.locations, e.provenance "
                 "FROM articles a LEFT JOIN article_extra e "
                 "ON a.article_id = e.article_id AND a.source = e.source"
             )
@@ -2408,6 +2409,7 @@ class ArticleDatabase:
                 "oa_status": row[2],
                 "best_oa_url": row[3],
                 "locations": row[4],
+                "provenance": row[5],
             }
             for row in rows
         }
@@ -2425,7 +2427,8 @@ class ArticleDatabase:
         with self._lock:
             cursor = self.conn.cursor()
             cursor.execute(
-                "SELECT a.article_id, a.source, a.oa_status, a.best_oa_url, e.locations "
+                "SELECT a.article_id, a.source, a.oa_status, a.best_oa_url, "
+                "e.locations, e.provenance "
                 "FROM articles a LEFT JOIN article_extra e "
                 "ON a.article_id = e.article_id AND a.source = e.source "
                 f"WHERE (a.article_id, a.source) IN ({placeholders})",
@@ -2438,6 +2441,7 @@ class ArticleDatabase:
                 "oa_status": row[2],
                 "best_oa_url": row[3],
                 "locations": row[4],
+                "provenance": row[5],
             }
             for row in rows
         }

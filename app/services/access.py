@@ -73,34 +73,120 @@ def _access_state(article: Mapping[str, Any]) -> AccessInfo:
 def _open_copy_url(
     article: Mapping[str, Any], source: str, locations: List[Mapping[str, Any]],
 ) -> Optional[str]:
-    source_id = source.lower()
     licensed_crossref = None
     doaj_url = None
-    other_urls: List[str] = []
-    for loc in locations:
-        url = _http_url(loc.get("url"))
-        if not url:
-            continue
+    best = None
+    other = None
+    seen: set[str] = set()
+
+    def consider(url: str, loc: Mapping[str, Any]) -> None:
+        nonlocal licensed_crossref, doaj_url, best, other
+        key = _url_key(url)
+        if not key or key in seen:
+            return
+        seen.add(key)
+        if not _url_is_open(article, url, loc):
+            return
         via = str(loc.get("via") or "").strip().lower()
+        source_id = str(source or "").strip().lower()
         if _is_crossref_link(via, source_id):
-            if _has_cc_licence(loc.get("license") or loc.get("licence")):
-                licensed_crossref = licensed_crossref or url
-            continue
+            licensed_crossref = licensed_crossref or url
+            return
         if via == "doaj" or source_id == "doaj":
             doaj_url = doaj_url or url
-            continue
-        other_urls.append(url)
+            return
+        retained_best = _http_url(article.get("best_oa_url"))
+        if retained_best and _url_key(retained_best) == key:
+            best = best or url
+            return
+        other = other or url
 
-    if doaj_url:
-        return doaj_url
-    if not _status_is_open(article.get("oa_status")):
-        return licensed_crossref
-    best = _http_url(article.get("best_oa_url"))
-    if best:
-        return best
-    for url in other_urls:
-        return url
-    return licensed_crossref
+    for loc in locations:
+        url = _http_url(loc.get("url"))
+        if url:
+            consider(url, loc)
+    best_url = _http_url(article.get("best_oa_url"))
+    if best_url:
+        filler = str(_provenance_mapping(article).get("best_oa_url") or "").strip()
+        consider(best_url, {
+            "url": best_url,
+            "host": article.get("host_name"),
+            "via": filler,
+        })
+    for loc in _urls_from_provenance(article):
+        url = _http_url(loc.get("url"))
+        if url:
+            consider(url, loc)
+    return doaj_url or best or other or licensed_crossref
+
+
+def _url_is_open(
+    article: Mapping[str, Any], url: Any, loc: Any = None,
+) -> bool:
+    """Open copy for this URL from its own source evidence. Missing evidence is closed."""
+    checked = _http_url(url)
+    if not checked:
+        return False
+    this_key = _url_key(checked)
+    if not this_key:
+        return False
+    loc_map = loc if isinstance(loc, Mapping) else {}
+    via = str(loc_map.get("via") or "").strip().lower()
+    article_source = str(article.get("source") or "").strip().lower()
+    source_id = via or article_source
+    if _is_crossref_location(via, loc_map, article_source):
+        return _has_cc_licence(loc_map.get("license") or loc_map.get("licence"))
+    if via == "doaj" or source_id == "doaj":
+        return True
+    oa_status, best_oa_url = _source_oa_evidence(article, source_id)
+    if not _status_is_open(oa_status) and via and via != article_source:
+        oa_status, best_oa_url = _source_oa_evidence(article, article_source)
+    if not _status_is_open(oa_status):
+        return False
+    best = _http_url(best_oa_url)
+    if best and _url_key(best) == this_key:
+        return True
+    if via:
+        return True
+    retained_best = _http_url(article.get("best_oa_url"))
+    return bool(retained_best and _url_key(retained_best) == this_key)
+
+
+def _is_crossref_location(
+    via: str, loc: Mapping[str, Any], article_source: str,
+) -> bool:
+    if via == "crossref":
+        return True
+    if via:
+        return False
+    if article_source != "crossref":
+        return False
+    return bool(loc.get("kind") or loc.get("license") or loc.get("licence"))
+
+
+def _source_oa_evidence(
+    article: Mapping[str, Any], source_id: str,
+) -> Tuple[Any, Any]:
+    wanted = str(source_id or "").strip().lower()
+    if not wanted:
+        return None, None
+    article_source = str(article.get("source") or "").strip().lower()
+    provenance = _provenance_mapping(article)
+    conflicts = _provenance_conflicts(article)
+    oa_status = _conflict_value_for_source(conflicts, "oa_status", wanted)
+    best_oa_url = _conflict_value_for_source(conflicts, "best_oa_url", wanted)
+    filled_oa = str(provenance.get("oa_status") or "").strip().lower()
+    filled_best = str(provenance.get("best_oa_url") or "").strip().lower()
+    if oa_status is None and filled_oa == wanted:
+        oa_status = article.get("oa_status")
+    if best_oa_url is None and filled_best == wanted:
+        best_oa_url = article.get("best_oa_url")
+    if wanted == article_source:
+        if oa_status is None:
+            oa_status = article.get("oa_status")
+        if best_oa_url is None:
+            best_oa_url = article.get("best_oa_url")
+    return oa_status, best_oa_url
 
 
 def _status_is_open(value: Any) -> bool:
@@ -333,19 +419,29 @@ def _collect_row_copies(
     row: Mapping[str, Any],
     take: Callable[[Mapping[str, Any], Mapping[str, Any]], None],
 ) -> None:
-    for loc in _locations(row):
+    seen: set[str] = set()
+
+    def once(loc: Mapping[str, Any]) -> None:
+        url = _http_url(loc.get("url"))
+        key = _url_key(url) if url else None
+        if key:
+            if key in seen:
+                return
+            seen.add(key)
         take(row, loc)
+
+    for loc in _locations(row):
+        once(loc)
     best = _http_url(row.get("best_oa_url"))
     if best:
-        take(row, {
+        filler = str(_provenance_mapping(row).get("best_oa_url") or "").strip()
+        once({
             "url": best,
             "host": row.get("host_name"),
-            "via": row.get("source"),
+            "via": filler or row.get("source"),
         })
     for loc in _urls_from_provenance(row):
-        # Provenance URLs belong to a merged-in source. Score them from that
-        # source's stored OA evidence, never the retained row's.
-        take(_provenance_copy_row(row, loc), loc)
+        once(loc)
 
 
 def _copy_from_location(
@@ -365,16 +461,7 @@ def _copy_from_location(
 def _copy_is_open(
     row: Mapping[str, Any], loc: Mapping[str, Any], url: str,
 ) -> bool:
-    best = _http_url(row.get("best_oa_url"))
-    best_key = _url_key(best) if best else None
-    this_key = _url_key(url)
-    synthetic = {
-        "source": loc.get("via") or row.get("source"),
-        "oa_status": row.get("oa_status"),
-        "best_oa_url": best if best_key and best_key == this_key else None,
-        "locations": [loc],
-    }
-    return access_state(synthetic).state == OPEN_LISTED
+    return _url_is_open(row, url, loc)
 
 
 def _copy_where(loc: Mapping[str, Any], row: Mapping[str, Any]) -> str:
@@ -475,38 +562,6 @@ def _conflict_value_for_source(
         if str(entry.get("source") or "").strip().lower() == wanted:
             return entry.get("value")
     return None
-
-
-def _provenance_open_evidence(
-    article: Mapping[str, Any], source: str, url: Any,
-) -> Tuple[Any, Optional[str]]:
-    """OA fields stored for this merged source. Missing evidence stays unset."""
-    conflicts = _provenance_conflicts(article)
-    oa_status = _conflict_value_for_source(conflicts, "oa_status", source)
-    wanted = str(source or "").strip().lower()
-    this_key = _url_key(_http_url(url) or "")
-    best_oa_url = None
-    if wanted and this_key:
-        for entry in _conflict_entries(conflicts, "best_oa_url"):
-            if str(entry.get("source") or "").strip().lower() != wanted:
-                continue
-            candidate = _http_url(entry.get("value"))
-            if candidate and _url_key(candidate) == this_key:
-                best_oa_url = candidate
-                break
-    return oa_status, best_oa_url
-
-
-def _provenance_copy_row(
-    article: Mapping[str, Any], loc: Mapping[str, Any],
-) -> dict:
-    via = str(loc.get("via") or "").strip()
-    oa_status, best_oa_url = _provenance_open_evidence(article, via, loc.get("url"))
-    return {
-        "source": via or article.get("source"),
-        "oa_status": oa_status,
-        "best_oa_url": best_oa_url,
-    }
 
 
 def _urls_from_provenance(article: Mapping[str, Any]) -> List[Mapping[str, Any]]:
