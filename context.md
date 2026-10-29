@@ -12,9 +12,9 @@
   poster. Live at `https://www.litpilot.org` from the production checkout,
   `main` through #106 (2026-10-16). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
-- Latest full suite (2026-10-28, `feat/type-chip-filter` after merging P1.8):
-  **1908 passed** in 173.49 s, no skips or xfails. `ruff check .` clean;
-  `pyright app` **0 errors**, 6 optional-import warnings (CI blocks on errors).
+- Latest full suite (2026-10-28, `feat/question-concepts`): **1956 passed**
+  in 158.57 s, no skips or xfails. `ruff check .` clean; `pyright app`
+  **0 errors**, 6 optional-import warnings (CI blocks on errors).
   `pip-audit` (2026-10-14): no known vulnerabilities; ROCm torch/triton are
   un-auditable. No dependency lockfile.
 - P1.7 shows a type chip on Search cards and a Type filter next to Sources.
@@ -23,9 +23,12 @@
   "Type not stored" keeps legacy rows. No type filter leaves ranking as it
   was. Search.js cache-bust is `20261028d`.
 - P1.8 adds `tools/eval_search.py` (capture, replay, score, labelsheet) and
-  five committed questions under `tools/bench/`. The `baseline_v1` corpus and
-  replay output live in `~/HealthDatabaseAccess-scratch/bench/` and are not
-  in git. Human labels are P1.9.
+  five committed questions under `tools/bench/`. Replay snapshots now copy
+  stored `work_type`, `doi` and `container_title` from the corpus row after
+  ranking. The `baseline_v1` corpus and replay output live in
+  `~/HealthDatabaseAccess-scratch/bench/` and are not in git. Human labels
+  are P1.9. P2.1 adds `app/services/question_concepts.py`; Search does not
+  import it yet.
 - P1.6 stores Collect inputs and Search questions in the library database
   (`fetch_runs`, `question_log`), about 50 rows each. Writes come from
   `_run_multi_fetch` (background and sync, including cancel and error) and
@@ -221,23 +224,22 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-28. `feat/type-chip-filter` merged `origin/main` after
-  P1.8. Search cards show a type chip when `work_type` is stored. A Type
-  filter next to Sources narrows candidates before ranking. "Type not stored"
-  keeps NULL and legacy rows. The benchmark harness is on main:
-  `tools/eval_search.py` captures, replays, scores, and writes label sheets.
-  Frozen `baseline_v1` and sheets stay in `~/HealthDatabaseAccess-scratch/bench/`
-  and are not committed. Label sheets include abstract, DOI or source link,
-  container and stored type, shuffle with a stable seed, put rank columns last,
-  and write `Q*.html` beside each CSV.
+- **Date:** 2026-10-28. Branch `feat/question-concepts` from `origin/main`.
+  P2.0 joins stored `work_type`, `doi` and `container_title` onto benchmark
+  replay hits after ranking. P2.1 adds `app/services/question_concepts.py`
+  (keywords plus actor/action/outcome/population/period/place). Search does
+  not import it. Frozen replay output is
+  `~/HealthDatabaseAccess-scratch/bench/baseline_v1b_results.json` and is
+  not committed.
 - Validation (production venv, this worktree, no install): `ruff check .`
-  clean, `pyright app` 0 errors / 6 optional-import warnings,
-  `node --check static/js/search.js` clean, pytest 1908 passed in 173.49 s.
-  Scratch is `~/HealthDatabaseAccess-scratch/p17/`.
+  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 1956
+  passed in 158.57 s. Scratch is
+  `~/HealthDatabaseAccess-scratch/pytest-question-concepts`.
+  Frozen replay key order matches `baseline_v1_results.json`. Score
+  `--split dev` OVERALL type_accuracy 0.7871, export_accuracy 0.8901.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
   and unscheduled roadmap backlog. Ship staging was last recorded at
-  `f9485cf`. P1.9 is human labels on the five questions. Capture of
-  `baseline_v1` saw Semantic Scholar HTTP 429 on Q1, Q3 and Q5, Europe PMC
-  and medRxiv HTTP 503 on Q4, and DOAJ and HAL `no_results` on every question.
-- **Next step:** parent review of the P1.7 PR. The spec.md Search-bullet
-  type chip and filter edit still waits on owner approval.
+  `f9485cf`. P2.2 is wiring concepts into ranking. Capture of `baseline_v1`
+  saw Semantic Scholar HTTP 429 on Q1, Q3 and Q5, Europe PMC and medRxiv
+  HTTP 503 on Q4, and DOAJ and HAL `no_results` on every question.
+- **Next step:** review of the `feat/question-concepts` PR.
