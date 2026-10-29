@@ -12,16 +12,17 @@
   poster. Live at `https://www.litpilot.org` from the production checkout,
   `main` through #106 (2026-10-16). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
-- Latest full suite (2026-10-28, `feat/access-label` review-fix after merging
-  main including #120): **2038 passed** in 164.95 s, no skips or xfails.
-  `ruff check .` clean; `pyright app` **0 errors**, 6 optional-import
-  warnings (CI blocks on errors).
+- Latest full suite (2026-10-28, `feat/access-label` CC-licence review-fix):
+  **2043 passed** in 203.21 s, no skips or xfails. `ruff check .` clean;
+  `pyright app` **0 errors**, 6 optional-import warnings (CI blocks on
+  errors).
   `pip-audit` (2026-10-14): no known vulnerabilities; ROCm torch/triton are
   un-auditable. No dependency lockfile.
 - P2.3 shows an access label on Search cards from stored OA fields, with a
   Free to read filter next to Type. Closed cards keep every reporting
-  source. Open labels need a real HTTP(S) host. Crossref needs a CC
-  licence path. Search.js cache-bust is `20261028e`.
+  source. Open labels need a real HTTP(S) host. Crossref needs a
+  recognised CC licence identifier and version. Search.js cache-bust is
+  `20261028e`.
 - P1.7 shows a type chip on Search cards and a Type filter next to Sources.
   The filter runs before ranking and reads only `work_type`. Ranked hits get
   that column in one batched query. Null and unknown types have no chip.
@@ -229,15 +230,16 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-28. `feat/access-label` (P2.3) review-fix: closed cards
-  keep every reporting source on the access payload, HTTP(S) URLs need a
-  valid host, and Crossref licences need a CC licence path. Search.js
-  cache-bust is still `20261028e`. Merged `origin/main` (PR #120) so the
-  changelog and handoff keep both sides.
+- **Date:** 2026-10-28. `feat/access-label` (P2.3) review-fix round 2:
+  Crossref open labels need a recognised CC licence identifier and
+  version (by, by-sa, by-nd, by-nc, by-nc-sa, by-nc-nd, plus CC0 and
+  Public Domain Mark 1.0). Invented paths and versions such as
+  `not-a-license/4.0` and `by/99.99` stay closed. Deed and jurisdiction
+  suffixes still count. Search.js cache-bust is still `20261028e`.
 - Validation (production venv, this worktree, no install): `ruff check .`
-  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2038
-  passed in 164.95 s. Scratch is
-  `~/HealthDatabaseAccess-scratch/pytest-fix-b1-r1`.
+  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2043
+  passed in 203.21 s. Scratch is
+  `~/HealthDatabaseAccess-scratch/pytest-fix-b1-r2`.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
   and unscheduled roadmap backlog. Ship staging was last recorded at
   `f9485cf`. P1.9 is human labels on the five questions. P2.2 is wiring

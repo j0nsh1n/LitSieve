@@ -18,7 +18,9 @@ _OPEN_OA_STATUS = frozenset({"gold", "green", "hybrid", "bronze", "diamond", "op
 _CLOSED_OA_STATUS = frozenset({"closed", "embargo", "restricted"})
 _CC_HOSTS = frozenset({"creativecommons.org", "www.creativecommons.org"})
 _CC_LICENCE_PATH = re.compile(
-    r"^/(?:licenses/[a-z0-9.+-]+/\d+\.\d+|publicdomain/(?:zero|mark)/\d+\.\d+)"
+    r"^/(?:licenses/(?:by-nc-sa|by-nc-nd|by-nc|by-nd|by-sa|by)"
+    r"/(?:1\.0|2\.0|2\.1|2\.5|3\.0|4\.0)"
+    r"|publicdomain/(?:zero|mark)/1\.0)"
     r"(?:/.*)?$",
     re.IGNORECASE,
 )

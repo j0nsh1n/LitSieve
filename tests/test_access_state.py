@@ -128,13 +128,19 @@ def test_crossref_link_without_licence_never_counts():
     assert info.sources == ("CrossRef",)
 
 
-def test_crossref_link_with_cc_licence_counts():
+@pytest.mark.parametrize("license", [
+    "https://creativecommons.org/licenses/by/4.0/",
+    "https://creativecommons.org/licenses/by-nc-sa/4.0/deed.en",
+    "https://creativecommons.org/licenses/by/3.0/us/",
+    "https://creativecommons.org/publicdomain/zero/1.0/",
+])
+def test_crossref_link_with_cc_licence_counts(license):
     info = _info(
         source="crossref",
         locations=[{
             "url": "https://example.org/cc.pdf",
             "via": "crossref",
-            "license": "https://creativecommons.org/licenses/by/4.0/",
+            "license": license,
         }],
     )
     assert info.state == OPEN_LISTED
@@ -146,6 +152,8 @@ def test_crossref_link_with_cc_licence_counts():
     "https://creativecommons.org/",
     "https://example.org/?q=creativecommons.org",
     "see creativecommons.org for details",
+    "https://creativecommons.org/licenses/not-a-license/4.0/",
+    "https://creativecommons.org/licenses/by/99.99/",
 ])
 def test_crossref_non_licence_text_does_not_count(license):
     info = _info(
