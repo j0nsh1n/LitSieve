@@ -7,6 +7,14 @@ anyio>=4.14.2
 fsspec>=2026.6.0
 # filelock: CVE-2026-112940, CVE-2026-112913, CVE-2026-112907 (fixed in 4.2.1).
 filelock>=4.2.1
+# certifi: PYSEC-2026-4320 (fixed in 2026.10.18).
+certifi>=2026.10.18
+# dnspython: CVE-2026-114605 (fixed in 2.9.0).
+dnspython>=2.9.0
+# msgpack: CVE-2026-114613 (fixed in 1.2.3).
+msgpack>=1.2.3
+# setuptools: GHSA-xmj3-9gf7-h52w (fixed in 84.1.0). CI also upgrades it.
+setuptools>=84.1.0
 numpy>=2.0.0
 
 # NLP and embeddings
