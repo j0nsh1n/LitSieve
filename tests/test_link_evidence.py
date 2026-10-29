@@ -9,10 +9,12 @@ import random
 
 import pytest
 
+from app.services import access as access_mod
 from app.services.access import (
     OPEN_LISTED,
     access_state,
     link_access,
+    other_copies_result,
 )
 from app.services.link_evidence import (
     LINK_EVIDENCE_KEY,
@@ -439,3 +441,313 @@ def test_clone_drops_extra_never_merged_still_uses_legacy(monkeypatch, tmp_path)
         assert access_state(row).state == OPEN_LISTED
     finally:
         db.close()
+
+
+def test_legacy_merged_conflict_copy_is_not_open(monkeypatch):
+    monkeypatch.delenv(dbconn.ENV_KEY, raising=False)
+    db = ArticleDatabase(":memory:")
+    try:
+        db.insert_articles([_paper(
+            "123", "pubmed", oa_status="closed",
+            best_oa_url="https://publisher.example/closed",
+        )])
+        db.conn.execute(
+            "UPDATE article_extra SET provenance = ?",
+            (json.dumps({
+                "conflicts": {
+                    "oa_status": [{"value": "gold", "source": "openalex"}],
+                    "best_oa_url": [{
+                        "value": "https://example.org/oa",
+                        "source": "openalex",
+                    }],
+                },
+            }),),
+        )
+        db.conn.commit()
+        extra = db.conn.execute("SELECT provenance FROM article_extra").fetchone()
+        row = db.get_all_articles()[0]
+        row["provenance"] = json.loads(extra[0])
+        assert is_never_merged(row) is False
+        assert access_state(row).state == "none_listed"
+        found = other_copies_result(row)
+        by_url = {item.url: item.open_listed for item in found.copies}
+        assert by_url.get("https://example.org/oa") is False
+        assert found.has_open_copy is False
+    finally:
+        db.close()
+
+
+def test_fresh_evidence_keeps_ordinary_legacy_links(monkeypatch):
+    monkeypatch.delenv(dbconn.ENV_KEY, raising=False)
+    db = ArticleDatabase(":memory:")
+    stamp = "2026-10-29T08:00:00.000000Z"
+    try:
+        db.insert_articles([_paper("1", "pubmed", _observed_at=stamp)])
+        db.conn.execute(
+            "UPDATE article_extra SET provenance = ?, locations = ?",
+            (
+                json.dumps({"conflicts": {
+                    "journal": [{"source": "hal", "value": "Other"}],
+                }}),
+                json.dumps([{"url": "https://example.org/doc", "host": "Legacy"}]),
+            ),
+        )
+        db.conn.commit()
+        before = other_copies_result(_article_with_extra(db))
+        assert [item.url for item in before.copies] == ["https://example.org/doc"]
+        assert before.copies[0].open_listed is False
+        db.insert_articles([_paper("1", "pubmed", _observed_at=stamp)])
+        after = other_copies_result(_article_with_extra(db))
+        assert [item.url for item in after.copies] == ["https://example.org/doc"]
+        assert after.copies[0].open_listed is False
+        stored = json.loads(db.conn.execute(
+            "SELECT locations FROM article_extra"
+        ).fetchone()[0])
+        assert stored == [{"url": "https://example.org/doc", "host": "Legacy"}]
+    finally:
+        db.close()
+
+
+def _article_with_extra(db):
+    row = db.get_all_articles()[0]
+    extra = db.conn.execute(
+        "SELECT provenance, locations FROM article_extra"
+    ).fetchone()
+    row["provenance"] = extra[0]
+    row["locations"] = extra[1]
+    return row
+
+
+@pytest.mark.parametrize("closed, opened", [
+    ("http://example.org/doc", "https://example.org/doc"),
+    ("https://example.org/doc", "https://example.org/doc/"),
+    ("https://example.org/doc#a", "https://example.org/doc#b"),
+])
+def test_p24_does_not_move_open_label_across_url_identity(
+    monkeypatch, closed, opened,
+):
+    monkeypatch.delenv(dbconn.ENV_KEY, raising=False)
+    db = ArticleDatabase(":memory:")
+    stamp = "2026-10-29T08:00:00.000000Z"
+    try:
+        db.insert_articles([_paper(
+            "123", "pubmed", oa_status="closed", best_oa_url=closed,
+            _observed_at=stamp,
+        )])
+        db.insert_articles([_paper(
+            "W1", "openalex", oa_status="gold", best_oa_url=opened,
+            _observed_at=stamp,
+        )])
+        extra = db.conn.execute("SELECT provenance FROM article_extra").fetchone()
+        row = db.get_all_articles()[0]
+        row["provenance"] = json.loads(extra[0])
+        evidence = row["provenance"][LINK_EVIDENCE_KEY]
+        assert link_access(evidence, closed).open_listed is False
+        assert link_access(evidence, opened).open_listed is True
+        assert access_state(row).url == opened
+        found = other_copies_result(row)
+        by_url = {item.url: item.open_listed for item in found.copies}
+        assert by_url.get(closed) is not True
+        assert opened not in by_url or by_url[opened] is True
+        open_urls = [item.url for item in found.copies if item.open_listed]
+        assert closed not in open_urls
+        if opened != access_state(row).url:
+            assert opened in open_urls
+    finally:
+        db.close()
+
+
+def test_malformed_evidence_does_not_open_or_use_legacy():
+    url = "https://example.org/shared"
+    for raw in (
+        {"version": 2, "observations": []},
+        {"version": 1, "observations": "broken"},
+        "not-json",
+    ):
+        row = {
+            "source": "openalex",
+            "oa_status": "gold",
+            "best_oa_url": url,
+            "provenance": {LINK_EVIDENCE_KEY: raw},
+        }
+        assert access_state(row).state == "none_listed"
+        assert link_access(raw, url).open_listed is False
+
+
+def test_incomplete_observation_is_not_a_witness():
+    url = "https://example.org/doc"
+    evidence = {
+        "version": 1,
+        "observations": [{
+            "locations": [{"url": url, "basis": "oa_best", "oa_status": "gold"}],
+        }],
+    }
+    decision = link_access(evidence, url)
+    assert decision.open_listed is False
+    assert decision.witnesses == ()
+    assert access_state({
+        "source": "pubmed",
+        "provenance": {LINK_EVIDENCE_KEY: evidence},
+    }).state == "none_listed"
+
+
+def test_broken_locations_list_rejects_the_row_update(monkeypatch):
+    monkeypatch.delenv(dbconn.ENV_KEY, raising=False)
+    db = ArticleDatabase(":memory:")
+    stamp = "2026-10-29T08:00:00.000000Z"
+    url = "https://example.org/shared"
+    try:
+        db.insert_articles([_paper(
+            "W1", "openalex", oa_status="gold", best_oa_url=url,
+            _observed_at=stamp,
+        )])
+        old = {
+            LINK_EVIDENCE_KEY: {
+                "version": 1,
+                "observations": [{"source": "openalex", "locations": "broken"}],
+            },
+        }
+        db.conn.execute(
+            "UPDATE article_extra SET provenance = ?",
+            (json.dumps(old),),
+        )
+        db.conn.commit()
+        result = db.insert_articles([_paper(
+            "W1", "openalex", oa_status="gold", best_oa_url=url,
+            _observed_at=stamp,
+        )])
+        assert result["updated"] == 0
+        assert result["dropped"] == 1
+        stored = json.loads(db.conn.execute(
+            "SELECT provenance FROM article_extra"
+        ).fetchone()[0])
+        assert stored == old
+    finally:
+        db.close()
+
+
+def test_replace_fetch_unions_surviving_evidence(monkeypatch):
+    monkeypatch.delenv(dbconn.ENV_KEY, raising=False)
+    url = "https://example.org/open"
+    first = _paper(
+        "W1", "openalex", oa_status="gold", best_oa_url=url,
+        _observed_at="2026-10-29T08:00:00.000000Z",
+    )
+    later = _paper(
+        "W1", "openalex", oa_status="closed", best_oa_url=url,
+        _observed_at="2026-10-29T09:00:00.000000Z",
+    )
+    empty = _paper(
+        "W1", "openalex", oa_status="closed",
+        _observed_at="2026-10-29T10:00:00.000000Z",
+    )
+    db = ArticleDatabase(":memory:")
+    try:
+        db.insert_articles([first])
+        before = json.loads(db.conn.execute(
+            "SELECT provenance FROM article_extra"
+        ).fetchone()[0])[LINK_EVIDENCE_KEY]
+        db.ensure_staging_articles()
+        db.insert_articles([later], staging=True)
+        db.insert_articles([empty], staging=True)
+        db.replace_from_staging()
+        after = json.loads(db.conn.execute(
+            "SELECT provenance FROM article_extra"
+        ).fetchone()[0])[LINK_EVIDENCE_KEY]
+        assert all(item in after["observations"] for item in before["observations"])
+        assert len(after["observations"]) >= 3
+        row = {"source": "openalex", "provenance": {LINK_EVIDENCE_KEY: after}}
+        assert access_state(row).state == OPEN_LISTED
+        db2 = ArticleDatabase(":memory:")
+        db2.insert_articles([first])
+        db2.insert_articles([later])
+        db2.insert_articles([empty])
+        appended = json.loads(db2.conn.execute(
+            "SELECT provenance FROM article_extra"
+        ).fetchone()[0])[LINK_EVIDENCE_KEY]
+        assert after == appended
+        db2.close()
+    finally:
+        db.close()
+
+
+def test_replace_fetch_evidence_union_rolls_back_then_retries(monkeypatch):
+    monkeypatch.delenv(dbconn.ENV_KEY, raising=False)
+    url = "https://example.org/open"
+    db = ArticleDatabase(":memory:")
+    try:
+        db.insert_articles([_paper(
+            "W1", "openalex", oa_status="gold", best_oa_url=url,
+            _observed_at="2026-10-29T08:00:00.000000Z",
+        )])
+        live = db.conn.execute("SELECT provenance FROM article_extra").fetchone()[0]
+        db.ensure_staging_articles()
+        db.insert_articles([_paper(
+            "W1", "openalex", oa_status="closed", best_oa_url=url,
+            _observed_at="2026-10-29T09:00:00.000000Z",
+        )], staging=True)
+        db.conn.execute(
+            """
+            CREATE TRIGGER fail_extra_copy BEFORE INSERT ON article_extra
+            BEGIN SELECT RAISE(ABORT, 'injected swap failure'); END
+            """
+        )
+        db.conn.commit()
+        with pytest.raises(dbconn.integrity_errors(), match="injected swap failure"):
+            db.replace_from_staging()
+        assert db.conn.execute(
+            "SELECT provenance FROM article_extra"
+        ).fetchone()[0] == live
+        db.conn.execute("DROP TRIGGER fail_extra_copy")
+        db.conn.commit()
+        assert db.replace_from_staging() == 1
+        after = json.loads(db.conn.execute(
+            "SELECT provenance FROM article_extra"
+        ).fetchone()[0])[LINK_EVIDENCE_KEY]
+        assert len(after["observations"]) == 2
+        row = {"source": "openalex", "provenance": {LINK_EVIDENCE_KEY: after}}
+        assert access_state(row).state == OPEN_LISTED
+    finally:
+        db.close()
+
+
+def test_copies_scan_each_observation_once(monkeypatch):
+    calls = {"n": 0}
+    real = access_mod._witness_from_location
+
+    def wrapped(*args, **kwargs):
+        calls["n"] += 1
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(access_mod, "_witness_from_location", wrapped)
+    n = 200
+    observations = []
+    for i in range(n):
+        observations.append({
+            "source": "openalex",
+            "source_record_id": "W1",
+            "observed_at": f"t{i:04}",
+            "locations": [{
+                "url": "https://example.org/doc",
+                "oa_status": "gold",
+                "licence": None,
+                "licence_scope": None,
+                "kind": None,
+                "host": None,
+                "basis": "oa_best",
+                "details": {},
+            }],
+        })
+    row = {
+        "source": "pubmed",
+        "article_id": "1",
+        "provenance": {LINK_EVIDENCE_KEY: {
+            "version": 1,
+            "observations": observations,
+        }},
+    }
+    found = other_copies_result(row)
+    assert len(found.copies) == 1
+    assert found.copies[0].open_listed is True
+    assert found.has_open_copy is True
+    assert calls["n"] == n

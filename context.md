@@ -12,12 +12,10 @@
   poster. Live at `https://www.litpilot.org` from the production checkout,
   `main` through #106 (2026-10-16). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
-- Latest full suite (2026-10-29, `feat/link-evidence`):
-  **2154 passed** in 175.59 s, no skips or xfails. `ruff check .` clean;
+- Latest full suite (2026-10-29, `feat/link-evidence` B6 r1):
+  **2165 passed** in 235.96 s, no skips or xfails. `ruff check .` clean;
   `pyright app` **0 errors**, 6 optional-import warnings (CI blocks on
-  errors).
-  `pip-audit` (2026-10-14): no known vulnerabilities; ROCm torch/triton are
-  un-auditable. No dependency lockfile.
+  errors). No dependency lockfile.
 - P2.8: a starred Search card with no open copy listed, and no P2.4 open
   other copy, can show "Different work you can read (N)" (at most 3).
   Neighbors come from stored embeddings through `search_similar` (same path
@@ -266,23 +264,22 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-29. `feat/link-evidence` from origin/main `266195e`
-  (PR #127). Stores per-source link observations in
-  `article_extra.provenance.link_evidence` (version 1). Merge is a pure
-  set-union. Card, Free to read, other copies, and Different work call
-  `link_access`. Never-merged rows still use the P2.3 row fields. Merged
-  rows without observations stay "No open copy listed". No schema change
-  and no UI wording change. Four-source serialized evidence is 1112 bytes.
-  Clones still drop `article_extra`. A cloned merged row then looks
-  never-merged and uses the row's remaining OA columns.
+- **Date:** 2026-10-29. `feat/link-evidence` (PR #128) review fixes 2-6
+  from `reviews/b6_sol_r1.md`. Reconstructed provenance copies on a merged
+  legacy row stay closed. P2.4 uses evidence URL identity (scheme, trailing
+  slash, and fragment stay). Replace-fetch unions live observations into
+  staging for surviving keys. Unusable `link_evidence` stays closed.
+  Incomplete observations are not witnesses. Unreadable stored locations
+  reject that row's update. Copies index each distinct URL once. Clone
+  policy (fix 1) is unchanged and still needs an owner decision.
 - Validation (production venv, this worktree, no install): `ruff check .`
-  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2154
-  passed in 175.59 s. Scratch is
-  `~/HealthDatabaseAccess-scratch/pytest-link-evidence`.
+  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2165
+  passed in 235.96 s. Scratch is
+  `~/HealthDatabaseAccess-scratch/pytest-fix-b6-r1`.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
   and unscheduled roadmap backlog. Ship staging was last recorded at
   `266195e`. P1.9 labels are done: a three-model panel plus the owner's
   review of 29 rows, in `~/HealthDatabaseAccess-scratch/bench/labels_final/`
   (not in git). The held-out test split is still unscored. P2.2, PR #122,
   remains open and on hold.
-- **Next step:** independent review of this PR.
+- **Next step:** owner decision on cloned merged rows (review fix 1).

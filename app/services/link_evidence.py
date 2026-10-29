@@ -66,17 +66,30 @@ def empty_evidence() -> Dict[str, Any]:
     return {"version": EVIDENCE_VERSION, "observations": []}
 
 
-def parse_link_evidence(raw: Any) -> Optional[Dict[str, Any]]:
-    """Trusted version-1 evidence, or None when missing or unusable on read."""
+EVIDENCE_ABSENT = "absent"
+EVIDENCE_INVALID = "invalid"
+EVIDENCE_OK = "ok"
+
+
+def inspect_link_evidence(raw: Any) -> Tuple[str, Optional[Dict[str, Any]]]:
+    """Distinguish a missing key from unusable stored evidence."""
+    if raw is None or raw == "":
+        return EVIDENCE_ABSENT, None
     payload = _unwrap_evidence(raw)
     if payload is None:
-        return None
+        return EVIDENCE_INVALID, None
     if payload.get("version") != EVIDENCE_VERSION:
-        return None
+        return EVIDENCE_INVALID, None
     observations = payload.get("observations")
     if not isinstance(observations, list):
-        return None
-    return payload
+        return EVIDENCE_INVALID, None
+    return EVIDENCE_OK, payload
+
+
+def parse_link_evidence(raw: Any) -> Optional[Dict[str, Any]]:
+    """Trusted version-1 evidence, or None when missing or unusable on read."""
+    status, payload = inspect_link_evidence(raw)
+    return payload if status == EVIDENCE_OK else None
 
 
 def _unwrap_evidence(raw: Any) -> Optional[Dict[str, Any]]:
@@ -100,7 +113,7 @@ def _unwrap_evidence(raw: Any) -> Optional[Dict[str, Any]]:
     return dict(nested) if isinstance(nested, Mapping) else None
 
 
-def evidence_from_article(article: Mapping[str, Any]) -> Optional[Dict[str, Any]]:
+def evidence_status_from_article(article: Mapping[str, Any]) -> Tuple[str, Optional[Dict[str, Any]]]:
     extra = article.get("_extra")
     provenance = None
     if isinstance(extra, Mapping):
@@ -111,10 +124,20 @@ def evidence_from_article(article: Mapping[str, Any]) -> Optional[Dict[str, Any]
         try:
             provenance = json.loads(provenance)
         except json.JSONDecodeError:
-            provenance = None
+            return EVIDENCE_INVALID, None
     if not isinstance(provenance, Mapping):
-        return None
-    return parse_link_evidence(provenance.get(LINK_EVIDENCE_KEY))
+        return EVIDENCE_ABSENT, None
+    if LINK_EVIDENCE_KEY not in provenance:
+        return EVIDENCE_ABSENT, None
+    raw = provenance.get(LINK_EVIDENCE_KEY)
+    if raw is None or raw == "":
+        return EVIDENCE_INVALID, None
+    return inspect_link_evidence(raw)
+
+
+def evidence_from_article(article: Mapping[str, Any]) -> Optional[Dict[str, Any]]:
+    status, payload = evidence_status_from_article(article)
+    return payload if status == EVIDENCE_OK else None
 
 
 def is_never_merged(row: Any) -> bool:
@@ -188,13 +211,38 @@ def merge_link_evidence(existing_evidence: Any, incoming_record: Mapping[str, An
     existing, unsupported = _load_existing_for_write(existing_evidence)
     observations = [_normalize_observation(item) for item in existing]
     observations.append(incoming)
+    return _evidence_payload(observations, unsupported)
+
+
+def union_link_evidence(left: Any, right: Any) -> Dict[str, Any]:
+    """Set-union of two stored evidence payloads. Does not mutate inputs."""
+    left_obs, left_unsupported = _load_existing_for_write(left)
+    right_obs, right_unsupported = _load_existing_for_write(right)
+    observations = [
+        _normalize_observation(item) for item in list(left_obs) + list(right_obs)
+    ]
+    return _evidence_payload(observations, list(left_unsupported) + list(right_unsupported))
+
+
+def _evidence_payload(
+    observations: Sequence[Mapping[str, Any]], unsupported: Sequence[Any],
+) -> Dict[str, Any]:
     merged = _unique_sorted(observations, _normalize_observation)
     out: Dict[str, Any] = {
         "version": EVIDENCE_VERSION,
         "observations": merged,
     }
-    if unsupported:
-        out["unsupported"] = list(unsupported)
+    extra = [item for item in unsupported if item is not None]
+    if extra:
+        seen = set()
+        kept = []
+        for item in extra:
+            marker = canonical_json(item)
+            if marker in seen:
+                continue
+            seen.add(marker)
+            kept.append(item)
+        out["unsupported"] = kept
     return json.loads(canonical_json(out))
 
 
@@ -229,17 +277,26 @@ def _load_existing_for_write(existing_evidence: Any) -> Tuple[List[Any], List[An
     for item in observations:
         if not isinstance(item, Mapping):
             raise UnreadableLinkEvidence("unreadable link_evidence")
+        _require_location_list(item.get("locations"))
         kept.append(dict(item))
     extra = [item for item in unsupported if item is not None]
     return kept, extra
 
 
+def _require_location_list(locations: Any) -> List[Any]:
+    if locations is None:
+        return []
+    if not isinstance(locations, list) or not all(
+        isinstance(item, Mapping) for item in locations
+    ):
+        raise UnreadableLinkEvidence("unreadable link_evidence")
+    return locations
+
+
 def _normalize_observation(item: Mapping[str, Any]) -> Dict[str, Any]:
-    locations = item.get("locations") or []
-    if not isinstance(locations, list):
-        locations = []
+    locations = _require_location_list(item.get("locations"))
     normalized_locations = _unique_sorted(
-        [_normalize_location(loc) for loc in locations if isinstance(loc, Mapping)],
+        [_normalize_location(loc) for loc in locations],
         lambda loc: loc,
     )
     return {

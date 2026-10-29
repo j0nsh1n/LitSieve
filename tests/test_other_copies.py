@@ -118,32 +118,31 @@ def test_dedupes_by_normalized_url():
         article_id="x",
         source="pubmed",
         locations=[
-            {"url": "https://PMC.EXAMPLE.ORG/a/", "host": "PubMed Central"},
-            {"url": "http://pmc.example.org/a", "host": "PMC"},
+            {"url": "https://PMC.EXAMPLE.ORG/a", "host": "PubMed Central"},
+            {"url": "https://pmc.example.org/a", "host": "PMC"},
         ],
     ))
     assert len(copies) == 1
     assert copies[0].where == "PubMed Central"
 
 
-def test_root_origin_slash_is_one_copy_and_does_not_eat_the_cap():
+def test_trailing_slash_and_scheme_are_distinct_copies():
     copies = other_copies(_article(
         locations=[
             {"url": "https://example.org", "host": "Example"},
             {"url": "https://example.org/", "host": "Example slash"},
+            {"url": "http://example.org/doc", "host": "HTTP"},
+            {"url": "https://example.org/doc", "host": "HTTPS"},
             {"url": "https://other.example/a", "host": "A"},
-            {"url": "https://other.example/b", "host": "B"},
-            {"url": "https://other.example/c", "host": "C"},
-            {"url": "https://other.example/d", "host": "D"},
-            {"url": "https://other.example/e", "host": "E"},
         ],
     ))
     urls = _urls(copies)
-    origin_hits = [url for url in urls if url.rstrip("/") == "https://example.org"]
-    assert len(origin_hits) == 1
+    assert "https://example.org" in urls
+    assert "https://example.org/" in urls
+    assert "http://example.org/doc" in urls
+    assert "https://example.org/doc" in urls
     assert len(copies) == COPY_LIMIT
-    assert "https://other.example/d" in urls
-    assert "https://other.example/e" not in urls
+    assert "https://other.example/a" in urls
 
 
 def test_invalid_urls_are_skipped():
@@ -257,7 +256,7 @@ def test_later_open_peer_labels_card_location():
     )
     copies = other_copies(card, [peer])
     assert copies == [
-        CopyInfo("Zenodo", "https://zenodo.org/records/9/files/paper.pdf", True),
+        CopyInfo("OpenAlex", "https://zenodo.org/records/9/files/paper.pdf", True),
     ]
 
 

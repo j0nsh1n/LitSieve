@@ -16,11 +16,13 @@ from app.services.link_evidence import (
     BASIS_HAL_FILE,
     BASIS_LOCATION_OPEN,
     BASIS_OA_BEST,
+    EVIDENCE_ABSENT,
+    EVIDENCE_OK,
     LICENCE_SCOPE_ENTRY,
-    evidence_from_article,
+    evidence_status_from_article,
     evidence_url_key,
+    inspect_link_evidence,
     is_never_merged,
-    parse_link_evidence,
 )
 from app.services.work_types import normalize_doi
 
@@ -96,11 +98,13 @@ def _access_state(article: Mapping[str, Any]) -> AccessInfo:
     source = str(article.get("source") or "").strip()
     locations = _locations(article)
     sources = _source_names(source, locations)
-    evidence = evidence_from_article(article)
-    if evidence is not None:
-        url = _card_url_from_evidence(evidence)
+    status, evidence = evidence_status_from_article(article)
+    if status == EVIDENCE_OK and evidence is not None:
+        url = _card_url_from_index(_index_link_decisions(evidence))
         if url:
             return AccessInfo(OPEN_LISTED, url, sources)
+        return AccessInfo(NONE_LISTED, None, sources)
+    if status != EVIDENCE_ABSENT:
         return AccessInfo(NONE_LISTED, None, sources)
     if is_never_merged(article):
         url = _open_copy_url(article, source, locations)
@@ -115,43 +119,62 @@ def link_access(evidence: Any, url: Any) -> LinkDecision:
     checked = _http_url(url)
     if not checked:
         return LinkDecision(False, ("invalid_url",), ())
-    payload = parse_link_evidence(evidence)
-    if payload is None:
-        return LinkDecision(False, ("missing_evidence",), ())
     wanted = evidence_url_key(checked)
     if not wanted:
         return LinkDecision(False, ("invalid_url",), ())
-    witnesses: List[LinkWitness] = []
-    reasons: List[str] = []
-    for observation in payload.get("observations") or []:
+    status, payload = inspect_link_evidence(evidence)
+    if status != EVIDENCE_OK or payload is None:
+        return LinkDecision(False, ("missing_evidence",), ())
+    return _index_link_decisions(payload).get(
+        wanted, LinkDecision(False, ("missing_evidence",), ()),
+    )
+
+
+def _index_link_decisions(evidence: Mapping[str, Any]) -> dict[str, LinkDecision]:
+    grouped: dict[str, List[Tuple[Mapping[str, Any], Mapping[str, Any], str]]] = {}
+    for observation in evidence.get("observations") or []:
         if not isinstance(observation, Mapping):
             continue
-        for loc in observation.get("locations") or []:
+        locations = observation.get("locations")
+        if not isinstance(locations, list):
+            continue
+        for loc in locations:
             if not isinstance(loc, Mapping):
                 continue
             loc_url = _http_url(loc.get("url"))
-            if not loc_url or evidence_url_key(loc_url) != wanted:
+            if not loc_url:
                 continue
+            key = evidence_url_key(loc_url)
+            if not key:
+                continue
+            grouped.setdefault(key, []).append((observation, loc, loc_url))
+    out: dict[str, LinkDecision] = {}
+    for key, items in grouped.items():
+        witnesses: List[LinkWitness] = []
+        reasons: List[str] = []
+        for observation, loc, loc_url in items:
             witness, reason = _witness_from_location(observation, loc, loc_url)
             if witness is not None:
                 witnesses.append(witness)
             elif reason:
                 reasons.append(reason)
-    if witnesses:
-        witnesses.sort(key=lambda item: (
-            item.source, item.source_record_id, item.observed_at, item.url,
-        ))
-        return LinkDecision(True, (witnesses[0].basis,), tuple(witnesses))
-    if not reasons:
-        reasons.append("missing_evidence")
-    unique: List[str] = []
-    seen = set()
-    for reason in reasons:
-        if reason in seen:
+        if witnesses:
+            witnesses.sort(key=lambda item: (
+                item.source, item.source_record_id, item.observed_at, item.url,
+            ))
+            out[key] = LinkDecision(True, (witnesses[0].basis,), tuple(witnesses))
             continue
-        seen.add(reason)
-        unique.append(reason)
-    return LinkDecision(False, tuple(unique), ())
+        unique: List[str] = []
+        seen = set()
+        for reason in reasons:
+            if reason in seen:
+                continue
+            seen.add(reason)
+            unique.append(reason)
+        if not unique:
+            unique.append("missing_evidence")
+        out[key] = LinkDecision(False, tuple(unique), ())
+    return out
 
 
 def _witness_from_location(
@@ -160,6 +183,10 @@ def _witness_from_location(
     basis = str(loc.get("basis") or "").strip()
     kind = str(loc.get("kind") or "").strip().lower()
     source = str(observation.get("source") or "").strip().lower()
+    record_id = str(observation.get("source_record_id") or "").strip()
+    observed_at = str(observation.get("observed_at") or "").strip()
+    if not source or not record_id or not observed_at:
+        return None, "missing_evidence"
     if basis == BASIS_CROSSREF_ENTRY:
         if str(loc.get("licence_scope") or "") != LICENCE_SCOPE_ENTRY:
             return None, "missing_entry_licence"
@@ -179,41 +206,33 @@ def _witness_from_location(
         return None, "missing_evidence"
     return LinkWitness(
         source=source,
-        source_record_id=str(observation.get("source_record_id") or ""),
-        observed_at=str(observation.get("observed_at") or ""),
+        source_record_id=record_id,
+        observed_at=observed_at,
         url=url,
         host=_text_or_none(loc.get("host")),
         basis=basis,
     ), None
 
 
-def _card_url_from_evidence(evidence: Mapping[str, Any]) -> Optional[str]:
+def _card_url_from_index(index: Mapping[str, LinkDecision]) -> Optional[str]:
     ranked: List[Tuple[int, str, str]] = []
     seen = set()
-    for observation in evidence.get("observations") or []:
-        if not isinstance(observation, Mapping):
+    for decision in index.values():
+        if not decision.open_listed or not decision.witnesses:
             continue
-        source = str(observation.get("source") or "").strip().lower()
+        witness = decision.witnesses[0]
+        source = witness.source
         if source == "doaj":
             priority = 0
         elif source == "crossref":
             priority = 2
         else:
             priority = 1
-        for loc in observation.get("locations") or []:
-            if not isinstance(loc, Mapping):
-                continue
-            url = _http_url(loc.get("url"))
-            if not url:
-                continue
-            witness, _reason = _witness_from_location(observation, loc, url)
-            if witness is None:
-                continue
-            marker = (priority, source, url)
-            if marker in seen:
-                continue
-            seen.add(marker)
-            ranked.append(marker)
+        marker = (priority, source, witness.url)
+        if marker in seen:
+            continue
+        seen.add(marker)
+        ranked.append(marker)
     if not ranked:
         return None
     ranked.sort()
@@ -461,14 +480,19 @@ def _other_copies(
     selected: dict[str, CopyInfo] = {}
     has_open = False
 
-    def take(row: Mapping[str, Any], loc: Mapping[str, Any]) -> None:
+    def take(
+        row: Mapping[str, Any],
+        loc: Mapping[str, Any],
+        status: str,
+        index: Mapping[str, LinkDecision],
+    ) -> None:
         nonlocal has_open
-        copy = _copy_from_location(row, loc)
+        copy = _copy_from_location(row, loc, status, index)
         if copy is None:
             return
         if copy.open_listed:
             has_open = True
-        key = _url_key(copy.url)
+        key = evidence_url_key(copy.url)
         if not key or key == main:
             return
         existing = selected.get(key)
@@ -478,7 +502,7 @@ def _other_copies(
             selected[key] = copy
             return
         if copy.open_listed and not existing.open_listed:
-            selected[key] = existing._replace(open_listed=True)
+            selected[key] = copy
 
     _collect_row_copies(article, take)
     article_key = (
@@ -497,17 +521,36 @@ def _other_copies(
 
 def _collect_row_copies(
     row: Mapping[str, Any],
-    take: Callable[[Mapping[str, Any], Mapping[str, Any]], None],
+    take: Callable[
+        [Mapping[str, Any], Mapping[str, Any], str, Mapping[str, LinkDecision]],
+        None,
+    ],
 ) -> None:
-    evidence = evidence_from_article(row)
-    if evidence is not None:
+    status, evidence = evidence_status_from_article(row)
+    index: Mapping[str, LinkDecision] = (
+        _index_link_decisions(evidence) if status == EVIDENCE_OK and evidence is not None else {}
+    )
+    seen: set[str] = set()
+
+    def emit(loc: Mapping[str, Any]) -> None:
+        url = _http_url(loc.get("url"))
+        key = evidence_url_key(url) if url else None
+        if not key or key in seen:
+            return
+        seen.add(key)
+        take(row, loc, status, index)
+
+    if status == EVIDENCE_OK and evidence is not None:
         for observation in evidence.get("observations") or []:
             if not isinstance(observation, Mapping):
                 continue
-            for loc in observation.get("locations") or []:
+            locations = observation.get("locations")
+            if not isinstance(locations, list):
+                continue
+            for loc in locations:
                 if not isinstance(loc, Mapping):
                     continue
-                take(row, {
+                emit({
                     "url": loc.get("url"),
                     "host": loc.get("host"),
                     "via": observation.get("source"),
@@ -516,57 +559,56 @@ def _collect_row_copies(
                     "license": loc.get("licence") or loc.get("license"),
                     "source": observation.get("source"),
                 })
-        return
     for loc in _locations(row):
-        take(row, loc)
+        emit(loc)
     best = _http_url(row.get("best_oa_url"))
     if best:
-        take(row, {
+        emit({
             "url": best,
             "host": row.get("host_name"),
             "via": row.get("source"),
         })
     for loc in _urls_from_provenance(row):
-        take(_provenance_copy_row(row, loc), loc)
+        emit(loc)
 
 
 def _copy_from_location(
-    row: Mapping[str, Any], loc: Mapping[str, Any],
+    row: Mapping[str, Any],
+    loc: Mapping[str, Any],
+    status: str,
+    index: Mapping[str, LinkDecision],
 ) -> Optional[CopyInfo]:
     url = _http_url(loc.get("url"))
-    if not url or not _url_key(url):
+    key = evidence_url_key(url) if url else None
+    if not url or not key:
         return None
-    evidence = evidence_from_article(row)
     open_listed = False
     where = None
-    if evidence is not None:
-        decision = link_access(evidence, url)
-        open_listed = decision.open_listed
-        if decision.witnesses:
-            where = _witness_where(decision.witnesses[0], loc, row)
-        kind = str(loc.get("kind") or "").strip().lower()
-        via = str(loc.get("via") or loc.get("source") or "").strip().lower()
-        source_id = str(row.get("source") or "").strip().lower()
+    via = str(loc.get("via") or loc.get("source") or "").strip().lower()
+    source_id = str(row.get("source") or "").strip().lower()
+    kind = str(loc.get("kind") or "").strip().lower()
+    licensed = _has_cc_licence(loc.get("license") or loc.get("licence"))
+    if status == EVIDENCE_OK:
+        decision = index.get(key)
+        if decision is not None:
+            open_listed = decision.open_listed
+            if decision.witnesses:
+                where = _witness_where(decision.witnesses[0], loc, row)
+                url = decision.witnesses[0].url
         if (
             not open_listed
             and kind == "text-mining"
             and _is_crossref_link(via, source_id)
-            and not _has_cc_licence(loc.get("license") or loc.get("licence"))
+            and not licensed
         ):
             return None
-    elif is_never_merged(row):
-        via = str(loc.get("via") or "").strip().lower()
-        source_id = str(row.get("source") or "").strip().lower()
-        if _is_crossref_link(via, source_id):
-            if not _has_cc_licence(loc.get("license") or loc.get("licence")):
-                return None
+    elif status == EVIDENCE_ABSENT and is_never_merged(row):
+        if _is_crossref_link(via, source_id) and not licensed:
+            return None
         open_listed = _legacy_copy_is_open(row, loc, url)
     else:
-        via = str(loc.get("via") or "").strip().lower()
-        source_id = str(row.get("source") or "").strip().lower()
-        if _is_crossref_link(via, source_id):
-            if not _has_cc_licence(loc.get("license") or loc.get("licence")):
-                return None
+        if _is_crossref_link(via, source_id) and not licensed:
+            return None
         open_listed = False
     return CopyInfo(where or _copy_where(loc, row), url, open_listed)
 
@@ -575,8 +617,8 @@ def _legacy_copy_is_open(
     row: Mapping[str, Any], loc: Mapping[str, Any], url: str,
 ) -> bool:
     best = _http_url(row.get("best_oa_url"))
-    best_key = _url_key(best) if best else None
-    this_key = _url_key(url)
+    best_key = evidence_url_key(best) if best else None
+    this_key = evidence_url_key(url)
     synthetic = {
         "source": loc.get("via") or row.get("source"),
         "oa_status": row.get("oa_status"),
@@ -589,14 +631,19 @@ def _legacy_copy_is_open(
 def _witness_where(
     witness: LinkWitness, loc: Mapping[str, Any], row: Mapping[str, Any],
 ) -> str:
-    host = str(witness.host or loc.get("host") or "").strip()
+    host = str(witness.host or "").strip()
     if host and host.casefold() not in _UNKNOWN_HOSTS:
         return host
     if witness.source:
         name = source_display_name(witness.source)
         if name:
             return name
-    return _copy_where(loc, row)
+    loc_url = _http_url(loc.get("url"))
+    loc_key = evidence_url_key(loc_url) if loc_url else None
+    witness_key = evidence_url_key(witness.url)
+    if loc_key and witness_key and loc_key == witness_key:
+        return _copy_where(loc, row)
+    return "publisher page"
 
 
 def _copy_where(loc: Mapping[str, Any], row: Mapping[str, Any]) -> str:
@@ -633,24 +680,7 @@ def _main_link_key(article: Mapping[str, Any]) -> Optional[str]:
     checked = _http_url(url)
     if not checked:
         return None
-    return _url_key(checked)
-
-
-def _url_key(url: str) -> Optional[str]:
-    try:
-        parsed = urlsplit(url)
-        host = (parsed.hostname or "").lower()
-        if not host:
-            return None
-        path = (parsed.path or "").rstrip("/")
-        port = parsed.port
-        if port in (80, 443):
-            port = None
-        netloc = host if port is None else f"{host}:{port}"
-        query = parsed.query
-        return f"{netloc}{path}?{query}" if query else f"{netloc}{path}"
-    except Exception:
-        return None
+    return evidence_url_key(checked)
 
 
 def _extra_mapping(article: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -677,58 +707,6 @@ def _provenance_mapping(article: Mapping[str, Any]) -> Mapping[str, Any]:
 def _provenance_conflicts(article: Mapping[str, Any]) -> Mapping[str, Any]:
     raw = _provenance_mapping(article).get("conflicts")
     return raw if isinstance(raw, Mapping) else {}
-
-
-def _conflict_entries(conflicts: Mapping[str, Any], field: str) -> List[Mapping[str, Any]]:
-    payload = conflicts.get(field)
-    if payload is None:
-        return []
-    entries = payload if isinstance(payload, list) else [payload]
-    return [entry for entry in entries if isinstance(entry, Mapping)]
-
-
-def _conflict_value_for_source(
-    conflicts: Mapping[str, Any], field: str, source: str,
-) -> Any:
-    wanted = str(source or "").strip().lower()
-    if not wanted:
-        return None
-    for entry in _conflict_entries(conflicts, field):
-        if str(entry.get("source") or "").strip().lower() == wanted:
-            return entry.get("value")
-    return None
-
-
-def _provenance_open_evidence(
-    article: Mapping[str, Any], source: str, url: Any,
-) -> Tuple[Any, Optional[str]]:
-    """OA fields stored for this merged source. Missing evidence stays unset."""
-    conflicts = _provenance_conflicts(article)
-    oa_status = _conflict_value_for_source(conflicts, "oa_status", source)
-    wanted = str(source or "").strip().lower()
-    this_key = _url_key(_http_url(url) or "")
-    best_oa_url = None
-    if wanted and this_key:
-        for entry in _conflict_entries(conflicts, "best_oa_url"):
-            if str(entry.get("source") or "").strip().lower() != wanted:
-                continue
-            candidate = _http_url(entry.get("value"))
-            if candidate and _url_key(candidate) == this_key:
-                best_oa_url = candidate
-                break
-    return oa_status, best_oa_url
-
-
-def _provenance_copy_row(
-    article: Mapping[str, Any], loc: Mapping[str, Any],
-) -> dict:
-    via = str(loc.get("via") or "").strip()
-    oa_status, best_oa_url = _provenance_open_evidence(article, via, loc.get("url"))
-    return {
-        "source": via or article.get("source"),
-        "oa_status": oa_status,
-        "best_oa_url": best_oa_url,
-    }
 
 
 def _urls_from_provenance(article: Mapping[str, Any]) -> List[Mapping[str, Any]]:

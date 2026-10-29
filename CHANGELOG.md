@@ -13,7 +13,10 @@ and this project aims to follow Semantic Versioning for app version strings
   from that source says so. Records that were never merged keep the existing
   access label. Merged records with no stored observations stay "No open
   copy listed" until a later fetch. The card, Free to read, other copies,
-  and Different work share this rule.
+  and Different work share this rule. A later replace-fetch keeps those
+  earlier listings for papers that stay in the library. A stored URL with a
+  different scheme, trailing slash, or fragment is a different copy. Broken
+  stored evidence stays "No open copy listed".
 - Whether any open copy of the same work exists is decided before the five
   copy list is capped. A sixth open URL still turns Different work off.
 - Different work accepts one seed, a question of at most 1,000 characters,
@@ -27,10 +30,10 @@ and this project aims to follow Semantic Versioning for app version strings
   prefix or different capital letters. Unstarring a paper hides that list
   even if a copy request was already in flight. Starring another paper on
   the same page still shows copies that were loading for the other cards.
-  A website URL with and without a trailing slash is one copy. A listed
-  URL says "Open copy listed" when any stored source for that URL meets
-  the open rule. A copy folded in by merge is labeled from that source's
-  own stored OA fields, not from the kept record.
+  Host letter case is ignored. A listed URL says "Open copy listed" when
+  any stored source for that exact URL meets the open rule. A copy folded
+  in by merge is labeled from that source's own stored OA fields, not from
+  the kept record.
 
 
 ### Added

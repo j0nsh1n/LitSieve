@@ -22,6 +22,7 @@ from app.services.link_evidence import (
     UnreadableLinkEvidence,
     incoming_record_from_article,
     merge_link_evidence,
+    union_link_evidence,
 )
 from app.services.work_types import normalize_doi, work_type_count_key
 from app.storage import dbconn
@@ -826,6 +827,7 @@ class ArticleDatabase:
                       AND COALESCE(a.abstract, '') = COALESCE(s.abstract, '')
                     """
                 )
+                self._union_live_evidence_into_staging(cursor)
                 cursor.execute("DELETE FROM key_points")
                 cursor.execute("DELETE FROM notes")
                 cursor.execute("DELETE FROM screening")
@@ -901,6 +903,40 @@ class ArticleDatabase:
                 raise
         self.compact()
         return n
+
+    def _union_live_evidence_into_staging(self, cursor) -> None:
+        """Keep trusted live observations for keys that survive replace-fetch."""
+        cursor.execute(
+            f"""
+            SELECT l.article_id, l.source, l.provenance, s.provenance
+            FROM article_extra l
+            INNER JOIN staging_article_extra s
+              ON l.article_id = s.article_id AND l.source = s.source
+            INNER JOIN {self.STAGING_TABLE} t
+              ON t.article_id = s.article_id AND t.source = s.source
+            """
+        )
+        rows = cursor.fetchall()
+        for article_id, source, live_raw, staged_raw in rows:
+            live_prov = self._load_provenance(live_raw)
+            staged_prov = self._load_provenance(staged_raw)
+            unioned = union_link_evidence(
+                live_prov.get(LINK_EVIDENCE_KEY),
+                staged_prov.get(LINK_EVIDENCE_KEY),
+            )
+            staged_prov[LINK_EVIDENCE_KEY] = unioned
+            cursor.execute(
+                """
+                UPDATE staging_article_extra
+                SET provenance = ?
+                WHERE article_id = ? AND source = ?
+                """,
+                (
+                    json.dumps(staged_prov, ensure_ascii=False, separators=(",", ":")),
+                    article_id,
+                    source,
+                ),
+            )
 
     def clear_all(self):
         """Wipe the library (sample reset / explicit empty).
