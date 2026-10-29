@@ -9,6 +9,15 @@ and this project aims to follow Semantic Versioning for app version strings
 ## [Unreleased]
 
 ### Fixed
+- One stored URL now has one access answer. The card label, Free to read,
+  other listed copies, and different-work eligibility share it. A merge
+  that brings in an open copy makes the kept record say "Open copy listed".
+- The five-copy list is only a display cap. A sixth open URL of the same
+  work still counts, so different-work suggestions stay off.
+- Different work takes one paper per request, a question of at most 1,000
+  characters, and at most 50 entries in each filter list.
+- The access label stays visible in Catalog and on collapsed phone rows.
+  Source and type chips are unchanged.
 - Different work suggestions load when that disclosure is opened, not when
   the card is drawn. An empty result removes the disclosure. With a year
   filter on, the closest open paper is kept even if it has no year.
@@ -18,8 +27,8 @@ and this project aims to follow Semantic Versioning for app version strings
   the same page still shows copies that were loading for the other cards.
   A website URL with and without a trailing slash is one copy. A listed
   URL says "Open copy listed" when any stored source for that URL meets
-  the open rule. A copy folded in by merge is labeled from that source's
-  own stored OA fields, not from the kept record.
+  the open rule. The kept record uses that same rule, so the card and the
+  copy list agree.
 
 
 ### Added
@@ -38,10 +47,11 @@ and this project aims to follow Semantic Versioning for app version strings
   papers into answers, how or why, context, and different. It scores the dev
   split only. Search is unchanged.
 - Search cards show an access label from stored OA fields: "Open copy listed"
-  (a link) or "No open copy listed (<source>)". A Free to read filter keeps
-  papers with an open copy listed. Nothing is checked over the network.
-  Crossref text-mining links count only when that link has a recognised
-  Creative Commons licence URL.
+  (a link) or "No open copy listed (<source>)". The label stays visible in
+  Catalog and on collapsed phone rows. A Free to read filter keeps papers
+  with an open copy listed. Nothing is checked over the network. Crossref
+  text-mining links count only when that link has a recognised Creative
+  Commons licence URL.
 - `app/services/question_concepts.py` reads a research question into
   keywords and actor, action, outcome, population, period and place
   phrases. Search does not call it yet.

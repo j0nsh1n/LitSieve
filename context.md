@@ -12,37 +12,41 @@
   poster. Live at `https://www.litpilot.org` from the production checkout,
   `main` through #106 (2026-10-16). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
-- Latest full suite (2026-10-28, `fix-b3-r1` on `feat/different-work`):
-  **2119 passed** in 160.87 s, no skips or xfails. `ruff check .` clean;
-  `pyright app` **0 errors**, 6 optional-import warnings (CI blocks on
-  errors).
+- Latest full suite (2026-10-29, `fix/access-cluster`): **2130 passed** in
+  166.08 s, no skips or xfails. `ruff check .` clean; `pyright app` **0
+  errors**, 6 optional-import warnings (CI blocks on errors). Scratch is
+  `~/HealthDatabaseAccess-scratch/pytest-fix-access-cluster`.
   `pip-audit` (2026-10-14): no known vulnerabilities; ROCm torch/triton are
   un-auditable. No dependency lockfile.
-- P2.8: a starred Search card with no open copy listed, and no P2.4 open
-  other copy, can show "Different work you can read (N)" (at most 3).
-  Neighbors come from stored embeddings through `search_similar` (same path
-  as more-like-starred / seed), cosine floor 0.45, same-work and set-aside
+- P2.8: a starred Search card with no open copy listed, and no open same-work
+  copy, can show "Different work you can read (N)" (at most 3). Neighbors
+  come from stored embeddings through `search_similar` (same path as
+  more-like-starred / seed), cosine floor 0.45, same-work and set-aside
   rows dropped. Eligible neighbors are sorted by cosine before the cap of
   3, so a year filter cannot drop a closer undated paper. The client loads
-  suggestions when the disclosure opens. The difference line uses year,
-  stored type, and `question_concepts` on the current Search question. JSON
-  route `POST /api/articles/different-work`, no schema change. Search.js
-  cache-bust is `20261028i`.
+  suggestions when the disclosure opens. The route accepts one seed, a
+  question of at most 1,000 characters, and at most 50 entries per filter
+  list. Same-DOI lookup reads a key/DOI projection first. The difference
+  line uses year, stored type, and `question_concepts` on the current Search
+  question. JSON route `POST /api/articles/different-work`, no schema
+  change. Search.js cache-bust is `20261029a`.
 - P2.4: a starred Search card with no open copy listed can show other listed
   copies of the same work (same-record locations, same DOI including
   set-aside rows, merged extra URLs). One batched JSON route, no schema
-  change, cap five. Same-work DOI lookup uses `normalize_doi` on stored
-  rows. Trailing-slash origins share one URL key. The client mounts copies
-  only on a starred none_listed card and keeps a page request when another
-  card is starred. Each listed URL keeps "Open copy listed" if any stored
-  occurrence of that URL meets the P2.3 open rule, including after five
-  copies are already selected. A merged-in copy uses that source's
-  `oa_status` and `best_oa_url` in provenance. Missing evidence leaves it
-  unlabeled.
+  change, cap five. `has_open_copy` is decided before that cap, so a sixth
+  open URL still blocks different-work suggestions. Same-work DOI lookup
+  uses `normalize_doi` on stored rows. Trailing-slash origins share one URL
+  key. The client mounts copies only on a starred none_listed card and
+  keeps a page request when another card is starred. Each listed URL keeps
+  "Open copy listed" if that URL's own source evidence meets the open rule.
 - P2.3 shows an access label on Search cards from stored OA fields, with a
-  Free to read filter next to Type. Closed cards keep every reporting
+  Free to read filter next to Type. Card, filter, copies, and different-work
+  eligibility share one URL resolver, including merged conflicts, filled
+  fields, equal URLs, and merged locations. The label stays visible in
+  Catalog and on collapsed phone rows. Closed cards keep every reporting
   source. Open labels need a real HTTP(S) host. Crossref needs a
-  recognised CC licence identifier and version.
+  recognised CC licence identifier and version. Style.css cache-bust is
+  `20261029a`.
 - P1.7 shows a type chip on Search cards and a Type filter next to Sources.
   The filter runs before ranking and reads only `work_type`. Ranked hits get
   that column in one batched query. Null and unknown types have no chip.
@@ -260,21 +264,23 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-28. `fix-b3-r1` on `feat/different-work` (PR #125, P2.8).
-  Different-work suggestions load when the disclosure opens. Eligible
-  neighbors are sorted by cosine before the cap of 3 so a year bound cannot
-  hide a closer undated paper. Cosine floor 0.45 from frozen baseline_v1
-  neighbors (Q1-Q3 on-topic pairs sit about 0.51-0.67; history related-pair
-  medians about 0.37-0.42; health and education neighbors are higher so the
-  cap of 3 binds first). Search.js cache-bust is `20261028i`.
+- **Date:** 2026-10-29. `fix/access-cluster` from `origin/main` (`c124604`).
+  Four access-track fixes. One URL resolver for card, Free to read, copies,
+  and P2.8. `has_open_copy` is decided before the five-copy cap. P2.8 takes
+  one seed and a cheap same-DOI lookup. The access chip sits outside the
+  tags Catalog and collapsed phone rows hide. Search.js and style.css
+  cache-bust is `20261029a`.
 - Validation (production venv, this worktree, no install): `ruff check .`
-  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2119
-  passed in 160.87 s. Scratch is
-  `~/HealthDatabaseAccess-scratch/pytest-fix-b3-r1`.
+  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2130
+  passed in 166.08 s. Scratch is
+  `~/HealthDatabaseAccess-scratch/pytest-fix-access-cluster`. Headless
+  Chrome screenshots of Catalog and default layout at 390 px are in
+  `~/HealthDatabaseAccess-scratch/audit-2026-10-27/phase2/screens_b4/`.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
   and unscheduled roadmap backlog. Ship staging was last recorded at
   `522ff7e`. P1.9 labels are done: a three-model panel plus the owner's
   review of 29 rows, in `~/HealthDatabaseAccess-scratch/bench/labels_final/`
   (not in git). The held-out test split is still unscored. P2.2, PR #122,
   remains open and on hold.
-- **Next step:** parent re-review of PR #125. Do not merge from the builder.
+- **Next step:** review of the access-cluster PR. Do not merge from the
+  builder.
