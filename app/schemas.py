@@ -19,6 +19,7 @@ _UNKNOWN_WORK_TYPE = sentence(
 
 class WorkTypeFilteredRequest(BaseModel):
     work_type_filter: Optional[List[str]] = None
+    free_to_read: bool = False
 
     @field_validator("work_type_filter")
     @classmethod
@@ -125,6 +126,35 @@ class NoteRequest(BaseModel):
     # Bind this write to a library this account owns. Omit to use the
     # currently active library (legacy clients / tests).
     library_id: Optional[str] = Field(default=None, max_length=128)
+
+
+class ArticleKey(BaseModel):
+    article_id: str = Field(min_length=1, max_length=256)
+    source: str = Field(min_length=1, max_length=64)
+
+
+class OtherCopiesRequest(BaseModel):
+    articles: List[ArticleKey] = Field(default_factory=list, max_length=200)
+    library_id: Optional[str] = Field(default=None, max_length=128)
+
+
+class DifferentWorkRequest(BaseModel):
+    articles: List[ArticleKey] = Field(default_factory=list, max_length=1)
+    library_id: Optional[str] = Field(default=None, max_length=128)
+    query_text: str = Field(default="", max_length=1000)
+    source_filter: Optional[List[str]] = Field(default=None, max_length=50)
+    cluster_filter: Optional[List[int]] = Field(default=None, max_length=50)
+    year_min: Optional[int] = None
+    year_max: Optional[int] = None
+    work_type_filter: Optional[List[str]] = Field(default=None, max_length=50)
+
+    @field_validator("work_type_filter")
+    @classmethod
+    def _known_work_types(cls, value: Optional[List[str]]) -> Optional[List[str]]:
+        try:
+            return parse_work_type_filter(value)
+        except ValueError:
+            raise ValueError(_UNKNOWN_WORK_TYPE) from None
 
 
 class AIArticleRequest(BaseModel):

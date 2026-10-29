@@ -8,12 +8,49 @@ and this project aims to follow Semantic Versioning for app version strings
 
 ## [Unreleased]
 
+### Fixed
+- Whether any open copy of the same work exists is decided before the five
+  copy list is capped. A sixth open URL still turns Different work off.
+- Different work accepts one seed, a question of at most 1,000 characters,
+  and at most 50 entries in each filter list.
+- The access label stays visible in Catalog and on collapsed phone rows,
+  including Table. Source and type chips still hide as they did.
+- Different work suggestions load when that disclosure is opened, not when
+  the card is drawn. An empty result removes the disclosure. With a year
+  filter on, the closest open paper is kept even if it has no year.
+- Other listed copies finds the same work when a stored DOI uses a doi.org
+  prefix or different capital letters. Unstarring a paper hides that list
+  even if a copy request was already in flight. Starring another paper on
+  the same page still shows copies that were loading for the other cards.
+  A website URL with and without a trailing slash is one copy. A listed
+  URL says "Open copy listed" when any stored source for that URL meets
+  the open rule. A copy folded in by merge is labeled from that source's
+  own stored OA fields, not from the kept record.
+
+
 ### Added
-- Search cards show "meaning X · words +Y" next to the score. Search CSV
-  adds meaning_score and word_bonus after Similarity.
+- On a starred Search card with no open copy listed anywhere, "Different work
+  you can read (N)" lists up to three other papers from the same library that
+  have an open copy listed and are close in meaning. Each row is labelled
+  "Different paper", says how it differs (year, type, or which of the
+  question's concepts it covers), and uses "Open copy listed". No
+  suggestions means no disclosure.
+- On a starred Search card with no open copy listed, "Other listed copies (N)"
+  names other known places for the same work (same DOI or a merged record),
+  each with a link. A copy that meets the stored open rule also says "Open
+  copy listed". The list uses stored data only, at most five URLs. Crossref
+  text-mining links appear only with a recognised Creative Commons licence.
+- `tools/eval_laya_groups.py` checks whether Laya can sort a question's top 30
+  papers into answers, how or why, context, and different. It scores the dev
+  split only. Search is unchanged.
+- Search cards show an access label from stored OA fields: "Open copy listed"
+  (a link) or "No open copy listed (<source>)". A Free to read filter keeps
+  papers with an open copy listed. Nothing is checked over the network.
+  Crossref text-mining links count only when that link has a recognised
+  Creative Commons licence URL.
 - `app/services/question_concepts.py` reads a research question into
   keywords and actor, action, outcome, population, period and place
-  phrases. Search ranking uses those keywords for the word-match share.
+  phrases. Search does not call it yet.
 - Search cards show a type chip when the paper has a stored type (Article,
   Review article, Book, Chapter, Thesis, and the rest of the stored types).
   Papers with no type, or an unknown type, have no chip. A Type filter sits
@@ -46,9 +83,10 @@ and this project aims to follow Semantic Versioning for app version strings
   this".
 
 ### Changed
-- Search ranking is 0.8 × meaning match plus 0.2 × BM25 on the question's
-  key words. Filler words such as "what", "how", and "role" are dropped.
-  With Prefer exact words off, the score is meaning only.
+- The offline Laya group check, when no threshold stays within a 5%
+  harmful-error rate, keeps the lowest harmful rate before macro-F1.
+  The dev report lists ndcg@10 and relevant@10 for each question, and how
+  those scores changed from today's order.
 - Label sheets include each paper's abstract and a link, shuffle the rows so
   rank is not first, and write a readable HTML page per question.
 - A later fetch of the same work fills empty metadata (including year and
@@ -129,6 +167,10 @@ and this project aims to follow Semantic Versioning for app version strings
   error text; the server log keeps it.
 
 ### Fixed
+- Closed Search cards name every source that reported on the paper in
+  "No open copy listed (<sources>)". An open label needs a real HTTP(S)
+  link with a hostname. A Crossref link counts when that entry has a
+  Creative Commons licence URL such as /licenses/by/4.0/.
 - Question concept helper keeps effect and impact as content unless they
   are the frame noun, as in "what impact did" or "the effect of". It
   reads a population after "in". Lowercase "us" is not a place. Search

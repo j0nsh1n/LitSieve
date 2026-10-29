@@ -29,6 +29,7 @@ from app.fetchers.plos import PLOSFetcher
 from app.fetchers.pubmed import PubMedFetcher
 from app.fetchers.semanticscholar import SemanticScholarFetcher
 from app.fetchers.zenodo import ZenodoFetcher
+from app.services.access import OPEN_LISTED, access_public_dict, access_state
 from app.services.clustering import (
     NOISE_CLUSTER_ID,
     NOISE_CLUSTER_LABEL,
@@ -36,16 +37,6 @@ from app.services.clustering import (
     ClusterLabeler,
 )
 from app.services.embeddings import EmbeddingEngine
-from app.services.lexical import (
-    RANK_FORMULA,
-    RANK_METHOD,
-    RANK_QUERY_KIND,
-    WORD_WEIGHT,
-    combine_rank_score,
-    lexical_query_text,
-    lexical_scores,
-    word_bonus_value,
-)
 from app.services.work_types import work_type_matches_filter
 from app.storage.database import (
     SEARCH_ARTICLE_COLUMNS,
@@ -53,6 +44,9 @@ from app.storage.database import (
     omit_null_metadata,
 )
 from app.utils import parse_year
+
+SEMANTIC_WEIGHT = 0.7
+LEXICAL_WEIGHT = 0.3
 
 
 def group_undated_last(results: List[Dict]) -> None:
@@ -616,8 +610,9 @@ class LiteratureSearchPipeline:
         year_max: Optional[int] = None,
         extra_exclude: Optional[set] = None,
         work_type_filter: Optional[List[str]] = None,
+        free_to_read: bool = False,
     ) -> Tuple[List[Tuple[str, str]], np.ndarray, Dict]:
-        """Embeddings + metadata after screening / source / type / cluster / year filters."""
+        """Embeddings + metadata after screening / source / type / access / cluster / year filters."""
 
         article_ids, article_embeddings = self._load_embeddings_cached()
         empty_meta: Dict = {}
@@ -648,6 +643,18 @@ class LiteratureSearchPipeline:
             keep = [
                 i for i, key in enumerate(article_ids)
                 if work_type_matches_filter(stored_types.get(key), wanted)
+            ]
+            if not keep:
+                return [], article_embeddings[:0], empty_meta
+            article_ids = [article_ids[i] for i in keep]
+            article_embeddings = article_embeddings[keep]
+
+        if free_to_read:
+            stored_access = self.db.get_article_access_fields()
+            keep = [
+                i for i, key in enumerate(article_ids)
+                if access_state(stored_access.get(key) or {"source": key[1]}).state
+                == OPEN_LISTED
             ]
             if not keep:
                 return [], article_embeddings[:0], empty_meta
@@ -702,6 +709,18 @@ class LiteratureSearchPipeline:
             else:
                 article["work_type"] = value
 
+    def _attach_access(self, articles: List[Dict]) -> None:
+        """Fill the access label on the ranked top-K from one batched lookup."""
+        if not articles:
+            return
+        keys = [(article["article_id"], article["source"]) for article in articles]
+        stored = self.db.get_access_fields_for_keys(keys)
+        for article in articles:
+            key = (article["article_id"], article["source"])
+            fields = stored.get(key) or {"source": article.get("source")}
+            info = access_state(fields)
+            article["access"] = access_public_dict(info)
+
     def _hybrid_rerank(
         self,
         query_text: str,
@@ -709,21 +728,22 @@ class LiteratureSearchPipeline:
         articles_all: Dict,
         top_k: int,
     ) -> List[Dict]:
-        """Blend semantic cosine with a BM25 word-match share; cut to top_k.
+        """Blend semantic cosine with TF-IDF lexical scores; cut to top_k.
 
-        Word scores stay on a fixed 0-1 scale (BM25 divided by the query's
-        theoretical max). Stretching against the shortlist (min-max) gave the
-        paper with the most word overlap the full lexical weight however small
-        that overlap was (audit 19.1). `similarity_score` is the blend, so the
-        number on each card is the one the list is sorted by; `semantic_score`
-        keeps the meaning part; `word_bonus` is the amount mixed in from words.
+        Both scores stay on their own fixed 0-1 cosine scale. Stretching them
+        against the shortlist (min-max) gave the paper with the most word
+        overlap the full lexical weight however small that overlap was (audit
+        19.1). `similarity_score` is the blend, so the number on each card is
+        the one the list is sorted by; `semantic_score` keeps the meaning part.
 
-        Lexical features are fit only on the semantic shortlist (typically
-        <= ~250 docs), not the full corpus, so rebuilding per query is
-        intentional and cheap. Full-corpus embedding loads are cached on the
-        pipeline (see _load_embeddings_cached) and invalidated when the corpus
-        changes.
+        TF-IDF is fit only on the semantic shortlist (typically <= ~250 docs),
+        not the full corpus, so rebuilding per query is intentional and cheap.
+        Full-corpus embedding loads are cached on the pipeline (see
+        _load_embeddings_cached) and invalidated when the corpus changes.
         """
+        from sklearn.feature_extraction.text import TfidfVectorizer
+        from sklearn.metrics.pairwise import cosine_similarity as sk_cosine
+
         keys = [k for k, _ in ranked]
         sem_scores = [float(s) for _, s in ranked]
         docs = []
@@ -732,25 +752,21 @@ class LiteratureSearchPipeline:
             docs.append(f"{a.get('title') or ''} {a.get('abstract') or ''}".strip())
 
         try:
-            qtext = lexical_query_text(query_text, RANK_QUERY_KIND)
-            lex: Optional[List[float]] = lexical_scores(qtext, docs, RANK_METHOD)
+            vec = TfidfVectorizer(stop_words='english', ngram_range=(1, 2))
+            mat = vec.fit_transform(docs)
+            q = vec.transform([query_text or ''])
+            lex: Optional[List[float]] = sk_cosine(q, mat).ravel().tolist()
         except Exception as e:
             logger.warning("Lexical boost failed (%s); pure semantic ranking.", e)
             lex = None
 
         if lex is None:
-            combined = [(s, s) for s in sem_scores]
-            bonuses: Optional[List[float]] = None
+            scores = list(sem_scores)
         else:
-            combined = [
-                combine_rank_score(s, L, RANK_FORMULA, WORD_WEIGHT)
-                for s, L in zip(sem_scores, lex)
+            scores = [
+                SEMANTIC_WEIGHT * s + LEXICAL_WEIGHT * L for s, L in zip(sem_scores, lex)
             ]
-            bonuses = [
-                word_bonus_value(s, L, RANK_FORMULA, WORD_WEIGHT)
-                for s, L in zip(sem_scores, lex)
-            ]
-        order = sorted(range(len(keys)), key=lambda i: combined[i], reverse=True)
+        order = sorted(range(len(keys)), key=lambda i: scores[i], reverse=True)
 
         out: List[Dict] = []
         for i in order[:top_k]:
@@ -758,12 +774,10 @@ class LiteratureSearchPipeline:
             if key not in articles_all:
                 continue
             article = omit_null_metadata(dict(articles_all[key]))
-            article['similarity_score'] = round(float(combined[i][0]), 4)
+            article['similarity_score'] = round(float(scores[i]), 4)
             article['semantic_score'] = round(float(sem_scores[i]), 4)
             if lex is not None:
                 article['lexical_score'] = round(float(lex[i]), 4)
-                if bonuses is not None:
-                    article['word_bonus'] = round(float(bonuses[i]), 4)
             out.append(article)
         return out
 
@@ -779,12 +793,13 @@ class LiteratureSearchPipeline:
         query_embedding: Optional[np.ndarray] = None,
         extra_exclude: Optional[set] = None,
         work_type_filter: Optional[List[str]] = None,
+        free_to_read: bool = False,
     ) -> List[Dict]:
         """
         Search for articles similar to a query (or a provided query embedding).
 
-        Filters (screening, source, type, cluster, year) apply BEFORE ranking.
-        When lexical_boost is True, re-rank a wider semantic shortlist with words.
+        Filters (screening, source, type, access, cluster, year) apply BEFORE ranking.
+        When lexical_boost is True, re-rank a wider semantic shortlist with TF-IDF.
         """
         logger.info("\n=== Searching for similar articles ===")
         logger.info(f"Query: {query_text}\n")
@@ -796,6 +811,7 @@ class LiteratureSearchPipeline:
             year_max=year_max,
             extra_exclude=extra_exclude,
             work_type_filter=work_type_filter,
+            free_to_read=free_to_read,
         )
         if len(article_ids) == 0:
             logger.info("No embeddings match the current filters.")
@@ -846,6 +862,7 @@ class LiteratureSearchPipeline:
             group_undated_last(similar_articles)
 
         self._attach_work_types(similar_articles)
+        self._attach_access(similar_articles)
 
         logger.info(f"Top {len(similar_articles)} most similar articles:\n")
         for i, article in enumerate(similar_articles, 1):
@@ -943,6 +960,7 @@ class LiteratureSearchPipeline:
         year_min: Optional[int] = None,
         year_max: Optional[int] = None,
         work_type_filter: Optional[List[str]] = None,
+        free_to_read: bool = False,
     ) -> Dict:
         """Rank papers near the centroid of the user's starred embeddings."""
         starred_keys = self.db.get_starred_keys()
@@ -981,6 +999,7 @@ class LiteratureSearchPipeline:
             lexical_boost=False,
             query_embedding=centroid,
             work_type_filter=work_type_filter,
+            free_to_read=free_to_read,
         )
         return {"results": results, "seed_count": len(starred_keys)}
 
@@ -1100,6 +1119,7 @@ class LiteratureSearchPipeline:
         lexical_boost: bool = True,
         include_seed: bool = False,
         work_type_filter: Optional[List[str]] = None,
+        free_to_read: bool = False,
     ) -> Dict:
         """Find a local seed article (by id/title), then rank similar papers."""
         article = self.db.find_article_by_seed(seed)
@@ -1121,8 +1141,118 @@ class LiteratureSearchPipeline:
             lexical_boost=lexical_boost,
             extra_exclude=extra_exclude,
             work_type_filter=work_type_filter,
+            free_to_read=free_to_read,
         )[:top_k]
         return {"seed": article, "results": results}
+
+    def suggest_different_work(
+        self,
+        keys: List[Tuple[str, str]],
+        query_text: str = "",
+        source_filter: Optional[List[str]] = None,
+        cluster_filter: Optional[List[int]] = None,
+        year_min: Optional[int] = None,
+        year_max: Optional[int] = None,
+        work_type_filter: Optional[List[str]] = None,
+    ) -> List[Dict]:
+        """Open copies of nearby papers when a starred card has none."""
+        from app.services.access import NONE_LISTED, other_copies_result
+        from app.services.different_work import (
+            MIN_SIMILARITY,
+            SUGGESTION_LIMIT,
+            difference_line,
+            pick_different_work,
+            suggestion_public_dict,
+            work_doi,
+        )
+        from app.services.question_concepts import question_concepts
+        from app.services.work_types import normalize_doi
+
+        if not keys:
+            return []
+        starred = self.db.get_starred_copy_fields(keys)
+        dois: List[str] = []
+        seen_doi: set = set()
+        for row in starred.values():
+            stored = str(row.get("doi") or "").strip()
+            normalized = normalize_doi(row.get("doi"))
+            for doi in (stored, normalized):
+                if doi and doi not in seen_doi:
+                    seen_doi.add(doi)
+                    dois.append(doi)
+        peers = self.db.get_copy_fields_for_dois(dois)
+        peers_by_doi: Dict[str, List[Dict]] = {}
+        for peer in peers:
+            doi = work_doi(peer.get("doi"))
+            if doi:
+                peers_by_doi.setdefault(doi, []).append(peer)
+
+        concepts = question_concepts(query_text) if str(query_text or "").strip() else None
+        ids, matrix = self._load_embeddings_cached()
+        id_to_idx = {key: i for i, key in enumerate(ids)}
+
+        out: List[Dict] = []
+        for key in keys:
+            raw = starred.get(key)
+            if not raw:
+                continue
+            article = self.db.get_article_by_id(key[0], key[1])
+            if not article:
+                continue
+            for field in (
+                "doi", "oa_status", "best_oa_url", "host_name", "locations", "provenance",
+            ):
+                if raw.get(field) is not None:
+                    article[field] = raw[field]
+            if access_state(article).state != NONE_LISTED:
+                continue
+            doi = work_doi(article.get("doi"))
+            peer_rows = list(peers_by_doi.get(doi, [])) if doi else []
+            if other_copies_result(article, peer_rows).has_open_copy:
+                continue
+            idx = id_to_idx.get(key)
+            if idx is None:
+                continue
+            extra_exclude = {key}
+            for peer in peer_rows:
+                extra_exclude.add((
+                    str(peer.get("article_id") or ""),
+                    str(peer.get("source") or ""),
+                ))
+            ranked = self.search_similar(
+                query_text="",
+                top_k=SUGGESTION_LIMIT + 8,
+                source_filter=source_filter,
+                cluster_filter=cluster_filter,
+                year_min=year_min,
+                year_max=year_max,
+                lexical_boost=False,
+                query_embedding=matrix[idx],
+                extra_exclude=extra_exclude,
+                work_type_filter=work_type_filter,
+                free_to_read=True,
+            )
+            picked = pick_different_work(
+                article,
+                ranked,
+                min_similarity=MIN_SIMILARITY,
+                limit=SUGGESTION_LIMIT,
+                same_work_keys=extra_exclude,
+            )
+            suggestions = []
+            for item in picked:
+                public = suggestion_public_dict(
+                    item, difference_line(article, item, concepts),
+                )
+                if public:
+                    suggestions.append(public)
+            if suggestions:
+                out.append({
+                    "article_id": key[0],
+                    "source": key[1],
+                    "suggestions": suggestions,
+                })
+        return out
 
     def get_cluster_briefings(self) -> List[Dict]:
         """Rule-based topic overview cards for each cluster."""

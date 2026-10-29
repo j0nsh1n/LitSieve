@@ -12,14 +12,41 @@
   poster. Live at `https://www.litpilot.org` from the production checkout,
   `main` through #106 (2026-10-16). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
-- Latest full suite (2026-10-28, `feat/word-bonus`): **1981 passed**
-  in 174.99 s, no skips or xfails. `ruff check .` clean; `pyright app`
-  **0 errors**, 6 optional-import warnings (CI blocks on errors).
+- Latest full suite (2026-10-29, `fix/access-bounds-visibility`):
+  **2127 passed** in 166.41 s, no skips or xfails. `ruff check .` clean;
+  `pyright app` **0 errors**, 6 optional-import warnings (CI blocks on
+  errors).
   `pip-audit` (2026-10-14): no known vulnerabilities; ROCm torch/triton are
   un-auditable. No dependency lockfile.
-- P2.2 ranks Search as 0.8 × meaning match plus 0.2 × BM25 on the question's
-  key words. Prefer exact words off is meaning only. Cards show
-  "meaning X · words +Y". Search.js and style.css cache-bust are `20261028e`.
+- P2.8: a starred Search card with no open copy listed, and no P2.4 open
+  other copy, can show "Different work you can read (N)" (at most 3).
+  Neighbors come from stored embeddings through `search_similar` (same path
+  as more-like-starred / seed), cosine floor 0.45, same-work and set-aside
+  rows dropped. Eligible neighbors are sorted by cosine before the cap of
+  3, so a year filter cannot drop a closer undated paper. The client loads
+  suggestions when the disclosure opens. The difference line uses year,
+  stored type, and `question_concepts` on the current Search question. JSON
+  route `POST /api/articles/different-work` takes one seed, a 1,000-character
+  question, and at most 50 entries per filter list. Same-DOI lookup reads a
+  key/DOI projection first. Open-copy existence uses `has_open_copy` before
+  the five-copy display cap. Search.js cache-bust is `20261029a`.
+- P2.4: a starred Search card with no open copy listed can show other listed
+  copies of the same work (same-record locations, same DOI including
+  set-aside rows, merged extra URLs). One batched JSON route, no schema
+  change, cap five. Same-work DOI lookup uses `normalize_doi` on stored
+  rows. Trailing-slash origins share one URL key. The client mounts copies
+  only on a starred none_listed card and keeps a page request when another
+  card is starred. Each listed URL keeps "Open copy listed" if any stored
+  occurrence of that URL meets the P2.3 open rule, including after five
+  copies are already selected. A merged-in copy uses that source's
+  `oa_status` and `best_oa_url` in provenance. Missing evidence leaves it
+  unlabeled. The copies payload includes `has_open_copy`.
+- P2.3 shows an access label on Search cards from stored OA fields, with a
+  Free to read filter next to Type. Closed cards keep every reporting
+  source. Open labels need a real HTTP(S) host. Crossref needs a
+  recognised CC licence identifier and version. The chip sits outside the
+  source/type tags that Catalog and collapsed phone Table rows hide.
+  style.css cache-bust is `20261029a`.
 - P1.7 shows a type chip on Search cards and a Type filter next to Sources.
   The filter runs before ranking and reads only `work_type`. Ranked hits get
   that column in one batched query. Null and unknown types have no chip.
@@ -29,9 +56,19 @@
   five committed questions under `tools/bench/`. Replay snapshots now copy
   stored `work_type`, `doi` and `container_title` from the corpus row after
   ranking. The `baseline_v1` corpus and replay output live in
-  `~/HealthDatabaseAccess-scratch/bench/` and are not in git. Human labels
-  are P1.9. P2.1 adds `app/services/question_concepts.py`; ranking reads
-  keywords from it.
+  `~/HealthDatabaseAccess-scratch/bench/` and are not in git. P1.9 labels
+  are in `bench/labels_final/`. P2.1 adds `app/services/question_concepts.py`.
+  Search uses it for the P2.8 difference line.
+- P2.5a adds `tools/eval_laya_groups.py`. It scores Laya relevance groups on
+  the dev split of the frozen top 30. The test split is not scored. The
+  write-up is `~/HealthDatabaseAccess-scratch/bench/p25a_results.md`. The
+  best run that stays under a 5% harmful-error rate sorts 16 of 91 dev papers
+  and does not improve ndcg@10. The report lists each question's ndcg@10
+  and relevant@10. No group setting is ready to show students. The one lead
+  is F2 (decomposed yes/no per concept): with the different-group cut at
+  0.65 it sorts 38 of 91 papers, puts 2 of 27 good papers in different
+  (over the 5% cap), and still raises ndcg@10. The dev slice has only 2
+  how_why papers, so it is too small to calibrate four groups.
 - P1.6 stores Collect inputs and Search questions in the library database
   (`fetch_runs`, `question_log`), about 50 rows each. Writes come from
   `_run_multi_fetch` (background and sync, including cancel and error) and
@@ -155,7 +192,7 @@
 | `static/` | vanilla JS/CSS (no npm); cache-bust `?v=` |
 | `tests/` | pytest; policy in `tests/README.md` |
 | `docs/` | DEPLOY, SELFHOST, plans, SCALE_NOTES |
-| `tools/` | backup, watchdog, bench_scale, eval_search, encrypt_databases, operator |
+| `tools/` | backup, watchdog, bench_scale, eval_search, eval_laya_groups, encrypt_databases, operator |
 
 ## Domain Model
 - **User** (`users.db`): username, password hash, token_version; optional recovery
@@ -227,15 +264,24 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-28. Branch `feat/word-bonus`. P2.2 ranking is blend BM25
-  at w = 0.2 on question keywords. Dev nDCG@10 0.4771 vs baseline 0.4457.
-  Test split 0.6046 vs 0.644. PR is open.
+- **Date:** 2026-10-29. `fix/access-bounds-visibility` from origin/main
+  `c124604`. Ports the three passing #126 fixes: uncapped open-copy
+  existence (`CopySet.has_open_copy`), bounded P2.8 requests (one seed,
+  length limits, lightweight DOI projection), and access-label visibility
+  in Catalog and phone Table. Leaves the evidence redesign and
+  `_merge_locations` on main. Search.js and style.css cache-bust
+  `20261029a`. Screenshots in
+  `~/HealthDatabaseAccess-scratch/audit-2026-10-27/phase2/screens_b5/`.
 - Validation (production venv, this worktree, no install): `ruff check .`
-  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 1981
-  passed in 174.99 s, `node --check static/js/search.js`. Scratch is
-  `~/HealthDatabaseAccess-scratch/pytest-word-bonus`. Sweep notes live in
-  `~/HealthDatabaseAccess-scratch/bench/p22_dev_sweep.md`.
+  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2127
+  passed in 166.41 s. Scratch is
+  `~/HealthDatabaseAccess-scratch/pytest-access-bounds-visibility`.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
   and unscheduled roadmap backlog. Ship staging was last recorded at
-  `f9485cf`.
-- **Next step:** review of the word-bonus PR.
+  `522ff7e`. P1.9 labels are done: a three-model panel plus the owner's
+  review of 29 rows, in `~/HealthDatabaseAccess-scratch/bench/labels_final/`
+  (not in git). The held-out test split is still unscored. P2.2, PR #122,
+  remains open and on hold. The evidence redesign from #126 follows in a
+  separate PR.
+- **Next step:** independent review of this PR. Do not merge from the
+  builder. Do not close #126.

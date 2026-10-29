@@ -72,11 +72,15 @@ a substitute for school library databases.
     exclude/restore; grouping is optional and never auto-runs after fetch.
   - Per-result **Not relevant** (`off_topic`), optional reasons, and Undo.
 - Search: per-result **Not relevant** (`off_topic`); export / report panel
-- Search: rank = meaning match (semantic cosine) plus a word-match bonus, capped at 1. The bonus uses the question's key words with filler words ("what", "how", "role") removed. Its size and method (bm25, w = 0.2) are set on the search benchmark, and it is at most 0.3. The card shows "meaning X · words +Y", and the list is sorted by the total. (decided 2026-10-28), year/source/type filters (a year range lists
-  papers with no usable year after the results, under "No year listed"; decided
+- Search: hybrid rank (0.7 × semantic cosine + 0.3 × TF-IDF cosine, both on
+  their own 0-1 scale; the card shows that blended score and the list is
+  sorted by it), year/source/type filters (a year range lists papers with no
+  usable year after the results, under "No year listed"; decided
   2026-10-16; cards show a type chip when the type is stored), seed
   paper, **more like starred** (starred papers **remain** in the result list),
   notes/stars, export on-screen results as RIS
+- Search: each card shows an access label taken from what the databases report. "Open copy listed" appears when a source lists a free copy with a link; otherwise the card shows "No open copy listed (<source>)". Nothing is checked over the network, so the label never says "verified". Crossref text-mining links never count as an open copy. A **Free to read** filter keeps the papers that have an open copy listed. When a starred paper has no open copy listed, Search shows other listed copies of the same work (same DOI or merged record), if any are known.
+- Search: when a starred paper has no open copy anywhere, Search may suggest **Different work** that covers the same question. The suggestion is labelled as a different paper, says how it differs (year, place, population, or type), and uses "open copy listed", never "free" or "verified".
 - Optional AI Refine / Ask / **Explain this study**: one abstract at a time;
   never silent bulk rewrite. Explain this study is a structured plain-language
   reading (audiences `high_school` | `general_reader`) of an abstract already

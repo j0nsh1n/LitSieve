@@ -9,6 +9,7 @@ const searchState = {
  filters: {
   top_k: 10, sort_by: 'similarity', pico_boost: false, lexical_boost: true,
   source_filter: [], year_min: null, year_max: null, work_type_filter: [],
+  free_to_read: false,
   display: { starred: false, noted: false, recent: false, sources: {} },
  },
 };
@@ -85,6 +86,307 @@ function storedWorkTypeFilter(picked) {
 function workTypeFilterForRequest(filters) {
  const selected = Array.isArray(filters.work_type_filter) ? filters.work_type_filter.filter(Boolean) : [];
  return selected.length ? selected.slice() : undefined;
+}
+
+function accessChipHtml(article) {
+ const access = article && article.access && typeof article.access === 'object'
+  ? article.access : {};
+ const url = typeof access.url === 'string' ? access.url.trim() : '';
+ const open = access.state === 'open_listed' && /^https?:\/\//i.test(url);
+ if (open) {
+  return `<a class="tag result-access-chip" href="${escapeAttr(url)}" target="_blank" rel="noopener">Open copy listed</a>`;
+ }
+ let sources = Array.isArray(access.sources)
+  ? access.sources.map((name) => String(name || '').trim()).filter(Boolean) : [];
+ if (!sources.length && article && article.source) {
+  const name = typeof getSourceName === 'function' ? getSourceName(article.source) : String(article.source);
+  if (name) sources = [name];
+ }
+ const suffix = sources.length ? ` (${escapeHtml(sources.join(', '))})` : '';
+ return `<span class="tag result-access-chip">No open copy listed${suffix}</span>`;
+}
+
+let otherCopiesCache = new Map();
+let otherCopiesGen = 0;
+
+function otherCopiesKey(article) {
+ return String(article && article.article_id != null ? article.article_id : '')
+  + '\t' + String(article && article.source != null ? article.source : '');
+}
+
+function otherCopiesHtml(copies) {
+ const rows = Array.isArray(copies) ? copies : [];
+ if (!rows.length) return '';
+ const items = rows.map((copy) => {
+  const url = copy && typeof copy.url === 'string' ? copy.url.trim() : '';
+  if (!/^https?:\/\//i.test(url)) return '';
+  const where = copy && copy.where ? String(copy.where) : 'publisher page';
+  const open = copy && copy.open_listed
+   ? ' <span class="tag">Open copy listed</span>' : '';
+  return `<li><a href="${escapeAttr(url)}" target="_blank" rel="noopener">${escapeHtml(where)}</a>${open}</li>`;
+ }).filter(Boolean);
+ if (!items.length) return '';
+ return `<details class="result-other-copies"><summary>Other listed copies (${items.length})</summary><ul>${items.join('')}</ul></details>`;
+}
+
+function mountOtherCopies(card, copies) {
+ if (!card) return;
+ const existing = card.querySelector('.result-other-copies');
+ const html = otherCopiesHtml(copies);
+ if (!html) {
+  if (existing) existing.remove();
+  return;
+ }
+ const wrap = document.createElement('div');
+ wrap.innerHTML = html;
+ const node = wrap.firstElementChild;
+ if (!node) return;
+ if (existing) existing.replaceWith(node);
+ else {
+  const head = card.querySelector('.result-row-head');
+  if (head) head.insertAdjacentElement('afterend', node);
+  else card.prepend(node);
+ }
+}
+
+function otherCopiesLibraryId() {
+ if (typeof pageLibraryId === 'function') return String(pageLibraryId() || '');
+ return String(activeLibraryId() || '');
+}
+
+function cardCanShowOtherCopies(card) {
+ if (!card) return false;
+ const starBtn = card.querySelector('.star-btn');
+ if (!starBtn || !starBtn.classList.contains('is-starred')) return false;
+ const chip = card.querySelector('.result-access-chip');
+ if (!chip) return false;
+ return String(chip.textContent || '').trim().indexOf('No open copy listed') === 0;
+}
+
+async function loadOtherCopiesForResults(articles) {
+ const gen = otherCopiesGen;
+ const libraryId = otherCopiesLibraryId();
+ const stale = () => gen !== otherCopiesGen || libraryId !== otherCopiesLibraryId();
+ const keys = [];
+ for (const article of articles || []) {
+  if (!article || !article.starred) continue;
+  if (!article.access || article.access.state !== 'none_listed') continue;
+  const key = otherCopiesKey(article);
+  if (!key || otherCopiesCache.has(key)) continue;
+  if (article.article_id && article.source) {
+   keys.push({ article_id: article.article_id, source: article.source });
+  }
+ }
+ if (keys.length) {
+  try {
+   const data = await apiCall('/api/articles/other-copies', {
+    method: 'POST',
+    body: withPageLibrary({ articles: keys.slice(0, 200) }),
+   });
+   if (stale()) return;
+   const rows = data && Array.isArray(data.articles) ? data.articles : [];
+   for (const row of rows) {
+    otherCopiesCache.set(otherCopiesKey(row), cacheOtherCopiesRow(row));
+   }
+   for (const item of keys) {
+    const key = otherCopiesKey(item);
+    if (!otherCopiesCache.has(key)) {
+     otherCopiesCache.set(key, { copies: [], has_open_copy: false });
+    }
+   }
+  } catch (_err) {
+   if (stale()) return;
+  }
+ }
+ if (stale()) return;
+ document.querySelectorAll('#results-list .result-row').forEach((card) => {
+  if (!cardCanShowOtherCopies(card)) return;
+  const key = `${card.dataset.articleId || ''}\t${card.dataset.source || ''}`;
+  const copies = cachedOtherCopies(key);
+  if (copies && copies.length) mountOtherCopies(card, copies);
+ });
+ if (stale()) return;
+ await loadDifferentWorkForResults();
+}
+
+let differentWorkCache = new Map();
+let differentWorkInflight = new Set();
+
+function differentWorkHtml(items) {
+ const rows = Array.isArray(items) ? items : [];
+ if (!rows.length) return '';
+ const lis = rows.map((item) => {
+  const url = item && typeof item.url === 'string' ? item.url.trim() : '';
+  if (!/^https?:\/\//i.test(url)) return '';
+  const title = item && item.title ? String(item.title) : 'Untitled paper';
+  const diff = item && item.difference
+   ? String(item.difference) : 'Different paper on a similar topic';
+  return `<li><a href="${escapeAttr(url)}" target="_blank" rel="noopener">${escapeHtml(title)}</a>`
+   + ' <span class="tag">Different paper</span>'
+   + ` <span class="result-different-work-why">${escapeHtml(diff)}</span>`
+   + ' <span class="tag">Open copy listed</span></li>';
+ }).filter(Boolean);
+ if (!lis.length) return '';
+ return `<details class="result-other-copies result-different-work"><summary>Different work you can read (${lis.length})</summary><ul>${lis.join('')}</ul></details>`;
+}
+
+function insertDifferentWorkNode(card, node) {
+ const copies = card.querySelector('.result-other-copies');
+ if (copies && !copies.classList.contains('result-different-work')) {
+  copies.insertAdjacentElement('afterend', node);
+  return;
+ }
+ const head = card.querySelector('.result-row-head');
+ if (head) head.insertAdjacentElement('afterend', node);
+ else card.prepend(node);
+}
+
+function bindDifferentWorkOpen(card, node) {
+ if (!node || node.dataset.dwBound === '1') return;
+ node.dataset.dwBound = '1';
+ node.addEventListener('toggle', () => {
+  if (!node.open) return;
+  void loadDifferentWorkForCard(card);
+ });
+}
+
+function mountDifferentWork(card, items, opened) {
+ if (!card) return;
+ const existing = card.querySelector('.result-different-work');
+ const html = differentWorkHtml(items);
+ if (!html) {
+  if (existing) existing.remove();
+  return;
+ }
+ const wrap = document.createElement('div');
+ wrap.innerHTML = html;
+ const node = wrap.firstElementChild;
+ if (!node) return;
+ if (opened) node.open = true;
+ if (existing) existing.replaceWith(node);
+ else insertDifferentWorkNode(card, node);
+}
+
+function mountDifferentWorkPlaceholder(card) {
+ if (!card || card.querySelector('.result-different-work')) return;
+ const node = document.createElement('details');
+ node.className = 'result-other-copies result-different-work';
+ const summary = document.createElement('summary');
+ summary.textContent = 'Different work you can read';
+ node.appendChild(summary);
+ insertDifferentWorkNode(card, node);
+ bindDifferentWorkOpen(card, node);
+}
+
+function cacheOtherCopiesRow(row) {
+ const copies = Array.isArray(row && row.copies) ? row.copies : [];
+ const has = !!(row && row.has_open_copy)
+  || copies.some((copy) => copy && copy.open_listed);
+ return { copies, has_open_copy: has };
+}
+
+function cachedOtherCopies(key) {
+ const cached = otherCopiesCache.get(key);
+ if (!cached) return [];
+ if (Array.isArray(cached.copies)) return cached.copies;
+ return Array.isArray(cached) ? cached : [];
+}
+
+function cardHasOpenOtherCopy(card) {
+ if (!card) return false;
+ const key = `${card.dataset.articleId || ''}\t${card.dataset.source || ''}`;
+ const cached = otherCopiesCache.get(key);
+ if (!cached) return false;
+ if (typeof cached.has_open_copy === 'boolean') return cached.has_open_copy;
+ const copies = cachedOtherCopies(key);
+ return copies.some((copy) => copy && copy.open_listed);
+}
+
+function differentWorkRequestBody(keys) {
+ const body = withPageLibrary({ articles: keys.slice(0, 200) });
+ const queryText = lastSearchParams && lastSearchParams.query_text
+  ? String(lastSearchParams.query_text) : '';
+ if (queryText) body.query_text = queryText;
+ const sources = searchState.filters.source_filter;
+ if (Array.isArray(sources) && sources.length) body.source_filter = sources.slice();
+ if (searchState.filters.year_min != null) body.year_min = searchState.filters.year_min;
+ if (searchState.filters.year_max != null) body.year_max = searchState.filters.year_max;
+ const types = workTypeFilterForRequest(searchState.filters);
+ if (types && types.length) body.work_type_filter = types;
+ return body;
+}
+
+function applyDifferentWorkToCard(card, items, opened) {
+ if (!cardCanShowOtherCopies(card) || cardHasOpenOtherCopy(card)) {
+  mountDifferentWork(card, []);
+  return;
+ }
+ if (items && items.length) mountDifferentWork(card, items, opened);
+ else mountDifferentWork(card, []);
+}
+
+async function loadDifferentWorkForCard(card) {
+ if (!card) return;
+ const gen = otherCopiesGen;
+ const libraryId = otherCopiesLibraryId();
+ const stale = () => gen !== otherCopiesGen || libraryId !== otherCopiesLibraryId();
+ if (!cardCanShowOtherCopies(card) || cardHasOpenOtherCopy(card)) {
+  mountDifferentWork(card, []);
+  return;
+ }
+ const articleId = card.dataset.articleId;
+ const source = card.dataset.source;
+ if (!articleId || !source) return;
+ const key = `${articleId}\t${source}`;
+ if (differentWorkCache.has(key)) {
+  applyDifferentWorkToCard(card, differentWorkCache.get(key), true);
+  return;
+ }
+ if (differentWorkInflight.has(key)) return;
+ differentWorkInflight.add(key);
+ try {
+  const data = await apiCall('/api/articles/different-work', {
+   method: 'POST',
+   body: differentWorkRequestBody([{ article_id: articleId, source }]),
+  });
+  if (stale()) return;
+  const rows = data && Array.isArray(data.articles) ? data.articles : [];
+  let items = [];
+  for (const row of rows) {
+   const rowKey = otherCopiesKey(row);
+   const suggestions = Array.isArray(row.suggestions) ? row.suggestions : [];
+   differentWorkCache.set(rowKey, suggestions);
+   if (rowKey === key) items = suggestions;
+  }
+  if (!differentWorkCache.has(key)) differentWorkCache.set(key, []);
+  applyDifferentWorkToCard(card, differentWorkCache.get(key) || items, true);
+ } catch (_err) {
+  if (stale()) return;
+ } finally {
+  differentWorkInflight.delete(key);
+ }
+}
+
+function loadDifferentWorkForResults() {
+ const gen = otherCopiesGen;
+ const libraryId = otherCopiesLibraryId();
+ if (gen !== otherCopiesGen || libraryId !== otherCopiesLibraryId()) return;
+ document.querySelectorAll('#results-list .result-row').forEach((card) => {
+  if (!cardCanShowOtherCopies(card) || cardHasOpenOtherCopy(card)) {
+   mountDifferentWork(card, []);
+   return;
+  }
+  const key = `${card.dataset.articleId || ''}\t${card.dataset.source || ''}`;
+  if (differentWorkCache.has(key)) {
+   applyDifferentWorkToCard(card, differentWorkCache.get(key));
+   return;
+  }
+  mountDifferentWorkPlaceholder(card);
+ });
+}
+
+function freeToReadForRequest(filters) {
+ return filters && filters.free_to_read ? true : undefined;
 }
 let lastSuccessfulSession = null;
 
@@ -234,6 +536,7 @@ function captureSearchSession(kind, opts = {}) {
   year_min: filters.year_min,
   year_max: filters.year_max,
   work_type_filter: filters.work_type_filter,
+  free_to_read: !!filters.free_to_read,
   filters: JSON.parse(JSON.stringify(searchState.filters)),
   saved_at: Date.now(),
  };
@@ -334,6 +637,8 @@ function applySearchSessionToForm(state) {
    searchState.filters.work_type_filter = available.length
     ? savedTypes.filter((id) => available.includes(id)) : savedTypes.slice();
   }
+  const savedFree = savedFilters ? savedFilters.free_to_read : state.free_to_read;
+  searchState.filters.free_to_read = savedFree === true;
   if (savedFilters && savedFilters.display) {
    Object.assign(displayFilterState, savedFilters.display, {
     sources: Object.assign({}, savedFilters.display.sources || {}),
@@ -496,6 +801,7 @@ function wireSearchFilterAdapters() {
  document.getElementById('simple-sort-chip')?.addEventListener('click', promptSimpleSort);
  document.getElementById('simple-sources-chip')?.addEventListener('click', promptSimpleSources);
  document.getElementById('simple-type-chip')?.addEventListener('click', promptSimpleTypes);
+ document.getElementById('simple-free-to-read-chip')?.addEventListener('click', toggleFreeToRead);
  document.getElementById('simple-starred-chip')?.addEventListener('click', promptSimpleStarred);
 }
 
@@ -891,6 +1197,16 @@ async function promptSimpleSearchScope(kind = 'text') {
     value: selectedWorkTypesOrAll(),
     options: workTypeFilterOptions(),
    }] : []),
+   {
+    id: 'free_to_read',
+    label: 'Free to read',
+    type: 'choice',
+    value: searchState.filters.free_to_read ? 'on' : 'off',
+    options: [
+     { value: 'off', label: 'All papers' },
+     { value: 'on', label: 'Open copy listed' },
+    ],
+   },
    ...(kind !== 'starred' ? [{
     id: 'lexical_boost', section: 'Ranking', label: 'Prefer exact words', type: 'choice',
     value: searchState.filters.lexical_boost ? 'on' : 'off',
@@ -938,6 +1254,9 @@ async function promptSimpleSearchScope(kind = 'text') {
  if (Array.isArray(result.types)) {
   searchState.filters.work_type_filter = storedWorkTypeFilter(result.types);
  }
+ if (result.free_to_read != null) {
+  searchState.filters.free_to_read = result.free_to_read === 'on';
+ }
  syncSearchFiltersFromForm();
  return true;
 }
@@ -947,7 +1266,7 @@ const SIMPLE_SORT_LABELS = {
 };
 
 function syncSimpleResultChips() {
- ['simple-sort-chip', 'simple-sources-chip', 'simple-type-chip', 'simple-starred-chip'].forEach((id) => {
+ ['simple-sort-chip', 'simple-sources-chip', 'simple-type-chip', 'simple-free-to-read-chip', 'simple-starred-chip'].forEach((id) => {
   const chip = document.getElementById(id);
   if (chip) chip.disabled = searchState.requestPending;
  });
@@ -964,6 +1283,11 @@ function syncSimpleResultChips() {
   const all = availableWorkTypeIds().length;
   const selected = searchState.filters.work_type_filter.length;
   types.textContent = (!selected || selected === all) ? 'Type: All' : `Type: ${selected} of ${all}`;
+ }
+ const free = document.getElementById('simple-free-to-read-chip');
+ if (free) {
+  free.classList.toggle('is-on', !!searchState.filters.free_to_read);
+  free.setAttribute('aria-pressed', String(!!searchState.filters.free_to_read));
  }
  const starred = document.getElementById('simple-starred-chip');
  if (starred) {
@@ -1036,6 +1360,18 @@ async function promptSimpleTypes() {
  } else await doSearch(replay);
 }
 
+async function toggleFreeToRead() {
+ if (searchState.requestPending) return;
+ searchState.filters.free_to_read = !searchState.filters.free_to_read;
+ syncSearchFilterControls();
+ if (!lastSearchParams) return;
+ const replay = { skipOptions: true, replay: true };
+ if (lastSearchParams.mode === 'starred') await doStarredSearch(replay);
+ else if (lastSearchParams.mode === 'seed' && lastSearchParams.include_seed) {
+  await doMoreLikeThisPaper({ article_id: lastSearchParams.query_text }, replay);
+ } else await doSearch(replay);
+}
+
 async function promptSimpleStarred() {
  if (searchState.requestPending) return;
  const choices = [{ label: displayFilterState.starred ? 'Show all current hits' : 'Show starred current hits', value: 'show' }];
@@ -1095,6 +1431,7 @@ async function doSearch(opts) {
  year_min: filters.year_min,
  year_max: filters.year_max,
  work_type_filter: filters.work_type_filter,
+ free_to_read: !!filters.free_to_read,
  mode: method,
  };
  const session = opts?.replay ? lastSuccessfulSession : captureSearchSession(method);
@@ -1113,6 +1450,7 @@ async function doSearch(opts) {
  year_max: filters.year_max,
  lexical_boost: filters.lexical_boost,
  work_type_filter: workTypeFilterForRequest(filters),
+ free_to_read: freeToReadForRequest(filters),
  },
  });
  const seed = data.seed;
@@ -1138,6 +1476,7 @@ async function doSearch(opts) {
  year_min: filters.year_min,
  year_max: filters.year_max,
  work_type_filter: workTypeFilterForRequest(filters),
+ free_to_read: freeToReadForRequest(filters),
  },
  });
  }
@@ -1188,6 +1527,7 @@ async function doStarredSearch(opts) {
  year_min: filters.year_min,
  year_max: filters.year_max,
  work_type_filter: filters.work_type_filter,
+ free_to_read: !!filters.free_to_read,
  mode: 'starred',
  };
  const session = opts?.replay ? lastSuccessfulSession : captureSearchSession('starred');
@@ -1202,6 +1542,7 @@ async function doStarredSearch(opts) {
  year_min: filters.year_min,
  year_max: filters.year_max,
  work_type_filter: workTypeFilterForRequest(filters),
+ free_to_read: freeToReadForRequest(filters),
  },
  });
  const banner = document.getElementById('seed-banner');
@@ -1261,6 +1602,7 @@ async function doMoreLikeThisPaper(article, opts) {
  year_min: filters.year_min,
  year_max: filters.year_max,
  work_type_filter: filters.work_type_filter,
+ free_to_read: !!filters.free_to_read,
  mode: 'seed',
  include_seed: true,
  };
@@ -1278,6 +1620,7 @@ async function doMoreLikeThisPaper(article, opts) {
  lexical_boost: filters.lexical_boost,
  include_seed: true,
  work_type_filter: workTypeFilterForRequest(filters),
+ free_to_read: freeToReadForRequest(filters),
  },
  });
  const seed = data.seed || article;
@@ -1531,6 +1874,8 @@ function buildResultCard(article, idx) {
  const card = document.createElement('article');
  card.className = 'article-card result-row';
  card.dataset.resultIndex = String(idx);
+ card.dataset.articleId = String(article.article_id || '');
+ card.dataset.source = String(article.source || '');
  // Catalog draws its index tab from this; it is the real source, not a topic.
  card.dataset.sourceName = getSourceName(article.source);
 
@@ -1589,6 +1934,7 @@ function buildResultCard(article, idx) {
  const typeChip = typeLabel
   ? `<span class="tag result-type-chip">${escapeHtml(typeLabel)}</span>`
   : '';
+ const accessChip = accessChipHtml(article);
  const byline = authors
   ? `${escapeHtml(authors)}${journal ? ' — ' + journal : ''}`
   : journal;
@@ -1609,8 +1955,10 @@ function buildResultCard(article, idx) {
  <span class="score-breakdown">${escapeHtml(scoreBreakdown)}</span>
  <span class="result-venue">${venue}</span>
  <span class="result-year">${year}</span>
- <span class="result-tags">
+ <span class="result-head-chips">
+  ${accessChip}<span class="result-tags">
   ${typeChip}<span class="tag">${escapeHtml(getSourceName(article.source))}</span>
+ </span>
  </span>
  </div>
  <h3 class="article-title result-row-title">${escapeHtml(article.title || '')}${resultMarksHtml(starred, !!String(noteVal).trim())}</h3>
@@ -1690,6 +2038,11 @@ function buildResultCard(article, idx) {
   });
  }
 
+ const cachedCopies = cachedOtherCopies(otherCopiesKey(article));
+ if (article.starred && cachedCopies && cachedCopies.length) {
+  mountOtherCopies(card, cachedCopies);
+ }
+
  const starBtn = card.querySelector('.star-btn');
  starBtn.addEventListener('click', async (e) => {
  e.preventDefault();
@@ -1719,7 +2072,14 @@ function buildResultCard(article, idx) {
  const starMark = card.querySelector('.result-mark-star');
  if (starMark) starMark.hidden = !next;
  bumpStarredCount(next ? 1 : -1);
+ if (!next) {
+  otherCopiesCache.delete(otherCopiesKey(article));
+  mountOtherCopies(card, []);
+  differentWorkCache.delete(otherCopiesKey(article));
+  mountDifferentWork(card, []);
+ }
  if (displayFilterState.starred) showSearchResults();
+ else if (next) void loadOtherCopiesForResults([{ ...article, starred: true }]);
  } catch (err) {
  starBtn.classList.toggle('is-starred', !next);
  starBtn.innerHTML = starLabelHtml(!next);
@@ -2036,7 +2396,13 @@ function visibleResults() {
 
 function showSearchResults(fullList) {
  const fresh = Array.isArray(fullList);
- if (fresh) lastResults = fullList;
+ if (fresh) {
+  lastResults = fullList;
+  otherCopiesCache = new Map();
+  differentWorkCache = new Map();
+  differentWorkInflight = new Set();
+  otherCopiesGen += 1;
+ }
  const bar = document.getElementById('display-filters');
  const hasHits = !!(lastResults && lastResults.length);
  if (bar) bar.hidden = !hasHits;
@@ -2045,6 +2411,7 @@ function showSearchResults(fullList) {
  syncSimpleResultChips();
  const shown = visibleResults();
  renderResults(shown);
+ void loadOtherCopiesForResults(shown);
  const countEl = document.getElementById('result-count');
  if (countEl) {
   countEl.textContent = displayFiltersActive() && hasHits
