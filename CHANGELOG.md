@@ -124,6 +124,10 @@ and this project aims to follow Semantic Versioning for app version strings
   error text; the server log keeps it.
 
 ### Fixed
+- Question concept helper keeps effect and impact as content unless they
+  are the frame noun, as in "what impact did" or "the effect of". It
+  reads a population after "in". Lowercase "us" is not a place. Search
+  still does not call it.
 - Benchmark replay snapshots now copy each paper's stored type, DOI and
   container title from the frozen corpus, so type_accuracy scores those
   fields.

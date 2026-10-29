@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import FrozenInstanceError
 from pathlib import Path
 
@@ -167,6 +168,70 @@ EXTRA_CASES = [
         QuestionConcepts(actor=("New Deal",), outcome=("unemployment",)),
     ),
     (
+        "impact assessment",
+        ["impact", "assessment"],
+        QuestionConcepts(),
+    ),
+    (
+        "How did X affect the greenhouse effect?",
+        ["X", "affect", "greenhouse", "effect"],
+        QuestionConcepts(
+            actor=("X",),
+            action=("affect",),
+            outcome=("greenhouse effect",),
+        ),
+    ),
+    (
+        "How did X affect Y in adolescents?",
+        ["X", "affect", "Y", "adolescents"],
+        QuestionConcepts(
+            actor=("X",),
+            action=("affect",),
+            outcome=("Y",),
+            population=("adolescents",),
+        ),
+    ),
+    (
+        "How did X affect Y in adolescents during 1930s?",
+        ["X", "affect", "Y", "adolescents", "1930s"],
+        QuestionConcepts(
+            actor=("X",),
+            action=("affect",),
+            outcome=("Y",),
+            population=("adolescents",),
+            period=("1930s",),
+        ),
+    ),
+    (
+        "How did X affect Y in Britain?",
+        ["X", "affect", "Y", "Britain"],
+        QuestionConcepts(
+            actor=("X",),
+            action=("affect",),
+            outcome=("Y",),
+            place=("Britain",),
+        ),
+    ),
+    (
+        "How does X affect us?",
+        ["X", "affect", "us"],
+        QuestionConcepts(
+            actor=("X",),
+            action=("affect",),
+            outcome=("us",),
+        ),
+    ),
+    (
+        "US UK British",
+        ["US", "UK", "British"],
+        QuestionConcepts(place=("US", "UK", "British")),
+    ),
+    (
+        "U.S. UK British",
+        ["U.S.", "UK", "British"],
+        QuestionConcepts(place=("U.S.", "UK", "British")),
+    ),
+    (
         "World War II Britain",
         ["World War II", "Britain"],
         QuestionConcepts(period=("World War II",), place=("Britain",)),
@@ -226,26 +291,58 @@ INVARIANT_QUESTIONS = [
 ]
 
 
-def _folded(text: str) -> str:
-    return " ".join((text or "").casefold().split())
+# Independent of app.services.question_concepts._tokenize / _WORD.
+_INDEPENDENT_TOKEN = re.compile(
+    r"[A-Za-z](?:\.[A-Za-z])+\.?"
+    r"|\d{4}\s*[–\-]\s*\d{4}"
+    r"|\d{3,4}s"
+    r"|[^\W\d_]+(?:['’\-][^\W\d_]+)*['’]?"
+    r"|\d+"
+)
 
 
-def _phrase_comes_from_question(phrase: str, question: str) -> bool:
-    haystack = _folded(question)
-    needle = _folded(phrase)
-    if not needle:
-        return True
-    return needle in haystack
+def _independent_tokens(text: str) -> list[str]:
+    return [match.group(0) for match in _INDEPENDENT_TOKEN.finditer(text or "")]
+
+
+def _whole_tokens_from_question(phrase: str, question: str) -> bool:
+    source = {token.casefold() for token in _independent_tokens(question)}
+    parts = _independent_tokens(phrase)
+    if not parts:
+        return not (phrase or "").strip()
+    return all(token.casefold() in source for token in parts)
 
 
 @pytest.mark.parametrize("question", INVARIANT_QUESTIONS)
 def test_every_output_token_comes_from_the_question(question):
     for phrase in question_keywords(question):
-        assert _phrase_comes_from_question(phrase, question)
+        assert _whole_tokens_from_question(phrase, question)
     concepts = question_concepts(question)
     for field in (
         concepts.actor, concepts.action, concepts.outcome,
         concepts.population, concepts.period, concepts.place,
     ):
         for phrase in field:
-            assert _phrase_comes_from_question(phrase, question)
+            assert _whole_tokens_from_question(phrase, question)
+
+
+def test_invariant_rejects_partial_word_and_invented_word():
+    question = "How does formative feedback affect sleep?"
+    assert not _whole_tokens_from_question("form", question)
+    assert not _whole_tokens_from_question("banana", question)
+    assert _whole_tokens_from_question("formative", question)
+    assert _whole_tokens_from_question("sleep", question)
+
+
+def test_invariant_allows_scaffold_and_punctuation_removal():
+    question = "How did the New, Deal affect society?"
+    keywords = question_keywords(question)
+    assert keywords == ["New Deal", "affect", "society"]
+    for phrase in keywords:
+        assert _whole_tokens_from_question(phrase, question)
+    concepts = question_concepts(question)
+    assert concepts.actor == ("New Deal",)
+    assert concepts.action == ("affect",)
+    assert concepts.outcome == ("society",)
+    for phrase in (*concepts.actor, *concepts.action, *concepts.outcome):
+        assert _whole_tokens_from_question(phrase, question)

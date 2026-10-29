@@ -42,8 +42,11 @@ _SCAFFOLD = frozenset({
     "that", "this", "these", "those",
     "and", "or", "but",
     "it", "its",
-    "impact", "effect", "effects",
 })
+
+_FRAME_EFFECT = frozenset({"impact", "effect", "effects"})
+_FRAME_EFFECT_PREV = frozenset({"the", "a", "an", "what", "which"})
+_FRAME_EFFECT_NEXT = frozenset({"did", "does", "do", "have", "has", "had"})
 
 _RELATION = frozenset({
     "affect", "affects", "affected", "affecting",
@@ -58,7 +61,7 @@ _RELATION = frozenset({
 })
 
 _PLACES = frozenset({
-    "u.s.", "u.s", "us", "usa", "uk", "united states",
+    "u.s.", "u.s", "usa", "uk", "united states",
     "britain", "british", "england", "english",
     "america", "american",
     "france", "french", "germany", "german",
@@ -116,7 +119,7 @@ class QuestionConcepts:
 
 def question_keywords(question: str) -> list[str]:
     """Content words in order, with question-frame scaffolding removed."""
-    return [token for token in _tokenize(question) if not _is_scaffold(token)]
+    return _content_tokens(_tokenize(question))
 
 
 def question_concepts(question: str) -> QuestionConcepts:
@@ -173,7 +176,33 @@ def _is_relation(token: str) -> bool:
 
 
 def _is_place(token: str) -> bool:
+    if token == "US":
+        return True
     return token.casefold() in _PLACES
+
+
+def _frame_effect_indexes(tokens: list[str]) -> frozenset[int]:
+    """Indexes where impact/effect is the question-frame noun, not content."""
+    found: set[int] = set()
+    for i, token in enumerate(tokens):
+        if token.casefold() not in _FRAME_EFFECT:
+            continue
+        nxt = tokens[i + 1].casefold() if i + 1 < len(tokens) else ""
+        prev = tokens[i - 1].casefold() if i else ""
+        if nxt in _FRAME_EFFECT_NEXT:
+            found.add(i)
+            continue
+        if nxt == "of" and prev in _FRAME_EFFECT_PREV:
+            found.add(i)
+    return frozenset(found)
+
+
+def _content_tokens(tokens: list[str]) -> list[str]:
+    skip = _frame_effect_indexes(tokens)
+    return [
+        token for i, token in enumerate(tokens)
+        if i not in skip and not _is_scaffold(token)
+    ]
 
 
 def _is_period(token: str) -> bool:
@@ -217,7 +246,7 @@ def _idx(lower: list[str], *words: str, start: int = 0) -> int:
 
 
 def _phrase(tokens: list[str]) -> tuple[str, ...]:
-    content = [token for token in tokens if not _is_scaffold(token)]
+    content = _content_tokens(tokens)
     if not content:
         return ()
     return (" ".join(content),)
@@ -256,6 +285,17 @@ def _split_y(tokens: list[str]) -> tuple[tuple[str, ...], tuple[str, ...]]:
     return _phrase(tokens), ()
 
 
+def _tokens_until_clause(tokens: list[str], start: int) -> list[str]:
+    rest = tokens[start:]
+    for i, token in enumerate(rest):
+        folded = token.casefold()
+        if folded == "during":
+            return rest[:i]
+        if i > 0 and folded == "in":
+            return rest[:i]
+    return rest
+
+
 def _setting_after_in(tokens: list[str], i: int) -> bool:
     if i >= len(tokens) or tokens[i].casefold() != "in":
         return False
@@ -266,18 +306,24 @@ def _setting_after_in(tokens: list[str], i: int) -> bool:
     return False
 
 
+def _population_after_in(tokens: list[str], i: int) -> bool:
+    if i >= len(tokens) or tokens[i].casefold() != "in":
+        return False
+    return _is_population_span(_tokens_until_clause(tokens, i + 1))
+
+
 def _clause_end(tokens: list[str]) -> int:
     lower = [token.casefold() for token in tokens]
     for i, word in enumerate(lower):
         if word == "during":
             return i
-        if _setting_after_in(tokens, i):
+        if _setting_after_in(tokens, i) or _population_after_in(tokens, i):
             return i
     return len(tokens)
 
 
 def _tail_cut(tokens: list[str]) -> tuple[list[str], tuple[str, ...]]:
-    """Cut Y at among/for/during/in-place. Return (y_tokens, population)."""
+    """Cut Y at among/for/in-population/during/in-place. Return (y_tokens, population)."""
     lower = [token.casefold() for token in tokens]
     for i, word in enumerate(lower):
         if word in {"among", "for"}:
@@ -287,6 +333,8 @@ def _tail_cut(tokens: list[str]) -> tuple[list[str], tuple[str, ...]]:
             return tokens[:i], ()
         if _setting_after_in(tokens, i):
             return tokens[:i], ()
+        if _population_after_in(tokens, i):
+            return tokens[:i], _phrase(_tokens_until_clause(tokens, i + 1))
     return tokens, ()
 
 

@@ -12,8 +12,8 @@
   poster. Live at `https://www.litpilot.org` from the production checkout,
   `main` through #106 (2026-10-16). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
-- Latest full suite (2026-10-28, `feat/question-concepts`): **1956 passed**
-  in 158.57 s, no skips or xfails. `ruff check .` clean; `pyright app`
+- Latest full suite (2026-10-28, `feat/question-concepts` r1): **1974 passed**
+  in 164.32 s, no skips or xfails. `ruff check .` clean; `pyright app`
   **0 errors**, 6 optional-import warnings (CI blocks on errors).
   `pip-audit` (2026-10-14): no known vulnerabilities; ROCm torch/triton are
   un-auditable. No dependency lockfile.
@@ -224,22 +224,18 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-28. Branch `feat/question-concepts` from `origin/main`.
-  P2.0 joins stored `work_type`, `doi` and `container_title` onto benchmark
-  replay hits after ranking. P2.1 adds `app/services/question_concepts.py`
-  (keywords plus actor/action/outcome/population/period/place). Search does
-  not import it. Frozen replay output is
-  `~/HealthDatabaseAccess-scratch/bench/baseline_v1b_results.json` and is
-  not committed.
+- **Date:** 2026-10-28. Branch `fix-a1-r1` tracking `feat/question-concepts`
+  (PR #120). Review-fix r1: effect/impact stay as content unless they are
+  the frame noun, population after "in", whole-token invariant with an
+  independent tokenizer, lowercase "us" is not a place. Five benchmark
+  expected concepts are unchanged. Search still does not import the helper.
 - Validation (production venv, this worktree, no install): `ruff check .`
-  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 1956
-  passed in 158.57 s. Scratch is
-  `~/HealthDatabaseAccess-scratch/pytest-question-concepts`.
-  Frozen replay key order matches `baseline_v1_results.json`. Score
+  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 1974
+  passed in 164.32 s. Scratch is
+  `~/HealthDatabaseAccess-scratch/pytest-fix-a1-r1`.
+  Frozen replay key order still matches `baseline_v1_results.json`. Score
   `--split dev` OVERALL type_accuracy 0.7871, export_accuracy 0.8901.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
   and unscheduled roadmap backlog. Ship staging was last recorded at
-  `f9485cf`. P2.2 is wiring concepts into ranking. Capture of `baseline_v1`
-  saw Semantic Scholar HTTP 429 on Q1, Q3 and Q5, Europe PMC and medRxiv
-  HTTP 503 on Q4, and DOAJ and HAL `no_results` on every question.
-- **Next step:** review of the `feat/question-concepts` PR.
+  `f9485cf`. P2.2 is wiring concepts into ranking.
+- **Next step:** re-review of PR #120 after the r1 push.
