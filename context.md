@@ -221,23 +221,19 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-28. `feat/type-chip-filter` merged `origin/main` after
-  P1.8. Search cards show a type chip when `work_type` is stored. A Type
-  filter next to Sources narrows candidates before ranking. "Type not stored"
-  keeps NULL and legacy rows. The benchmark harness is on main:
-  `tools/eval_search.py` captures, replays, scores, and writes label sheets.
-  Frozen `baseline_v1` and sheets stay in `~/HealthDatabaseAccess-scratch/bench/`
-  and are not committed. Label sheets include abstract, DOI or source link,
-  container and stored type, shuffle with a stable seed, put rank columns last,
-  and write `Q*.html` beside each CSV.
+- **Date:** 2026-10-28. `feat/access-label` (P2.3) adds an access chip on
+  each Search card from stored OA fields only: "Open copy listed" with a
+  link, or "No open copy listed (<source>)". A Free to read chip sits next
+  to Type and keeps papers with an open copy listed, using the same before-
+  ranking pattern as the Type filter. Crossref text-mining links never
+  count unless that link has a CC licence URL. `access_state` lives in
+  `app/services/access.py`. No schema change. Search.js cache-bust is
+  `20261028e`.
 - Validation (production venv, this worktree, no install): `ruff check .`
   clean, `pyright app` 0 errors / 6 optional-import warnings,
-  `node --check static/js/search.js` clean, pytest 1908 passed in 173.49 s.
-  Scratch is `~/HealthDatabaseAccess-scratch/p17/`.
+  `node --check static/js/search.js` clean, pytest 1961 passed in 155.35 s.
+  Scratch is `~/HealthDatabaseAccess-scratch/pytest-feat-access-label`.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
   and unscheduled roadmap backlog. Ship staging was last recorded at
-  `f9485cf`. P1.9 is human labels on the five questions. Capture of
-  `baseline_v1` saw Semantic Scholar HTTP 429 on Q1, Q3 and Q5, Europe PMC
-  and medRxiv HTTP 503 on Q4, and DOAJ and HAL `no_results` on every question.
-- **Next step:** parent review of the P1.7 PR. The spec.md Search-bullet
-  type chip and filter edit still waits on owner approval.
+  `f9485cf`. P1.9 is human labels on the five questions.
+- **Next step:** parent review of this PR. Do not merge from the builder.

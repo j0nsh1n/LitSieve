@@ -100,6 +100,22 @@ def test_js_type_chip_words_match_python():
     card = _slice(_read("static", "js", "search.js"), "function buildResultCard(", "const noteRowHtml")
     assert "workTypeChipLabel(article.work_type)" in card
     assert "result-type-chip" in card
+    assert "accessChipHtml(article)" in card
+
+
+def test_access_chip_wording_and_forbidden_claims():
+    search = _read("static", "js", "search.js")
+    helper = _slice(search, "function accessChipHtml(", "function freeToReadForRequest")
+    assert "Open copy listed" in helper
+    assert "No open copy listed" in helper
+    assert "result-access-chip" in helper
+    lowered = helper.lower()
+    assert "verified" not in lowered
+    assert "free pdf" not in lowered
+    assert "guaranteed" not in lowered
+    template = _read("templates", "search.html")
+    assert 'id="simple-free-to-read-chip"' in template
+    assert "Free to read" in template
 
 
 def test_score_tooltip_says_the_list_is_sorted_by_it():

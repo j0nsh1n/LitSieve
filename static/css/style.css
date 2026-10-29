@@ -2123,6 +2123,9 @@ input[type="range"]::-moz-range-thumb:hover {
 .result-tags .study-type-badge {
     margin-left: 0;
 }
+.result-access-chip {
+    text-decoration: none;
+}
 .result-row-title {
     min-width: 0;
     margin: var(--space-1) 0 var(--space-2);

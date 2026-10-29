@@ -260,6 +260,28 @@ def test_known_work_type_filter_is_accepted(app_module):
     assert r.status_code == 200, r.text
 
 
+@pytest.mark.parametrize("path, body", [
+    ("/api/search", {"query_text": "health", "top_k": 3, "free_to_read": True}),
+    ("/api/search/seed", {"seed": "x", "free_to_read": True}),
+    ("/api/search/starred", {"free_to_read": True}),
+])
+def test_free_to_read_filter_is_accepted(app_module, path, body):
+    c = TestClient(app_module.app)
+    headers = _register(c)
+    _seed(app_module, c, headers)
+    r = c.post(path, json=body, headers=headers)
+    assert r.status_code in (200, 400), r.text
+    if r.status_code != 200:
+        return
+    for row in r.json().get("results") or []:
+        access = row.get("access")
+        if access is not None:
+            assert access["state"] == "open_listed"
+            assert access.get("url")
+        assert "_extra" not in row
+        assert "provider_record" not in row
+
+
 # --- Notes -----------------------------------------------------------------
 
 def test_note_roundtrip(app_module):

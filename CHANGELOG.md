@@ -9,6 +9,11 @@ and this project aims to follow Semantic Versioning for app version strings
 ## [Unreleased]
 
 ### Added
+- Search cards show an access label from stored OA fields: "Open copy listed"
+  (a link) or "No open copy listed (<source>)". A Free to read filter keeps
+  papers with an open copy listed. Nothing is checked over the network.
+  Crossref text-mining links never count unless that link has a CC licence
+  URL.
 - Search cards show a type chip when the paper has a stored type (Article,
   Review article, Book, Chapter, Thesis, and the rest of the stored types).
   Papers with no type, or an unknown type, have no chip. A Type filter sits

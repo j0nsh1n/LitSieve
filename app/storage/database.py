@@ -2392,6 +2392,56 @@ class ArticleDatabase:
             rows = cursor.fetchall()
         return {(row[0], row[1]): row[2] for row in rows}
 
+    def get_article_access_fields(self) -> Dict[Tuple[str, str], Dict]:
+        """oa_status, best_oa_url, and locations — used to filter before ranking."""
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                "SELECT a.article_id, a.source, a.oa_status, a.best_oa_url, e.locations "
+                "FROM articles a LEFT JOIN article_extra e "
+                "ON a.article_id = e.article_id AND a.source = e.source"
+            )
+            rows = cursor.fetchall()
+        return {
+            (row[0], row[1]): {
+                "source": row[1],
+                "oa_status": row[2],
+                "best_oa_url": row[3],
+                "locations": row[4],
+            }
+            for row in rows
+        }
+
+    def get_access_fields_for_keys(
+        self, keys: List[Tuple[str, str]],
+    ) -> Dict[Tuple[str, str], Dict]:
+        """One batched access-field read for the ranked top-K keys."""
+        if not keys:
+            return {}
+        placeholders = ",".join(["(?, ?)"] * len(keys))
+        params: List[Any] = []
+        for article_id, source in keys:
+            params.extend([article_id, source])
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                "SELECT a.article_id, a.source, a.oa_status, a.best_oa_url, e.locations "
+                "FROM articles a LEFT JOIN article_extra e "
+                "ON a.article_id = e.article_id AND a.source = e.source "
+                f"WHERE (a.article_id, a.source) IN ({placeholders})",
+                params,
+            )
+            rows = cursor.fetchall()
+        return {
+            (row[0], row[1]): {
+                "source": row[1],
+                "oa_status": row[2],
+                "best_oa_url": row[3],
+                "locations": row[4],
+            }
+            for row in rows
+        }
+
     def get_year_counts(self) -> Dict[str, int]:
         """Papers per publication year (unknown years under 'unknown')."""
         from app.utils import parse_year

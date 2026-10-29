@@ -29,6 +29,7 @@ from app.fetchers.plos import PLOSFetcher
 from app.fetchers.pubmed import PubMedFetcher
 from app.fetchers.semanticscholar import SemanticScholarFetcher
 from app.fetchers.zenodo import ZenodoFetcher
+from app.services.access import OPEN_LISTED, access_public_dict, access_state
 from app.services.clustering import (
     NOISE_CLUSTER_ID,
     NOISE_CLUSTER_LABEL,
@@ -610,8 +611,9 @@ class LiteratureSearchPipeline:
         year_max: Optional[int] = None,
         extra_exclude: Optional[set] = None,
         work_type_filter: Optional[List[str]] = None,
+        free_to_read: bool = False,
     ) -> Tuple[List[Tuple[str, str]], np.ndarray, Dict]:
-        """Embeddings + metadata after screening / source / type / cluster / year filters."""
+        """Embeddings + metadata after screening / source / type / access / cluster / year filters."""
 
         article_ids, article_embeddings = self._load_embeddings_cached()
         empty_meta: Dict = {}
@@ -642,6 +644,18 @@ class LiteratureSearchPipeline:
             keep = [
                 i for i, key in enumerate(article_ids)
                 if work_type_matches_filter(stored_types.get(key), wanted)
+            ]
+            if not keep:
+                return [], article_embeddings[:0], empty_meta
+            article_ids = [article_ids[i] for i in keep]
+            article_embeddings = article_embeddings[keep]
+
+        if free_to_read:
+            stored_access = self.db.get_article_access_fields()
+            keep = [
+                i for i, key in enumerate(article_ids)
+                if access_state(stored_access.get(key) or {"source": key[1]}).state
+                == OPEN_LISTED
             ]
             if not keep:
                 return [], article_embeddings[:0], empty_meta
@@ -695,6 +709,21 @@ class LiteratureSearchPipeline:
                 article.pop("work_type", None)
             else:
                 article["work_type"] = value
+
+    def _attach_access(self, articles: List[Dict]) -> None:
+        """Fill the access label on the ranked top-K from one batched lookup."""
+        if not articles:
+            return
+        keys = [(article["article_id"], article["source"]) for article in articles]
+        stored = self.db.get_access_fields_for_keys(keys)
+        for article in articles:
+            key = (article["article_id"], article["source"])
+            fields = stored.get(key) or {"source": article.get("source")}
+            info = access_state(fields)
+            if info.state == OPEN_LISTED:
+                article["access"] = access_public_dict(info)
+            else:
+                article.pop("access", None)
 
     def _hybrid_rerank(
         self,
@@ -768,11 +797,12 @@ class LiteratureSearchPipeline:
         query_embedding: Optional[np.ndarray] = None,
         extra_exclude: Optional[set] = None,
         work_type_filter: Optional[List[str]] = None,
+        free_to_read: bool = False,
     ) -> List[Dict]:
         """
         Search for articles similar to a query (or a provided query embedding).
 
-        Filters (screening, source, type, cluster, year) apply BEFORE ranking.
+        Filters (screening, source, type, access, cluster, year) apply BEFORE ranking.
         When lexical_boost is True, re-rank a wider semantic shortlist with TF-IDF.
         """
         logger.info("\n=== Searching for similar articles ===")
@@ -785,6 +815,7 @@ class LiteratureSearchPipeline:
             year_max=year_max,
             extra_exclude=extra_exclude,
             work_type_filter=work_type_filter,
+            free_to_read=free_to_read,
         )
         if len(article_ids) == 0:
             logger.info("No embeddings match the current filters.")
@@ -834,6 +865,7 @@ class LiteratureSearchPipeline:
             group_undated_last(similar_articles)
 
         self._attach_work_types(similar_articles)
+        self._attach_access(similar_articles)
 
         logger.info(f"Top {len(similar_articles)} most similar articles:\n")
         for i, article in enumerate(similar_articles, 1):
@@ -931,6 +963,7 @@ class LiteratureSearchPipeline:
         year_min: Optional[int] = None,
         year_max: Optional[int] = None,
         work_type_filter: Optional[List[str]] = None,
+        free_to_read: bool = False,
     ) -> Dict:
         """Rank papers near the centroid of the user's starred embeddings."""
         starred_keys = self.db.get_starred_keys()
@@ -969,6 +1002,7 @@ class LiteratureSearchPipeline:
             lexical_boost=False,
             query_embedding=centroid,
             work_type_filter=work_type_filter,
+            free_to_read=free_to_read,
         )
         return {"results": results, "seed_count": len(starred_keys)}
 
@@ -1088,6 +1122,7 @@ class LiteratureSearchPipeline:
         lexical_boost: bool = True,
         include_seed: bool = False,
         work_type_filter: Optional[List[str]] = None,
+        free_to_read: bool = False,
     ) -> Dict:
         """Find a local seed article (by id/title), then rank similar papers."""
         article = self.db.find_article_by_seed(seed)
@@ -1109,6 +1144,7 @@ class LiteratureSearchPipeline:
             lexical_boost=lexical_boost,
             extra_exclude=extra_exclude,
             work_type_filter=work_type_filter,
+            free_to_read=free_to_read,
         )[:top_k]
         return {"seed": article, "results": results}
 
