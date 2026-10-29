@@ -16,6 +16,25 @@ BASIS_CROSSREF_ENTRY = "crossref_entry"
 BASIS_LISTED_ONLY = "listed_only"
 LICENCE_SCOPE_ENTRY = "entry"
 LICENCE_SCOPE_RECORD = "record"
+_OA_ADAPTER_BASES = frozenset({BASIS_OA_BEST, BASIS_LOCATION_OPEN, BASIS_LISTED_ONLY})
+SOURCE_ADAPTER_BASES = {
+    "arxiv": _OA_ADAPTER_BASES,
+    "biorxiv": _OA_ADAPTER_BASES,
+    "clinicaltrials": _OA_ADAPTER_BASES,
+    "crossref": frozenset({BASIS_CROSSREF_ENTRY, BASIS_LISTED_ONLY}),
+    "doaj": frozenset({BASIS_DOAJ_FULLTEXT, BASIS_LISTED_ONLY}),
+    "eric": _OA_ADAPTER_BASES,
+    "europepmc": _OA_ADAPTER_BASES,
+    "hal": frozenset({BASIS_HAL_FILE, BASIS_LISTED_ONLY}),
+    "medrxiv": _OA_ADAPTER_BASES,
+    "nasa_ads": _OA_ADAPTER_BASES,
+    "openaire": _OA_ADAPTER_BASES,
+    "openalex": _OA_ADAPTER_BASES,
+    "plos": _OA_ADAPTER_BASES,
+    "pubmed": _OA_ADAPTER_BASES,
+    "semanticscholar": _OA_ADAPTER_BASES,
+    "zenodo": _OA_ADAPTER_BASES,
+}
 _LOCATION_KEYS = (
     "url",
     "oa_status",
@@ -145,6 +164,29 @@ def evidence_status_from_article(article: Mapping[str, Any]) -> Tuple[str, Optio
 def evidence_from_article(article: Mapping[str, Any]) -> Optional[Dict[str, Any]]:
     status, payload = evidence_status_from_article(article)
     return payload if status == EVIDENCE_OK else None
+
+
+def location_matches_adapter(source: str, loc: Mapping[str, Any]) -> bool:
+    """True when this location's basis is one the source adapter can emit."""
+    allowed = SOURCE_ADAPTER_BASES.get(str(source or "").strip().lower())
+    if allowed is None:
+        return False
+    basis = _text(loc.get("basis")) or BASIS_LISTED_ONLY
+    return basis in allowed
+
+
+def observation_matches_adapter(observation: Mapping[str, Any]) -> bool:
+    """True when every location matches a shape that source's adapter emits."""
+    owner = observation_ownership(observation)
+    if owner is None:
+        return False
+    locations = observation.get("locations")
+    if not isinstance(locations, list):
+        return False
+    if not all(isinstance(item, Mapping) for item in locations):
+        return False
+    source = owner[0]
+    return all(location_matches_adapter(source, item) for item in locations)
 
 
 def observation_ownership(
@@ -316,6 +358,8 @@ def _load_existing_for_write(existing_evidence: Any) -> Tuple[List[Any], List[An
             raise UnreadableLinkEvidence("unreadable link_evidence")
         _require_location_list(item.get("locations"))
         _require_owner_strings(item)
+        if not observation_matches_adapter(item):
+            raise UnreadableLinkEvidence("unreadable link_evidence")
         kept.append(dict(item))
     extra = [item for item in unsupported if item is not None]
     return kept, extra

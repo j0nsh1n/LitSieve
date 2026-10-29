@@ -23,6 +23,7 @@ from app.services.link_evidence import (
     evidence_url_key,
     inspect_link_evidence,
     is_never_merged,
+    location_matches_adapter,
     observation_ownership,
 )
 from app.services.work_types import normalize_doi
@@ -194,6 +195,8 @@ def _witness_from_location(
     if owner is None:
         return None, "missing_evidence"
     source, record_id, observed_at = owner
+    if not location_matches_adapter(source, loc):
+        return None, "missing_evidence"
     basis = str(loc.get("basis") or "").strip()
     kind = str(loc.get("kind") or "").strip().lower()
     if basis == BASIS_CROSSREF_ENTRY:

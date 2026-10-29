@@ -6,11 +6,14 @@ import itertools
 import json
 import os
 import random
+from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
 from app.services import access as access_mod
 from app.services.access import (
+    NONE_LISTED,
     OPEN_LISTED,
     access_state,
     link_access,
@@ -19,17 +22,25 @@ from app.services.access import (
 )
 from app.services.link_evidence import (
     LINK_EVIDENCE_KEY,
+    SOURCE_ADAPTER_BASES,
     canonical_json,
     evidence_url_key,
     incoming_record_from_article,
     is_never_merged,
     merge_link_evidence,
+    observation_from_record,
+    observation_matches_adapter,
     serialize_link_evidence,
 )
-from app.services.pipeline import LiteratureSearchPipeline
+from app.services.pipeline import FETCHERS, LiteratureSearchPipeline
 from app.storage import dbconn
 from app.storage.database import ArticleDatabase
-from app.storage.shares import generate_share_code, library_is_clone
+from app.storage.shares import (
+    CLONE_APPLICATION_ID,
+    connection_is_clone,
+    generate_share_code,
+    library_is_clone,
+)
 from app.storage.user_db import UserDatabase
 
 if os.environ.get("CI"):
@@ -1121,3 +1132,402 @@ def test_copies_scan_each_observation_once(monkeypatch):
     assert found.copies[0].open_listed is True
     assert found.has_open_copy is True
     assert calls["n"] == n
+
+
+def _clone_setup(monkeypatch, tmp_path):
+    from app.storage import shares as shares_mod
+
+    owner_path = tmp_path / "owner" / "articles.db"
+    clone_path = tmp_path / "clone" / "articles.db"
+    owner_path.parent.mkdir(parents=True)
+    udb = UserDatabase(db_path=str(tmp_path / "users.db"))
+    owner = udb.create_user("owner", "hash")
+    student = udb.create_user("student", "hash")
+    monkeypatch.setattr(
+        shares_mod,
+        "library_db_path",
+        lambda user, library: owner_path if user == owner["id"] else clone_path,
+    )
+    return shares_mod, udb, owner, student, owner_path, clone_path
+
+
+def test_clone_marker_is_written_before_replace(monkeypatch, tmp_path):
+    monkeypatch.delenv(dbconn.ENV_KEY, raising=False)
+    shares_mod, udb, owner, student, owner_path, clone_path = _clone_setup(
+        monkeypatch, tmp_path,
+    )
+    db = ArticleDatabase(str(owner_path))
+    try:
+        db.insert_articles([_paper(
+            "123", "pubmed", best_oa_url=PUBMED_CLOSED,
+        )])
+        db.insert_articles([_paper(
+            "W1", "openalex", oa_status="gold", best_oa_url=OPENALEX_OPEN,
+        )])
+    finally:
+        db.close()
+
+    seen = {}
+    real_replace = shares_mod.os.replace
+
+    def wrapped(src, dst):
+        conn = dbconn.connect(f"file:{src}?mode=ro", uri=True)
+        try:
+            seen["marked"] = connection_is_clone(conn)
+            seen["app_id"] = conn.execute("PRAGMA application_id").fetchone()[0]
+        finally:
+            conn.close()
+        return real_replace(src, dst)
+
+    monkeypatch.setattr(shares_mod.os, "replace", wrapped)
+    shares_mod.clone_library_data(owner["id"], "lib", student["id"], "cloned")
+    assert seen["marked"] is True
+    assert seen["app_id"] == CLONE_APPLICATION_ID
+    clone_db = ArticleDatabase(str(clone_path))
+    try:
+        assert connection_is_clone(clone_db.conn) is True
+        assert library_is_clone(
+            student["id"], "cloned", user_db=udb, conn=clone_db.conn,
+        ) is True
+        row = _access_row(clone_db, "123", "pubmed")
+        pipe = LiteratureSearchPipeline(db_path=str(clone_path))
+        try:
+            pipe._lra_user_id = student["id"]
+            pipe._lra_library_id = "cloned"
+            from app import core
+            monkeypatch.setattr(core, "user_db", udb)
+            assert pipe.trust_legacy_access() is False
+            _assert_no_open(row, trust_legacy=pipe.trust_legacy_access(),
+                            closed_url=PUBMED_CLOSED)
+        finally:
+            pipe.close()
+    finally:
+        clone_db.close()
+
+
+def test_join_race_does_not_cache_legacy_trust(monkeypatch, tmp_path):
+    monkeypatch.delenv(dbconn.ENV_KEY, raising=False)
+    from app import core
+    from app.storage import shares as shares_mod
+
+    owner_path = tmp_path / "race-owner.db"
+    clone_path = tmp_path / "race-clone.db"
+    udb = UserDatabase(db_path=str(tmp_path / "users.db"))
+    owner = udb.create_user("race-owner", "hash")
+    student = udb.create_user("race-student", "hash")
+    monkeypatch.setattr(core, "user_db", udb)
+    db = ArticleDatabase(str(owner_path))
+    try:
+        db.insert_articles([_paper("seed", "pubmed", best_oa_url=PUBMED_CLOSED)])
+        db.insert_articles([_paper(
+            "oa", "openalex", oa_status="gold", best_oa_url=OPENALEX_OPEN,
+        )])
+    finally:
+        db.close()
+    share = udb.create_share(
+        owner_user_id=owner["id"],
+        owner_library_id="source",
+        title_snapshot="Source",
+        code=generate_share_code(),
+    )
+    observed = {}
+    held = []
+
+    def concurrent_read(*_args, **_kwargs):
+        q = core.get_pipeline(student["id"], "new-clone")
+        held.append(q)
+        observed["before_commit"] = q.trust_legacy_access()
+        observed["before_commit_is_clone"] = library_is_clone(
+            student["id"], "new-clone", user_db=udb, db_path=clone_path,
+        )
+
+    with patch.object(
+        shares_mod, "library_db_path",
+        side_effect=lambda uid, lid: owner_path if uid == owner["id"] else clone_path,
+    ), patch.object(core, "library_db_path", return_value=clone_path), patch.object(
+        core, "ensure_libraries",
+    ), patch.object(
+        shares_mod, "library_exists", return_value=True,
+    ), patch.object(
+        shares_mod, "get_active_library_id", return_value="old",
+    ), patch.object(
+        shares_mod, "create_library_with_unique_name",
+        return_value={"library": {"id": "new-clone", "name": "Clone"}},
+    ), patch.object(
+        shares_mod, "set_active_library", side_effect=concurrent_read,
+    ), patch.object(
+        shares_mod, "list_libraries",
+        return_value={"libraries": [{"id": "old"}, {"id": "new-clone"}]},
+    ):
+        shares_mod.join_share(udb, student["id"], "race-student", share["code"])
+        q = held[0]
+        observed["redemption_committed"] = library_is_clone(
+            student["id"], "new-clone", user_db=udb, db_path=clone_path,
+        )
+        observed["after_commit_cached_trust"] = q.trust_legacy_access()
+        row = q.db.get_article_access_fields()[("seed", "pubmed")]
+        row = dict(row)
+        row["article_id"] = "seed"
+        row["source"] = "pubmed"
+        card = access_state(row, trust_legacy=q.trust_legacy_access())
+        copies = other_copies_result(row, trust_legacy=q.trust_legacy_access())
+        assert observed["before_commit"] is False
+        assert observed["before_commit_is_clone"] is True
+        assert observed["redemption_committed"] is True
+        assert observed["after_commit_cached_trust"] is False
+        assert card.state == NONE_LISTED
+        assert copies.has_open_copy is False
+        core.release_pipeline(student["id"], "new-clone")
+
+
+def test_owner_deletion_does_not_erase_clone_identity(monkeypatch, tmp_path):
+    monkeypatch.delenv(dbconn.ENV_KEY, raising=False)
+    shares_mod, udb, owner, student, owner_path, clone_path = _clone_setup(
+        monkeypatch, tmp_path,
+    )
+    db = ArticleDatabase(str(owner_path))
+    try:
+        db.insert_articles([_paper("seed", "pubmed", best_oa_url=PUBMED_CLOSED)])
+        db.insert_articles([_paper(
+            "oa", "openalex", oa_status="gold", best_oa_url=OPENALEX_OPEN,
+        )])
+    finally:
+        db.close()
+    shares_mod.clone_library_data(owner["id"], "lib", student["id"], "lifecycle")
+    _redeem(udb, owner["id"], "lib", student["id"], "lifecycle")
+    from app import core
+    monkeypatch.setattr(core, "user_db", udb)
+    pipe = LiteratureSearchPipeline(db_path=str(clone_path))
+    try:
+        pipe._lra_user_id = student["id"]
+        pipe._lra_library_id = "lifecycle"
+        row = _access_row(pipe.db, "seed", "pubmed")
+        assert pipe.trust_legacy_access() is False
+        _assert_no_open(row, trust_legacy=False, closed_url=PUBMED_CLOSED)
+        assert udb.delete_user(owner["id"])
+        assert library_is_clone(
+            student["id"], "lifecycle", user_db=udb, db_path=clone_path,
+        ) is True
+        assert pipe.trust_legacy_access() is False
+        _assert_no_open(
+            _access_row(pipe.db, "seed", "pubmed"),
+            trust_legacy=pipe.trust_legacy_access(),
+            closed_url=PUBMED_CLOSED,
+        )
+    finally:
+        pipe.close()
+    fresh = LiteratureSearchPipeline(db_path=str(clone_path))
+    try:
+        fresh._lra_user_id = student["id"]
+        fresh._lra_library_id = "lifecycle"
+        assert fresh.trust_legacy_access() is False
+        _assert_no_open(
+            _access_row(fresh.db, "seed", "pubmed"),
+            trust_legacy=fresh.trust_legacy_access(),
+            closed_url=PUBMED_CLOSED,
+        )
+    finally:
+        fresh.close()
+
+
+def test_redemption_fallback_does_not_cache_a_negative(monkeypatch, tmp_path):
+    monkeypatch.delenv(dbconn.ENV_KEY, raising=False)
+    udb = UserDatabase(db_path=str(tmp_path / "users.db"))
+    owner = udb.create_user("owner", "hash")
+    student = udb.create_user("student", "hash")
+    db = ArticleDatabase(str(tmp_path / "racing.db"))
+    try:
+        db.insert_articles([_paper(
+            "W1", "openalex", oa_status="gold", best_oa_url=NEVER_MERGED_OPEN,
+        )])
+        db.conn.execute("DELETE FROM article_extra")
+        db.conn.commit()
+    finally:
+        db.close()
+    from app import core
+    monkeypatch.setattr(core, "user_db", udb)
+    pipe = LiteratureSearchPipeline(db_path=str(tmp_path / "racing.db"))
+    try:
+        pipe._lra_user_id = student["id"]
+        pipe._lra_library_id = "racing-clone"
+        assert pipe.trust_legacy_access() is True
+        trace = []
+        udb.conn.set_trace_callback(trace.append)
+        articles = [{"article_id": "W1", "source": "openalex"} for _ in range(100)]
+        pipe._attach_access(articles)
+        selects = [
+            statement for statement in trace
+            if "SELECT 1 FROM share_redemptions" in statement
+            and "student_library_id" in statement
+        ]
+        assert len(selects) == 1
+        udb.conn.set_trace_callback(None)
+        _redeem(udb, owner["id"], "lib", student["id"], "racing-clone")
+        assert library_is_clone(student["id"], "racing-clone", user_db=udb) is True
+        assert pipe.trust_legacy_access() is False
+        row = _access_row(pipe.db, "W1", "openalex")
+        _assert_no_open(row, trust_legacy=pipe.trust_legacy_access(),
+                        closed_url=NEVER_MERGED_OPEN)
+        pipe._attach_access(articles)
+        assert articles[0]["access"]["state"] != OPEN_LISTED
+    finally:
+        pipe.close()
+
+
+@pytest.mark.parametrize("name, changes", [
+    ("crossref_oa_best", {"source": "crossref"}),
+    ("hal_oa_best", {"source": "hal"}),
+    ("pubmed_doaj_fulltext", {
+        "source": "pubmed",
+        "locations": [{
+            "url": "https://example.org/shared",
+            "basis": "doaj_fulltext",
+            "oa_status": "closed",
+            "kind": "landing",
+        }],
+    }),
+])
+def test_malformed_source_basis_is_never_open_and_preserved(
+    monkeypatch, name, changes,
+):
+    monkeypatch.delenv(dbconn.ENV_KEY, raising=False)
+    url = "https://example.org/shared"
+    stamp = "2026-10-29T08:00:00.000000Z"
+    paper = _paper(
+        "W1", "openalex", oa_status="gold", best_oa_url=url, _observed_at=stamp,
+    )
+    db = ArticleDatabase(":memory:")
+    try:
+        db.insert_articles([paper])
+        stored = json.loads(db.conn.execute(
+            "SELECT provenance FROM article_extra"
+        ).fetchone()[0])
+        stored[LINK_EVIDENCE_KEY]["observations"][0].update(changes)
+        before = json.dumps(stored)
+        db.conn.execute("UPDATE article_extra SET provenance = ?", (before,))
+        db.conn.commit()
+        row = _access_row(db, "W1", "openalex")
+        _assert_no_open(row, trust_legacy=False, closed_url=url)
+        decision = link_access(stored[LINK_EVIDENCE_KEY], url)
+        assert decision.open_listed is False
+        result = db.insert_articles([dict(
+            paper, oa_status="closed", journal="Changed journal",
+        )])
+        after = db.conn.execute("SELECT provenance FROM article_extra").fetchone()[0]
+        assert result["updated"] == 0
+        assert result["dropped"] == 1
+        assert after == before
+        article = db.conn.execute(
+            "SELECT journal, oa_status FROM articles"
+        ).fetchone()
+        assert article[0] != "Changed journal"
+        assert json.loads(after)[LINK_EVIDENCE_KEY]["observations"][0]["source"] == (
+            changes.get("source") or "openalex"
+        )
+    finally:
+        db.close()
+    assert name
+
+
+def _load_source_fixture(name):
+    path = Path(__file__).resolve().parent / "fixtures" / "sources" / name
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _real_adapter_articles():
+    from app.fetchers.clinicaltrials import ClinicalTrialsFetcher
+    from app.fetchers.crossref import CrossRefFetcher
+    from app.fetchers.doaj import DOAJFetcher
+    from app.fetchers.eric import ERICFetcher
+    from app.fetchers.europepmc import EuropePMCFetcher
+    from app.fetchers.hal import HALFetcher
+    from app.fetchers.nasa_ads import NASAADSFetcher
+    from app.fetchers.openaire import OpenAIREFetcher
+    from app.fetchers.openalex import OpenAlexFetcher
+    from app.fetchers.plos import PLOSFetcher
+    from app.fetchers.semanticscholar import SemanticScholarFetcher
+    from app.fetchers.zenodo import ZenodoFetcher
+
+    articles = []
+
+    def add(source, article):
+        if article:
+            articles.append((source, article))
+
+    add("openalex", OpenAlexFetcher()._parse_work(
+        _load_source_fixture("openalex_article_oa.json")["results"][0],
+    ))
+    add("openalex", OpenAlexFetcher()._parse_work(
+        _load_source_fixture("openalex_article_closed.json")["results"][0],
+    ))
+    add("crossref", CrossRefFetcher()._parse_item(
+        _load_source_fixture("crossref_book.json")["message"]["items"][0],
+    ))
+    add("doaj", DOAJFetcher()._parse_result(
+        _load_source_fixture("doaj_oa_article.json")["results"][0],
+    ))
+    add("hal", HALFetcher()._parse(
+        _load_source_fixture("hal_file.json")["response"]["docs"][0],
+    ))
+    add("hal", HALFetcher()._parse(
+        _load_source_fixture("hal_notice.json")["response"]["docs"][0],
+    ))
+    add("zenodo", ZenodoFetcher()._parse_record(
+        _load_source_fixture("zenodo_open.json")["hits"]["hits"][0],
+    ))
+    add("zenodo", ZenodoFetcher()._parse_record(
+        _load_source_fixture("zenodo_restricted.json")["hits"]["hits"][0],
+    ))
+    add("semanticscholar", SemanticScholarFetcher()._parse_paper(
+        _load_source_fixture("s2_paper.json"),
+    ))
+    add("eric", ERICFetcher()._parse_doc(
+        _load_source_fixture("eric_journal.json")["response"]["docs"][0],
+    ))
+    add("europepmc", EuropePMCFetcher()._parse_article(
+        _load_source_fixture("europepmc_oa_pmc.json")["resultList"]["result"][0],
+    ))
+    add("clinicaltrials", ClinicalTrialsFetcher()._parse_study(
+        _load_source_fixture("clinicaltrials_studies.json")["studies"][0],
+    ))
+    add("nasa_ads", NASAADSFetcher()._parse_doc(
+        _load_source_fixture("nasa_ads_doc.json")["response"]["docs"][0],
+    ))
+    add("openaire", OpenAIREFetcher()._parse(
+        _load_source_fixture("openaire_publications.json")["response"]["results"]["result"][0],
+    ))
+    add("plos", PLOSFetcher()._parse(
+        _load_source_fixture("plos_search_parenthesised.json")["response"]["docs"][0],
+    ))
+    return articles
+
+
+def test_every_adapter_output_matches_the_allow_list():
+    assert set(SOURCE_ADAPTER_BASES) == set(FETCHERS)
+    stamp = "2026-10-29T12:00:00.000000Z"
+    seen = set()
+    for source, article in _real_adapter_articles():
+        extra = article.get("_extra") if isinstance(article.get("_extra"), dict) else {}
+        rec = incoming_record_from_article(article, extra, stamp)
+        obs = observation_from_record(rec)
+        assert observation_matches_adapter(obs), (source, obs)
+        seen.add(source)
+    for source in FETCHERS:
+        extra = {}
+        status = "gold"
+        if source == "hal":
+            extra = {"kind": "file", "host": "HAL"}
+            status = "green"
+        elif source == "doaj":
+            extra = {"kind": "fulltext"}
+        elif source == "crossref":
+            extra = {"license": "https://creativecommons.org/licenses/by/4.0/"}
+            status = None
+        rec = _incoming(
+            source, f"{source}-id", f"https://example.org/{source}", status, stamp,
+            **extra,
+        )
+        obs = observation_from_record(rec)
+        assert observation_matches_adapter(obs), (source, obs)
+        seen.add(source)
+    assert seen == set(FETCHERS)

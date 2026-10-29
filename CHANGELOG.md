@@ -19,8 +19,10 @@ and this project aims to follow Semantic Versioning for app version strings
   different copy. IPv6 identity keeps the brackets around the host. Broken
   stored evidence stays "No open copy listed". A stored observation whose
   source, record id, or timestamp is not a string is unused, and a later
-  fetch leaves that stored value unchanged. A cloned library lists no open
-  copy until that clone fetches the paper itself.
+  fetch leaves that stored value unchanged. A stored observation whose
+  source and basis do not match what that source writes is unused, and a
+  later fetch leaves it unchanged. A cloned library lists no open copy
+  until that clone fetches the paper itself.
 
 - Narrow it down's "Set aside N papers" count, confirm button, and the papers
   it actually sets aside follow the optional book-review checkbox and any

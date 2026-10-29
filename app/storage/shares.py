@@ -48,14 +48,57 @@ MAX_MAX_USES = 10_000
 # another student's Collect inputs or Search questions.
 CLONE_TABLES = frozenset({"articles", "embeddings", "screening", "key_points", "notes", "clusters"})
 
+# SQLite header slot. The library file has no key/value meta table, so a clone
+# stores identity here before os.replace publishes the file. 'LSCL'.
+CLONE_APPLICATION_ID = 0x4C53434C
+
+
+def _mark_clone_connection(conn: Any) -> None:
+    conn.execute(f"PRAGMA application_id = {CLONE_APPLICATION_ID}")
+
+
+def connection_is_clone(conn: Any) -> bool:
+    """True when this open library connection carries the clone marker."""
+    row = conn.execute("PRAGMA application_id").fetchone()
+    return int((row[0] if row else 0) or 0) == CLONE_APPLICATION_ID
+
+
+def library_file_is_clone(db_path: Any) -> bool:
+    """True when the library file itself is marked as a clone."""
+    path = Path(db_path)
+    if not path.is_file():
+        return False
+    conn = dbconn.connect(f"file:{path}?mode=ro", uri=True)
+    try:
+        return connection_is_clone(conn)
+    finally:
+        conn.close()
+
 
 def library_is_clone(
-    user_id: str, library_id: str, *, user_db: Any = None,
+    user_id: str,
+    library_id: str,
+    *,
+    user_db: Any = None,
+    conn: Any = None,
+    db_path: Any = None,
 ) -> bool:
-    """True when this library was created by redeeming a share.
+    """True when this library is a share clone.
 
-    A lookup error counts as a clone so access stays closed.
+    The clone file's application_id marker is checked first. share_redemptions
+    remains the fallback for clones made before that marker existed. A lookup
+    error counts as a clone so access stays closed.
     """
+    try:
+        if conn is not None:
+            if connection_is_clone(conn):
+                return True
+        else:
+            path = db_path if db_path is not None else library_db_path(user_id, library_id)
+            if library_file_is_clone(path):
+                return True
+    except Exception:
+        return True
     try:
         db = user_db
         if db is None:
@@ -197,15 +240,13 @@ def clone_library_data(
     dest = library_db_path(dest_user_id, dest_library_id)
     dest.parent.mkdir(parents=True, exist_ok=True)
 
-    if not src.is_file():
-        # Empty source → leave empty dest (pipeline will create schema on open).
-        return {"articles": 0, "embeddings": 0, "screening": 0, "key_points": 0}
-
-    # Build the clone in a temp DB, sanitize it there, then atomically move it
-    # into place. The sqlite backup API yields a consistent snapshot including
-    # committed WAL frames (a wal_checkpoint can silently return busy), and
-    # sanitize-then-VACUUM before publishing means the student's file never
-    # contains the owner's private notes/clusters, even transiently.
+    # Build the clone in a temp DB, sanitize it there, mark it as a clone, then
+    # atomically move it into place. The sqlite backup API yields a consistent
+    # snapshot including committed WAL frames (a wal_checkpoint can silently
+    # return busy), and sanitize-then-VACUUM before publishing means the
+    # student's file never contains the owner's private notes/clusters, even
+    # transiently. The clone marker is written before os.replace so a reader
+    # that opens the published file cannot miss it.
     tmp = dest.with_name(dest.name + ".cloning")
     for path in (tmp, dest, Path(str(dest) + "-wal"), Path(str(dest) + "-shm")):
         if path.exists():
@@ -215,37 +256,50 @@ def clone_library_data(
                 pass
 
     try:
-        src_conn = dbconn.connect(f"file:{src}?mode=ro", uri=True)
-        try:
+        if src.is_file():
+            src_conn = dbconn.connect(f"file:{src}?mode=ro", uri=True)
+            try:
+                tmp_conn = dbconn.connect(str(tmp))
+                try:
+                    src_conn.backup(tmp_conn)
+                    # Copy by allow-list: anything else in the owner's file (AI
+                    # explanations, a half-finished fetch's staging, a crashed
+                    # swap's _swap_keep_* tables) is not the student's (20.3).
+                    tables = [
+                        row[0] for row in tmp_conn.execute(
+                            "SELECT name FROM sqlite_master WHERE type = 'table'"
+                        )
+                    ]
+                    for table in tables:
+                        if table not in CLONE_TABLES and not table.startswith("sqlite_"):
+                            tmp_conn.execute(f'DROP TABLE IF EXISTS "{table}"')
+                    tmp_conn.execute("DELETE FROM notes")
+                    tmp_conn.execute("DELETE FROM clusters")
+                    if not include_embeddings:
+                        tmp_conn.execute("DELETE FROM embeddings")
+                    tmp_conn.commit()
+                    # Compact so the deleted rows are not recoverable from the file.
+                    tmp_conn.execute("VACUUM")
+                    _mark_clone_connection(tmp_conn)
+                    tmp_conn.commit()
+                finally:
+                    tmp_conn.close()
+            finally:
+                src_conn.close()
+        else:
             tmp_conn = dbconn.connect(str(tmp))
             try:
-                src_conn.backup(tmp_conn)
-                # Copy by allow-list: anything else in the owner's file (AI
-                # explanations, a half-finished fetch's staging, a crashed
-                # swap's _swap_keep_* tables) is not the student's (20.3).
-                tables = [
-                    row[0] for row in tmp_conn.execute(
-                        "SELECT name FROM sqlite_master WHERE type = 'table'"
-                    )
-                ]
-                for table in tables:
-                    if table not in CLONE_TABLES and not table.startswith("sqlite_"):
-                        tmp_conn.execute(f'DROP TABLE IF EXISTS "{table}"')
-                tmp_conn.execute("DELETE FROM notes")
-                tmp_conn.execute("DELETE FROM clusters")
-                if not include_embeddings:
-                    tmp_conn.execute("DELETE FROM embeddings")
+                _mark_clone_connection(tmp_conn)
                 tmp_conn.commit()
-                # Compact so the deleted rows are not recoverable from the file.
-                tmp_conn.execute("VACUUM")
             finally:
                 tmp_conn.close()
-        finally:
-            src_conn.close()
         os.replace(tmp, dest)
     except BaseException:
         tmp.unlink(missing_ok=True)
         raise
+
+    if not src.is_file():
+        return {"articles": 0, "embeddings": 0, "screening": 0, "key_points": 0}
 
     db = ArticleDatabase(str(dest))
     try:

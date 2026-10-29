@@ -53,7 +53,7 @@ from app.storage.database import (
     ArticleDatabase,
     omit_null_metadata,
 )
-from app.storage.shares import library_is_clone
+from app.storage.shares import connection_is_clone, library_is_clone
 from app.utils import parse_year
 
 
@@ -130,18 +130,33 @@ class LiteratureSearchPipeline:
         self._trust_legacy_cached: Optional[bool] = None
 
     def trust_legacy_access(self) -> bool:
-        """False in a cloned library. One lookup, cached for this pipeline."""
-        cached = self._trust_legacy_cached
-        if cached is not None:
-            return cached
+        """False in a cloned library.
+
+        A clone marker on this library file is cached. A redemption hit is
+        cached. A miss from the redemption fallback is not, so a join still
+        in flight cannot freeze a stale "not a clone" answer.
+        """
+        if self._trust_legacy_cached is False:
+            return False
+        try:
+            if connection_is_clone(self.db.conn):
+                self._trust_legacy_cached = False
+                return False
+        except Exception:
+            self._trust_legacy_cached = False
+            return False
         user_id = getattr(self, "_lra_user_id", None)
         library_id = getattr(self, "_lra_library_id", None)
         if not user_id or not library_id:
-            self._trust_legacy_cached = True
             return True
-        value = not library_is_clone(str(user_id), str(library_id))
-        self._trust_legacy_cached = value
-        return value
+        try:
+            if library_is_clone(str(user_id), str(library_id), conn=self.db.conn):
+                self._trust_legacy_cached = False
+                return False
+        except Exception:
+            self._trust_legacy_cached = False
+            return False
+        return True
 
     def invalidate_corpus_cache(self) -> None:
         """Drop the embeddings matrix cache (call after corpus mutations)."""
