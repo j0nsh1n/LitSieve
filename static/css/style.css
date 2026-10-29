@@ -2126,6 +2126,27 @@ input[type="range"]::-moz-range-thumb:hover {
 .result-access-chip {
     text-decoration: none;
 }
+.result-other-copies {
+    margin: var(--space-2) 0 0;
+    font-size: var(--fs-sm);
+}
+.result-other-copies summary {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    color: var(--accent);
+    font-size: var(--fs-sm);
+    font-weight: 700;
+    cursor: pointer;
+    list-style: none;
+}
+.result-other-copies summary::-webkit-details-marker {
+    display: none;
+}
+.result-other-copies ul {
+    margin: var(--space-1) 0 0;
+    padding-left: var(--space-4);
+}
 .result-row-title {
     min-width: 0;
     margin: var(--space-1) 0 var(--space-2);

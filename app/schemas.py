@@ -128,6 +128,16 @@ class NoteRequest(BaseModel):
     library_id: Optional[str] = Field(default=None, max_length=128)
 
 
+class ArticleKey(BaseModel):
+    article_id: str = Field(min_length=1, max_length=256)
+    source: str = Field(min_length=1, max_length=64)
+
+
+class OtherCopiesRequest(BaseModel):
+    articles: List[ArticleKey] = Field(default_factory=list, max_length=200)
+    library_id: Optional[str] = Field(default=None, max_length=128)
+
+
 class AIArticleRequest(BaseModel):
     """Identify one paper in the active library for optional AI assist."""
     article_id: str

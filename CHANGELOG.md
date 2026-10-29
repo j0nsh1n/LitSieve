@@ -9,6 +9,11 @@ and this project aims to follow Semantic Versioning for app version strings
 ## [Unreleased]
 
 ### Added
+- On a starred Search card with no open copy listed, "Other listed copies (N)"
+  names other known places for the same work (same DOI or a merged record),
+  each with a link. A copy that meets the stored open rule also says "Open
+  copy listed". The list uses stored data only, at most five URLs. Crossref
+  text-mining links appear only with a recognised Creative Commons licence.
 - Search cards show an access label from stored OA fields: "Open copy listed"
   (a link) or "No open copy listed (<source>)". A Free to read filter keeps
   papers with an open copy listed. Nothing is checked over the network.

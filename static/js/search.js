@@ -106,6 +106,88 @@ function accessChipHtml(article) {
  return `<span class="tag result-access-chip">No open copy listed${suffix}</span>`;
 }
 
+let otherCopiesCache = new Map();
+let otherCopiesGen = 0;
+
+function otherCopiesKey(article) {
+ return String(article && article.article_id != null ? article.article_id : '')
+  + '\t' + String(article && article.source != null ? article.source : '');
+}
+
+function otherCopiesHtml(copies) {
+ const rows = Array.isArray(copies) ? copies : [];
+ if (!rows.length) return '';
+ const items = rows.map((copy) => {
+  const url = copy && typeof copy.url === 'string' ? copy.url.trim() : '';
+  if (!/^https?:\/\//i.test(url)) return '';
+  const where = copy && copy.where ? String(copy.where) : 'publisher page';
+  const open = copy && copy.open_listed
+   ? ' <span class="tag">Open copy listed</span>' : '';
+  return `<li><a href="${escapeAttr(url)}" target="_blank" rel="noopener">${escapeHtml(where)}</a>${open}</li>`;
+ }).filter(Boolean);
+ if (!items.length) return '';
+ return `<details class="result-other-copies"><summary>Other listed copies (${items.length})</summary><ul>${items.join('')}</ul></details>`;
+}
+
+function mountOtherCopies(card, copies) {
+ if (!card) return;
+ const existing = card.querySelector('.result-other-copies');
+ const html = otherCopiesHtml(copies);
+ if (!html) {
+  if (existing) existing.remove();
+  return;
+ }
+ const wrap = document.createElement('div');
+ wrap.innerHTML = html;
+ const node = wrap.firstElementChild;
+ if (!node) return;
+ if (existing) existing.replaceWith(node);
+ else {
+  const head = card.querySelector('.result-row-head');
+  if (head) head.insertAdjacentElement('afterend', node);
+  else card.prepend(node);
+ }
+}
+
+async function loadOtherCopiesForResults(articles) {
+ const gen = ++otherCopiesGen;
+ const keys = [];
+ for (const article of articles || []) {
+  if (!article || !article.starred) continue;
+  if (!article.access || article.access.state !== 'none_listed') continue;
+  const key = otherCopiesKey(article);
+  if (!key || otherCopiesCache.has(key)) continue;
+  if (article.article_id && article.source) {
+   keys.push({ article_id: article.article_id, source: article.source });
+  }
+ }
+ if (keys.length) {
+  try {
+   const data = await apiCall('/api/articles/other-copies', {
+    method: 'POST',
+    body: withPageLibrary({ articles: keys.slice(0, 200) }),
+   });
+   if (gen !== otherCopiesGen) return;
+   const rows = data && Array.isArray(data.articles) ? data.articles : [];
+   for (const row of rows) {
+    otherCopiesCache.set(otherCopiesKey(row), Array.isArray(row.copies) ? row.copies : []);
+   }
+   for (const item of keys) {
+    const key = otherCopiesKey(item);
+    if (!otherCopiesCache.has(key)) otherCopiesCache.set(key, []);
+   }
+  } catch (_err) {
+   if (gen !== otherCopiesGen) return;
+  }
+ }
+ if (gen !== otherCopiesGen) return;
+ document.querySelectorAll('#results-list .result-row').forEach((card) => {
+  const key = `${card.dataset.articleId || ''}\t${card.dataset.source || ''}`;
+  const copies = otherCopiesCache.get(key);
+  if (copies && copies.length) mountOtherCopies(card, copies);
+ });
+}
+
 function freeToReadForRequest(filters) {
  return filters && filters.free_to_read ? true : undefined;
 }
@@ -1595,6 +1677,8 @@ function buildResultCard(article, idx) {
  const card = document.createElement('article');
  card.className = 'article-card result-row';
  card.dataset.resultIndex = String(idx);
+ card.dataset.articleId = String(article.article_id || '');
+ card.dataset.source = String(article.source || '');
  // Catalog draws its index tab from this; it is the real source, not a topic.
  card.dataset.sourceName = getSourceName(article.source);
 
@@ -1747,6 +1831,11 @@ function buildResultCard(article, idx) {
   });
  }
 
+ const cachedCopies = otherCopiesCache.get(otherCopiesKey(article));
+ if (article.starred && cachedCopies && cachedCopies.length) {
+  mountOtherCopies(card, cachedCopies);
+ }
+
  const starBtn = card.querySelector('.star-btn');
  starBtn.addEventListener('click', async (e) => {
  e.preventDefault();
@@ -1776,7 +1865,12 @@ function buildResultCard(article, idx) {
  const starMark = card.querySelector('.result-mark-star');
  if (starMark) starMark.hidden = !next;
  bumpStarredCount(next ? 1 : -1);
+ if (!next) {
+  otherCopiesCache.delete(otherCopiesKey(article));
+  mountOtherCopies(card, []);
+ }
  if (displayFilterState.starred) showSearchResults();
+ else if (next) void loadOtherCopiesForResults([{ ...article, starred: true }]);
  } catch (err) {
  starBtn.classList.toggle('is-starred', !next);
  starBtn.innerHTML = starLabelHtml(!next);
@@ -2093,7 +2187,11 @@ function visibleResults() {
 
 function showSearchResults(fullList) {
  const fresh = Array.isArray(fullList);
- if (fresh) lastResults = fullList;
+ if (fresh) {
+  lastResults = fullList;
+  otherCopiesCache = new Map();
+  otherCopiesGen += 1;
+ }
  const bar = document.getElementById('display-filters');
  const hasHits = !!(lastResults && lastResults.length);
  if (bar) bar.hidden = !hasHits;
@@ -2102,6 +2200,7 @@ function showSearchResults(fullList) {
  syncSimpleResultChips();
  const shown = visibleResults();
  renderResults(shown);
+ void loadOtherCopiesForResults(shown);
  const countEl = document.getElementById('result-count');
  if (countEl) {
   countEl.textContent = displayFiltersActive() && hasHits
