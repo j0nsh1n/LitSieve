@@ -12,8 +12,8 @@
   poster. Live at `https://www.litpilot.org` from the production checkout,
   `main` through #106 (2026-10-16). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
-- Latest full suite (2026-10-29, `feat/narrow-by-type`):
-  **2144 passed** in 201.90 s, no skips or xfails. `ruff check .` clean;
+- Latest full suite (2026-10-29, `fix/laya-worker-default`):
+  **2159 passed** in 166.09 s, no skips or xfails. `ruff check .` clean;
   `pyright app` **0 errors**, 6 optional-import warnings (CI blocks on
   errors).
   `pip-audit` (2026-10-14): no known vulnerabilities; ROCm torch/triton are
@@ -121,8 +121,11 @@
   remains a browser preference. Account opens as a dockable panel over any
   page for signed-in users. Shared assets carry dated `?v=` values.
 - Laya sidecar (`tools/laya_worker.py`, port 7880) is socket-activated and
-  exits after 5 idle minutes; Search wakes it. Its checkpoint is uncalibrated
-  for questions with 11+ options (topic areas has 13).
+  exits after 5 idle minutes; Search wakes it. It builds
+  `Router(preload=False, default="english")` and warms up on an English
+  sentence so short topics and startup stay on the English checkpoint.
+  Its checkpoint is uncalibrated for questions with 11+ options (topic
+  areas has 13).
 - Guest sessions use sample papers, cannot fetch public sources and expire
   after 30 minutes. Search includes all available sources when unset.
 - Ship rollback dispatches detached when supported, carries its actor, and
@@ -283,23 +286,21 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-29. `feat/narrow-by-type` (PR #130, P2.7 type-only)
-  after merging `origin/main` (PR #122). Narrow it down keeps books and
-  chapters with no abstract and offers an unticked line for book reviews and
-  trial registrations. Review r1 fix 2: optional rows, Keep choices, the "Set
-  aside N papers" count, the confirm button and the applied keys use one
-  selected set. Fix 1 (server-side offered-key boundary) was declined: the
-  generic screening endpoint already lets a student set aside any of their own
-  papers, with CSRF and ownership checks, and it is undoable. simple_tools.js
-  cache-bust is `20261029c`; search.js and style.css stay `20261029a`.
+- **Date:** 2026-10-29. `fix/laya-worker-default` from origin/main
+  (`57dfa3e`, PR #130 merge). The Laya sidecar builds
+  `Router(preload=False, default="english")` and warms up on
+  "This is a warmup sentence." so Laya 0.4.17 keeps short Latin topics and
+  startup on the English checkpoint. The production venv switch is not in
+  this PR.
 - PR #122 (merged) keeps only the P2.2 sweep tooling. Its gate FAILED on the
   15-question benchmark (test ndcg@10 0.5712 vs today's 0.5755), so Search
   ranking is unchanged. Leave-one-question-out shortlists inside each fold,
   and `score-test` refuses a second test pass. Notes:
   `~/HealthDatabaseAccess-scratch/bench/p22_dev_sweep_v2.md`.
-- Validation (`fix-a8-r1`, production venv, no install): `ruff check .`
-  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2145
-  passed in 217.74 s.
+- Validation (production venv, this worktree, no install): `ruff check .`
+  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2159
+  passed in 166.09 s. Scratch is
+  `~/HealthDatabaseAccess-scratch/pytest-fix-laya-worker-default`.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
   and unscheduled roadmap backlog. Ship staging is at `266195e`. P1.9 labels
   are done: a three-model panel plus the owner's review of 29 rows, in
@@ -308,4 +309,5 @@ Guest User (is_guest) → sample corpus only; purged by age
   split is still unscored. That is a different score from the scored
   15-question v2 P2.2 test pass and from the v2 Laya test score. The
   evidence redesign from #126 follows in a separate PR.
-- **Next step:** merge PR #130 when CI passes. Do not merge from the builder.
+- **Next step:** independent review of this PR. Do not merge from the
+  builder. The production Laya venv switch is a later Phase 2 deploy.

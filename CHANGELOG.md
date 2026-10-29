@@ -93,6 +93,9 @@ and this project aims to follow Semantic Versioning for app version strings
   this".
 
 ### Changed
+- The Laya sidecar keeps the English checkpoint as its default, including
+  for short topics the language detector cannot place, and warms up on an
+  English sentence so it does not load a second checkpoint.
 - Narrow it down checks paper type. It never sets aside a book or chapter
   just because it has no abstract. It can set aside book reviews and trial
   registrations, but only if the student ticks that box.

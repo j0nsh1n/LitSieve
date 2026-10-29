@@ -4,6 +4,7 @@ stays up. Runs the real worker with --no-preload, so no model or torch loads."""
 from __future__ import annotations
 
 import configparser
+import importlib.util
 import json
 import os
 import pathlib
@@ -12,6 +13,7 @@ import socket
 import subprocess
 import sys
 import time
+import types
 
 import pytest
 import requests
@@ -133,6 +135,37 @@ def _unit(name):
     cp.optionxform = str
     cp.read(REPO / "deploy" / name)
     return cp
+
+
+def test_router_keeps_the_english_default(monkeypatch):
+    created = []
+    warmup = []
+
+    class FakeRouter:
+        def __init__(self, **kwargs):
+            created.append(kwargs)
+
+        def predict(self, state, questions):
+            warmup.append((state, questions))
+            return {}
+
+    fake_laya = types.ModuleType("laya")
+    fake_laya.Router = FakeRouter
+    monkeypatch.setitem(sys.modules, "laya", fake_laya)
+    fake_torch = types.ModuleType("torch")
+    fake_torch.cuda = types.SimpleNamespace(is_available=lambda: False)
+    monkeypatch.setitem(sys.modules, "torch", fake_torch)
+
+    spec = importlib.util.spec_from_file_location(
+        "laya_worker_router_test", REPO / "tools" / "laya_worker.py"
+    )
+    mod = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(mod)
+    mod._router = None
+    mod.router()
+    assert created == [{"preload": False, "default": "english"}]
+    assert warmup[0][0]["text"] == "This is a warmup sentence."
 
 
 def test_systemd_units_start_laya_on_demand_and_let_it_idle_out():
