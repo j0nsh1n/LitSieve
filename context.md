@@ -32,8 +32,8 @@
   five committed questions under `tools/bench/`. Replay snapshots now copy
   stored `work_type`, `doi` and `container_title` from the corpus row after
   ranking. The `baseline_v1` corpus and replay output live in
-  `~/HealthDatabaseAccess-scratch/bench/` and are not in git. Human labels
-  are P1.9. P2.1 adds `app/services/question_concepts.py`; Search does not
+  `~/HealthDatabaseAccess-scratch/bench/` and are not in git. P1.9 labels
+  are in `bench/labels_final/`. P2.1 adds `app/services/question_concepts.py`; Search does not
   import it yet.
 - P2.5a adds `tools/eval_laya_groups.py`. It scores Laya relevance groups on
   the dev split of the frozen top 30. The test split is not scored. The
@@ -251,7 +251,8 @@ Guest User (is_guest) → sample corpus only; purged by age
   passed in 238.99 s. Scratch is `~/HealthDatabaseAccess-scratch/pytest-fix-a3-r1`.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
   and unscheduled roadmap backlog. Ship staging was last recorded at
-  `f9485cf`. P1.9 is still the human labels on the five questions. The
-  held-out test split is still unscored. P2.2, PR #122, remains open and
+  `522ff7e`. P1.9 labels are done: a three-model panel plus the owner's
+  review of 29 rows, in `~/HealthDatabaseAccess-scratch/bench/labels_final/`
+  (not in git). The held-out test split is still unscored. P2.2, PR #122, remains open and
   on hold.
 - **Next step:** parent review of this PR. Do not merge from the builder.
