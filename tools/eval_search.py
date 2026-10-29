@@ -556,6 +556,25 @@ def _overall_ndcg_by_rank(
     return rows
 
 
+def _p22_in_results(results: Mapping[str, Any]) -> bool:
+    for qrow in results.get("questions") or []:
+        for name in (qrow.get("rankings") or {}):
+            if parse_p22_name(str(name)):
+                return True
+    return False
+
+
+def claim_test_stamp(path: Path, chosen: str) -> bool:
+    """Create the one-shot stamp. A second claim returns False and writes nothing."""
+    try:
+        fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+    except FileExistsError:
+        return False
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        json.dump({"status": "started", "chosen": chosen}, handle)
+    return True
+
+
 def leave_one_out_p22(
     scored: Sequence[Mapping[str, Any]],
     *,
@@ -566,13 +585,10 @@ def leave_one_out_p22(
 ) -> Dict[str, Any]:
     """Pick on n-1 questions, then score the held-out question.
 
-    Candidates are the top ``top_n`` settings by overall nDCG. Each fold uses
-    the same choose rule as the full set.
+    The full-data top ``top_n`` table is reference only. Each fold shortlists
+    from training questions, then uses the same choose rule as the full set.
     """
     ranked = _overall_ndcg_by_rank(scored)
-    top = [name for name, _ in ranked[:top_n]]
-    allowed = set(top)
-    allowed.add(baseline_name)
     qids: List[str] = []
     by_rank: Dict[str, Dict[str, Mapping[str, Any]]] = {}
     for row in scored:
@@ -588,10 +604,16 @@ def leave_one_out_p22(
         train = [
             row for row in scored
             if str(row.get("id") or "") != held
-            and str(row.get("ranking") or "") in allowed
+        ]
+        fold_top = [name for name, _ in _overall_ndcg_by_rank(train)[:top_n]]
+        allowed = set(fold_top)
+        allowed.add(baseline_name)
+        fold_train = [
+            row for row in train
+            if str(row.get("ranking") or "") in allowed
         ]
         pick = choose_p22(
-            train,
+            fold_train,
             baseline_name=baseline_name,
             ndcg_window=ndcg_window,
             max_drop=max_drop,
@@ -1100,10 +1122,17 @@ def write_p22_sweep_md(
         if name and name not in seen:
             seen.add(name)
             names.append(name)
+    split = str(payload.get("split") or "").strip() or "all"
+    if split == "dev":
+        split_line = "Dev split only. Baseline is today's hybrid (`lexical_on`)."
+    elif split == "test":
+        split_line = "Test split. Baseline is today's hybrid (`lexical_on`)."
+    else:
+        split_line = f"Split `{split}`. Baseline is today's hybrid (`lexical_on`)."
     lines = [
-        "# P2.2 word-bonus dev sweep",
+        "# P2.2 word-bonus sweep",
         "",
-        "Dev split only. Baseline is today's hybrid (`lexical_on`).",
+        split_line,
         "",
         "## Overall",
         "",
@@ -1136,7 +1165,10 @@ def write_p22_sweep_md(
     loo = payload.get("leave_one_out")
     if isinstance(loo, dict):
         lines.extend(["", "## Leave-one-question-out", ""])
-        lines.append("Top 5 settings by overall ndcg@10. Each fold picks on the other questions, then scores the held-out one.")
+        lines.append(
+            "Full-data top 5 by overall ndcg@10 is reference only. "
+            "Each fold shortlists and picks on the other questions, then scores the held-out one."
+        )
         lines.extend(["", "| rank | setting | overall ndcg@10 |", "|---|---|---|"])
         for i, row in enumerate(loo.get("top") or [], start=1):
             lines.append(f"| {i} | {row.get('name')} | {row.get('overall_ndcg')} |")
@@ -1148,24 +1180,32 @@ def write_p22_sweep_md(
         for fold in loo.get("folds") or []:
             beats = fold.get("beats_held_baseline")
             beats_s = "" if beats is None else ("yes" if beats else "no")
+            picked = fold.get("picked") or ""
+            held_ndcg = fold.get("held_ndcg")
+            held_s = "" if held_ndcg is None else held_ndcg
             lines.append(
-                f"| {fold.get('held_out')} | {fold.get('picked')} | "
-                f"{fold.get('held_ndcg')} | {fold.get('baseline_ndcg')} | {beats_s} |"
+                f"| {fold.get('held_out')} | {picked} | "
+                f"{held_s} | {fold.get('baseline_ndcg')} | {beats_s} |"
             )
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def cmd_score(args: argparse.Namespace) -> int:
-    results = load_json(Path(args.results))
-    labels = load_labels(Path(args.labels))
-    split_filter = args.split or "all"
+def _score_named(
+    results: Mapping[str, Any],
+    labels: Mapping[str, Sequence[Mapping[str, str]]],
+    split_filter: str,
+    names: Optional[Sequence[str]] = None,
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], Dict[str, Any]]:
     scored: List[Dict[str, Any]] = []
+    wanted = list(names) if names is not None else None
     for qrow in results.get("questions") or []:
         qid = str(qrow.get("id") or "")
         rankings = qrow.get("rankings") or {}
-        names = list(rankings) or ["lexical_on"]
-        for name in names:
+        row_names = wanted if wanted is not None else (list(rankings) or ["lexical_on"])
+        for name in row_names:
+            if wanted is not None and name not in rankings:
+                continue
             scored.append(score_question(qrow, labels.get(qid, []), split_filter, name))
     by_ranking: Dict[str, List[Dict[str, Any]]] = {}
     for row in scored:
@@ -1176,6 +1216,21 @@ def cmd_score(args: argparse.Namespace) -> int:
     overall = next((r for r in overalls if r.get("ranking") == "lexical_on"), None)
     if overall is None:
         overall = overalls[0] if overalls else _overall_for([], "lexical_on", split_filter)
+    return scored, overalls, overall
+
+
+def cmd_score(args: argparse.Namespace) -> int:
+    results = load_json(Path(args.results))
+    split_filter = args.split or "dev"
+    if _p22_in_results(results) and split_filter != "dev":
+        print(
+            "P2.2 sweep selection needs --split dev. "
+            "Use score-test to score the saved choice on the test split once.",
+            flush=True,
+        )
+        return 2
+    labels = load_labels(Path(args.labels))
+    scored, overalls, overall = _score_named(results, labels, split_filter)
     table = [*scored, *overalls]
     _print_table(table)
     has_p22 = any(parse_p22_name(str(r.get("ranking"))) for r in scored)
@@ -1200,6 +1255,67 @@ def cmd_score(args: argparse.Namespace) -> int:
         table_path = Path(args.table).expanduser()
         write_p22_sweep_md(payload, table_path, choice=choice)
         print(f"wrote {table_path}", flush=True)
+    return 0
+
+
+def cmd_score_test(args: argparse.Namespace) -> int:
+    dev_path = Path(args.dev_scores)
+    if not dev_path.is_file():
+        print(f"missing dev scores {dev_path}", flush=True)
+        return 2
+    dev = load_json(dev_path)
+    chosen = str((dev.get("choice") or {}).get("name") or "")
+    if not chosen:
+        print("dev scores did not choose a setting", flush=True)
+        return 2
+    results = load_json(Path(args.results))
+    rankings_ok = False
+    for qrow in results.get("questions") or []:
+        rankings = qrow.get("rankings") or {}
+        if chosen in rankings and "lexical_on" in rankings:
+            rankings_ok = True
+            break
+    if not rankings_ok:
+        print(
+            f"results must include lexical_on and the saved choice {chosen}",
+            flush=True,
+        )
+        return 2
+    out = Path(args.out)
+    stamp = Path(str(out) + ".test-stamp.json")
+    if out.is_file():
+        print(f"test scores already written: {out}", flush=True)
+        return 3
+    if not claim_test_stamp(stamp, chosen):
+        print(f"test split already scored: {stamp}", flush=True)
+        return 3
+    try:
+        labels = load_labels(Path(args.labels))
+        scored, overalls, overall = _score_named(
+            results, labels, "test", ["lexical_on", chosen],
+        )
+        table = [*scored, *overalls]
+        _print_table(table)
+        payload = {
+            "results": str(Path(args.results)),
+            "labels": str(Path(args.labels)),
+            "split": "test",
+            "questions": scored,
+            "overall": overall,
+            "overalls": overalls,
+            "choice": dev.get("choice"),
+            "leave_one_out": None,
+        }
+        write_json(out, payload)
+        if args.table:
+            table_path = Path(args.table).expanduser()
+            write_p22_sweep_md(payload, table_path, choice=dev.get("choice"))
+            print(f"wrote {table_path}", flush=True)
+    except Exception:
+        if stamp.exists():
+            stamp.unlink()
+        raise
+    print(f"wrote {out}", flush=True)
     return 0
 
 
@@ -1470,10 +1586,21 @@ def build_parser() -> argparse.ArgumentParser:
     sco = sub.add_parser("score", help="Score a replay against human labels")
     sco.add_argument("--results", required=True)
     sco.add_argument("--labels", required=True)
-    sco.add_argument("--split", choices=("dev", "test", "all"), default="all")
+    sco.add_argument("--split", choices=("dev", "test", "all"), default="dev")
     sco.add_argument("--out", default=None)
     sco.add_argument("--table", default=None, help="Write a Markdown sweep table")
     sco.set_defaults(func=cmd_score)
+
+    st = sub.add_parser(
+        "score-test",
+        help="Score the saved dev choice and today's ranking on the test split once",
+    )
+    st.add_argument("--results", required=True)
+    st.add_argument("--labels", required=True)
+    st.add_argument("--dev-scores", required=True)
+    st.add_argument("--out", required=True)
+    st.add_argument("--table", default=None, help="Write a Markdown test table")
+    st.set_defaults(func=cmd_score_test)
 
     lab = sub.add_parser("labelsheet", help="Write blank CSVs for a human labeller")
     lab.add_argument("--results", required=True)

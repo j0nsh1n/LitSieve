@@ -9,6 +9,10 @@ and this project aims to follow Semantic Versioning for app version strings
 ## [Unreleased]
 
 ### Fixed
+- The P2.2 sweep leave-one-question-out shortlist is built inside each fold
+  from the training questions. `score --split test` and `--split all` refuse
+  to pick a setting. `score-test` scores the saved dev choice and today's
+  ranking once.
 - Whether any open copy of the same work exists is decided before the five
   copy list is capped. A sixth open URL still turns Different work off.
 - Different work accepts one seed, a question of at most 1,000 characters,
@@ -44,8 +48,8 @@ and this project aims to follow Semantic Versioning for app version strings
   papers into answers, how or why, context, and different. It scores the dev
   split only. Search is unchanged.
 - `tools/eval_search.py` can replay a 48-setting word-match sweep (blend or
-  bonus, TF-IDF or BM25, raw question or keywords) on a frozen corpus. Search
-  ranking is unchanged.
+  bonus, TF-IDF or BM25, raw question or keywords) on a frozen corpus. The
+  v2 sweep lost on test (FAIL), so Search ranking is unchanged.
 - Search cards show an access label from stored OA fields: "Open copy listed"
   (a link) or "No open copy listed (<source>)". A Free to read filter keeps
   papers with an open copy listed. Nothing is checked over the network.

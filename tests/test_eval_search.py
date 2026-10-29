@@ -525,3 +525,190 @@ def test_leave_one_out_p22_picks_on_the_other_questions():
     assert by_held["Q1"]["picked"] == "bonus_w0.3_bm25_keywords"
     assert by_held["Q1"]["held_ndcg"] == 0.52
     assert by_held["Q1"]["beats_held_baseline"] is True
+
+
+def _loo_held_out_fixture(held_a: float) -> list:
+    scored = []
+    for qid, a_score, b_score in (
+        ("Q1", 0.6, 0.5),
+        ("Q2", 0.6, 0.5),
+        ("Q3", held_a, 0.8),
+    ):
+        scored.append({"id": qid, "ranking": "lexical_on", "ndcg@10": 0.4})
+        scored.append({"id": qid, "ranking": "bonus_w0.2_bm25_keywords", "ndcg@10": a_score})
+        scored.append({"id": qid, "ranking": "blend_w0.3_tfidf_raw", "ndcg@10": b_score})
+    return scored
+
+
+def test_leave_one_out_p22_held_out_scores_do_not_change_the_fold_pick():
+    low = ev.leave_one_out_p22(_loo_held_out_fixture(0.0), top_n=1)
+    high = ev.leave_one_out_p22(_loo_held_out_fixture(1.0), top_n=1)
+    low_pick = next(fold["picked"] for fold in low["folds"] if fold["held_out"] == "Q3")
+    high_pick = next(fold["picked"] for fold in high["folds"] if fold["held_out"] == "Q3")
+    assert low_pick == high_pick == "bonus_w0.2_bm25_keywords"
+
+
+def test_leave_one_out_p22_held_out_cannot_swap_the_shortlist_boundary():
+    names = [
+        "blend_w0.05_tfidf_raw",
+        "blend_w0.1_tfidf_raw",
+        "blend_w0.15_tfidf_raw",
+        "blend_w0.2_tfidf_raw",
+        "blend_w0.25_tfidf_raw",
+        "blend_w0.3_tfidf_raw",
+    ]
+    train_scores = [0.90, 0.50, 0.49, 0.48, 0.47, 0.46]
+
+    def scored_for(held_rest: float) -> list:
+        rows = []
+        for qid in ("Q1", "Q2", "Q3"):
+            rows.append({"id": qid, "ranking": "lexical_on", "ndcg@10": 0.4})
+            for name, train in zip(names, train_scores):
+                ndcg = train if qid != "Q3" else (0.0 if name == names[0] else held_rest)
+                rows.append({"id": qid, "ranking": name, "ndcg@10": ndcg})
+        return rows
+
+    low = ev.leave_one_out_p22(scored_for(0.0), top_n=5)
+    high = ev.leave_one_out_p22(scored_for(1.0), top_n=5)
+    low_pick = next(fold["picked"] for fold in low["folds"] if fold["held_out"] == "Q3")
+    high_pick = next(fold["picked"] for fold in high["folds"] if fold["held_out"] == "Q3")
+    assert low_pick == high_pick == names[0]
+
+
+def _tiny_p22_score_inputs(tmp_path: Path):
+    results = {
+        "questions": [{
+            "id": "Q1",
+            "text": "sleep",
+            "rankings": {
+                "lexical_on": [{
+                    "rank": 1, "key": "k-dir", "title": "dir",
+                    "work_type": "journal-article", "source": "openalex",
+                    "article_id": "b", "journal": "Sleep",
+                }],
+                "bonus_w0.2_bm25_keywords": [{
+                    "rank": 1, "key": "k-dir", "title": "dir",
+                    "work_type": "journal-article", "source": "openalex",
+                    "article_id": "b", "journal": "Sleep",
+                }],
+                "blend_w0.3_tfidf_raw": [{
+                    "rank": 1, "key": "k-inc", "title": "inc",
+                    "work_type": "journal-article", "source": "openalex",
+                    "article_id": "a", "journal": "Sleep",
+                }],
+            },
+            "timings": {"embed_s": 0.1, "lexical_on_s": 0.01, "lexical_off_s": 0.01},
+        }]
+    }
+    results_path = tmp_path / "results.json"
+    results_path.write_text(json.dumps(results), encoding="utf-8")
+    labels_dir = tmp_path / "labels"
+    labels_dir.mkdir()
+    labels_dir.joinpath("Q1.json").write_text(json.dumps([
+        {
+            "key": "k-dir", "title": "dir", "labeller": "owner",
+            "category": "direct_answer", "work_type": "journal-article",
+            "split": "test",
+        },
+        {
+            "key": "k-inc", "title": "inc", "labeller": "owner",
+            "category": "incidental", "work_type": "journal-article",
+            "split": "test",
+        },
+    ]), encoding="utf-8")
+    return results_path, labels_dir
+
+
+def test_cmd_score_refuses_p22_test_and_all_splits(tmp_path, capsys):
+    results_path, labels_dir = _tiny_p22_score_inputs(tmp_path)
+    out = tmp_path / "scores.json"
+    table = tmp_path / "table.md"
+    for split in ("test", "all"):
+        if out.exists():
+            out.unlink()
+        assert ev.main([
+            "score", "--results", str(results_path), "--labels", str(labels_dir),
+            "--split", split, "--out", str(out), "--table", str(table),
+        ]) == 2
+        assert not out.exists()
+        assert not table.exists()
+        captured = capsys.readouterr()
+        assert "score-test" in captured.out
+        assert "Dev split only" not in captured.out
+
+
+def test_cmd_score_p22_dev_writes_choice(tmp_path):
+    results_path, labels_dir = _tiny_p22_score_inputs(tmp_path)
+    # Dev labels so choose_p22 sees a question.
+    labels_dir.joinpath("Q1.json").write_text(json.dumps([
+        {
+            "key": "k-dir", "title": "dir", "labeller": "owner",
+            "category": "direct_answer", "work_type": "journal-article",
+            "split": "dev",
+        },
+    ]), encoding="utf-8")
+    out = tmp_path / "dev.json"
+    table = tmp_path / "table.md"
+    assert ev.main([
+        "score", "--results", str(results_path), "--labels", str(labels_dir),
+        "--split", "dev", "--out", str(out), "--table", str(table),
+    ]) == 0
+    payload = json.loads(out.read_text(encoding="utf-8"))
+    assert payload["split"] == "dev"
+    assert payload["choice"]["name"]
+    assert payload["leave_one_out"]["folds"]
+    text = table.read_text(encoding="utf-8")
+    assert "Dev split only" in text
+    assert payload["choice"]["name"] in text
+
+
+def test_score_test_uses_saved_choice_once(tmp_path):
+    results_path, labels_dir = _tiny_p22_score_inputs(tmp_path)
+    chosen = "bonus_w0.2_bm25_keywords"
+    dev_path = tmp_path / "dev.json"
+    dev_path.write_text(json.dumps({
+        "choice": {"name": chosen, "overall_ndcg": 0.5},
+    }), encoding="utf-8")
+    out = tmp_path / "test.json"
+    table = tmp_path / "table.md"
+    argv = [
+        "score-test", "--results", str(results_path), "--labels", str(labels_dir),
+        "--dev-scores", str(dev_path), "--out", str(out), "--table", str(table),
+    ]
+    assert ev.main(argv) == 0
+    payload = json.loads(out.read_text(encoding="utf-8"))
+    assert payload["split"] == "test"
+    assert payload["choice"]["name"] == chosen
+    assert payload["leave_one_out"] is None
+    names = sorted({row["ranking"] for row in payload["questions"]})
+    assert names == ["bonus_w0.2_bm25_keywords", "lexical_on"]
+    text = table.read_text(encoding="utf-8")
+    assert text.startswith("# P2.2 word-bonus sweep\n")
+    assert "Test split." in text
+    assert "Dev split only" not in text
+    stamp = Path(str(out) + ".test-stamp.json")
+    assert stamp.is_file()
+    first = out.read_text(encoding="utf-8")
+    assert ev.main(argv) == 3
+    assert out.read_text(encoding="utf-8") == first
+    assert "other" not in stamp.read_text(encoding="utf-8")
+
+
+def test_p22_test_stamp_blocks_a_second_claim(tmp_path):
+    path = tmp_path / "scores.json.test-stamp.json"
+    assert ev.claim_test_stamp(path, "bonus_w0.2_bm25_keywords") is True
+    assert ev.claim_test_stamp(path, "other") is False
+    saved = path.read_text(encoding="utf-8")
+    assert "bonus_w0.2_bm25_keywords" in saved
+    assert "other" not in saved
+
+
+def test_score_test_command_is_wired():
+    parser = ev.build_parser()
+    held = parser.parse_args([
+        "score-test", "--results", "r.json", "--labels", "labels",
+        "--dev-scores", "dev.json", "--out", "test.json",
+    ])
+    assert held.func is ev.cmd_score_test
+    score = parser.parse_args(["score", "--results", "r.json", "--labels", "labels"])
+    assert score.split == "dev"

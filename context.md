@@ -78,8 +78,10 @@
 - P2.2 re-ran the word-match sweep on the 15-question `baseline_v2` corpus.
   The chosen setting (`bonus_w0.2_bm25_keywords`) beat today's ranking on
   dev (ndcg@10 0.4381 vs 0.3973) and lost on test (0.5712 vs 0.5755), with
-  Q1, Q5 and Q14 dropping more than 0.05. Search ranking is unchanged. Sweep
-  notes: `~/HealthDatabaseAccess-scratch/bench/p22_dev_sweep_v2.md`.
+  Q1, Q5 and Q14 dropping more than 0.05. Search ranking is unchanged. Gate
+  is FAIL. Leave-one-question-out now shortlists inside each fold. Q4 has
+  no pick and Q11 picked `blend_w0.2_bm25_keywords`. Sweep notes:
+  `~/HealthDatabaseAccess-scratch/bench/p22_dev_sweep_v2.md`.
 - P1.6 stores Collect inputs and Search questions in the library database
   (`fetch_runs`, `question_log`), about 50 rows each. Writes come from
   `_run_multi_fetch` (background and sync, including cancel and error) and
@@ -275,20 +277,21 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-29. Branch `feat/word-bonus`, PR #122. Merged
-  `origin/main` (`05f8c6e`, includes P2.5b). Re-ran the P2.2 word-match
-  sweep on the 15-question `baseline_v2` corpus, dev split only. Chosen
-  setting `bonus_w0.2_bm25_keywords` beat today's 0.7/0.3 TF-IDF ranking
-  on dev (ndcg@10 0.4381 vs 0.3973) and lost on the one test pass
-  (0.5712 vs 0.5755). Q1, Q5 and Q14 dropped more than 0.05 on test, so
-  the product ranking, card copy, CSV columns and spec ranking sentence
-  stay as on main. The PR keeps the sweep ranker in `tools/eval_search.py`
-  and `app/services/lexical.py`. Search.js and style.css cache-bust stay
+- **Date:** 2026-10-29. Branch `feat/word-bonus`, PR #122. Review-fix after
+  merging `origin/main` (`05f8c6e`). Leave-one-question-out shortlists
+  inside each fold from training questions. `score --split test` and
+  `--split all` refuse P2.2 sweep selection. `score-test` scores the saved
+  dev choice and today's ranking once. Search ranking, card copy, CSV
+  columns and the spec ranking sentence stay as on main. Gate is still
+  FAIL. Corrected LOO from cached `p22_v2_dev_scores.json` (no test-split
+  re-score): Q4 has no pick, Q11 picked `blend_w0.2_bm25_keywords`
+  (0.3183 vs today's 0.4982). The other 13 folds still picked
+  `bonus_w0.2_bm25_keywords`. Search.js and style.css cache-bust stay
   `20261029a`.
 - Validation (production venv, this worktree, no install): `ruff check .`
-  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2133
-  passed in 183.79 s. Scratch is
-  `~/HealthDatabaseAccess-scratch/pytest-fix-a2-rerun`. Sweep notes:
+  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2152
+  passed in 213.00 s. Scratch is
+  `~/HealthDatabaseAccess-scratch/pytest-fix-a6-r1`. Sweep notes:
   `~/HealthDatabaseAccess-scratch/bench/p22_dev_sweep_v2.md`.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
   and unscheduled roadmap backlog. Ship staging is at `266195e`. P1.9 labels
