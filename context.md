@@ -12,8 +12,8 @@
   poster. Live at `https://www.litpilot.org` from the production checkout,
   `main` through #106 (2026-10-16). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
-- Latest full suite (2026-10-28, `feat/access-label` CC-licence review-fix):
-  **2043 passed** in 203.21 s, no skips or xfails. `ruff check .` clean;
+- Latest full suite (2026-10-28, `feat/laya-groups-eval`):
+  **2056 passed** in 238.99 s, no skips or xfails. `ruff check .` clean;
   `pyright app` **0 errors**, 6 optional-import warnings (CI blocks on
   errors).
   `pip-audit` (2026-10-14): no known vulnerabilities; ROCm torch/triton are
@@ -32,9 +32,15 @@
   five committed questions under `tools/bench/`. Replay snapshots now copy
   stored `work_type`, `doi` and `container_title` from the corpus row after
   ranking. The `baseline_v1` corpus and replay output live in
-  `~/HealthDatabaseAccess-scratch/bench/` and are not in git. Human labels
-  are P1.9. P2.1 adds `app/services/question_concepts.py`; Search does not
+  `~/HealthDatabaseAccess-scratch/bench/` and are not in git. P1.9 labels
+  are in `bench/labels_final/`. P2.1 adds `app/services/question_concepts.py`; Search does not
   import it yet.
+- P2.5a adds `tools/eval_laya_groups.py`. It scores Laya relevance groups on
+  the dev split of the frozen top 30. The test split is not scored. The
+  write-up is `~/HealthDatabaseAccess-scratch/bench/p25a_results.md`. The
+  best run that stays under a 5% harmful-error rate sorts 16 of 91 dev papers
+  and does not improve ndcg@10. The report lists each question's ndcg@10
+  and relevant@10. No group setting is ready to show students.
 - P1.6 stores Collect inputs and Search questions in the library database
   (`fetch_runs`, `question_log`), about 50 rows each. Writes come from
   `_run_multi_fetch` (background and sync, including cancel and error) and
@@ -158,7 +164,7 @@
 | `static/` | vanilla JS/CSS (no npm); cache-bust `?v=` |
 | `tests/` | pytest; policy in `tests/README.md` |
 | `docs/` | DEPLOY, SELFHOST, plans, SCALE_NOTES |
-| `tools/` | backup, watchdog, bench_scale, eval_search, encrypt_databases, operator |
+| `tools/` | backup, watchdog, bench_scale, eval_search, eval_laya_groups, encrypt_databases, operator |
 
 ## Domain Model
 - **User** (`users.db`): username, password hash, token_version; optional recovery
@@ -230,18 +236,23 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-28. `feat/access-label` (P2.3) review-fix round 2:
-  Crossref open labels need a recognised CC licence identifier and
-  version (by, by-sa, by-nd, by-nc, by-nc-sa, by-nc-nd, plus CC0 and
-  Public Domain Mark 1.0). Invented paths and versions such as
-  `not-a-license/4.0` and `by/99.99` stay closed. Deed and jurisdiction
-  suffixes still count. Search.js cache-bust is still `20261028e`.
+- **Date:** 2026-10-28. `feat/laya-groups-eval` review fix. Ineligible
+  calibrations now keep the lowest harmful-error rate before macro-F1.
+  The dev report saves ndcg@10 and relevant@10 for each question. No search
+  or UI change. The held-out test split was not scored. The rerun reused
+  the 54 cached batches and made no new sidecar calls.
+- Title-only F1 with the concept wording is still the strongest setting
+  under a 5% harmful-error cap. It sorts 16 of 91 dev papers and lowers
+  ndcg@10. The only threshold that moved is F2's different-group cut, from
+  0.50 to 0.65. That setting now sorts 38 of 91 papers, puts 2 of 27 good
+  papers in different, and still raises ndcg@10. The top 5 list is unchanged.
 - Validation (production venv, this worktree, no install): `ruff check .`
-  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2043
-  passed in 203.21 s. Scratch is
-  `~/HealthDatabaseAccess-scratch/pytest-fix-b1-r2`.
+  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2056
+  passed in 238.99 s. Scratch is `~/HealthDatabaseAccess-scratch/pytest-fix-a3-r1`.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
   and unscheduled roadmap backlog. Ship staging was last recorded at
-  `f9485cf`. P1.9 is human labels on the five questions. P2.2 is wiring
-  concepts into ranking.
+  `522ff7e`. P1.9 labels are done: a three-model panel plus the owner's
+  review of 29 rows, in `~/HealthDatabaseAccess-scratch/bench/labels_final/`
+  (not in git). The held-out test split is still unscored. P2.2, PR #122, remains open and
+  on hold.
 - **Next step:** parent review of this PR. Do not merge from the builder.
