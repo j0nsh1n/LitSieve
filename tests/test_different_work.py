@@ -11,6 +11,7 @@ from app.services.different_work import (
     difference_line,
     pick_different_work,
 )
+from app.services.link_evidence import SOURCE_ADAPTER_SHAPES
 from app.services.pipeline import LiteratureSearchPipeline
 from app.services.question_concepts import question_concepts
 from app.storage.database import ArticleDatabase
@@ -143,14 +144,25 @@ def _paper(article_id, source, title, abstract, **kwargs):
         "journal": "J",
     }
     article.update(kwargs)
-    if article.get("source") == "doaj" and article.get("best_oa_url"):
-        extra = dict(article.get("_extra") or {})
-        extra.setdefault("locations", [{
-            "url": article["best_oa_url"],
-            "kind": "fulltext",
-            "via": "doaj",
-        }])
-        article["_extra"] = extra
+    source = article.get("source")
+    url = article.get("best_oa_url")
+    shape = SOURCE_ADAPTER_SHAPES.get(source)
+    if shape and url:
+        kinds = shape["kind"]
+        kind = None
+        if None not in kinds:
+            for item in ("pdf", "file", "fulltext", "landing"):
+                if item in kinds:
+                    kind = item
+                    break
+        if kind:
+            extra = dict(article.get("_extra") or {})
+            extra.setdefault("locations", [{
+                "url": url,
+                "kind": kind,
+                "via": source,
+            }])
+            article["_extra"] = extra
     return article
 
 

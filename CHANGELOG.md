@@ -21,9 +21,9 @@ and this project aims to follow Semantic Versioning for app version strings
   listed". A stored observation whose source, record id, or timestamp is
   not a string is unused, and a later fetch leaves that stored value
   unchanged. A stored observation is unused unless its source, basis,
-  kind, licence, and licence scope match what that source writes, and a
-  later fetch leaves it unchanged. Clones still drop stored observations
-  until they fetch.
+  kind, licence, and licence scope match the values that source writes.
+  Each source has its own list. A later fetch leaves a mismatch
+  unchanged. Clones still drop stored observations until they fetch.
 
 - Narrow it down's "Set aside N papers" count, confirm button, and the papers
   it actually sets aside follow the optional book-review checkbox and any

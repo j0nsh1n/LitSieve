@@ -15,25 +15,114 @@ BASIS_DOAJ_FULLTEXT = "doaj_fulltext"
 BASIS_CROSSREF_ENTRY = "crossref_entry"
 BASIS_LISTED_ONLY = "listed_only"
 LICENCE_SCOPE_ENTRY = "entry"
-LICENCE_SCOPE_RECORD = "record"
+# Fetcher copies an API string; any non-empty stripped string is allowed.
+ANY_TEXT = object()
 _OA_ADAPTER_BASES = frozenset({BASIS_OA_BEST, BASIS_LOCATION_OPEN, BASIS_LISTED_ONLY})
+_NO_LICENCE = frozenset({None})
+_NO_SCOPE = frozenset({None})
+_ENTRY_OR_NONE = frozenset({LICENCE_SCOPE_ENTRY, None})
+_ANY_LICENCE = frozenset({ANY_TEXT, None})
+
+
+def _adapter_shape(
+    basis: frozenset,
+    kinds: frozenset,
+    licences: frozenset,
+    scopes: frozenset,
+) -> Dict[str, frozenset]:
+    return {
+        "basis": basis,
+        "kind": kinds,
+        "licence": licences,
+        "licence_scope": scopes,
+    }
+
+
+# Stored location values each source adapter can emit. Kind and licence cite
+# the fetcher. Basis and licence_scope cite _basis_for in this file.
+SOURCE_ADAPTER_SHAPES = {
+    # app/fetchers/arxiv.py:130 kind='pdf'; no license= on the location.
+    "arxiv": _adapter_shape(
+        _OA_ADAPTER_BASES, frozenset({"pdf"}), _NO_LICENCE, _NO_SCOPE,
+    ),
+    # app/fetchers/biorxiv.py:51 kind="pdf"; no license=.
+    "biorxiv": _adapter_shape(
+        _OA_ADAPTER_BASES, frozenset({"pdf"}), _NO_LICENCE, _NO_SCOPE,
+    ),
+    # app/fetchers/clinicaltrials.py:167 attach_work_fields has no locations.
+    "clinicaltrials": _adapter_shape(
+        _OA_ADAPTER_BASES, frozenset({None}), _NO_LICENCE, _NO_SCOPE,
+    ),
+    # app/fetchers/crossref.py:173 kind is content-type or intended-application.
+    # Location licence is omitted by the fetcher (171-175); _basis_for:513-516
+    # stores one when the incoming location has a licence (entry-level CC).
+    "crossref": _adapter_shape(
+        frozenset({BASIS_CROSSREF_ENTRY, BASIS_LISTED_ONLY}),
+        frozenset({ANY_TEXT, None}),
+        _ANY_LICENCE,
+        _ENTRY_OR_NONE,
+    ),
+    # app/fetchers/doaj.py:147 kind='fulltext'; no license=.
+    "doaj": _adapter_shape(
+        frozenset({BASIS_DOAJ_FULLTEXT, BASIS_LISTED_ONLY}),
+        frozenset({"fulltext"}),
+        _NO_LICENCE,
+        _NO_SCOPE,
+    ),
+    # app/fetchers/eric.py:116 attach_work_fields has no locations.
+    "eric": _adapter_shape(
+        _OA_ADAPTER_BASES, frozenset({None}), _NO_LICENCE, _NO_SCOPE,
+    ),
+    # app/fetchers/europepmc.py:171 kind is pdf or fulltext; no license= (169-173).
+    "europepmc": _adapter_shape(
+        _OA_ADAPTER_BASES, frozenset({"pdf", "fulltext"}), _NO_LICENCE, _NO_SCOPE,
+    ),
+    # app/fetchers/hal.py:117 kind="file"; no license=.
+    "hal": _adapter_shape(
+        frozenset({BASIS_HAL_FILE, BASIS_LISTED_ONLY}),
+        frozenset({"file"}),
+        _NO_LICENCE,
+        _NO_SCOPE,
+    ),
+    # app/fetchers/biorxiv.py:51 via MedRxivFetcher; kind="pdf"; no license=.
+    "medrxiv": _adapter_shape(
+        _OA_ADAPTER_BASES, frozenset({"pdf"}), _NO_LICENCE, _NO_SCOPE,
+    ),
+    # app/fetchers/nasa_ads.py:106 attach_work_fields has no locations.
+    "nasa_ads": _adapter_shape(
+        _OA_ADAPTER_BASES, frozenset({None}), _NO_LICENCE, _NO_SCOPE,
+    ),
+    # app/fetchers/openaire.py:243 has oa_status, no locations, no best_oa_url.
+    "openaire": _adapter_shape(
+        _OA_ADAPTER_BASES, frozenset({None}), _NO_LICENCE, _NO_SCOPE,
+    ),
+    # app/fetchers/openalex.py:236 kind is pdf, landing, or None;
+    # :239 license is best.license or best.license_id.
+    "openalex": _adapter_shape(
+        _OA_ADAPTER_BASES,
+        frozenset({"pdf", "landing", None}),
+        _ANY_LICENCE,
+        _ENTRY_OR_NONE,
+    ),
+    # app/fetchers/plos.py:117 kind="fulltext"; no license=.
+    "plos": _adapter_shape(
+        _OA_ADAPTER_BASES, frozenset({"fulltext"}), _NO_LICENCE, _NO_SCOPE,
+    ),
+    # app/fetchers/pubmed.py:169 attach_work_fields has no locations.
+    "pubmed": _adapter_shape(
+        _OA_ADAPTER_BASES, frozenset({None}), _NO_LICENCE, _NO_SCOPE,
+    ),
+    # app/fetchers/semanticscholar.py:118 kind='pdf'; no license=.
+    "semanticscholar": _adapter_shape(
+        _OA_ADAPTER_BASES, frozenset({"pdf"}), _NO_LICENCE, _NO_SCOPE,
+    ),
+    # app/fetchers/zenodo.py:124 kind='file'; :126 license=license_id.
+    "zenodo": _adapter_shape(
+        _OA_ADAPTER_BASES, frozenset({"file"}), _ANY_LICENCE, _ENTRY_OR_NONE,
+    ),
+}
 SOURCE_ADAPTER_BASES = {
-    "arxiv": _OA_ADAPTER_BASES,
-    "biorxiv": _OA_ADAPTER_BASES,
-    "clinicaltrials": _OA_ADAPTER_BASES,
-    "crossref": frozenset({BASIS_CROSSREF_ENTRY, BASIS_LISTED_ONLY}),
-    "doaj": frozenset({BASIS_DOAJ_FULLTEXT, BASIS_LISTED_ONLY}),
-    "eric": _OA_ADAPTER_BASES,
-    "europepmc": _OA_ADAPTER_BASES,
-    "hal": frozenset({BASIS_HAL_FILE, BASIS_LISTED_ONLY}),
-    "medrxiv": _OA_ADAPTER_BASES,
-    "nasa_ads": _OA_ADAPTER_BASES,
-    "openaire": _OA_ADAPTER_BASES,
-    "openalex": _OA_ADAPTER_BASES,
-    "plos": _OA_ADAPTER_BASES,
-    "pubmed": _OA_ADAPTER_BASES,
-    "semanticscholar": _OA_ADAPTER_BASES,
-    "zenodo": _OA_ADAPTER_BASES,
+    name: shape["basis"] for name, shape in SOURCE_ADAPTER_SHAPES.items()
 }
 _LOCATION_KEYS = (
     "url",
@@ -87,10 +176,6 @@ def evidence_url_key(url: str) -> Optional[str]:
         return None
 
 
-def empty_evidence() -> Dict[str, Any]:
-    return {"version": EVIDENCE_VERSION, "observations": []}
-
-
 EVIDENCE_ABSENT = "absent"
 EVIDENCE_INVALID = "invalid"
 EVIDENCE_OK = "ok"
@@ -109,12 +194,6 @@ def inspect_link_evidence(raw: Any) -> Tuple[str, Optional[Dict[str, Any]]]:
     if not isinstance(observations, list):
         return EVIDENCE_INVALID, None
     return EVIDENCE_OK, payload
-
-
-def parse_link_evidence(raw: Any) -> Optional[Dict[str, Any]]:
-    """Trusted version-1 evidence, or None when missing or unusable on read."""
-    status, payload = inspect_link_evidence(raw)
-    return payload if status == EVIDENCE_OK else None
 
 
 def _unwrap_evidence(raw: Any) -> Optional[Dict[str, Any]]:
@@ -160,15 +239,8 @@ def evidence_status_from_article(article: Mapping[str, Any]) -> Tuple[str, Optio
     return inspect_link_evidence(raw)
 
 
-def evidence_from_article(article: Mapping[str, Any]) -> Optional[Dict[str, Any]]:
-    status, payload = evidence_status_from_article(article)
-    return payload if status == EVIDENCE_OK else None
-
-
 _WRONG_TYPE = object()
 _SHAPE_KEYS = ("basis", "kind", "licence", "licence_scope")
-_DOAJ_FULLTEXT_KINDS = frozenset({None, "fulltext"})
-_HAL_FILE_KINDS = frozenset({None, "file"})
 
 
 def _typed_text(value: Any) -> Any:
@@ -182,14 +254,14 @@ def _typed_text(value: Any) -> Any:
 
 
 def location_matches_adapter(source: str, loc: Mapping[str, Any]) -> bool:
-    """True when source, basis, kind, licence and scope match that adapter."""
+    """True when every field is the right type and in that source's set."""
     if not isinstance(source, str):
         return False
     if not isinstance(loc, Mapping):
         return False
     source_key = source.strip().lower()
-    allowed = SOURCE_ADAPTER_BASES.get(source_key)
-    if allowed is None:
+    shape = SOURCE_ADAPTER_SHAPES.get(source_key)
+    if shape is None:
         return False
     for key in _SHAPE_KEYS:
         if _typed_text(loc.get(key)) is _WRONG_TYPE:
@@ -199,37 +271,37 @@ def location_matches_adapter(source: str, loc: Mapping[str, Any]) -> bool:
     basis = _typed_text(loc.get("basis"))
     if basis is None:
         basis = BASIS_LISTED_ONLY
-    if basis not in allowed:
-        return False
     kind = _typed_text(loc.get("kind"))
     licence = _typed_text(loc.get("licence"))
     if licence is None:
         licence = _typed_text(loc.get("license"))
     licence_scope = _typed_text(loc.get("licence_scope"))
-    return _adapter_emits(source_key, basis, kind, licence, licence_scope)
+    if not _value_in_set(basis, shape["basis"]):
+        return False
+    if not _value_in_set(kind, shape["kind"]):
+        return False
+    if not _value_in_set(licence, shape["licence"]):
+        return False
+    if not _value_in_set(licence_scope, shape["licence_scope"]):
+        return False
+    return _basis_licence_scope_ok(basis, licence, licence_scope)
 
 
-def _adapter_emits(
-    source: str,
+def _value_in_set(value: Any, allowed: frozenset) -> bool:
+    if value in allowed:
+        return True
+    return ANY_TEXT in allowed and isinstance(value, str)
+
+
+def _basis_licence_scope_ok(
     basis: str,
-    kind: Optional[str],
     licence: Optional[str],
     licence_scope: Optional[str],
 ) -> bool:
-    if source == "crossref":
-        if basis == BASIS_CROSSREF_ENTRY:
-            return licence is not None and licence_scope == LICENCE_SCOPE_ENTRY
-        return basis == BASIS_LISTED_ONLY and licence is None and licence_scope is None
-    if source == "hal":
-        if basis == BASIS_HAL_FILE:
-            return kind in _HAL_FILE_KINDS and licence is None and licence_scope is None
-        return basis == BASIS_LISTED_ONLY and licence is None and licence_scope is None
-    if source == "doaj":
-        if basis == BASIS_DOAJ_FULLTEXT:
-            return kind in _DOAJ_FULLTEXT_KINDS and licence is None and licence_scope is None
-        return basis == BASIS_LISTED_ONLY and licence is None and licence_scope is None
-    if basis == BASIS_LISTED_ONLY:
+    if basis in {BASIS_LISTED_ONLY, BASIS_HAL_FILE, BASIS_DOAJ_FULLTEXT}:
         return licence is None and licence_scope is None
+    if basis == BASIS_CROSSREF_ENTRY:
+        return licence is not None and licence_scope == LICENCE_SCOPE_ENTRY
     if basis in {BASIS_OA_BEST, BASIS_LOCATION_OPEN}:
         if licence is None:
             return licence_scope is None
@@ -248,7 +320,7 @@ def observation_matches_adapter(observation: Mapping[str, Any]) -> bool:
     if not all(isinstance(item, Mapping) for item in locations):
         return False
     source = owner[0]
-    if source not in SOURCE_ADAPTER_BASES:
+    if source not in SOURCE_ADAPTER_SHAPES:
         return False
     return all(location_matches_adapter(source, item) for item in locations)
 

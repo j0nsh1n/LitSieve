@@ -7,9 +7,11 @@ import itertools
 import json
 import os
 import random
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from unittest.mock import patch
 
+import numpy as np
 import pytest
 
 from app.services import access as access_mod
@@ -22,8 +24,10 @@ from app.services.access import (
     other_copies_result,
 )
 from app.services.link_evidence import (
+    ANY_TEXT,
     LINK_EVIDENCE_KEY,
     SOURCE_ADAPTER_BASES,
+    SOURCE_ADAPTER_SHAPES,
     canonical_json,
     evidence_url_key,
     incoming_record_from_article,
@@ -1240,6 +1244,8 @@ def _load_source_fixture(name):
 
 
 def _real_adapter_articles():
+    from app.fetchers.arxiv import ARXIV_NS, ATOM_NS, ArXivFetcher
+    from app.fetchers.biorxiv import BioRxivFetcher, MedRxivFetcher
     from app.fetchers.clinicaltrials import ClinicalTrialsFetcher
     from app.fetchers.crossref import CrossRefFetcher
     from app.fetchers.doaj import DOAJFetcher
@@ -1256,8 +1262,8 @@ def _real_adapter_articles():
     articles = []
 
     def add(source, article):
-        if article:
-            articles.append((source, article))
+        assert article is not None, f"{source} fixture produced no article"
+        articles.append((source, article))
 
     add("openalex", OpenAlexFetcher()._parse_work(
         _load_source_fixture("openalex_article_oa.json")["results"][0],
@@ -1304,71 +1310,145 @@ def _real_adapter_articles():
     add("plos", PLOSFetcher()._parse(
         _load_source_fixture("plos_search_parenthesised.json")["response"]["docs"][0],
     ))
+    add("biorxiv", BioRxivFetcher()._parse_article(
+        _load_source_fixture("europepmc_ppr_biorxiv.json")["resultList"]["result"][0],
+    ))
+    add("medrxiv", MedRxivFetcher()._parse_article(
+        _load_source_fixture("europepmc_ppr_medrxiv.json")["resultList"]["result"][0],
+    ))
+    root = ET.parse(
+        Path(__file__).resolve().parent / "fixtures" / "sources" / "arxiv_and_query.xml",
+    ).getroot()
+    ns = {"a": ATOM_NS, "ax": ARXIV_NS}
+    add("arxiv", ArXivFetcher()._parse_entry(root.findall("a:entry", ns)[0], ns))
     return articles
 
 
 _REQUIRED_ADAPTERS = frozenset({
     "hal", "openalex", "doaj", "crossref", "zenodo", "openaire", "europepmc",
 })
-_SHAPE_MUTATIONS = (
+_ADAPTER_STAMP = "2026-10-29T12:00:00.000000Z"
+_TYPE_MUTATIONS = (
     ("source", "not-a-source"),
-    ("basis", "forged_basis"),
+    ("basis", {"bad": "basis"}),
     ("kind", {"bad": "kind"}),
     ("licence", {"bad": "licence"}),
     ("licence_scope", {"bad": "scope"}),
 )
+_STRING_MUTATIONS = (
+    ("basis", "forged_basis"),
+    ("kind", "not-an-adapter-kind"),
+    ("licence", "https://example.org/forged-licence"),
+    ("licence_scope", "record"),
+)
+_IMPOSSIBLE_KINDS = (
+    ("openalex", "not-an-adapter-kind"),
+    ("zenodo", "landing"),
+    ("europepmc", "text-mining"),
+    ("biorxiv", "landing"),
+    ("semanticscholar", "file"),
+)
 
 
-def _adapter_observations():
-    stamp = "2026-10-29T12:00:00.000000Z"
+def _observation_from_article(article):
+    extra = article.get("_extra") if isinstance(article.get("_extra"), dict) else {}
+    return observation_from_record(
+        incoming_record_from_article(article, extra, _ADAPTER_STAMP),
+    )
+
+
+def _real_adapter_observations():
+    return [
+        _observation_from_article(article)
+        for _source, article in _real_adapter_articles()
+    ]
+
+
+def _typical_kind(source):
+    kinds = SOURCE_ADAPTER_SHAPES[source]["kind"]
+    for item in ("pdf", "file", "fulltext", "landing"):
+        if item in kinds:
+            return item
+    return None
+
+
+def _synthetic_adapter_observations():
     observations = []
-    for source, article in _real_adapter_articles():
-        extra = article.get("_extra") if isinstance(article.get("_extra"), dict) else {}
-        rec = incoming_record_from_article(article, extra, stamp)
-        observations.append(observation_from_record(rec))
     for source in FETCHERS:
         extra = {}
         status = "gold"
+        kind = _typical_kind(source)
+        if kind:
+            extra["kind"] = kind
         if source == "hal":
-            extra = {"kind": "file", "host": "HAL"}
+            extra["host"] = "HAL"
             status = "green"
-        elif source == "doaj":
-            extra = {"kind": "fulltext"}
         elif source == "crossref":
-            extra = {"license": "https://creativecommons.org/licenses/by/4.0/"}
+            extra["license"] = "https://creativecommons.org/licenses/by/4.0/"
             status = None
         rec = _incoming(
-            source, f"{source}-id", f"https://example.org/{source}", status, stamp,
-            **extra,
+            source, f"{source}-id", f"https://example.org/{source}", status,
+            _ADAPTER_STAMP, **extra,
         )
         observations.append(observation_from_record(rec))
     return observations
 
 
+def _value_allowed_for_source(source, field, value):
+    if field == "source":
+        return False
+    allowed = SOURCE_ADAPTER_SHAPES[source][field]
+    if value in allowed:
+        return True
+    return ANY_TEXT in allowed and isinstance(value, str)
+
+
+def _shape_mutations(obs):
+    yield from _TYPE_MUTATIONS
+    if not obs.get("locations"):
+        return
+    source = obs["source"]
+    for field, value in _STRING_MUTATIONS:
+        if not _value_allowed_for_source(source, field, value):
+            yield field, value
+
+
 def test_every_adapter_output_matches_the_allow_list():
+    assert set(SOURCE_ADAPTER_SHAPES) == set(FETCHERS)
     assert set(SOURCE_ADAPTER_BASES) == set(FETCHERS)
-    observations = _adapter_observations()
-    seen = {obs["source"] for obs in observations}
-    for obs in observations:
+    real = _real_adapter_observations()
+    assert real, "real parser fixtures produced no observations"
+    real_sources = {obs["source"] for obs in real}
+    assert "doaj" in real_sources
+    assert _REQUIRED_ADAPTERS <= real_sources
+    for obs in real:
         assert observation_matches_adapter(obs), obs
         for loc in obs["locations"]:
             assert location_matches_adapter(obs["source"], loc), (obs["source"], loc)
-    assert seen == set(FETCHERS)
-    assert _REQUIRED_ADAPTERS <= seen
+    synthetics = _synthetic_adapter_observations()
     assert any(
         obs["source"] == "crossref"
         and any(
             loc.get("basis") == "crossref_entry" and loc.get("licence")
             for loc in obs["locations"]
         )
-        for obs in observations
+        for obs in synthetics
     )
+    combined = real + synthetics
+    for obs in synthetics:
+        assert observation_matches_adapter(obs), obs
+        for loc in obs["locations"]:
+            assert location_matches_adapter(obs["source"], loc), (obs["source"], loc)
+    assert {obs["source"] for obs in combined} == set(FETCHERS)
 
 
 def test_real_adapter_outputs_fail_when_each_shape_field_mutates():
-    for obs in _adapter_observations():
+    real = _real_adapter_observations()
+    assert real, "real parser fixtures produced no observations"
+    assert any(obs["source"] == "doaj" for obs in real)
+    for obs in real + _synthetic_adapter_observations():
         assert observation_matches_adapter(obs)
-        for field, value in _SHAPE_MUTATIONS:
+        for field, value in _shape_mutations(obs):
             mutated = copy.deepcopy(obs)
             if field == "source":
                 mutated["source"] = value
@@ -1376,11 +1456,166 @@ def test_real_adapter_outputs_fail_when_each_shape_field_mutates():
                 continue
             else:
                 mutated["locations"][0][field] = value
-            assert not observation_matches_adapter(mutated), (obs["source"], field)
+            assert not observation_matches_adapter(mutated), (obs["source"], field, value)
             if field != "source" and mutated["locations"]:
                 assert not location_matches_adapter(
                     obs["source"], mutated["locations"][0],
-                ), (obs["source"], field)
+                ), (obs["source"], field, value)
+
+
+def test_real_doaj_and_real_adapter_list_are_required():
+    articles = _real_adapter_articles()
+    assert articles
+    assert any(source == "doaj" for source, _article in articles)
+
+
+def _seed_vector():
+    return np.array([1.0, 0.0], dtype=np.float32)
+
+
+def _neighbor_vector():
+    return np.array([0.95, 0.1], dtype=np.float32)
+
+
+def _open_neighbor_paper():
+    return _paper(
+        "nb", "doaj", doi="10.9999/neighbor", oa_status="gold",
+        best_oa_url="https://example.org/neighbor.pdf",
+        title="A neighboring open paper",
+        _observed_at=_ADAPTER_STAMP,
+        _extra={"locations": [{
+            "url": "https://example.org/neighbor.pdf",
+            "kind": "fulltext",
+            "via": "doaj",
+        }]},
+    )
+
+
+def _pipe_with_neighbor(db_path, seed):
+    pipe = LiteratureSearchPipeline(db_path=str(db_path))
+    pipe.embedding_engine.embed_query = lambda _q: _seed_vector()
+    pipe.db.insert_articles([seed], dedupe=False)
+    pipe.db.insert_articles([_open_neighbor_paper()], dedupe=False)
+    key = (seed["article_id"], seed["source"])
+    pipe.db.insert_embeddings(
+        {key: _seed_vector(), ("nb", "doaj"): _neighbor_vector()},
+        model_name="general",
+    )
+    pipe.db.upsert_note(*key, starred=True)
+    return pipe, key
+
+
+def _assert_readers(pipe, key, *, expect_open):
+    row = _access_row(pipe.db, key[0], key[1])
+    cards = [{"article_id": key[0], "source": key[1]}]
+    pipe._attach_access(cards)
+    copies = other_copies_result(row)
+    listed = pipe.search_similar(
+        "Same work from two sources", top_k=10, lexical_boost=False,
+        free_to_read=True,
+    )
+    free = key in {(item["article_id"], item["source"]) for item in listed}
+    different = len(pipe.suggest_different_work([key]))
+    if expect_open:
+        assert cards[0]["access"]["state"] == OPEN_LISTED
+        assert free is True
+        assert copies.has_open_copy is True
+        assert different == 0
+    else:
+        assert cards[0]["access"]["state"] != OPEN_LISTED
+        assert free is False
+        assert copies.has_open_copy is False
+        assert different == 1
+
+
+def _assert_refresh_preserves(paper, evidence, *, staging):
+    db = ArticleDatabase(":memory:")
+    try:
+        if staging:
+            db.ensure_staging_articles()
+        db.insert_articles([paper], staging=staging)
+        table = "staging_article_extra" if staging else "article_extra"
+        articles = "staging_articles" if staging else "articles"
+        raw = json.dumps({LINK_EVIDENCE_KEY: evidence})
+        db.conn.execute(f"UPDATE {table} SET provenance = ?", (raw,))
+        db.conn.commit()
+        before_article = db.conn.execute(f"SELECT * FROM {articles}").fetchall()
+        result = db.insert_articles(
+            [dict(paper, journal="Changed by refresh")], staging=staging,
+        )
+        after = db.conn.execute(f"SELECT provenance FROM {table}").fetchone()[0]
+        assert result["updated"] == 0
+        assert result["dropped"] == 1
+        assert after == raw
+        assert before_article == db.conn.execute(f"SELECT * FROM {articles}").fetchall()
+    finally:
+        db.close()
+
+
+def _real_observation_for(source):
+    for parsed_source, article in _real_adapter_articles():
+        if parsed_source != source:
+            continue
+        obs = _observation_from_article(article)
+        if obs["locations"]:
+            return obs
+    kind = _typical_kind(source)
+    extra = {"kind": kind} if kind else {}
+    return observation_from_record(_incoming(
+        source, f"{source}-id", f"https://example.org/{source}", "gold",
+        _ADAPTER_STAMP, **extra,
+    ))
+
+
+def test_real_positive_parser_output_is_open_on_readers(monkeypatch, tmp_path):
+    monkeypatch.delenv(dbconn.ENV_KEY, raising=False)
+    source, article = next(
+        (parsed, row) for parsed, row in _real_adapter_articles() if parsed == "doaj"
+    )
+    seed = dict(article)
+    seed["_observed_at"] = _ADAPTER_STAMP
+    pipe, key = _pipe_with_neighbor(tmp_path / "real-open.db", seed)
+    try:
+        _assert_readers(pipe, key, expect_open=True)
+    finally:
+        pipe.close()
+    assert source == "doaj"
+
+
+@pytest.mark.parametrize("source, bad_kind", _IMPOSSIBLE_KINDS)
+def test_impossible_kind_is_closed_and_preserved(monkeypatch, tmp_path, source, bad_kind):
+    monkeypatch.delenv(dbconn.ENV_KEY, raising=False)
+    original = _real_observation_for(source)
+    assert original["locations"]
+    assert observation_matches_adapter(original)
+    obs = copy.deepcopy(original)
+    obs["locations"][0]["kind"] = bad_kind
+    assert observation_matches_adapter(obs) is False
+    assert location_matches_adapter(source, obs["locations"][0]) is False
+    url = obs["locations"][0]["url"]
+    evidence = {"version": 1, "observations": [obs]}
+    seed = _paper(
+        "seed", "openalex", oa_status="gold", best_oa_url=url,
+        doi="10.1234/impossible-kind",
+        _observed_at=_ADAPTER_STAMP,
+    )
+    pipe, key = _pipe_with_neighbor(tmp_path / f"{source}-readers.db", seed)
+    try:
+        raw = json.dumps({LINK_EVIDENCE_KEY: evidence})
+        pipe.db.conn.execute(
+            "UPDATE article_extra SET provenance = ? "
+            "WHERE article_id = ? AND source = ?",
+            (raw, key[0], key[1]),
+        )
+        pipe.db.conn.commit()
+        _assert_readers(pipe, key, expect_open=False)
+        row = _access_row(pipe.db, key[0], key[1])
+        _assert_no_open(row, closed_url=url)
+        assert link_access(evidence, url).open_listed is False
+    finally:
+        pipe.close()
+    for staging in (False, True):
+        _assert_refresh_preserves(seed, evidence, staging=staging)
 
 
 def _doaj_fulltext_observation(changes):
