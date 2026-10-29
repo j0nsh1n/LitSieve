@@ -12,8 +12,8 @@
   poster. Live at `https://www.litpilot.org` from the production checkout,
   `main` through #106 (2026-10-16). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
-- Latest full suite (2026-10-29, `feat/link-evidence` B6 r2):
-  **2197 passed** in 221.95 s, no skips or xfails. `ruff check .` clean;
+- Latest full suite (2026-10-29, `feat/link-evidence` B6 r2 after main):
+  **2210 passed** in 188.06 s, no skips or xfails. `ruff check .` clean;
   `pyright app` **0 errors**, 6 optional-import warnings (CI blocks on
   errors). No dependency lockfile. `certifi>=2026.10.19`.
 - P2.8: a starred Search card with no open copy listed, and no P2.4 open
@@ -75,6 +75,13 @@
   thresholds on the dev split. `score-test` scores that choice once.
   Search still ranks as it does today. The write-up is
   `~/HealthDatabaseAccess-scratch/bench/p25b_results.md`.
+- P2.2 re-ran the word-match sweep on the 15-question `baseline_v2` corpus.
+  The chosen setting (`bonus_w0.2_bm25_keywords`) beat today's ranking on
+  dev (ndcg@10 0.4381 vs 0.3973) and lost on test (0.5712 vs 0.5755), with
+  Q1, Q5 and Q14 dropping more than 0.05. Search ranking is unchanged. Gate
+  is FAIL. Leave-one-question-out now shortlists inside each fold. Q4 has
+  no pick and Q11 picked `blend_w0.2_bm25_keywords`. Sweep notes:
+  `~/HealthDatabaseAccess-scratch/bench/p22_dev_sweep_v2.md`.
 - P1.6 stores Collect inputs and Search questions in the library database
   (`fetch_runs`, `question_log`), about 50 rows each. Writes come from
   `_run_multi_fetch` (background and sync, including cancel and error) and
@@ -271,23 +278,27 @@ Guest User (is_guest) → sample corpus only; purged by age
 
 ## Session Handoff
 - **Date:** 2026-10-29. `feat/link-evidence` (PR #128) round-2 review fixes
-  from `reviews/b6_sol_r2.md`, after merging origin/main (PR #129). URL
-  identity keeps IPv6 brackets, so `[2001:db8::1]:8080` and `[2001:db8::1:8080]`
-  stay different hosts. Login names stay in the key too. Ownership fields
-  must be strings before any coercion. A wrong-typed source, record id, or
-  timestamp is never a witness, and a later write leaves that stored value
-  unchanged. `certifi>=2026.10.19`. Clone policy (fix 1) is unchanged.
-  Search.js and style.css cache-bust stay `20261029a`. P2.5b `run-f2` and
-  `score-test` are on this branch from main. Those groups stay off ranking.
+  from `reviews/b6_sol_r2.md`, after merging origin/main including PR #129
+  and PR #122. URL identity keeps IPv6 brackets, so `[2001:db8::1]:8080`
+  and `[2001:db8::1:8080]` stay different hosts. Login names stay in the
+  key too. Ownership fields must be strings before any coercion. A
+  wrong-typed source, record id, or timestamp is never a witness, and a
+  later write leaves that stored value unchanged. `certifi>=2026.10.19`.
+  Clone policy (fix 1) is unchanged. Search.js and style.css cache-bust
+  stay `20261029a`. P2.2 is on main: leave-one-question-out shortlists
+  inside each fold, `score --split test` and `--split all` refuse sweep
+  selection, Search ranking is unchanged (test lost). P2.5b `run-f2` and
+  `score-test` stay off ranking.
 - Validation (production venv, this worktree, no install): `ruff check .`
-  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2197
-  passed in 221.95 s. Scratch is
-  `~/HealthDatabaseAccess-scratch/pytest-fix-b6-r2`.
+  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2210
+  passed in 188.06 s. Scratch is
+  `~/HealthDatabaseAccess-scratch/pytest-fix-b6-r2-main`.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
   and unscheduled roadmap backlog. Ship staging is at `266195e`. P1.9 labels
   are done: a three-model panel plus the owner's review of 29 rows, in
-  `~/HealthDatabaseAccess-scratch/bench/labels_final/` (not in git). That
-  five-question test split is still unscored, and it is a different score
-  from the v2 Laya test score. P2.2, PR #122, remains open and on hold.
-- **Next step:** owner decision on cloned merged rows (review fix 1). Independent
-  review of these round-2 fixes.
+  `~/HealthDatabaseAccess-scratch/bench/labels_final/` and
+  `labels_final_v2/` (not in git). The original five-question held-out
+  split is still unscored. That is a different score from the scored
+  15-question v2 P2.2 test pass and from the v2 Laya test score.
+- **Next step:** owner decision on cloned merged rows (review fix 1).
+  Independent review of these round-2 fixes.
