@@ -160,6 +160,50 @@ def test_replay_determinism(tmp_path, monkeypatch):
     assert on_a[0] == "10.1234/paper-0"
 
 
+def test_replay_hits_carry_stored_work_type(tmp_path, monkeypatch):
+    """Replay snapshots must copy type, DOI and container from the corpus row.
+
+    Ranking reads SEARCH_ARTICLE_COLUMNS, so a DOI that is not the article_id
+    and a container_title never appear unless the harness joins the stored row.
+    """
+    _patch_embeddings(monkeypatch)
+    corpus = tmp_path / "corpus"
+    qdir = corpus / "Q1"
+    qdir.mkdir(parents=True)
+    articles = [{
+        "article_id": "W999typed",
+        "source": "openalex",
+        "title": "Later school start times increase adolescent sleep duration",
+        "abstract": "Sleep duration increased.",
+        "year": "2018",
+        "authors": ["Doe J"],
+        "journal": "Sleep Series",
+        "work_type": "book-chapter",
+        "doi": "10.9999/typed-chapter",
+        "container_title": "Parent Book of Sleep",
+    }]
+    (qdir / "openalex.json").write_text(json.dumps(articles), encoding="utf-8")
+    (corpus / "manifest.json").write_text(json.dumps({
+        "git_sha": "testdata",
+        "questions": [{
+            "id": "Q1",
+            "text": "How do later school start times affect sleep duration among adolescents?",
+            "topic": "health",
+        }],
+    }), encoding="utf-8")
+    results = tmp_path / "results.json"
+    assert ev.main([
+        "replay", "--corpus", str(corpus), "--out", str(results),
+        "--work-dir", str(tmp_path / "work"),
+    ]) == 0
+    hits = json.loads(results.read_text(encoding="utf-8"))["questions"][0]["rankings"]["lexical_on"]
+    assert hits
+    hit = hits[0]
+    assert hit["work_type"] == "book-chapter"
+    assert hit["doi"] == "10.9999/typed-chapter"
+    assert hit["container_title"] == "Parent Book of Sleep"
+
+
 def test_labelsheet_output(tmp_path, monkeypatch):
     _patch_embeddings(monkeypatch)
     results = tmp_path / "results.json"
