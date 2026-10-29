@@ -144,7 +144,7 @@ def test_other_copies_disclosure_wording():
     assert "none_listed" in search
     css = _read("static", "css", "style.css")
     assert ".result-other-copies" in css
-    assert 'href="/static/css/style.css?v=20261029a"' in _read("templates", "base.html")
+    assert 'href="/static/css/style.css?v=20261029b"' in _read("templates", "base.html")
 
 
 def test_access_chip_stays_visible_when_layouts_hide_tags():
@@ -156,6 +156,22 @@ def test_access_chip_stays_visible_when_layouts_hide_tags():
     assert "display: none" not in catalog_chip
     assert "display: flex" in catalog_chip
     assert ".result-row .result-row-head > .tag:not(.result-access-chip)" in css
+    phone = css[css.index("@media (max-width: 640px)"):]
+    table_hide = (
+        'html[data-layout="table"] .result-row:not(.is-open) .result-head-chips'
+        ' { display: none; }'
+    )
+    assert table_hide not in phone
+    assert (
+        'html[data-layout="table"] .result-row:not(.is-open) .result-tags'
+        ' { display: none; }'
+    ) in phone
+    table_chip = phone[phone.index(
+        'html[data-layout="table"] .result-row:not(.is-open) .result-access-chip'
+    ):]
+    table_chip = table_chip[:table_chip.index("}")]
+    assert "display: none" not in table_chip
+    assert "display: flex" in table_chip
 
 
 def test_different_work_disclosure_wording():

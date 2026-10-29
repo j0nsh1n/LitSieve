@@ -9453,17 +9453,26 @@ html[data-look="catalog"] .note-field {
     }
     html[data-layout="columns"] #results-list > .result-row:first-child:not(.is-open) .result-row-title { font-size: var(--fs-xl); }
     html[data-layout="index"] .result-row:not(.is-open) { min-height: 0; }
-    /* The source column leaves the table; the opened paper still names it. */
+    /* The source column leaves the table; the opened paper still names it.
+       Access stays on the collapsed row. Source and type stay hidden. */
     html[data-layout="table"] { --table-columns: minmax(0, 1fr) 3rem 2.75rem 3rem; }
-    html[data-layout="table"] .results-columns span:nth-child(2),
-    html[data-layout="table"] .result-row:not(.is-open) .result-head-chips { display: none; }
+    html[data-layout="table"] .results-columns span:nth-child(2) { display: none; }
     html[data-layout="table"] .results-columns span:nth-child(4) { grid-column: 3 / span 2; }
     html[data-layout="table"] .result-row:not(.is-open) .result-row-main {
         grid-template-areas:
             "title year score toggle"
+            "chips year score toggle"
             "byline year score toggle";
         column-gap: var(--space-2);
     }
+    html[data-layout="table"] .result-row:not(.is-open) .result-head-chips {
+        display: flex;
+        grid-area: chips;
+        margin: 0;
+        justify-content: flex-start;
+    }
+    html[data-layout="table"] .result-row:not(.is-open) .result-tags { display: none; }
+    html[data-layout="table"] .result-row:not(.is-open) .result-access-chip { display: flex; }
     html[data-layout="table"] .result-row:not(.is-open) .result-year { font-size: var(--fs-xs); }
     html:is([data-layout="register"], [data-layout="table"]) .result-row:not(.is-open) .result-toggle {
         min-width: 2.75rem;

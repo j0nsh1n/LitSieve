@@ -9,15 +9,16 @@ and this project aims to follow Semantic Versioning for app version strings
 ## [Unreleased]
 
 ### Fixed
-- One stored URL now has one access answer. The card label, Free to read,
-  other listed copies, and different-work eligibility share it. A merge
-  that brings in an open copy makes the kept record say "Open copy listed".
+- One stored URL now has one access answer, taken only from evidence that
+  source owns. The card label, Free to read, other listed copies, and
+  different-work eligibility share it. A merge that brings in an open copy
+  makes the kept record say "Open copy listed".
 - The five-copy list is only a display cap. A sixth open URL of the same
   work still counts, so different-work suggestions stay off.
 - Different work takes one paper per request, a question of at most 1,000
   characters, and at most 50 entries in each filter list.
-- The access label stays visible in Catalog and on collapsed phone rows.
-  Source and type chips are unchanged.
+- The access label stays visible in Catalog, on collapsed phone rows, and
+  on collapsed phone Table rows. Source and type chips are unchanged.
 - Different work suggestions load when that disclosure is opened, not when
   the card is drawn. An empty result removes the disclosure. With a year
   filter on, the closest open paper is kept even if it has no year.

@@ -651,3 +651,98 @@ def test_merge_equal_url_is_open_on_card_filter_copies_and_p28(
         assert suggestions == []
     finally:
         pipe.db.close()
+
+
+def _located_paper(article_id, source, status, url):
+    return _same_work_paper(
+        article_id=article_id,
+        source=source,
+        oa_status=status,
+        best_oa_url=url,
+        _extra={"locations": [{"url": url, "via": source, "host": source}]},
+    )
+
+
+def test_merge_retained_gold_keeps_incoming_hal_url_closed(
+    tmp_path, monkeypatch,
+):
+    monkeypatch.delenv(dbconn.ENV_KEY, raising=False)
+    pipe = LiteratureSearchPipeline(db_path=str(tmp_path / "merge-hal-closed.db"))
+    monkeypatch.setattr(pipe.embedding_engine, "embed_query", lambda _q: _vec(1.0, 0.0))
+    open_url = "https://example.org/open"
+    closed_url = "https://example.org/closed"
+    try:
+        card, key = _seed_merged_library(
+            pipe,
+            _located_paper("W1", "openalex", "gold", open_url),
+            _located_paper("hal-1", "hal", "closed", closed_url),
+        )
+        info, copies, filter_state, listed, suggestions = _combined_outputs(
+            pipe, card, key,
+        )
+        by_url = {item.url: item.open_listed for item in copies}
+        assert info.state == OPEN_LISTED
+        assert info.url == open_url
+        assert filter_state == OPEN_LISTED
+        assert key in {(row["article_id"], row["source"]) for row in listed}
+        assert by_url[open_url] is True
+        assert by_url[closed_url] is False
+        assert suggestions == []
+    finally:
+        pipe.db.close()
+
+
+def test_merge_openalex_filled_status_does_not_open_pubmed_url(
+    tmp_path, monkeypatch,
+):
+    monkeypatch.delenv(dbconn.ENV_KEY, raising=False)
+    pipe = LiteratureSearchPipeline(db_path=str(tmp_path / "merge-filled-status.db"))
+    monkeypatch.setattr(pipe.embedding_engine, "embed_query", lambda _q: _vec(1.0, 0.0))
+    closed_url = "https://example.org/closed"
+    open_url = "https://example.org/open"
+    try:
+        card, key = _seed_merged_library(
+            pipe,
+            _located_paper("123", "pubmed", None, closed_url),
+            _located_paper("W1", "openalex", "gold", open_url),
+        )
+        info, copies, filter_state, listed, suggestions = _combined_outputs(
+            pipe, card, key,
+        )
+        by_url = {item.url: item.open_listed for item in copies}
+        assert info.state == OPEN_LISTED
+        assert info.url == open_url
+        assert filter_state == OPEN_LISTED
+        assert key in {(row["article_id"], row["source"]) for row in listed}
+        assert by_url[open_url] is True
+        assert by_url.get(closed_url) is False
+        assert card["provenance"].get("oa_status") == "openalex"
+        assert suggestions == []
+    finally:
+        pipe.db.close()
+
+
+def test_merge_equal_url_with_retained_pubmed_location_is_open(
+    tmp_path, monkeypatch,
+):
+    monkeypatch.delenv(dbconn.ENV_KEY, raising=False)
+    pipe = LiteratureSearchPipeline(db_path=str(tmp_path / "merge-equal-located.db"))
+    monkeypatch.setattr(pipe.embedding_engine, "embed_query", lambda _q: _vec(1.0, 0.0))
+    shared = "https://example.org/same"
+    try:
+        card, key = _seed_merged_library(
+            pipe,
+            _located_paper("123", "pubmed", "closed", shared),
+            _located_paper("W1", "openalex", "gold", shared),
+        )
+        info, copies, filter_state, listed, suggestions = _combined_outputs(
+            pipe, card, key,
+        )
+        assert info.state == OPEN_LISTED
+        assert info.url == shared
+        assert filter_state == OPEN_LISTED
+        assert key in {(row["article_id"], row["source"]) for row in listed}
+        assert any(item.url == shared and item.open_listed for item in copies)
+        assert suggestions == []
+    finally:
+        pipe.db.close()

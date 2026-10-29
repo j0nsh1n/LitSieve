@@ -79,6 +79,18 @@ def test_phone_compact_rows_have_thumb_sized_open_button():
     assert '.result-row:not(.is-open) .result-tags { display: none; }' in phone
     assert '.result-row:not(.is-open) .result-access-chip { display: none; }' not in phone
     assert '.result-row:not(.is-open) .result-access-chip { display: flex; }' in phone
+    assert (
+        'html[data-layout="table"] .result-row:not(.is-open) .result-head-chips'
+        ' { display: none; }'
+    ) not in phone
+    assert (
+        'html[data-layout="table"] .result-row:not(.is-open) .result-tags'
+        ' { display: none; }'
+    ) in phone
+    assert (
+        'html[data-layout="table"] .result-row:not(.is-open) .result-access-chip'
+        ' { display: flex; }'
+    ) in phone
     venue = re.search(r'\.result-row:not\(\.is-open\) \.result-venue \{([^}]+)\}', phone)
     assert venue and "text-overflow: ellipsis" in venue.group(1)
 

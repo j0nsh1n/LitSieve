@@ -264,17 +264,18 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-29. `fix/access-cluster` from `origin/main` (`c124604`).
-  Four access-track fixes. One URL resolver for card, Free to read, copies,
-  and P2.8. `has_open_copy` is decided before the five-copy cap. P2.8 takes
-  one seed and a cheap same-DOI lookup. The access chip sits outside the
-  tags Catalog and collapsed phone rows hide. Search.js and style.css
-  cache-bust is `20261029a`.
+- **Date:** 2026-10-29. `fix/access-cluster` follow-up on PR #126 (`fix-b4-r2`).
+  Each URL's open-copy answer uses records owned by that URL's source
+  (url, source, that source's oa_status, licence). Equal-URL merge keeps
+  the incoming source on the location. Collapsed phone Table rows keep the
+  access chip and still hide source and type. style.css cache-bust is
+  `20261029b`. search.js stays `20261029a`.
 - Validation (production venv, this worktree, no install): `ruff check .`
-  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2130
-  passed in 166.08 s. Scratch is
-  `~/HealthDatabaseAccess-scratch/pytest-fix-access-cluster`. Headless
-  Chrome screenshots of Catalog and default layout at 390 px are in
+  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2133
+  passed in 162.79 s. Scratch is
+  `~/HealthDatabaseAccess-scratch/pytest-fix-b4-r2`. Headless Chrome
+  screenshots of Catalog, default 390 px, and Table 390 px (collapsed and
+  expanded, open and closed) are in
   `~/HealthDatabaseAccess-scratch/audit-2026-10-27/phase2/screens_b4/`.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
   and unscheduled roadmap backlog. Ship staging was last recorded at

@@ -1160,20 +1160,72 @@ class ArticleDatabase:
         return left == right
 
     @staticmethod
-    def _merge_locations(existing: Any, incoming: Any) -> List[Dict]:
+    def _merge_locations(
+        existing: Any, incoming: Any, incoming_source: str = "",
+    ) -> List[Dict]:
         out: List[Dict] = []
-        seen: set = set()
-        for loc in list(existing or []) + list(incoming or []):
+        seen_url_via: set = set()
+        by_url: Dict[str, Dict] = {}
+        source = str(incoming_source or "").strip()
+
+        def take_existing(loc: Any) -> None:
             if not isinstance(loc, dict):
-                continue
+                return
+            loc = dict(loc)
             url = str(loc.get("url") or loc.get("URL") or "")
+            via = str(loc.get("via") or "").strip()
             if url:
-                if url in seen:
-                    continue
-                seen.add(url)
+                key = (url, via.lower())
+                if key in seen_url_via:
+                    return
+                seen_url_via.add(key)
+                if url not in by_url:
+                    by_url[url] = loc
                 out.append(loc)
             elif loc not in out:
                 out.append(loc)
+
+        def take_incoming(loc: Any) -> None:
+            if not isinstance(loc, dict):
+                return
+            loc = dict(loc)
+            url = str(loc.get("url") or loc.get("URL") or "")
+            provided_via = str(loc.get("via") or "").strip()
+            via = provided_via or source
+            if not url:
+                if loc not in out:
+                    out.append(loc)
+                return
+            kept = by_url.get(url)
+            if kept is None:
+                key = (url, provided_via.lower())
+                if key in seen_url_via:
+                    return
+                seen_url_via.add(key)
+                by_url[url] = loc
+                out.append(loc)
+                return
+            if not via:
+                return
+            kept_via = str(kept.get("via") or "").strip()
+            if not kept_via:
+                kept["via"] = via
+                seen_url_via.add((url, via.lower()))
+                return
+            if via.lower() == kept_via.lower():
+                return
+            key = (url, via.lower())
+            if key in seen_url_via:
+                return
+            extra = dict(loc)
+            extra["via"] = via
+            seen_url_via.add(key)
+            out.append(extra)
+
+        for loc in list(existing or []):
+            take_existing(loc)
+        for loc in list(incoming or []):
+            take_incoming(loc)
         return out
 
     def _title_same_work(self, existing: Dict, incoming: Dict) -> bool:
@@ -1410,6 +1462,7 @@ class ArticleDatabase:
         conflicts: Dict[str, Any],
         *,
         staging: bool,
+        incoming_source: str = "",
     ) -> bool:
         table = "staging_article_extra" if staging else "article_extra"
         row = cursor.execute(
@@ -1452,7 +1505,9 @@ class ArticleDatabase:
 
         incoming_locations = (extra or {}).get("locations") or []
         before_len = len(locations)
-        locations = self._merge_locations(locations, incoming_locations)
+        locations = self._merge_locations(
+            locations, incoming_locations, incoming_source,
+        )
         added_locations = len(locations) > before_len
         if (
             not filled
@@ -1559,6 +1614,7 @@ class ArticleDatabase:
             filled,
             conflicts,
             staging=staging,
+            incoming_source=incoming_source,
         )
         return bool(filled) or added_locations
 
