@@ -12,10 +12,12 @@
   poster. Live at `https://www.litpilot.org` from the production checkout,
   `main` through #106 (2026-10-16). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
-- Latest full suite (2026-10-29, `feat/link-evidence` B6 r2 after main):
-  **2210 passed** in 188.06 s, no skips or xfails. `ruff check .` clean;
+- Latest full suite (2026-10-29, `feat/link-evidence` after merging P2.7):
+  **2216 passed** in 168.69 s, no skips or xfails. `ruff check .` clean;
   `pyright app` **0 errors**, 6 optional-import warnings (CI blocks on
-  errors). No dependency lockfile. `certifi>=2026.10.19`.
+  errors). `pip-audit` (2026-10-14): no known vulnerabilities; ROCm
+  torch/triton are un-auditable. No dependency lockfile.
+  `certifi>=2026.10.19`.
 - P2.8: a starred Search card with no open copy listed, and no P2.4 open
   other copy, can show "Different work you can read (N)" (at most 3).
   Neighbors come from stored embeddings through `search_similar` (same path
@@ -47,6 +49,12 @@
   HTTP(S) host. Crossref needs a recognised CC licence identifier and version.
   The chip sits outside the source/type tags that Catalog and collapsed phone
   Table rows hide. style.css cache-bust is `20261029a`.
+- P2.7: Narrow it down uses stored `work_type`. Books and chapters with no
+  abstract stay in; the preview names how many. Book reviews and trial
+  registrations can be set aside only if the student ticks that box.
+  Preview still writes nothing. simple_tools.js cache-bust is `20261029c`.
+  The confirm count, button, and submitted keys follow the optional
+  checkbox and any papers the student Keeps.
 - P1.7 shows a type chip on Search cards and a Type filter next to Sources.
   The filter runs before ranking and reads only `work_type`. Ranked hits get
   that column in one batched query. Null and unknown types have no chip.
@@ -277,28 +285,37 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-29. `feat/link-evidence` (PR #128) round-2 review fixes
-  from `reviews/b6_sol_r2.md`, after merging origin/main including PR #129
-  and PR #122. URL identity keeps IPv6 brackets, so `[2001:db8::1]:8080`
-  and `[2001:db8::1:8080]` stay different hosts. Login names stay in the
-  key too. Ownership fields must be strings before any coercion. A
-  wrong-typed source, record id, or timestamp is never a witness, and a
-  later write leaves that stored value unchanged. `certifi>=2026.10.19`.
-  Clone policy (fix 1) is unchanged. Search.js and style.css cache-bust
-  stay `20261029a`. P2.2 is on main: leave-one-question-out shortlists
-  inside each fold, `score --split test` and `--split all` refuse sweep
-  selection, Search ranking is unchanged (test lost). P2.5b `run-f2` and
-  `score-test` stay off ranking.
+- **Date:** 2026-10-29. Merged origin/main (PR #130, P2.7 Narrow it down by
+  type) into `feat/link-evidence` (PR #128). Conflicts were CHANGELOG.md and
+  context.md only. The two features do not share code files. Link-evidence
+  stores per-source observations on merge. Narrow it down keeps books and
+  chapters with no abstract and offers an unticked line for book reviews and
+  trial registrations. Optional rows, Keep choices, the "Set aside N papers"
+  count, the confirm button, and the applied keys use one selected set. URL
+  identity keeps IPv6 brackets, so `[2001:db8::1]:8080` and
+  `[2001:db8::1:8080]` stay different hosts. Login names stay in the key.
+  Ownership fields must be strings. A wrong-typed source, record id, or
+  timestamp is never a witness, and a later write leaves that stored value
+  unchanged. `certifi>=2026.10.19`. Clone policy (review fix 1) is unchanged
+  and waits on an owner decision. simple_tools.js cache-bust is `20261029c`;
+  search.js and style.css stay `20261029a`.
+- PR #122 (merged) keeps only the P2.2 sweep tooling. Its gate FAILED on the
+  15-question benchmark (test ndcg@10 0.5712 vs today's 0.5755), so Search
+  ranking is unchanged. Leave-one-question-out shortlists inside each fold,
+  and `score-test` refuses a second test pass. Notes:
+  `~/HealthDatabaseAccess-scratch/bench/p22_dev_sweep_v2.md`. P2.5b `run-f2`
+  and `score-test` stay off ranking.
 - Validation (production venv, this worktree, no install): `ruff check .`
-  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2210
-  passed in 188.06 s. Scratch is
-  `~/HealthDatabaseAccess-scratch/pytest-fix-b6-r2-main`.
+  clean, `pyright app` 0 errors / 6 optional-import warnings,
+  `node --check static/js/simple_tools.js` clean, pytest 2216 passed in
+  168.69 s. Scratch is
+  `~/HealthDatabaseAccess-scratch/pytest-fix-b6-merge3`.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
   and unscheduled roadmap backlog. Ship staging is at `266195e`. P1.9 labels
   are done: a three-model panel plus the owner's review of 29 rows, in
   `~/HealthDatabaseAccess-scratch/bench/labels_final/` and
   `labels_final_v2/` (not in git). The original five-question held-out
   split is still unscored. That is a different score from the scored
-  15-question v2 P2.2 test pass and from the v2 Laya test score.
+  15-question v2 P2.2 test pass and from the v2 Laya test score. The
+  evidence redesign from #126 follows in a separate PR.
 - **Next step:** owner decision on cloned merged rows (review fix 1).
-  Independent review of these round-2 fixes.

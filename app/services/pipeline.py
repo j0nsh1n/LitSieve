@@ -37,7 +37,11 @@ from app.services.clustering import (
     ClusterLabeler,
 )
 from app.services.embeddings import EmbeddingEngine
-from app.services.work_types import work_type_matches_filter
+from app.services.work_types import (
+    NARROW_KEEP_NO_ABSTRACT_TYPES,
+    NARROW_OPTIONAL_ASIDE_TYPES,
+    work_type_matches_filter,
+)
 from app.storage.database import (
     SEARCH_ARTICLE_COLUMNS,
     ArticleDatabase,
@@ -895,6 +899,8 @@ class LiteratureSearchPipeline:
             return {
                 "candidates": [],
                 "staying": [],
+                "kept_no_abstract": [],
+                "optional_type_aside": [],
                 "total_ranked": 0,
                 "proposed_count": 0,
                 "fraction": fraction,
@@ -940,12 +946,38 @@ class LiteratureSearchPipeline:
                 "similarity_score": float(scores[idx]),
             }
 
-        candidates = [_preview_row(idx) for idx in order[:n_propose]]
-        staying = [_preview_row(idx) for idx in reversed(list(order[n_propose:]))]
+        stored_types = self.db.get_article_work_types()
+        kept_no_abstract = []
+        rankable_idxs = []
+        # A low score on a book with no abstract is not evidence it is off-topic.
+        for idx in order:
+            key = article_ids[idx]
+            meta = articles_all.get(key) or {}
+            work_type = stored_types.get(key)
+            if (
+                work_type in NARROW_KEEP_NO_ABSTRACT_TYPES
+                and not str(meta.get("abstract") or "").strip()
+            ):
+                kept_no_abstract.append(_preview_row(idx))
+                continue
+            rankable_idxs.append(idx)
+
+        candidates = [_preview_row(idx) for idx in rankable_idxs[:n_propose]]
+        staying = [
+            _preview_row(idx) for idx in reversed(rankable_idxs[n_propose:])
+        ]
+        optional_type_aside = [
+            row
+            for row in staying
+            if stored_types.get((row["article_id"], row["source"]))
+            in NARROW_OPTIONAL_ASIDE_TYPES
+        ]
 
         return {
             "candidates": candidates,
             "staying": staying,
+            "kept_no_abstract": kept_no_abstract,
+            "optional_type_aside": optional_type_aside,
             "total_ranked": total,
             "proposed_count": len(candidates),
             "fraction": fraction,

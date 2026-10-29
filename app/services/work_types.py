@@ -50,6 +50,11 @@ WORK_TYPE_FILTER_LABELS = {
 
 ALLOWED_WORK_TYPE_FILTERS = frozenset(WORK_TYPES) | {WORK_TYPE_NOT_STORED}
 
+# Narrow it down: books/chapters with no abstract stay in; reviews and trial
+# registrations can be set aside only if the student ticks that box.
+NARROW_KEEP_NO_ABSTRACT_TYPES = frozenset({"book", "edited-book", "book-chapter"})
+NARROW_OPTIONAL_ASIDE_TYPES = frozenset({"book-review", "registry-record"})
+
 # provider -> raw type -> canonical. Unknown or absent raw values map to unknown.
 TYPE_MAP: Dict[str, Dict[str, str]] = {
     "openalex": {
