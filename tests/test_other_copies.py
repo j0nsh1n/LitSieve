@@ -7,7 +7,14 @@ import json
 import numpy as np
 import pytest
 
-from app.services.access import COPY_LIMIT, OPEN_LISTED, CopyInfo, access_state, other_copies
+from app.services.access import (
+    COPY_LIMIT,
+    OPEN_LISTED,
+    CopyInfo,
+    access_state,
+    other_copies,
+    other_copies_result,
+)
 from app.services.pipeline import LiteratureSearchPipeline
 from app.storage import dbconn
 from app.storage.database import ArticleDatabase
@@ -261,6 +268,36 @@ def test_open_peer_labels_one_of_five_selected_locations():
     assert _urls(copies) == [f"https://example.org/copy/{i}" for i in range(COPY_LIMIT)]
     assert copies[2].open_listed is True
     assert [item.open_listed for item in copies] == [False, False, True, False, False]
+
+
+def test_sixth_open_url_sets_has_open_copy_without_joining_the_list():
+    locations = [
+        {"url": f"https://example.org/copy/{i}", "host": f"Host {i}"}
+        for i in range(COPY_LIMIT)
+    ]
+    card = _article(
+        article_id="123",
+        source="pubmed",
+        doi="10.1234/same",
+        locations=locations,
+    )
+    peer = _article(
+        article_id="W9",
+        source="openalex",
+        doi="10.1234/same",
+        oa_status="gold",
+        best_oa_url="https://example.org/copy/open",
+        host_name="Zenodo",
+        locations=[{
+            "url": "https://example.org/copy/open",
+            "host": "Zenodo",
+            "via": "openalex",
+        }],
+    )
+    found = other_copies_result(card, [peer])
+    assert _urls(found.copies) == [f"https://example.org/copy/{i}" for i in range(COPY_LIMIT)]
+    assert [item.open_listed for item in found.copies] == [False] * COPY_LIMIT
+    assert found.has_open_copy is True
 
 
 def test_cap_is_five():

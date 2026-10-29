@@ -186,11 +186,13 @@ async function loadOtherCopiesForResults(articles) {
    if (stale()) return;
    const rows = data && Array.isArray(data.articles) ? data.articles : [];
    for (const row of rows) {
-    otherCopiesCache.set(otherCopiesKey(row), Array.isArray(row.copies) ? row.copies : []);
+    otherCopiesCache.set(otherCopiesKey(row), cacheOtherCopiesRow(row));
    }
    for (const item of keys) {
     const key = otherCopiesKey(item);
-    if (!otherCopiesCache.has(key)) otherCopiesCache.set(key, []);
+    if (!otherCopiesCache.has(key)) {
+     otherCopiesCache.set(key, { copies: [], has_open_copy: false });
+    }
    }
   } catch (_err) {
    if (stale()) return;
@@ -200,7 +202,7 @@ async function loadOtherCopiesForResults(articles) {
  document.querySelectorAll('#results-list .result-row').forEach((card) => {
   if (!cardCanShowOtherCopies(card)) return;
   const key = `${card.dataset.articleId || ''}\t${card.dataset.source || ''}`;
-  const copies = otherCopiesCache.get(key);
+  const copies = cachedOtherCopies(key);
   if (copies && copies.length) mountOtherCopies(card, copies);
  });
  if (stale()) return;
@@ -276,11 +278,27 @@ function mountDifferentWorkPlaceholder(card) {
  bindDifferentWorkOpen(card, node);
 }
 
+function cacheOtherCopiesRow(row) {
+ const copies = Array.isArray(row && row.copies) ? row.copies : [];
+ const has = !!(row && row.has_open_copy)
+  || copies.some((copy) => copy && copy.open_listed);
+ return { copies, has_open_copy: has };
+}
+
+function cachedOtherCopies(key) {
+ const cached = otherCopiesCache.get(key);
+ if (!cached) return [];
+ if (Array.isArray(cached.copies)) return cached.copies;
+ return Array.isArray(cached) ? cached : [];
+}
+
 function cardHasOpenOtherCopy(card) {
  if (!card) return false;
  const key = `${card.dataset.articleId || ''}\t${card.dataset.source || ''}`;
- const copies = otherCopiesCache.get(key);
- if (!Array.isArray(copies) || !copies.length) return false;
+ const cached = otherCopiesCache.get(key);
+ if (!cached) return false;
+ if (typeof cached.has_open_copy === 'boolean') return cached.has_open_copy;
+ const copies = cachedOtherCopies(key);
  return copies.some((copy) => copy && copy.open_listed);
 }
 

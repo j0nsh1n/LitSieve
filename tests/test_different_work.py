@@ -277,6 +277,53 @@ def test_pipeline_skips_when_an_open_other_copy_exists(pipe):
     assert pipe.suggest_different_work([("copied", "crossref")]) == []
 
 
+def test_pipeline_skips_when_the_only_open_url_is_sixth(tmp_path, monkeypatch):
+    p = LiteratureSearchPipeline(db_path=str(tmp_path / "sixth-open.db"))
+    locations = [
+        {"url": f"https://example.org/copy/{i}", "host": f"Host {i}", "via": "pubmed"}
+        for i in range(5)
+    ]
+    p.db.insert_articles([
+        _paper(
+            "seed", "pubmed", "Closed seed with five closed copies",
+            "A closed paper about the zyptron pathway.",
+            year="2008", doi="10.1234/sixth",
+            oa_status="closed",
+            _extra={"locations": locations},
+        ),
+        _paper(
+            "peer", "openalex", "Same work open copy",
+            "Open copy of the seed at a sixth URL.",
+            year="2008", doi="10.1234/sixth",
+            oa_status="gold",
+            best_oa_url="https://example.org/copy/open",
+        ),
+        _paper(
+            "nb", "doaj", "Nearby open zyptron",
+            "An open neighbor about zyptron.",
+            year="2019", doi="10.1234/nb",
+            oa_status="gold",
+            best_oa_url="https://example.org/nb.pdf",
+        ),
+    ], dedupe=False)
+    p.db.insert_embeddings(
+        {
+            ("seed", "pubmed"): _vec(1.0, 0.0),
+            ("nb", "doaj"): _vec(0.95, 0.1),
+        },
+        model_name="general",
+    )
+    p.db.upsert_note("seed", "pubmed", starred=True)
+    monkeypatch.setattr(
+        p.embedding_engine, "embed_query",
+        lambda _q: _vec(1.0, 0.0),
+    )
+    try:
+        assert p.suggest_different_work([("seed", "pubmed")]) == []
+    finally:
+        p.db.close()
+
+
 def test_pipeline_keeps_closest_undated_when_year_bound_groups_last(
     tmp_path, monkeypatch,
 ):

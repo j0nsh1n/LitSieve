@@ -44,6 +44,11 @@ class CopyInfo(NamedTuple):
     open_listed: bool
 
 
+class CopySet(NamedTuple):
+    copies: List[CopyInfo]
+    has_open_copy: bool
+
+
 def access_state(article: Any) -> AccessInfo:
     """Listed-open copy from stored fields only. Never raises on odd data."""
     try:
@@ -314,12 +319,18 @@ def _source_names(source: str, locations: Iterable[Mapping[str, Any]]) -> Tuple[
 
 def other_copies(article: Any, same_work_rows: Any = None) -> List[CopyInfo]:
     """Other listed copies of the same work. Never raises on odd data."""
+    return other_copies_result(article, same_work_rows).copies
+
+
+def other_copies_result(article: Any, same_work_rows: Any = None) -> CopySet:
+    """Display copies plus whether any open same-work URL exists."""
     try:
         rows = same_work_rows if isinstance(same_work_rows, list) else []
         body = article if isinstance(article, Mapping) else {}
-        return _other_copies(body, rows)
+        copies, has_open = _other_copies(body, rows)
+        return CopySet(copies, has_open)
     except Exception:
-        return []
+        return CopySet([], False)
 
 
 def copy_public_dict(info: CopyInfo) -> dict:
@@ -367,27 +378,32 @@ def _other_copies_payload(
                 )
                 if peer_key != (article_id, source):
                     peers.append(peer)
-        copies = other_copies(raw, peers)
-        if not copies:
+        found = other_copies_result(raw, peers)
+        if not found.copies and not found.has_open_copy:
             continue
         out.append({
             "article_id": article_id,
             "source": source,
-            "copies": [copy_public_dict(item) for item in copies],
+            "copies": [copy_public_dict(item) for item in found.copies],
+            "has_open_copy": found.has_open_copy,
         })
     return out
 
 
 def _other_copies(
     article: Mapping[str, Any], same_work_rows: List[Any],
-) -> List[CopyInfo]:
+) -> Tuple[List[CopyInfo], bool]:
     main = _main_link_key(article)
     selected: dict[str, CopyInfo] = {}
+    has_open = False
 
     def take(row: Mapping[str, Any], loc: Mapping[str, Any]) -> None:
+        nonlocal has_open
         copy = _copy_from_location(row, loc)
         if copy is None:
             return
+        if copy.open_listed:
+            has_open = True
         key = _url_key(copy.url)
         if not key or key == main:
             return
@@ -412,7 +428,7 @@ def _other_copies(
         if peer_key == article_key and peer_key != ("", ""):
             continue
         _collect_row_copies(raw, take)
-    return list(selected.values())
+    return list(selected.values()), has_open
 
 
 def _collect_row_copies(
