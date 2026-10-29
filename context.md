@@ -75,6 +75,13 @@
   thresholds on the dev split. `score-test` scores that choice once.
   Search still ranks as it does today. The write-up is
   `~/HealthDatabaseAccess-scratch/bench/p25b_results.md`.
+- P2.2 re-ran the word-match sweep on the 15-question `baseline_v2` corpus.
+  The chosen setting (`bonus_w0.2_bm25_keywords`) beat today's ranking on
+  dev (ndcg@10 0.4381 vs 0.3973) and lost on test (0.5712 vs 0.5755), with
+  Q1, Q5 and Q14 dropping more than 0.05. Search ranking is unchanged. Gate
+  is FAIL. Leave-one-question-out now shortlists inside each fold. Q4 has
+  no pick and Q11 picked `blend_w0.2_bm25_keywords`. Sweep notes:
+  `~/HealthDatabaseAccess-scratch/bench/p22_dev_sweep_v2.md`.
 - P1.6 stores Collect inputs and Search questions in the library database
   (`fetch_runs`, `question_log`), about 50 rows each. Writes come from
   `_run_multi_fetch` (background and sync, including cancel and error) and
@@ -270,26 +277,29 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-29. `feat/laya-groups-eval-2` from origin/main `266195e`.
-  Adds `run-f2` and `score-test` in `tools/eval_laya_groups.py`. Search and
-  the UI stay as they are. Search.js and style.css cache-bust stay
-  `20261029a`. The dev pick is `f2b-full-outcome-p0`. The one test score
-  failed the gate. Test ndcg@10 is 0.418, concept coverage is 0.445, and
-  today's order is 0.575. Harmful errors are 3 of 58. Q4, Q5, and Q12 are
-  below today's test order. 100 of 271 dev papers and 68 of 169 test papers
-  stay unsorted. A cold batch of 30 full abstracts took 9331 ms. The warm
-  median was 401 ms. A full question sends 4 batches. Q9 and Q15 send 1.
-  The write-up is `~/HealthDatabaseAccess-scratch/bench/p25b_results.md`.
+- **Date:** 2026-10-29. Branch `feat/word-bonus`, PR #122. Review-fix after
+  merging `origin/main` (`05f8c6e`). Leave-one-question-out shortlists
+  inside each fold from training questions. `score --split test` and
+  `--split all` refuse P2.2 sweep selection. `score-test` scores the saved
+  dev choice and today's ranking once. Search ranking, card copy, CSV
+  columns and the spec ranking sentence stay as on main. Gate is still
+  FAIL. Corrected LOO from cached `p22_v2_dev_scores.json` (no test-split
+  re-score): Q4 has no pick, Q11 picked `blend_w0.2_bm25_keywords`
+  (0.3183 vs today's 0.4982). The other 13 folds still picked
+  `bonus_w0.2_bm25_keywords`. Search.js and style.css cache-bust stay
+  `20261029a`.
 - Validation (production venv, this worktree, no install): `ruff check .`
-  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2139
-  passed in 177.73 s. Scratch is
-  `~/HealthDatabaseAccess-scratch/pytest-feat-laya-groups-eval-2`.
+  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2152
+  passed in 213.00 s. Scratch is
+  `~/HealthDatabaseAccess-scratch/pytest-fix-a6-r1`. Sweep notes:
+  `~/HealthDatabaseAccess-scratch/bench/p22_dev_sweep_v2.md`.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
   and unscheduled roadmap backlog. Ship staging is at `266195e`. P1.9 labels
   are done: a three-model panel plus the owner's review of 29 rows, in
-  `~/HealthDatabaseAccess-scratch/bench/labels_final/` (not in git). That
-  five-question test split is still unscored, and it is a different score
-  from the v2 Laya test score. P2.2, PR #122, remains open and on hold. The
+  `~/HealthDatabaseAccess-scratch/bench/labels_final/` and
+  `labels_final_v2/` (not in git). The original five-question held-out
+  split is still unscored. That is a different score from the scored
+  15-question v2 P2.2 test pass and from the v2 Laya test score. The
   evidence redesign from #126 follows in a separate PR.
-- **Next step:** independent review of this PR. Leave the merge to the
-  reviewer. These groups stay off the student ranking.
+- **Next step:** independent review of PR #122. Do not merge from the
+  builder.

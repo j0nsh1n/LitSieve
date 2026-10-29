@@ -133,6 +133,23 @@ def test_a_weak_word_overlap_does_not_get_the_full_word_weight(pipe):
     assert by_id["y"]["similarity_score"] > by_id["z"]["similarity_score"]
 
 
+def test_bm25_normalization_stays_in_unit_interval():
+    from app.services.lexical import bm25_scores, combine_rank_score, word_bonus_value
+
+    docs = [
+        "later school start times and adolescent sleep duration sleep sleep",
+        "unrelated mining geology quartz",
+        "",
+    ]
+    scores = bm25_scores("later school start times sleep", docs)
+    assert len(scores) == 3
+    assert all(0.0 <= s <= 1.0 for s in scores)
+    assert scores[0] > scores[1]
+    total, _ = combine_rank_score(0.9, 1.0, "bonus", 0.3)
+    assert total == pytest.approx(1.0)
+    assert word_bonus_value(0.9, 1.0, "bonus", 0.3) == pytest.approx(0.1)
+
+
 def test_pico_boost_adds_to_the_blended_score(pipe):
     from app.services.enrich import apply_pico_boost
 
