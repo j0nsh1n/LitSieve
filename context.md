@@ -50,7 +50,9 @@
 - P2.7: Narrow it down uses stored `work_type`. Books and chapters with no
   abstract stay in; the preview names how many. Book reviews and trial
   registrations can be set aside only if the student ticks that box.
-  Preview still writes nothing. simple_tools.js cache-bust is `20261029b`.
+  Preview still writes nothing. simple_tools.js cache-bust is `20261029c`.
+  The confirm count, button, and submitted keys follow the optional
+  checkbox and any papers the student Keeps.
 - P1.7 shows a type chip on Search cards and a Type filter next to Sources.
   The filter runs before ranking and reads only `work_type`. Ranked hits get
   that column in one batched query. Null and unknown types have no chip.
@@ -274,16 +276,18 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-29. `feat/narrow-by-type` from origin/main `05f8c6e`
-  (contains `266195e`). Narrow it down checks stored paper type. Books and
-  chapters with no abstract stay in. Book reviews and trial registrations
-  are optional, behind an unticked checkbox. Preview still writes nothing.
+- **Date:** 2026-10-29. `feat/narrow-by-type` (local `fix-a8-r1`). Review
+  r1 fix 2 only: optional type rows, Keep choices, the "Set aside N papers"
+  count, the confirm button, and the keys sent on apply use one selected
+  set. Fix 1 (server-side offered-key boundary) was not implemented. The
+  generic screening endpoint already lets a student set aside any of their
+  own papers, CSRF and ownership checks apply, and it is undoable.
   Search.js and style.css cache-bust stay `20261029a`. simple_tools.js is
-  `20261029b`.
+  `20261029c`.
 - Validation (production venv, this worktree, no install): `ruff check .`
-  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2144
-  passed in 201.90 s. Scratch is
-  `~/HealthDatabaseAccess-scratch/pytest-narrow-by-type`.
+  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 2145
+  passed in 217.74 s. Scratch is
+  `~/HealthDatabaseAccess-scratch/pytest-fix-a8-r1`.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
   and unscheduled roadmap backlog. Ship staging is at `266195e`. P1.9 labels
   are done: a three-model panel plus the owner's review of 29 rows, in
@@ -291,5 +295,5 @@ Guest User (is_guest) → sample corpus only; purged by age
   five-question test split is still unscored, and it is a different score
   from the v2 Laya test score. P2.2, PR #122, remains open and on hold. The
   evidence redesign from #126 follows in a separate PR.
-- **Next step:** independent review of this PR. Do not merge from the
-  builder.
+- **Next step:** independent re-review of PR #130. Do not merge from the
+  fixer.

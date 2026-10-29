@@ -9,6 +9,9 @@ and this project aims to follow Semantic Versioning for app version strings
 ## [Unreleased]
 
 ### Fixed
+- Narrow it down's "Set aside N papers" count, confirm button, and the papers
+  it actually sets aside follow the optional book-review checkbox and any
+  papers you Keep.
 - Whether any open copy of the same work exists is decided before the five
   copy list is capped. A sixth open URL still turns Different work off.
 - Different work accepts one seed, a question of at most 1,000 characters,

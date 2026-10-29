@@ -699,12 +699,15 @@ def test_narrow_it_down_type_copy_and_optional_checkbox():
     assert "books and chapters kept: no abstract to judge" in js
     assert "Also set aside ${optN} book reviews and trial registrations" in js
     assert "_mergeSimpleScreenTypeAside" in js
+    assert "_simpleScreenApplyItems" in js
+    assert "_syncOptionalTypeAsidePlacement" in js
     apply_fn = js[js.find("async function doSimpleScreenApply") : js.find("function doSimpleScreenSkip")]
-    assert "_mergeSimpleScreenTypeAside(items, data)" in apply_fn
-    merge = js[js.find("function _mergeSimpleScreenTypeAside") : js.find("function wireSimpleScreeningCard")]
+    assert "_simpleScreenApplyItems(data)" in apply_fn
+    merge = js[js.find("function _mergeSimpleScreenTypeAside") : js.find("function _simpleScreenApplyItems")]
     assert "_simpleScreenAlsoTypesOn()" in merge
+    assert "_simpleTriageKeptKeys.has(key)" in merge
     page = _read("templates", "search.html")
-    assert 'src="/static/js/simple_tools.js?v=20261029b"' in page
+    assert 'src="/static/js/simple_tools.js?v=20261029c"' in page
 
 
 def test_simple_screen_confirm_question_box_after_prepare():
