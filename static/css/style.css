@@ -2112,8 +2112,15 @@ input[type="range"]::-moz-range-thumb:hover {
     color: var(--text-soft);
     padding-top: var(--space-1);
 }
-.result-tags {
+.result-head-chips {
     margin-left: auto;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    justify-content: flex-end;
+    align-items: center;
+}
+.result-tags {
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-2);
@@ -2124,6 +2131,7 @@ input[type="range"]::-moz-range-thumb:hover {
     margin-left: 0;
 }
 .result-access-chip {
+    flex-shrink: 0;
     text-decoration: none;
 }
 .result-other-copies {
@@ -2376,7 +2384,7 @@ input[type="range"]::-moz-range-thumb:hover {
     background: var(--bg);
 }
 .result-row > .tag,
-.result-row .result-row-head > .tag {
+.result-row .result-row-head > .tag:not(.result-access-chip) {
     margin-left: auto;
 }
 .result-row .study-type-badge {
@@ -8671,6 +8679,8 @@ input:autofill:focus-visible {
         font-size: var(--fs-xs);
     }
     .result-row:not(.is-open) .result-tags { display: none; }
+    .result-row:not(.is-open) .result-head-chips,
+    .result-row:not(.is-open) .result-access-chip { display: flex; }
     .result-toggle {
         top: var(--space-1);
         right: var(--space-1);
@@ -8690,7 +8700,7 @@ input:autofill:focus-visible {
         overflow: hidden;
         text-overflow: ellipsis;
     }
-    .result-row.is-open .result-tags {
+    .result-row.is-open .result-head-chips {
         flex: 1 1 100%;
         order: 3;
     }
@@ -9096,7 +9106,7 @@ html[data-layout="register"] .result-row:not(.is-open) .result-row-title {
     line-height: 1.3;
 }
 html[data-layout="register"] .result-row:not(.is-open) .result-byline { grid-area: byline; }
-html[data-layout="register"] .result-row:not(.is-open) .result-tags {
+html[data-layout="register"] .result-row:not(.is-open) .result-head-chips {
     display: flex;
     grid-area: tags;
     margin: var(--space-1) 0 0;
@@ -9139,7 +9149,7 @@ html[data-layout="table"] .result-row:not(.is-open) .result-row-title {
     line-height: 1.35;
 }
 html[data-layout="table"] .result-row:not(.is-open) .result-byline { grid-area: byline; font-size: var(--fs-xs); }
-html[data-layout="table"] .result-row:not(.is-open) .result-tags {
+html[data-layout="table"] .result-row:not(.is-open) .result-head-chips {
     display: flex;
     grid-area: source;
     margin: 0;
@@ -9292,8 +9302,12 @@ html[data-layout="index"] .result-row:not(.is-open) .result-row-head {
     padding-bottom: var(--space-2);
     border-bottom: 1px solid var(--rule);
 }
-/* The tab already names the source. */
+/* The tab already names the source. Access stays visible. */
 html[data-layout="index"] .result-row .result-tags { display: none; }
+html[data-layout="index"] .result-row .result-head-chips,
+html[data-layout="index"] .result-row .result-access-chip {
+    display: flex;
+}
 html[data-layout="index"] .result-row:not(.is-open) .result-row-title {
     font-size: var(--fs-lg);
     line-height: 1.25;
@@ -9439,17 +9453,26 @@ html[data-look="catalog"] .note-field {
     }
     html[data-layout="columns"] #results-list > .result-row:first-child:not(.is-open) .result-row-title { font-size: var(--fs-xl); }
     html[data-layout="index"] .result-row:not(.is-open) { min-height: 0; }
-    /* The source column leaves the table; the opened paper still names it. */
+    /* The source column leaves the table; the opened paper still names it.
+       Access stays on the collapsed row. Source and type stay hidden. */
     html[data-layout="table"] { --table-columns: minmax(0, 1fr) 3rem 2.75rem 3rem; }
-    html[data-layout="table"] .results-columns span:nth-child(2),
-    html[data-layout="table"] .result-row:not(.is-open) .result-tags { display: none; }
+    html[data-layout="table"] .results-columns span:nth-child(2) { display: none; }
     html[data-layout="table"] .results-columns span:nth-child(4) { grid-column: 3 / span 2; }
     html[data-layout="table"] .result-row:not(.is-open) .result-row-main {
         grid-template-areas:
             "title year score toggle"
+            "chips year score toggle"
             "byline year score toggle";
         column-gap: var(--space-2);
     }
+    html[data-layout="table"] .result-row:not(.is-open) .result-head-chips {
+        display: flex;
+        grid-area: chips;
+        margin: 0;
+        justify-content: flex-start;
+    }
+    html[data-layout="table"] .result-row:not(.is-open) .result-tags { display: none; }
+    html[data-layout="table"] .result-row:not(.is-open) .result-access-chip { display: flex; }
     html[data-layout="table"] .result-row:not(.is-open) .result-year { font-size: var(--fs-xs); }
     html:is([data-layout="register"], [data-layout="table"]) .result-row:not(.is-open) .result-toggle {
         min-width: 2.75rem;

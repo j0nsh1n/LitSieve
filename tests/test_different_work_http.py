@@ -149,14 +149,11 @@ def test_starred_none_listed_returns_suggestions(app_module):
     _seed()
     r = _post(c, headers, [
         {"article_id": "seed", "source": "crossref"},
-        {"article_id": "open-a", "source": "openalex"},
-        {"article_id": "legacy", "source": "pubmed"},
     ])
     assert r.status_code == 200, r.text
     rows = r.json()["articles"]
     by_id = {row["article_id"]: row for row in rows}
-    assert "open-a" not in by_id
-    assert "legacy" not in by_id
+    assert list(by_id) == ["seed"]
     suggestions = by_id["seed"]["suggestions"]
     assert suggestions
     assert suggestions[0]["url"] == "https://example.org/a.pdf"
@@ -195,6 +192,40 @@ def test_foreign_library_is_400(app_module):
         library_id=other_id,
     )
     assert r.status_code == 400
+
+
+def test_two_seeds_are_422(app_module):
+    c = TestClient(app_module.app)
+    headers = _register(c)
+    r = _post(c, headers, [
+        {"article_id": "seed", "source": "crossref"},
+        {"article_id": "open-a", "source": "openalex"},
+    ])
+    assert r.status_code == 422
+
+
+def test_question_over_1000_chars_is_422(app_module):
+    c = TestClient(app_module.app)
+    headers = _register(c)
+    r = _post(
+        c, headers,
+        [{"article_id": "seed", "source": "crossref"}],
+        query_text="x" * 1001,
+    )
+    assert r.status_code == 422
+
+
+def test_filter_list_over_50_is_422(app_module):
+    c = TestClient(app_module.app)
+    headers = _register(c)
+    seed = [{"article_id": "seed", "source": "crossref"}]
+    too_many = ["pubmed"] * 51
+    r = _post(c, headers, seed, source_filter=too_many)
+    assert r.status_code == 422
+    r = _post(c, headers, seed, cluster_filter=list(range(51)))
+    assert r.status_code == 422
+    r = _post(c, headers, seed, work_type_filter=["journal-article"] * 51)
+    assert r.status_code == 422
 
 
 def test_search_payload_does_not_include_suggestions(app_module):

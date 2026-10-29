@@ -9,6 +9,12 @@ and this project aims to follow Semantic Versioning for app version strings
 ## [Unreleased]
 
 ### Fixed
+- Whether any open copy of the same work exists is decided before the five
+  copy list is capped. A sixth open URL still turns Different work off.
+- Different work accepts one seed, a question of at most 1,000 characters,
+  and at most 50 entries in each filter list.
+- The access label stays visible in Catalog and on collapsed phone rows,
+  including Table. Source and type chips still hide as they did.
 - Different work suggestions load when that disclosure is opened, not when
   the card is drawn. An empty result removes the disclosure. With a year
   filter on, the closest open paper is kept even if it has no year.

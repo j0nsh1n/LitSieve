@@ -277,6 +277,53 @@ def test_pipeline_skips_when_an_open_other_copy_exists(pipe):
     assert pipe.suggest_different_work([("copied", "crossref")]) == []
 
 
+def test_pipeline_skips_when_the_only_open_url_is_sixth(tmp_path, monkeypatch):
+    p = LiteratureSearchPipeline(db_path=str(tmp_path / "sixth-open.db"))
+    locations = [
+        {"url": f"https://example.org/copy/{i}", "host": f"Host {i}", "via": "pubmed"}
+        for i in range(5)
+    ]
+    p.db.insert_articles([
+        _paper(
+            "seed", "pubmed", "Closed seed with five closed copies",
+            "A closed paper about the zyptron pathway.",
+            year="2008", doi="10.1234/sixth",
+            oa_status="closed",
+            _extra={"locations": locations},
+        ),
+        _paper(
+            "peer", "openalex", "Same work open copy",
+            "Open copy of the seed at a sixth URL.",
+            year="2008", doi="10.1234/sixth",
+            oa_status="gold",
+            best_oa_url="https://example.org/copy/open",
+        ),
+        _paper(
+            "nb", "doaj", "Nearby open zyptron",
+            "An open neighbor about zyptron.",
+            year="2019", doi="10.1234/nb",
+            oa_status="gold",
+            best_oa_url="https://example.org/nb.pdf",
+        ),
+    ], dedupe=False)
+    p.db.insert_embeddings(
+        {
+            ("seed", "pubmed"): _vec(1.0, 0.0),
+            ("nb", "doaj"): _vec(0.95, 0.1),
+        },
+        model_name="general",
+    )
+    p.db.upsert_note("seed", "pubmed", starred=True)
+    monkeypatch.setattr(
+        p.embedding_engine, "embed_query",
+        lambda _q: _vec(1.0, 0.0),
+    )
+    try:
+        assert p.suggest_different_work([("seed", "pubmed")]) == []
+    finally:
+        p.db.close()
+
+
 def test_pipeline_keeps_closest_undated_when_year_bound_groups_last(
     tmp_path, monkeypatch,
 ):
@@ -354,3 +401,43 @@ def test_pipeline_empty_without_embeddings(tmp_path, monkeypatch):
         assert p.suggest_different_work([("seed", "crossref")]) == []
     finally:
         p.db.close()
+
+
+def _select_statements(statements):
+    return [sql for sql in statements if sql.lstrip()[:6].upper() == "SELECT"]
+
+
+def _full_access_reads(selects):
+    """SELECTs that load locations/provenance for the whole library."""
+    found = []
+    for sql in selects:
+        compact = " ".join(sql.split()).lower()
+        if "article_extra" not in compact:
+            continue
+        if "locations" not in compact:
+            continue
+        if " in (" in compact:
+            continue
+        found.append(sql)
+    return found
+
+
+def test_one_request_bounds_selects_and_full_access_reads(pipe):
+    pipe.suggest_different_work([("seed", "crossref")])
+    statements = []
+    pipe.db.conn.set_trace_callback(statements.append)
+    try:
+        rows = pipe.suggest_different_work([("seed", "crossref")])
+    finally:
+        pipe.db.conn.set_trace_callback(None)
+    assert rows
+    selects = _select_statements(statements)
+    assert len(selects) <= 9
+    assert len(_full_access_reads(selects)) <= 1
+    projection = [
+        sql for sql in selects
+        if "trim(doi)" in " ".join(sql.split()).lower()
+        and "article_extra" not in sql.lower()
+        and "locations" not in sql.lower()
+    ]
+    assert len(projection) == 1

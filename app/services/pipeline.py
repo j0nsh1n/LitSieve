@@ -1156,7 +1156,7 @@ class LiteratureSearchPipeline:
         work_type_filter: Optional[List[str]] = None,
     ) -> List[Dict]:
         """Open copies of nearby papers when a starred card has none."""
-        from app.services.access import NONE_LISTED, other_copies
+        from app.services.access import NONE_LISTED, other_copies_result
         from app.services.different_work import (
             MIN_SIMILARITY,
             SUGGESTION_LIMIT,
@@ -1208,8 +1208,7 @@ class LiteratureSearchPipeline:
                 continue
             doi = work_doi(article.get("doi"))
             peer_rows = list(peers_by_doi.get(doi, [])) if doi else []
-            copies = other_copies(article, peer_rows)
-            if any(copy.open_listed for copy in copies):
+            if other_copies_result(article, peer_rows).has_open_copy:
                 continue
             idx = id_to_idx.get(key)
             if idx is None:

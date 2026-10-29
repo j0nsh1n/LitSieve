@@ -101,6 +101,13 @@ def test_js_type_chip_words_match_python():
     assert "workTypeChipLabel(article.work_type)" in card
     assert "result-type-chip" in card
     assert "accessChipHtml(article)" in card
+    assert "result-head-chips" in card
+    tags_open = card.index('<span class="result-tags">')
+    tags_close = card.index("</span>", tags_open)
+    tags_html = card[tags_open:tags_close]
+    assert "${accessChip}" not in tags_html
+    assert "${accessChip}" in card
+    assert card.index("result-head-chips") < tags_open
 
 
 def test_access_chip_wording_and_forbidden_claims():
@@ -118,7 +125,7 @@ def test_access_chip_wording_and_forbidden_claims():
     template = _read("templates", "search.html")
     assert 'id="simple-free-to-read-chip"' in template
     assert "Free to read" in template
-    assert 'src="/static/js/search.js?v=20261028i"' in template
+    assert 'src="/static/js/search.js?v=20261029a"' in template
 
 
 def test_other_copies_disclosure_wording():
@@ -137,7 +144,34 @@ def test_other_copies_disclosure_wording():
     assert "none_listed" in search
     css = _read("static", "css", "style.css")
     assert ".result-other-copies" in css
-    assert 'href="/static/css/style.css?v=20261028f"' in _read("templates", "base.html")
+    assert 'href="/static/css/style.css?v=20261029a"' in _read("templates", "base.html")
+
+
+def test_access_chip_stays_visible_when_layouts_hide_tags():
+    css = _read("static", "css", "style.css")
+    assert "html[data-layout=\"index\"] .result-row .result-tags { display: none; }" in css
+    assert "html[data-layout=\"index\"] .result-row .result-access-chip" in css
+    catalog_chip = css[css.index("html[data-layout=\"index\"] .result-row .result-access-chip"):]
+    catalog_chip = catalog_chip[:catalog_chip.index("}")]
+    assert "display: none" not in catalog_chip
+    assert "display: flex" in catalog_chip
+    assert ".result-row .result-row-head > .tag:not(.result-access-chip)" in css
+    phone = css[css.index("@media (max-width: 640px)"):]
+    table_hide = (
+        'html[data-layout="table"] .result-row:not(.is-open) .result-head-chips'
+        ' { display: none; }'
+    )
+    assert table_hide not in phone
+    assert (
+        'html[data-layout="table"] .result-row:not(.is-open) .result-tags'
+        ' { display: none; }'
+    ) in phone
+    table_chip = phone[phone.index(
+        'html[data-layout="table"] .result-row:not(.is-open) .result-access-chip'
+    ):]
+    table_chip = table_chip[:table_chip.index("}")]
+    assert "display: none" not in table_chip
+    assert "display: flex" in table_chip
 
 
 def test_different_work_disclosure_wording():
