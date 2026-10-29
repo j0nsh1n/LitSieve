@@ -106,7 +106,9 @@ def test_score_tooltip_says_the_list_is_sorted_by_it():
     card = _slice(_read("static", "js", "search.js"), "function buildResultCard(", "const url = getArticleUrl")
     assert "sorted" in card
     assert "Similarity score (0–1): how closely" not in card
-    assert "exact words" in card
+    assert "key words" in card
+    assert "meaning ${meaningScore.toFixed(2)}" in card
+    assert "words +${wordBonus.toFixed(2)}" in card
 
 
 def test_rail_refreshes_after_every_screening_change():

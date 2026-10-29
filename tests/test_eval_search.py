@@ -439,17 +439,19 @@ def test_score_metrics(tmp_path):
 
 
 def test_bm25_scores_stay_in_unit_interval():
+    from app.services.lexical import bm25_scores
+
     docs = [
         "later school start times and adolescent sleep duration sleep sleep",
         "unrelated mining geology quartz",
         "",
     ]
-    scores = ev.bm25_scores("later school start times sleep", docs)
+    scores = bm25_scores("later school start times sleep", docs)
     assert len(scores) == 3
     assert all(0.0 <= s <= 1.0 for s in scores)
     assert scores[0] > scores[1]
     assert scores[1] == 0.0 or scores[1] < scores[0]
-    empty = ev.bm25_scores("zzzznotaword", docs)
+    empty = bm25_scores("zzzznotaword", docs)
     assert empty == [0.0, 0.0, 0.0]
 
 

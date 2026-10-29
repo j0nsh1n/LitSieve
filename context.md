@@ -12,23 +12,26 @@
   poster. Live at `https://www.litpilot.org` from the production checkout,
   `main` through #106 (2026-10-16). The bare `litpilot.org` has no DNS record.
 - Python **3.14** (Dockerfile, CI, Render, Ruff target).
-- Latest full suite (2026-10-28, `feat/question-concepts` r1): **1974 passed**
-  in 164.32 s, no skips or xfails. `ruff check .` clean; `pyright app`
+- Latest full suite (2026-10-28, `feat/word-bonus`): **1981 passed**
+  in 174.99 s, no skips or xfails. `ruff check .` clean; `pyright app`
   **0 errors**, 6 optional-import warnings (CI blocks on errors).
   `pip-audit` (2026-10-14): no known vulnerabilities; ROCm torch/triton are
   un-auditable. No dependency lockfile.
+- P2.2 ranks Search as 0.8 × meaning match plus 0.2 × BM25 on the question's
+  key words. Prefer exact words off is meaning only. Cards show
+  "meaning X · words +Y". Search.js and style.css cache-bust are `20261028e`.
 - P1.7 shows a type chip on Search cards and a Type filter next to Sources.
   The filter runs before ranking and reads only `work_type`. Ranked hits get
   that column in one batched query. Null and unknown types have no chip.
   "Type not stored" keeps legacy rows. No type filter leaves ranking as it
-  was. Search.js cache-bust is `20261028d`.
+  was.
 - P1.8 adds `tools/eval_search.py` (capture, replay, score, labelsheet) and
   five committed questions under `tools/bench/`. Replay snapshots now copy
   stored `work_type`, `doi` and `container_title` from the corpus row after
   ranking. The `baseline_v1` corpus and replay output live in
   `~/HealthDatabaseAccess-scratch/bench/` and are not in git. Human labels
-  are P1.9. P2.1 adds `app/services/question_concepts.py`; Search does not
-  import it yet.
+  are P1.9. P2.1 adds `app/services/question_concepts.py`; ranking reads
+  keywords from it.
 - P1.6 stores Collect inputs and Search questions in the library database
   (`fetch_runs`, `question_log`), about 50 rows each. Writes come from
   `_run_multi_fetch` (background and sync, including cancel and error) and
@@ -224,18 +227,15 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-28. Branch `fix-a1-r1` tracking `feat/question-concepts`
-  (PR #120). Review-fix r1: effect/impact stay as content unless they are
-  the frame noun, population after "in", whole-token invariant with an
-  independent tokenizer, lowercase "us" is not a place. Five benchmark
-  expected concepts are unchanged. Search still does not import the helper.
+- **Date:** 2026-10-28. Branch `feat/word-bonus`. P2.2 ranking is blend BM25
+  at w = 0.2 on question keywords. Dev nDCG@10 0.4771 vs baseline 0.4457.
+  Test split 0.6046 vs 0.644. PR is open.
 - Validation (production venv, this worktree, no install): `ruff check .`
-  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 1974
-  passed in 164.32 s. Scratch is
-  `~/HealthDatabaseAccess-scratch/pytest-fix-a1-r1`.
-  Frozen replay key order still matches `baseline_v1_results.json`. Score
-  `--split dev` OVERALL type_accuracy 0.7871, export_accuracy 0.8901.
+  clean, `pyright app` 0 errors / 6 optional-import warnings, pytest 1981
+  passed in 174.99 s, `node --check static/js/search.js`. Scratch is
+  `~/HealthDatabaseAccess-scratch/pytest-word-bonus`. Sweep notes live in
+  `~/HealthDatabaseAccess-scratch/bench/p22_dev_sweep.md`.
 - Open items remain the optional source keys, bare `litpilot.org` DNS record,
   and unscheduled roadmap backlog. Ship staging was last recorded at
-  `f9485cf`. P2.2 is wiring concepts into ranking.
-- **Next step:** re-review of PR #120 after the r1 push.
+  `f9485cf`.
+- **Next step:** review of the word-bonus PR.

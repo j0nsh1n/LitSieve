@@ -36,6 +36,16 @@ from app.services.clustering import (
     ClusterLabeler,
 )
 from app.services.embeddings import EmbeddingEngine
+from app.services.lexical import (
+    RANK_FORMULA,
+    RANK_METHOD,
+    RANK_QUERY_KIND,
+    WORD_WEIGHT,
+    combine_rank_score,
+    lexical_query_text,
+    lexical_scores,
+    word_bonus_value,
+)
 from app.services.work_types import work_type_matches_filter
 from app.storage.database import (
     SEARCH_ARTICLE_COLUMNS,
@@ -55,10 +65,6 @@ def group_undated_last(results: List[Dict]) -> None:
         article['no_year'] = parse_year(article.get('year')) == 0
     results.sort(key=lambda a: a['no_year'])
 
-
-# Hybrid rank: meaning first, exact words second (both cosine, 0-1).
-SEMANTIC_WEIGHT = 0.7
-LEXICAL_WEIGHT = 0.3
 
 FETCHERS = {
     'pubmed': PubMedFetcher,
@@ -703,22 +709,21 @@ class LiteratureSearchPipeline:
         articles_all: Dict,
         top_k: int,
     ) -> List[Dict]:
-        """Blend semantic cosine with TF-IDF lexical scores; cut to top_k.
+        """Blend semantic cosine with a BM25 word-match share; cut to top_k.
 
-        Both scores stay on their own fixed 0-1 cosine scale. Stretching them
-        against the shortlist (min-max) gave the paper with the most word
-        overlap the full lexical weight however small that overlap was (audit
-        19.1). `similarity_score` is the blend, so the number on each card is
-        the one the list is sorted by; `semantic_score` keeps the meaning part.
+        Word scores stay on a fixed 0-1 scale (BM25 divided by the query's
+        theoretical max). Stretching against the shortlist (min-max) gave the
+        paper with the most word overlap the full lexical weight however small
+        that overlap was (audit 19.1). `similarity_score` is the blend, so the
+        number on each card is the one the list is sorted by; `semantic_score`
+        keeps the meaning part; `word_bonus` is the amount mixed in from words.
 
-        TF-IDF is fit only on the semantic shortlist (typically <= ~250 docs),
-        not the full corpus, so rebuilding per query is intentional and cheap.
-        Full-corpus embedding loads are cached on the pipeline (see
-        _load_embeddings_cached) and invalidated when the corpus changes.
+        Lexical features are fit only on the semantic shortlist (typically
+        <= ~250 docs), not the full corpus, so rebuilding per query is
+        intentional and cheap. Full-corpus embedding loads are cached on the
+        pipeline (see _load_embeddings_cached) and invalidated when the corpus
+        changes.
         """
-        from sklearn.feature_extraction.text import TfidfVectorizer
-        from sklearn.metrics.pairwise import cosine_similarity as sk_cosine
-
         keys = [k for k, _ in ranked]
         sem_scores = [float(s) for _, s in ranked]
         docs = []
@@ -727,21 +732,25 @@ class LiteratureSearchPipeline:
             docs.append(f"{a.get('title') or ''} {a.get('abstract') or ''}".strip())
 
         try:
-            vec = TfidfVectorizer(stop_words='english', ngram_range=(1, 2))
-            mat = vec.fit_transform(docs)
-            q = vec.transform([query_text or ''])
-            lex: Optional[List[float]] = sk_cosine(q, mat).ravel().tolist()
+            qtext = lexical_query_text(query_text, RANK_QUERY_KIND)
+            lex: Optional[List[float]] = lexical_scores(qtext, docs, RANK_METHOD)
         except Exception as e:
             logger.warning("Lexical boost failed (%s); pure semantic ranking.", e)
             lex = None
 
         if lex is None:
-            scores = list(sem_scores)
+            combined = [(s, s) for s in sem_scores]
+            bonuses: Optional[List[float]] = None
         else:
-            scores = [
-                SEMANTIC_WEIGHT * s + LEXICAL_WEIGHT * L for s, L in zip(sem_scores, lex)
+            combined = [
+                combine_rank_score(s, L, RANK_FORMULA, WORD_WEIGHT)
+                for s, L in zip(sem_scores, lex)
             ]
-        order = sorted(range(len(keys)), key=lambda i: scores[i], reverse=True)
+            bonuses = [
+                word_bonus_value(s, L, RANK_FORMULA, WORD_WEIGHT)
+                for s, L in zip(sem_scores, lex)
+            ]
+        order = sorted(range(len(keys)), key=lambda i: combined[i], reverse=True)
 
         out: List[Dict] = []
         for i in order[:top_k]:
@@ -749,10 +758,12 @@ class LiteratureSearchPipeline:
             if key not in articles_all:
                 continue
             article = omit_null_metadata(dict(articles_all[key]))
-            article['similarity_score'] = round(float(scores[i]), 4)
+            article['similarity_score'] = round(float(combined[i][0]), 4)
             article['semantic_score'] = round(float(sem_scores[i]), 4)
             if lex is not None:
                 article['lexical_score'] = round(float(lex[i]), 4)
+                if bonuses is not None:
+                    article['word_bonus'] = round(float(bonuses[i]), 4)
             out.append(article)
         return out
 
@@ -773,7 +784,7 @@ class LiteratureSearchPipeline:
         Search for articles similar to a query (or a provided query embedding).
 
         Filters (screening, source, type, cluster, year) apply BEFORE ranking.
-        When lexical_boost is True, re-rank a wider semantic shortlist with TF-IDF.
+        When lexical_boost is True, re-rank a wider semantic shortlist with words.
         """
         logger.info("\n=== Searching for similar articles ===")
         logger.info(f"Query: {query_text}\n")
@@ -828,6 +839,7 @@ class LiteratureSearchPipeline:
                 if key in articles_all:
                     article = dict(articles_all[key])
                     article['similarity_score'] = float(similarity)
+                    article['semantic_score'] = round(float(similarity), 4)
                     similar_articles.append(article)
 
         if year_min is not None or year_max is not None:

@@ -1537,11 +1537,18 @@ function buildResultCard(article, idx) {
  const sim = Number(article.similarity_score) || 0;
  const simPct = Math.max(0, Math.min(100, Math.round(sim * 1000) / 10));
  const simLabel = sim.toFixed(3);
- // Hover definition: 0–1 rank of meaning match vs the query (not a quality grade).
+ const meaningScore = Number.isFinite(Number(article.semantic_score))
+  ? Number(article.semantic_score)
+  : sim;
+ const wordBonus = Number(article.word_bonus);
+ const meaningLabel = `meaning ${meaningScore.toFixed(2)}`;
+ const scoreBreakdown = Number.isFinite(wordBonus)
+  ? `${meaningLabel} · words +${wordBonus.toFixed(2)}`
+  : meaningLabel;
+ // Hover definition: meaning match plus a small word bonus (not a quality grade).
  const scoreHelp =
-  'Similarity score (0–1): mostly how closely this paper matches your query by meaning, '
-  + 'plus a smaller share for the exact words it shares with it. The list is sorted '
-  + 'by this number. Not a quality or evidence grade.';
+  'Meaning match plus a small bonus for the question\'s key words. The list is sorted '
+  + 'by the total. Not a quality or evidence grade.';
 
  const url = getArticleUrl(article.article_id, article.source);
  const idText = escapeHtml(article.article_id || '');
@@ -1599,6 +1606,7 @@ function buildResultCard(article, idx) {
   <span class="score-meter-value">${escapeHtml(simLabel)}</span>
   <span class="score-meter-track"><span class="score-meter-fill"></span></span>
  </div>
+ <span class="score-breakdown">${escapeHtml(scoreBreakdown)}</span>
  <span class="result-venue">${venue}</span>
  <span class="result-year">${year}</span>
  <span class="result-tags">
@@ -2478,6 +2486,10 @@ async function doExportResults(format, libraryId = '') {
   const item = { article_id: a.article_id, source: a.source };
   const score = Number(a.similarity_score);
   if (a.similarity_score != null && Number.isFinite(score)) item.similarity_score = score;
+  const meaning = Number(a.semantic_score);
+  if (a.semantic_score != null && Number.isFinite(meaning)) item.meaning_score = meaning;
+  const bonus = Number(a.word_bonus);
+  if (a.word_bonus != null && Number.isFinite(bonus)) item.word_bonus = bonus;
   if (a.cluster_label) item.cluster_label = String(a.cluster_label);
   return item;
  });

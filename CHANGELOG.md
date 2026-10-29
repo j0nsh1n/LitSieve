@@ -9,9 +9,11 @@ and this project aims to follow Semantic Versioning for app version strings
 ## [Unreleased]
 
 ### Added
+- Search cards show "meaning X · words +Y" next to the score. Search CSV
+  adds meaning_score and word_bonus after Similarity.
 - `app/services/question_concepts.py` reads a research question into
   keywords and actor, action, outcome, population, period and place
-  phrases. Search does not call it yet.
+  phrases. Search ranking uses those keywords for the word-match share.
 - Search cards show a type chip when the paper has a stored type (Article,
   Review article, Book, Chapter, Thesis, and the rest of the stored types).
   Papers with no type, or an unknown type, have no chip. A Type filter sits
@@ -44,6 +46,9 @@ and this project aims to follow Semantic Versioning for app version strings
   this".
 
 ### Changed
+- Search ranking is 0.8 × meaning match plus 0.2 × BM25 on the question's
+  key words. Filler words such as "what", "how", and "role" are dropped.
+  With Prefer exact words off, the score is meaning only.
 - Label sheets include each paper's abstract and a link, shuffle the rows so
   rank is not first, and write a readable HTML page per question.
 - A later fetch of the same work fills empty metadata (including year and

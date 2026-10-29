@@ -118,8 +118,17 @@ def test_the_shown_score_is_the_score_the_list_is_sorted_by(pipe):
     scores = [a["similarity_score"] for a in res]
     assert scores == sorted(scores, reverse=True)
     for a in res:
-        blend = 0.7 * a["semantic_score"] + 0.3 * a["lexical_score"]
+        blend = 0.8 * a["semantic_score"] + 0.2 * a["lexical_score"]
         assert a["similarity_score"] == pytest.approx(blend, abs=1e-3)
+        assert a["word_bonus"] == pytest.approx(0.2 * a["lexical_score"], abs=1e-3)
+
+
+def test_toggle_off_is_semantic_only(pipe):
+    res = pipe.search_similar("zyptron pathway", top_k=3, lexical_boost=False)
+    for a in res:
+        assert a["similarity_score"] == pytest.approx(a["semantic_score"], abs=1e-3)
+        assert "word_bonus" not in a
+        assert "lexical_score" not in a
 
 
 def test_a_weak_word_overlap_does_not_get_the_full_word_weight(pipe):
@@ -131,6 +140,46 @@ def test_a_weak_word_overlap_does_not_get_the_full_word_weight(pipe):
     by_id = {a["article_id"]: a for a in res}
     assert 0 < by_id["z"]["lexical_score"] < 0.5
     assert by_id["y"]["similarity_score"] > by_id["z"]["similarity_score"]
+
+
+def test_bm25_normalization_stays_in_unit_interval():
+    from app.services.lexical import bm25_scores, combine_rank_score, word_bonus_value
+
+    docs = [
+        "later school start times and adolescent sleep duration sleep sleep",
+        "unrelated mining geology quartz",
+        "",
+    ]
+    scores = bm25_scores("later school start times sleep", docs)
+    assert len(scores) == 3
+    assert all(0.0 <= s <= 1.0 for s in scores)
+    assert scores[0] > scores[1]
+    total, _ = combine_rank_score(0.9, 1.0, "bonus", 0.3)
+    assert total == pytest.approx(1.0)
+    assert word_bonus_value(0.9, 1.0, "bonus", 0.3) == pytest.approx(0.1)
+
+
+def test_word_match_uses_question_keywords(pipe):
+    pipe.db.insert_articles([{
+        "article_id": "filler",
+        "source": "pubmed",
+        "title": "The role they play",
+        "abstract": "What role they play and how they play it.",
+        "year": "2019",
+        "authors": [],
+        "journal": "J",
+    }])
+    pipe.db.insert_embeddings(
+        {("filler", "pubmed"): np.array([0.2, 0.2], dtype=np.float32)},
+        model_name="general",
+    )
+    pipe.invalidate_corpus_cache()
+    res = pipe.search_similar(
+        "What role did zyptron play in cells", top_k=10, lexical_boost=True,
+    )
+    by_id = {a["article_id"]: a for a in res}
+    assert by_id["filler"]["lexical_score"] == pytest.approx(0.0, abs=1e-3)
+    assert by_id["x"]["lexical_score"] > 0
 
 
 def test_pico_boost_adds_to_the_blended_score(pipe):

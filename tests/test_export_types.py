@@ -188,7 +188,7 @@ def test_export_matrix_key_lines_per_type():
             assert line in apa, (work_type, line, apa)
         csv_body, _, _ = exports._format_ranked_export([article], "csv")
         row = _csv_rows(csv_body)[1]
-        assert row[10] == expect["csv_type"], (work_type, row)
+        assert row[12] == expect["csv_type"], (work_type, row)
         assert "JO  - " not in ris or work_type in {
             "journal-article", "review-article", "book-review",
         }
@@ -333,17 +333,22 @@ def test_selection_csv_keeps_visible_order_and_appends_type_columns():
         for i in range(3)
     ]
     papers[0]["similarity_score"] = 0.9
+    papers[0]["semantic_score"] = 0.85
+    papers[0]["word_bonus"] = 0.08
     papers[2]["similarity_score"] = 0.1
     body, _, _ = exports._format_ranked_export(papers, "csv")
     rows = _csv_rows(body)
-    assert rows[0][:10] == [
-        "Rank", "Similarity", "Title", "Year", "Journal", "Authors",
-        "Source", "ID", "Cluster ID", "Cluster Label",
+    assert rows[0][:12] == [
+        "Rank", "Similarity", "meaning_score", "word_bonus", "Title", "Year",
+        "Journal", "Authors", "Source", "ID", "Cluster ID", "Cluster Label",
     ]
     assert rows[0][-5:] == ["Type", "DOI", "Container", "Publisher", "Open copy URL"]
-    assert [row[2] for row in rows[1:]] == ["Paper 0", "Paper 1", "Paper 2"]
-    assert rows[1][10] == "journal-article"
-    assert rows[1][11] == "10.1234/p0"
+    assert [row[4] for row in rows[1:]] == ["Paper 0", "Paper 1", "Paper 2"]
+    assert rows[1][2] == "0.850"
+    assert rows[1][3] == "0.080"
+    assert rows[2][2] == ""
+    assert rows[1][12] == "journal-article"
+    assert rows[1][13] == "10.1234/p0"
 
 
 def test_csv_formula_protection_covers_new_columns():

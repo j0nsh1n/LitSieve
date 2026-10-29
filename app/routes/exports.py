@@ -96,14 +96,16 @@ def _format_ranked_export(results: List[dict], fmt: str):
         output = io.StringIO()
         writer = csv.writer(output)
         writer.writerow([
-            "Rank", "Similarity", "Title", "Year", "Journal", "Authors",
-            "Source", "ID", "Cluster ID", "Cluster Label",
+            "Rank", "Similarity", "meaning_score", "word_bonus", "Title", "Year",
+            "Journal", "Authors", "Source", "ID", "Cluster ID", "Cluster Label",
             *_CSV_EXTRA_HEADERS,
         ])
         for i, a in enumerate(results, 1):
             sim = a.get("similarity_score")
+            meaning = a.get("semantic_score", a.get("meaning_score"))
+            bonus = a.get("word_bonus")
             cells = _csv_row([
-                i, "",
+                i, "", "", "",
                 a.get("title", ""), a.get("year", ""),
                 a.get("journal", ""), "; ".join(a.get("authors") or []),
                 a.get("source", ""), a.get("article_id", ""),
@@ -113,6 +115,10 @@ def _format_ranked_export(results: List[dict], fmt: str):
             # Our own number, not source text: written as is, even when negative.
             if isinstance(sim, (int, float)) and not isinstance(sim, bool):
                 cells[1] = f"{sim:.3f}"
+            if isinstance(meaning, (int, float)) and not isinstance(meaning, bool):
+                cells[2] = f"{meaning:.3f}"
+            if isinstance(bonus, (int, float)) and not isinstance(bonus, bool):
+                cells[3] = f"{bonus:.3f}"
             writer.writerow(cells)
         return output.getvalue(), "text/csv", "search_results.csv"
     # txt
@@ -186,6 +192,12 @@ async def api_export_selection(req: ExportSelectionRequest, request: Request, li
                 score = _clean_score(key.similarity_score)
                 if score is not None:
                     art["similarity_score"] = score
+                meaning = _clean_score(key.meaning_score)
+                if meaning is not None:
+                    art["semantic_score"] = meaning
+                bonus = _clean_score(key.word_bonus)
+                if bonus is not None:
+                    art["word_bonus"] = bonus
                 label = _clean_label(key.cluster_label)
                 if label and not art.get("cluster_label"):
                     art["cluster_label"] = label

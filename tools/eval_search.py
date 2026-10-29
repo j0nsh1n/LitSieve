@@ -23,7 +23,6 @@ import logging
 import math
 import os
 import random
-import re
 import subprocess
 import sys
 import time
@@ -38,8 +37,12 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from app.content.source_catalog import TOPIC_PACKS, TOPIC_SOURCE_HINTS
 from app.services.citations import _real_journal, article_doi, article_url, citation_model
+from app.services.lexical import (
+    combine_rank_score,
+    lexical_query_text,
+    lexical_scores,
+)
 from app.services.pipeline import FETCHERS, LiteratureSearchPipeline
-from app.services.question_concepts import question_keywords
 from app.version import APP_VERSION
 
 logger = logging.getLogger("eval_search")
@@ -367,9 +370,6 @@ P22_WEIGHTS = (0.05, 0.1, 0.15, 0.2, 0.25, 0.3)
 P22_FORMULAS = ("blend", "bonus")
 P22_METHODS = ("tfidf", "bm25")
 P22_QUERY_KINDS = ("raw", "keywords")
-BM25_K1 = 1.5
-BM25_B = 0.75
-_BM25_TOKEN = re.compile(r"(?u)\b\w\w+\b")
 
 
 def p22_ranker_name(formula: str, weight: float, method: str, query_kind: str) -> str:
@@ -387,103 +387,8 @@ def p22_configs() -> List[Tuple[str, str, float, str, str]]:
     return rows
 
 
-def lexical_query_text(query: str, kind: str) -> str:
-    if kind == "keywords":
-        return " ".join(question_keywords(query))
-    return query or ""
-
-
 def paper_text(article: Mapping[str, Any]) -> str:
     return f"{article.get('title') or ''} {article.get('abstract') or ''}".strip()
-
-
-def tfidf_scores(query_text: str, docs: Sequence[str]) -> List[float]:
-    from sklearn.feature_extraction.text import TfidfVectorizer
-    from sklearn.metrics.pairwise import cosine_similarity as sk_cosine
-
-    if not docs:
-        return []
-    try:
-        vec = TfidfVectorizer(stop_words="english", ngram_range=(1, 2))
-        mat = vec.fit_transform(list(docs))
-        q = vec.transform([query_text or ""])
-        return [float(x) for x in sk_cosine(q, mat).ravel().tolist()]
-    except Exception:
-        return [0.0] * len(docs)
-
-
-def bm25_tokens(text: str) -> List[str]:
-    return [m.group(0).casefold() for m in _BM25_TOKEN.finditer(text or "")]
-
-
-def bm25_scores(
-    query_text: str,
-    docs: Sequence[str],
-    *,
-    k1: float = BM25_K1,
-    b: float = BM25_B,
-) -> List[float]:
-    """Okapi BM25 scaled by the query's theoretical max, not the shortlist.
-
-    The cap is sum_q idf(q)·(k1+1), the score a document would get if every
-    query term had infinite tf at average length. Min-max on the shortlist is
-    what audit 19.1 rejected.
-    """
-    n_docs = len(docs)
-    if n_docs == 0:
-        return []
-    tokenized = [bm25_tokens(doc) for doc in docs]
-    avgdl = sum(len(toks) for toks in tokenized) / n_docs
-    df: Dict[str, int] = {}
-    for toks in tokenized:
-        for term in set(toks):
-            df[term] = df.get(term, 0) + 1
-    query_terms = list(dict.fromkeys(bm25_tokens(query_text)))
-    if not query_terms:
-        return [0.0] * n_docs
-    idf = {
-        term: math.log(1.0 + (n_docs - df.get(term, 0) + 0.5) / (df.get(term, 0) + 0.5))
-        for term in query_terms
-    }
-    max_score = sum(idf[term] * (k1 + 1.0) for term in query_terms)
-    if max_score <= 0:
-        return [0.0] * n_docs
-    out: List[float] = []
-    for toks in tokenized:
-        tf_map: Dict[str, int] = {}
-        for term in toks:
-            tf_map[term] = tf_map.get(term, 0) + 1
-        dl = len(toks)
-        score = 0.0
-        for term in query_terms:
-            tf = tf_map.get(term, 0)
-            if tf <= 0:
-                continue
-            denom = tf + k1 * (1.0 - b + b * dl / (avgdl or 1.0))
-            score += idf[term] * (tf * (k1 + 1.0)) / denom
-        out.append(min(1.0, max(0.0, score / max_score)))
-    return out
-
-
-def lexical_scores(query_text: str, docs: Sequence[str], method: str) -> List[float]:
-    if method == "bm25":
-        return bm25_scores(query_text, docs)
-    return tfidf_scores(query_text, docs)
-
-
-def combine_rank_score(
-    semantic: float,
-    lexical: float,
-    formula: str,
-    weight: float,
-) -> Tuple[float, float]:
-    """Return (sort score, semantic) so bonus ties break on meaning."""
-    sem = float(semantic)
-    lex = float(lexical)
-    w = float(weight)
-    if formula == "bonus":
-        return (min(1.0, sem + w * lex), sem)
-    return ((1.0 - w) * sem + w * lex, sem)
 
 
 def _rerank_hits(
