@@ -79,10 +79,13 @@ class LinkDecision(NamedTuple):
     witnesses: Tuple[LinkWitness, ...]
 
 
-def access_state(article: Any) -> AccessInfo:
+def access_state(article: Any, *, trust_legacy: bool = True) -> AccessInfo:
     """Listed-open copy from stored fields only. Never raises on odd data."""
     try:
-        return _access_state(article if isinstance(article, Mapping) else {})
+        return _access_state(
+            article if isinstance(article, Mapping) else {},
+            trust_legacy=trust_legacy,
+        )
     except Exception:
         return AccessInfo(NONE_LISTED, None, ())
 
@@ -95,7 +98,13 @@ def access_public_dict(info: AccessInfo) -> dict:
     return out
 
 
-def _access_state(article: Mapping[str, Any]) -> AccessInfo:
+def _use_legacy_access(article: Mapping[str, Any], trust_legacy: bool) -> bool:
+    return trust_legacy and is_never_merged(article)
+
+
+def _access_state(
+    article: Mapping[str, Any], *, trust_legacy: bool = True,
+) -> AccessInfo:
     source = str(article.get("source") or "").strip()
     locations = _locations(article)
     sources = _source_names(source, locations)
@@ -107,7 +116,7 @@ def _access_state(article: Mapping[str, Any]) -> AccessInfo:
         return AccessInfo(NONE_LISTED, None, sources)
     if status != EVIDENCE_ABSENT:
         return AccessInfo(NONE_LISTED, None, sources)
-    if is_never_merged(article):
+    if _use_legacy_access(article, trust_legacy):
         url = _open_copy_url(article, source, locations)
         if url:
             return AccessInfo(OPEN_LISTED, url, sources)
@@ -400,17 +409,23 @@ def _source_names(source: str, locations: Iterable[Mapping[str, Any]]) -> Tuple[
     return tuple(source_display_name(item) for item in ids)
 
 
-def other_copies(article: Any, same_work_rows: Any = None) -> List[CopyInfo]:
+def other_copies(
+    article: Any, same_work_rows: Any = None, *, trust_legacy: bool = True,
+) -> List[CopyInfo]:
     """Other listed copies of the same work. Never raises on odd data."""
-    return other_copies_result(article, same_work_rows).copies
+    return other_copies_result(
+        article, same_work_rows, trust_legacy=trust_legacy,
+    ).copies
 
 
-def other_copies_result(article: Any, same_work_rows: Any = None) -> CopySet:
+def other_copies_result(
+    article: Any, same_work_rows: Any = None, *, trust_legacy: bool = True,
+) -> CopySet:
     """Display copies plus whether any open same-work URL exists."""
     try:
         rows = same_work_rows if isinstance(same_work_rows, list) else []
         body = article if isinstance(article, Mapping) else {}
-        copies, has_open = _other_copies(body, rows)
+        copies, has_open = _other_copies(body, rows, trust_legacy=trust_legacy)
         return CopySet(copies, has_open)
     except Exception:
         return CopySet([], False)
@@ -423,10 +438,14 @@ def copy_public_dict(info: CopyInfo) -> dict:
 def other_copies_payload(
     articles: Mapping[Tuple[str, str], Any],
     same_work_rows: Iterable[Any] = (),
+    *,
+    trust_legacy: bool = True,
 ) -> List[dict]:
     """Public payload for starred none-listed cards. Empty when nothing to show."""
     try:
-        return _other_copies_payload(articles, same_work_rows)
+        return _other_copies_payload(
+            articles, same_work_rows, trust_legacy=trust_legacy,
+        )
     except Exception:
         return []
 
@@ -434,6 +453,8 @@ def other_copies_payload(
 def _other_copies_payload(
     articles: Mapping[Tuple[str, str], Any],
     same_work_rows: Iterable[Any],
+    *,
+    trust_legacy: bool = True,
 ) -> List[dict]:
     peers_by_doi: dict[str, List[Mapping[str, Any]]] = {}
     for raw in same_work_rows:
@@ -448,7 +469,7 @@ def _other_copies_payload(
     for key, raw in articles.items():
         if not isinstance(raw, Mapping):
             continue
-        if access_state(raw).state != NONE_LISTED:
+        if access_state(raw, trust_legacy=trust_legacy).state != NONE_LISTED:
             continue
         article_id, source = key
         doi = _work_doi(raw.get("doi"))
@@ -461,7 +482,7 @@ def _other_copies_payload(
                 )
                 if peer_key != (article_id, source):
                     peers.append(peer)
-        found = other_copies_result(raw, peers)
+        found = other_copies_result(raw, peers, trust_legacy=trust_legacy)
         if not found.copies and not found.has_open_copy:
             continue
         out.append({
@@ -474,7 +495,10 @@ def _other_copies_payload(
 
 
 def _other_copies(
-    article: Mapping[str, Any], same_work_rows: List[Any],
+    article: Mapping[str, Any],
+    same_work_rows: List[Any],
+    *,
+    trust_legacy: bool = True,
 ) -> Tuple[List[CopyInfo], bool]:
     main = _main_link_key(article)
     selected: dict[str, CopyInfo] = {}
@@ -487,7 +511,9 @@ def _other_copies(
         index: Mapping[str, LinkDecision],
     ) -> None:
         nonlocal has_open
-        copy = _copy_from_location(row, loc, status, index)
+        copy = _copy_from_location(
+            row, loc, status, index, trust_legacy=trust_legacy,
+        )
         if copy is None:
             return
         if copy.open_listed:
@@ -579,6 +605,8 @@ def _copy_from_location(
     loc: Mapping[str, Any],
     status: str,
     index: Mapping[str, LinkDecision],
+    *,
+    trust_legacy: bool = True,
 ) -> Optional[CopyInfo]:
     url = _http_url(loc.get("url"))
     key = evidence_url_key(url) if url else None
@@ -604,7 +632,7 @@ def _copy_from_location(
             and not licensed
         ):
             return None
-    elif status == EVIDENCE_ABSENT and is_never_merged(row):
+    elif status == EVIDENCE_ABSENT and _use_legacy_access(row, trust_legacy):
         if _is_crossref_link(via, source_id) and not licensed:
             return None
         open_listed = _legacy_copy_is_open(row, loc, url)

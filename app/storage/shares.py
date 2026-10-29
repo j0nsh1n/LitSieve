@@ -48,6 +48,23 @@ MAX_MAX_USES = 10_000
 # another student's Collect inputs or Search questions.
 CLONE_TABLES = frozenset({"articles", "embeddings", "screening", "key_points", "notes", "clusters"})
 
+
+def library_is_clone(
+    user_id: str, library_id: str, *, user_db: Any = None,
+) -> bool:
+    """True when this library was created by redeeming a share.
+
+    A lookup error counts as a clone so access stays closed.
+    """
+    try:
+        db = user_db
+        if db is None:
+            from app import core
+            db = core.user_db
+        return bool(db.library_was_cloned(user_id, library_id))
+    except Exception:
+        return True
+
 def generate_share_code() -> str:
     """Return an unguessable XXXX-YYYY classroom code."""
     raw = "".join(secrets.choice(_CODE_ALPHABET) for _ in range(8))

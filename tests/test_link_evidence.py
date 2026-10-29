@@ -14,6 +14,7 @@ from app.services.access import (
     OPEN_LISTED,
     access_state,
     link_access,
+    other_copies_payload,
     other_copies_result,
 )
 from app.services.link_evidence import (
@@ -25,8 +26,11 @@ from app.services.link_evidence import (
     merge_link_evidence,
     serialize_link_evidence,
 )
+from app.services.pipeline import LiteratureSearchPipeline
 from app.storage import dbconn
 from app.storage.database import ArticleDatabase
+from app.storage.shares import generate_share_code, library_is_clone
+from app.storage.user_db import UserDatabase
 
 if os.environ.get("CI"):
     import sqlcipher3 as sqlcipher  # noqa: F401
@@ -427,19 +431,244 @@ def test_missing_evidence_is_not_open():
     assert "missing_evidence" in link_access(None, "https://example.org/a").reasons
 
 
-def test_clone_drops_extra_never_merged_still_uses_legacy(monkeypatch, tmp_path):
+PUBMED_CLOSED = "https://example.org/pubmed-closed"
+OPENALEX_OPEN = "https://example.org/openalex-open"
+NEVER_MERGED_OPEN = "https://example.org/oa.pdf"
+
+
+def _access_row(db, article_id=None, source=None):
+    fields = db.get_article_access_fields()
+    if article_id is None:
+        key = next(iter(fields))
+    else:
+        key = (article_id, source)
+    row = dict(fields[key])
+    row["article_id"] = key[0]
+    row["source"] = key[1]
+    return row
+
+
+def _redeem(udb, owner_id, owner_lib, student_id, student_lib):
+    share = udb.create_share(
+        owner_user_id=owner_id,
+        owner_library_id=owner_lib,
+        title_snapshot="Clone",
+        code=generate_share_code(),
+    )
+    udb.record_redemption(share["id"], student_id, student_lib)
+    return share
+
+
+def _assert_no_open(row, *, trust_legacy, closed_url=None):
+    card = access_state(row, trust_legacy=trust_legacy)
+    copies = other_copies_result(row, trust_legacy=trust_legacy)
+    payload = other_copies_payload(
+        {(str(row.get("article_id") or "id"), str(row.get("source") or "src")): row},
+        trust_legacy=trust_legacy,
+    )
+    assert card.state != OPEN_LISTED
+    assert card.url is None
+    assert copies.has_open_copy is False
+    assert not any(item.open_listed for item in copies.copies)
+    assert not any(item.get("has_open_copy") for item in payload)
+    if closed_url:
+        assert card.url != closed_url
+        assert not any(
+            item.url == closed_url and item.open_listed for item in copies.copies
+        )
+
+
+def test_never_merged_without_extra_still_uses_legacy_in_non_clone(monkeypatch, tmp_path):
     monkeypatch.delenv(dbconn.ENV_KEY, raising=False)
-    db = ArticleDatabase(str(tmp_path / "clone.db"))
+    db = ArticleDatabase(str(tmp_path / "owner.db"))
     try:
         db.insert_articles([_paper(
             "W1", "openalex", oa_status="gold",
-            best_oa_url="https://example.org/oa.pdf",
+            best_oa_url=NEVER_MERGED_OPEN,
         )])
         db.conn.execute("DELETE FROM article_extra")
         db.conn.commit()
         row = db.get_all_articles()[0]
         assert is_never_merged(row) is True
         assert access_state(row).state == OPEN_LISTED
+        assert access_state(row).url == NEVER_MERGED_OPEN
+    finally:
+        db.close()
+
+
+def test_cloned_merged_row_pubmed_url_never_open(monkeypatch, tmp_path):
+    monkeypatch.delenv(dbconn.ENV_KEY, raising=False)
+    from app.storage import shares as shares_mod
+
+    owner_path = tmp_path / "owner" / "articles.db"
+    clone_path = tmp_path / "clone" / "articles.db"
+    owner_path.parent.mkdir(parents=True)
+    udb = UserDatabase(db_path=str(tmp_path / "users.db"))
+    owner = udb.create_user("owner", "hash")
+    student = udb.create_user("student", "hash")
+    monkeypatch.setattr(
+        shares_mod,
+        "library_db_path",
+        lambda user, library: owner_path if user == owner["id"] else clone_path,
+    )
+    db = ArticleDatabase(str(owner_path))
+    try:
+        db.insert_articles([_paper(
+            "123", "pubmed", best_oa_url=PUBMED_CLOSED,
+        )])
+        db.insert_articles([_paper(
+            "W1", "openalex", oa_status="gold", best_oa_url=OPENALEX_OPEN,
+        )])
+        owner_row = _access_row(db, "123", "pubmed")
+        card = access_state(owner_row)
+        copies = other_copies_result(owner_row)
+        assert card.state == OPEN_LISTED
+        assert card.url == OPENALEX_OPEN
+        by_url = {item.url: item.open_listed for item in copies.copies}
+        assert by_url.get(PUBMED_CLOSED) is False
+        assert copies.has_open_copy is True
+    finally:
+        db.close()
+
+    shares_mod.clone_library_data(owner["id"], "lib", student["id"], "cloned")
+    _redeem(udb, owner["id"], "lib", student["id"], "cloned")
+    trust = not library_is_clone(student["id"], "cloned", user_db=udb)
+    assert trust is False
+    clone_db = ArticleDatabase(str(clone_path))
+    try:
+        extras = clone_db.conn.execute(
+            "SELECT COUNT(*) FROM article_extra"
+        ).fetchone()[0]
+        assert extras == 0
+        row = _access_row(clone_db, "123", "pubmed")
+        assert row["oa_status"] == "gold"
+        assert row["best_oa_url"] == PUBMED_CLOSED
+        assert is_never_merged(row) is True
+        _assert_no_open(row, trust_legacy=trust, closed_url=PUBMED_CLOSED)
+        pipe = LiteratureSearchPipeline(db_path=str(clone_path))
+        try:
+            pipe._lra_user_id = student["id"]
+            pipe._lra_library_id = "cloned"
+            from app import core
+            monkeypatch.setattr(core, "user_db", udb)
+            assert pipe.trust_legacy_access() is False
+            articles = [{"article_id": "123", "source": "pubmed"}]
+            pipe._attach_access(articles)
+            assert articles[0]["access"]["state"] != OPEN_LISTED
+            assert "url" not in articles[0]["access"]
+        finally:
+            pipe.close()
+    finally:
+        clone_db.close()
+
+
+def test_cloned_never_merged_row_opens_after_clone_fetch(monkeypatch, tmp_path):
+    monkeypatch.delenv(dbconn.ENV_KEY, raising=False)
+    from app.storage import shares as shares_mod
+
+    owner_path = tmp_path / "owner" / "articles.db"
+    clone_path = tmp_path / "clone" / "articles.db"
+    owner_path.parent.mkdir(parents=True)
+    udb = UserDatabase(db_path=str(tmp_path / "users.db"))
+    owner = udb.create_user("owner", "hash")
+    student = udb.create_user("student", "hash")
+    monkeypatch.setattr(
+        shares_mod,
+        "library_db_path",
+        lambda user, library: owner_path if user == owner["id"] else clone_path,
+    )
+    db = ArticleDatabase(str(owner_path))
+    try:
+        db.insert_articles([_paper(
+            "W1", "openalex", oa_status="gold", best_oa_url=NEVER_MERGED_OPEN,
+        )])
+        owner_row = _access_row(db, "W1", "openalex")
+        assert access_state(owner_row).state == OPEN_LISTED
+        assert access_state(owner_row).url == NEVER_MERGED_OPEN
+    finally:
+        db.close()
+
+    shares_mod.clone_library_data(owner["id"], "lib", student["id"], "cloned")
+    _redeem(udb, owner["id"], "lib", student["id"], "cloned")
+    trust = not library_is_clone(student["id"], "cloned", user_db=udb)
+    clone_db = ArticleDatabase(str(clone_path))
+    try:
+        row = _access_row(clone_db, "W1", "openalex")
+        assert is_never_merged(row) is True
+        _assert_no_open(row, trust_legacy=trust, closed_url=NEVER_MERGED_OPEN)
+        clone_db.insert_articles([_paper(
+            "W1", "openalex", oa_status="gold", best_oa_url=NEVER_MERGED_OPEN,
+            _observed_at="2026-10-29T12:00:00.000000Z",
+        )])
+        fetched = _access_row(clone_db, "W1", "openalex")
+        card = access_state(fetched, trust_legacy=trust)
+        copies = other_copies_result(fetched, trust_legacy=trust)
+        assert card.state == OPEN_LISTED
+        assert card.url == NEVER_MERGED_OPEN
+        p28_eligible = card.state != OPEN_LISTED and not copies.has_open_copy
+        assert p28_eligible is False
+    finally:
+        clone_db.close()
+
+
+def test_redemption_alone_treats_library_as_clone(monkeypatch, tmp_path):
+    monkeypatch.delenv(dbconn.ENV_KEY, raising=False)
+    udb = UserDatabase(db_path=str(tmp_path / "users.db"))
+    owner = udb.create_user("owner", "hash")
+    student = udb.create_user("student", "hash")
+    _redeem(udb, owner["id"], "lib", student["id"], "old-clone")
+    db = ArticleDatabase(str(tmp_path / "old-clone.db"))
+    try:
+        db.insert_articles([_paper(
+            "W1", "openalex", oa_status="gold", best_oa_url=NEVER_MERGED_OPEN,
+        )])
+        db.conn.execute("DELETE FROM article_extra")
+        db.conn.commit()
+        row = _access_row(db, "W1", "openalex")
+        assert library_is_clone(student["id"], "old-clone", user_db=udb) is True
+        trust = not library_is_clone(student["id"], "old-clone", user_db=udb)
+        _assert_no_open(row, trust_legacy=trust, closed_url=NEVER_MERGED_OPEN)
+    finally:
+        db.close()
+
+
+def test_clone_lookup_error_means_not_open(monkeypatch, tmp_path):
+    monkeypatch.delenv(dbconn.ENV_KEY, raising=False)
+
+    class Boom:
+        def library_was_cloned(self, *_args, **_kwargs):
+            raise RuntimeError("redemptions unavailable")
+
+    assert library_is_clone("u", "l", user_db=Boom()) is True
+    db = ArticleDatabase(str(tmp_path / "lib.db"))
+    try:
+        db.insert_articles([_paper(
+            "W1", "openalex", oa_status="gold", best_oa_url=NEVER_MERGED_OPEN,
+        )])
+        db.conn.execute("DELETE FROM article_extra")
+        db.conn.commit()
+        row = _access_row(db, "W1", "openalex")
+        trust = not library_is_clone("u", "l", user_db=Boom())
+        _assert_no_open(row, trust_legacy=trust, closed_url=NEVER_MERGED_OPEN)
+    finally:
+        db.close()
+
+
+def test_non_clone_library_still_trusts_never_merged(monkeypatch, tmp_path):
+    monkeypatch.delenv(dbconn.ENV_KEY, raising=False)
+    udb = UserDatabase(db_path=str(tmp_path / "users.db"))
+    owner = udb.create_user("owner", "hash")
+    assert library_is_clone(owner["id"], "lib", user_db=udb) is False
+    db = ArticleDatabase(str(tmp_path / "owner.db"))
+    try:
+        db.insert_articles([_paper(
+            "W1", "openalex", oa_status="gold", best_oa_url=NEVER_MERGED_OPEN,
+        )])
+        row = _access_row(db, "W1", "openalex")
+        trust = not library_is_clone(owner["id"], "lib", user_db=udb)
+        card = access_state(row, trust_legacy=trust)
+        assert card.state == OPEN_LISTED
+        assert card.url == NEVER_MERGED_OPEN
     finally:
         db.close()
 

@@ -218,7 +218,9 @@ async def api_other_copies(req: OtherCopiesRequest, request: Request):
                     seen_doi.add(doi)
                     dois.append(doi)
         peers = p.db.get_copy_fields_for_dois(dois)
-        return {"articles": other_copies_payload(starred, peers)}
+        return {"articles": other_copies_payload(
+            starred, peers, trust_legacy=p.trust_legacy_access(),
+        )}
     except Exception as e:
         return server_error()
     finally:

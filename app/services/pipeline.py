@@ -29,7 +29,13 @@ from app.fetchers.plos import PLOSFetcher
 from app.fetchers.pubmed import PubMedFetcher
 from app.fetchers.semanticscholar import SemanticScholarFetcher
 from app.fetchers.zenodo import ZenodoFetcher
-from app.services.access import OPEN_LISTED, access_public_dict, access_state
+from app.services.access import (
+    NONE_LISTED,
+    OPEN_LISTED,
+    access_public_dict,
+    access_state,
+    other_copies_result,
+)
 from app.services.clustering import (
     NOISE_CLUSTER_ID,
     NOISE_CLUSTER_LABEL,
@@ -47,6 +53,7 @@ from app.storage.database import (
     ArticleDatabase,
     omit_null_metadata,
 )
+from app.storage.shares import library_is_clone
 from app.utils import parse_year
 
 
@@ -120,6 +127,21 @@ class LiteratureSearchPipeline:
         self._cached_emb_ids = None
         self._cached_emb_matrix = None
         self._cached_emb_gen = -1
+        self._trust_legacy_cached: Optional[bool] = None
+
+    def trust_legacy_access(self) -> bool:
+        """False in a cloned library. One lookup, cached for this pipeline."""
+        cached = self._trust_legacy_cached
+        if cached is not None:
+            return cached
+        user_id = getattr(self, "_lra_user_id", None)
+        library_id = getattr(self, "_lra_library_id", None)
+        if not user_id or not library_id:
+            self._trust_legacy_cached = True
+            return True
+        value = not library_is_clone(str(user_id), str(library_id))
+        self._trust_legacy_cached = value
+        return value
 
     def invalidate_corpus_cache(self) -> None:
         """Drop the embeddings matrix cache (call after corpus mutations)."""
@@ -656,9 +678,13 @@ class LiteratureSearchPipeline:
 
         if free_to_read:
             stored_access = self.db.get_article_access_fields()
+            trust_legacy = self.trust_legacy_access()
             keep = [
                 i for i, key in enumerate(article_ids)
-                if access_state(stored_access.get(key) or {"source": key[1]}).state
+                if access_state(
+                    stored_access.get(key) or {"source": key[1]},
+                    trust_legacy=trust_legacy,
+                ).state
                 == OPEN_LISTED
             ]
             if not keep:
@@ -720,10 +746,11 @@ class LiteratureSearchPipeline:
             return
         keys = [(article["article_id"], article["source"]) for article in articles]
         stored = self.db.get_access_fields_for_keys(keys)
+        trust_legacy = self.trust_legacy_access()
         for article in articles:
             key = (article["article_id"], article["source"])
             fields = stored.get(key) or {"source": article.get("source")}
-            info = access_state(fields)
+            info = access_state(fields, trust_legacy=trust_legacy)
             article["access"] = access_public_dict(info)
 
     def _hybrid_rerank(
@@ -1188,7 +1215,6 @@ class LiteratureSearchPipeline:
         work_type_filter: Optional[List[str]] = None,
     ) -> List[Dict]:
         """Open copies of nearby papers when a starred card has none."""
-        from app.services.access import NONE_LISTED, other_copies_result
         from app.services.different_work import (
             MIN_SIMILARITY,
             SUGGESTION_LIMIT,
@@ -1202,6 +1228,7 @@ class LiteratureSearchPipeline:
 
         if not keys:
             return []
+        trust_legacy = self.trust_legacy_access()
         starred = self.db.get_starred_copy_fields(keys)
         dois: List[str] = []
         seen_doi: set = set()
@@ -1236,11 +1263,13 @@ class LiteratureSearchPipeline:
             ):
                 if raw.get(field) is not None:
                     article[field] = raw[field]
-            if access_state(article).state != NONE_LISTED:
+            if access_state(article, trust_legacy=trust_legacy).state != NONE_LISTED:
                 continue
             doi = work_doi(article.get("doi"))
             peer_rows = list(peers_by_doi.get(doi, [])) if doi else []
-            if other_copies_result(article, peer_rows).has_open_copy:
+            if other_copies_result(
+                article, peer_rows, trust_legacy=trust_legacy,
+            ).has_open_copy:
                 continue
             idx = id_to_idx.get(key)
             if idx is None:
