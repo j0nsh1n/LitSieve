@@ -102,10 +102,8 @@ After a detached deploy from **Ship** finishes, check its receipt and history.
 
 ## Optional: Laya sidecar
 
-Laya is a small local typed-decision model. LitSieve uses it only as a switch:
-picking a study-type tag when the wording patterns are unsure, and picking the
-topic areas from the typed topic while collecting (shown as one line with Change). It never ranks search results (on the sample
-library it ranked worse than the current embeddings + word-match blend).
+Laya is a small local typed-decision model. LitSieve uses it for study-type tags
+and topic areas. An optional relevance checkpoint can also adjust search ranking.
 
 It runs as its own service from Laya's interpreter, so LitSieve's venv never
 imports torch for it, and a crash cannot take the site down. LitSieve calls it
@@ -125,7 +123,17 @@ echo 'LITSIEVE_LAYA_URL=http://127.0.0.1:7880' >> .env
 systemctl --user restart litsieve-uvicorn.service
 ```
 
-Turn it off by removing `LITSIEVE_LAYA_URL` from `.env` and restarting the app.
+Search reranking is off by default. To try it in staging, start the worker with
+`--relevance-checkpoint /path/to/checkpoint` and set `LITSIEVE_LAYA_RERANK=true`
+with `LITSIEVE_LAYA_URL` in the app environment. The checkpoint must contain a
+`questions.json` group with an `answers` criterion. Similarity search adds
+0.045 times its answer probability to the displayed similarity score. The
+client allows 1.2 seconds for a response; a cold load can fall back to the
+original ranking while the worker loads. Get owner approval after staging before
+turning this on in production. Set `LITSIEVE_LAYA_RERANK=false` and restart the
+app to turn reranking off without disabling the other Laya features.
+
+Turn all Laya features off by removing `LITSIEVE_LAYA_URL` from `.env` and restarting the app.
 To keep it loaded instead, drop `--idle-exit 300` from the service's `ExecStart`.
 
 ## Cloudflare Tunnel

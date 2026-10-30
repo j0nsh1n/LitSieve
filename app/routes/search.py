@@ -1,6 +1,7 @@
 """Semantic search (text / PICO / seed / starred) plus per-article notes."""
 
 import logging
+import os
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
@@ -23,10 +24,12 @@ from app.schemas import (
     SeedSearchRequest,
     StarredSearchRequest,
 )
+from app.services import laya_client
 from app.services.access import other_copies_payload
 from app.services.enrich import (
     enrich_search_results,
 )
+from app.services.pipeline import LAYA_POOL_FLOOR, rerank_relevance
 from app.services.work_types import normalize_doi
 from app.storage import quota
 from app.storage.dbconn import integrity_errors
@@ -50,15 +53,24 @@ async def api_search(req: SearchRequest, request: Request):
     uid = user["user_id"]
     p = get_pipeline(uid)
     try:
+        rerank = (os.environ.get("LITSIEVE_LAYA_RERANK", "").lower() in ("1", "true", "yes", "on")
+                  and laya_client.enabled() and req.sort_by == "similarity" and bool(req.query_text.strip()))
+        search_args = dict(source_filter=req.source_filter, cluster_filter=req.cluster_filter,
+                           year_min=req.year_min, year_max=req.year_max, lexical_boost=req.lexical_boost,
+                           work_type_filter=req.work_type_filter, free_to_read=req.free_to_read)
         results = await run_in_thread(
             p.search_similar, req.query_text,
-            top_k=req.top_k, source_filter=req.source_filter,
-            cluster_filter=req.cluster_filter,
-            year_min=req.year_min, year_max=req.year_max,
-            lexical_boost=req.lexical_boost,
-            work_type_filter=req.work_type_filter,
-            free_to_read=req.free_to_read,
+            top_k=max(LAYA_POOL_FLOOR, req.top_k) if rerank else req.top_k,
+            **search_args,
         )
+        if rerank and results:
+            papers = [{"title": a.get("title") or "", "abstract": a.get("abstract") or ""} for a in results]
+            probabilities = await run_in_thread(laya_client.relevance, req.query_text, papers)
+            if probabilities is None and req.top_k < LAYA_POOL_FLOOR:
+                results = await run_in_thread(p.search_similar, req.query_text, top_k=req.top_k, **search_args)
+            elif probabilities is not None:
+                rerank_relevance(results, probabilities)
+            results = results[:req.top_k]
         await run_in_thread(
             enrich_search_results,
             results, p, query_text=req.query_text, pico_boost=req.pico_boost,
