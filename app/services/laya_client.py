@@ -2,8 +2,8 @@
 
 Laya is a small typed-decision model: given a text and a fixed set of options it
 picks one, with a probability. LitSieve uses it as a switch at points where the
-code already owns every branch (study-type tags, topic areas) and never for
-ranking. Everything here fails closed: when LITSIEVE_LAYA_URL is unset, the
+code already owns every branch (study-type tags, topic areas). An optional
+checkpoint can also adjust search ranking. Everything here fails closed: when LITSIEVE_LAYA_URL is unset, the
 worker is down or slow, or the answer is malformed, calls return None and the
 caller keeps today's behaviour.
 """
@@ -106,6 +106,36 @@ def choice(instructions: str, options: Dict[str, str], states: List[str]) -> Opt
         clean.append({"choice": pick, "p": float(p),
                       "probabilities": {k: float(v) for k, v in probs.items() if k in options and isinstance(v, (int, float))}})
     return clean
+
+
+def relevance(question: str, papers: List[dict]) -> Optional[List[float]]:
+    """Return one probability per paper, or None when the sidecar fails."""
+    url = base_url()
+    if not url or not papers or _cooling_down():
+        return None
+    try:
+        # 50 warm papers take about 0.5 s; 1.2 s leaves headroom while a cold
+        # checkpoint load falls back and completes in the worker for next time.
+        resp = requests.post(f"{url}/v1/relevance", json={"question": question, "papers": papers}, timeout=TIMEOUT)
+        resp.raise_for_status()
+        data = resp.json()
+    except (requests.RequestException, ValueError) as exc:
+        _mark_down(type(exc).__name__)
+        if isinstance(exc, requests.RequestException):
+            wake()
+        return None
+    results = data.get("results") if isinstance(data, dict) else None
+    if not isinstance(results, list) or len(results) != len(papers):
+        _mark_down("malformed response")
+        return None
+    values = []
+    for row in results:
+        value = row.get("p_answers") if isinstance(row, dict) else None
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or not 0 <= value <= 1:
+            _mark_down("malformed answer")
+            return None
+        values.append(float(value))
+    return values
 
 
 def _reset_for_tests() -> None:

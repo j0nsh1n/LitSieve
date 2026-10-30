@@ -292,21 +292,7 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-29. Branch `feat/laya-local-checkpoint` (PR #132).
-  `tools/eval_laya_groups.py` gains `run-ft`, `predict-local`, and
-  `score-ft-test`. `run-ft` shells out to the Laya 0.4.17 interpreter and
-  does not call port 7880. `score-ft-test` reads the benchmark test split
-  once. Search ranking is unchanged.
-- Phase 2 is merged and deployed at `fd15238` (#120–#131). The Laya sidecar
-  runs on the 0.4.17 venv through a systemd drop-in; PR #131 keeps it on the
-  English checkpoint.
-- Fine-tuned checkpoints `litsieve-relevance-v1`, `v2`, and `v3-binary` live
-  in `~/.local/share/laya-ft/`. None is registered with the production
-  router. The leading candidate is v3-binary as a soft boost (today's score +
-  0.045 × P(answers)); its final check is a one-time score on held-out set 2
-  (H11–H20). Reports: `~/HealthDatabaseAccess-scratch/bench/p25c`–`p25g`.
-- Open items remain the optional source keys, the bare litpilot.org DNS
-  record, and the unscheduled roadmap backlog. Labels live in
-  `~/HealthDatabaseAccess-scratch/bench/labels_final*/` and are not in git.
-- **Next step:** act on the held-out set 2 verdict. Do not connect any
-  checkpoint to production without the owner's approval.
+- **Date:** 2026-10-29. Branch `feat/laya-rerank` adds optional checkpoint-based
+  relevance reranking for query similarity search. It is off by default.
+- Holdout 2 leak-free nDCG@10 was 0.7150 with reranking and 0.6854 before it.
+- Next step: stage the feature and obtain owner approval before production use.

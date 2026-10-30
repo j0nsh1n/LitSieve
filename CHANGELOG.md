@@ -52,6 +52,7 @@ and this project aims to follow Semantic Versioning for app version strings
 
 
 ### Added
+- Optional local Laya relevance reranking for similarity searches, off by default.
 - `tools/eval_laya_groups.py` can score a local Laya checkpoint on the dev
   split with `run-ft`, and score that saved choice on the test split once
   with `score-ft-test`. `run-ft` does not call the production sidecar.

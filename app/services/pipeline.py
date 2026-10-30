@@ -70,6 +70,14 @@ def group_undated_last(results: List[Dict]) -> None:
 # Hybrid rank: meaning first, exact words second (both cosine, 0-1).
 SEMANTIC_WEIGHT = 0.7
 LEXICAL_WEIGHT = 0.3
+LAYA_RELEVANCE_WEIGHT = 0.045
+LAYA_POOL_FLOOR = 30
+
+
+def rerank_relevance(results: List[Dict], probabilities: List[float]) -> None:
+    for article, probability in zip(results, probabilities):
+        article["similarity_score"] = float(article["similarity_score"]) + LAYA_RELEVANCE_WEIGHT * probability
+    results.sort(key=lambda a: (not a.get("no_year"), a["similarity_score"]), reverse=True)
 
 FETCHERS = {
     'pubmed': PubMedFetcher,

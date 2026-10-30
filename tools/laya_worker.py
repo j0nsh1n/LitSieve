@@ -24,6 +24,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import socket
 import threading
 import time
@@ -37,6 +38,9 @@ MAX_OPTIONS = 16          # Laya's choice heads are calibrated up to 10; 13 topi
 MAX_TEXT = 4000           # characters per text; Laya truncates to its own token budget anyway
 
 _router = None
+_relevance_agent = None
+_relevance_checkpoint = None
+_relevance_questions = None
 _lock = threading.Lock()  # one model, one GPU: decisions run one batch at a time
 _device = "unloaded"
 SD_LISTEN_FD = 3          # systemd hands the first activated socket over as fd 3
@@ -98,6 +102,45 @@ def choice(instructions: str, options: dict, states: list, state_key: str = "tex
     return out
 
 
+def configure_relevance(path: str) -> None:
+    global _relevance_checkpoint, _relevance_questions
+    with open(os.path.join(path, "questions.json"), encoding="utf-8") as f:
+        questions = json.load(f)
+    group = questions.get("group", {})
+    if not isinstance(group, dict) or "answers" not in group.get("criteria", {}):
+        raise ValueError("relevance checkpoint group must have an answers criterion")
+    _relevance_checkpoint = path
+    _relevance_questions = {"group": group}
+
+
+def relevance(question: str, papers: list) -> list:
+    global _relevance_agent
+    states = []
+    for paper in papers:
+        title = " ".join(paper["title"].split()) or "(no title)"
+        abstract = " ".join(paper["abstract"].split())
+        lead = " ".join(re.split(r"(?<=[.!?])\s+", abstract)[:2])
+        states.append(f"Question: {question.strip()}\nTitle: {title}\nAbstract: {lead}"[:MAX_TEXT])
+    with _lock:
+        if _relevance_agent is None:
+            from laya import load
+            _relevance_agent = load(_relevance_checkpoint)
+        rows = _relevance_agent.predict_batch(states, _relevance_questions, batch_size=len(states))
+    return [{"p_answers": float(row["answers"]["group"]["probabilities"]["answers"])} for row in rows]
+
+
+def validate_relevance(body: dict) -> str | None:
+    if not isinstance(body.get("question"), str) or not body["question"].strip():
+        return "question must be a non-empty string"
+    papers = body.get("papers")
+    if not isinstance(papers, list) or not 1 <= len(papers) <= MAX_STATES:
+        return f"papers must contain 1-{MAX_STATES} items"
+    if not all(isinstance(p, dict) and isinstance(p.get("title"), str)
+               and isinstance(p.get("abstract"), str) for p in papers):
+        return "each paper must have string title and abstract"
+    return None
+
+
 def validate(body: dict) -> str | None:
     if not isinstance(body.get("instructions"), str) or not body["instructions"].strip():
         return "instructions must be a non-empty string"
@@ -134,12 +177,14 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/health":
-            self._send(200, {"ok": True, "loaded": _router is not None, "device": _device})
+            self._send(200, {"ok": True, "loaded": _router is not None, "device": _device,
+                             "relevance_configured": _relevance_checkpoint is not None,
+                             "relevance_loaded": _relevance_agent is not None})
         else:
             self._send(404, {"error": "not found"})
 
     def do_POST(self):
-        if self.path != "/v1/choice":
+        if self.path not in ("/v1/choice", "/v1/relevance"):
             return self._send(404, {"error": "not found"})
         n = int(self.headers.get("Content-Length") or 0)
         if n <= 0 or n > MAX_BODY:
@@ -148,12 +193,18 @@ class Handler(BaseHTTPRequestHandler):
             body = json.loads(self.rfile.read(n))
         except ValueError:
             return self._send(400, {"error": "invalid JSON"})
-        err = validate(body if isinstance(body, dict) else {})
+        body = body if isinstance(body, dict) else {}
+        if self.path == "/v1/relevance" and _relevance_checkpoint is None:
+            return self._send(404, {"error": "relevance not configured"})
+        err = (validate_relevance(body) if self.path == "/v1/relevance" else validate(body))
         if err:
             return self._send(400, {"error": err})
         t = time.time()
         try:
-            results = choice(body["instructions"], body["options"], body["states"], body.get("state_key") or "text")
+            if self.path == "/v1/relevance":
+                results = relevance(body["question"], body["papers"])
+            else:
+                results = choice(body["instructions"], body["options"], body["states"], body.get("state_key") or "text")
         except Exception as exc:  # report, never crash the worker
             return self._send(500, {"error": f"{type(exc).__name__}: {exc}"[:300]})
         self._send(200, {"results": results, "ms": round((time.time() - t) * 1000, 1)})
@@ -175,7 +226,10 @@ def main():
     ap.add_argument("--no-preload", action="store_true", help="load the model on the first request")
     ap.add_argument("--idle-exit", type=float, default=0, metavar="SECONDS",
                     help="when socket-activated, exit after this long without a request (0: never)")
+    ap.add_argument("--relevance-checkpoint", metavar="PATH")
     args = ap.parse_args()
+    if args.relevance_checkpoint:
+        configure_relevance(args.relevance_checkpoint)
     if not args.no_preload:
         router()
     activated = socket_activated()
