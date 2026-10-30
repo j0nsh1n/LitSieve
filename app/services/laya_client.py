@@ -29,7 +29,8 @@ WAKE_EVERY_SECONDS = 60.0
 WAKE_TIMEOUT = (0.25, 15.0)
 
 _state_lock = threading.Lock()
-_down_until = 0.0
+# Separate cooldowns: a slow relevance checkpoint must not switch off tags and topic areas.
+_down_until = {"choice": 0.0, "relevance": 0.0}
 _woken_at = float("-inf")
 
 
@@ -41,16 +42,15 @@ def enabled() -> bool:
     return bool(base_url())
 
 
-def _mark_down(reason: str) -> None:
-    global _down_until
+def _mark_down(reason: str, kind: str = "choice") -> None:
     with _state_lock:
-        _down_until = time.monotonic() + COOLDOWN_SECONDS
-    logger.warning("Laya unavailable (%s); falling back for %.0fs", reason, COOLDOWN_SECONDS)
+        _down_until[kind] = time.monotonic() + COOLDOWN_SECONDS
+    logger.warning("Laya %s unavailable (%s); falling back for %.0fs", kind, reason, COOLDOWN_SECONDS)
 
 
-def _cooling_down() -> bool:
+def _cooling_down(kind: str = "choice") -> bool:
     with _state_lock:
-        return time.monotonic() < _down_until
+        return time.monotonic() < _down_until[kind]
 
 
 def wake() -> None:
@@ -111,7 +111,7 @@ def choice(instructions: str, options: Dict[str, str], states: List[str]) -> Opt
 def relevance(question: str, papers: List[dict]) -> Optional[List[float]]:
     """Return one probability per paper, or None when the sidecar fails."""
     url = base_url()
-    if not url or not papers or _cooling_down():
+    if not url or not papers or _cooling_down("relevance"):
         return None
     try:
         # 50 warm papers take about 0.5 s; 1.2 s leaves headroom while a cold
@@ -120,26 +120,27 @@ def relevance(question: str, papers: List[dict]) -> Optional[List[float]]:
         resp.raise_for_status()
         data = resp.json()
     except (requests.RequestException, ValueError) as exc:
-        _mark_down(type(exc).__name__)
+        _mark_down(type(exc).__name__, "relevance")
         if isinstance(exc, requests.RequestException):
             wake()
         return None
     results = data.get("results") if isinstance(data, dict) else None
     if not isinstance(results, list) or len(results) != len(papers):
-        _mark_down("malformed response")
+        _mark_down("malformed response", "relevance")
         return None
     values = []
     for row in results:
         value = row.get("p_answers") if isinstance(row, dict) else None
         if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or not 0 <= value <= 1:
-            _mark_down("malformed answer")
+            _mark_down("malformed answer", "relevance")
             return None
         values.append(float(value))
     return values
 
 
 def _reset_for_tests() -> None:
-    global _down_until, _woken_at
+    global _woken_at
     with _state_lock:
-        _down_until = 0.0
+        for kind in _down_until:
+            _down_until[kind] = 0.0
         _woken_at = float("-inf")

@@ -160,3 +160,57 @@ def test_seed_search_does_not_call_relevance(monkeypatch):
     monkeypatch.setattr(laya_client, 'relevance', unexpected)
     result = asyncio.run(search.api_search_seed(SeedSearchRequest(seed='seed'), None))
     assert result['results'][0]['similarity_score'] == .5
+
+
+LONG = 'word ' * 1200
+
+
+@pytest.mark.parametrize('question,paper', [
+    ('Q?', {'title': '', 'abstract': 'Only one sentence.'}),
+    ('Q?', {'title': 'T', 'abstract': ''}),
+    ('Q?', {'title': 'T', 'abstract': 'Dr. Smith et al. found e.g. this. Then that? And more.'}),
+    ('Q?', {'title': 'T', 'abstract': LONG + 'end. Second. Third.'}),
+    (LONG + '?', {'title': LONG, 'abstract': 'A. B.'}),
+], ids=['no-title', 'no-abstract', 'abbreviations', 'long-abstract', 'long-question'])
+def test_worker_state_matches_eval_on_edge_cases(tmp_path, monkeypatch, question, paper):
+    questions = {'group': {'type': 'choice', 'criteria': {'answers': 'yes', 'not': 'no'}}}
+    (tmp_path / 'questions.json').write_text(json.dumps(questions))
+    seen = []
+
+    class Agent:
+        def predict_batch(self, states, q, batch_size):
+            seen.extend(states)
+            return [{'answers': {'group': {'probabilities': {'answers': .5}}}} for _ in states]
+
+    monkeypatch.setattr(laya_worker, '_relevance_agent', Agent())
+    laya_worker.configure_relevance(str(tmp_path))
+    laya_worker.relevance(question, [paper])
+    want = eval_laya_groups.group_state(question, paper['title'], eval_laya_groups.first_sentences(paper['abstract'], 2))
+    assert seen == [want]
+
+
+def test_relevance_failure_leaves_choice_working(monkeypatch):
+    laya_client._reset_for_tests()
+    monkeypatch.setenv('LITSIEVE_LAYA_URL', 'http://localhost:1234')
+    monkeypatch.setattr(laya_client, 'wake', lambda: None)
+    calls = []
+
+    class Response:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {'results': [{'choice': 'a', 'p': .9, 'probabilities': {'a': .9, 'b': .1}}]}
+
+    def post(url, **kwargs):
+        calls.append(url)
+        if url.endswith('/v1/relevance'):
+            raise requests.Timeout('cold')
+        return Response()
+
+    monkeypatch.setattr(laya_client.requests, 'post', post)
+    assert laya_client.relevance('q', [{'title': 't', 'abstract': 'a'}]) is None
+    assert laya_client.relevance('q', [{'title': 't', 'abstract': 'a'}]) is None
+    assert laya_client.choice('pick', {'a': 'A', 'b': 'B'}, ['text'])[0]['choice'] == 'a'
+    assert calls == ['http://localhost:1234/v1/relevance', 'http://localhost:1234/v1/choice']
+    laya_client._reset_for_tests()

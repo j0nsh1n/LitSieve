@@ -120,7 +120,8 @@ def relevance(question: str, papers: list) -> list:
         title = " ".join(paper["title"].split()) or "(no title)"
         abstract = " ".join(paper["abstract"].split())
         lead = " ".join(re.split(r"(?<=[.!?])\s+", abstract)[:2])
-        states.append(f"Question: {question.strip()}\nTitle: {title}\nAbstract: {lead}"[:MAX_TEXT])
+        # No MAX_TEXT cut: the checkpoint was scored on uncut states; MAX_BODY bounds the request.
+        states.append(f"Question: {question.strip()}\nTitle: {title}\nAbstract: {lead}")
     with _lock:
         if _relevance_agent is None:
             from laya import load
