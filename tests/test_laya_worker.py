@@ -130,6 +130,13 @@ def test_bad_requests_are_refused_before_the_model_loads(worker):
     assert _health(port)["loaded"] is False
 
 
+def test_health_reports_configured_tag_checkpoint_without_loading(worker):
+    port, proc = worker("--tag-checkpoint", "/checkpoint", activated=False)
+    health = _wait_up(port, proc)
+    assert health["tag_checkpoint"] == "/checkpoint"
+    assert health["loaded"] is False
+
+
 def _unit(name):
     cp = configparser.ConfigParser(strict=False, interpolation=None)
     cp.optionxform = str
@@ -175,3 +182,28 @@ def test_systemd_units_start_laya_on_demand_and_let_it_idle_out():
     assert "--idle-exit 300" in svc["Service"]["ExecStart"]
     assert svc["Unit"]["Requires"] == "litsieve-laya.socket"
     assert not svc.has_section("Install"), "an enabled service would load Laya at login and hold the memory"
+
+
+def test_tag_checkpoint_uses_panel_input_and_never_loads_router(monkeypatch):
+    spec = importlib.util.spec_from_file_location("laya_worker_tag_test", REPO / "tools" / "laya_worker.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    calls = []
+
+    class FakeAgent:
+        def predict_batch(self, states, questions, batch_size):
+            calls.append((states, questions, batch_size))
+            return [{"answers": {"pick": {"choice": "one", "probabilities": {"one": 0.87654, "two": 0.12346}}}}]
+
+    fake = types.ModuleType("laya")
+    fake.load = lambda path: calls.append(path) or FakeAgent()
+    monkeypatch.setitem(sys.modules, "laya", fake)
+    fake_torch = types.ModuleType("torch")
+    fake_torch.cuda = types.SimpleNamespace(is_available=lambda: False)
+    monkeypatch.setitem(sys.modules, "torch", fake_torch)
+    monkeypatch.setattr(mod, "router", lambda: pytest.fail("base router loaded"))
+    mod._tag_checkpoint = "/checkpoint"
+    result = mod.choice("Question?", {"one": "First", "two": "Second"}, ["a" * 4001], "other")
+    assert calls == ["/checkpoint", ([{"text": "a" * 4000}], {"pick": {"type": "choice", "instructions": "Question?", "criteria": {"one": "First", "two": "Second"}}}, 1)]
+    assert result == [{"choice": "one", "p": 0.8765, "probabilities": {"one": 0.8765, "two": 0.1235}}]
+    assert mod._device == "cpu"

@@ -8,6 +8,10 @@ and this project aims to follow Semantic Versioning for app version strings
 
 ## [Unreleased]
 
+### Added
+- The Laya worker can use a separate tag checkpoint. An optional study-type
+  backup can tag papers when Laya gives no answer. It is off by default.
+
 ### Fixed
 - A listed URL is open only when a stored observation from that source,
   written by a fetch, says so. Rows with no stored observations stay

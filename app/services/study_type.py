@@ -14,6 +14,8 @@ Default labels are plain-language for younger students, with a short
 from __future__ import annotations
 
 import hashlib
+import logging
+import os
 import re
 import threading
 from collections import OrderedDict
@@ -301,23 +303,27 @@ def _cache_key(a: dict) -> str:
     return hashlib.sha1(text.encode("utf-8", "ignore")).hexdigest()
 
 
-def refine_study_types_with_laya(articles: List[dict]) -> int:
+def refine_study_types_with_laya(articles: List[dict], embedding_engine=None) -> int:
     """After attach_study_types: ask Laya (one batch) about papers the patterns were unsure of.
 
-    Returns how many tags Laya changed. With Laya off or unavailable, nothing changes.
+    Return how many tags Laya or the optional backup changed.
     """
     from app.services import laya_client
 
-    if not laya_client.enabled():
+    laya_enabled = laya_client.enabled()
+    if not laya_enabled and not _backup_enabled():
         return 0
     unsure = [a for a in articles or []
               if float(a.get("study_type_confidence") or 0) < PATTERN_KEEP
               and len(f"{a.get('title') or ''}{a.get('abstract') or ''}") >= 80]
     if not unsure:
         return 0
+    if not laya_enabled:
+        return _refine_with_backup(unsure, embedding_engine)
     keys = [_cache_key(a) for a in unsure]
     with _cache_lock:
         missing = [(k, a) for k, a in zip(keys, unsure) if k not in _cache]
+    backup_changed = 0
     if missing:
         answers = laya_client.choice(
             "What kind of study is this paper?",
@@ -325,33 +331,66 @@ def refine_study_types_with_laya(articles: List[dict]) -> int:
             [f"{a.get('title') or ''}. {a.get('abstract') or ''}" for _, a in missing],
         )
         if answers is None:
-            return 0  # do not cache failures; try again on a later search
-        with _cache_lock:
-            for (k, _), ans in zip(missing, answers):
-                _cache[k] = (ans["choice"], ans["p"]) if ans["p"] >= LAYA_MIN_P else None
-                _cache.move_to_end(k)
-            while len(_cache) > _CACHE_MAX:
-                _cache.popitem(last=False)
-    changed = 0
+            if not _backup_enabled():
+                return 0
+            backup_changed = _refine_with_backup([a for _, a in missing], embedding_engine)
+        else:
+            with _cache_lock:
+                for (k, _), ans in zip(missing, answers):
+                    _cache[k] = (ans["choice"], ans["p"]) if ans["p"] >= LAYA_MIN_P else None
+                    _cache.move_to_end(k)
+                while len(_cache) > _CACHE_MAX:
+                    _cache.popitem(last=False)
+    changed = backup_changed
     for k, a in zip(keys, unsure):
         with _cache_lock:
             hit = _cache.get(k)
         if not hit:
             continue
         type_id, p = hit
-        info = _result(type_id, p, None)
-        a["study_type"] = info["study_type"]
-        a["study_type_label"] = info["study_type_label"]
-        a["study_type_label_formal"] = info["study_type_label_formal"]
-        a["study_type_meaning"] = info["study_type_meaning"]
-        a["study_type_confidence"] = info["confidence"]
-        a["study_type_confidence_band"] = info["confidence_band"]
-        a["study_type_matched"] = None
-        a["study_type_warning"] = info["warning"]
-        a["study_type_disclaimer"] = info["disclaimer"]
-        a["study_type_source"] = "laya"
+        _apply_model_result(a, type_id, p, "laya")
         changed += 1
     return changed
+
+
+def _apply_model_result(a: dict, type_id: str, p: float, source: str) -> None:
+    info = _result(type_id, p, None)
+    a["study_type"] = info["study_type"]
+    a["study_type_label"] = info["study_type_label"]
+    a["study_type_label_formal"] = info["study_type_label_formal"]
+    a["study_type_meaning"] = info["study_type_meaning"]
+    a["study_type_confidence"] = info["confidence"]
+    a["study_type_confidence_band"] = info["confidence_band"]
+    a["study_type_matched"] = None
+    a["study_type_warning"] = info["warning"]
+    a["study_type_disclaimer"] = info["disclaimer"]
+    a["study_type_source"] = source
+
+
+def _backup_enabled() -> bool:
+    return os.getenv("LITSIEVE_STUDY_BACKUP", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _refine_with_backup(articles: List[dict], engine) -> int:
+    if not _backup_enabled():
+        return 0
+    try:
+        from app.services.study_backup import classify
+        model = None
+        if (engine is not None and engine.model_name == "general"
+                and engine.resolve_model_path("general") == "sentence-transformers/all-MiniLM-L6-v2"):
+            model = engine.cached_model()
+        texts = [f"{a.get('title') or ''}. {a.get('abstract') or ''}"[:4000] for a in articles]
+        answers = classify(texts, model)
+        changed = 0
+        for article, answer in zip(articles, answers):
+            if answer:
+                _apply_model_result(article, answer[0], answer[1], "backup")
+                changed += 1
+        return changed
+    except Exception:
+        logging.getLogger(__name__).exception("Study type backup failed")
+        return 0
 
 
 def _clear_laya_cache_for_tests() -> None:

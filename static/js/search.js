@@ -1723,6 +1723,8 @@ function renderStudyTypeBadge(article) {
  || 'Automated guess from title and abstract only. May be wrong.';
  const matched = article.study_type_source === 'laya'
  ? ' Tagged by Laya, a local AI model, because the wording patterns were unsure.'
+ : article.study_type_source === 'backup'
+ ? ' Tagged by a local backup model because the wording patterns were unsure.'
  : (article.study_type_matched ? ` Matched: “${article.study_type_matched}”.` : '');
  const formalBit = formal && formal !== label ? ` Formal name: ${formal}.` : '';
  const title = `${disc}${formalBit}${matched}${warn ? ' ' + warn : ''} Confidence: ${conf}.`;

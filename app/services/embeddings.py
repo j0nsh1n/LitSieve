@@ -191,6 +191,12 @@ class EmbeddingEngine:
         self.model_name = model_name
         self.device = None  # resolved lazily when the model is first loaded
 
+    def cached_model(self) -> Any:
+        """Return an already-loaded model without causing a load."""
+        key = (self.resolve_model_path(self.model_name), select_device())
+        with _model_cache_lock:
+            return _model_cache.get(key)
+
     @property
     def model(self) -> Any:
         """The shared model for this engine's name.
