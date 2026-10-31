@@ -91,20 +91,46 @@ def router():
     return _router
 
 
-def choice(instructions: str, options: dict, states: list, state_key: str = "text") -> list:
+def tag_agent():
     global _tag_agent, _device
+    if _tag_agent is None:
+        from laya import load
+        _tag_agent = load(_tag_checkpoint)
+        try:
+            import torch
+            _device = "cuda" if torch.cuda.is_available() else "cpu"
+        except Exception:
+            _device = "unknown"
+    return _tag_agent
+
+
+def relevance_agent():
+    global _relevance_agent
+    if _relevance_agent is None:
+        from laya import load
+        _relevance_agent = load(_relevance_checkpoint)
+    return _relevance_agent
+
+
+def preload() -> None:
+    """Load every configured model before serving, so a wake-up is ready for the next search."""
+    if _tag_checkpoint:
+        tag_agent().predict_batch(
+            [{"text": "This is a warmup sentence."}],
+            {"pick": {"type": "choice", "instructions": "warm up", "criteria": {"a": "yes", "b": "no"}}},
+            batch_size=1,
+        )
+    else:
+        router()
+    if _relevance_checkpoint:
+        relevance_agent().predict_batch(["This is a warmup sentence."], _relevance_questions, batch_size=1)
+
+
+def choice(instructions: str, options: dict, states: list, state_key: str = "text") -> list:
     q = {"pick": {"type": "choice", "instructions": instructions, "criteria": options}}
     with _lock:
         if _tag_checkpoint:
-            if _tag_agent is None:
-                from laya import load
-                _tag_agent = load(_tag_checkpoint)
-                try:
-                    import torch
-                    _device = "cuda" if torch.cuda.is_available() else "cpu"
-                except Exception:
-                    _device = "unknown"
-            res = _tag_agent.predict_batch(
+            res = tag_agent().predict_batch(
                 [{"text": s[:MAX_TEXT]} for s in states], q, batch_size=len(states)
             )
         else:
@@ -130,7 +156,6 @@ def configure_relevance(path: str) -> None:
 
 
 def relevance(question: str, papers: list) -> list:
-    global _relevance_agent
     states = []
     for paper in papers:
         title = " ".join(paper["title"].split()) or "(no title)"
@@ -139,10 +164,7 @@ def relevance(question: str, papers: list) -> list:
         # No MAX_TEXT cut: the checkpoint was scored on uncut states; MAX_BODY bounds the request.
         states.append(f"Question: {question.strip()}\nTitle: {title}\nAbstract: {lead}")
     with _lock:
-        if _relevance_agent is None:
-            from laya import load
-            _relevance_agent = load(_relevance_checkpoint)
-        rows = _relevance_agent.predict_batch(states, _relevance_questions, batch_size=len(states))
+        rows = relevance_agent().predict_batch(states, _relevance_questions, batch_size=len(states))
     return [{"p_answers": float(row["answers"]["group"]["probabilities"]["answers"])} for row in rows]
 
 
@@ -253,8 +275,8 @@ def main():
     _tag_checkpoint = args.tag_checkpoint
     if args.relevance_checkpoint:
         configure_relevance(args.relevance_checkpoint)
-    if not args.no_preload and not _tag_checkpoint:
-        router()
+    if not args.no_preload:
+        preload()
     activated = socket_activated()
     srv = ThreadingHTTPServer(("127.0.0.1", args.port), Handler, bind_and_activate=not activated)
     if activated:

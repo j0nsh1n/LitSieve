@@ -214,3 +214,37 @@ def test_relevance_failure_leaves_choice_working(monkeypatch):
     assert laya_client.choice('pick', {'a': 'A', 'b': 'B'}, ['text'])[0]['choice'] == 'a'
     assert calls == ['http://localhost:1234/v1/relevance', 'http://localhost:1234/v1/choice']
     laya_client._reset_for_tests()
+
+
+def test_preload_loads_both_configured_models_and_skips_the_router(tmp_path, monkeypatch):
+    questions = {'group': {'type': 'choice', 'criteria': {'answers': 'yes', 'not': 'no'}}}
+    (tmp_path / 'questions.json').write_text(json.dumps(questions))
+    loaded, calls = [], []
+
+    class Agent:
+        def predict_batch(self, states, q, batch_size):
+            calls.append(states)
+            return []
+
+    def load(path):
+        loaded.append(path)
+        return Agent()
+
+    monkeypatch.setitem(sys.modules, 'laya', types.SimpleNamespace(load=load))
+    monkeypatch.setattr(laya_worker, '_tag_agent', None)
+    monkeypatch.setattr(laya_worker, '_relevance_agent', None)
+    monkeypatch.setattr(laya_worker, '_tag_checkpoint', 'tags')
+    monkeypatch.setattr(laya_worker, 'router', lambda: pytest.fail('loaded the base router'))
+    laya_worker.configure_relevance(str(tmp_path))
+    laya_worker.preload()
+    assert loaded == ['tags', str(tmp_path)]
+    assert len(calls) == 2
+
+
+def test_preload_uses_the_router_without_a_tag_checkpoint(monkeypatch):
+    called = []
+    monkeypatch.setattr(laya_worker, '_tag_checkpoint', None)
+    monkeypatch.setattr(laya_worker, '_relevance_checkpoint', None)
+    monkeypatch.setattr(laya_worker, 'router', lambda: called.append(True))
+    laya_worker.preload()
+    assert called == [True]
