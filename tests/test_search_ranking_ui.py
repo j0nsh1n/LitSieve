@@ -125,7 +125,7 @@ def test_access_chip_wording_and_forbidden_claims():
     template = _read("templates", "search.html")
     assert 'id="simple-free-to-read-chip"' in template
     assert "Free to read" in template
-    assert 'src="/static/js/search.js?v=20261030d"' in template
+    assert 'src="/static/js/search.js?v=20261031a"' in template
 
 
 def test_other_copies_disclosure_wording():
@@ -240,3 +240,21 @@ def test_the_after_prepare_status_says_set_aside_not_removed():
     dedup = _slice(collect, "async function silentResolveDuplicatesAfterPrepare", "async function doCreateEmbeddings")
     assert "Removed" not in dedup
     assert "Narrow it down can bring" in dedup
+
+
+def test_a_reused_card_takes_the_ids_of_its_new_position():
+    search = _read("static", "js", "search.js")
+    code = _slice(search, "function buildResultListItem(", "/**\n * Download exactly the papers")
+    script = r"""
+const vm = require('vm');
+const code = process.argv[1];
+const body = { id: 'result-body-0' };
+const attrs = { 'aria-controls': 'result-body-0' };
+const toggle = { setAttribute(k, v) { attrs[k] = v; } };
+const card = { querySelector: (s) => (s === '.result-row-body' ? body : toggle) };
+const sandbox = { card, buildResultCard() { throw new Error('built a new card'); } };
+vm.runInNewContext(code + ';this.out = buildResultListItem([{}, {}, {}], {}, 2, 3, card);', sandbox);
+console.log(JSON.stringify([body.id, attrs['aria-controls']]));
+"""
+    out = subprocess.run(["node", "-e", script, code], capture_output=True, text=True, check=True)
+    assert json.loads(out.stdout) == ["result-body-5", "result-body-5"]

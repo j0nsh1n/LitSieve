@@ -2641,6 +2641,14 @@ function renderResults(results, extra = [], preserveCard = null) {
 /** A result card; the first undated paper under a year range starts the "No year listed" group. */
 function buildResultListItem(results, article, idx, idOffset = 0, existingCard = null) {
  const card = existingCard || buildResultCard(article, idx + idOffset);
+ if (existingCard) {
+  // A reused card keeps its old position's ids unless they move with it.
+  const bodyId = `result-body-${idx + idOffset}`;
+  const body = card.querySelector('.result-row-body');
+  if (body) body.id = bodyId;
+  const toggle = card.querySelector('.result-toggle');
+  if (toggle) toggle.setAttribute('aria-controls', bodyId);
+ }
  if (!article.no_year || (idx > 0 && results[idx - 1].no_year)) return card;
  const group = document.createDocumentFragment();
  const heading = document.createElement('h3');
