@@ -133,6 +133,17 @@ original ranking while the worker loads. Get owner approval after staging before
 turning this on in production. Set `LITSIEVE_LAYA_RERANK=false` and restart the
 app to turn reranking off without disabling the other Laya features.
 
+To use a full tag checkpoint for study types and topic areas, pass
+`--tag-checkpoint /path/to/checkpoint` to the worker. The worker loads that
+checkpoint on the first choice request instead of loading the base router.
+Its `/health` response includes the configured tag checkpoint path.
+
+The study-type backup is off by default. Set `LITSIEVE_STUDY_BACKUP=true` in
+the app environment to use it when Laya gives no answer. A low-confidence
+Laya answer still counts as an answer. The backup never suggests topic areas.
+It uses a loaded `general` embedding model when available and otherwise uses
+text alone. It does not load an embedding model for the backup.
+
 Turn all Laya features off by removing `LITSIEVE_LAYA_URL` from `.env` and restarting the app.
 To keep it loaded instead, drop `--idle-exit 300` from the service's `ExecStart`.
 

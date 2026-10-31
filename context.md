@@ -1,6 +1,7 @@
 # context.md — LitSieve
 
 ## Current State
+- Optional tag checkpoint and study-type backup (2026-10-30, `feat/laya-tag-model`): full suite 2275 passed, Ruff clean, Pyright 0 errors with 6 optional-import warnings. The backup is off by default. Its frozen 100-row probability fixture matches both modes exactly.
 - Tunnel maintenance (2026-10-26): host RPM `cloudflared-2026.10.4-1.fc44`
   was already installed. Restarted `cloudflared-litpilot-token.service` to
   replace its running 2026.10.3 process with 2026.10.4. Four connections
@@ -292,7 +293,6 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-29. Branch `feat/laya-rerank` adds optional checkpoint-based
-  relevance reranking for query similarity search. It is off by default.
-- Holdout 2 leak-free nDCG@10 was 0.7150 with reranking and 0.6854 before it.
-- Next step: stage the feature and obtain owner approval before production use.
+- **Date:** 2026-10-30. Branch `feat/laya-tag-model` adds a separate Laya tag checkpoint and an optional study-type backup. Both need configuration.
+- The frozen backup matches 100 reference rows in both modes. The full suite passed 2275 tests.
+- Next step: obtain an independent examiner verdict and stage the models before the owner decides on production use.

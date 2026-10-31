@@ -41,6 +41,8 @@ _router = None
 _relevance_agent = None
 _relevance_checkpoint = None
 _relevance_questions = None
+_tag_checkpoint = None
+_tag_agent = None
 _lock = threading.Lock()  # one model, one GPU: decisions run one batch at a time
 _device = "unloaded"
 SD_LISTEN_FD = 3          # systemd hands the first activated socket over as fd 3
@@ -90,10 +92,24 @@ def router():
 
 
 def choice(instructions: str, options: dict, states: list, state_key: str = "text") -> list:
+    global _tag_agent, _device
     q = {"pick": {"type": "choice", "instructions": instructions, "criteria": options}}
-    reqs = [{"state": {state_key: s[:MAX_TEXT]}, "questions": q} for s in states]
     with _lock:
-        res = router().predict_batch(reqs)
+        if _tag_checkpoint:
+            if _tag_agent is None:
+                from laya import load
+                _tag_agent = load(_tag_checkpoint)
+                try:
+                    import torch
+                    _device = "cuda" if torch.cuda.is_available() else "cpu"
+                except Exception:
+                    _device = "unknown"
+            res = _tag_agent.predict_batch(
+                [{"text": s[:MAX_TEXT]} for s in states], q, batch_size=len(states)
+            )
+        else:
+            reqs = [{"state": {state_key: s[:MAX_TEXT]}, "questions": q} for s in states]
+            res = router().predict_batch(reqs)
     out = []
     for r in res:
         a = r["answers"]["pick"]
@@ -178,9 +194,12 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/health":
-            self._send(200, {"ok": True, "loaded": _router is not None, "device": _device,
-                             "relevance_configured": _relevance_checkpoint is not None,
-                             "relevance_loaded": _relevance_agent is not None})
+            health = {"ok": True, "loaded": _router is not None or _tag_agent is not None, "device": _device,
+                      "relevance_configured": _relevance_checkpoint is not None,
+                      "relevance_loaded": _relevance_agent is not None}
+            if _tag_checkpoint:
+                health["tag_checkpoint"] = _tag_checkpoint
+            self._send(200, health)
         else:
             self._send(404, {"error": "not found"})
 
@@ -222,16 +241,19 @@ def exit_when_idle(srv: ThreadingHTTPServer, seconds: float) -> None:
 
 
 def main():
+    global _tag_checkpoint
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--port", type=int, default=int(os.environ.get("LAYA_WORKER_PORT", "7880")))
     ap.add_argument("--no-preload", action="store_true", help="load the model on the first request")
     ap.add_argument("--idle-exit", type=float, default=0, metavar="SECONDS",
                     help="when socket-activated, exit after this long without a request (0: never)")
     ap.add_argument("--relevance-checkpoint", metavar="PATH")
+    ap.add_argument("--tag-checkpoint", metavar="PATH")
     args = ap.parse_args()
+    _tag_checkpoint = args.tag_checkpoint
     if args.relevance_checkpoint:
         configure_relevance(args.relevance_checkpoint)
-    if not args.no_preload:
+    if not args.no_preload and not _tag_checkpoint:
         router()
     activated = socket_activated()
     srv = ThreadingHTTPServer(("127.0.0.1", args.port), Handler, bind_and_activate=not activated)

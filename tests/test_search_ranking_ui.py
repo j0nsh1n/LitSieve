@@ -125,7 +125,7 @@ def test_access_chip_wording_and_forbidden_claims():
     template = _read("templates", "search.html")
     assert 'id="simple-free-to-read-chip"' in template
     assert "Free to read" in template
-    assert 'src="/static/js/search.js?v=20261029a"' in template
+    assert 'src="/static/js/search.js?v=20261030a"' in template
 
 
 def test_other_copies_disclosure_wording():

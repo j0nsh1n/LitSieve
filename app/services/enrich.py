@@ -71,7 +71,7 @@ def attach_key_points(results: List[dict], p) -> None:
         a["key_points_origin"] = origins.get(key, "extractive")
 
 
-def attach_study_types(results: List[dict]) -> None:
+def attach_study_types(results: List[dict], p=None) -> None:
     """Heuristic study-type tags at search time (cheap; may be wrong)."""
     from app.content.ui_flags import get_ui_flags
     if not get_ui_flags().get("show_study_type_tags", True):
@@ -79,7 +79,10 @@ def attach_study_types(results: List[dict]) -> None:
     from app.services.study_type import attach_study_types, refine_study_types_with_laya
     attach_study_types(results)
     # Optional: a local Laya model settles the tags the patterns were unsure of.
-    refine_study_types_with_laya(results)
+    if p is None:
+        refine_study_types_with_laya(results)
+    else:
+        refine_study_types_with_laya(results, getattr(p, "embedding_engine", None))
 
 
 def enrich_search_results(results: List[dict], p, *, query_text: str = "", pico_boost: bool = False) -> None:
@@ -91,4 +94,4 @@ def enrich_search_results(results: List[dict], p, *, query_text: str = "", pico_
         apply_pico_boost(results, query_text)
     attach_notes(results, p)
     attach_key_points(results, p)
-    attach_study_types(results)
+    attach_study_types(results, p)
