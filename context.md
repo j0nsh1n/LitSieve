@@ -1,6 +1,7 @@
 # context.md — LitSieve
 
 ## Current State
+- Search filter row (2026-10-30, `fix-136-r2`): primary cards are direct grid children again. Clearing the final note clears its filter while keeping the open card. Browser checks remain open.
 - Optional tag checkpoint and study-type backup (2026-10-30, `feat/laya-tag-model`): full suite 2275 passed, Ruff clean, Pyright 0 errors with 6 optional-import warnings. The backup is off by default. Its frozen 100-row probability fixture matches both modes exactly.
 - Tunnel maintenance (2026-10-26): host RPM `cloudflared-2026.10.4-1.fc44`
   was already installed. Restarted `cloudflared-litpilot-token.service` to
@@ -293,6 +294,5 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-30. Branch `feat/laya-tag-model` adds a separate Laya tag checkpoint and an optional study-type backup. Both need configuration.
-- The frozen backup matches 100 reference rows in both modes. The full suite passed 2275 tests.
-- Next step: obtain an independent examiner verdict and stage the models before the owner decides on production use.
+- **Date:** 2026-10-30. Branch `fix-136-r2` fixes result layouts and clearing the final note for PR #136.
+- Browser verification remains open. The T3 runtime does not allow preview tools to verify this edit or a browser switch for that purpose.

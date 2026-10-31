@@ -8,12 +8,18 @@ and this project aims to follow Semantic Versioning for app version strings
 
 ## [Unreleased]
 
+### Changed
+- Search puts result filters in one row. Sources filter current hits and show counts. Date and note filters appear when useful.
+- More like your starred papers adds a separate section below the current results. The section is included in visible-results exports and session restore.
+
 ### Added
 - The Laya worker loads its configured tag and relevance models at start-up, so a wake-up is ready for the next search.
 - The Laya worker can use a separate tag checkpoint. An optional study-type
   backup can tag papers when Laya gives no answer. It is off by default.
 
 ### Fixed
+- Search restores the Columns and Index card layouts. Clearing the last note also clears the note filter and keeps the open paper in place.
+- Search keeps recommendations across repeated reloads, applies filters to both sections, and exposes the database search scope in Sources. Saving a note keeps the open paper in place.
 - A listed URL is open only when a stored observation from that source,
   written by a fetch, says so. Rows with no stored observations stay
   "No open copy listed" until a later fetch. That includes papers that

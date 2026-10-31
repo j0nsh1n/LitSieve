@@ -1807,6 +1807,8 @@ input[type="range"]::-moz-range-thumb:hover {
     flex-wrap: wrap;
     gap: var(--space-2);
 }
+#starred-search-btn[hidden], #starred-search-help[hidden] { display: none; }
+.result-sort-chip { margin-left: auto; }
 .display-filter-chip {
     appearance: none;
     border: 1px solid var(--rule);

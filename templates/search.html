@@ -205,10 +205,10 @@
      </div>
     </details>
 
-    <button type="button" id="starred-search-btn" class="btn btn-secondary btn-block u-mt-md">
+    <button hidden type="button" id="starred-search-btn" class="btn btn-secondary btn-block u-mt-md">
     More like my starred (<span id="starred-count">0</span>)
     </button>
-    <p class="help-text">Finds papers similar to the ones you starred. Starred papers stay in the results.</p>
+    <p hidden id="starred-search-help" class="help-text">Finds papers similar to the ones you starred. Starred papers stay in the results.</p>
    </section>
    </div>{# /.search-rail-scroll #}
 
@@ -226,20 +226,16 @@
      <h2 class="seed-banner-heading-simple">Starting from this paper</h2>
      <p class="info-text" id="seed-banner-text"></p>
     </section>
-    <div class="simple-result-chips" role="group" aria-label="Result options">
-     <button type="button" class="display-filter-chip" id="simple-sort-chip">Sort: Similarity</button>
-     <button type="button" class="display-filter-chip" id="simple-sources-chip">Sources: All</button>
-     <button type="button" class="display-filter-chip" id="simple-type-chip">Type: All</button>
-     <button type="button" class="display-filter-chip" id="simple-free-to-read-chip" aria-pressed="false">Free to read</button>
-     <button type="button" class="display-filter-chip" id="simple-starred-chip" aria-pressed="false">Starred</button>
-    </div>
     <div class="display-filters" id="display-filters" hidden>
-     <span class="display-filters-label" id="display-filters-label">Show</span>
-     <div class="display-filter-chips" id="display-filter-chips" role="group"
-      aria-labelledby="display-filters-label">
+     <div class="display-filter-chips" id="display-filter-chips" role="group" aria-label="Filter and sort results">
       <button type="button" class="display-filter-chip is-on" data-filter="all" aria-pressed="true">All</button>
-      <button type="button" class="display-filter-chip" data-filter="noted" aria-pressed="false">Has a note</button>
-      <button type="button" class="display-filter-chip" data-filter="recent" id="display-filter-recent" aria-pressed="false">Since 2021</button>
+      <button type="button" class="display-filter-chip" id="simple-starred-chip" aria-pressed="false" hidden>Starred</button>
+      <button type="button" class="display-filter-chip" id="simple-free-to-read-chip" aria-pressed="false">Free to read</button>
+      <button type="button" class="display-filter-chip" data-filter="noted" aria-pressed="false" hidden>Has a note</button>
+      <button type="button" class="display-filter-chip" data-filter="recent" id="display-filter-recent" aria-pressed="false" hidden></button>
+      <button type="button" class="display-filter-chip" id="simple-type-chip">Type: All</button>
+      <button type="button" class="display-filter-chip" id="simple-sources-chip">Sources: All</button>
+      <button type="button" class="display-filter-chip result-sort-chip" id="simple-sort-chip">Sort: Similarity</button>
      </div>
      <p class="help-text" id="display-filter-status"></p>
     </div>
@@ -260,5 +256,5 @@
 <script src="/static/js/simple_themes.js?v=20261016r"></script>
 <script src="/static/js/collect.js?v=20261028c"></script>
 <script src="/static/js/reader.js?v=20261016c"></script>
-<script src="/static/js/search.js?v=20261030a"></script>
+<script src="/static/js/search.js?v=20261031a"></script>
 {% endblock %}
