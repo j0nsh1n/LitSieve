@@ -56,6 +56,10 @@ class Activity:
         self._busy = 0
         self._last = time.monotonic()
 
+    def restart(self) -> None:
+        with self._lock:
+            self._last = time.monotonic()
+
     def begin(self) -> None:
         with self._lock:
             self._busy += 1
@@ -284,6 +288,7 @@ def main():
         srv.socket = socket.socket(fileno=SD_LISTEN_FD)
     idle_exit = args.idle_exit if activated else 0
     if idle_exit > 0:
+        _activity.restart()  # loading isn't idle time
         threading.Thread(target=exit_when_idle, args=(srv, idle_exit), daemon=True).start()
     where = "socket from systemd" if activated else f"127.0.0.1:{args.port}"
     idle = f", exits after {idle_exit:g}s idle" if idle_exit > 0 else ""
