@@ -566,7 +566,7 @@ def test_search_display_filter_chips_are_easy_options():
     assert "displayFilterState.recent" in js
     # Export the filtered on-screen set, not the unfiltered hit list.
     exp = js[js.find("async function doExportResults") : js.find("async function doExportResults") + 900]
-    assert "visibleResults" in exp
+    assert "visibleExportResults" in exp
     css = _read("static", "css", "style.css")
     assert ".display-filter-chip" in css
     assert 'html[data-mode="simple"]' not in css
@@ -1011,7 +1011,7 @@ def test_search_results_open_in_place_one_at_a_time():
     opener = js[js.index("function setResultRowOpen") : js.index("function buildResultCard")]
     assert "setAttribute('aria-expanded', open ? 'true' : 'false')" in opener
     assert "#results-list .result-row.is-open" in opener
-    render = js[js.index("function renderResults") : js.index("function renderResults") + 1200]
+    render = js[js.index("function renderResults") : js.index("function buildResultListItem")]
     assert "openResultRow(container.querySelector('.result-row'), false)" in render
     css = _read("static", "css", "style.css")
     assert '.result-row:not(.is-open) .result-row-body' in css

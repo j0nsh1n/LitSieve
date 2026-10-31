@@ -125,7 +125,7 @@ def test_access_chip_wording_and_forbidden_claims():
     template = _read("templates", "search.html")
     assert 'id="simple-free-to-read-chip"' in template
     assert "Free to read" in template
-    assert 'src="/static/js/search.js?v=20261030a"' in template
+    assert 'src="/static/js/search.js?v=20261030b"' in template
 
 
 def test_other_copies_disclosure_wording():
@@ -144,7 +144,7 @@ def test_other_copies_disclosure_wording():
     assert "none_listed" in search
     css = _read("static", "css", "style.css")
     assert ".result-other-copies" in css
-    assert 'href="/static/css/style.css?v=20261029a"' in _read("templates", "base.html")
+    assert 'href="/static/css/style.css?v=20261030b"' in _read("templates", "base.html")
 
 
 def test_access_chip_stays_visible_when_layouts_hide_tags():

@@ -108,7 +108,7 @@ vm.runInContext(`librarySourceCounts={pubmed:2};`,sandbox);
 (async()=>{
  sandbox.updateSimpleSearchPanel(false); assert.equal(el('search-simple-panel').hidden,false);
  await sandbox.promptSimpleExportScope();
- assert.deepEqual(Array.from(choices[0].choices,x=>x.value),['all','included','excluded','starred',null]);
+ assert.deepEqual(Array.from(choices[0].choices,x=>x.value),['all','included','excluded',null]);
  assert.equal(el('actions').id,'simple-export-scope');
  assert.equal(calls[0].url,'/api/export/library?scope=all&format=csv&library_id=page-lib');
  assert.equal(downloads,1);

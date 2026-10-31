@@ -4,6 +4,7 @@ let lastSearchParams = null;
 let lastQueryTokens = [];
 /** Last on-screen result list (export “these results” uses this exact order). */
 let lastResults = [];
+let starredResults = [];
 const searchState = {
  requestPending: false,
  filters: {
@@ -409,7 +410,12 @@ function applySearchInputMethod(mode) {
 }
 
 function displayRecentYear() {
- return new Date().getFullYear() - 5;
+ const years = [...new Set(lastResults.map((a) => parseYear(a.year)).filter(Boolean))].sort((a, b) => a - b);
+ if (!years.length) return null;
+ const recent = new Date().getFullYear() - 5;
+ if (lastResults.some((a) => parseYear(a.year) >= recent)
+     && lastResults.some((a) => parseYear(a.year) < recent)) return recent;
+ return years.length > 1 ? years[Math.floor(years.length / 2)] : null;
 }
 
 /** sessionStorage key: refresh keeps query + filters; re-runs search on load. */
@@ -547,8 +553,10 @@ async function saveSearchSession(kind) {
  try {
   const state = lastSuccessfulSession
    ? Object.assign({}, lastSuccessfulSession, collectSearchFilters(), {
-    filters: JSON.parse(JSON.stringify(searchState.filters)), saved_at: Date.now(),
+    filters: JSON.parse(JSON.stringify(searchState.filters)), starred_results: starredResults, saved_at: Date.now(),
    }) : captureSearchSession(kind);
+  state.starred_results = starredResults;
+  state.starred_only = !lastSuccessfulSession && starredResults.length > 0;
   if (!state.library_id) {
    state.library_id = await resolveLibraryId();
   }
@@ -657,6 +665,7 @@ function clearSearchWorkspace() {
  lastSearchParams = null;
  lastQueryTokens = [];
  lastResults = [];
+ starredResults = [];
  lastSuccessfulSession = null;
  const qt = document.getElementById('query-text');
  if (qt) qt.value = '';
@@ -699,6 +708,11 @@ async function restoreSearchSession() {
  if (state.library_id && libId && state.library_id !== libId) return;
 
  applySearchSessionToForm(state);
+ if (state.starred_only && Array.isArray(state.starred_results)) {
+  starredResults = state.starred_results;
+  showSearchResults();
+  return;
+ }
 
  if (state.mode === 'starred') {
   await doStarredSearch({ fromRestore: true });
@@ -711,12 +725,23 @@ async function restoreSearchSession() {
   const seedId = (state.seed_query || '').trim();
   if (!seedId) return;
   await doMoreLikeThisPaper({ article_id: seedId }, { fromRestore: true });
+  if (Array.isArray(state.starred_results)) { starredResults = state.starred_results; showSearchResults(); }
   return;
  }
  // Only auto-run when there is something to search with.
  const q = buildQueryText();
- if (!q) return;
+ if (!q) {
+  if (Array.isArray(state.starred_results) && state.starred_results.length) {
+   starredResults = state.starred_results;
+   showSearchResults();
+  }
+  return;
+ }
  await doSearch({ fromRestore: true });
+ if (Array.isArray(state.starred_results)) {
+  starredResults = state.starred_results;
+  showSearchResults();
+ }
 }
 
 function parseOptionalYear(id) {
@@ -1274,9 +1299,9 @@ function syncSimpleResultChips() {
  if (sort) sort.textContent = `Sort: ${SIMPLE_SORT_LABELS[searchState.filters.sort_by] || 'Similarity'}`;
  const sources = document.getElementById('simple-sources-chip');
  if (sources) {
-  const all = Object.keys(librarySourceCounts).length;
-  const selected = searchState.filters.source_filter.length;
-  sources.textContent = selected === all ? 'Sources: All' : `Sources: ${selected} of ${all}`;
+  const all = new Set(lastResults.map((a) => a.source).filter(Boolean)).size;
+  const selected = Object.values(displayFilterState.sources).filter(Boolean).length;
+  sources.textContent = !selected ? 'Sources: All' : `Sources: ${selected} of ${all}`;
  }
  const types = document.getElementById('simple-type-chip');
  if (types) {
@@ -1290,7 +1315,13 @@ function syncSimpleResultChips() {
   free.setAttribute('aria-pressed', String(!!searchState.filters.free_to_read));
  }
  const starred = document.getElementById('simple-starred-chip');
+ const starredButton = document.getElementById('starred-search-btn');
+ const starredHelp = document.getElementById('starred-search-help');
+ if (starredButton) starredButton.hidden = libraryStarredCount === 0;
+ if (starredHelp) starredHelp.hidden = libraryStarredCount === 0;
+ if (!libraryStarredCount) displayFilterState.starred = false;
  if (starred) {
+  starred.hidden = libraryStarredCount === 0;
   starred.classList.toggle('is-on', displayFilterState.starred);
   starred.setAttribute('aria-pressed', String(displayFilterState.starred));
  }
@@ -1313,23 +1344,22 @@ async function promptSimpleSort() {
 
 async function promptSimpleSources() {
  if (searchState.requestPending) return;
- const ids = Object.keys(librarySourceCounts).sort((a, b) => getSourceName(a).localeCompare(getSourceName(b)));
+ const counts = {};
+ lastResults.forEach((a) => { if (a.source) counts[a.source] = (counts[a.source] || 0) + 1; });
+ const ids = Object.keys(counts).sort((a, b) => getSourceName(a).localeCompare(getSourceName(b)));
+ const selected = ids.filter((id) => displayFilterState.sources[id]);
  const values = await openSiteForm({
-  title: 'Sources', message: 'Counts are papers in your library, including papers set aside or not yet prepared. Search uses the selected sources before ranking.',
-  confirmLabel: 'Search these sources', fields: [{
-   id: 'sources', label: 'Include sources', type: 'multi-choice', value: searchState.filters.source_filter,
-   options: ids.map((value) => ({ value, label: getSourceName(value), hint: `${librarySourceCounts[value]} papers in your library` })),
-  }], validate: (vals) => vals.sources.length ? null : 'Please select at least one source.',
+  title: 'Sources', message: 'Filter the current results by source.', confirmLabel: 'Apply',
+  fields: [{ id: 'sources', label: 'Include sources', type: 'multi-choice',
+   value: selected.length ? selected : ids,
+   options: ids.map((value) => ({ value, label: getSourceName(value), hint: `${counts[value]} paper${counts[value] === 1 ? '' : 's'}` })) }],
+  validate: (vals) => vals.sources.length ? null : 'Please select at least one source.',
  });
  if (!values || searchState.requestPending) return;
- searchState.filters.source_filter = values.sources;
- syncSearchFilterControls();
- if (!lastSearchParams) return;
- const replaySources = { skipOptions: true, replay: true };
- if (lastSearchParams.mode === 'starred') await doStarredSearch(replaySources);
- else if (lastSearchParams.mode === 'seed' && lastSearchParams.include_seed) {
-  await doMoreLikeThisPaper({ article_id: lastSearchParams.query_text }, replaySources);
- } else await doSearch(replaySources);
+ displayFilterState.sources = {};
+ if (values.sources.length !== ids.length) values.sources.forEach((id) => { displayFilterState.sources[id] = true; });
+ showSearchResults();
+ await saveSearchSession();
 }
 
 async function promptSimpleTypes() {
@@ -1384,7 +1414,7 @@ async function promptSimpleStarred() {
  });
  if (searchState.requestPending) return;
  if (value === 'find') {
-  await doStarredSearch({ clearStarred: true });
+  await doStarredSearch();
  } else if (value === 'show') {
   displayFilterState.starred = !displayFilterState.starred;
   showSearchResults();
@@ -1485,6 +1515,7 @@ async function doSearch(opts) {
  lastSearchParams = searchParams;
  lastSuccessfulSession = session;
  lastResults = results;
+ starredResults = [];
  showSearchResults(results);
  // Persist query + filters so a browser refresh restores this search.
  await saveSearchSession(method);
@@ -1498,74 +1529,28 @@ async function doSearch(opts) {
  }
 }
 
-async function doStarredSearch(opts) {
- if (searchState.requestPending) return;
- const fromRestore = !!(opts && opts.fromRestore);
- if (!fromRestore && !opts?.skipOptions) {
-  const scoped = await promptSimpleSearchScope('starred');
-  if (!scoped) return;
- }
+async function doStarredSearch(opts = {}) {
+ if (searchState.requestPending || !libraryStarredCount) return;
+ const fromRestore = !!opts.fromRestore;
  const filters = collectSearchFilters();
- if (searchState.requestPending) return;
  if (!requireSelectedSources(filters, fromRestore)) return;
  setSearchRequestPending(true);
  const btn = document.getElementById('starred-search-btn');
  setLoading(btn, true);
- const resultsSec = document.getElementById('results-section');
- if (resultsSec) {
-  resultsSec.classList.remove('u-hidden');
-  resultsSec.style.display = 'block';
- }
- showResultSkeletons(6);
- const searchParams = {
- query_text: '',
- top_k: filters.top_k,
- sort_by: filters.sort_by,
- source_filter: filters.source_filter,
- pico_boost: false,
- lexical_boost: false,
- year_min: filters.year_min,
- year_max: filters.year_max,
- work_type_filter: filters.work_type_filter,
- free_to_read: !!filters.free_to_read,
- mode: 'starred',
- };
- const session = opts?.replay ? lastSuccessfulSession : captureSearchSession('starred');
- lastQueryTokens = [];
  try {
- document.getElementById('seed-banner').style.display = 'none';
- const data = await apiCall('/api/search/starred', {
- method: 'POST',
- body: {
- top_k: filters.top_k,
- source_filter: filters.source_filter,
- year_min: filters.year_min,
- year_max: filters.year_max,
- work_type_filter: workTypeFilterForRequest(filters),
- free_to_read: freeToReadForRequest(filters),
- },
- });
- const banner = document.getElementById('seed-banner');
- const bannerText = document.getElementById('seed-banner-text');
- if (banner && bannerText) {
- banner.style.display = 'block';
- bannerText.textContent =
- `More like your starred papers (${data.seed_count || 0} star${(data.seed_count || 0) === 1 ? '' : 's'}). Starred papers stay in the list (usually near the top).`;
- }
- let results = data.results || [];
- lastSearchParams = searchParams;
- lastSuccessfulSession = session;
- lastResults = results;
- if (opts?.clearStarred) displayFilterState.starred = false;
- showSearchResults(results);
- refreshStarredCount(data.seed_count);
- await saveSearchSession('starred');
+  const data = await apiCall('/api/search/starred', { method: 'POST', body: {
+   top_k: filters.top_k, source_filter: filters.source_filter,
+   year_min: filters.year_min, year_max: filters.year_max,
+   work_type_filter: workTypeFilterForRequest(filters), free_to_read: freeToReadForRequest(filters),
+  }});
+  starredResults = data.results || [];
+  showSearchResults();
+  await saveSearchSession();
  } catch (e) {
- if (!fromRestore) showNotification(`Starred search failed: ${e.message}`, 'error');
- clearResultSkeletonsOnError(fromRestore);
+  if (!fromRestore) showNotification(`Starred search failed: ${e.message}`, 'error');
  } finally {
- setSearchRequestPending(false);
- setLoading(btn, false);
+  setSearchRequestPending(false);
+  setLoading(btn, false);
  }
 }
 
@@ -1637,6 +1622,7 @@ async function doMoreLikeThisPaper(article, opts) {
  lastSearchParams = searchParams;
  lastSuccessfulSession = session;
  lastResults = results;
+ starredResults = [];
  showSearchResults(results);
  // The button sits on a result far down the list; bring the "Starting from
  // this paper" banner and the re-ranked list into view (Looks polish).
@@ -2062,6 +2048,7 @@ function buildResultCard(article, idx) {
  starred: next,
  }),
  });
+ const wasStarredFilter = displayFilterState.starred;
  patchLastResult(article, { starred: next });
  const starMark = card.querySelector('.result-mark-star');
  if (starMark) starMark.hidden = !next;
@@ -2072,8 +2059,9 @@ function buildResultCard(article, idx) {
   differentWorkCache.delete(otherCopiesKey(article));
   mountDifferentWork(card, []);
  }
- if (displayFilterState.starred) showSearchResults();
+ if (wasStarredFilter) showSearchResults();
  else if (next) void loadOtherCopiesForResults([{ ...article, starred: true }]);
+ void saveSearchSession();
  } catch (err) {
  starBtn.classList.toggle('is-starred', !next);
  starBtn.innerHTML = starLabelHtml(!next);
@@ -2105,7 +2093,8 @@ function buildResultCard(article, idx) {
  const noteMark = card.querySelector('.result-mark-note');
  if (noteMark) noteMark.hidden = !noteField.value.trim();
  showNotification('Note saved.', 'success');
- if (displayFilterState.noted) showSearchResults();
+ showSearchResults();
+ void saveSearchSession();
  } catch (err) {
  saveBtn.textContent = prev;
  showNotification(`Could not save note: ${err.message}`, 'error');
@@ -2153,6 +2142,9 @@ function buildResultCard(article, idx) {
  }
  showNotification('Marked not relevant (screened out).', 'success');
  lastResults = lastResults.filter(
+ (a) => !(a.article_id === article.article_id && a.source === article.source)
+ );
+ starredResults = starredResults.filter(
  (a) => !(a.article_id === article.article_id && a.source === article.source)
  );
  // Leave the undo strip in place. Rebuilding the list would remove Why? and Undo.
@@ -2230,6 +2222,8 @@ function syncResultCountAfterScreen() {
 function replaceCardWithUndo(cardEl, article, opts) {
  const parent = cardEl.parentNode;
  if (!parent) return null;
+ const wasRecommendation = starredResults.some((a) => a.article_id === article.article_id && a.source === article.source)
+  && !lastResults.some((a) => a.article_id === article.article_id && a.source === article.source);
  setResultRowOpen(cardEl, false);
  const pending = !!(opts && opts.pending);
  const why = !!(opts && opts.why);
@@ -2267,10 +2261,9 @@ function replaceCardWithUndo(cardEl, article, opts) {
  const nr = cardEl.querySelector('.not-relevant-btn');
  if (nr) nr.disabled = false;
  showNotification('Restored to included set.', 'success');
- if (!lastResults.some(
- (a) => a.article_id === article.article_id && a.source === article.source
- )) {
- lastResults.push(article);
+ const target = wasRecommendation ? starredResults : lastResults;
+ if (!target.some((a) => a.article_id === article.article_id && a.source === article.source)) {
+  target.push(article);
  }
  syncResultCountAfterScreen();
  } catch (err) {
@@ -2374,12 +2367,12 @@ function displayFiltersActive() {
  return Object.keys(displayFilterState.sources).some((k) => displayFilterState.sources[k]);
 }
 
-function visibleResults() {
+function visibleResults(list = lastResults) {
  const srcOn = Object.keys(displayFilterState.sources).filter(
   (k) => displayFilterState.sources[k]
  );
  const recentYear = displayRecentYear();
- return clientSort((lastResults || []).filter((a) => {
+ return clientSort((list || []).filter((a) => {
   if (displayFilterState.starred && !a.starred) return false;
   if (displayFilterState.noted && !String(a.note || '').trim()) return false;
   if (displayFilterState.recent && parseYear(a.year) < recentYear) return false;
@@ -2399,13 +2392,23 @@ function showSearchResults(fullList) {
  }
  const bar = document.getElementById('display-filters');
  const hasHits = !!(lastResults && lastResults.length);
- if (bar) bar.hidden = !hasHits;
+ const recent = displayRecentYear();
+ const recentBtn = document.getElementById('display-filter-recent');
+ if (recentBtn) { recentBtn.hidden = recent === null; recentBtn.textContent = recent === null ? '' : `Since ${recent}`; }
+ if (recent === null) displayFilterState.recent = false;
+ const noteBtn = document.querySelector('[data-filter="noted"]');
+ const hasNotes = lastResults.some((a) => String(a.note || '').trim());
+ if (noteBtn) noteBtn.hidden = !hasNotes;
+ if (!hasNotes) displayFilterState.noted = false;
+ if (bar) bar.hidden = !(hasHits || starredResults.length);
  syncDisplayFilterSourceChips();
  syncDisplayFilterChipState();
  syncSimpleResultChips();
  const shown = visibleResults();
- renderResults(shown);
- void loadOtherCopiesForResults(shown);
+ const originalIds = new Set(lastResults.map((a) => `${a.source}\0${a.article_id}`));
+ const extra = visibleResults(starredResults.filter((a) => !originalIds.has(`${a.source}\0${a.article_id}`)));
+ renderResults(shown, extra);
+ void loadOtherCopiesForResults(shown.concat(extra));
  const countEl = document.getElementById('result-count');
  if (countEl) {
   countEl.textContent = displayFiltersActive() && hasHits
@@ -2417,7 +2420,7 @@ function showSearchResults(fullList) {
  const status = document.getElementById('display-filter-status');
  if (status) {
   status.textContent = displayFiltersActive() && hasHits
-   ? (shown.length
+   ? (shown.length || extra.length
     ? `Showing ${shown.length} of ${lastResults.length} on this page.`
     : 'No papers match these filters. Click All to show everything.')
    : '';
@@ -2429,8 +2432,8 @@ function showSearchResults(fullList) {
  }
  const exportSec = document.getElementById('export-results-section');
  if (exportSec) {
-  exportSec.hidden = !shown.length;
-  exportSec.style.display = shown.length ? 'block' : 'none';
+  exportSec.hidden = !(shown.length || extra.length);
+  exportSec.style.display = (shown.length || extra.length) ? 'block' : 'none';
  }
  updateSimpleSearchPanel(hasHits);
  // A new ranking (a search, More like this) starts at its top, even when the
@@ -2462,33 +2465,9 @@ function searchTileClearance() {
 }
 
 function syncDisplayFilterSourceChips() {
- const host = document.getElementById('display-filter-chips');
- if (!host) return;
- host.querySelectorAll('[data-filter-source]').forEach((el) => el.remove());
- const seen = {};
- (lastResults || []).forEach((a) => {
-  if (a && a.source) seen[a.source] = true;
- });
- const ids = Object.keys(seen).sort();
- if (ids.length < 2) {
-  Object.keys(displayFilterState.sources).forEach((k) => {
-   if (!seen[k]) delete displayFilterState.sources[k];
-  });
-  return;
- }
- ids.forEach((id) => {
-  if (!(id in displayFilterState.sources)) displayFilterState.sources[id] = false;
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'display-filter-chip';
-  btn.setAttribute('data-filter-source', id);
-  btn.setAttribute('aria-pressed', 'false');
-  const name = typeof getSourceName === 'function' ? getSourceName(id) : id;
-  btn.textContent = name;
-  host.appendChild(btn);
- });
- Object.keys(displayFilterState.sources).forEach((k) => {
-  if (!seen[k]) delete displayFilterState.sources[k];
+ const seen = new Set(lastResults.map((a) => a.source));
+ Object.keys(displayFilterState.sources).forEach((key) => {
+  if (!seen.has(key)) delete displayFilterState.sources[key];
  });
 }
 
@@ -2512,7 +2491,7 @@ function syncDisplayFilterChipState() {
 
 function wireDisplayFilters() {
  const recentBtn = document.getElementById('display-filter-recent');
- if (recentBtn) recentBtn.textContent = `Since ${displayRecentYear()}`;
+
  const host = document.getElementById('display-filter-chips');
  if (!host || host.dataset.wired === '1') return;
  host.dataset.wired = '1';
@@ -2543,23 +2522,23 @@ function wireDisplayFilters() {
 
 function patchLastResult(article, patch) {
  if (!article || !lastResults) return;
- lastResults.forEach((a) => {
+ lastResults.concat(starredResults).forEach((a) => {
   if (a.article_id === article.article_id && a.source === article.source) {
    Object.assign(a, patch);
   }
  });
 }
 
-function renderResults(results) {
+function renderResults(results, extra = []) {
  const container = document.getElementById('results-list');
  container.innerHTML = '';
 
  if (results.length === 0) {
  // Filters that hide every paper already say so in the filter bar.
- if (!(lastResults && lastResults.length)) {
+ if (!(lastResults && lastResults.length) && !extra.length) {
   container.innerHTML = '<p class="info-text">No results found. Try a different query or check that embeddings have been created.</p>';
  }
- return;
+ if (!extra.length) return;
  }
 
  const renderItem = (article, idx) => buildResultListItem(results, article, idx);
@@ -2567,6 +2546,13 @@ function renderResults(results) {
  renderPaginatedList(container, results, renderItem, { noun: 'results' });
  } else {
  results.forEach((article, idx) => container.appendChild(renderItem(article, idx)));
+ }
+ if (extra.length) {
+  const heading = document.createElement('h2');
+  heading.className = 'results-group-heading';
+  heading.textContent = 'More like your starred papers';
+  container.appendChild(heading);
+  extra.forEach((article, idx) => container.appendChild(buildResultListItem(extra, article, idx, results.length)));
  }
  // The grid layouts start closed: an open paper there is a side panel.
  if (!resultsUseReaderPanel()) {
@@ -2579,8 +2565,8 @@ function renderResults(results) {
 }
 
 /** A result card; the first undated paper under a year range starts the "No year listed" group. */
-function buildResultListItem(results, article, idx) {
- const card = buildResultCard(article, idx);
+function buildResultListItem(results, article, idx, idOffset = 0) {
+ const card = buildResultCard(article, idx + idOffset);
  if (!article.no_year || (idx > 0 && results[idx - 1].no_year)) return card;
  const group = document.createDocumentFragment();
  const heading = document.createElement('h3');
@@ -2621,14 +2607,14 @@ async function promptSimpleExportScope() {
   showNotification('Reload this page before exporting your library.', 'error');
   return;
  }
- const hasResults = visibleResults().length > 0;
+ const hasResults = visibleExportResults().length > 0;
  const scopes = [];
  if (hasResults) scopes.push({ value: 'results', label: 'These visible results', primary: true });
  scopes.push(
   { value: 'all', label: 'All library papers' },
   { value: 'included', label: 'Kept papers' },
   { value: 'excluded', label: 'Set-aside papers' },
-  { value: 'starred', label: 'Starred papers' },
+  ...(libraryStarredCount ? [{ value: 'starred', label: 'Starred papers' }] : []),
   { value: null, label: 'Cancel', cancel: true },
  );
  const scope = await openSiteChoice({
@@ -2830,8 +2816,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
 });
 
+function visibleExportResults() {
+ const ids = new Set(lastResults.map((a) => `${a.source}\0${a.article_id}`));
+ return visibleResults().concat(visibleResults(starredResults.filter((a) => !ids.has(`${a.source}\0${a.article_id}`))));
+}
+
 async function doExportResults(format, libraryId = '') {
- const exportRows = visibleResults();
+ const exportRows = visibleExportResults();
  if (!exportRows.length) {
   showNotification('Run a search first, then export the results shown on screen.', 'error');
   return;
