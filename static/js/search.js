@@ -2126,6 +2126,7 @@ function buildResultCard(article, idx) {
  saveBtn.addEventListener('click', async (e) => {
  e.preventDefault();
  const prev = saveBtn.textContent;
+ const restoreSaveFocus = document.activeElement === saveBtn;
  saveBtn.disabled = true;
  // "Saved" only once the server has it (Looks polish).
  saveBtn.textContent = 'Saving…';
@@ -2144,13 +2145,18 @@ function buildResultCard(article, idx) {
  if (noteMark) noteMark.hidden = !noteField.value.trim();
  showNotification('Note saved.', 'success');
  const noteBtn = document.querySelector('[data-filter="noted"]');
- if (noteBtn) noteBtn.hidden = !lastResults.concat(starredResults).some((a) => String(a.note || '').trim());
+ const hasNotes = lastResults.concat(starredResults).some((a) => String(a.note || '').trim());
+ if (noteBtn) noteBtn.hidden = !hasNotes;
+ if (!hasNotes && displayFilterState.noted) showSearchResults(undefined, card);
  void saveSearchSession();
  } catch (err) {
  saveBtn.textContent = prev;
  showNotification(`Could not save note: ${err.message}`, 'error');
  } finally {
  saveBtn.disabled = false;
+ if (restoreSaveFocus && saveBtn.isConnected && document.activeElement === document.body) {
+  saveBtn.focus({ preventScroll: true });
+ }
  if (saveBtn.textContent === 'Saved') {
   setTimeout(() => { if (saveBtn.textContent === 'Saved') saveBtn.textContent = prev; }, 1200);
  }
@@ -2432,7 +2438,7 @@ function visibleResults(list = lastResults) {
  }), searchState.filters.sort_by);
 }
 
-function showSearchResults(fullList) {
+function showSearchResults(fullList, preserveCard = null) {
  const fresh = Array.isArray(fullList);
  if (fresh) {
   lastResults = fullList;
@@ -2458,7 +2464,7 @@ function showSearchResults(fullList) {
  const shown = visibleResults();
  const originalIds = new Set(lastResults.map((a) => `${a.source}\0${a.article_id}`));
  const extra = visibleResults(starredResults.filter((a) => !originalIds.has(`${a.source}\0${a.article_id}`)));
- renderResults(shown, extra);
+ renderResults(shown, extra, preserveCard);
  void loadOtherCopiesForResults(shown.concat(extra));
  const countEl = document.getElementById('result-count');
  if (countEl) {
@@ -2580,8 +2586,10 @@ function patchLastResult(article, patch) {
  });
 }
 
-function renderResults(results, extra = []) {
+function renderResults(results, extra = [], preserveCard = null) {
  const container = document.getElementById('results-list');
+ const focused = preserveCard && preserveCard.contains(document.activeElement) ? document.activeElement : null;
+ const wasOpen = preserveCard && preserveCard.classList.contains('is-open');
  container.innerHTML = '';
 
  if (results.length === 0) {
@@ -2592,25 +2600,38 @@ function renderResults(results, extra = []) {
  if (!extra.length) return;
  }
 
- const renderItem = (article, idx) => buildResultListItem(results, article, idx);
- if (typeof renderPaginatedList === 'function') {
- const primary = document.createElement('div');
- container.appendChild(primary);
- renderPaginatedList(primary, results, renderItem, { noun: 'results' });
- } else {
- results.forEach((article, idx) => container.appendChild(renderItem(article, idx)));
- }
+ const matchingCard = (article) => preserveCard
+  && preserveCard.dataset.articleId === String(article.article_id || '')
+  && preserveCard.dataset.source === String(article.source || '') ? preserveCard : null;
+ const renderItem = (article, idx) => buildResultListItem(results, article, idx, 0, matchingCard(article));
+ let heading = null;
  if (extra.length) {
-  const heading = document.createElement('h2');
+  heading = document.createElement('h2');
   heading.className = 'results-group-heading';
   heading.textContent = 'More like your starred papers';
   container.appendChild(heading);
-  extra.forEach((article, idx) => container.appendChild(buildResultListItem(extra, article, idx, results.length)));
+ }
+ if (typeof renderPaginatedList === 'function') {
+ const primary = { appendChild: (node) => container.insertBefore(node, heading) };
+ const preservedIndex = results.findIndex((article) => matchingCard(article));
+ const pageSize = preservedIndex < 0 ? undefined : Math.max(LIST_PAGE_SIZE, preservedIndex + 1);
+ renderPaginatedList(primary, results, renderItem, { noun: 'results', pageSize });
+ } else {
+ results.forEach((article, idx) => container.insertBefore(renderItem(article, idx), heading));
+ }
+ if (extra.length) {
+  extra.forEach((article, idx) => container.appendChild(buildResultListItem(extra, article, idx, results.length, matchingCard(article))));
  }
  // The grid layouts start closed: an open paper there is a side panel.
- if (!resultsUseReaderPanel()) {
+ if (wasOpen && preserveCard.isConnected) {
+  if (resultsUseReaderPanel()) {
+   preserveCard.classList.remove('is-open');
+   setResultRowOpen(preserveCard, true);
+  }
+ } else if (!resultsUseReaderPanel()) {
   openResultRow(container.querySelector('.result-row'), false);
  }
+ if (focused && focused.isConnected) focused.focus({ preventScroll: true });
 
  if (typeof enhanceAbstracts === 'function') {
  enhanceAbstracts(container);
@@ -2618,8 +2639,8 @@ function renderResults(results, extra = []) {
 }
 
 /** A result card; the first undated paper under a year range starts the "No year listed" group. */
-function buildResultListItem(results, article, idx, idOffset = 0) {
- const card = buildResultCard(article, idx + idOffset);
+function buildResultListItem(results, article, idx, idOffset = 0, existingCard = null) {
+ const card = existingCard || buildResultCard(article, idx + idOffset);
  if (!article.no_year || (idx > 0 && results[idx - 1].no_year)) return card;
  const group = document.createDocumentFragment();
  const heading = document.createElement('h3');

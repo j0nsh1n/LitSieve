@@ -96,6 +96,7 @@ const sandbox = {
  releaseRequest: () => { heldRequest = null; releaseRequest(); },
 };
 vm.createContext(sandbox);
+vm.runInContext('const LIST_PAGE_SIZE = 50;', sandbox);
 vm.runInContext(fs.readFileSync('static/js/search.js', 'utf8'), sandbox);
 vm.runInContext(`
 el('top-k').value = '10'; el('sort-by').value = 'similarity';
@@ -541,6 +542,61 @@ assert.equal(button.textContent, 'Saved');
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js not installed")
+def test_clearing_final_note_clears_filter_and_updates_results_and_export():
+    run_search_js(r"""
+const noted = {article_id:'a', source:'pubmed', title:'Noted', note:'A note'};
+const other = {article_id:'b', source:'pubmed', title:'Other'};
+lastResults = [noted, other]; displayFilterState.noted = true;
+const card = buildResultCard(noted, 0);
+const field = card.querySelector('.note-field'); const button = card.querySelector('.note-save');
+field.value = '';
+button.isConnected = true; document.activeElement = button;
+button.focus = () => { document.activeElement = button; };
+Object.defineProperty(button, 'disabled', {set(value) { if (value) document.activeElement = document.body; }});
+let preserved; renderResults = (rows, extra, keep) => { rendered = rows; preserved = keep; };
+await button.listeners.click({preventDefault() {}});
+assert.equal(displayFilterState.noted, false);
+assert.deepEqual([...rendered.map((a) => a.article_id)], ['a', 'b']);
+assert.deepEqual([...visibleExportResults().map((a) => a.article_id)], ['a', 'b']);
+assert.equal(el('result-count').textContent, '2');
+assert.equal(preserved, card);
+assert.equal(document.activeElement, button);
+assert.equal(readSearchSession().filters.display.noted, false);
+""")
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="Node.js not installed")
+def test_refresh_preserves_open_card_and_focused_note_in_every_layout():
+    run_search_js(r"""
+const article = {article_id:'a', source:'pubmed'};
+const list = el('results-list');
+list.insertBefore = (node) => { node.isConnected = true; return node; };
+list.appendChild = (node) => { node.isConnected = true; return node; };
+Object.defineProperty(list, 'innerHTML', {set() { document.activeElement = null; }});
+const card = new Element(); card.dataset = {articleId:'a', source:'pubmed'};
+card.classList.add('is-open');
+const field = new Element(); card.contains = (node) => node === field;
+field.isConnected = true; field.focus = () => { document.activeElement = field; };
+let renderedCard;
+buildResultListItem = (rows, item, idx, offset, existing) => { renderedCard = existing; return existing; };
+renderPaginatedList = (parent, rows, render) => parent.appendChild(render(rows[0], 0));
+setResultRowOpen = (node, open) => {
+ assert.equal(node, card); assert.equal(open, true);
+ assert.equal(node.classList.contains('is-open'), false);
+ node.classList.add('is-open');
+};
+for (const layout of ['reading', 'table', 'columns', 'index']) {
+ document.documentElement.getAttribute = () => layout;
+ document.activeElement = field; card.isConnected = false;
+ actualRenderResults([article], [], card);
+ assert.equal(renderedCard, card, layout);
+ assert.equal(card.classList.contains('is-open'), true, layout);
+ assert.equal(document.activeElement, field, layout);
+}
+""")
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="Node.js not installed")
 def test_empty_recommendation_section_replays_when_filter_is_removed():
     run_search_js(r"""
 await applyAvailableSources(); refreshStarredCount(1);
@@ -557,11 +613,10 @@ assert.equal(starredResults[0].article_id, 'open');
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js not installed")
 def test_later_primary_pages_stay_above_recommendations():
     run_search_js(r"""
-const list = el('results-list'); list.items = []; list.appendChild = (child) => list.items.push(child);
-document.createElement = () => {
- const node = new Element(); node.items = []; node.appendChild = (child) => node.items.push(child);
- return node;
-};
+const list = el('results-list'); list.items = [];
+list.appendChild = (child) => { list.items.push(child); return child; };
+list.insertBefore = (child, before) => { list.items.splice(list.items.indexOf(before), 0, child); return child; };
+document.createElement = () => new Element();
 buildResultListItem = (rows, article) => article;
 resultsUseReaderPanel = () => true;
 let addNextPage;
@@ -571,7 +626,6 @@ renderPaginatedList = (parent, rows, render) => {
 };
 actualRenderResults([{article_id:'first'}, {article_id:'later'}], [{article_id:'recommendation'}]);
 addNextPage();
-assert.deepEqual([...list.items[0].items.map((a) => a.article_id)], ['first', 'later']);
-assert.equal(list.items[1].textContent, 'More like your starred papers');
-assert.equal(list.items[2].article_id, 'recommendation');
+assert.deepEqual([...list.items.map((a) => a.article_id || a.textContent)],
+ ['first', 'later', 'More like your starred papers', 'recommendation']);
 """)
