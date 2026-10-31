@@ -107,6 +107,31 @@ def test_a_request_in_flight_holds_off_the_exit(worker):
     assert proc.wait(timeout=10) == 0
 
 
+@needs_activate
+def test_preload_longer_than_the_idle_limit_still_answers_the_waiting_request(tmp_path):
+    (tmp_path / "laya.py").write_text(
+        "import time\n"
+        "class Router:\n"
+        "    def __init__(self, **kwargs):\n"
+        "        time.sleep(1.2)\n"
+        "    def predict(self, *args, **kwargs):\n"
+        "        return {}\n"
+    )
+    (tmp_path / "torch.py").write_text("class cuda:\n    is_available = staticmethod(lambda: False)\n")
+    port = _free_port()
+    # systemd-socket-activate clears the environment unless told to pass a variable on.
+    args = [ACTIVATE, "-E", f"PYTHONPATH={tmp_path}", "-l", f"127.0.0.1:{port}", sys.executable,
+            str(REPO / "tools" / "laya_worker.py"), "--port", str(port), "--idle-exit", "0.5"]
+    proc = _start(args)
+    try:
+        assert _wait_up(port, proc)["loaded"] is True
+        assert proc.wait(timeout=10) == 0
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+            proc.wait()
+
+
 def test_without_socket_activation_it_binds_its_port_and_never_idles_out(worker):
     port, proc = worker("--idle-exit", "1", activated=False)
     _wait_up(port, proc)

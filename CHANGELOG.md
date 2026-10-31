@@ -13,6 +13,7 @@ and this project aims to follow Semantic Versioning for app version strings
 - More like your starred papers adds a separate section below the current results. The section is included in visible-results exports and session restore.
 
 ### Added
+- The Laya worker loads its configured tag and relevance models at start-up, so a wake-up is ready for the next search.
 - The Laya worker can use a separate tag checkpoint. An optional study-type
   backup can tag papers when Laya gives no answer. It is off by default.
 
