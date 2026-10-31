@@ -5,6 +5,7 @@ let lastQueryTokens = [];
 /** Last on-screen result list (export “these results” uses this exact order). */
 let lastResults = [];
 let starredResults = [];
+let hasStarredSection = false;
 const searchState = {
  requestPending: false,
  filters: {
@@ -556,7 +557,8 @@ async function saveSearchSession(kind) {
     filters: JSON.parse(JSON.stringify(searchState.filters)), starred_results: starredResults, saved_at: Date.now(),
    }) : captureSearchSession(kind);
   state.starred_results = starredResults;
-  state.starred_only = !lastSuccessfulSession && starredResults.length > 0;
+  state.starred_section = hasStarredSection;
+  state.starred_only = !lastSuccessfulSession && lastSearchParams?.mode === 'starred';
   if (!state.library_id) {
    state.library_id = await resolveLibraryId();
   }
@@ -666,6 +668,7 @@ function clearSearchWorkspace() {
  lastQueryTokens = [];
  lastResults = [];
  starredResults = [];
+ hasStarredSection = false;
  lastSuccessfulSession = null;
  const qt = document.getElementById('query-text');
  if (qt) qt.value = '';
@@ -709,12 +712,19 @@ async function restoreSearchSession() {
 
  applySearchSessionToForm(state);
  if (state.starred_only && Array.isArray(state.starred_results)) {
+  lastSearchParams = { mode: 'starred' };
   starredResults = state.starred_results;
+  hasStarredSection = true;
   showSearchResults();
   return;
  }
 
  if (state.mode === 'starred') {
+  if (!libraryStarredCount) {
+   clearSearchWorkspace();
+   showSearchResults();
+   return;
+  }
   await doStarredSearch({ fromRestore: true });
   return;
  }
@@ -725,7 +735,15 @@ async function restoreSearchSession() {
   const seedId = (state.seed_query || '').trim();
   if (!seedId) return;
   await doMoreLikeThisPaper({ article_id: seedId }, { fromRestore: true });
-  if (Array.isArray(state.starred_results)) { starredResults = state.starred_results; showSearchResults(); }
+  if (Array.isArray(state.starred_results)) {
+   starredResults = state.starred_results;
+   hasStarredSection = state.starred_section ?? !!starredResults.length;
+   if (state.filters?.display) Object.assign(displayFilterState, state.filters.display, {
+    sources: { ...(state.filters.display.sources || {}) },
+   });
+   showSearchResults();
+   await saveSearchSession();
+  }
   return;
  }
  // Only auto-run when there is something to search with.
@@ -733,6 +751,7 @@ async function restoreSearchSession() {
  if (!q) {
   if (Array.isArray(state.starred_results) && state.starred_results.length) {
    starredResults = state.starred_results;
+   hasStarredSection = state.starred_section ?? !!starredResults.length;
    showSearchResults();
   }
   return;
@@ -740,7 +759,12 @@ async function restoreSearchSession() {
  await doSearch({ fromRestore: true });
  if (Array.isArray(state.starred_results)) {
   starredResults = state.starred_results;
+  hasStarredSection = state.starred_section ?? !!starredResults.length;
+  if (state.filters?.display) Object.assign(displayFilterState, state.filters.display, {
+   sources: { ...(state.filters.display.sources || {}) },
+  });
   showSearchResults();
+  await saveSearchSession();
  }
 }
 
@@ -1299,9 +1323,12 @@ function syncSimpleResultChips() {
  if (sort) sort.textContent = `Sort: ${SIMPLE_SORT_LABELS[searchState.filters.sort_by] || 'Similarity'}`;
  const sources = document.getElementById('simple-sources-chip');
  if (sources) {
-  const all = new Set(lastResults.map((a) => a.source).filter(Boolean)).size;
+  const all = new Set(lastResults.concat(starredResults).map((a) => a.source).filter(Boolean)).size;
   const selected = Object.values(displayFilterState.sources).filter(Boolean).length;
-  sources.textContent = !selected ? 'Sources: All' : `Sources: ${selected} of ${all}`;
+  const databases = Object.keys(librarySourceCounts);
+  const scope = searchState.filters.source_filter.length;
+  sources.textContent = scope < databases.length ? `Sources: ${scope} of ${databases.length} databases`
+   : !selected ? 'Sources: All' : `Sources: ${selected} of ${all}`;
  }
  const types = document.getElementById('simple-type-chip');
  if (types) {
@@ -1345,19 +1372,33 @@ async function promptSimpleSort() {
 async function promptSimpleSources() {
  if (searchState.requestPending) return;
  const counts = {};
- lastResults.forEach((a) => { if (a.source) counts[a.source] = (counts[a.source] || 0) + 1; });
+ const primaryIds = new Set(lastResults.map((a) => `${a.source}\0${a.article_id}`));
+ lastResults.concat(starredResults.filter((a) => !primaryIds.has(`${a.source}\0${a.article_id}`)))
+  .forEach((a) => { if (a.source) counts[a.source] = (counts[a.source] || 0) + 1; });
  const ids = Object.keys(counts).sort((a, b) => getSourceName(a).localeCompare(getSourceName(b)));
+ const databases = Object.keys(librarySourceCounts).sort((a, b) => getSourceName(a).localeCompare(getSourceName(b)));
  const selected = ids.filter((id) => displayFilterState.sources[id]);
  const values = await openSiteForm({
-  title: 'Sources', message: 'Filter the current results by source.', confirmLabel: 'Apply',
-  fields: [{ id: 'sources', label: 'Include sources', type: 'multi-choice',
+  title: 'Sources', confirmLabel: 'Apply',
+  fields: [...(ids.length ? [{ id: 'sources', label: 'Show from these results', type: 'multi-choice',
    value: selected.length ? selected : ids,
-   options: ids.map((value) => ({ value, label: getSourceName(value), hint: `${counts[value]} paper${counts[value] === 1 ? '' : 's'}` })) }],
-  validate: (vals) => vals.sources.length ? null : 'Please select at least one source.',
+   options: ids.map((value) => ({ value, label: getSourceName(value), hint: `${counts[value]} paper${counts[value] === 1 ? '' : 's'}` })) }] : []),
+   ...(databases.length ? [{ id: 'databases', label: 'Search these databases', type: 'multi-choice',
+    value: searchState.filters.source_filter.slice(),
+    options: databases.map((value) => ({ value, label: getSourceName(value) })) }] : [])],
+  validate: (vals) => (ids.length && !vals.sources?.length) || (databases.length && !vals.databases?.length)
+   ? 'Please select at least one source in each section.' : null,
  });
  if (!values || searchState.requestPending) return;
  displayFilterState.sources = {};
- if (values.sources.length !== ids.length) values.sources.forEach((id) => { displayFilterState.sources[id] = true; });
+ if (values.sources && values.sources.length !== ids.length) values.sources.forEach((id) => { displayFilterState.sources[id] = true; });
+ const changed = values.databases && (values.databases.length !== searchState.filters.source_filter.length
+  || values.databases.some((id) => !searchState.filters.source_filter.includes(id)));
+ if (changed) {
+  searchState.filters.source_filter = values.databases.slice();
+  syncSearchFilterControls();
+  await replayCurrentSearch();
+ }
  showSearchResults();
  await saveSearchSession();
 }
@@ -1382,24 +1423,29 @@ async function promptSimpleTypes() {
  if (!values || searchState.requestPending) return;
  searchState.filters.work_type_filter = storedWorkTypeFilter(values.types);
  syncSearchFilterControls();
- if (!lastSearchParams) return;
- const replay = { skipOptions: true, replay: true };
- if (lastSearchParams.mode === 'starred') await doStarredSearch(replay);
- else if (lastSearchParams.mode === 'seed' && lastSearchParams.include_seed) {
-  await doMoreLikeThisPaper({ article_id: lastSearchParams.query_text }, replay);
- } else await doSearch(replay);
+ await replayCurrentSearch();
 }
 
 async function toggleFreeToRead() {
  if (searchState.requestPending) return;
  searchState.filters.free_to_read = !searchState.filters.free_to_read;
  syncSearchFilterControls();
+ await replayCurrentSearch();
+}
+
+async function replayCurrentSearch() {
  if (!lastSearchParams) return;
+ const hadRecommendations = hasStarredSection;
+ const selectedSources = { ...displayFilterState.sources };
  const replay = { skipOptions: true, replay: true };
  if (lastSearchParams.mode === 'starred') await doStarredSearch(replay);
  else if (lastSearchParams.mode === 'seed' && lastSearchParams.include_seed) {
   await doMoreLikeThisPaper({ article_id: lastSearchParams.query_text }, replay);
  } else await doSearch(replay);
+ if (hadRecommendations && lastSearchParams.mode !== 'starred') {
+  displayFilterState.sources = selectedSources;
+  await doStarredSearch(replay);
+ }
 }
 
 async function promptSimpleStarred() {
@@ -1516,6 +1562,7 @@ async function doSearch(opts) {
  lastSuccessfulSession = session;
  lastResults = results;
  starredResults = [];
+ hasStarredSection = false;
  showSearchResults(results);
  // Persist query + filters so a browser refresh restores this search.
  await saveSearchSession(method);
@@ -1544,6 +1591,8 @@ async function doStarredSearch(opts = {}) {
    work_type_filter: workTypeFilterForRequest(filters), free_to_read: freeToReadForRequest(filters),
   }});
   starredResults = data.results || [];
+  hasStarredSection = true;
+  if (!lastSuccessfulSession) lastSearchParams = { mode: 'starred' };
   showSearchResults();
   await saveSearchSession();
  } catch (e) {
@@ -1623,6 +1672,7 @@ async function doMoreLikeThisPaper(article, opts) {
  lastSuccessfulSession = session;
  lastResults = results;
  starredResults = [];
+ hasStarredSection = false;
  showSearchResults(results);
  // The button sits on a result far down the list; bring the "Starting from
  // this paper" banner and the re-ranked list into view (Looks polish).
@@ -2093,7 +2143,8 @@ function buildResultCard(article, idx) {
  const noteMark = card.querySelector('.result-mark-note');
  if (noteMark) noteMark.hidden = !noteField.value.trim();
  showNotification('Note saved.', 'success');
- showSearchResults();
+ const noteBtn = document.querySelector('[data-filter="noted"]');
+ if (noteBtn) noteBtn.hidden = !lastResults.concat(starredResults).some((a) => String(a.note || '').trim());
  void saveSearchSession();
  } catch (err) {
  saveBtn.textContent = prev;
@@ -2397,10 +2448,10 @@ function showSearchResults(fullList) {
  if (recentBtn) { recentBtn.hidden = recent === null; recentBtn.textContent = recent === null ? '' : `Since ${recent}`; }
  if (recent === null) displayFilterState.recent = false;
  const noteBtn = document.querySelector('[data-filter="noted"]');
- const hasNotes = lastResults.some((a) => String(a.note || '').trim());
+ const hasNotes = lastResults.concat(starredResults).some((a) => String(a.note || '').trim());
  if (noteBtn) noteBtn.hidden = !hasNotes;
  if (!hasNotes) displayFilterState.noted = false;
- if (bar) bar.hidden = !(hasHits || starredResults.length);
+ if (bar) bar.hidden = !(hasHits || starredResults.length || libraryStarredCount);
  syncDisplayFilterSourceChips();
  syncDisplayFilterChipState();
  syncSimpleResultChips();
@@ -2465,7 +2516,7 @@ function searchTileClearance() {
 }
 
 function syncDisplayFilterSourceChips() {
- const seen = new Set(lastResults.map((a) => a.source));
+ const seen = new Set(lastResults.concat(starredResults).map((a) => a.source));
  Object.keys(displayFilterState.sources).forEach((key) => {
   if (!seen.has(key)) delete displayFilterState.sources[key];
  });
@@ -2543,7 +2594,9 @@ function renderResults(results, extra = []) {
 
  const renderItem = (article, idx) => buildResultListItem(results, article, idx);
  if (typeof renderPaginatedList === 'function') {
- renderPaginatedList(container, results, renderItem, { noun: 'results' });
+ const primary = document.createElement('div');
+ container.appendChild(primary);
+ renderPaginatedList(primary, results, renderItem, { noun: 'results' });
  } else {
  results.forEach((article, idx) => container.appendChild(renderItem(article, idx)));
  }

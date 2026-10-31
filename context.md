@@ -1,7 +1,7 @@
 # context.md — LitSieve
 
 ## Current State
-- Search filter row (2026-10-30, `feat/search-filter-row`): full suite 2274 passed, Ruff clean, Pyright 0 errors with 6 optional-import warnings. Browser checks remain open.
+- Search filter row (2026-10-30, `fix-136-r1`): session restore, database scope, and recommendation filters corrected. Browser checks remain open.
 - Optional tag checkpoint and study-type backup (2026-10-30, `feat/laya-tag-model`): full suite 2275 passed, Ruff clean, Pyright 0 errors with 6 optional-import warnings. The backup is off by default. Its frozen 100-row probability fixture matches both modes exactly.
 - Tunnel maintenance (2026-10-26): host RPM `cloudflared-2026.10.4-1.fc44`
   was already installed. Restarted `cloudflared-litpilot-token.service` to
@@ -294,6 +294,6 @@ Guest User (is_guest) → sample corpus only; purged by age
   divider hairline.
 
 ## Session Handoff
-- **Date:** 2026-10-30. Branch `feat/search-filter-row` combines result filters and adds a separate starred recommendations section.
-- Sources filter current hits without a new search. Type and free-to-read still re-run the search. The date preset comes from the current hits.
-- The full suite passed 2274 tests. The focused tests passed after the final section assertion was added. Browser verification remains open. The T3 runtime prohibits preview tools for verifying this edit and does not permit switching browsers for that reason.
+- **Date:** 2026-10-30. Branch `fix-136-r1` fixes Search session restore, source scope, starred recommendations, zero-hit actions, and note focus for PR #136.
+- Sources offers both result filtering and database scope. Type, Free to read, and database scope replay the active search and its recommendations.
+- Browser verification remains open. The T3 runtime does not allow preview tools to verify this edit or a browser switch for that purpose.

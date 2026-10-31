@@ -17,6 +17,7 @@ and this project aims to follow Semantic Versioning for app version strings
   backup can tag papers when Laya gives no answer. It is off by default.
 
 ### Fixed
+- Search keeps recommendations across repeated reloads, applies filters to both sections, and exposes the database search scope in Sources. Saving a note keeps the open paper in place.
 - A listed URL is open only when a stored observation from that source,
   written by a fetch, says so. Rows with no stored observations stay
   "No open copy listed" until a later fetch. That includes papers that

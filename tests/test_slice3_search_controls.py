@@ -100,6 +100,7 @@ vm.runInContext(fs.readFileSync('static/js/search.js', 'utf8'), sandbox);
 vm.runInContext(`
 el('top-k').value = '10'; el('sort-by').value = 'similarity';
 el('lexical-boost').checked = true; el('nav-library-select').value = 'lib-a';
+const actualRenderResults = renderResults;
 let rendered = []; let renderedExtra = [];
 renderResults = (rows, extra = []) => { rendered = rows; renderedExtra = extra; };
 syncDisplayFilterSourceChips = () => {};
@@ -413,7 +414,7 @@ starredResults = []; await restoreSearchSession();
 assert.equal(starredResults.length, 2);
 displayFilterState.noted = true; displayFilterState.recent = true;
 lastResults = [{article_id: 'a', source: 'sample', year: '2020'}]; showSearchResults();
-assert.equal(displayFilterState.noted, false);
+assert.equal(displayFilterState.noted, true);
 assert.equal(displayFilterState.recent, false);
 await doSearch({skipOptions: true}); assert.equal(starredResults.length, 0);
 """)
@@ -431,4 +432,146 @@ assert.equal(visibleExportResults()[0].article_id, 'seed');
 starredResults = []; const before = requests.length; await restoreSearchSession();
 assert.equal(requests.length, before);
 assert.equal(visibleExportResults()[0].article_id, 'seed');
+""")
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="Node.js not installed")
+def test_recommendations_survive_two_primary_reloads():
+    run_search_js(r"""
+await applyAvailableSources(); refreshStarredCount(1);
+el('query-text').value = 'question'; await doSearch({skipOptions: true});
+setHits([{article_id: 'recommendation', source: 'pubmed'}]); await doStarredSearch();
+setHits([{article_id: 'primary', source: 'sample'}]);
+await restoreSearchSession(); await restoreSearchSession();
+assert.equal(readSearchSession().starred_results[0].article_id, 'recommendation');
+assert.equal(renderedExtra[0].article_id, 'recommendation');
+""")
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="Node.js not installed")
+def test_source_scope_is_visible_and_change_replays_search():
+    run_search_js(r"""
+await applyAvailableSources(); el('query-text').value = 'question';
+searchState.filters.source_filter = ['pubmed']; syncSearchFilterControls();
+await doSearch({skipOptions: true});
+assert.notEqual(el('simple-sources-chip').textContent, 'Sources: All');
+openSiteForm = async (form) => {
+ assert.equal(form.fields[0].label, 'Show from these results');
+ assert.equal(form.fields[1].label, 'Search these databases');
+ assert.deepEqual([...form.fields[1].value], ['pubmed']);
+ return {sources: form.fields[0].value, databases: ['sample', 'pubmed', 'arxiv']};
+};
+await promptSimpleSources();
+assert.deepEqual([...requests.at(-1).body.source_filter].sort(), ['arxiv', 'pubmed', 'sample']);
+""")
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="Node.js not installed")
+def test_standalone_recommendations_replay_type_and_free_filters():
+    run_search_js(r"""
+setStats({sources: {pubmed: 2}, starred: 1, work_type_counts: {'journal-article': 1, book: 1}});
+await applyAvailableSources(); refreshStarredCount(1);
+setHits([{article_id: 'closed', source: 'pubmed'}]); await doStarredSearch();
+await restoreSearchSession();
+setHits([{article_id: 'open', source: 'pubmed'}]); await toggleFreeToRead();
+assert.equal(requests.at(-1).path, '/api/search/starred');
+assert.equal(requests.at(-1).body.free_to_read, true);
+assert.deepEqual([...visibleExportResults().map((a) => a.article_id)], ['open']);
+openSiteForm = async () => ({types: ['journal-article']});
+await promptSimpleTypes();
+assert.deepEqual([...requests.at(-1).body.work_type_filter], ['journal-article']);
+""")
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="Node.js not installed")
+def test_recommendation_sources_filter_both_sections_and_standalone():
+    run_search_js(r"""
+await applyAvailableSources(); refreshStarredCount(1);
+el('query-text').value = 'question'; setHits([{article_id:'a', source:'sample'}]); await doSearch({skipOptions:true});
+setHits([{article_id:'b', source:'pubmed'}]); await doStarredSearch();
+openSiteForm = async (form) => {
+ assert.deepEqual([...form.fields[0].options.map((o) => o.value)], ['pubmed', 'sample']);
+ return {sources: ['pubmed'], databases: form.fields[1].value};
+};
+await promptSimpleSources();
+assert.deepEqual([...visibleExportResults().map((a) => a.article_id)], ['b']);
+lastResults = []; showSearchResults();
+openSiteForm = async (form) => ({sources: ['pubmed'], databases: form.fields[1].value});
+await promptSimpleSources();
+assert.equal(visibleExportResults()[0].article_id, 'b');
+""")
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="Node.js not installed")
+def test_zero_hits_keep_starred_action_reachable():
+    run_search_js(r"""
+await applyAvailableSources(); refreshStarredCount(1); setHits([]);
+el('query-text').value = 'question'; await doSearch({skipOptions:true});
+assert.equal(el('display-filters').hidden, false);
+assert.equal(el('simple-starred-chip').hidden, false);
+""")
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="Node.js not installed")
+def test_legacy_starred_session_without_stars_is_cleared():
+    run_search_js(r"""
+await applyAvailableSources(); refreshStarredCount(0);
+sessionStorage.setItem(SEARCH_SESSION_KEY, JSON.stringify({v:1, mode:'starred', library_id:'lib-a'}));
+await restoreSearchSession();
+assert.equal(readSearchSession(), null);
+assert.equal(el('results-section').style.display, 'block');
+assert.equal(requests.length, 0);
+""")
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="Node.js not installed")
+def test_saving_note_keeps_the_open_card_and_focus():
+    run_search_js(r"""
+const article = {article_id:'a', source:'pubmed', title:'Paper'};
+lastResults = [article];
+const card = buildResultCard(article, 0);
+const field = card.querySelector('.note-field'); const button = card.querySelector('.note-save');
+field.value = 'My note';
+let rerendered = false; showSearchResults = () => { rerendered = true; };
+await button.listeners.click({preventDefault() {}});
+assert.equal(article.note, 'My note');
+assert.equal(rerendered, false);
+assert.equal(button.textContent, 'Saved');
+""")
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="Node.js not installed")
+def test_empty_recommendation_section_replays_when_filter_is_removed():
+    run_search_js(r"""
+await applyAvailableSources(); refreshStarredCount(1);
+el('query-text').value = 'question'; await doSearch({skipOptions:true});
+setHits([]); await doStarredSearch(); await restoreSearchSession();
+const before = requests.length; setHits([{article_id:'open', source:'pubmed'}]);
+await toggleFreeToRead();
+assert.equal(requests.length, before + 2);
+assert.equal(requests.at(-1).path, '/api/search/starred');
+assert.equal(starredResults[0].article_id, 'open');
+""")
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="Node.js not installed")
+def test_later_primary_pages_stay_above_recommendations():
+    run_search_js(r"""
+const list = el('results-list'); list.items = []; list.appendChild = (child) => list.items.push(child);
+document.createElement = () => {
+ const node = new Element(); node.items = []; node.appendChild = (child) => node.items.push(child);
+ return node;
+};
+buildResultListItem = (rows, article) => article;
+resultsUseReaderPanel = () => true;
+let addNextPage;
+renderPaginatedList = (parent, rows, render) => {
+ parent.appendChild(render(rows[0], 0));
+ addNextPage = () => parent.appendChild(render(rows[1], 1));
+};
+actualRenderResults([{article_id:'first'}, {article_id:'later'}], [{article_id:'recommendation'}]);
+addNextPage();
+assert.deepEqual([...list.items[0].items.map((a) => a.article_id)], ['first', 'later']);
+assert.equal(list.items[1].textContent, 'More like your starred papers');
+assert.equal(list.items[2].article_id, 'recommendation');
 """)
