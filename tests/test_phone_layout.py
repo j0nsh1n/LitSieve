@@ -95,10 +95,12 @@ def test_phone_compact_rows_have_thumb_sized_open_button():
     assert venue and "text-overflow: ellipsis" in venue.group(1)
 
 
-def test_phone_tools_strip_stays_on_one_row():
+def test_phone_tools_strip_wraps_instead_of_cutting_text():
     phone = _block(PHONE, "max-width: 640px")
     strip = re.search(r'\.simple-tools-strip,\s*\.simple-screen-dock \{([^}]+)\}', phone)
-    assert strip and "flex-wrap: nowrap" in strip.group(1)
+    assert strip and "flex-wrap: wrap" in strip.group(1)
+    count = re.search(r'\.simple-tools-count \{([^}]+)\}', phone)
+    assert count and "text-overflow" not in count.group(1)
     narrow = re.search(r'\.simple-screen-dock #simple-screen-open-btn \{([^}]+)\}', phone)
     assert narrow and "width: auto" in narrow.group(1)
 

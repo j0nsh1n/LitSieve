@@ -9,6 +9,9 @@ and this project aims to follow Semantic Versioning for app version strings
 ## [Unreleased]
 
 ### Changed
+- Search keeps Star and Not relevant on closed results, and the row toggle now says Details so it cannot be read as opening the paper.
+- On phones, Search has a one-row bottom bar and a tighter search area, so the first result's title shows without scrolling. Text in the tools strip wraps instead of being cut off.
+- On phones, the "what would be set aside" preview shows the list first and opens a paper when you tap it.
 - Search puts result filters in one row. Sources filter current hits and show counts. Date and note filters appear when useful.
 - More like your starred papers adds a separate section below the current results. The section is included in visible-results exports and session restore.
 
@@ -18,6 +21,8 @@ and this project aims to follow Semantic Versioning for app version strings
   backup can tag papers when Laya gives no answer. It is off by default.
 
 ### Fixed
+- Loading sample papers now offers Prepare papers straight away, and the page updates without a reload.
+- The Type filter is hidden when a library has no stored paper types.
 - Search restores the Columns and Index card layouts. Clearing the last note also clears the note filter and keeps the open paper in place.
 - Search keeps recommendations across repeated reloads, applies filters to both sections, and exposes the database search scope in Sources. Saving a note keeps the open paper in place.
 - A listed URL is open only when a stored observation from that source,

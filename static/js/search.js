@@ -1333,6 +1333,7 @@ function syncSimpleResultChips() {
  const types = document.getElementById('simple-type-chip');
  if (types) {
   const all = availableWorkTypeIds().length;
+  types.hidden = !availableWorkTypeIds().some((id) => id !== 'not-stored');
   const selected = searchState.filters.work_type_filter.length;
   types.textContent = (!selected || selected === all) ? 'Type: All' : `Type: ${selected} of ${all}`;
  }
@@ -1838,7 +1839,7 @@ function setResultRowOpen(card, open) {
  const toggle = card.querySelector('.result-toggle');
  if (toggle) {
   toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-  toggle.textContent = open ? 'Close' : 'Open';
+  toggle.textContent = open ? 'Close' : 'Details';
  }
  // The reading column opens a paper straight to its whole abstract.
  if (open && document.documentElement.getAttribute('data-layout') === 'reading') {
@@ -2006,7 +2007,7 @@ function buildResultCard(article, idx) {
   card.innerHTML = `
   <div class="result-row-main">
   ${headHtml}
-  <button type="button" class="result-toggle" aria-expanded="false" aria-controls="result-body-${idx}">Open</button>
+  <button type="button" class="result-toggle" aria-expanded="false" aria-controls="result-body-${idx}">Details</button>
   <div class="article-body result-row-body" id="result-body-${idx}">
   ${keyPointsHtml}
   <details class="result-abstract">

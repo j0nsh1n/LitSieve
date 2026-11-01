@@ -184,6 +184,8 @@ document.addEventListener('DOMContentLoaded', () => {
  if (unlockBtn) {
   unlockBtn.addEventListener('click', unlockSimpleFetch);
  }
+ const samplePrepareBtn = document.getElementById('simple-prepare-papers-btn');
+ if (samplePrepareBtn) samplePrepareBtn.addEventListener('click', doCreateEmbeddings);
  const embeddingsBtn = document.getElementById('embeddings-btn');
  if (embeddingsBtn) embeddingsBtn.addEventListener('click', doCreateEmbeddings);
  const coverageBtn = document.getElementById('coverage-refresh');
@@ -743,10 +745,13 @@ function updateSimpleFetchLock() {
   if (lock && msg) {
    const n = Number(_lastTotalArticles) || 0;
    const nLabel = n === 1 ? '1 paper' : `${n} papers`;
-   msg.textContent =
-    `This collection already has ${nLabel}. Fetching again can replace them or mix in a new search. Use Re-prepare if you only need to get them ready for search again.`;
+   msg.textContent = _lastReadyArticles < _lastTotalArticles
+    ? `This collection has ${nLabel}. Prepare them to get them ready for search.`
+    : `This collection already has ${nLabel}. Fetching again can replace them or mix in a new search. Use Re-prepare if you only need to get them ready for search again.`;
   }
  }
+ const prepareBtn = document.getElementById('simple-prepare-papers-btn');
+ if (prepareBtn) prepareBtn.hidden = !lock || _lastReadyArticles >= _lastTotalArticles;
  if (heading) {
   heading.textContent = lock ? '2. Your papers' : '2. Find articles on your topic';
  }
@@ -895,10 +900,11 @@ async function loadSampleCorpus(clearFirst) {
  body: withPageLibrary({ clear_first: !!clearFirst }),
  });
  showNotification(
- `Loaded ${data.inserted || data.loaded || 0} sample papers. Use Re-prepare Papers when you are ready.`,
+ `Loaded ${data.inserted || data.loaded || 0} sample papers. Prepare them when you are ready.`,
  'success'
  );
  await loadPageData();
+ await refreshSimpleScreeningCard();
  // Samples have no embeddings yet; reveal the optional prepare card so Re-prepare is available.
  updatePrepareSectionVisibility(_lastTotalArticles, { forceShow: true });
  refreshCoverage();
@@ -906,7 +912,7 @@ async function loadSampleCorpus(clearFirst) {
  applyModelRecommendation();
  setStatus(
  'embeddings-status',
- 'Sample papers loaded. Choose a model if needed, then press Re-prepare Papers.',
+ 'Sample papers loaded. Select Prepare papers to continue.',
  'info'
  );
  } catch (e) {
