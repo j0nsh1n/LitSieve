@@ -707,7 +707,7 @@ def test_narrow_it_down_type_copy_and_optional_checkbox():
     assert "_simpleScreenAlsoTypesOn()" in merge
     assert "_simpleTriageKeptKeys.has(key)" in merge
     page = _read("templates", "search.html")
-    assert 'src="/static/js/simple_tools.js?v=20261029c"' in page
+    assert 'src="/static/js/simple_tools.js?v=20261031b"' in page
 
 
 def test_simple_screen_confirm_question_box_after_prepare():

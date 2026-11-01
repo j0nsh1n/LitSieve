@@ -1642,7 +1642,7 @@ function renderScreenTriageDetail() {
  }
 }
 
-function selectScreenTriagePaper(key, moveFocus) {
+function selectScreenTriagePaper(key, moveFocus, keepDetail) {
  const order = _screenTriageOrder();
  if (!order.length) {
   _simpleTriageKey = '';
@@ -1655,7 +1655,7 @@ function selectScreenTriagePaper(key, moveFocus) {
  }
  _simpleTriageKey = next;
  const detail = document.getElementById('screen-triage-detail');
- if (detail) detail.classList.add('is-open');
+ if (detail && !keepDetail) detail.classList.add('is-open');
  renderScreenTriage();
  if (moveFocus) {
  const row = _screenTriageRowEl(_simpleTriageKey);
@@ -1679,7 +1679,7 @@ function moveScreenTriagePaper(dest) {
   _simpleTriageAsideKeys.delete(key);
  }
  _simpleScreenCandidates = _simpleTriageGo.slice();
- selectScreenTriagePaper(key, false);
+ selectScreenTriagePaper(key, false, true);
 }
 
 function stepScreenTriage(delta) {
@@ -1702,7 +1702,7 @@ function openSimpleScreenTriage() {
  const first = _simpleTriageGo[0] || _simpleTriageStay[0];
  _simpleTriageKey = first ? _screenPaperKey(first) : '';
  const detail = document.getElementById('screen-triage-detail');
- if (detail && _simpleTriageKey) detail.classList.add('is-open');
+ if (detail) detail.classList.toggle('is-open', !!_simpleTriageKey && !window.matchMedia('(max-width: 900px)').matches);
  renderScreenTriage();
  if (_simpleTriageKeyHandler) {
   document.removeEventListener('keydown', _simpleTriageKeyHandler, true);
